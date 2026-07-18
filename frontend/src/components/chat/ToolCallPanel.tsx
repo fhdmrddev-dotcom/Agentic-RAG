@@ -113,7 +113,7 @@ function ToolArgsBlock({ tc }: { tc: ToolCall }) {
     <div className="mt-1.5 ml-8">
       <button
         onClick={() => setOpen(v => !v)}
-        className="flex items-center gap-1 text-[10px] text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+        className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-muted-foreground transition-colors"
       >
         <Code2 className="w-2.5 h-2.5" />
         <span>{open ? "Hide" : "Show"} parameters</span>
@@ -223,7 +223,7 @@ function ToolResultBlock({ tc, defaultOpen = false }: { tc: ToolCall; defaultOpe
       ) : (
         <button
           onClick={() => setOpen((v) => !v)}
-          className="flex items-center gap-1.5 text-[11px] text-muted-foreground/60 hover:text-foreground transition-colors"
+          className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
         >
           {open
             ? <ChevronDown className="w-3 h-3" />
@@ -392,7 +392,7 @@ function ToolEssenceLine({
         ) : (
           <>
             <span className="font-semibold text-foreground/80">{toolLabel(tc.name)}</span>
-            <span className="mx-1 text-muted-foreground/50">→</span>
+            <span className="mx-1 text-muted-foreground">→</span>
             <span className="text-muted-foreground">{result}</span>
           </>
         )}
@@ -467,7 +467,7 @@ function StepRow({
           className={cn(
             "mt-1 font-mono text-[10px] tabular-nums leading-none",
             node === "active" ? "text-primary font-bold" : "text-success/80",
-            node === "queued" && "text-muted-foreground/50",
+            node === "queued" && "text-muted-foreground",
           )}
         >
           {snum}
@@ -709,7 +709,7 @@ export function ToolCallPanel({ toolCalls, activatedSkills }: Props) {
                         (tc.iteration); after D-04, "Step" means exactly one
                         visible action (the rail snum / unifiedStepCount), so
                         the round divider is relabeled to free that word. */}
-                    <span className="text-[10px] font-semibold text-muted-foreground/70 tracking-wider uppercase">
+                    <span className="text-[10px] font-semibold text-muted-foreground tracking-wider uppercase">
                       Round {tc.iteration + 1}
                     </span>
                     <div className="flex-1 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
@@ -730,7 +730,7 @@ export function ToolCallPanel({ toolCalls, activatedSkills }: Props) {
                     onClick={() => collapseStep(stepKey)}
                     data-testid="step-recollapse"
                     aria-label="Hide this step"
-                    className="mb-1 flex items-center gap-1 text-[10px] text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+                    className="mb-1 flex items-center gap-1 text-[10px] text-muted-foreground hover:text-muted-foreground transition-colors"
                   >
                     <ChevronUp className="w-3 h-3" />
                     <span>Hide</span>
@@ -750,7 +750,7 @@ export function ToolCallPanel({ toolCalls, activatedSkills }: Props) {
                         rest — a silent sub-agent model downgrade is a trust
                         signal, not a detail to hide behind a click. */}
                     {tc.sub_agent_model && (
-                      <div className="ml-8 mt-1 text-[10px] text-muted-foreground/70 italic font-mono">
+                      <div className="ml-8 mt-1 text-[10px] text-muted-foreground italic font-mono">
                         Sub-agent: {tc.sub_agent_model}
                       </div>
                     )}
@@ -865,7 +865,7 @@ export function ToolCallPanel({ toolCalls, activatedSkills }: Props) {
                         analyze_document branch — extends naturally when
                         more sub-agent tools land). */}
                     {tc.sub_agent_model && (
-                      <div className="ml-8 mt-1 text-[10px] text-muted-foreground/70 italic font-mono">
+                      <div className="ml-8 mt-1 text-[10px] text-muted-foreground italic font-mono">
                         Sub-agent: {tc.sub_agent_model}
                       </div>
                     )}

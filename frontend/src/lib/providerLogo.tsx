@@ -3,13 +3,17 @@
  *
  * This is the G-5 micro-extraction: both `RunCard.tsx` and `ToolCallPanel.tsx`
  * import from here (Plan 04) instead of each growing a private copy of the
- * provider→logo map or the preparing-description parse. Two exports:
+ * provider→logo map or the preparing-description parse. Three exports:
  *
  *   1. `providerLogo(provider)` — maps the resolved `message.provider` string
  *      (CTC-01) to an `@lobehub/icons` brand mark, or `null` for unmapped keys
  *      so the caller renders its existing `Bot` fallback (D-08).
  *   2. `preparingDescription(tc)` — extracts a tool's `description` during the
  *      `preparing` window from the partial-JSON `tc.argsCodeText` (TDP-02).
+ *   3. `modelLogo(modelId)` — maps a model id to its OWN `@lobehub` model-family
+ *      mark (Claude sunburst, Gemini star, Kimi, …) for the model PICKER (the
+ *      composer + Settings), or `null` so the caller falls back to `providerLogo`
+ *      then its generic `Cpu` glyph. Same antd-free leaf-import invariant.
  *
  * SECURITY:
  *   - `provider` is the already-resolved `runs.provider` value (`config.py`
@@ -48,6 +52,19 @@ import MinimaxColor from "@lobehub/icons/es/Minimax/components/Color"
 import OpenRouter from "@lobehub/icons/es/OpenRouter/components/Mono"
 import Ollama from "@lobehub/icons/es/Ollama/components/Mono"
 import LmStudio from "@lobehub/icons/es/LmStudio/components/Mono"
+// Model-FAMILY marks for `modelLogo` (the model picker). Same deep-leaf pattern as
+// the provider marks above (antd-free — verified: each `components/{Color,Mono}`
+// leaf imports only react + jsx-runtime + local style/useFillId). These are the
+// model's own brand (Claude's sunburst, Gemini's star, …), distinct from the
+// provider mark; `.Color` where the brand ships a gradient, `.Mono` for Grok.
+import Claude from "@lobehub/icons/es/Claude/components/Color"
+import Gemma from "@lobehub/icons/es/Gemma/components/Color"
+import Kimi from "@lobehub/icons/es/Kimi/components/Color"
+import ChatGLM from "@lobehub/icons/es/ChatGLM/components/Color"
+import Meta from "@lobehub/icons/es/Meta/components/Color"
+import Mistral from "@lobehub/icons/es/Mistral/components/Color"
+import Qwen from "@lobehub/icons/es/Qwen/components/Color"
+import Grok from "@lobehub/icons/es/Grok/components/Mono"
 
 /** An `@lobehub/icons` brand mark — a React component accepting a `size` prop. */
 type ProviderMark = ComponentType<{ size?: number }>
@@ -89,6 +106,59 @@ const MARKS: Record<string, ProviderMark> = {
 export function providerLogo(provider: string | undefined): ProviderMark | null {
   // The `?? null` mirrors fileIcon's `?? DEFAULT_SPEC` — total over any key.
   return provider ? (MARKS[provider] ?? null) : null
+}
+
+/**
+ * The model-family → mark table for the model PICKER (composer + Settings). Each
+ * entry is `[substring, mark]`; the FIRST whose substring appears in the
+ * lowercased model id wins, so the order is most-specific-first. Unlike
+ * `providerLogo` (keyed on the resolved provider), this reads the model id itself,
+ * so a model keeps its OWN brand mark regardless of who serves it — an OpenRouter
+ * provider hosting Llama / DeepSeek / Gemma surfaces three different marks, and
+ * Claude's sunburst / Gemini's star (distinct from the Anthropic / Google provider
+ * marks) surface on the model line.
+ *
+ * Keys are model-FAMILY names, NOT provider ids: `kimi`/`moonshot` → Kimi,
+ * `glm`/`chatglm` → ChatGLM, `minimax`/`abab` → MiniMax, `gpt` → the OpenAI mark
+ * (there is no distinct GPT art). `gemma` precedes `gemini` and `mixtral` precedes
+ * `mistral` for readability only — the families don't overlap as substrings. Marks
+ * reuse the same antd-free leaf imports as `MARKS` (`GeminiColor`/`DeepSeekColor`/
+ * `MinimaxColor`/`OpenAI` are shared). Provider is NOT unwrapped from the id — a
+ * bare `openrouter` selection with an opaque id simply falls through to null.
+ */
+const MODEL_MARKS: ReadonlyArray<readonly [string, ProviderMark]> = [
+  ["claude", Claude],
+  ["gemma", Gemma],
+  ["gemini", GeminiColor],
+  ["deepseek", DeepSeekColor],
+  ["kimi", Kimi],
+  ["moonshot", Kimi],
+  ["chatglm", ChatGLM],
+  ["glm", ChatGLM],
+  ["minimax", MinimaxColor],
+  ["abab", MinimaxColor],
+  ["grok", Grok],
+  ["mixtral", Mistral],
+  ["mistral", Mistral],
+  ["qwen", Qwen],
+  ["llama", Meta],
+  ["gpt", OpenAI],
+]
+
+/**
+ * Resolve a model's OWN `@lobehub` brand mark for the model picker.
+ *
+ * @param modelId the model id (e.g. "claude-opus-4-7", "google/gemma-4-31b-it:free")
+ * @returns the mark component, or `null` when no family matches so the caller
+ *   falls back to `providerLogo(provider)`, then its generic `Cpu` glyph.
+ */
+export function modelLogo(modelId: string | undefined): ProviderMark | null {
+  if (!modelId) return null
+  const id = modelId.toLowerCase()
+  for (const [needle, mark] of MODEL_MARKS) {
+    if (id.includes(needle)) return mark
+  }
+  return null
 }
 
 /** First complete `"description":"…"` key in a JSON string (escapes tolerated). */

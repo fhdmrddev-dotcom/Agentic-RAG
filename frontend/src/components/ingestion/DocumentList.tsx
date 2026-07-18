@@ -223,6 +223,9 @@ function ClassificationRowChip({ doc, onRefresh }: { doc: Document; onRefresh: (
     <span
       className="inline-flex items-center gap-1"
       // The chip's controls are NOT the filename-open affordance — stop row clicks.
+      // Phase 155 (A11Y-01): role="presentation" — this wrapper is a pure layout +
+      // click-propagation guard, not itself an interactive control (its buttons are).
+      role="presentation"
       onClick={(e) => e.stopPropagation()}
     >
       <span className="inline-flex items-center gap-1 rounded-full bg-[hsl(var(--warning)/0.15)] px-2 py-0.5 text-[11px] font-semibold text-[hsl(var(--warning))] whitespace-nowrap">
@@ -382,7 +385,12 @@ export function DocumentList({ documents, onDelete, onRefresh, folderId, current
                       <button
                         type="button"
                         onClick={() => onSelect?.(doc.id)}
-                        aria-pressed={selectedDocId === doc.id}
+                        // WR-02: this opens the detail panel — it is NOT a toggle
+                        // (re-clicking does not un-select), so aria-pressed misleads
+                        // screen readers into announcing togglable "pressed" state.
+                        // aria-current marks the currently-open item instead (the
+                        // codebase convention, cf. NavPanel's aria-current).
+                        aria-current={selectedDocId === doc.id ? "true" : undefined}
                         className="flex items-center gap-1.5 flex-wrap text-left truncate hover:text-primary transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-primary/40 rounded-sm"
                       >
                         {doc.filename}
@@ -423,11 +431,12 @@ export function DocumentList({ documents, onDelete, onRefresh, folderId, current
                             onClick={() => handleReingest(doc.id)}
                             disabled={reingestingId === doc.id || doc.status === "pending" || doc.status === "processing"}
                             className="h-7 w-7 p-0 text-muted-foreground hover:text-primary"
+                            aria-label="Re-ingest document"
                           >
                             {reingestingId === doc.id ? (
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
                             ) : (
-                              <RefreshCw className="h-3.5 w-3.5" />
+                              <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
                             )}
                           </Button>
                         </TooltipTrigger>
@@ -440,8 +449,9 @@ export function DocumentList({ documents, onDelete, onRefresh, folderId, current
                             size="sm"
                             onClick={() => setMoveTarget(doc)}
                             className="h-7 w-7 p-0 text-muted-foreground hover:text-primary"
+                            aria-label="Move to folder"
                           >
-                            <FolderInput className="h-3.5 w-3.5" />
+                            <FolderInput className="h-3.5 w-3.5" aria-hidden="true" />
                           </Button>
                         </TooltipTrigger>
                         <TooltipContent>Move to folder</TooltipContent>
@@ -453,8 +463,9 @@ export function DocumentList({ documents, onDelete, onRefresh, folderId, current
                             size="sm"
                             onClick={() => setDeleteTarget(doc)}
                             className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
+                            aria-label="Delete document"
                           >
-                            <Trash2 className="h-3.5 w-3.5" />
+                            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                           </Button>
                         </TooltipTrigger>
                         <TooltipContent>Delete document</TooltipContent>

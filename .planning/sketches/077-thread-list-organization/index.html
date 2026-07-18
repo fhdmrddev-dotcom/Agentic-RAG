@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sketch 077 · Thread-List Organization</title>
+<link rel="stylesheet" href="../themes/default.css">
+<style>
+  #stage { max-width: none; margin: 0 auto; padding: 26px; transition: max-width var(--dur-base) var(--ease-out); }
+  .frame-caption { margin-bottom: 12px; padding: 0 2px; }
+  .fc-note { font-size: var(--text-sm); color: var(--color-text-muted); }
+  .fc-note b { color: var(--color-text); font-weight: 600; }
+
+  .app-frame { display: flex; height: 660px; border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow-lg); background: var(--color-bg); }
+
+  /* ── Nav panel (expanded — carries Sketch 076 winner B: New Chat + Search) ── */
+  .nav-panel { position: relative; width: 288px; flex-shrink: 0; display: flex; flex-direction: column;
+    background: var(--color-bg-elev1); border-right: 1px solid var(--color-border);
+    transition: width var(--dur-slow) var(--ease-out); overflow: visible; }
+  .nav-panel.collapsed { width: 64px; }
+  .np-toggle { position: absolute; top: 15px; z-index: 20; width: 32px; height: 32px; display: grid; place-items: center;
+    border: 0; border-radius: var(--radius-md); background: transparent; color: var(--color-text-muted);
+    cursor: pointer; transition: all var(--dur-base) var(--ease-out); right: 12px; }
+  .nav-panel.collapsed .np-toggle { right: auto; left: 16px; }
+  .np-toggle:hover { background: var(--color-accent); color: var(--color-text); }
+  .np-toggle .tg-open { display: none; }
+  .nav-panel.collapsed .np-toggle .tg-close { display: none; }
+  .nav-panel.collapsed .np-toggle .tg-open { display: block; }
+
+  .np-header { height: 64px; display: flex; align-items: center; gap: 10px; padding: 0 16px; flex-shrink: 0; }
+  .np-logo { width: 32px; height: 32px; border-radius: var(--radius-md); display: grid; place-items: center;
+    background: linear-gradient(135deg, var(--color-primary-strong), var(--color-accent-violet));
+    box-shadow: 0 2px 10px hsl(239 84% 67% / 0.35); flex-shrink: 0; }
+  .np-logo svg { width: 17px; height: 17px; color: #fff; }
+  .np-wordmark { font-family: var(--font-headline); font-weight: 600; font-size: 15px; letter-spacing: -0.01em; color: var(--color-text); white-space: nowrap; }
+
+  .np-nav { padding: 4px 0 6px; display: flex; flex-direction: column; gap: 2px; }
+  .np-item { position: relative; display: flex; align-items: center; gap: 12px; height: 40px; margin: 0 12px; padding: 0 10px;
+    border: 0; border-radius: var(--radius-md); background: transparent; color: var(--color-text-muted); cursor: pointer;
+    font-family: inherit; font-size: var(--text-sm); transition: background var(--dur-fast), color var(--dur-fast); }
+  .np-item:hover { background: var(--color-accent); color: var(--color-text); }
+  .np-item.active { background: var(--color-primary-dim); color: var(--color-primary); font-weight: 500; }
+  .np-item svg { width: 19px; height: 19px; flex-shrink: 0; }
+  .nav-panel.collapsed .np-item { margin: 0 auto; width: 40px; padding: 0; justify-content: center; }
+
+  .np-actions { margin: 8px 0; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px;
+    border-top: 1px solid var(--color-border-soft); border-bottom: 1px solid var(--color-border-soft); }
+  .np-newchat { position: relative; display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 12px;
+    border: 1px solid var(--color-primary-glow); border-radius: var(--radius-md); background: var(--color-primary-dim);
+    color: var(--color-primary); font-weight: 600; font-size: var(--text-sm); font-family: inherit; cursor: pointer; transition: all var(--dur-fast); }
+  .np-newchat:hover { background: hsl(239 100% 82% / 0.22); box-shadow: var(--shadow-glow-primary); }
+  .np-newchat svg { width: 17px; height: 17px; }
+  .nav-panel.collapsed .np-newchat { width: 40px; margin: 0 auto; padding: 0; justify-content: center; }
+
+  .np-search-input { display: flex; align-items: center; gap: 8px; height: 38px; padding: 0 10px;
+    border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); transition: border-color var(--dur-fast); }
+  .np-search-input:focus-within { border-color: var(--color-primary-glow); box-shadow: 0 0 0 3px var(--color-primary-dim); }
+  .np-search-input svg { width: 15px; height: 15px; color: var(--color-text-dim); flex-shrink: 0; }
+  .np-search-input input { flex: 1; min-width: 0; border: 0; background: transparent; outline: none; color: var(--color-text); font-family: inherit; font-size: var(--text-sm); }
+  .np-search-input input::placeholder { color: var(--color-text-dim); }
+  .np-search-clear { border: 0; background: transparent; color: var(--color-text-dim); cursor: pointer; font-size: 14px; padding: 0 2px; display: none; }
+  .np-search-input.has-q .np-search-clear { display: block; }
+  .np-rail-btn { position: relative; width: 40px; height: 40px; margin: 0 auto; display: flex; align-items: center; justify-content: center;
+    border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); color: var(--color-text-muted); cursor: pointer; }
+  .only-collapsed { display: none !important; }
+  .nav-panel.collapsed .only-collapsed { display: flex !important; }
+  .nav-panel.collapsed .only-expanded { display: none !important; }
+
+  /* Group-by toggle (variant C) */
+  .group-toggle { display: flex; align-items: center; justify-content: space-between; padding: 8px 4px 6px; }
+  .group-toggle > span { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-text-dim); }
+  .gt-seg { display: inline-flex; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-full); padding: 2px; }
+  .gt-btn { border: 0; background: transparent; color: var(--color-text-muted); cursor: pointer; font-family: inherit; font-size: 11px; font-weight: 600; padding: 4px 12px; border-radius: var(--radius-full); transition: all var(--dur-fast); }
+  .gt-btn:hover { color: var(--color-text); }
+  .gt-btn.active { background: var(--color-primary-dim); color: var(--color-primary); }
+
+  /* Threads */
+  .np-threads { flex: 1; overflow-y: auto; padding: 4px 12px 12px; }
+  .nav-panel.collapsed .np-threads { opacity: 0; pointer-events: none; }
+  .th-head { display: flex; align-items: center; justify-content: space-between; padding: 4px 4px 2px; }
+  .th-head > span:first-child { font-size: 10px; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; color: var(--color-text-muted); }
+  .th-count { font-size: 10px; font-family: var(--font-mono); color: var(--color-text-dim); background: var(--color-muted); padding: 1px 7px; border-radius: var(--radius-full); }
+
+  /* Group */
+  .grp { margin-bottom: 2px; }
+  .grp-head { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 7px;
+    padding: 10px 8px 6px; font-size: 10px; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase;
+    color: var(--color-text-dim); background: linear-gradient(var(--color-bg-elev1) 72%, transparent);
+    border: 0; width: 100%; text-align: left; font-family: inherit; }
+  button.grp-head { cursor: pointer; transition: color var(--dur-fast); }
+  button.grp-head:hover { color: var(--color-text-muted); }
+  .grp-head .gh-chev { width: 13px; height: 13px; transition: transform var(--dur-fast) var(--ease-out); color: var(--color-text-dim); }
+  .grp.collapsed .gh-chev { transform: rotate(-90deg); }
+  .grp-head .gh-fi { width: 13px; height: 13px; color: var(--color-primary); opacity: 0.7; }
+  .grp-head .gh-name { flex: 1; }
+  .grp-count { font-family: var(--font-mono); font-size: 10px; color: var(--color-text-dim); background: var(--color-muted); padding: 0 6px; border-radius: var(--radius-full); letter-spacing: 0; }
+  .grp-body { display: flex; flex-direction: column; gap: 1px; overflow: hidden; }
+  .grp.collapsed .grp-body { display: none; }
+
+  .th-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; text-align: left;
+    padding: 8px 10px; border: 0; border-radius: var(--radius-md); background: transparent; cursor: pointer;
+    color: var(--color-text-muted); font-family: inherit; transition: all var(--dur-fast); width: 100%; }
+  .th-row:hover { background: var(--color-accent); color: var(--color-text); }
+  .th-row.active { background: var(--color-primary-dim); }
+  .th-title { font-size: var(--text-sm); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: inherit; min-width: 0; }
+  .th-folder, .th-meta { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; color: var(--color-text-dim); flex-shrink: 0; white-space: nowrap; }
+  .th-folder svg { width: 11px; height: 11px; }
+  .th-folder.unfiled { font-style: italic; opacity: 0.7; }
+  mark { background: hsl(239 100% 82% / 0.28); color: var(--color-text); border-radius: 3px; padding: 0 1px; }
+
+  .th-empty { display: none; text-align: center; color: var(--color-text-dim); font-size: var(--text-sm); padding: 28px 12px; }
+  .th-empty.show { display: block; }
+
+  /* Footer */
+  .np-footer { flex-shrink: 0; padding: 12px; border-top: 1px solid var(--color-border-soft); display: flex; align-items: center; gap: 10px; }
+  .np-avatar { width: 30px; height: 30px; border-radius: var(--radius-full); flex-shrink: 0; display: grid; place-items: center; font-size: 11px; font-weight: 700; color: #fff; background: linear-gradient(135deg, var(--color-accent-violet), var(--color-primary-strong)); }
+  .np-acct-name { font-size: var(--text-sm); color: var(--color-text); }
+  .np-acct-sub { font-size: 10px; color: var(--color-text-dim); }
+  .np-foot-btn { margin-left: auto; width: 30px; height: 30px; display: grid; place-items: center; border: 0; border-radius: var(--radius-md); background: transparent; color: var(--color-text-muted); cursor: pointer; }
+  .np-foot-btn:hover { background: var(--color-accent); color: var(--color-text); }
+  .np-foot-btn svg { width: 17px; height: 17px; }
+  .np-label { transition: opacity var(--dur-fast); }
+  .nav-panel.collapsed .np-label { display: none; }
+  .tip { position: absolute; left: calc(100% + 12px); top: 50%; transform: translateY(-50%); background: var(--color-surface-hi); border: 1px solid var(--color-border); color: var(--color-text); font-size: var(--text-xs); padding: 5px 9px; border-radius: 6px; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity var(--dur-fast); box-shadow: var(--shadow-md); z-index: 70; }
+  .nav-panel:not(.collapsed) .tip { display: none; }
+  .nav-panel.collapsed .np-rail-btn:hover .tip { opacity: 1; }
+
+  /* Chat context (faint, right) */
+  .chat-context { flex: 1; display: flex; flex-direction: column; min-width: 0; background: var(--color-bg); }
+  .cc-top { height: 56px; border-bottom: 1px solid var(--color-border-soft); display: flex; align-items: center; gap: 10px; padding: 0 20px; }
+  .cc-chip { font-size: var(--text-xs); color: var(--color-text-muted); background: var(--color-surface); border: 1px solid var(--color-border); padding: 4px 10px; border-radius: var(--radius-full); }
+  .cc-body { flex: 1; display: grid; place-items: center; padding: 24px; }
+  .cc-hint { text-align: center; color: var(--color-text-dim); max-width: 340px; }
+  .cc-hint h3 { font-family: var(--font-headline); font-weight: 600; color: var(--color-text-muted); font-size: var(--text-lg); margin: 0 0 6px; }
+  .cc-hint p { margin: 0; font-size: var(--text-sm); }
+  .cc-composer { margin: 0 20px 22px; height: 48px; border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); display: flex; align-items: center; padding: 0 16px; color: var(--color-text-dim); font-size: var(--text-sm); }
+
+  #toast { position: fixed; left: 50%; bottom: 26px; transform: translate(-50%, 16px); opacity: 0; background: var(--color-surface-hi); border: 1px solid var(--color-primary-glow); color: var(--color-text); font-size: var(--text-sm); padding: 10px 18px; border-radius: var(--radius-full); box-shadow: var(--shadow-lg); pointer-events: none; transition: all var(--dur-base); z-index: 9998; }
+  #toast.show { opacity: 1; transform: translate(-50%, 0); }
+</style>
+</head>
+<body>
+
+<div class="variant-nav">
+  <span class="label">Sketch 077 · Threads</span>
+  <button class="variant-tab active" onclick="showVariant('a', event)">A · Date sections</button>
+  <button class="variant-tab" onclick="showVariant('b', event)">B · Folder groups</button>
+  <button class="variant-tab" onclick="showVariant('c', event)">C · Search + Date⇄Folder toggle</button>
+</div>
+
+<div id="stage">
+  <div id="variant-a" class="variant"></div>
+  <div id="variant-b" class="variant" style="display:none"></div>
+  <div id="variant-c" class="variant" style="display:none"></div>
+</div>
+
+<div class="sketch-toolbar">
+  <span>view</span>
+  <button onclick="setVp('420px')">▯</button>
+  <button onclick="setVp('980px')">▭</button>
+  <button onclick="setVp('none')">▬</button>
+  <select id="theme-switcher" onchange="document.querySelector('link[href*=themes]').href='../themes/'+this.value+'.css'">
+    <option value="default">Deep Midnight</option>
+  </select>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const P = {
+  panelClose:'<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/><path d="M15 9l-3 3 3 3"/>',
+  panelOpen:'<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/><path d="M13 9l3 3-3 3"/>',
+  sparkles:'<path d="M12 3l1.6 5.1L19 10l-5.4 1.9L12 17l-1.6-5.1L5 10l5.4-1.9z"/>',
+  message:'<path d="M21 15a2 2 0 0 1-2 2H8l-4 4V5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2z"/>',
+  file:'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/>',
+  skills:'<path d="M12 3l1.6 5.1L19 10l-5.4 1.9L12 17l-1.6-5.1L5 10l5.4-1.9z"/><path d="M19 15l.7 2.3L22 18l-2.3.7L19 21l-.7-2.3L16 18l2.3-.7z"/>',
+  workflow:'<rect x="3" y="3" width="8" height="8" rx="2"/><path d="M7 11v3a2 2 0 0 0 2 2h4"/><rect x="13" y="13" width="8" height="8" rx="2"/>',
+  shield:'<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
+  settings:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/>',
+  plus:'<path d="M12 5v14M5 12h14"/>', search:'<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>',
+  folder:'<path d="M4 20a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h4.9l2 3H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2z"/>',
+  chevron:'<path d="M6 9l6 6 6-6"/>', moon:'<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>'
+};
+function svg(n, cls){ return '<svg class="'+(cls||'')+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+P[n]+'</svg>'; }
+
+/* Real Thread shape: title / folder_id / updated_at (here: f = folder name|null, d = days since updated) */
+const THREADS = [
+  {t:"Q3 revenue variance analysis", f:"Finance", d:0},
+  {t:"Debug embedding drift after re-index", f:"Engineering", d:0},
+  {t:"Standup notes", f:null, d:0},
+  {t:"Draft investor update — July", f:"Finance", d:1},
+  {t:"Summarize the SOC 2 controls doc", f:"Product", d:1},
+  {t:"Compare GPT-5.6 vs Opus for extraction", f:"Engineering", d:2},
+  {t:"Why is retrieval missing figures?", f:"Engineering", d:3},
+  {t:"Onboarding checklist for new PM", f:"Product", d:4},
+  {t:"Pricing experiment ideas", f:null, d:6},
+  {t:"Weekly metrics rollup", f:"Finance", d:8},
+  {t:"Customer churn hypotheses", f:"Product", d:11},
+  {t:"Vendor security questionnaire", f:"Product", d:14},
+  {t:"Board deck outline", f:"Finance", d:20},
+  {t:"Refactor ingestion pipeline notes", f:"Engineering", d:27},
+  {t:"Fix citation footer overflow", f:"Engineering", d:34},
+  {t:"Marketing site copy pass", f:null, d:45},
+  {t:"Grocery + travel planning", f:"Personal", d:52},
+  {t:"Tax document checklist", f:"Personal", d:70},
+  {t:"Old prototype brainstorm", f:"Engineering", d:120}
+];
+const NAV = [["message","Chat",true],["file","Documents",false],["skills","Skills",false],["workflow","Workflows",false],["shield","Governance",false],["settings","Settings",false]];
+
+function relDate(d){ if(d===0)return 'Today'; if(d===1)return '1d'; if(d<7)return d+'d'; if(d<30)return Math.round(d/7)+'w'; return Math.round(d/30)+'mo'; }
+function groupByDate(ts){
+  const b=[['Today',t=>t.d===0],['Yesterday',t=>t.d===1],['Last 7 days',t=>t.d>=2&&t.d<=7],['Last 30 days',t=>t.d>=8&&t.d<=30],['Older',t=>t.d>30]];
+  return b.map(([label,fn])=>({label,items:ts.filter(fn)})).filter(g=>g.items.length);
+}
+function groupByFolder(ts){
+  const order=['Finance','Engineering','Product','Personal'];
+  const g=order.map(name=>({label:name,folder:true,items:ts.filter(t=>t.f===name)}));
+  const un=ts.filter(t=>!t.f); if(un.length) g.push({label:'Unfiled',folder:true,items:un});
+  return g.filter(x=>x.items.length);
+}
+function rowHTML(t, mode){
+  const meta = mode==='folder'
+    ? `<span class="th-meta">${relDate(t.d)}</span>`
+    : (t.f ? `<span class="th-folder">${svg('folder')}${t.f}</span>` : `<span class="th-folder unfiled">Unfiled</span>`);
+  return `<button class="th-row ${t.d===0&&mode!=='folder'?'':''}" data-title="${t.t.toLowerCase()}"><span class="th-title">${t.t}</span>${meta}</button>`;
+}
+function listHTML(v, mode){
+  const groups = mode==='folder' ? groupByFolder(THREADS) : groupByDate(THREADS);
+  const body = groups.map(g=>`
+    <div class="grp">
+      ${g.folder
+        ? `<button class="grp-head" onclick="toggleGroup(this)">${svg('chevron','gh-chev')}${svg('folder','gh-fi')}<span class="gh-name">${g.label}</span><span class="grp-count">${g.items.length}</span></button>`
+        : `<div class="grp-head">${g.label}<span class="grp-count" style="margin-left:7px">${g.items.length}</span></div>`}
+      <div class="grp-body">${g.items.map(t=>rowHTML(t, mode)).join('')}</div>
+    </div>`).join('');
+  return body + `<div class="th-empty">No chats match your search.</div>`;
+}
+
+function panelHTML(v, opts){
+  const nav = NAV.map(([ic,label,active])=>`<button class="np-item ${active?'active':''}">${svg(ic)}<span class="np-label">${label}</span><span class="tip">${label}</span></button>`).join('');
+  const toggle = opts.toggle ? `
+    <div class="group-toggle"><span>Group by</span>
+      <div class="gt-seg"><button class="gt-btn active" onclick="setGroupMode('${v}','date',this)">Date</button><button class="gt-btn" onclick="setGroupMode('${v}','folder',this)">Folder</button></div>
+    </div>` : '';
+  return `
+  <aside class="nav-panel" id="np-${v}">
+    <button class="np-toggle" onclick="toggleCollapse('${v}')" aria-label="Toggle navigation">${svg('panelClose','tg-close')}${svg('panelOpen','tg-open')}</button>
+    <div class="np-header"><div class="np-logo">${svg('sparkles')}</div><span class="np-wordmark np-label">Agentic RAG</span></div>
+    <div class="np-nav">${nav}</div>
+    <div class="np-actions">
+      <button class="np-newchat" onclick="newChat()">${svg('plus')}<span class="np-label">New Chat</span></button>
+      <div class="np-search-input only-expanded" id="si-${v}">${svg('search')}<input type="text" placeholder="Search chats…" oninput="filterThreads('${v}', this.value)"><button class="np-search-clear" onclick="clearSearch('${v}')" aria-label="Clear search">✕</button></div>
+      <button class="np-rail-btn only-collapsed" onclick="toggleCollapse('${v}')" aria-label="Search chats">${svg('search')}<span class="tip">Search chats</span></button>
+    </div>
+    <div class="np-threads scrollbar-thin">
+      <div class="th-head"><span>Chats</span><span class="th-count">${THREADS.length}</span></div>
+      ${toggle}
+      <div class="th-list" id="thl-${v}">${listHTML(v, opts.mode)}</div>
+    </div>
+    <div class="np-footer">
+      <div class="np-avatar">FD</div>
+      <div class="np-label"><div class="np-acct-name">fhdmrd</div><div class="np-acct-sub">Operator</div></div>
+      <button class="np-foot-btn np-label" title="Theme" aria-label="Toggle theme">${svg('moon')}</button>
+    </div>
+  </aside>`;
+}
+function frameHTML(v, opts){
+  const caps = { a:"Time-first — the recency the operator scrolls for, in Today / Yesterday / 7d / 30d / Older sections.", b:"Container-first — collapsible folder groups (folders already exist in the data), each with a count.", c:"Search-forward with a Date⇄Folder toggle — the synthesis: pick the mental model that fits the moment." };
+  return `
+  <div class="frame">
+    <div class="frame-caption"><span class="fc-note"><b>${THREADS.length} chats</b> (imagine 280+). ${caps[v]} Type in Search to filter live — matches highlight, empty groups fold away.</span></div>
+    <div class="app-frame">
+      ${panelHTML(v, opts)}
+      <main class="chat-context">
+        <div class="cc-top"><span class="cc-chip">Deep · Claude Opus 4.8</span><span class="cc-chip">General</span></div>
+        <div class="cc-body"><div class="cc-hint"><h3>Q3 revenue variance analysis</h3><p>Find any chat fast — search, or jump to a section.</p></div></div>
+        <div class="cc-composer">Ask anything…</div>
+      </main>
+    </div>
+  </div>`;
+}
+
+document.getElementById('variant-a').innerHTML = frameHTML('a', { mode:'date',   toggle:false });
+document.getElementById('variant-b').innerHTML = frameHTML('b', { mode:'folder', toggle:false });
+document.getElementById('variant-c').innerHTML = frameHTML('c', { mode:'date',   toggle:true  });
+
+/* ── Interactivity ── */
+function toggleCollapse(v){ document.getElementById('np-'+v).classList.toggle('collapsed'); }
+function toggleGroup(head){ head.parentNode.classList.toggle('collapsed'); }
+function setGroupMode(v, mode, btn){
+  document.getElementById('thl-'+v).innerHTML = listHTML(v, mode);
+  btn.parentNode.querySelectorAll('.gt-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  const inp = document.querySelector('#si-'+v+' input'); if (inp) inp.value='';
+  document.getElementById('si-'+v).classList.remove('has-q');
+}
+function esc(s){ return s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'); }
+function filterThreads(v, q){
+  q=(q||'').trim();
+  const list=document.getElementById('thl-'+v);
+  const si=document.getElementById('si-'+v); si.classList.toggle('has-q', !!q);
+  const rx = q ? new RegExp('('+esc(q)+')','ig') : null;
+  let anyGlobal=false;
+  list.querySelectorAll('.th-row').forEach(r=>{
+    const title=r.querySelector('.th-title'); const raw=r.dataset.title;
+    const hit = !q || raw.includes(q.toLowerCase());
+    r.style.display = hit ? '' : 'none';
+    if (hit) anyGlobal=true;
+    // highlight
+    const orig = title.textContent;
+    title.innerHTML = (q && hit) ? orig.replace(rx,'<mark>$1</mark>') : orig;
+  });
+  list.querySelectorAll('.grp').forEach(g=>{
+    const vis=[...g.querySelectorAll('.th-row')].some(r=>r.style.display!=='none');
+    g.style.display = vis ? '' : 'none';
+  });
+  const empty=list.querySelector('.th-empty'); if(empty) empty.classList.toggle('show', !anyGlobal);
+}
+function clearSearch(v){ const inp=document.querySelector('#si-'+v+' input'); inp.value=''; filterThreads(v,''); inp.focus(); }
+function newChat(){ toast('New chat started'); }
+function showVariant(id, ev){
+  ['a','b','c'].forEach(x=>document.getElementById('variant-'+x).style.display='none');
+  document.getElementById('variant-'+id).style.display='block';
+  document.querySelectorAll('.variant-tab').forEach(t=>t.classList.remove('active'));
+  if(ev) ev.target.classList.add('active');
+}
+function setVp(w){ document.getElementById('stage').style.maxWidth=w; }
+let _tt; function toast(m){ const el=document.getElementById('toast'); el.textContent=m; el.classList.add('show'); clearTimeout(_tt); _tt=setTimeout(()=>el.classList.remove('show'),1600); }
+</script>
+</body>
+</html>

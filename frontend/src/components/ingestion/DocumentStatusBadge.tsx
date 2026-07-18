@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils"
+import { TERM_MAP, usePlainLabel, type TermKey } from "@/lib/termMap"
 
 interface Props {
   status: "pending" | "processing" | "completed" | "failed"
@@ -13,18 +14,24 @@ const styles: Record<Props["status"], string> = {
   failed: "bg-red-100 text-red-800",
 }
 
-function ingestionStepLabel(step: string | null | undefined): string {
-  if (step === "extracting") return "Extracting"
-  if (step === "extracting_tables") return "Extracting tables"
-  if (step === "extracting_images") return "Extracting images"
-  if (step === "chunking") return "Chunking"
-  if (step === "embedding") return "Embedding"
-  if (step === "metadata") return "Extracting metadata"
-  return "processing"
-}
-
 export function DocumentStatusBadge({ status, ingestionStep }: Props) {
-  const label = status === "processing" ? ingestionStepLabel(ingestionStep) : status
+  // Phase 154 Plan 02 (LANG-01 / Surface A): route the DISPLAY label through the
+  // term-map — plain by default, today's technical words under the reveal toggle.
+  // The `status`/`ingestionStep` ENUMS the backend emits are UNTOUCHED (D-02a):
+  // `styles[status]` (below) still keys on the raw `status`, never the label.
+  //
+  // Hooks can't be conditional, so compute ONE term key unconditionally, then call
+  // usePlainLabel once. While processing, prefer the granular `ingest.<step>` key
+  // when it exists in the map; otherwise (no/unknown step) fall back to the plain
+  // `status.processing` label — never a raw key.
+  const termKey: TermKey =
+    status === "processing"
+      ? `ingest.${ingestionStep}` in TERM_MAP
+        ? (`ingest.${ingestionStep}` as TermKey)
+        : "status.processing"
+      : (`status.${status}` as TermKey)
+  const label = usePlainLabel(termKey)
+
   return (
     <span
       className={cn(

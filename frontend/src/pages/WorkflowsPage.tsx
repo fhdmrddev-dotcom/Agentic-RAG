@@ -25,15 +25,27 @@
  * live; the draft-CRUD affordances + the Workflows nav entry wear a net-new violet
  * flag.
  */
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { Upload, Check, X, MoreHorizontal, Trash2, Loader2, AlertTriangle } from "lucide-react"
+import { cn } from "@/lib/utils"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import {
   listPublishedWorkflows,
   listStarterWorkflows,
   listDraftWorkflows,
   createWorkflowDraft,
+  getWorkflowDeletePreview,
+  deleteWorkflowCascade,
   type PublishedWorkflow,
   type WorkflowDraftRow,
   type WorkflowDefinitionJSON,
+  type WorkflowDeletePreview,
 } from "@/lib/api"
 import { type BuilderInitial } from "@/pages/WorkflowBuilderPage"
 import { PublishGauntlet } from "@/components/workflows/PublishGauntlet"
@@ -78,9 +90,17 @@ interface WorkflowsPageProps {
   /** The project folders (the filter rail's options) — from ChatLayout's useFolders. */
   folders: Folder[]
   /** doRun — defined in ChatLayout (it owns thread state): createThread →
-   *  sendMessage(workflowDefinitionId) → select + view + redirect to Chat. The page
-   *  NEVER constructs a bespoke run route. */
-  onLaunch: (def: PublishedWorkflow, kickoff: string) => Promise<void>
+   *  (upload staged template) → sendMessage(workflowDefinitionId, folder_id) → select
+   *  + view + redirect to Chat. The page NEVER constructs a bespoke run route.
+   *  Phase 152 (WFIN-01/02): the optional third arg carries the Run modal's two run
+   *  inputs — a staged template `File` (uploaded to the launched thread, Landmine 8)
+   *  and a per-run KB-folder override `folderId` (→ create_workflow_run.inputs, D-01).
+   *  Both absent = today's byte-identical launch (D-06). */
+  onLaunch: (
+    def: PublishedWorkflow,
+    kickoff: string,
+    opts?: { templateFile?: File | null; folderId?: string | null },
+  ) => Promise<void>
 }
 
 type PageView = "library" | "builder"
@@ -401,7 +421,7 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
       <div className="grid min-h-0 flex-1 grid-cols-[200px_1fr] gap-6 overflow-y-auto px-6 py-5">
         {/* ── Project filter rail (live ?project_folder_id= re-query) ── */}
         <nav aria-label="Project filter" className="flex flex-col gap-1">
-          <p className="px-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">
+          <p className="px-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
             Project
           </p>
           <FilterItem label="All projects" active={selectedProjectId === null} onClick={() => setSelectedProjectId(null)} />
@@ -473,6 +493,10 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
                     folderName={folderName((wf.definition as DefShape | undefined)?.project_folder_id)}
                     onRun={() => { setRunFor(wf); setKickoff("") }}
                     onTweak={() => onTweak(wf)}
+                    // 152-04 (WFIN-03): after a confirmed cascade delete, re-fetch the
+                    // Published shelf so the card is removed ONLY on server confirmation
+                    // (D-LOCK-04 — no optimistic vanish; the list never filters locally).
+                    onDeleted={() => { refetchPublished().catch(console.error) }}
                   />
                 ))}
               </div>
@@ -512,11 +536,15 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
         </div>
       </div>
 
-      {/* ── Run modal (D-103-1: read-only folder chip + ONE textarea + hint; enabled on empty) ── */}
+      {/* ── Run modal (152 WFIN-01/02: scope <select> + staged template + provenance;
+            D-LOCK-01/02). `key` forces fresh per-workflow modal state (staged file +
+            scope pick reset between opens). ── */}
       {runFor && (
         <RunModal
+          key={runFor.id}
           wf={runFor}
-          folderName={folderName((runFor.definition as DefShape | undefined)?.project_folder_id)}
+          folders={folders}
+          authorDefaultFolderId={(runFor.definition as DefShape | undefined)?.project_folder_id ?? null}
           kickoff={kickoff}
           submitting={runSubmitting}
           onKickoffChange={setKickoff}
@@ -524,15 +552,19 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
             if (runSubmitting) return
             setRunFor(null)
           }}
-          onRun={async () => {
+          onRun={async ({ templateFile, folderId }) => {
             // WR-05: one click = one thread. Ignore re-entry while a launch is in flight.
             if (runSubmitting) return
             const target = runFor
             const text = kickoff
             setRunSubmitting(true)
             try {
-              await onLaunch(target, text)
-              setRunFor(null)
+              // 152 (WFIN-01/02): thread the staged template + per-run folder override
+              // through the existing launch (doRun uploads the file to the launched
+              // thread, then create_workflow_run.inputs carries folder_id). Re-throw on
+              // failure so the modal can render the server's 422 verbatim (do NOT close).
+              await onLaunch(target, text, { templateFile, folderId })
+              setRunFor(null) // close only on a successful launch
             } finally {
               setRunSubmitting(false)
             }
@@ -609,22 +641,69 @@ function DraftCard({ draft, onOpen }: { draft: WorkflowDraftRow; onOpen: () => v
   )
 }
 
+/** The in-place delete lifecycle (D-LOCK-04), adapting the 064-B KillPhase machine:
+ *  idle → deleting (Deleting…) → deleted (Deleted · recorded) | error (Try again). */
+type DeletePhase = "idle" | "deleting" | "deleted" | "error"
+
 function PublishedCard({
   wf,
   folderName,
   onRun,
   onTweak,
+  onDeleted,
 }: {
   wf: PublishedWorkflow
   folderName: string | null
   onRun: () => void
   onTweak: () => void
+  /** 152-04 (WFIN-03): re-fetch the Published shelf after a CONFIRMED cascade delete —
+   *  the card leaves the list ONLY on server confirmation (D-LOCK-04: no optimistic
+   *  vanish, no undo; hard-delete is irreversible). */
+  onDeleted: () => void
 }) {
   const def = wf.definition as DefShape | undefined
   const version = typeof def?.version === "number" ? def.version : undefined
+
+  // ── WFIN-03 delete surface (D-LOCK-03/04/05). The ⋯-menu opens a victim-naming
+  //    confirm Sheet (the shipped 064-B / ActiveRunsSection primitive): it names the
+  //    EXACT server counts (Removed vs Kept), shows an amber cancel-first banner when a
+  //    run is live, and transitions the card in place — never an optimistic vanish. ──
+  const [sheetOpen, setSheetOpen] = useState(false)
+  const [preview, setPreview] = useState<WorkflowDeletePreview | null>(null)
+  const [previewError, setPreviewError] = useState<string | null>(null)
+  const [deletePhase, setDeletePhase] = useState<DeletePhase>("idle")
+  const descId = `wf-delete-${wf.id}`
+
+  const openDeleteSheet = () => {
+    // Fresh state each open, then fetch the EXACT server counts BEFORE offering the
+    // destructive action — the sheet never renders placeholder/guessed counts (D-LOCK-03).
+    setPreview(null)
+    setPreviewError(null)
+    setDeletePhase("idle")
+    setSheetOpen(true)
+    getWorkflowDeletePreview(wf.id)
+      .then(setPreview)
+      .catch((e) =>
+        setPreviewError(e instanceof Error ? e.message : "Couldn’t load the delete preview"),
+      )
+  }
+
+  const handleDelete = async () => {
+    setDeletePhase("deleting")
+    try {
+      await deleteWorkflowCascade(wf.id)
+      setDeletePhase("deleted")
+      // Server-confirmed: re-fetch the shelf so the card leaves the list ONLY now
+      // (D-LOCK-04 — the list is never filtered locally / optimistically).
+      onDeleted()
+    } catch {
+      setDeletePhase("error")
+    }
+  }
+
   return (
     <div data-testid="published-card" className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4">
-      {/* Card chrome (NOT a soul atom): name/version header, folder chip, status pill. */}
+      {/* Card chrome (NOT a soul atom): name/version header, folder chip, ⋯-menu + status pill. */}
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
@@ -638,14 +717,40 @@ function PublishedCard({
             <span className="mt-0.5 inline-block text-[11px] text-muted-foreground">📁 {folderName}</span>
           )}
         </div>
-        <span className="shrink-0 rounded-full border border-primary/40 px-1.5 py-0.5 font-mono text-[9px] uppercase text-primary">
-          published
-        </span>
+        {/* Right cluster: the NET-NEW ⋯ menu (Pitfall 8 — no menu existed on this card)
+            sits immediately left of the published pill. Neutral treatment; the destructive
+            weight lands ONLY on Delete-forever in the sheet (UI-SPEC Visual Hierarchy). */}
+        <div className="flex flex-none items-center gap-1">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                aria-label="Workflow actions"
+                className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              >
+                <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuItem
+                data-testid="published-delete"
+                className="text-destructive focus:text-destructive"
+                onClick={openDeleteSheet}
+              >
+                <Trash2 className="mr-2 h-3.5 w-3.5" aria-hidden="true" />
+                Delete workflow…
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <span className="rounded-full border border-primary/40 px-1.5 py-0.5 font-mono text-[9px] uppercase text-primary">
+            published
+          </span>
+        </div>
       </div>
       {/* WUX-01: the shared card-scale soul (tier chip + glyph-dot spine + needs +
           output) replaces the old TierBadge + PhaseChain + "entry needs" trio. */}
       <WorkflowSoul def={def} scale="card" />
-      {/* D-01: the Run button below stays the Phase-121 one-click launch-into-thread —
+      {/* D-01: the Run/Tweak footer stays UNCHANGED — the Phase-121 one-click launch —
           it is NEVER routed through the two-door fork. */}
       <div className="mt-auto flex items-center gap-2 border-t border-border/60 pt-2">
         <button
@@ -666,6 +771,139 @@ function PublishedCard({
           ▶ Run
         </button>
       </div>
+
+      {/* ── WFIN-03 victim-naming delete Sheet (D-LOCK-03/04/05 — the shipped 064-B /
+            ActiveRunsSection bottom-sheet primitive). EXACT server-sourced Removed/Kept
+            counts; an amber cancel-first banner ONLY when a run is live; an in-place
+            lifecycle (Deleting… → Deleted · recorded) with NO optimistic vanish + NO undo.
+            The single destructive-weighted control is Delete-forever. ── */}
+      <Sheet
+        open={sheetOpen}
+        onOpenChange={(o) => {
+          // Never dismiss mid-delete (the action is in flight). A confirmed delete stays
+          // open on its terminal state until the shelf re-fetch unmounts the card.
+          if (!o && deletePhase === "deleting") return
+          setSheetOpen(o)
+        }}
+      >
+        <SheetContent side="bottom" aria-describedby={descId} className="mx-auto max-w-lg">
+          <SheetHeader>
+            <SheetTitle>Delete this workflow?</SheetTitle>
+          </SheetHeader>
+          <div id={descId} className="px-4 pb-4">
+            {previewError ? (
+              <div>
+                <p role="alert" className="text-sm text-destructive">
+                  {previewError}
+                </p>
+                <div className="mt-4 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setSheetOpen(false)}
+                    className="rounded-md border border-border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                  >
+                    Keep it
+                  </button>
+                </div>
+              </div>
+            ) : preview === null ? (
+              <p role="status" className="text-sm text-muted-foreground">
+                Loading the exact counts…
+              </p>
+            ) : (
+              <>
+                {/* Removed group — danger-tinted heading + EXACT server counts (never guessed). */}
+                <div>
+                  <p className="text-[13px] font-semibold text-destructive">Permanently removed</p>
+                  <p className="mt-1 text-sm text-foreground">
+                    <span className="font-medium">{preview.name}</span> · {preview.versions} versions ·{" "}
+                    {preview.runs} run records
+                  </p>
+                </div>
+                {/* Kept group — neutral heading + the reassurance that closes "no orphaned
+                    threads"; it ALWAYS renders (incl. the 0-threads variant). */}
+                <div className="mt-6">
+                  <p className="text-[13px] font-semibold text-foreground">Kept — not touched</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {preview.threads > 0
+                      ? `${preview.threads} chat threads become normal chats — transcripts & files stay. Your knowledge base is untouched.`
+                      : "No chat threads to keep."}
+                  </p>
+                </div>
+                {/* Amber cancel-first banner — ONLY when a run is live (D-LOCK-05); amber,
+                    never red (the graded action-guards rule). */}
+                {preview.in_flight > 0 && (
+                  <div
+                    role="status"
+                    data-testid="delete-inflight-banner"
+                    className="mt-4 flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[13px] text-amber-400"
+                  >
+                    <AlertTriangle className="mt-0.5 h-4 w-4 flex-none" aria-hidden="true" />
+                    <span>
+                      {preview.in_flight === 1
+                        ? "1 run is still in progress. It’s cancelled safely first, then the workflow is deleted."
+                        : `${preview.in_flight} runs are still in progress. They’re cancelled safely first, then the workflow is deleted.`}
+                    </span>
+                  </div>
+                )}
+                {/* Action row / in-place lifecycle (adapts the 064-B KillPhase terminals). */}
+                <div className="mt-5 flex items-center justify-end gap-2">
+                  {deletePhase === "idle" && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setSheetOpen(false)}
+                        className="rounded-md border border-border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                      >
+                        Keep it
+                      </button>
+                      <button
+                        type="button"
+                        data-testid="delete-forever"
+                        onClick={() => void handleDelete()}
+                        className="rounded-md bg-destructive px-3 py-1.5 text-sm font-medium text-destructive-foreground transition-colors hover:bg-destructive/90"
+                      >
+                        Delete forever
+                      </button>
+                    </>
+                  )}
+                  {deletePhase === "deleting" && (
+                    <span role="status" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                      Deleting…
+                    </span>
+                  )}
+                  {deletePhase === "deleted" && (
+                    <span role="status" className="inline-flex items-center gap-1.5 text-sm font-medium text-foreground">
+                      <Check className="h-4 w-4 text-success" aria-hidden="true" />
+                      Deleted · recorded
+                    </span>
+                  )}
+                  {deletePhase === "error" && (
+                    <div className="flex items-center gap-2">
+                      <span role="status" className="text-sm text-destructive">
+                        Couldn’t delete the workflow
+                      </span>
+                      <button
+                        type="button"
+                        data-testid="delete-retry"
+                        onClick={() => void handleDelete()}
+                        className="inline-flex items-center rounded-md border border-destructive/40 bg-destructive/10 px-2 py-0.5 text-[11px] font-medium text-destructive transition-colors hover:bg-destructive/20"
+                      >
+                        Try again
+                      </button>
+                    </div>
+                  )}
+                </div>
+                {/* Recorded footer — the audit receipt honesty (D-LOCK-03). */}
+                <p className="mt-4 text-[12px] text-muted-foreground">
+                  ✎ Recorded with your name in the audit log.
+                </p>
+              </>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   )
 }
@@ -718,7 +956,8 @@ function StarterCard({ wf, onUse }: { wf: PublishedWorkflow; onUse: () => void }
 
 function RunModal({
   wf,
-  folderName,
+  folders,
+  authorDefaultFolderId,
   kickoff,
   submitting,
   onKickoffChange,
@@ -726,15 +965,128 @@ function RunModal({
   onRun,
 }: {
   wf: PublishedWorkflow
-  folderName: string | null
+  /** The owner's project folders — the scope <select>'s option source (D-LOCK-01). */
+  folders: Folder[]
+  /** The workflow's author-time retrieval default (definition.project_folder_id).
+   *  null = an unbound workflow (whole-KB default). */
+  authorDefaultFolderId: string | null
   kickoff: string
   submitting: boolean
   onKickoffChange: (v: string) => void
   onCancel: () => void
-  onRun: () => void | Promise<void>
+  /** 152 (WFIN-01/02): launch carries the two run inputs — a staged template `File`
+   *  and a per-run folder override `folderId` (null = stay on the workflow default,
+   *  D-06). May reject (e.g. a template 422) → the modal renders the message inline. */
+  onRun: (extras: { templateFile: File | null; folderId: string | null }) => void | Promise<void>
 }) {
   const def = wf.definition as DefShape | undefined
   const keys = entryInputKeys(def)
+
+  // ── WFIN-02 (D-LOCK-01) + WR-05: the KB-scope <select>. The "" option is ALWAYS the
+  //    resting selection and truthfully labels the server-applied scope: for a BOUND
+  //    workflow it reads "Workflow default" (the override channel is narrow-only, D-06 —
+  //    "" resolves to the author default server-side, never whole-KB), and ONLY an
+  //    UNBOUND workflow (no project_folder_id) reads "All documents" (where folderId:null
+  //    genuinely means whole-KB). A real folder DIFFERENT from the author default is the
+  //    only per-run override.
+  const authorDefaultExists =
+    !!authorDefaultFolderId && folders.some((f) => f.id === authorDefaultFolderId)
+  // Initial selection is "" in every case — for a bound workflow "" now truthfully IS
+  // the workflow default (WR-05); it never mislabels an author-scoped run as whole-KB.
+  const [selectedFolderId, setSelectedFolderId] = useState<string>("")
+  // ── WFIN-01 (D-LOCK-02): the staged template File. No thread exists yet — doRun
+  //    uploads it to the launched thread (Landmine 8); this only stages it.
+  const [templateFile, setTemplateFile] = useState<File | null>(null)
+  // The inline launch/upload error (the server's validate_upload 422 verbatim — it
+  // surfaces at launch because the upload targets the launched thread, not on stage).
+  const [launchError, setLaunchError] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // A4 composition guard (WR-03 — the client mirror of backend scope.py
+  // resolve_run_scope_root, 152-06): a workflow that declares any per-phase folder_scope
+  // must NOT offer an override whose OWN subtree misses a declared phase's folder_scope —
+  // that would silently empty the phase's ∩ at retrieval (phase_types.py:326). Membership
+  // in the author subtree is necessary but NOT sufficient (a child A of project P empties
+  // a phase scoped to sibling B), so we intersect against each CANDIDATE's own subtree.
+  const hasPhaseFolderScope = (def?.phases ?? []).some((p) => {
+    const fs = (p.config as { folder_scope?: unknown } | undefined)?.folder_scope
+    return Array.isArray(fs) && fs.length > 0
+  })
+  // Each declared phase's non-empty folder_scope id list. A phase with no folder_scope
+  // imposes no constraint — dropped here, exactly like the backend's `if scope and …`.
+  const phaseFolderScopes = useMemo<string[][]>(() => {
+    return (def?.phases ?? [])
+      .map((p) => {
+        const fs = (p.config as { folder_scope?: unknown } | undefined)?.folder_scope
+        return Array.isArray(fs) ? fs.filter((x): x is string => typeof x === "string") : []
+      })
+      .filter((fs) => fs.length > 0)
+  }, [def])
+  const authorDefaultName = authorDefaultExists
+    ? folders.find((f) => f.id === authorDefaultFolderId)?.name ?? null
+    : null
+  // Override options = every OTHER owner-reachable folder. For a workflow that declares
+  // per-phase folder_scope, mirror the CORRECTED backend A4 rule (scope.py, 152-08): the
+  // override must satisfy BOTH the NECESSARY author-subtree membership AND the SUFFICIENT
+  // per-phase intersection. No-scope workflows are unchanged.
+  const overrideOptions = useMemo(() => {
+    const candidates = folders.filter((f) => f.id !== authorDefaultFolderId)
+    if (!hasPhaseFolderScope) return candidates
+    const subtreeOf = (rootId: string): Set<string> => {
+      const ids = new Set<string>()
+      const visit = (rid: string) => {
+        if (ids.has(rid)) return
+        ids.add(rid)
+        for (const f of folders) if (f.parent_id === rid) visit(f.id)
+      }
+      visit(rootId)
+      return ids
+    }
+    // NECESSARY (author-subtree containment — mirrors scope.py's restored A4 check, 152-08):
+    // for a BOUND folder_scope workflow, a candidate must be a MEMBER of the author's OWN
+    // project subtree. A strict ANCESTOR/SIBLING of the bound project would WIDEN the run's
+    // retrieval to unrelated sibling projects, so it must NEVER be offered. When there is no
+    // author default (the UNBOUND + folder_scope shape) there is no declared boundary to
+    // contain against — skip this filter and apply only the per-phase intersection (the
+    // unbound path stays as shipped).
+    const contained =
+      authorDefaultFolderId != null
+        ? candidates.filter((cand) => subtreeOf(authorDefaultFolderId).has(cand.id))
+        : candidates
+    // SUFFICIENT (per-phase intersection): keep a candidate ONLY when EVERY declared phase
+    // folder_scope still intersects the CANDIDATE's OWN subtree — otherwise offering it steers
+    // the run into empty retrieval (phase_types.py:326).
+    return contained.filter((cand) => {
+      const sub = subtreeOf(cand.id)
+      return phaseFolderScopes.every((scope) => scope.some((id) => sub.has(id)))
+    })
+  }, [folders, hasPhaseFolderScope, phaseFolderScopes, authorDefaultFolderId])
+
+  const onFilePicked = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0]
+    e.target.value = "" // reset so re-selecting the same file fires change again
+    if (!f) return
+    setTemplateFile(f)
+    setLaunchError(null)
+  }
+
+  const handleRun = async () => {
+    setLaunchError(null)
+    // Only a real folder that DIFFERS from the author default is a per-run override.
+    // The "" option (labelled "Workflow default" for a bound wf, "All documents" for an
+    // unbound one — WR-05) passes NO override (D-06). NOTE: the Plan-01 override channel
+    // narrows only — a bound workflow cannot widen to whole-KB via this path (override
+    // falls through to the author default), which is exactly why the "" label reads
+    // "Workflow default" (not "All documents") on a bound workflow. Narrowing works.
+    const normalized = selectedFolderId || null
+    const folderId = normalized && normalized !== authorDefaultFolderId ? normalized : null
+    try {
+      await onRun({ templateFile, folderId })
+    } catch (e) {
+      // Surface the server's validate_upload message VERBATIM (never a friendlier lie).
+      setLaunchError(e instanceof Error ? e.message : "Run failed")
+    }
+  }
   // WR-06 (a11y): a lightweight focus contract for the aria-modal dialog —
   // Escape-to-close, initial focus on the textarea, and Tab containment within the
   // dialog (a minimal trap, no heavy dep / no shadcn Dialog rewrite).
@@ -791,13 +1143,38 @@ function RunModal({
           <span className="text-[15px] font-semibold text-foreground">{wf.name}</span>
         </div>
         <div className="flex flex-col gap-3 px-4 py-4">
-          {/* Read-only bound-folder chip (D-103-1 — the NAME, never a path; never a picker). */}
-          <div data-testid="run-folder-chip" className="flex items-center gap-2 text-[12px] text-muted-foreground">
-            <span className="font-medium text-foreground">Knowledge base:</span>
-            <span className="rounded-md border border-border bg-muted px-2 py-1">
-              📁 {folderName ?? "Bound to the workflow"}
-            </span>
-          </div>
+          {/* WFIN-02 (D-LOCK-01): the KB-scope <select> — native, byte-matching the
+              ChatArea scope selector ("All documents / {folder}"). The author default
+              is tagged "workflow default"; picking another = a per-run override. Hidden
+              when there are no folders (matches ChatArea's folders.length guard). */}
+          {folders.length > 0 && (
+            <label data-testid="run-scope" className="flex flex-col gap-1.5">
+              <span className="text-[13px] font-medium text-foreground">Knowledge base:</span>
+              <select
+                data-testid="run-scope-select"
+                value={selectedFolderId}
+                onChange={(e) => setSelectedFolderId(e.target.value)}
+                className="rounded-md border border-border bg-card px-2.5 py-1.5 text-[14px] text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+              >
+                {/* WR-05: the "" option truthfully labels the server-applied scope.
+                    Bound → "Workflow default" (with the folder name when the author
+                    folder is visible, bare otherwise — never a whole-KB lie); unbound →
+                    "All documents" (folderId:null genuinely means whole-KB). */}
+                <option value="">
+                  {authorDefaultFolderId
+                    ? authorDefaultName
+                      ? `Workflow default — 📁 ${authorDefaultName}`
+                      : "Workflow default"
+                    : "All documents"}
+                </option>
+                {overrideOptions.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    📁 {f.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <label className="flex flex-col gap-1.5">
             <span className="text-[13px] font-medium text-foreground">What should this run work on?</span>
             <textarea
@@ -810,6 +1187,67 @@ function RunModal({
               className="w-full resize-y rounded-md border border-border bg-background px-3 py-2 text-[14px] text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             />
           </label>
+          {/* WFIN-01 (D-LOCK-02): a quiet, self-start template upload. The button STAGES
+              the picked File in modal state (no thread exists yet — doRun uploads it to
+              the launched thread, Landmine 8). Idle → validated-file card ({name} ✓ ✕)
+              OR the inline 422 error (server message verbatim, role="alert"). Beneath it,
+              the honest provenance note. */}
+          <div className="flex flex-col gap-1.5">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".docx,.pptx,.xlsx,.md,.json,.csv,.txt,.py,.js,.sh,.png,.jpg,.jpeg,.gif,.webp"
+              aria-label="Upload template file"
+              tabIndex={-1}
+              className="hidden"
+              onChange={onFilePicked}
+            />
+            {templateFile ? (
+              <div
+                data-testid="run-template-file"
+                className="flex items-center gap-2 self-start rounded-md border border-border bg-muted/40 px-2.5 py-1.5 text-[12px]"
+              >
+                <span className="text-foreground">{templateFile.name}</span>
+                <Check className="h-3.5 w-3.5 text-success" aria-hidden="true" />
+                <button
+                  type="button"
+                  aria-label="Remove template"
+                  disabled={submitting}
+                  onClick={() => {
+                    setTemplateFile(null)
+                    setLaunchError(null)
+                  }}
+                  className="text-muted-foreground transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <X className="h-3 w-3" aria-hidden="true" />
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                data-testid="run-template-upload"
+                disabled={submitting}
+                onClick={() => fileInputRef.current?.click()}
+                className={cn(
+                  "flex items-center gap-1.5 self-start rounded-md border border-border px-2.5 py-1.5",
+                  "text-[12px] font-medium text-foreground/80 transition-colors",
+                  "hover:bg-accent focus:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+                  "disabled:cursor-not-allowed disabled:opacity-50",
+                )}
+              >
+                <Upload className="h-3.5 w-3.5" aria-hidden="true" />
+                {submitting ? "Uploading…" : "Upload template"}
+              </button>
+            )}
+            {launchError && (
+              <p data-testid="run-upload-error" role="alert" className="px-0.5 text-[11px] text-destructive">
+                {launchError}
+              </p>
+            )}
+            <p data-testid="run-provenance" className="px-0.5 text-[12px] text-muted-foreground">
+              Stored untrusted — never run as code, never fed to the fill engine.
+            </p>
+          </div>
           {/* Declared input_keys → a HINT line only (never fake structured fields). */}
           <p data-testid="run-hint" className="text-[12px] text-muted-foreground">
             This workflow expects: <span className="font-mono text-foreground">{keys.join(", ")}</span>
@@ -834,7 +1272,7 @@ function RunModal({
               type="button"
               data-testid="run-confirm"
               disabled={submitting}
-              onClick={() => void onRun()}
+              onClick={() => void handleRun()}
               className="rounded-md bg-primary px-4 py-1.5 text-[13px] font-medium text-primary-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {submitting ? "Running…" : "▶ Run workflow"}

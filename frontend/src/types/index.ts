@@ -197,6 +197,12 @@ export interface Message {
    * Accumulated during streaming via reasoning_delta SSE events.
    * Rendered in a collapsible "Thinking" block in RunCard. */
   reasoningContent?: string
+  /** Phase 149 Plan 09 (D-149-10): honest disabled-model fallback notice. Stamped by
+   * StreamsProvider from the `model_disabled_fallback` SSE event when the user's selected
+   * model was operator-DISABLED and the run fell back to the org default. `message` already
+   * names BOTH models (rendered as an inline notice in MessageItem). Absent on the common
+   * enabled path — the swap is never silent (never a dropped event). */
+  modelFallbackNotice?: { disabledModel: string; fallbackModel: string; message: string }
 }
 
 export interface DocumentMetadata {

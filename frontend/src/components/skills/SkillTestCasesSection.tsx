@@ -122,7 +122,8 @@ export function SkillTestCasesSection({ skillId }: Props) {
       {/* Test cases (add / edit / delete) */}
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
-          <label className="text-sm font-medium text-foreground">Eval test cases</label>
+          {/* Phase 155 (A11Y-01): section heading, not a single-control label -> <span>. */}
+          <span className="text-sm font-medium text-foreground">Eval test cases</span>
           <Button
             type="button"
             variant="ghost"
@@ -199,7 +200,8 @@ export function SkillTestCasesSection({ skillId }: Props) {
 
       {/* Version history (read-only, newest first) */}
       <div className="flex flex-col gap-2">
-        <label className="text-sm font-medium text-foreground">Version history</label>
+        {/* Phase 155 (A11Y-01): section heading, not a single-control label -> <span>. */}
+        <span className="text-sm font-medium text-foreground">Version history</span>
         {versions.length === 0 ? (
           <p className="text-xs text-muted-foreground">No versions yet.</p>
         ) : (

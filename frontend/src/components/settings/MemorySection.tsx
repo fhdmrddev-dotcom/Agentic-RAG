@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { supabase } from "@/lib/supabase"
 import { Button } from "@/components/ui/button"
 import {
@@ -27,6 +27,12 @@ export function MemorySection() {
   const [editingKey, setEditingKey] = useState<string | null>(null)
   const [editValue, setEditValue] = useState("")
   const [saving, setSaving] = useState(false)
+  // Phase 155 (A11Y-01): focus the edit field via ref when a row opens for editing,
+  // instead of the declarative `autoFocus` prop (jsx-a11y/no-autofocus) — same UX.
+  const editInputRef = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    if (editingKey) editInputRef.current?.focus()
+  }, [editingKey])
   const [deleteTarget, setDeleteTarget] = useState<MemoryEntry | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
@@ -156,11 +162,12 @@ export function MemorySection() {
                     {editingKey === entry.key ? (
                       <div className="flex items-center gap-2">
                         <input
+                          ref={editInputRef}
                           type="text"
+                          aria-label={`Edit value for ${entry.key}`}
                           value={editValue}
                           onChange={(e) => setEditValue(e.target.value)}
                           className="flex-1 text-sm bg-transparent border-b border-primary/40 focus:outline-none px-1 py-0.5"
-                          autoFocus
                           onKeyDown={(e) => {
                             if (e.key === "Enter" && editValue.trim()) saveEdit()
                             if (e.key === "Escape") cancelEdit()
@@ -172,11 +179,12 @@ export function MemorySection() {
                           className="h-6 w-6 p-0 text-primary"
                           onClick={saveEdit}
                           disabled={!editValue.trim() || saving}
+                          aria-label="Save value"
                         >
                           {saving ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
                           ) : (
-                            <Check className="h-3.5 w-3.5" />
+                            <Check className="h-3.5 w-3.5" aria-hidden="true" />
                           )}
                         </Button>
                         <Button
@@ -185,8 +193,9 @@ export function MemorySection() {
                           className="h-6 w-6 p-0 text-muted-foreground"
                           onClick={cancelEdit}
                           disabled={saving}
+                          aria-label="Cancel editing"
                         >
-                          <X className="h-3.5 w-3.5" />
+                          <X className="h-3.5 w-3.5" aria-hidden="true" />
                         </Button>
                       </div>
                     ) : (
@@ -203,24 +212,27 @@ export function MemorySection() {
                     })}
                   </span>
 
-                  {/* Action icons — visible on hover */}
+                  {/* Action icons — visible on hover OR keyboard focus-within (WR-01:
+                      keeps the focus-visible ring reachable for keyboard users). */}
                   {editingKey !== entry.key && (
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity shrink-0">
                       <Button
                         variant="ghost"
                         size="sm"
                         className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
                         onClick={() => startEdit(entry)}
+                        aria-label={`Edit ${entry.key}`}
                       >
-                        <Pencil className="h-3.5 w-3.5" />
+                        <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
                       </Button>
                       <Button
                         variant="ghost"
                         size="sm"
                         className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
                         onClick={() => setDeleteTarget(entry)}
+                        aria-label={`Delete ${entry.key}`}
                       >
-                        <Trash2 className="h-3.5 w-3.5" />
+                        <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                       </Button>
                     </div>
                   )}

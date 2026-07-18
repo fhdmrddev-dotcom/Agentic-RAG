@@ -18,7 +18,7 @@ import {
   ApiError,
 } from "@/lib/api"
 import type { Folder, Thread } from "@/types"
-import { Folder as FolderIcon, Menu, Sparkles } from "lucide-react"
+import { Folder as FolderIcon, Menu, Sparkles, PanelLeftOpen } from "lucide-react"
 
 interface Provider {
   id: string
@@ -35,9 +35,14 @@ interface Props {
   prefillMessage?: string | null
   onClearPrefill?: () => void
   onOpenDrawer?: () => void
+  // Phase 156 REFINEMENT (operator 2026-07-16): reopens the folded-away chat-history
+  // column (sketch Variant A #reopenA — the ▷ handle in the chat top-bar). Provided by
+  // ChatLayout ONLY while the history is collapsed; undefined otherwise, so the handle
+  // renders exactly when there's a hidden column to bring back.
+  onReopenHistory?: () => void
 }
 
-export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefillMessage, onClearPrefill, onOpenDrawer }: Props) {
+export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefillMessage, onClearPrefill, onOpenDrawer, onReopenHistory }: Props) {
   // Plan 075.4-01 D-075.4-A1: useMessages still exposes the viewed-thread
   // values (isStreaming, fallbackNotice) for back-compat — but the composer
   // disabled prop and per-thread surfaces go through the direct selectors
@@ -56,6 +61,10 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
   const [selectedProvider, setSelectedProvider] = useState<string>("")
   const [models, setModels] = useState<string[]>([])
   const [selectedModel, setSelectedModel] = useState<string>("")
+  // Phase 149 (IN-01 / D-149-05): the registry's deprecated-model ids, threaded from
+  // getProviders() into MessageInput so the chat picker renders the informational
+  // `deprecated` badge (deprecated ≠ disabled — the model stays selectable).
+  const [deprecatedModels, setDeprecatedModels] = useState<Set<string>>(new Set())
   const [agentMode, setAgentMode] = useState<"default" | "explorer">("default")
   const [scopeFolderId, setScopeFolderId] = useState<string | null>(null)
   const justCreatedThreadRef = useRef<string | null>(null)
@@ -133,8 +142,10 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
 
   useEffect(() => {
     getProviders()
-      .then(({ active, active_model, providers: list }) => {
+      .then(({ active, active_model, providers: list, deprecated_models }) => {
         setProviders(list)
+        // Defensive: absent → empty set → no badge (older backend / read blip).
+        setDeprecatedModels(new Set(deprecated_models ?? []))
         const activeProvider = list.find((p) => p.id === active) ?? list[0]
         if (activeProvider) {
           setSelectedProvider(activeProvider.id)
@@ -348,6 +359,7 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
       models={models}
       selectedModel={selectedModel}
       onModelChange={setSelectedModel}
+      deprecatedModels={deprecatedModels}
       agentMode={agentMode}
       onAgentModeChange={setAgentMode}
       prefillMessage={failedDraft ?? prefillMessage}
@@ -368,9 +380,31 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
     />
   )
 
+  // Phase 156 REFINEMENT: the ▷ "Show chat history" handle (sketch #reopenA). Desktop-
+  // only (mobile uses the drawer); rendered only when the history is collapsed
+  // (onReopenHistory provided). Reused in both the welcome and the active-thread header.
+  const reopenHistoryButton = onReopenHistory ? (
+    <button
+      type="button"
+      onClick={onReopenHistory}
+      title="Show chat history"
+      aria-label="Show chat history"
+      className="hidden md:flex items-center justify-center w-8 h-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent/40 transition-colors shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+    >
+      <PanelLeftOpen className="w-[18px] h-[18px]" aria-hidden="true" />
+    </button>
+  ) : null
+
   if (!thread) {
     return (
       <div className="flex flex-col h-full bg-background">
+        {/* Phase 156 REFINEMENT: desktop reopen handle for the welcome state — only when
+            history is collapsed (so an empty chat can still bring the list back). */}
+        {reopenHistoryButton && (
+          <div className="hidden md:flex px-4 py-2 items-center border-b border-border/30">
+            {reopenHistoryButton}
+          </div>
+        )}
         {/* Mobile nav trigger for welcome state */}
         <div className="md:hidden px-4 py-2 flex items-center border-b border-border/30">
           <button
@@ -424,6 +458,8 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
   return (
     <div className="flex flex-col h-full bg-background">
       <div className="px-6 py-3 bg-background/80 backdrop-blur-md flex items-center gap-2.5 border-b border-border/30">
+        {/* Phase 156 REFINEMENT: the ▷ reopen-history handle (desktop, collapsed-only). */}
+        {reopenHistoryButton}
         {/* Mobile menu trigger */}
         <button
           type="button"

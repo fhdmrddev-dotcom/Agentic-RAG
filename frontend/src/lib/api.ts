@@ -12,6 +12,24 @@ export interface SkillImportResult {
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL as string
 
+/** Phase 148 (VIS-01 / D-04) — the mid-session feature-flip bounce signal. When a
+ *  governed page's audience is tightened while a non-operator is on it, that page's
+ *  NEXT data fetch is refused server-side (a 403 from `require_visible`). Any api.ts
+ *  call that surfaces the refusal as an `ApiError(403)` dispatches this window event
+ *  (one chokepoint — the `ApiError` constructor below), so the App-level listener can
+ *  bounce home with a plain refusal instead of a dead/blank governed page.
+ *  RENDER-ONLY — the server 403 is the security wall; this only avoids a dead-end. */
+export const FEATURE_FORBIDDEN_EVENT = "agentic:feature-forbidden"
+
+/** Phase 148 (VIS-01 / D-04 — CR-02 fix) — the EXACT server refusal detail that
+ *  `require_visible` returns (dependencies.py) for a non-operator hitting an
+ *  Operators-only governed feature. This literal is the SOLE trigger for the
+ *  graceful-bounce event: a bare 403 is NOT enough (the FLAG-01 workflows kill-switch
+ *  and the app-layer ban check BOTH also return 403 through `ApiError`). The backend
+ *  gate, the `ApiError` dispatch guard below, and the App-level `onForbidden` listener
+ *  all agree on THIS one literal — keep them in lockstep. */
+export const VISIBILITY_REFUSAL = "This feature is available to administrators only."
+
 /** Phase 092 (092-06 / F3): a status-carrying error so the send path can
  *  distinguish a 409 lock-refusal (MODE-02 server-side Harness→Deep refusal)
  *  from a generic failure. Mirrors the existing DownloadError idiom (status +
@@ -23,8 +41,36 @@ export class ApiError extends Error {
     super(message)
     this.status = status
     this.name = "ApiError"
+    // Phase 148 (VIS-01 / D-04 — CR-01/CR-02 fix): a bare 403 is NOT uniquely a
+    // `require_visible` feature refusal. The FLAG-01 workflows kill-switch
+    // (threads.py — reachable via postMessage) and the app-layer ban check
+    // (dependencies.py — on the shared auth path) BOTH return 403 through `ApiError`.
+    // So gate the graceful-bounce event on the EXACT server refusal detail literal,
+    // NOT the bare status — only a genuine `require_visible` refusal carries
+    // VISIBILITY_REFUSAL, so only it bounces (the kill-switch/ban 403s keep their real
+    // message + their own error handling). getEffectiveFeatures throws a PLAIN Error
+    // (never ApiError), so the /features read can never feed this loop either (CR-01).
+    // Render-only; the server 403 remains the authority.
+    if (status === 403 && message === VISIBILITY_REFUSAL && typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent(FEATURE_FORBIDDEN_EVENT, { detail: { message, status } }),
+      )
+    }
   }
 }
+
+/** Phase 148 (VIS-01 / D-04) — the four governed feature keys (the effective-map
+ *  keys of `GET /features`). skill_studio + model_management are Operators-only on
+ *  the day-one map; workflow_authoring + governance_health are Everyone (148-05). */
+export type GovernedFeature =
+  | "skill_studio"
+  | "model_management"
+  | "workflow_authoring"
+  | "governance_health"
+
+/** The caller's effective feature→visible map. Partial so the fail-CLOSED `{}`
+ *  fallback (hook error / pre-resolve) type-checks — an absent key reads as hidden. */
+export type EffectiveFeatures = Partial<Record<GovernedFeature, boolean>>
 
 async function getAuthHeaders(): Promise<HeadersInit> {
   const { data } = await supabase.auth.getSession()
@@ -298,6 +344,13 @@ export interface StreamCallbacks {
   onSubAgentDelta?: (text: string) => void
   onSubAgentDone?: () => void
   onSkillActivated?: (skillName: string) => void
+  /** Phase 149 Plan 09 (D-149-10): the honest disabled-model fallback notice. Backend
+   * emits `model_disabled_fallback` on the run stream (naming BOTH the disabled model and
+   * the org-default fallback) when the user's selected model was operator-DISABLED. Pre-fix
+   * the frontend had NO handler → the event was dropped and the user saw a SILENT swap (the
+   * UAT Test-7 root cause). The handler stamps `modelFallbackNotice` on the assistant message
+   * so MessageItem renders an inline notice. Informational only — carries no terminal state. */
+  onModelDisabledFallback?: (disabledModel: string, fallbackModel: string, message: string) => void
   /** Phase 067.1 Plan 04: skill description hint from skill_loaded follow-up SSE event.
    * Fires AFTER skill_activated when the skill row's description column is non-empty. */
   onSkillLoaded?: (skillName: string, description: string) => void
@@ -467,6 +520,13 @@ export async function postMessage(
      *  the producer drives run_workflow instead of the Deep agent loop. Only
      *  sent when a workflow is picked — a Deep send omits it (byte-identical). */
     workflowDefinitionId?: string
+    /** Phase 152 (WFIN-02 / D-01) — a per-run KB-folder retrieval OVERRIDE for a
+     *  Harness kickoff. Travels as `folder_id` in the create_workflow_run.inputs
+     *  jsonb (MessageCreate.folder_id, Plan 01); the server owner-gates it (D-05)
+     *  and layers it over the definition's author default. Only sent when the Run
+     *  modal picks a folder that differs from the workflow default — absence is the
+     *  byte-identical D-06 path (no override → the author default / whole-KB). */
+    folderId?: string | null
   } = {},
 ): Promise<PostMessageResponse> {
   const headers = await getAuthHeaders()
@@ -482,6 +542,9 @@ export async function postMessage(
       ...(options.workflowDefinitionId
         ? { workflow_definition_id: options.workflowDefinitionId }
         : {}),
+      // WFIN-02 (D-01): additive — same shape as workflow_definition_id. Only sent
+      // when a per-run folder override is present; absence = D-06 (author default).
+      ...(options.folderId ? { folder_id: options.folderId } : {}),
     }),
   })
   // 092-06 (F3): preserve the HTTP status so a 409 lock-refusal is
@@ -637,6 +700,16 @@ export async function subscribeToRun(
         }
         else if (t === "skill_activated" && callbacks.onSkillActivated)
           callbacks.onSkillActivated(parsed.skill_name as string)
+        // Phase 149 Plan 09 (D-149-10): the honest disabled-model fallback notice.
+        // Informational branch (mirrors skill_activated) — carries NO `return`, so the
+        // cursor-advance below still fires. Pre-fix this event fell through the ladder and
+        // was silently dropped (the UAT Test-7 silent-swap root cause).
+        else if (t === "model_disabled_fallback" && callbacks.onModelDisabledFallback)
+          callbacks.onModelDisabledFallback(
+            parsed.disabled_model as string,
+            parsed.fallback_model as string,
+            parsed.message as string,
+          )
         else if (t === "skill_loaded" && callbacks.onSkillLoaded)
           callbacks.onSkillLoaded(parsed.skill_name as string, parsed.description as string)
         else if (t === "code_execution_start" && callbacks.onCodeExecutionStart)
@@ -2118,6 +2191,21 @@ export interface FullAppSettings {
   web_search_has_api_key: boolean
   web_search_max_results: number
   sandbox_enabled: boolean
+  // Phase 147 (FLAG-01 / migration 097) — the three net-new per-feature kill-switch
+  // + maintenance flags added to the `FullSettingsResponse` contract (Plan 147-01).
+  // `getSettings()` is the Control Room grid's flag-read source (no new flags GET);
+  // `setFlag()` is the write path. Defaults keep existing behavior byte-identical:
+  // self_improve/workflows default true, maintenance_mode false.
+  self_improve_enabled: boolean
+  workflows_enabled: boolean
+  maintenance_mode: boolean
+  // Phase 159 (MODEL-03 / D-159-04) — the persisted operator toggle that hides known
+  // non-chat "utility" model ids (embeddings / audio / image / …) from the model-
+  // discovery panel by default. Default true (migration 103). Rides the same
+  // `getSettings()` read + `setFlag("model_discovery_filter_enabled", …)` write path as
+  // the FLAG-01 booleans above; purely a display/curation concern (never gates the
+  // confirmable diff — 149 red line). ControlRoomPage passes it to ModelDiscoveryPanel.
+  model_discovery_filter_enabled: boolean
   context_window_max_tokens: number
   sub_agent_max_output_tokens: number
   sub_agent_model: string
@@ -2145,6 +2233,13 @@ export interface FullAppSettings {
   // Phase 075.3 D-075.3-13 + D-075.3-12: per-unknown-model inferred provider
   // mapping; frontend reads this to substitute {provider} in the tooltip text.
   inferred_provider_for: Record<string, string>
+  // Phase 149 (MODEL-01 / D-149-05) — the global set of model_ids flagged
+  // `deprecated` in the model registry. Plan 05 populates this in the backend
+  // settings payload; the picker (ModelPillRow / MessageInput) reads it
+  // defensively (`new Set(deprecated_models ?? [])`) to render an informational
+  // `deprecated` badge on those pills. Optional so an older backend response
+  // without the field never crashes the frontend (absent → empty set → no badge).
+  deprecated_models?: string[]
 }
 
 export type AppSettings = FullAppSettings
@@ -2276,7 +2371,7 @@ export async function kickReembed(): Promise<ReembedProgress> {
   return res.json() as Promise<ReembedProgress>
 }
 
-export async function getProviders(): Promise<{ active: string; active_model: string; providers: { id: string; name: string; models: string[]; is_active: boolean }[] }> {
+export async function getProviders(): Promise<{ active: string; active_model: string; providers: { id: string; name: string; models: string[]; is_active: boolean }[]; deprecated_models?: string[] }> {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_BASE}/settings/providers`, { headers, cache: "no-store" })
   if (!res.ok) throw new Error("Failed to get providers")
@@ -2600,24 +2695,30 @@ export interface GovLowConfidenceItem {
   min_confidence: number
 }
 
+// Phase 148 (VIS-01 / D-04): the three `document-governance` signal reads are
+// governed by `require_visible('governance_health')` (148-05). They throw `ApiError`
+// (carrying `res.status`) — NOT a plain Error — so a mid-session governance_health
+// tighten surfaces the 403 through the D-04 graceful bounce (GovernancePage auto-fetches
+// all three on mount, so a non-operator landing after a tighten bounces home instead of
+// dead-ending). ApiError extends Error, so existing message-only catch sites are unaffected.
 export async function getGovBroken(offset = 0, limit = 20): Promise<PaginatedResponse<GovBrokenItem>> {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_BASE}/document-governance/broken-relationships?offset=${offset}&limit=${limit}`, { headers })
-  if (!res.ok) throw new Error("Failed to load broken relationships")
+  if (!res.ok) throw new ApiError("Failed to load broken relationships", res.status)
   return res.json() as Promise<PaginatedResponse<GovBrokenItem>>
 }
 
 export async function getGovUnclassified(offset = 0, limit = 20): Promise<PaginatedResponse<GovUnclassifiedItem>> {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_BASE}/document-governance/unclassified?offset=${offset}&limit=${limit}`, { headers })
-  if (!res.ok) throw new Error("Failed to load unclassified documents")
+  if (!res.ok) throw new ApiError("Failed to load unclassified documents", res.status)
   return res.json() as Promise<PaginatedResponse<GovUnclassifiedItem>>
 }
 
 export async function getGovLowConfidence(offset = 0, limit = 20): Promise<PaginatedResponse<GovLowConfidenceItem>> {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_BASE}/document-governance/low-confidence?offset=${offset}&limit=${limit}`, { headers })
-  if (!res.ok) throw new Error("Failed to load low-confidence metadata")
+  if (!res.ok) throw new ApiError("Failed to load low-confidence metadata", res.status)
   return res.json() as Promise<PaginatedResponse<GovLowConfidenceItem>>
 }
 
@@ -3156,6 +3257,58 @@ export async function deleteWorkflowDraft(id: string, signal?: AbortSignal): Pro
   if (!res.ok) throw new Error(`Failed to delete workflow draft (status ${res.status})`)
 }
 
+// ── Phase 152-04 (WFIN-03 / D-LOCK-03/04/05) — the published-workflow safe DELETE
+//    cascade + its server-sourced victim-naming counts. These hit DISTINCT routes on
+//    api/workflows.py (Plan 02, D-08) — NEVER the draft `DELETE /workflows/{id}` above
+//    (Pitfall 7 — the routes must not collide). ────────────────────────────────────
+
+/** The victim-naming delete sheet's EXACT server-sourced counts (D-LOCK-03). The sheet
+ *  never guesses these: `versions` + `runs` are the Removed group (definition versions +
+ *  run records hard-deleted), `threads` is the Kept group (chats detached but preserved),
+ *  and `in_flight` is the count of runs STILL LIVE — the honest signal the amber
+ *  cancel-first banner gates on (D-LOCK-05). `in_flight` is the LIVE count, never `runs`
+ *  (which is historical run records — "in progress" off that would be a lie). */
+export interface WorkflowDeletePreview {
+  name: string
+  versions: number
+  runs: number
+  threads: number
+  in_flight: number
+}
+
+/** GET /workflows/{id}/delete-preview — the server-sourced Removed/Kept counts the
+ *  victim-naming sheet renders BEFORE commit (D-LOCK-03). Owner-gated + 404-collapse on
+ *  the backend (a non-owner / unknown id → WorkflowNotFoundError, no existence leak). The
+ *  error is NOT swallowed — the sheet renders its own load-error state on a throw. */
+export async function getWorkflowDeletePreview(
+  id: string,
+  signal?: AbortSignal,
+): Promise<WorkflowDeletePreview> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/workflows/${id}/delete-preview`, { headers, signal })
+  if (res.status === 404) throw new WorkflowNotFoundError()
+  if (!res.ok) throw new Error(`Failed to load workflow delete preview (status ${res.status})`)
+  return (await res.json()) as WorkflowDeletePreview
+}
+
+/** DELETE /workflows/{id}/cascade — the WFIN-03 hard-delete (204): the definition + ALL
+ *  versions + ALL runs are removed; in-flight runs are cancelled-first server-side; threads
+ *  are detached-but-KEPT (they become normal chats). A DISTINCT route from the draft
+ *  `DELETE /workflows/{id}` (Pitfall 7 — never collide). Owner-gated on the backend (404 on
+ *  non-owner). The error is NOT swallowed — the sheet's error state renders on a throw, and
+ *  the card is removed only AFTER the server confirms (D-LOCK-04 — no optimistic vanish,
+ *  no undo; hard-delete is irreversible). */
+export async function deleteWorkflowCascade(id: string, signal?: AbortSignal): Promise<void> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/workflows/${id}/cascade`, {
+    method: "DELETE",
+    headers,
+    signal,
+  })
+  if (res.status === 404) throw new WorkflowNotFoundError()
+  if (!res.ok) throw new Error(`Failed to delete workflow (status ${res.status})`)
+}
+
 /** POST /workflows/generate — NL one-shot structured generation. The route
  *  returns HTTP 200 even on a FAILED generation (`ok:false`), so we read the body
  *  and NEVER throw on `ok:false` (only on a real HTTP/network error). */
@@ -3493,5 +3646,789 @@ export async function streamTunerRun(
         return
       }
     }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 146 (ADMIN-01) — Control Room admin data layer.
+//
+// SECURITY NOTE (Pitfall 13 / D-07): these client functions decide RENDERING
+// ONLY. The backend `require_operator` router gate (Plan 02) is the sole
+// authority — a non-operator's `GET /admin/me` returns a byte-identical 404
+// {"detail":"Not Found"} (non-discoverable, 404-not-403), so the surface never
+// reveals it exists. A forged `isOperator=true` in the browser reveals nothing
+// and reaches no data: every /admin call is independently 404-gated server-side.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** The operator identity returned by `GET /admin/me` (Plan 02). */
+export interface OperatorIdentity {
+  id: string
+  email: string
+  granted_at: string
+}
+
+/** The four raw backpressure signals from `GET /admin/backpressure` (Plan 02).
+ *  The Control Room maps each to a plain label (Server capacity · Agents working
+ *  · Database connections · Work spread) behind the "⌥ Technical names" toggle. */
+export interface BackpressureSignals {
+  anyio_threadpool_depth: { borrowed: number; total: number }
+  redis_active_runs: number
+  postgres_pool_in_use: number
+  per_worker_run_count: number
+  // Phase 147 (ADMIN-02 / D-078-08 additive-only) — the dependency-health probes
+  // appended to the SAME `GET /admin/backpressure` payload. OPTIONAL for
+  // back-compat: a backend that has not yet shipped Plan 147-04 omits the key and
+  // the four fields above stay byte-identical. `sandbox` has a third `"off"` state
+  // — a deliberately-disabled sandbox (SANDBOX_ENABLED=false) is grey, never red.
+  dependencies?: {
+    redis: { state: "up" | "down"; latency_ms: number | null }
+    supabase: { state: "up" | "down"; latency_ms: number | null }
+    sandbox: { state: "off" | "up" | "down"; latency_ms: number | null }
+  }
+  // Phase 150 (SEC-01 / D-150-02 / additive, back-compat) — the at-rest secrets
+  // encryption state, appended to the SAME payload. OPTIONAL: a backend that has
+  // not shipped Plan 150-05 omits the key and every field above stays byte-compatible.
+  // `encrypted` = all secret columns are ciphertext at rest; `plaintext` = the
+  // deliberate no-key config (NEUTRAL, never red — Pitfall 6); `error` = genuine
+  // decrypt failures (columns_unreadable) and/or lingering plaintext under an active
+  // key (columns_plaintext — a swallowed sweep); `unknown` = a key is active but ZERO
+  // secret values were observed (an empty / cold-cache row — WR-02: NEUTRAL, never green,
+  // so a DB outage can't paint a false "Encrypted"). Only counters > 0 are present.
+  secrets_encryption?: {
+    state: "encrypted" | "plaintext" | "error" | "unknown"
+    columns_unreadable?: number
+    columns_plaintext?: number
+  }
+}
+
+/** One append-only `operator_audit_log` row from `GET /admin/audit` (Plan 02) —
+ *  the recent-actions ledger feed. `label` is the human sentence; `is_write`
+ *  drives the ✎ write mark. */
+export interface OperatorAuditRow {
+  id: string
+  action: string
+  label: string
+  is_write: boolean
+  target_type: string | null
+  target_id: string | null
+  created_at: string
+}
+
+/** The operator probe. Calls `GET /admin/me`; a 404 means "not an operator" →
+ *  resolves to `null` so the caller renders NOTHING (the D-07 non-discoverable
+ *  contract — a non-operator's nav stays byte-identical to today). Returns the
+ *  operator identity on 200. Mirrors the `getTunerLatest` 404→null idiom.
+ *  RENDER-ONLY: never a security boundary (see SECURITY NOTE above). */
+export async function getOperatorProbe(): Promise<OperatorIdentity | null> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/admin/me`, { headers })
+  if (res.status === 404) return null
+  if (!res.ok) throw new ApiError("Failed to load the operator identity.", res.status)
+  return (await res.json()) as OperatorIdentity
+}
+
+/** Phase 148 (VIS-01 / D-04): the caller's effective feature→visible map from the
+ *  authenticated `GET /features` (148-05). EVERY authenticated user has a map — a
+ *  non-operator reaches it (200) to learn which governed nav items to hide; this is
+ *  deliberately NOT the operator-probe's 404→null idiom (there is no "you have no
+ *  map" state). RENDER-ONLY: the per-endpoint `require_visible` gates (148-05) are the
+ *  sole security authority — a governed page fetch still returns 403 server-side
+ *  regardless of this map (that 403 is the graceful-bounce trigger, not this call). */
+export async function getEffectiveFeatures(): Promise<EffectiveFeatures> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/features`, { headers })
+  // CR-01 fix: NEVER throw ApiError here. A banned user's `GET /features` returns 403
+  // (get_current_user → _is_banned), and an ApiError(403) would dispatch the
+  // FEATURE_FORBIDDEN_EVENT → App.onForbidden → refetchFeatures() → this call again →
+  // an unbounded /features refetch storm. A PLAIN Error keeps the effective-features
+  // read entirely out of the graceful-bounce loop; useEffectiveFeatures catches it and
+  // fails CLOSED to `{}` (every governed feature hidden). The server 403 stays the wall.
+  if (!res.ok) throw new Error("Failed to load feature visibility.")
+  const body = (await res.json()) as { features?: EffectiveFeatures }
+  return body.features ?? {}
+}
+
+/** Read the four live backpressure/health signals (`GET /admin/backpressure`).
+ *  Plain authed GET — the router gate returns 404 to non-operators. */
+export async function getBackpressure(): Promise<BackpressureSignals> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/admin/backpressure`, { headers })
+  if (!res.ok) throw new ApiError("Failed to load system health.", res.status)
+  return (await res.json()) as BackpressureSignals
+}
+
+/** Read the recent operator-actions ledger feed (`GET /admin/audit`). Plain
+ *  authed GET; `limit` optionally caps how many rows come back.
+ *
+ *  CR-01: the backend returns an ENVELOPE `{"entries": [...]}` (admin.py) — the
+ *  same shape as `getAuditLogs` above. Unwrap `.entries` here; casting the raw
+ *  object to `OperatorAuditRow[]` shipped a `{entries}` object into `auditRows`
+ *  state, and the next `auditRows.slice(...)` crashed the whole Control Room tree
+ *  (no error boundary above it → white screen). The unwrap is the contract. */
+export async function getOperatorAudit(limit?: number): Promise<OperatorAuditRow[]> {
+  const headers = await getAuthHeaders()
+  const qs = limit != null ? `?limit=${encodeURIComponent(limit)}` : ""
+  const res = await fetch(`${API_BASE}/admin/audit${qs}`, { headers })
+  if (!res.ok) throw new ApiError("Failed to load the operator audit feed.", res.status)
+  const body = (await res.json()) as { entries?: OperatorAuditRow[] }
+  return body.entries ?? []
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 148 (ADMIN-03 / 067-A) — the platform-audit browser (BOTH-ledger client).
+//
+// The operator ledger above is your OWN governance actions (operator_audit_log).
+// This section adds the SECOND source of the 067-A one-browser-two-sources surface:
+// the cross-user PLATFORM `audit_log` (every user's real activity — the 19-action
+// vocabulary of migs 030/071). These are the SC#4 no-RLS-backstop cross-user READS:
+// every `GET /admin/platform-audit` call records `audit.view_platform` server-side
+// (viewing user activity is ITSELF in the ledger — never silent), and a successful
+// export records `audit.export` naming the exact count. Query/scope/cap safety is
+// entirely server-side (148-04/06 — parameterized binds, page_size ≤ 100,
+// COUNT-first refuse-over-50000). The client only renders + passes filters; it never
+// does an unbounded client-side fetch. RENDER-ONLY (Pitfall 13): every /admin call
+// is independently 404-gated server-side.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** The shared filter shape for the platform-audit browse + CSV export (067-A). A
+ *  NULL/absent `userId` is the deliberate ALL-users read; a value scopes to one user.
+ *  `actionTypes` maps to the repeatable `action_type` query param (text[] ANY);
+ *  `since`/`until` are ISO timestamps forming a half-open `[since, until)` window. */
+export interface PlatformAuditFilters {
+  userId?: string | null
+  actionTypes?: string[]
+  since?: string | null
+  until?: string | null
+}
+
+/** One cross-user `audit_log` row from `GET /admin/platform-audit` (148-06). Unlike
+ *  the operator ledger this is the RAW platform vocabulary — `action_type` is a code
+ *  (e.g. `document.upload`) the UI maps to a plain-first label + group. `user_id` is
+ *  the acting user (clickable → filter-to-them); no email is joined (metadata only). */
+export interface PlatformAuditRow {
+  id: string
+  user_id: string | null
+  action_type: string
+  metadata: Record<string, unknown> | null
+  created_at: string
+}
+
+/** One server page of the platform-audit browse. `has_more` drives the pager Next —
+ *  the browse endpoint is COUNT-free by design (no full-tenant total leak, SC#4). */
+export interface PlatformAuditPage {
+  entries: PlatformAuditRow[]
+  page: number
+  page_size: number
+  has_more: boolean
+}
+
+/** Shared query-string builder for the two platform-audit calls (browse + export) so
+ *  the export set is EXACTLY the browsed/filtered set (067-A CSV honesty). */
+function platformAuditParams(filters: PlatformAuditFilters): URLSearchParams {
+  const params = new URLSearchParams()
+  if (filters.userId) params.set("user_id", filters.userId)
+  for (const at of filters.actionTypes ?? []) params.append("action_type", at)
+  if (filters.since) params.set("since", filters.since)
+  if (filters.until) params.set("until", filters.until)
+  return params
+}
+
+/** Browse the cross-user platform `audit_log` (`GET /admin/platform-audit`, 148-06).
+ *  A RECORDED read — every call stamps `audit.view_platform` server-side (SC#4: viewing
+ *  user activity is itself in the ledger). Plain authed GET; the router gate returns a
+ *  byte-identical 404 to non-operators. Pagination is 1-based; the server clamps
+ *  `pageSize` ≤ 100 (no full-tenant leak). The backend returns an envelope
+ *  `{entries, page, page_size, has_more}` — unwrap defensively (CR-01 precedent). */
+export async function getPlatformAudit(
+  filters: PlatformAuditFilters,
+  page = 1,
+  pageSize = 50,
+): Promise<PlatformAuditPage> {
+  const headers = await getAuthHeaders()
+  const params = platformAuditParams(filters)
+  params.set("page", String(Math.max(1, page)))
+  params.set("page_size", String(pageSize))
+  const res = await fetch(`${API_BASE}/admin/platform-audit?${params}`, { headers })
+  if (!res.ok) throw new ApiError("Failed to load platform activity.", res.status)
+  const body = (await res.json()) as Partial<PlatformAuditPage>
+  return {
+    entries: body.entries ?? [],
+    page: body.page ?? page,
+    page_size: body.page_size ?? pageSize,
+    has_more: body.has_more ?? false,
+  }
+}
+
+/** Export EXACTLY the filtered platform `audit_log` set as CSV (`GET
+ *  /admin/platform-audit/export`, 148-06) and trigger a browser download. On SUCCESS the
+ *  server records ONE `audit.export` row naming the exact count (the ✎ receipt lands in
+ *  the OPERATOR ledger on the next read). On an over-cap set the server REFUSES with 413
+ *  (never a partial download) — surfaced here as an `ApiError(413)` so the caller shows
+ *  "narrow the filter" instead of downloading a truncated file. Mirrors `exportAuditLogs`'s
+ *  blob-download idiom. NOTE: /admin never returns 403, so this ApiError cannot trip the
+ *  VIS-01 feature-forbidden bounce (that is uniquely a `require_visible` 403). */
+export async function exportPlatformAudit(filters: PlatformAuditFilters): Promise<void> {
+  const token = await getAuthToken()
+  const params = platformAuditParams(filters)
+  const res = await fetch(`${API_BASE}/admin/platform-audit/export?${params}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!res.ok) {
+    throw new ApiError(
+      res.status === 413
+        ? "Too many rows — narrow the filter, then export again."
+        : "Failed to export platform activity.",
+      res.status,
+    )
+  }
+  const blob = await res.blob()
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement("a")
+  a.href = url
+  a.download = "platform-audit.csv"
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 148 (ADMIN-03 users roster + VIS-01 feature visibility) — the Users &
+// Access write layer (068-A roster · graded action guards · 069-A audience rows).
+//
+// SAME security posture as every /admin call above: these decide RENDERING + fire
+// the SERVER-enforced writes. The router `require_operator` gate (146) is the sole
+// authority — a non-operator gets a byte-identical 404. The self-guards the roster
+// UI shows (disable/remove-operator on your own row) are COURTESY only; the server
+// refuses a self-target with 409 (148-06) — that is the real lockout-proof wall.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** One roster row from `GET /admin/users` (148-06 → `list_users_roster`, one join).
+ *  Honest last-active: `last_sign_in_at` NULL means the user has NEVER signed in (the
+ *  UI renders "never signed in" italic — never fabricated). `banned_until` in the
+ *  FUTURE means the account is disabled (GoTrue ban) → the Disabled status chip.
+ *  `is_operator` drives the ⛨ role chip; `doc_count`/`chat_count` are the identity sub. */
+export interface UserRosterRow {
+  id: string
+  email: string | null
+  created_at: string
+  last_sign_in_at: string | null
+  banned_until: string | null
+  is_operator: boolean
+  doc_count: number
+  chat_count: number
+}
+
+/** One server page of the users roster. The backend returns newest-active-first
+ *  (`ORDER BY last_sign_in_at DESC NULLS LAST`); the client only filters/searches
+ *  the loaded page — never an unbounded client-side fetch. */
+export interface UserRosterPage {
+  users: UserRosterRow[]
+  page: number
+  page_size: number
+}
+
+// NOTE: the governed-feature key union `GovernedFeature` is already defined once near
+// the top of this file (the `GET /features` effective-map keys). It IS the backend
+// `_VISIBILITY_FEATURES` allowlist — reused here as the `setFeatureVisibility` key type
+// (a value outside it is rejected 400 server-side before any write). Do NOT redeclare it.
+
+/** The audience an advanced feature is visible to. An ENUM, **NEVER a boolean** —
+ *  the SEED-115 extensible-audience forward-compat contract: the two-position control
+ *  is the degenerate two-audience case of a value designed to grow into an audience
+ *  picker (IdP groups / departments at v3.4). `everyone` = all end users see it;
+ *  `operators` = operators only (end users are refused server-side, not just hidden). */
+export type FeatureAudience = "everyone" | "operators"
+
+/** Read the users roster (`GET /admin/users`, 148-06). Plain authed GET — the router
+ *  gate returns 404 to non-operators; this cross-user read is floor-EXEMPT (the `/runs`
+ *  poll precedent, D-07). 1-based pagination; the server clamps `pageSize` ≤ 100. The
+ *  backend returns an envelope `{users, page, page_size}` — unwrap defensively (CR-01). */
+export async function getUsersRoster(page = 1, pageSize = 50): Promise<UserRosterPage> {
+  const headers = await getAuthHeaders()
+  const params = new URLSearchParams({
+    page: String(Math.max(1, page)),
+    page_size: String(pageSize),
+  })
+  const res = await fetch(`${API_BASE}/admin/users?${params}`, { headers })
+  if (!res.ok) throw new ApiError("Failed to load the users roster.", res.status)
+  const body = (await res.json()) as Partial<UserRosterPage>
+  return {
+    users: body.users ?? [],
+    page: body.page ?? page,
+    page_size: body.page_size ?? pageSize,
+  }
+}
+
+/** Disable a user (`POST /admin/users/{id}/disable`, 148-06). Server-enforced: GoTrue
+ *  ban + in-flight run cancel + a recorded `user.disable` row. A self-target is refused
+ *  409 BEFORE any mutation (lockout-proof — the UI self-guard is only courtesy). The
+ *  user's documents/chats/settings are KEPT; re-enable restores access. */
+export async function disableUser(userId: string): Promise<void> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/admin/users/${encodeURIComponent(userId)}/disable`, {
+    method: "POST",
+    headers,
+  })
+  if (!res.ok) throw new ApiError("Failed to disable the user.", res.status)
+}
+
+/** Re-enable a user (`POST /admin/users/{id}/enable`, 148-06). Restorative + direct:
+ *  lifts the GoTrue ban and records a `user.enable` row. */
+export async function enableUser(userId: string): Promise<void> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/admin/users/${encodeURIComponent(userId)}/enable`, {
+    method: "POST",
+    headers,
+  })
+  if (!res.ok) throw new ApiError("Failed to re-enable the user.", res.status)
+}
+
+/** Grant operator access (`POST /admin/users/{id}/operator`, 148-06 / D-01). The server
+ *  INSERTs the membership populating `granted_by` (mig 095 provenance), idempotently, and
+ *  records `operator.grant`. Blast radius: the grantee can see every user's activity + kill
+ *  anyone's runs — the amber roster sheet names it before firing. */
+export async function grantOperator(userId: string): Promise<void> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/admin/users/${encodeURIComponent(userId)}/operator`, {
+    method: "POST",
+    headers,
+  })
+  if (!res.ok) throw new ApiError("Failed to grant operator access.", res.status)
+}
+
+/** Revoke operator access (`DELETE /admin/users/{id}/operator`, 148-06). The person keeps
+ *  their normal account (only the membership row is removed); past operator actions stay in
+ *  the trail forever. A self-revoke is refused 409 server-side BEFORE any delete. */
+export async function revokeOperator(userId: string): Promise<void> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/admin/users/${encodeURIComponent(userId)}/operator`, {
+    method: "DELETE",
+    headers,
+  })
+  if (!res.ok) throw new ApiError("Failed to revoke operator access.", res.status)
+}
+
+/** Set a governed feature's audience (`PUT /admin/visibility`, 148-06 / VIS-01). The body
+ *  is `{feature, audience}` where `audience` is an ENUM VALUE (`"everyone"`|`"operators"`),
+ *  **never a boolean** — the extensible-audience forward-compat contract (SEED-115). The
+ *  server allowlist-validates both (400 on a bad value BEFORE any write), atomically JSONB-
+ *  merges the single record (no lost-update clobber), and records `visibility.set`. The
+ *  audience flip propagates within the ~30s per-worker TTL ("on their next call"). */
+export async function setFeatureVisibility(
+  feature: GovernedFeature,
+  audience: FeatureAudience,
+): Promise<void> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/admin/visibility`, {
+    method: "PUT",
+    headers,
+    body: JSON.stringify({ feature, audience }),
+  })
+  if (!res.ok) throw new ApiError("Failed to update feature visibility.", res.status)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 147 (ADMIN-02 + FLAG-01) — Control Plane client contract.
+//
+// The Wave-1 seam: types + client fns every Wave-2/3 admin component consumes
+// (ActiveRunsSection, CapabilityGrid, MaintenancePanel). SAME security posture as
+// the 146 operator calls above: these decide RENDERING ONLY. Every /admin call is
+// independently 404-gated server-side (Pitfall 13 / T-147-12) — the client is
+// presentation, never a trust boundary. A forged operator flag reaches no data.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** One live entry from `GET /admin/runs` (Plan 147-02) — every `runs:active`
+ *  member, enriched from its `runs` row for the 064-B card. `started_at` is a unix
+ *  epoch so the client computes elapsed with local math (no poll to tick — D-07).
+ *  `killable` is false for eval/tuner jobs (bounded internal work — D-01); those
+ *  render an honest "ends on its own" copy with no Kill affordance. `not_responding`
+ *  is the SERVER-derived stalled-stream signal (run:{id} stream age — the 064-B
+ *  not-responding tag source), never inferred client-side. */
+export interface AdminActiveRun {
+  run_id: string
+  kind: "chat" | "workflow" | "eval" | "tuner"
+  thread_id: string | null
+  user_id: string | null
+  user_email: string | null
+  model: string | null
+  provider: string | null
+  started_at: number
+  killable: boolean
+  not_responding: boolean
+}
+
+/** The five per-feature kill-switch / maintenance flags on the `app_settings` TTL
+ *  substrate (FLAG-01). `web_search_enabled` + `sandbox_enabled` are live since 053;
+ *  the other three ship with migration 097 (Plan 147-01). Fail-closed polarity is a
+ *  BACKEND concern (capability flags default-on last-known-good; `maintenance_mode`
+ *  cold-cache → false / platform OPEN). This union is the write key for `setFlag`. */
+export type FlagKey =
+  | "web_search_enabled"
+  | "sandbox_enabled"
+  | "self_improve_enabled"
+  | "workflows_enabled"
+  | "maintenance_mode"
+  // Phase 159 (MODEL-03 / D-159-04) — the discovery-panel utility filter toggle. Rides
+  // `PUT /admin/flags` verbatim (backend added the key to `_FLAG_HUMAN_NAMES`).
+  | "model_discovery_filter_enabled"
+
+/** Read the live active-runs list (`GET /admin/runs`, Plan 147-02). Plain authed
+ *  GET — the router gate returns 404 to non-operators. The backend returns an
+ *  ENVELOPE `{"runs": [...]}` (same shape as `getOperatorAudit`'s `{entries}`);
+ *  unwrap `.runs` here — casting the raw object to `AdminActiveRun[]` would ship a
+ *  `{runs}` object into list state and crash the next `.map` (CR-01 precedent). */
+export async function getAdminActiveRuns(): Promise<AdminActiveRun[]> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/admin/runs`, { headers })
+  if (!res.ok) throw new ApiError("Failed to load active runs.", res.status)
+  const body = (await res.json()) as { runs?: AdminActiveRun[] }
+  return body.runs ?? []
+}
+
+/** Operator Kill: cancel ANY user's run (`POST /admin/runs/{run_id}/kill`,
+ *  Plan 147-02 — the ownership-unscoped sibling of the owner `DELETE /runs/{id}`).
+ *  Idempotent-terminal → 204; the killed user sees exactly a self-cancel (D-03) —
+ *  who/why lives only in `operator_audit_log`, never in the victim's chat. */
+export async function killRun(runId: string): Promise<void> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/admin/runs/${encodeURIComponent(runId)}/kill`, {
+    method: "POST",
+    headers,
+  })
+  if (!res.ok) throw new ApiError("Failed to end the run.", res.status)
+}
+
+/** Flip a per-feature kill-switch / maintenance flag (`PUT /admin/flags`, Plan
+ *  147-03). Body `{key, value}`; the backend writes `app_settings` + invalidates
+ *  the TTL cache. Effect propagates within the ~30s per-worker window ("takes
+ *  effect on their next call" — the 065-A impact copy accounts for this latency). */
+export async function setFlag(key: FlagKey, value: boolean): Promise<void> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/admin/flags`, {
+    method: "PUT",
+    headers,
+    body: JSON.stringify({ key, value }),
+  })
+  if (!res.ok) throw new ApiError("Failed to update the setting.", res.status)
+}
+
+/** Extract a FastAPI `detail` STRING from a non-2xx response for an `ApiError`
+ *  message, falling back to a generic line when the body is a 422 detail-array or
+ *  non-JSON. Mirrors `proposalError` but returns the string (ApiError owns status).
+ *  Used by the model-registry write seams so a 409 refusal preserves the server's
+ *  plain-language `detail` (the default/locked-guard reason) instead of a generic. */
+async function errorDetail(res: Response, fallback: string): Promise<string> {
+  try {
+    const j = (await res.json()) as { detail?: unknown }
+    if (typeof j?.detail === "string") return j.detail
+  } catch {
+    /* non-JSON body — keep the generic fallback */
+  }
+  return fallback
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 149 (MODEL-01 + MODEL-02 / D-149-07) — the model-registry client contract.
+//
+// The interface-first Wave-1 seams the operator Model Registry tab (Plan 07)
+// consumes: read the registry (`getModelRegistry`), edit one model's capabilities
+// (`setModelCapability`), lock/unlock + pin the org default (`setModelLock` — the
+// DEDICATED PUT endpoint, SEPARATE from PATCH), and run live `/models` discovery
+// (`runModelDiscovery`, ephemeral diff). SAME security posture as the 146/147
+// admin calls above: these decide RENDERING ONLY — every /admin call is
+// independently 404-gated server-side (Pitfall 13 / T-149-08). The client adds
+// NO authority; the backend `require_operator` 404 gate (Plan 05/06) is the sole
+// wall. A non-operator simply gets a 404 → ApiError. The read seam UNWRAPS the
+// `{models}` envelope IN THE CLIENT (never in the component — CR-01 precedent).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** One row of the model registry from `GET /admin/models` (Plan 05). Mirrors the
+ *  backend registry columns: `capability_source` distinguishes a `"registry"`
+ *  hardcoded-default row from a `"db_override"` operator-edited row (the
+ *  `model_capabilities_overrides` table, live since mig 053). `is_default` marks
+ *  the pinned org default; `is_locked` reflects the D-149-07 lock. `deprecated`
+ *  drives the picker's informational badge (surfaced via `deprecated_models`). */
+export interface ModelRegistryRow {
+  model_id: string
+  provider: string
+  capability_source: "registry" | "db_override"
+  enabled: boolean
+  deprecated: boolean
+  /** IN-02: the stored deprecation reason (operator context, never shown to end users). The
+   *  tab seeds the DeprecatedControl input from this so re-editing a deprecated model
+   *  preserves the current note instead of clobbering it with a blank. Optional/nullable —
+   *  absent or unset → empty input. */
+  deprecated_reason?: string | null
+  /** WR-04 honesty: a numeric capability NOT tracked in the built-in registry reads `null`
+   *  (rendered as "—" in the tab), NOT a concrete `0`. No built-in MODEL_CAPABILITIES row
+   *  carries `context_window_tokens`, so it is `null` on every pure-DEF row until an operator
+   *  sets an override. `null` shows an empty edit input (the operator can type a number). */
+  context_window_tokens: number | null
+  max_output_tokens: number | null
+  native_tools: boolean
+  llm_call_timeout_seconds: number | null
+  is_default: boolean
+  is_locked: boolean
+  /** The editable columns actually STORED as a DB override (OVR) vs inherited from the
+   *  built-in registry (DEF). The tab renders per-field OVR/DEF and shows a Reset only on
+   *  overridden fields; a Reset sends an explicit `null` for that field (clears to DEF, Plan
+   *  05 Task 3). Additive — the Plan-05 backend `_registry_row` already emits it (the seven
+   *  `_MODEL_CAP_COLUMNS` names); Plan 07 extends the TS type per the 149-04/05 handoff. */
+  overridden_fields: string[]
+}
+
+/** The editable-columns patch body for `PATCH /admin/models/{id}` (Plan 06). Every
+ *  field optional — the tab sends only what changed. `deprecated` + `deprecated_reason`
+ *  flip the D-149-05 badge (the reason is operator context, never shown to end users). */
+export interface ModelCapabilityPatch {
+  enabled?: boolean
+  deprecated?: boolean
+  deprecated_reason?: string | null
+  context_window_tokens?: number
+  max_output_tokens?: number
+  native_tools?: boolean
+  llm_call_timeout_seconds?: number
+}
+
+/** The request body for `POST /admin/models` (Plan 02 — the D-159-02 add-by-ID write).
+ *  Adds ONE model as a DB-only `model_capabilities_overrides` row from the operator's
+ *  EXPLICIT `provider` pick (validated server-side against the native-7 + openrouter
+ *  roster). The capability fields are optional pre-fills (every column is null-safe on
+ *  the table). There is deliberately NO `enabled` field — the server FORCES
+ *  `enabled=false` (the 149 opt-in-enable rule / SC#3: an add never auto-enables; the
+ *  operator flips it on from the registry table afterward). Mirrors the backend
+ *  `AddModelRequest` pydantic shape exactly. */
+export interface AddModelBody {
+  model_id: string
+  provider: string
+  context_window_tokens?: number | null
+  max_output_tokens?: number | null
+  native_tools?: boolean | null
+  deprecated?: boolean
+  deprecated_reason?: string | null
+}
+
+// ── Plan-07 shape reconciliation (149-06 SUMMARY handoff) ─────────────────────
+// The Plan-04 `DiscoveryResult` stub (`{providers:[{new_models,…}]}`) was an
+// interface-first placeholder. The Plan-06 backend actually returns
+// `compute_diff`'s top-level `{new,changed,vanished}` groups PLUS an additive
+// per-provider `providers` outcome summary (names + status only — NEVER the
+// response body or key, T-149-04). These types now mirror that exact wire shape,
+// which the ModelDiscoveryPanel consumes.
+
+/** The propose-only sentinel the backend emits for a capability a provider did NOT
+ *  return (`model_discovery_service.UNKNOWN`). The panel renders any field equal to
+ *  this as the amber "unknown — you set it" input — NEVER a guessed value (SC#3). */
+export const DISCOVERY_UNKNOWN = "unknown"
+
+/** One discovered-but-unknown model (`compute_diff` "new"). Lands `enabled=false`; each
+ *  capability field is a concrete provider-returned value OR the `DISCOVERY_UNKNOWN`
+ *  sentinel string (SC#3 — never a guess; keys are the discovery-service field names
+ *  `context` / `max_output` / `native_tools`). */
+export interface DiscoveredNewModel {
+  provider: string
+  model_id: string
+  enabled: boolean
+  /** Phase 159 (MODEL-03 / D-159-01) — a DISPLAY-ONLY tag: `true` when the backend's
+   *  `is_utility_model` matched this id as non-chat "utility" noise (embeddings / audio /
+   *  image / moderation / rerank / …). The discovery panel (Plan 06) hides utility-flagged
+   *  entries by default behind the persisted `model_discovery_filter_enabled` toggle, but it
+   *  NEVER gates the confirmable diff (149 red line — propose, humans confirm). Optional for
+   *  backward-compat: an older backend response without the field → undefined → not hidden. */
+  utility?: boolean
+  capabilities: Record<string, number | boolean | string>
+}
+
+/** One model whose provider-RETURNED capability differs from the stored value. */
+export interface DiscoveredChangedModel {
+  provider: string
+  model_id: string
+  changes: Record<string, { from: number | boolean | string | null; to: number | boolean | string }>
+}
+
+/** One stored model an OK provider did NOT return — flagged, never auto-deleted (058/060). */
+export interface DiscoveredVanishedModel {
+  provider: string
+  model_id: string
+}
+
+/** One provider's honest run outcome — names + status only. `status` is `"ok"`,
+ *  `"no_key"`, `"http-{code}"`, or `"error-{ExceptionName}"`; `ok` is the derived
+ *  boolean so the panel can show ran-vs-skipped/errored. */
+export interface DiscoveryProviderOutcome {
+  provider: string
+  status: string
+  ok: boolean
+}
+
+/** The full ephemeral diff returned by `runModelDiscovery` — never persisted; the
+ *  operator reviews it and confirms individual changes through `setModelCapability`. */
+export interface DiscoveryResult {
+  new: DiscoveredNewModel[]
+  changed: DiscoveredChangedModel[]
+  vanished: DiscoveredVanishedModel[]
+  providers: DiscoveryProviderOutcome[]
+}
+
+/** Read the model registry (`GET /admin/models`, Plan 05). Plain authed GET — the
+ *  router gate returns 404 to non-operators. The backend returns an ENVELOPE
+ *  `{"models": [...]}` (same shape as `getAdminActiveRuns`'s `{runs}`); unwrap
+ *  `.models` HERE — casting the raw object to `ModelRegistryRow[]` would ship a
+ *  `{models}` object into list state and crash the next `.map` (CR-01 precedent). */
+export async function getModelRegistry(): Promise<ModelRegistryRow[]> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/admin/models`, { headers })
+  if (!res.ok) throw new ApiError("Failed to load the model registry.", res.status)
+  const body = (await res.json()) as { models?: ModelRegistryRow[] }
+  return body.models ?? []
+}
+
+/** Edit one model's capabilities (`PATCH /admin/models/{id}`, Plan 06). Sends only
+ *  the changed fields. A 409 (the default/locked guard — e.g. disabling the pinned
+ *  default) surfaces as `ApiError` carrying the server `detail` so the tab can show
+ *  the plain-language refusal rather than a generic failure. */
+export async function setModelCapability(
+  modelId: string,
+  patch: ModelCapabilityPatch,
+): Promise<void> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/admin/models/${encodeURIComponent(modelId)}`, {
+    method: "PATCH",
+    headers,
+    body: JSON.stringify(patch),
+  })
+  if (!res.ok) throw new ApiError(await errorDetail(res, "Failed to update the model."), res.status)
+}
+
+/** Add ONE model by explicit id + provider (`POST /admin/models`, Plan 02 — the
+ *  D-159-02 add-by-ID write). Writes a DB-only override row that lands `enabled=false`
+ *  (SC#3 — the server forces it; `AddModelBody` carries NO `enabled` field). A 409
+ *  ("already in the registry") or 422 (bad provider / wrong-typed capability) surfaces
+ *  as `ApiError` carrying the server `detail` so the add-by-ID form can show the
+ *  plain-language refusal (mirrors `setModelCapability`). The client adds NO authority —
+ *  the router 404-gates non-operators server-side. */
+export async function addModelById(body: AddModelBody): Promise<void> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/admin/models`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) throw new ApiError(await errorDetail(res, "Failed to add the model."), res.status)
+}
+
+/** Lock/unlock + pin the org default (`PUT /admin/models/{id}/lock`, Plan 06) — the
+ *  DEDICATED D-149-07 lock endpoint, SEPARATE from the PATCH capability seam. Body
+ *  `{ locked }`: `true` locks + pins the org default, `false` unlocks. A 409 (e.g. the
+ *  no-dead-default guard refusing to lock a disabled model) surfaces as `ApiError`
+ *  with the server `detail`. This is the seam Plan 07's `onLock`/`handleLock` calls. */
+export async function setModelLock(modelId: string, locked: boolean): Promise<void> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/admin/models/${encodeURIComponent(modelId)}/lock`, {
+    method: "PUT",
+    headers,
+    body: JSON.stringify({ locked }),
+  })
+  if (!res.ok) throw new ApiError(await errorDetail(res, "Failed to update the model lock."), res.status)
+}
+
+/** Run live `/models` discovery across the configured providers (`POST
+ *  /admin/models/discover`, Plan 06). Returns the ephemeral propose-only diff
+ *  (SC#3 — never auto-enables anything); the operator confirms each change. */
+export async function runModelDiscovery(): Promise<DiscoveryResult> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/admin/models/discover`, { method: "POST", headers })
+  if (!res.ok) throw new ApiError("Failed to run model discovery.", res.status)
+  return (await res.json()) as DiscoveryResult
+}
+
+/** Record ONE deliberate Control Plane ledger row (`POST /admin/control-plane/record`,
+ *  Plan 147-02). D-07 honesty seam: automated polls are floor-EXEMPT (silent);
+ *  instead a `"visit"` row ("Opened the Control Plane") is written once on tab-open
+ *  and the manual ↻ writes a `"refresh"` row. Every ledger row stays a human action. */
+export async function recordControlPlaneEvent(event: "visit" | "refresh"): Promise<void> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/admin/control-plane/record`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ event }),
+  })
+  if (!res.ok) throw new ApiError("Failed to record the Control Plane event.", res.status)
+}
+
+/** Read the maintenance flag from the PUBLIC `GET /health` endpoint (Plan 147-01
+ *  appends an additive `maintenance` boolean). This is the NON-ADMIN flag source
+ *  for the end-user maintenance banner: end users get a 404 on every `/admin/*`
+ *  route, so the app-shell banner cannot read `/settings`-gated operator data —
+ *  it reads the public health probe instead. Unauthed, best-effort: any failure
+ *  or a backend that has not yet shipped the field resolves to `false` (banner
+ *  hidden — never falsely announce maintenance). */
+export async function getMaintenanceStatus(): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE}/health`)
+    if (!res.ok) return false
+    const body = (await res.json()) as { maintenance?: boolean }
+    return body.maintenance ?? false
+  } catch {
+    return false
+  }
+}
+
+/** Phase 158 (DEPLOY-02 / D-06) — the STATIC, blip-proof first-run setup-entry signal.
+ *
+ *  Read from the PUBLIC (unauth) `GET /setup/status`. Users are PRE-AUTH here, so this NEVER
+ *  routes through `getAuthHeaders` (which throws "Not authenticated") — it mirrors
+ *  `getMaintenanceStatus`, the unauth sibling. Any failure resolves to a safe
+ *  `{needs_setup:false}`: a box that can't reach the backend must fall through to the normal
+ *  auth page, never falsely render the wizard.
+ *
+ *  URL note: the backend serves this UNPREFIXED at `/setup/status`; in prod `API_BASE` is
+ *  `/api` and nginx strips the single `/api`, in local dev `API_BASE` is `http://localhost:8000`
+ *  — so `${API_BASE}/setup/status` is correct in BOTH (exactly like `${API_BASE}/health`). */
+export interface SetupStatus {
+  needs_setup: boolean
+  finalized: boolean
+  has_token: boolean
+}
+
+export async function getSetupStatus(): Promise<SetupStatus> {
+  try {
+    const res = await fetch(`${API_BASE}/setup/status`)
+    if (!res.ok) return { needs_setup: false, finalized: false, has_token: false }
+    const body = (await res.json()) as Partial<SetupStatus>
+    return {
+      needs_setup: body.needs_setup ?? false,
+      finalized: body.finalized ?? false,
+      has_token: body.has_token ?? false,
+    }
+  } catch {
+    return { needs_setup: false, finalized: false, has_token: false }
+  }
+}
+
+/** Phase 158 (DEPLOY-02 / D-07) — the two PUBLIC Supabase values from the open
+ *  `GET /public-config`, so the browser's Supabase client can bind at runtime WITHOUT a
+ *  frontend rebuild (VITE_* are baked at build — the SC#3 honesty hinge). NEVER a secret: the
+ *  backend returns ONLY `supabase_url` + `supabase_anon_key` (both public by design). Returns
+ *  null on any failure — the caller then keeps the baked VITE_* fallback.
+ *
+ *  Note: `lib/supabase.ts` `hydrateSupabaseFromRuntime` inlines its own equivalent fetch to
+ *  avoid an api.ts → supabase.ts import cycle; this helper is for any OTHER consumer (the
+ *  wizard) that wants the runtime creds through the shared api layer. */
+export interface PublicConfig {
+  supabase_url: string
+  supabase_anon_key: string
+}
+
+export async function getPublicConfig(): Promise<PublicConfig | null> {
+  try {
+    const res = await fetch(`${API_BASE}/public-config`)
+    if (!res.ok) return null
+    const body = (await res.json()) as Partial<PublicConfig>
+    if (!body.supabase_url || !body.supabase_anon_key) return null
+    return { supabase_url: body.supabase_url, supabase_anon_key: body.supabase_anon_key }
+  } catch {
+    return null
   }
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest"
-import { render, screen } from "@testing-library/react"
+import { render, screen, fireEvent } from "@testing-library/react"
 import { ModelPillRow } from "@/components/settings/ModelPillRow"
 
 /**
@@ -106,5 +106,67 @@ describe("ModelPillRow / unverified badge", () => {
     )
     // React JSX auto-escapes the interpolated string — no <script> element in the DOM
     expect(container.querySelector("script")).toBeNull()
+  })
+})
+
+/**
+ * Phase 149 Plan 04 (D-149-05) — the `deprecated` badge matrix. Mirrors the
+ * amber `unverified` chip: a model in `deprecatedModels` shows a small
+ * informational `deprecated` badge but STAYS a selectable pill (badge only, no
+ * refusal). Absent/undefined `deprecatedModels` renders exactly as before.
+ */
+describe("ModelPillRow / deprecated badge", () => {
+  it("renders the deprecated badge on a member model and keeps the pill selectable", () => {
+    const onSelect = vi.fn()
+    render(
+      <ModelPillRow
+        models={["gpt-4o", "gpt-4-legacy"]}
+        llmModel="gpt-4o"
+        verifiedModels={new Set(["gpt-4o", "gpt-4-legacy"])}
+        inferredProviderFor={{}}
+        deprecatedModels={new Set(["gpt-4-legacy"])}
+        onSelect={onSelect}
+      />,
+    )
+    const badges = screen.getAllByText(/^deprecated$/i)
+    expect(badges).toHaveLength(1)
+    // The deprecated chip lives inside the gpt-4-legacy pill
+    const pill = badges[0].closest("button")
+    expect(pill?.textContent).toContain("gpt-4-legacy")
+    // Still a clickable <button> with no `disabled` — badge-only, no refusal
+    expect(pill).not.toBeNull()
+    expect(pill?.hasAttribute("disabled")).toBe(false)
+    fireEvent.click(pill!)
+    expect(onSelect).toHaveBeenCalledWith("gpt-4-legacy")
+  })
+
+  it("does not render the deprecated badge on a non-member model", () => {
+    render(
+      <ModelPillRow
+        models={["gpt-4o", "gpt-4-legacy"]}
+        llmModel="gpt-4o"
+        verifiedModels={new Set(["gpt-4o", "gpt-4-legacy"])}
+        inferredProviderFor={{}}
+        deprecatedModels={new Set(["gpt-4-legacy"])}
+        onSelect={vi.fn()}
+      />,
+    )
+    // gpt-4o is not in the set → its pill carries no deprecated chip
+    const gpt4o = screen.getByText("gpt-4o").closest("button")
+    expect(gpt4o?.textContent).not.toContain("deprecated")
+  })
+
+  it("renders without error and shows no deprecated badge when deprecatedModels is undefined", () => {
+    render(
+      <ModelPillRow
+        models={["gpt-4o", "gpt-4-legacy"]}
+        llmModel="gpt-4o"
+        verifiedModels={new Set(["gpt-4o", "gpt-4-legacy"])}
+        inferredProviderFor={{}}
+        onSelect={vi.fn()}
+      />,
+    )
+    // Defensive default — absent prop → no badge, no crash
+    expect(screen.queryByText(/^deprecated$/i)).toBeNull()
   })
 })

@@ -1,5 +1,47 @@
 # Sketch Wrap-Up Summary
 
+## Wrap-up 2026-07-11 — Operator Control Room (Phases 146–148)
+
+**Date:** 2026-07-11
+**Sketches processed:** 9 (9 included, 0 excluded)
+**Design areas (new reference files):** control-room-shell-and-receipts ·
+control-plane-live-surface · governance-audit-users-visibility
+**Skill output:** `./.claude/skills/sketch-findings-agentic-rag/` (append mode — now
+covers all 68 winner-locked sketches, 001–069 minus orphan 017)
+
+### Included Sketches
+
+| # | Name | Winner | Design Area |
+|---|------|--------|-------------|
+| 061 | control-room-shell | B | Shell & receipts |
+| 062 | gate-honesty-and-receipts | A | Shell & receipts |
+| 063 | control-plane-composition-and-health | B | Control Plane live surface |
+| 064 | active-runs-and-kill | B | Control Plane live surface |
+| 065 | system-controls-and-maintenance | A | Control Plane live surface |
+| 066 | control-plane-assembled-and-linkage | reference | Shell & receipts (linkage contract) |
+| 067 | audit-browser | A | Governance |
+| 068 | users-and-access | A | Governance |
+| 069 | feature-visibility | A | Governance |
+
+### Key Decisions (headline per area)
+
+1. **Shell & receipts:** amber operator band + horizontal tabs (never a second rail);
+   honest locks without roadmap numbers; plain-first + ⌥ Technical names (LANG-01 born at
+   146); the always-on ledger IS the receipt (✎ writes, consequence ≠ receipt); the 066
+   graded-guard rule — victim-naming sheet / arm-to-confirm / direct — governs every admin
+   action app-wide.
+2. **Control Plane:** pinned vitals that degrade visibly mid-scroll; run cards whose Kill
+   names its victim and delegates to the zombie-heal (stuck = *recovered*); kill-switch
+   grid where OFF looks armed; maintenance spatially apart.
+3. **Governance (the Phase 148 build contract):** one audit browser over BOTH ledgers with
+   recorded CSV export and visible cross-user reads; the users roster with last-active
+   honesty + victim-naming disable + lockout-proof self-rows + flagged operator grant; the
+   feature-visibility audience map on Users & Access, API-enforced, with the
+   extensible-audience (never-boolean) forward-compat contract (Glean greenlist model →
+   SEED-115 / v3.4 org-RBAC).
+
+---
+
 ## Wrap-up 2026-07-04 — batch wrap of 8 sessions
 
 **Date:** 2026-07-04

@@ -329,7 +329,7 @@ export const RunCard = memo(function RunCard({ message, isStreaming }: RunCardPr
               REAL resolved `{provider} · {model} · turn N` (message.provider/model
               from the additive enrich); falls back to `turn N` for legacy/no-run
               messages. Rendered as React text children only (T-095.1-03-01). */}
-          <div className="font-mono text-xs text-muted-foreground/70 truncate">
+          <div className="font-mono text-xs text-muted-foreground truncate">
             {runSub}
           </div>
           {hasStart && (
@@ -432,7 +432,7 @@ export const RunCard = memo(function RunCard({ message, isStreaming }: RunCardPr
                 </button>
               </CollapsibleTrigger>
               <CollapsibleContent className="data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0">
-                <div className="px-3 py-2 text-xs text-muted-foreground/70 whitespace-pre-wrap font-mono leading-relaxed max-h-64 overflow-y-auto border-l-2 border-muted-foreground/20 ml-3">
+                <div className="px-3 py-2 text-xs text-muted-foreground whitespace-pre-wrap font-mono leading-relaxed max-h-64 overflow-y-auto border-l-2 border-muted-foreground/20 ml-3">
                   {message.reasoningContent}
                 </div>
               </CollapsibleContent>

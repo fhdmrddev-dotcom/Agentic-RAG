@@ -427,6 +427,164 @@ async def delete_workflow_definition(
     return row is not None
 
 
+# ── published-workflow safe DELETE cascade (Phase 152 / WFIN-03, D-LOCK-04) ──
+async def delete_published_workflow_cascade(
+    pool: asyncpg.Pool, *, slug: str, user_id: UUID
+) -> dict:
+    """Hard-delete a workflow (definition + ALL versions + ALL runs) in FK-safe order.
+
+    "Delete the workflow" = every row sharing ``slug`` owned by the caller (A1 — the
+    Published shelf renders one card per slug, so a delete must sweep all versions, not
+    a single one). Resolved owner-scoped (``created_by = $2``): a foreign / unknown slug
+    resolves to 0 version_ids → ``{"deleted": False}`` (the route maps that to 404, no
+    existence leak — service role bypasses RLS, so the WHERE is the ONLY boundary,
+    T-152-02-01).
+
+    FK-SAFE ORDER (verified against full-schema.sql — one transaction, mirrors
+    ``create_workflow_run``'s ``acquire() -> transaction()`` shape):
+      1. ``DELETE workflow_runs WHERE definition_id = ANY(version_ids)`` FIRST — the
+         ``workflow_runs.definition_id`` FK is ``ON DELETE RESTRICT`` (:3203), THE blocker.
+         Deleting the runs AUTO-cascades ``workflow_phases`` (ON DELETE CASCADE :3195) and
+         AUTO-detaches threads (``threads.active_workflow_run_id`` ON DELETE SET NULL :3131 —
+         threads are KEPT as normal chats, D-LOCK-04). No orphaned runs / phases / anchors.
+      2. ``DELETE workflow_definitions WHERE id = ANY(version_ids)`` — the RESTRICT is now
+         satisfied. The immutability trigger is ``BEFORE UPDATE`` only (:2598) → it does NOT
+         fire on DELETE, so no trigger amendment and NO migration are needed.
+
+    ``harness_audit`` is deliberately NOT touched — its ``run_id`` has NO FK (nullable), so
+    its append-only receipts LINGER as the audit trail (A3 — the SC names runs+threads, not
+    audit). All params bind ``$N`` / ``ANY($1::uuid[])`` — NEVER an f-string on user values
+    (T-152-02-04). Cancel-first of any in-flight run lives in the SERVICE/route layer BEFORE
+    this txn (D-LOCK-05), never inside it.
+
+    Returns ``{"deleted": True, "name", "versions", "runs"}`` or ``{"deleted": False}``.
+    """
+    async with pool.acquire() as con:
+        async with con.transaction():
+            rows = await con.fetch(
+                "SELECT id, name FROM workflow_definitions WHERE slug = $1 AND created_by = $2",
+                slug,
+                user_id,
+            )
+            if not rows:
+                return {"deleted": False}  # → route maps to 404 (no existence leak)
+            version_ids = [r["id"] for r in rows]
+            name = rows[0]["name"]
+            # runs FIRST (RESTRICT blocker) → cascades phases + SET-NULLs thread anchors
+            run_status = await con.execute(
+                "DELETE FROM workflow_runs WHERE definition_id = ANY($1::uuid[])",
+                version_ids,
+            )
+            await con.execute(
+                "DELETE FROM workflow_definitions WHERE id = ANY($1::uuid[])",
+                version_ids,
+            )
+    # asyncpg returns the command tag "DELETE <n>"; parse the deleted-run count.
+    try:
+        runs_deleted = int(run_status.split()[-1])
+    except (ValueError, AttributeError, IndexError):
+        runs_deleted = 0
+    return {"deleted": True, "name": name, "versions": len(version_ids), "runs": runs_deleted}
+
+
+async def delete_workflow_cascade_preview(
+    pool: asyncpg.Pool, *, slug: str, user_id: UUID
+) -> dict:
+    """Exact Removed/Kept counts for the victim-naming sheet (D-LOCK-03) — read-only.
+
+    Owner-scoping applies to the DEFINITIONS only (``created_by = $2`` resolves the
+    caller's own version_ids for ``slug``). The ``runs`` / ``threads`` / ``in_flight``
+    counts are then computed over those definitions' workflow_runs — which, for an
+    ``is_global`` definition, AGGREGATE across ALL runners (``workflow_runs.user_id`` is
+    the runner, not the definition owner), NOT just the caller's own runs (WR-01). These
+    read counts are owner-definition-scoped and low-sensitivity; the DESTRUCTIVE path is
+    fail-closed separately by the ``count_foreign_runs_on_global`` 409 guard in the
+    cascade route, which refuses to delete a global definition that has other users' runs.
+    An unknown / foreign slug → ``{"found": False}`` (the route maps that to 404,
+    indistinguishable from not-found). ``$N`` / ``ANY($1::uuid[])`` binding only.
+
+    Returns ``{"found": True, "name", "versions", "runs", "threads", "in_flight"}`` where
+    ``runs`` = ``COUNT(*)`` of the workflow_runs for those versions (Removed), ``threads`` =
+    ``COUNT(DISTINCT thread_id)`` of the threads those runs live on (Kept — they become
+    normal chats), and ``in_flight`` = ``COUNT(*)`` of runs still LIVE (active/paused/
+    cap_paused — the D-LOCK-05 cancel-first signal). Or ``{"found": False}``.
+    """
+    async with pool.acquire() as con:
+        rows = await con.fetch(
+            "SELECT id, name FROM workflow_definitions WHERE slug = $1 AND created_by = $2",
+            slug,
+            user_id,
+        )
+        if not rows:
+            return {"found": False}
+        version_ids = [r["id"] for r in rows]
+        name = rows[0]["name"]
+        runs = await con.fetchval(
+            "SELECT COUNT(*) FROM workflow_runs WHERE definition_id = ANY($1::uuid[])",
+            version_ids,
+        )
+        threads = await con.fetchval(
+            "SELECT COUNT(DISTINCT thread_id) FROM workflow_runs "
+            "WHERE definition_id = ANY($1::uuid[])",
+            version_ids,
+        )
+        # Phase 152-04 (D-LOCK-05): the count of runs STILL LIVE — the honest signal
+        # the frontend's amber cancel-first banner gates on. Matches the cancel-first
+        # status set the DELETE route heals (active/paused/cap_paused) so the banner
+        # and the actual cancel agree. This is a LIVE signal, never the total ``runs``
+        # (which is historical run RECORDS — showing "in progress" off that would lie).
+        in_flight = await con.fetchval(
+            "SELECT COUNT(*) FROM workflow_runs WHERE definition_id = ANY($1::uuid[]) "
+            "AND status IN ('active', 'paused', 'cap_paused')",
+            version_ids,
+        )
+    return {
+        "found": True,
+        "name": name,
+        "versions": len(version_ids),
+        "runs": int(runs or 0),
+        "threads": int(threads or 0),
+        "in_flight": int(in_flight or 0),
+    }
+
+
+async def count_foreign_runs_on_global(
+    pool: asyncpg.Pool, *, slug: str, user_id: UUID
+) -> int:
+    """Count OTHER users' runs on the caller's ``is_global`` definitions for ``slug`` (WR-01).
+
+    The delete cascade's owner gate is on the DEFINITION (``created_by``), but the
+    ``ON DELETE RESTRICT`` FK forces ``DELETE workflow_runs`` to sweep EVERY runner's
+    rows on an ``is_global`` definition (any user may run a global published workflow;
+    ``workflow_runs.user_id`` is the runner). This helper is the fail-closed guard: it
+    resolves the caller's OWN global version_ids (``created_by = $2 AND is_global = true``)
+    then returns ``COUNT(*)`` of workflow_runs on those versions owned by anyone else
+    (``user_id <> $2``). The cascade route refuses (409) when this is > 0, so a global
+    starter's owner can no longer silently cancel + delete every user's run history.
+
+    Non-global definitions and global definitions with only the owner's own runs → 0
+    (unaffected). ``$N`` / ``ANY($1::uuid[])`` binding only — never an f-string on user
+    values (T-152-05-05).
+    """
+    async with pool.acquire() as con:
+        rows = await con.fetch(
+            "SELECT id FROM workflow_definitions "
+            "WHERE slug = $1 AND created_by = $2 AND is_global = true",
+            slug,
+            user_id,
+        )
+        if not rows:
+            return 0  # non-global / foreign slug → no cross-user blast radius
+        version_ids = [r["id"] for r in rows]
+        count = await con.fetchval(
+            "SELECT COUNT(*) FROM workflow_runs "
+            "WHERE definition_id = ANY($1::uuid[]) AND user_id <> $2",
+            version_ids,
+            user_id,
+        )
+    return int(count or 0)
+
+
 # ── workflow_phases reads (RUN-KEYED → workflow_run_id) ──────────────────────
 async def load_run_phases(pool: asyncpg.Pool, run_id: UUID) -> list[dict]:
     """All phases for a run, in ``phase_index`` order (resumability substrate).

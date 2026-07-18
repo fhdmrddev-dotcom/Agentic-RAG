@@ -1,451 +1,288 @@
-# Architecture Research
+# Architecture Research — v3.3 Operator UX Integration
 
-**Domain:** State-machine workflow runtime ("harness") + dual Deep/Harness mode, layered onto an existing multi-provider Agentic-RAG platform (FastAPI + Supabase/Postgres + Redis Streams + React/Zustand)
-**Researched:** 2026-05-30
-**Confidence:** HIGH (every integration claim grounded in the real files named below; the few forward-looking pieces are flagged MEDIUM)
+**Domain:** Subsequent-milestone integration into an existing ~160K LOC Agentic RAG platform (React/Vite + FastAPI + Supabase + Redis Streams)
+**Researched:** 2026-07-10
+**Confidence:** HIGH (every substrate claim below verified against live code with file:line; the stale `PRDs/v3.2-operator-ux.md` §5/§6 tables were treated as hypotheses and are corrected in the dedicated section)
+**Migration head:** `094_starter_workflows.sql` — **next new migration = `095`** (the stale PRD's reserved range `065–074` is 100% consumed by harness/DM/skill migrations)
 
-> **Scope note.** This answers "how does the harness state-machine integrate end-to-end with our EXISTING architecture." It validates/refines the v2.7 PRD §3 Theme B design against the *actually-shipped* substrate (which differs materially from what the PRD assumed — see the **PRD-vs-reality deltas** callouts). Plugin Contract (Theme E) is OUT OF SCOPE per D-v2.8-01. The 5 migration numbers/range in the PRD (125-139) are **stale fiction** — the real head is `055_todos_table.sql`, so v2.8 renumbers from **056**.
+> This is an **integration** architecture doc, not an ecosystem survey. The stack is fixed. The question is: for each of the four v3.3 tracks, which existing seams are the integration points, what is net-new vs modified, what data-flow changes occur, and what build order the dependencies suggest. Verified substrate is cited `file:line`; the roadmap should trust these over the 2026-05-10 brief.
 
 ---
 
-## Standard Architecture
+## Brief corrections (stale `PRDs/v3.2-operator-ux.md` claims that are WRONG against live code)
 
-### System Overview — where the harness sits
+The brief was authored 2026-05-10, **predates the entire v2.7–v3.2 workflow/skill/DM surface**, and uses a since-abandoned version/migration sequence. Its business decisions (D-PRD-01..15) hold; its internals do not. Corrections, most load-bearing first:
+
+| # | Brief claim (§5/§6) | Live reality | Impact on roadmap |
+|---|---|---|---|
+| C-1 | Migration range `065–074` reserved for this milestone; `model_capabilities_overrides` ships as new migration `066` | Head is **`094`**; `model_capabilities_overrides` **already exists since `053`** (`053_settings_unification.sql:35-50`). Slots 065–094 are consumed. | Next migration = `095`. No table CREATE for model overrides — at most an `ALTER` to add admin-only columns. |
+| C-2 | `model_capabilities_overrides` PK = `model_key`; fields include `default_temperature`, `deprecated`, `notes`, `updated_by`, `updated_at` | Actual PK = **`model_id`**; columns are `provider, llm_call_timeout_seconds, context_window_tokens, max_output_tokens, native_tools, enabled, created_at, updated_at` (`053:35-45`). **No** `default_temperature`/`deprecated`/`notes`/`updated_by`. | The write UI targets the existing shape. If audit fields (`updated_by`, `deprecated`, `notes`) are wanted, they are a small additive `ALTER` — not a new table. |
+| C-3 | The max-tokens clamp read lives in `anthropic_service.py:150-200 _clamp_max_tokens` and must be pointed at the overrides table | The overrides read is **already live and provider-agnostic**: `config.get_model_capability_async` (`config.py:669-701`) + `get_per_call_timeout_async` (`config.py:625-666`), both reading `model_capabilities_overrides` via TTL-cached `_load_model_overrides` (`user_settings.py:302`). Hot-path callers: `agent_loop.py:2023`, `threads.py:1086`, `task_service.py:279`. | **The read path is DONE.** Only the write UI + an RLS write policy are missing. Pointing this at `anthropic_service` would *fork the shared path* (red-line violation) — do not. |
+| C-4 | "Close `CONCERNS.md:81-83`: API keys persisted to `settings_override.json` as plain text" | `settings_override.json` was **eliminated in Phase 081.1** (`user_settings.py:4` — "file-based settings_override.json eliminated"; mig `053` moved ~15 settings into `app_settings`). | The goal shifts from *"get secrets off the JSON file"* (done) to *"encrypt secrets at rest in the DB"* (`app_settings`/`user_settings` still store them as plaintext columns). Track 3's secrets work is now an at-rest-encryption story. |
+| C-5 | `/admin/backpressure` is a "v2.6 endpoint"; auth flips from `BACKPRESSURE_ADMIN_USER_IDS` to RBAC | It **does exist** (`admin.py:52`, Phase 078 WORKER-LIFT-04) and is env-var-gated (`admin.py:24 _check_backpressure_auth`), reading `runs:active` ZCARD (`admin.py:72`). The `/admin` router prefix already exists (`admin.py:21`). | The dashboard can wrap the live endpoint; the auth-gate swap to `operator_users` RBAC is real and small. `admin.py` is currently a single small file — extend it, do not re-grow `threads.py`. |
+| C-6 | OBS-PRIM: add `org_id` to `audit_log, runs, documents, threads, messages` (all net-new) | Forward-compat `org_id uuid` (NO FK) **already exists** on the v3.0 DM tables: `document_views, document_relationships, classification_rules, metadata_field_definitions` (`071_dm_foundations.sql:49-113`). The five core tables the brief lists do **not** have it yet. | The org_id stub pattern is established (nullable, no FK, RLS stays user-scoped). Extend it to the core tables — cheap, and v3.4-RLS-safe. |
+| C-7 | Brief is silent on Track 1 (workflow file inputs) entirely | Track 1 is the v3.2 carry-forward cluster (FILE-01/SEED-104, SEED-108/110/112). The brief predates the harness — it has **no** coverage of the Run modal, folder-scope binding, template upload, or the tool registry. | Track 1's integration points are established v2.9/v3.0 substrate (below), not brief hypotheses. Trust the code. |
+
+---
+
+## Standard Architecture — the existing seams v3.3 plugs into
+
+### System overview (integration seams marked with a star)
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
-│  FRONTEND (React / Vite / Zustand)                                         │
-│  ┌───────────────┐   ┌─────────────────────────────────────────────────┐  │
-│  │  Chat surface │   │  WorkspacePanel (v2.7)                           │  │
-│  │ (MessageList) │   │  Todos │ Files │ Tasks │ Asks │ ◀NEW▶ Phases     │  │
-│  └──────┬────────┘   └───────────────────────┬─────────────────────────┘  │
-│         │  reads bucketsBySurface            │  reads per-thread Maps      │
-│         └──────────────┬─────────────────────┘  (PANEL-06 isolation)      │
-│                  StreamsProvider  — ONE EventSource per run,               │
-│                  demuxes SSE by event.type → chat bucket OR panel Map      │
-│                  ◀NEW▶ workflow_phase_* handlers → phasesByThread Map      │
-└──────────────────────────────┬───────────────────────────────────────────┘
-                               │ GET /runs/{run_id}/stream?since=N  (replay+tail)
-┌──────────────────────────────┴───────────────────────────────────────────┐
-│  BACKEND (FastAPI, WORKER_COUNT=2)                                         │
-│                                                                            │
-│   threads.py  POST /threads/{id}/messages ── spawns ──▶ agent_runner()     │
-│      (3,186 LOC, G-5 FIRING)                              producer task    │
-│                                                              │             │
-│   ◀NEW EXTRACTION SEAM▶                                       │             │
-│   app/services/agent_loop.py  ◀── run_agent_loop(ctx)  ◀──────┘            │
-│      (the iteration loop + tool-dispatch block, lifted verbatim)           │
-│                          │                                                 │
-│         ┌────────────────┴───────────────┐                                 │
-│   Deep Mode path                   ◀NEW▶ Harness Mode path                 │
-│   (free chat, no gating)          app/services/harness_engine.py           │
-│                                    run_workflow(workflow_run) drives        │
-│                                    phases → calls into:                     │
-│   ┌─────────────────────────────────────────────────────────────────┐     │
-│   │ PHASE EXECUTORS (PHASE_TYPE_REGISTRY)                            │     │
-│   │  programmatic    → PROGRAMMATIC_PHASE_REGISTRY[fn] (no LLM)      │     │
-│   │  llm_single      → 1 drained LLM call (task_service helper)      │     │
-│   │  llm_agent       → run_agent_loop() w/ phase whitelist          │     │
-│   │  llm_batch_agents→ N× run_task_sub_agent() + merge              │     │
-│   │  llm_human_input → ask_user_service pause/resume (verbatim)     │     │
-│   └─────────────────────────────────────────────────────────────────┘     │
-│                          │                                                 │
-│   tool_dispatcher.dispatch_tool(name, args, ctx)  ◀── per-phase whitelist  │
-│      reads ctx.available_tools  (precedent: _handle_task subset gate)      │
-│      ◀NEW▶ refuses tool ∉ whitelist → "tool_not_available_in_phase"        │
-│                          │                                                 │
-│   _emit(redis, run_id, type, **fields) ── XADD ──▶ run:{run_id} Stream     │
-└──────────────────────────────┬───────────────────────────────────────────┘
-                               │
-┌──────────────┬───────────────┴──────────────┬─────────────────────────────┐
-│  Postgres    │  Redis                        │  Supabase Storage           │
-│  runs        │  run:{run_id}  (XADD buffer)  │  workspace-files bucket     │
-│  threads     │  runs_by_thread:{tid}         │                             │
-│  ◀NEW▶       │  runs:active                  │                             │
-│  workflow_*  │  ask_user:{rid}:{tcid}        │                             │
-│  todos,ws_*  │  tasks:global:active          │                             │
-└──────────────┴───────────────────────────────┴─────────────────────────────┘
+│  FRONTEND  (React/Vite, Deep Midnight design system)                     │
+│  ┌────────────┐ ┌────────────┐ ┌──────────────┐ ┌────────────────────┐   │
+│  │ ChatLayout │ │SettingsPage│ │WorkflowsPage │ │  (NET-NEW) /admin  │   │
+│  │  doRun *   │ │  5 tabs    │ │  RunModal *  │ │   route tree       │   │
+│  │            │ │            │ │  (kickoff-   │ │  (Track 2)         │   │
+│  │ MessageItem│ │            │ │   only today)│ │                    │   │
+│  │ CitationList*│ │           │ │              │ │                    │   │
+│  └─────┬──────┘ └─────┬──────┘ └──────┬───────┘ └─────────┬──────────┘   │
+├────────┼──────────────┼───────────────┼───────────────────┼──────────────┤
+│  BACKEND (FastAPI)    │               │                   │              │
+│  ┌─────▼──────────────▼───────────────▼───┐  ┌────────────▼───────────┐  │
+│  │ api/threads.py (JUST extracted v3.2) — │  │ api/admin.py *         │  │
+│  │  the agent-loop entry; DO NOT re-grow  │  │  /backpressure (live)  │  │
+│  └─────┬──────────────────────────────────┘  │  + NET-NEW /admin/*    │  │
+│  ┌─────▼───────────────┐ ┌──────────────────┐ └────────────────────────┘  │
+│  │ services/agent_loop │ │ tool_dispatcher  │  ┌────────────────────────┐  │
+│  │  (shared path) *    │ │  _TOOL_REGISTRY *│  │ config.py              │  │
+│  │  citations accrue   │ │  (dict — add a   │  │  get_model_capability_ │  │
+│  └─────┬───────────────┘ │   handler + key) │  │  async * (reads DB     │  │
+│  ┌─────▼───────────────┐ └───────┬──────────┘  │  overrides — LIVE)     │  │
+│  │ provider_gateway/   │ ┌───────▼──────────┐  └────────────────────────┘  │
+│  │  adapters (per-     │ │ harness/         │  ┌────────────────────────┐  │
+│  │  provider boundary) │ │  scope.py *      │  │ services/sandbox_svc *  │  │
+│  │  RED LINE: no fork  │ │  phase_types.py *│  │  base64-preamble file  │  │
+│  └─────────────────────┘ │  emitters.py *   │  │  injection into /sandbox│ │
+│                          └──────────────────┘  └────────────────────────┘  │
+├──────────────────────────────────────────────────────────────────────────┤
+│  DATA                                                                     │
+│  ┌────────────────┐  ┌──────────────────┐  ┌──────────────────────────┐   │
+│  │ Postgres (RLS) │  │ Storage buckets  │  │ Redis Streams            │   │
+│  │  model_caps_   │  │  documents *     │  │  run:{id}, runs:active * │   │
+│  │  overrides *   │  │  skill-files *   │  │  runs_by_thread:{tid}    │   │
+│  │  workspace_    │  │  sandbox-outputs │  │  (best-effort hint)      │   │
+│  │  files *       │  │                  │  │                          │   │
+│  │  audit_log     │  └──────────────────┘  └──────────────────────────┘   │
+│  └────────────────┘                                                       │
+└──────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Component Responsibilities
+### Component responsibilities (the seams, verified)
 
-| Component | Responsibility | Status | Implementation |
-|-----------|----------------|--------|----------------|
-| `harness_engine.py` | Drive a `workflow_run` through ordered phases; own ALL phase transitions; persist phase state to Postgres before/after each phase; emit `workflow_*` SSE | **NEW** | Plain-Python state machine (no LangGraph). Reads `workflow_phases` rows, dispatches to `PHASE_TYPE_REGISTRY` |
-| `agent_loop.py` | The iteration loop + per-iteration tool-dispatch block (lifted from `threads.py:1818-2779`) | **NEW (extracted)** | Called by both Deep Mode (today's path) AND harness `llm_agent` phase |
-| `tool_dispatcher.py` | Route tool call → handler; **enforce per-phase whitelist** | **MODIFIED (1 add)** | Add a pre-check in `dispatch_tool()` reading `ctx.available_tools`; precedent: `_handle_task` already gates on it |
-| `task_service.py` | Spawn child sub-agent (own run row + stream + concurrency caps) | **REUSED/generalized** | `run_task_sub_agent` IS a complete mini agent-loop — `llm_agent`/`llm_batch_agents` build on it |
-| `ask_user_service.py` | Cross-worker pause/resume via Redis pub/sub | **REUSED verbatim** | `llm_human_input` phase calls the existing `_handle_ask_user` flow |
-| `threads.py` | HTTP route + producer-task lifecycle (`_emit`, `_spawn`, `agent_runner` shell, shielded finalize) | **MODIFIED (slimmed)** | Keeps route + finalize; delegates the loop body to `agent_loop.py`; branches Deep vs Harness |
-| `StreamsProvider.tsx` | Demux SSE by event type → chat bucket vs panel Maps | **MODIFIED (+1 Map)** | Add `workflow_phase_*` handlers → `phasesByThread` Map (mirrors the 7 Phase-086 panel handlers) |
-| `WorkspacePanel` | Render todos/files/tasks/asks + **NEW phase timeline** | **MODIFIED (+1 section)** | New `<PhaseTimeline>` reads `usePhases(threadId)` |
-| `panel.py` | GET reconcile endpoints for panel state | **MODIFIED (+routes)** | Add `GET /threads/{id}/workflow` (current run + phases) |
-| Postgres `workflow_definitions/_runs/_phases` | Versioned templates + run instances + per-run phase state (resumable) | **NEW (3 tables)** | RLS via `threads.user_id` FK chain (proven pattern, migration 054/055) |
+| Seam | Responsibility | Live location | v3.3 role |
+|------|----------------|---------------|-----------|
+| `_TOOL_REGISTRY` | Flat `dict[str, handler]`; add a tool = write `_handle_X(args, ctx)` + one dict entry, `threads.py` untouched | `tool_dispatcher.py:3189` | Track 1: `attach_skill_file` + `fetch_document_file` are two new entries |
+| `get_model_capability_async` | 4-tier resolve: DB overrides → env CSV → static `MODEL_CAPABILITIES` → default | `config.py:669-701` | Track 3: write UI feeds the DB tier it already reads |
+| `harness/scope.py` | `resolve_project_subtree` (parent_id walk → list) + `assert_folder_scopes_subset` (D-07 subset gate) | `scope.py:51,92` | Track 1 (SEED-112): resolve a run-input folder scope through here |
+| `phase_types.py` ToolContext build | Single seam that narrows `folder_subtree_ids` = project subtree ∩ phase `folder_scope` → feeds `search_documents` | `phase_types.py:316-338` | Track 1 (SEED-112): the intersection point a run-scope binds into |
+| `harness/emitters.py` | Re-dispatches the hardened `_handle_render_template` as the deterministic fill driver; whitelist-gated | `emitters.py:116-166` | Track 1 (SEED-110): resolves the uploaded template into the fill |
+| sandbox file injection | Downloads `skill-files` bytes → base64 preamble → writes `/sandbox/{name}` before user code | `tool_dispatcher.py:1076-1123` | Track 1 (SEED-108): same pattern, source = `documents` bucket |
+| `api/admin.py` | `/admin` router; live `/backpressure` reading `runs:active` ZCARD; env-var auth gate | `admin.py:21,52,72` | Track 2: extend with `/admin/*` routes + swap gate to RBAC |
+| `api/runs.py cancel_run` | Cancel + zombie-heal (D-062-11); updates Postgres then Redis | `runs.py:1097` | Track 2: admin "kill run" delegates here |
+| `agent_loop.py` citation accrual | Accumulates `retrieved_citations` + `source_refs`, dedups, persists `row["source_refs"]` | `agent_loop.py:1421-1495, 2471-2474` | Track 4 (SEED-033): inline markers ride this existing channel |
 
 ---
 
-## Recommended Project Structure
+## Per-track integration
 
-```
-backend/app/
-├── api/
-│   ├── threads.py          # MODIFIED: route + finalize stay; loop body extracted; Deep|Harness branch
-│   ├── runs.py             # MODIFIED: + POST /runs/{id}/ask_user_response already exists (reuse for human_input)
-│   ├── panel.py            # MODIFIED: + GET /threads/{id}/workflow ; + POST .../workflow/cancel
-│   └── workflows.py        # NEW: CRUD for workflow_definitions (publish=immutable), POST start a run
-├── services/
-│   ├── agent_loop.py       # NEW (G-5 EXTRACTION): run_agent_loop(loop_ctx) — the lifted iteration loop
-│   ├── harness_engine.py   # NEW: run_workflow() state machine + transition + validator dispatch + audit emit
-│   ├── harness/            # NEW package
-│   │   ├── phase_types.py      # PHASE_TYPE_REGISTRY: 5 executors
-│   │   ├── programmatic.py     # PROGRAMMATIC_PHASE_REGISTRY (typed pure-Python phase fns)
-│   │   ├── validators.py       # VALIDATOR_REGISTRY: json_schema / regex / file_exists / programmatic
-│   │   └── models.py           # Pydantic: PhaseConfig, ValidatorSpec, WorkflowDefinition (config validation)
-│   ├── tool_dispatcher.py  # MODIFIED: + whitelist pre-check in dispatch_tool()
-│   ├── task_service.py     # REUSED: run_task_sub_agent generalizes llm_agent/llm_batch_agents
-│   └── ask_user_service.py # REUSED VERBATIM: llm_human_input
-├── db/
-│   └── workflows.py        # NEW: typed asyncpg helpers (insert_workflow_run, advance_phase, ...) — mirrors db/runs.py
-└── models/
-    └── workflow.py         # NEW: API request/response Pydantic models
+### Track 1 — Workflow & file inputs (v3.2 carry-forwards)
 
-frontend/src/
-├── providers/StreamsProvider.tsx   # MODIFIED: + workflow_phase_* handlers → phasesByThread Map
-├── stores/streamsStore.ts          # MODIFIED: + phasesByThread Map + actions
-├── components/panel/
-│   ├── WorkspacePanel.tsx          # MODIFIED: + <PhaseTimeline> section (auto-open on Harness)
-│   └── PhaseTimeline.tsx           # NEW: locked/current/done glyphs + gate badges + ARIA landmarks
-├── hooks/usePhases.ts              # NEW: reads phasesByThread, reconciles via GET /workflow
-└── lib/api.ts                      # MODIFIED: + workflow_* arms in subscribeToRun SSE parser
-```
+The strongest-substrate track. Every piece plugs into established v2.9/v3.0 seams; there is **no new runtime** — only new tools (registry entries) and new run-input plumbing.
 
-### Structure Rationale
+#### 1a. `attach_skill_file` agent tool (FILE-01 / SEED-104 — the one undelivered v3.2 requirement)
 
-- **`agent_loop.py` extracted FIRST (G-5).** `threads.py` is 3,186 LOC and on the hot-file ledger (9+ phases). The harness must NOT bolt onto it. Extracting the loop body gives both Deep Mode and the `llm_agent` phase ONE shared loop — no fork, no drift.
-- **`harness/` is a package, not one file.** The 5 phase types + 4 validators + Pydantic config models are distinct concerns. `harness_engine.py` owns transitions only; phase *execution* lives in `harness/phase_types.py`.
-- **`db/workflows.py` mirrors the shipped `db/runs.py`** (typed asyncpg helpers owning SQL strings) — keeps blocking-I/O discipline (D-v2.5-01) and asyncpg-pool hot paths (D-073).
+- **Integration point:** `_TOOL_REGISTRY` (`tool_dispatcher.py:3189`) — one new `_handle_attach_skill_file`. The write endpoint substrate already exists: `_upload_skill_files` (`skills.py:113-158`) uploads to the **`skill-files`** bucket and inserts a `skill_files` row (`skill_id, user_id, filename, file_path, file_size, mime_type`). SEED-104 explicitly mandates reusing `skill_files` + `skill-files` (no new bucket).
+- **Net-new:** the tool handler; a service-layer `attach_skill_file(skill_id, filename, bytes, user_id)` shared by the tool and (optionally) the existing HTTP endpoint; a threat model for a **WRITE-capable agent tool** (owner-scope assert, size/MIME allowlist, path-traversal guard — `skills.py:52 _sanitize_zip_name` is the reuse pattern).
+- **Modified:** nothing in `threads.py`. The sandbox already materializes generated files (`/sandbox/output/` → `sandbox-outputs`, `sandbox_service.py:297`); the tool copies the agent's produced bytes from workspace/sandbox into `skill-files`.
+- **Data flow:** agent writes file (workspace/sandbox) → `attach_skill_file(skill, name)` → download-or-read bytes → upload `skill-files` + insert `skill_files` row → `read_skill_file`/`load_skill` (`tool_dispatcher.py:707,904`) resolve it next run.
+- **Cross-provider:** needs SC#10 proof (a new write tool all providers can drive) — this is exactly why v3.2 deferred it (avoid a 3rd decimal insert; give it its own threat-modeled phase).
+
+#### 1b. Run-time template upload as a workflow run input (SEED-110)
+
+- **Integration point:** the **Run modal** (`WorkflowsPage.tsx:719-847`) is today a read-only folder chip + **one** kickoff textarea + input-keys hint; launch is `onLaunch(target, text)` → `doRun` (`ChatLayout.tsx:314`) → `createThread + sendMessage(workflow_definition_id)` (the **shared chat pathway**, never a bespoke `/run`). The fill substrate is complete: `workspace_files.kind='template_input'` + `expires_at` TTL (`068_workspace_template_ephemeral.sql`), upload endpoint `upload_template` (`workspace.py:160-210`), a `TemplateUpload.tsx` component **already exists in the workspace panel**, and `_handle_render_template` is re-dispatched by the whitelist-gated emitter (`emitters.py:116-166`). Kickoff run-pin already extends template expiry (`threads.py:1006`).
+- **Net-new:** a file-upload control **on the Run modal** (today template upload only exists mid-run in the workspace panel — SEED-110 wants it as a **pre-run input**); a run-input channel threading the uploaded artifact reference through `onLaunch → doRun → sendMessage → create_workflow_run` (which already persists `inputs`, SEED-047); binding the uploaded file to the new run's thread/workspace **before** the fill phase executes.
+- **Modified:** `RunModal` (add upload + carry the ref), `doRun`/`onLaunch` signature (carry more than `text`), `create_workflow_run` inputs persistence (already exists — add the template ref key).
+- **Data-flow change:** `RunModal upload → workspace_files(kind=template_input, run-pinned) → create_workflow_run.inputs → harness fill phase → _handle_render_template resolves the template_input row → deterministic cited render`. No change to the fill engine.
+
+#### 1c. Per-workflow / per-run KB folder-scope (SEED-112)
+
+- **Integration point:** the Phase 098 folder-scope binding is fully live. `search_documents` (`_handle_search_documents`, `tool_dispatcher.py:248-276`) already filters by `ctx.folder_subtree_ids` (RPC `p_folder_ids` primary + post-query scope clip at `:262`, emitting `scope_violation`). The workflow already resolves a **project subtree** at run-start and narrows per-phase at the single seam `phase_types.py:316-338` (`_effective = _proj ∩ _phase_scope`). `scope.py` provides `resolve_project_subtree` + `assert_folder_scopes_subset`.
+- **Net-new:** an **optional** retrieval-scope field on the workflow definition **or** a run-input scope selector; making the Run modal's read-only folder chip **editable** (D-103-1 explicitly made it "never a picker" — this reverses that for user-owned workflows); resolving the chosen folder → `folder_subtree_ids` at run-start (reuse `resolve_project_subtree`).
+- **Modified:** `RunModal` chip → picker; the run-start scope resolution (bind the selected folder into the same `folder_subtree_ids` the harness already threads); definition schema gains an optional `folder_scope`/`retrieval_scope` field.
+- **Data flow:** identical to Phase 098 once resolved — the selected folder enters `folder_subtree_ids`, `assert_folder_scopes_subset` guards it, `search_documents` constrains. Absent scope = current whole-KB default (keeps starters unscoped, D-143-4b intact).
+- **Constraint:** SEED-112 carries an **operator directive — research Glean/Beam workflow-scope + run-input UX FIRST** before locking this control (and it informs the whole workflow-UX cluster: 110 + 112 + SEED-051 authoring + SEED-111 lifecycle).
+
+#### 1d. RAG↔sandbox original-file bridge — `fetch_document_file`/`load_kb_file` (SEED-108)
+
+- **Integration point:** `_TOOL_REGISTRY` — one new read-direction tool. KB originals live in the **`documents`** bucket at `documents.file_path = {user_id}/{document_id}/{filename}` (`documents.py:473`, download at `:712`/`:1074`). The inverse of `harvest_output_files`' `copy_from_runtime`. The injection mechanism already exists: the skill-file base64-preamble path (`tool_dispatcher.py:1076-1123`) writes bytes into `/sandbox/`.
+- **Net-new:** the handler; a `/sandbox/input/<filename>` materialization (mirror the base64-preamble but pull from `documents` bucket, RLS-scoped like `read_document`); a **size cap + stream-to-disk** (never into model context).
+- **Modified:** nothing in the shared path; reuses `get_or_create` session + `copy_to_runtime`.
+- **Data flow (net-new):** `fetch_document_file(doc)` → RLS-scoped resolve `documents.file_path` → download bytes → write `/sandbox/input/<name>` → `execute_code` operates on real bytes (python-docx/pypdf/openpyxl on the actual file, not a text reconstruction).
+- **Honesty tie-in:** until faithful binary conversion is possible (SEED-106 binaries: soffice/pandoc), the agent must say "reconstructed from text" not "converted your file" (cross-links Phase 142 SRH-01).
 
 ---
 
-## Architectural Patterns
+### Track 2 — Admin shell + operator role
 
-### Pattern 1: Per-phase tool whitelist enforcement (the state-machine lock)
+Mostly net-new, but it lands on **real** primitives (`admin.py`, `runs:active`, `cancel_run`, `audit_log`, `/health`), not the brief's imagined ones.
 
-**What:** The dispatcher refuses any tool call not in the active phase's `available_tools`. This is the headline "LLM cannot skip/reorder/escape phases" guarantee.
+- **Integration points (live):** `admin.py:21` (`/admin` router), `admin.py:52` (`/backpressure` reading `runs:active` ZCARD), `runs.py:1097` (`cancel_run` + zombie-heal), `main.py:458` (`/health`), `audit_log` (v2.2 F-06), the `org_id`-stub pattern (`071:49-113`).
+- **Net-new:**
+  - `operator_users` table (system-level `super_admin`/`operator`, distinct from v3.4 org RBAC) — **does not exist** (verified). RLS on every admin table cross-references it; a `get_current_operator` dependency parallels `get_current_user`.
+  - `/admin` **frontend** route tree (NOT a Settings tab — `SettingsPage.tsx` stays user-level and untouched); guarded by an `operator_role` auth-context field.
+  - `/admin/*` backend routes (users, audit browser, active-runs, health-detail, kill-run, feature-flags/kill-switch). Extend `admin.py` — **do not** route through `threads.py` (JUST extracted in v3.2 FND-01; G-5 hot file).
+  - `operator_audit_log` (net-new; INSERT-only RLS mirroring `audit_log`).
+  - `org_id` stubs on the five core tables (`audit_log, runs, documents, threads, messages`) — extend the established pattern.
+- **Modified:** `admin.py` auth gate swaps `BACKPRESSURE_ADMIN_USER_IDS` → `operator_users` RBAC (one-time env-var read as migration assist); `App.tsx`/auth context adds `operator_role`.
+- **Data-flow change:** admin mutating routes → `record_operator_action(...)` → `operator_audit_log`; admin reads use a service-role client **only after** an `operator_users` membership check (failures → 404, non-discoverable). Kill-run delegates to `cancel_run` (no new cancellation path).
+- **Multi-worker note:** any admin background job (e.g. audit pruner) must be cross-worker-safe (`WORKER_COUNT=2`) — single-execution via a Redis lock, never an in-process singleton (D-PRD-12).
 
-**Evidence — the precedent already ships.** `tool_dispatcher.ToolContext.available_tools` exists (line 88) and `_handle_task` already enforces a per-subset refusal (lines 1091-1110): `invalid = [t for t in requested_tools if t not in available ...]`. The harness generalizes this from sub-agent-toolset to per-phase-toolset.
+---
 
-**Minimal, shared-path-safe wiring (the critical cross-provider question):**
+### Track 3 — Model & settings management
 
-```python
-# tool_dispatcher.py — add ONE guard at the top of dispatch_tool(). Additive;
-# zero behavioral change when phase_whitelist is None (Deep Mode).
-async def dispatch_tool(tool_name: str, args: dict, ctx: ToolContext) -> ToolResult:
-    if ctx.phase_whitelist is not None and tool_name not in ctx.phase_whitelist:
-        return ToolResult(result=json.dumps({
-            "error": "tool_not_available_in_phase",
-            "tool": tool_name,
-            "allowed": sorted(ctx.phase_whitelist),
-        }))
-    handler = _TOOL_REGISTRY.get(tool_name)
-    if handler is None:
-        return ToolResult(result=f"Unknown tool: {tool_name}")
-    return await handler(args, ctx)
+The critical correction track: **the read substrate is done; only the write UI + secrets-at-rest are missing.**
+
+- **Integration points (live):** `model_capabilities_overrides` table (`053:35-45`, PK `model_id`), read via `get_model_capability_async` (`config.py:669`) + `get_per_call_timeout_async` (`config.py:625`), TTL-cached `_load_model_overrides` (`user_settings.py:302`), consumed on the hot path at `agent_loop.py:2023` / `threads.py:1086` / `task_service.py:279`. Settings already unified into `app_settings` (mig 053; `settings_override.json` eliminated in Phase 081.1).
+- **Net-new:**
+  - A **write UI + write route** for `model_capabilities_overrides`. Current RLS is `model_overrides_read_all` (SELECT for authenticated) with **no write policy** (`053:49`) → only service-role writes today. Add a `super_admin`-gated write route (service-role after an `operator_users` check) **or** a new RLS write policy referencing `operator_users`.
+  - Live `/models` discovery service (per-provider probe → populate/curate the registry; note Phase 096 already did a one-off `/models` curation manually — this makes it a UI action).
+  - A `SecretsBackend` abstraction with **encryption at rest** (secrets are in `app_settings`/`user_settings` plaintext columns today; the goal is DB-side encryption, e.g. pgsodium — **not** the already-done JSON-file removal).
+- **Modified:** optionally `ALTER model_capabilities_overrides` to add `updated_by`/`deprecated`/`notes` (admin audit fields the current table lacks). The read tiers need **no** change — they already merge DB rows over static defaults (`config.py:682-693`).
+- **Data-flow change:** admin edits a capability row → 30s TTL cache expiry → next `get_model_capability_async` returns the merged override (`capability_source="db_override"`). No restart, no provider fork.
+- **Red line:** all capability resolution stays in `config.py` (provider-agnostic). Do **not** implement per-provider clamp reads (the brief's `anthropic_service` suggestion) — that forks the shared path.
+
+---
+
+### Track 4 — User-friendliness (Glean/Beam-informed)
+
+- **Inline citations (SEED-033):** the citation **data** already flows end-to-end — handlers build `citations` + `source_refs` (`tool_dispatcher.py:290,462,588`), `agent_loop.py` accrues + dedups + persists `row["source_refs"]` (`:1421-1495, 2471-2474`), and `MessageItem` already renders a `<CitationList>` at end-of-message (`MessageItem.tsx:442`). **Net-new = inline attribution:** footnote-style markers threaded into the streamed assistant text (mapped to the existing citation objects) + inline rendering in the markdown, on top of (not replacing) the CitationList. This is a rendering/attribution layer over existing data — it does **not** need new retrieval plumbing, but it **does** touch the SSE stream + `MessageItem` (both G-5 hot files — sketch-first per G-2).
+- **Plain-language two-audience layer (SEED-085), WCAG AA (SEED-092):** cross-cutting UI concerns; WCAG applies to all net-new `/admin` + Run-modal surfaces (keyboard nav, `aria-label`, 4.5:1 contrast, color+icon+text status). The Run modal already models a minimal focus trap (`WorkflowsPage.tsx:738-777`) — reuse that pattern for new dialogs.
+
+---
+
+## Data flow — the three net-new flows
+
+**Flow A — KB file into the sandbox (SEED-108):**
+```
+agent: fetch_document_file(doc)
+  → RLS resolve documents.file_path ({user_id}/{doc_id}/{name})
+  → Storage.download("documents", path)          [size-capped, stream to disk]
+  → base64 preamble → write /sandbox/input/<name> [reuse tool_dispatcher.py:1076-1123 pattern]
+  → execute_code operates on REAL bytes
 ```
 
-Add `phase_whitelist: frozenset[str] | None = None` as a NEW optional field on `ToolContext`. In Deep Mode it stays `None` → the guard is a no-op → **the shared path is byte-equivalent for all 9 providers.** The refusal rides the existing `tool_result` message append (`threads.py:2700-2708`) — the LLM sees it as a normal tool result, exactly like `_handle_task`'s refusal strings already do. No new SSE event type required, no provider branch.
+**Flow B — template as a run input (SEED-110):**
+```
+RunModal upload
+  → Storage + workspace_files(kind=template_input, expires_at=+TTL)   [reuse workspace.py:160]
+  → create_workflow_run.inputs = {..., template_ref}                  [SEED-047 persists inputs]
+  → run-pin extends expiry (threads.py:1006)
+  → harness fill phase → emitters._render_template_post
+  → _handle_render_template resolves the template_input row → cited deterministic render
+```
 
-> **Why this is cross-provider-safe (075.x lesson):** the guard lives at the *single* dispatch entry, BELOW the provider-specific streaming/parsing code. It never touches `threads.py`'s chunk handlers, the SSE emitter, or any `anthropic_service`/`openai_service` path — the exact shared-path edits that caused the 075.3 cascade. The refusal is a string in a tool_result, the most provider-agnostic surface that exists.
+**Flow C — run-scoped retrieval (SEED-112):**
+```
+RunModal folder picker (was: read-only chip)
+  → create_workflow_run.inputs = {..., folder_scope}
+  → run-start: resolve_project_subtree / assert_folder_scopes_subset (scope.py)
+  → phase_types.py:316 narrows folder_subtree_ids = subtree ∩ scope
+  → search_documents(folder_ids=ctx.folder_subtree_ids)  [tool_dispatcher.py:254 — unchanged]
+```
 
-**When the whitelist gets set:** `agent_loop.py` builds `ToolContext` once per iteration (today at `threads.py:2632`). In a harness `llm_agent` phase the loop is invoked with `phase_whitelist=frozenset(phase.available_tools)`. The two ALSO interact with `get_tools()` composition — see Pattern 6.
+---
 
-**Trade-offs:** A per-phase whitelist read could add Postgres latency per tool call. Mitigation: the whitelist is passed *into* the loop as a frozenset (resolved once when the phase starts), NOT re-queried per tool call. The PRD §6 row-1 "in-memory cache per run_id" concern is over-engineered — the phase's `available_tools` is a fixed list for the phase's lifetime; pass it by value.
+## Suggested build order (dependency-driven)
 
-### Pattern 2: Phase types map onto existing primitives (no new orchestration framework)
+The tracks are largely independent, but within/across them these dependencies dictate order:
 
-**What:** All 5 phase types are thin wrappers over already-shipped code. This is the single most important finding — the harness is ~80% composition, ~20% new state machine.
+1. **Foundation first — `operator_users` + `/admin` shell skeleton + RBAC dependency (Track 2 core).**
+   Rationale: the model-registry write UI (Track 3) and every admin mutation need the `get_current_operator` gate and `operator_audit_log`. Ship the role table, the RLS-referenced membership check, the `/admin` route tree, and the auth-gate swap on the existing `/backpressure` endpoint. Cheap, unblocks Track 3's write path. (org_id core-table stubs ride along — cheap, v3.4-safe.)
 
-| Phase type | Maps onto | Evidence |
+2. **Model registry write UI (Track 3) — depends on (1).**
+   Rationale: the read path is already live; this is the highest-value/lowest-risk closure (a `super_admin`-gated write route + UI over the existing `model_capabilities_overrides` table). Live `/models` discovery is a natural companion. Secrets-at-rest encryption is a separable sub-phase (bigger; can defer/STRETCH).
+
+3. **Workflow file-input cluster (Track 1) — after Glean/Beam research (operator directive, SEED-112).**
+   Order within the cluster by shared substrate:
+   - **SEED-108 `fetch_document_file` first** — pure new read tool, no UI, unblocks "work on my KB file" and pairs with the sandbox injection already proven. Lowest coupling.
+   - **FILE-01 `attach_skill_file`** — new WRITE tool; its threat model + upload/storage pattern is the reference SEED-110 reuses. Do it before the run-input surfaces so the shared upload/threat pattern exists.
+   - **SEED-110 template upload + SEED-112 folder scope together** — both are Run-modal run-input surfaces sharing one "run inputs" channel (`onLaunch → doRun → create_workflow_run.inputs`); build the channel once, add both controls. Gated on the Glean/Beam UX research.
+
+4. **UX track (Track 4) — inline citations, plain-language, WCAG — last / parallel.**
+   Rationale: inline citations touch G-5 hot files (SSE stream, `MessageItem`) → sketch-first (G-2). WCAG applies to all net-new surfaces from (1)-(3), so it audits best once those surfaces exist. Plain-language layer is cross-cutting polish.
+
+**Ordering invariant:** Track 2 (1) precedes Track 3 (2) precedes any admin-gated write. Track 1's shared upload/threat pattern (FILE-01) precedes the run-input surfaces (110/112). Everything after the Glean/Beam research gate for the workflow-UX cluster.
+
+---
+
+## Anti-patterns (the hard constraints, as concrete "do not")
+
+| Anti-pattern | Why it breaks | Do instead |
 |---|---|---|
-| `programmatic` | `PROGRAMMATIC_PHASE_REGISTRY[name](input, ctx) -> output` | NEW dict, mirrors `_TOOL_REGISTRY` shape (tool_dispatcher.py:1465). Pure Python, no LLM. |
-| `llm_single` | One drained LLM call | `task_service._stream_one_iteration` (lines 162-193) already does exactly this — `create_adaptive_streaming_chat` + drain in threadpool. Extract/reuse. |
-| `llm_agent` | `run_agent_loop(ctx, phase_whitelist=...)` | The extracted loop (Pattern 1). OR, for an isolated sub-context, `run_task_sub_agent` (task_service.py:196) which is ALREADY a complete max_steps-bounded agent loop with its own run row + stream. |
-| `llm_batch_agents` | N× `run_task_sub_agent` + deterministic merge | `task_service.run_task_sub_agent` (line 196) spawns a child with own `run:{sub_run_id}` stream + per-run `Semaphore(3)` + global Redis-Lua cap (20). Fan out N, `asyncio.gather`, merge by `phase_config.merge_strategy`. |
-| `llm_human_input` | `ask_user_service` pause/resume | `_handle_ask_user` (tool_dispatcher.py:1273) + `subscribe_for_response` + `POST /runs/{id}/ask_user_response` (runs.py:496) ALL exist. The phase emits the prompt and blocks on the SAME pub/sub channel. |
-
-> **PRD-vs-reality delta (major, favorable):** The PRD §3 says `llm_agent` "Mirrors `agent_runner` (threads.py:1059)". Reality is *better* — `task_service.run_task_sub_agent` is a self-contained, cross-provider-safe agent loop with its OWN run row, stream, model resolution, and tool dispatch (it already calls `dispatch_tool` with a constrained `available_tools`). `llm_agent` and `llm_batch_agents` should be built on **`run_task_sub_agent`**, not on the buried `agent_runner`. This means the harness can produce per-phase agent loops *today* by passing `allowed_tools=phase.available_tools` and `max_steps=phase.max_steps`. The whitelist enforcement is already wired into that path (sub_ctx.available_tools + `_SUB_AGENT_EXCLUDED`).
-
-**When to use which loop for `llm_agent`:** Use `run_task_sub_agent` when the phase is a bounded unit (most cases) — it gives isolation + concurrency accounting for free. Use the extracted `run_agent_loop` only when the phase needs the FULL chat history + all the streaming-reliability machinery (transient-reattach, snapshot, etc.) that the top-level loop has and the sub-agent loop intentionally omits.
-
-**`programmatic` example:**
-```python
-# harness/programmatic.py
-PROGRAMMATIC_PHASE_REGISTRY: dict[str, Callable[[dict, "PhaseRunCtx"], Awaitable[dict]]] = {}
-
-def register_programmatic(name: str):
-    def deco(fn): PROGRAMMATIC_PHASE_REGISTRY[name] = fn; return fn
-    return deco
-
-@register_programmatic("schema_validate")
-async def _schema_validate(input: dict, ctx) -> dict:
-    # pure Python — e.g. jsonschema.validate(input["payload"], input["schema"])
-    return {"valid": True, ...}
-```
-
-### Pattern 3: Resumable phase state via Postgres (survives uvicorn restart)
-
-**What:** Every phase transition writes to `workflow_phases` (Postgres) BEFORE the next phase starts. A worker restart re-reads the row and resumes. This is the D-PRD-08 multi-worker requirement.
-
-**When:** `harness_engine.run_workflow` loops: read current phase row → execute → validate gate → UPSERT phase status + output → advance `workflow_runs.current_phase_id` → emit `workflow_transition`. The write precedes the SSE emit (PRD §6 row-2 ordering; consumers tolerate lag via D-v2.5-03 reconcile).
-
-**Trade-offs:** Phase output stored as `jsonb`. Large outputs (e.g. a generated report) go to `workspace_files` (the bucket) and the phase stores only the path — mirrors the workspace hybrid-storage decision. Don't bloat `workflow_phases.output` with multi-KB blobs.
-
-**Resumption invariant:** On producer (re)spawn for a thread with `threads.active_workflow_run_id IS NOT NULL`, `harness_engine` reads the run + phases and resumes at `status IN ('pending','active')`. A phase that was `active` mid-LLM-call is re-run from the top (LLM calls aren't checkpointed mid-stream — D-v2.5-05 "no auto-retry of paid calls" applies, so re-running a partially-completed `llm_agent` phase needs an idempotency guard or operator confirm; flag as PITFALL).
-
-### Pattern 4: New SSE event types ride the EXISTING run stream (zero new substrate)
-
-**What:** All `workflow_phase_*` / `workflow_transition` / `workflow_run_complete` events go through the same `_emit(redis, run_id, type, **fields)` → XADD → `run:{run_id}` path (`threads.py:109`). The panel consumes via the same `GET /runs/{id}/stream?since=N`.
-
-**Evidence:** This is exactly how Phase 086/087 added `todo_updated`, `workspace_file_written/deleted`, `ask_user_prompt/response`, `sub_agent_start/done`. The wire vocabulary is shared across all providers (one UX, N adapters — `feedback_provider_uniform_ux`).
-
-**Frontend demux (mirrors the 7 Phase-086 handlers at StreamsProvider.tsx:674-702):**
-```ts
-// StreamsProvider.tsx makeStreamCallbacks — ADD alongside onTodoUpdated etc.
-onWorkflowPhaseStart: (phase) =>
-  useStreamsStore.getState().actions.upsertPhaseForThread(threadId, phase),
-onWorkflowTransition: (from, to) =>
-  useStreamsStore.getState().actions.advancePhaseForThread(threadId, from, to),
-onWorkflowRunComplete: (status, artifactPath) =>
-  useStreamsStore.getState().actions.completeWorkflowForThread(threadId, status, artifactPath),
-```
-These write to a NEW `phasesByThread: Map<threadId, PhaseTimeline>` — **never** to `bucketsBySurface`, preserving PANEL-06 (panel events trigger zero chat re-renders, verified pattern). Add `EMPTY_PHASES` module constant for stable empty-reference (StreamsProvider.tsx:101-104 precedent).
-
-**Reconcile-on-mount:** `usePhases(threadId)` fetches `GET /threads/{id}/workflow` on mount (D-v2.5-03 — Realtime/SSE is a hint, fetch is truth), exactly as `useTodos`/`useWorkspaceFiles` reconcile via `panel.py` GET endpoints.
-
-### Pattern 5: Dual-mode wiring (where mode lives, how the lock works)
-
-**What:** Mode is a per-thread property, not per-message. Deep Mode (default) = today's free chat. Harness Mode = a `workflow_run` is active and locks the thread.
-
-**Where mode lives:** `threads.active_workflow_run_id uuid NULL` (NEW column, migration in v2.8). `NULL` = Deep Mode; non-null = Harness Mode. This is the single source of truth the agent_runner branch reads.
-
-**Mode dispatch (in `agent_runner` after history load, ~threads.py:1519):**
-```python
-if thread_row["active_workflow_run_id"]:        # Harness Mode
-    await harness_engine.resume_or_run(workflow_run_id, loop_ctx)
-    return
-# else fall through to today's Deep Mode loop (unchanged)
-```
-
-**Workflow-lock enforcement:** `POST /threads/{id}/workflow/cancel` is the ONLY way to clear `active_workflow_run_id` while a run is `active`/`paused`. Deep→Harness is allowed (spawns a `workflow_run` row, sets the column); Harness→Deep is refused at the API layer until the run reaches a terminal status OR is explicitly cancelled (PRD Theme F / Q-v2.7-05 "allowed with lock").
-
-> **PRD-vs-reality delta:** PRD Theme F proposes `threads.deep_mode_metadata jsonb`. **Drop it for v2.8** — it has no consumer in the locked scope (it was a v3.0 Skill-Studio convenience). The single `active_workflow_run_id` column is sufficient for the dual-mode lock. Adding unused columns violates the lean gate.
-
-### Pattern 6: `get_tools()` composition with the per-phase whitelist
-
-**What:** `get_tools(user_settings)` (openai_service.py:768) returns the full tool SCHEMA list (the JSON the LLM sees). The per-phase whitelist filters this.
-
-**Two distinct surfaces — keep them separate:**
-1. **Tool schemas** (what the LLM is *told* exists) — filter `get_tools()` output by the phase whitelist before passing as `tools_override` to `create_adaptive_streaming_chat`. Precedent: `task_service.py:304-308` already does `sub_tool_schemas = [t for t in get_tools(...) if t["function"]["name"] in allowed_tools]`.
-2. **Tool dispatch** (what the dispatcher *executes*) — `ctx.phase_whitelist` guard (Pattern 1). Belt-and-suspenders: even if a model hallucinates a tool not in its schema list, the dispatcher refuses it.
-
-```python
-# In an llm_agent phase:
-phase_tools = [t for t in get_tools(user_settings)
-               if t["function"]["name"] in phase.available_tools]   # surface 1
-loop_ctx.phase_whitelist = frozenset(phase.available_tools)          # surface 2
-```
-
-> **SEED-035 folds in here:** the tool-count budget guard wraps `get_tools()` at this same composition site (cap the number of schemas advertised). Natural home — the whitelist already filters here.
-
-**Trade-offs:** This is the ONE place the harness touches `openai_service`. The change is *additive* (filter an existing list) — no provider branch, no shared-path mutation.
+| Re-growing `backend/app/api/threads.py` | JUST extracted in v3.2 FND-01; G-5 hot file (9+ phases) | New tools → `_TOOL_REGISTRY` in `tool_dispatcher.py`; admin routes → `admin.py` |
+| Per-provider model-capability reads (e.g. `anthropic_service._clamp_max_tokens`) | Forks the shared provider path (D-14 red line) | Keep resolution in `config.get_model_capability_async` (provider-agnostic) |
+| An in-process singleton for admin jobs / secrets cache | `WORKER_COUNT=2` — two workers, double-execution (D-PRD-12) | Cross-worker Redis lock (mirror the harness `claim_run` CAS pattern) |
+| A bespoke `/workflows/{id}/run` endpoint for run inputs | Diverges from the shared chat pathway (`doRun → sendMessage`) | Thread inputs through `create_workflow_run.inputs` (SEED-047) |
+| Blocking I/O in async admin/tool handlers | Freezes the event loop (D-v2.5-01) | `run_in_threadpool` (every supabase-py call — see the tool handlers' pattern) |
+| An `operator`/`org_admin` role model that conflicts with v3.4 org RBAC | v3.4 is a one-way RLS-rewrite door | System-level `operator_users` only; org_id stubs nullable/no-FK; never a role shape that fights the rewrite |
+| A new storage bucket for skill/template/KB files | Fragments the file surface | Reuse `skill-files` (skill), `workspace_files`/panel (template), `documents` (KB), `sandbox-outputs` (output) |
+| Making Deep Mode non-byte-identical when a v3.3 feature is off | Breaks the D-14 invariant every phase preserves | Gated no-ops (the `folder_subtree_ids is None` / `skill_snapshot is None` pattern, e.g. `tool_dispatcher.py:262,910`) |
 
 ---
 
-## Data Flow
+## Integration points summary
 
-### Harness run lifecycle
+### Storage buckets (all reused — no new bucket)
 
-```
-User toggles Harness Mode (or invokes harness-required skill)
-    ↓
-POST /threads/{id}/workflow {definition_id}   (api/workflows.py)
-    ↓ INSERT workflow_runs (status=active) + N workflow_phases (status=pending)
-    ↓ SET threads.active_workflow_run_id = run.id
-POST /threads/{id}/messages  → agent_runner producer spawns
-    ↓ reads active_workflow_run_id → branches to harness_engine.run_workflow()
-    ↓
-┌── for each phase (ordered by phase_index) ──────────────────────────┐
-│  UPSERT phase.status = active ; emit workflow_phase_start            │
-│  dispatch by phase_type → PHASE_TYPE_REGISTRY[type](phase, ctx)      │
-│     programmatic   → pure Python                                     │
-│     llm_single     → 1 drained call                                  │
-│     llm_agent      → run_task_sub_agent(allowed=whitelist, max_steps)│
-│     llm_batch_agents → gather(N× run_task_sub_agent) → merge         │
-│     llm_human_input→ emit ask_user_prompt ; block on pub/sub         │
-│  VALIDATOR_REGISTRY gate → pass? advance : on_failure handler        │
-│  UPSERT phase.status = completed ; output=jsonb ; emit phase_end     │
-│  advance workflow_runs.current_phase_id ; emit workflow_transition   │
-└─────────────────────────────────────────────────────────────────────┘
-    ↓ all phases done
-UPDATE workflow_runs.status=completed ; CLEAR threads.active_workflow_run_id
-emit workflow_run_complete{status, final_artifact_path}
-    ↓ (shielded finalize — threads.py:158-255 block, reused)
-```
+| Bucket | Path convention | Used by | v3.3 track |
+|--------|-----------------|---------|------------|
+| `documents` | `{user_id}/{doc_id}/{filename}` | `documents.file_path` | Track 1 (SEED-108 source) |
+| `skill-files` | `{user_id}/{skill_id}/{filename}` | `skill_files.file_path` | Track 1 (FILE-01 target) |
+| `sandbox-outputs` | `{user_id}/{exec_id}/{filename}` | `harvest_output_files` | Track 1 (attach source) |
+| workspace (via `workspace_files`) | `kind='template_input'` + TTL | `upload_template` | Track 1 (SEED-110) |
 
-### RLS data flow (how the new tables RLS against threads)
+### Internal boundaries
 
-```
-workflow_runs.thread_id  ──FK──▶ threads.id ──user_id──▶ auth.uid()
-   RLS:  USING (auth.uid() = (SELECT user_id FROM threads WHERE id = thread_id))
-   ↑ EXACT pattern shipped in 054_workspace_files.sql:41 + 055_todos_table.sql:25
-
-workflow_phases.workflow_run_id ──FK──▶ workflow_runs.id ──FK──▶ threads
-   RLS:  USING (auth.uid() = (SELECT t.user_id FROM threads t
-                              JOIN workflow_runs wr ON wr.thread_id = t.id
-                              WHERE wr.id = workflow_run_id))
-   ↑ EXACT 2-hop JOIN pattern from 054:58-66 (workspace_file_versions)
-
-workflow_definitions  ── NO thread FK (templates are reusable) ──▶
-   RLS:  USING (auth.uid() = created_by OR org_id IS NULL-shared)
-   ↑ owner-private + future org-shared; mirrors skills table ownership
-```
-
-> **Concrete RLS recommendation:** `workflow_runs` and `workflow_phases` RLS against `threads.user_id` via the FK chain — the **proven** pattern (zero new RLS thinking required). `workflow_definitions` is the only table NOT thread-scoped (it's a template); use the skills-style owner/global ownership. All tables carry `org_id uuid NULL` from day 1 (D-PRD-02 forward-compat) but RLS predicates stay user-scoped for v2.8.
-
-### State management (frontend)
-
-```
-run:{run_id} SSE ──▶ StreamsProvider demux (by event.type)
-   chat events     → bucketsBySurface Map  → MessageList re-renders
-   workflow events → phasesByThread Map    → PhaseTimeline re-renders ONLY
-                     (PANEL-06: chat selectors never read phasesByThread)
-GET /threads/{id}/workflow ──▶ usePhases reconcile-on-mount (truth source)
-```
+| Boundary | Communication | v3.3 note |
+|----------|---------------|-----------|
+| `tool_dispatcher._TOOL_REGISTRY` ↔ agent loop | dict dispatch via `ToolContext` | Add tools here; `threads.py` untouched |
+| `config.py` ↔ providers | `get_model_capability_async` (shared) | Never fork per-provider |
+| harness `phase_types` ↔ `search_documents` | `ctx.folder_subtree_ids` | SEED-112 binds here |
+| Run modal ↔ run creation | `onLaunch → doRun → sendMessage → create_workflow_run` | Run-input channel for 110/112 |
+| `admin.py` ↔ `operator_users` | RLS + `get_current_operator` dep | Net-new gate |
+| SSE stream ↔ `MessageItem` | `citations`/`source_refs` on message | Inline-citation layer (SEED-033) |
 
 ---
 
-## Build Order (dependency-ordered — the deliverable)
+## Scaling & open questions
 
-> Respects the quality gate: extraction → engine → phase types → mode → panel. Each step ships independently behind the `active_workflow_run_id IS NULL` no-op (Deep Mode stays byte-identical throughout).
+| Concern | Note |
+|---|---|
+| `model_capabilities_overrides` write contention | Low-cardinality admin table; 30s TTL cache absorbs reads. Trivial. |
+| Admin active-runs view | `runs:active` ZSET cardinality ≈ active runs (bounded); ZRANGE O(log N). Paginate at 100. |
+| SEED-108 large-file materialization | Must cap size + stream to disk (never model context); the one real perf risk in Track 1. |
+| Inline citations at long context | Reuses existing dedup (`_deduplicate_citations` `agent_loop.py:812`); marker-mapping is O(citations). |
+| org RBAC (v3.4) collision | org_id stubs are nullable/no-FK; RLS stays user-scoped until v3.4. Verify no v3.3 policy assumes org_id. |
 
-**Phase A — G-5 Extraction (BLOCKING, ships first, zero feature).**
-Extract `agent_runner`'s loop body (`threads.py:1818-2779`) into `app/services/agent_loop.py::run_agent_loop(loop_ctx)`. `threads.py` keeps the route, producer spawn, `_emit`/`_spawn`, shielded finalize. **Acceptance bar: Deep Mode is byte-identical** — full cross-provider UAT (the 4-axis scoreboard) BEFORE any harness code lands. This satisfies G-5 (the harness sits in a clean module, not bolted onto 3,186 LOC). *No dependency.*
-
-**Phase B — Schema + RLS.**
-Migrations `056_workflow_definitions.sql`, `057_workflow_runs.sql`, `058_workflow_phases.sql`, `059_threads_active_workflow_run_id.sql`. RLS via the 054/055 FK-chain pattern. Pydantic config models (`harness/models.py`) + jsonschema (4.26.0, installed) validator for phase configs. Immutable-on-publish trigger on `workflow_definitions` (mirrors skill-version immutable trigger). *Depends on: nothing (parallel with A).*
-
-**Phase C — Harness engine + 5 phase types + validators.**
-`harness_engine.py` (transition loop, resumable, audit emit) + `harness/phase_types.py` (5 executors wiring to `run_task_sub_agent`/`ask_user_service`/`PROGRAMMATIC_PHASE_REGISTRY`) + `harness/validators.py` (4 kinds). New `workflow_*` SSE events through `_emit`. *Depends on: A (uses `run_agent_loop`/sub-agent loop), B (tables).*
-
-**Phase D — Whitelist enforcement.**
-Add `phase_whitelist` to `ToolContext` + the one guard in `dispatch_tool()` + the `get_tools()` filter at the composition site (folds SEED-035). *Depends on: C (engine sets the whitelist per phase). Can land inside C.*
-
-**Phase E — Dual-mode wiring.**
-`agent_runner` branch on `active_workflow_run_id`; `api/workflows.py` (start run, CRUD); `POST /threads/{id}/workflow/cancel` lock enforcement; folds SEED-029 (Continue button = the per-phase `max_steps` resume affordance). *Depends on: C, D.*
-
-**Phase F — Panel phase-timeline + StreamsProvider extension.**
-`phasesByThread` Map + actions in `streamsStore`; `workflow_phase_*` handlers in `makeStreamCallbacks`; `subscribeToRun` parser arms in `lib/api.ts`; `<PhaseTimeline>` section in `WorkspacePanel` (ARIA landmarks per Theme H); `GET /threads/{id}/workflow` reconcile endpoint; `usePhases` hook. *Depends on: C/E (events to render).*
-
-**Phase G — Eval-harness regression gate + verification.**
-Fold SEED-034 (`scripts/eval_cross_provider.py`) as the CI regression gate; cross-provider × multi-tool × parallel-thread × long-message scoreboard (CLAUDE.md SC#10) on the harness surface; uvicorn-restart-mid-workflow resumability UAT; SEED-036a (`task()` global fair-share for `llm_batch_agents`). *Depends on: all.*
-
-**Critical path:** A → C → E → F. B parallels A. D folds into C. G is the verify wave.
+**Open questions for requirements/roadmap:**
+1. Does the model-registry write use a **new RLS write policy** (referencing `operator_users`) or a **service-role route** behind the operator gate? (053 has read-only RLS today.)
+2. SEED-112 folder scope: **definition-time field** vs **run-input selector** vs both? (Blocked on Glean/Beam research — operator directive.)
+3. Secrets-at-rest: pgsodium in-DB encryption vs an external `SecretsBackend` — and is it CORE or STRETCH? (The JSON-file removal the brief scoped is already done.)
+4. Is the install wizard / deployment-preset half of the brief (Themes H/I) **in scope for v3.3** or deferred? (Biggest lift; natural STRETCH per PROJECT.md — the cloud deploy already shipped `superrag.cloud`.)
 
 ---
-
-## Anti-Patterns
-
-### Anti-Pattern 1: Editing the shared streaming/parsing path to add phase logic
-**What people do:** Add phase-whitelist checks or workflow branching inside `threads.py`'s chunk handlers (`_on_chunk_openai`), the SSE emitter, or `anthropic_service`.
-**Why it's wrong:** This is *exactly* the 075.3 cross-provider cascade (`feedback_no_cross_provider_regressions`). Every shared-path edit risks breaking a working provider.
-**Do this instead:** All harness logic lives ABOVE the loop (`harness_engine`) or at the SINGLE dispatch entry (`dispatch_tool` guard) — both provider-agnostic. The whitelist refusal is a tool_result string, the most neutral surface.
-
-### Anti-Pattern 2: Building the harness on `agent_runner` directly (skipping extraction)
-**What people do:** Call into the 3,186-LOC `threads.py` loop from the engine, or copy-paste the loop.
-**Why it's wrong:** G-5 violation; two divergent loops; the next streaming bug must be fixed twice.
-**Do this instead:** Extract once (Phase A); the `llm_agent` phase reuses `run_task_sub_agent` (already a clean loop) or the extracted `run_agent_loop`.
-
-### Anti-Pattern 3: New Redis namespace / new SSE substrate for workflow events
-**What people do:** A `workflow:{id}` stream parallel to `run:{run_id}`.
-**Why it's wrong:** Breaks the single-EventSource-per-run discipline; the panel would need a second subscription; replay/reconcile machinery duplicated.
-**Do this instead:** `workflow_*` events XADD to `run:{run_id}` via `_emit`. Panel demuxes by type (Phase 086 pattern). Zero new substrate (D-v2.5-08).
-
-### Anti-Pattern 4: Querying the whitelist per tool call
-**What people do:** `SELECT available_tools FROM workflow_phases WHERE ...` inside `dispatch_tool`.
-**Why it's wrong:** Postgres roundtrip per tool call; the PRD §6 even proposed an in-memory cache to "fix" this.
-**Do this instead:** Resolve `available_tools` ONCE when the phase starts; pass the frozenset by value into the loop's `ToolContext`. No per-call query, no cache.
-
-### Anti-Pattern 5: Mid-LLM-call checkpointing for resumability
-**What people do:** Try to resume a paid LLM call from the exact token where uvicorn died.
-**Why it's wrong:** Impossible (provider state is gone) and violates D-v2.5-05 (no auto-retry of paid calls).
-**Do this instead:** Checkpoint at PHASE boundaries only. A phase that was `active` mid-call re-runs from the top with an idempotency guard (or operator confirm for expensive phases). Document the cost.
-
----
-
-## Scaling Considerations
-
-| Scale | Architecture Adjustments |
-|-------|--------------------------|
-| 0-100s users | Monolith fine. `workflow_phases` rows are tiny (100s users × 5 runs × 10 phases ≈ 5k rows). Index on `(workflow_run_id, phase_index)`. |
-| 100s-1k users | `llm_batch_agents` fan-out is the pressure point: N sub-agents × M parallel runs can exceed the AnyIO ceiling (~200) + global task cap (20, Redis-Lua). **SEED-036a fair-share folds in here.** Per-phase `max_parallel_agents` config (default 5). |
-| 1k+ users | Multi-worker (WORKER_COUNT=2 default, D-PRD-12) already handles producer distribution. Workflow resumability is cross-worker-safe (Postgres phase state). HNSW index migration (deferred) for RAG, orthogonal to harness. |
-
-### Scaling Priorities
-1. **First bottleneck:** `llm_batch_agents` concurrency — bounded by `max_parallel_agents` + the existing global `tasks:global:active` Redis-Lua cap (task_service.py:58). Already enforced.
-2. **Second bottleneck:** `workflow_phases.output jsonb` bloat if large outputs stored inline. Mitigation: spill to `workspace-files` bucket, store path only.
-
----
-
-## Integration Points
-
-### Internal Boundaries
-
-| Boundary | Communication | Notes |
-|----------|---------------|-------|
-| `harness_engine` ↔ `agent_loop` | Direct call `run_agent_loop(ctx, phase_whitelist=...)` | The extracted loop is the shared substrate for Deep + `llm_agent`. |
-| `harness_engine` ↔ `task_service` | Direct call `run_task_sub_agent(allowed_tools=..., max_steps=...)` | `llm_agent`/`llm_batch_agents`; concurrency caps inherited for free. |
-| `harness_engine` ↔ `ask_user_service` | Redis pub/sub `ask_user:{run_id}:{tcid}` | `llm_human_input` reuses the verbatim flow + existing `POST /runs/{id}/ask_user_response`. |
-| `harness_engine` ↔ `tool_dispatcher` | `ToolContext.phase_whitelist` field | The ONLY dispatcher change: 1 additive guard. |
-| `harness_engine` ↔ `_emit`/Redis | XADD to `run:{run_id}` | Same stream as all SSE; zero new substrate. |
-| `agent_runner` ↔ `harness_engine` | Branch on `threads.active_workflow_run_id` | Single source of mode truth. |
-| StreamsProvider ↔ panel | `phasesByThread` Map (NEW) | PANEL-06 isolation preserved; chat never reads it. |
-
-### External Services
-
-| Service | Integration Pattern | Notes |
-|---------|---------------------|-------|
-| 9 LLM providers | Via `create_adaptive_streaming_chat` (unchanged) | Harness adds NO provider code; phases call the existing adaptive-chat entry. Cross-provider parity is preserved because the harness never touches the streaming/parsing path. |
-| Supabase Storage | `workspace-files` bucket (existing) | Large phase outputs spill here; signed-URL pattern from sandbox-outputs/workspace. |
-| Redis | `run:{run_id}` (events), `ask_user:*` (human_input), `tasks:global:active` (batch caps) | All existing key conventions; no new namespace. |
-
----
-
-## Key Findings Summary (for the synthesizer)
-
-1. **The harness is ~80% composition.** All 5 phase types wrap already-shipped, cross-provider-tested code: `run_task_sub_agent` (a complete mini agent-loop with own run/stream/concurrency caps) for `llm_agent`+`llm_batch_agents`, `ask_user_service` verbatim for `llm_human_input`, a new `PROGRAMMATIC_PHASE_REGISTRY` dict (mirrors `_TOOL_REGISTRY`) for `programmatic`, and `task_service._stream_one_iteration` for `llm_single`. The genuinely-new code is the state machine (`harness_engine.py`) + Pydantic phase config + 4 validators.
-
-2. **Per-phase whitelist enforcement is a 1-line additive guard at `dispatch_tool()`** reading a new `ToolContext.phase_whitelist` frozenset — the precedent (`_handle_task`'s subset gate, lines 1091-1110) already ships. In Deep Mode the field is `None` → no-op → shared path byte-identical for all 9 providers → **zero cross-provider regression risk** (the guard lives below the streaming/parsing code, the surface that caused the 075.x cascade).
-
-3. **G-5 extraction MUST ship first.** `agent_runner` is buried in `threads.py:1818-2779` (3,186-LOC, hot-file ledger, 9+ phases). Extract the loop body to `app/services/agent_loop.py::run_agent_loop()` BEFORE harness code, with full cross-provider UAT proving Deep Mode is byte-identical. Both Deep Mode and `llm_agent` then share ONE loop.
-
-4. **New tables RLS via the proven `threads.user_id` FK chain.** `workflow_runs`/`workflow_phases` use the EXACT pattern shipped in `054_workspace_files.sql:41` + `055_todos_table.sql:25` (1-hop) and `054:58-66` (2-hop JOIN). `workflow_definitions` is the only non-thread-scoped table (owner/global like skills). Migration head is **055** → renumber **056-059** (PRD's 125-139 is stale fiction).
-
-5. **All workflow SSE rides the existing `run:{run_id}` stream; the panel demuxes into a new `phasesByThread` Map** exactly as Phase 086 added the 7 todo/file/ask/task handlers (StreamsProvider.tsx:674-702). PANEL-06 isolation (panel events → zero chat re-renders) is preserved by writing to a dedicated Map, never `bucketsBySurface`. Zero new Redis namespace, zero new substrate (D-v2.5-08).
-
-6. **Mode lives in `threads.active_workflow_run_id` (1 new column).** NULL=Deep, non-null=Harness + locked. `agent_runner` branches on it. The lock is enforced at `POST /threads/{id}/workflow/cancel` (only exit while active). **Drop the PRD's `deep_mode_metadata jsonb`** — no consumer in v2.8 scope.
-
-7. **`get_tools()` composition is the ONE `openai_service` touch** — filter the existing schema list by the phase whitelist before `tools_override` (precedent: `task_service.py:304-308`). Additive, no provider branch. SEED-035 tool-count budget folds in at this same site.
-
-8. **Build order:** A (extract loop) → B (schema/RLS, parallel) → C (engine + 5 types + validators) → D (whitelist guard, folds into C) → E (dual-mode + SEED-029) → F (panel timeline + StreamsProvider) → G (eval gate + SEED-034/036a + resumability UAT). Deep Mode stays a byte-identical no-op behind `active_workflow_run_id IS NULL` at every step.
 
 ## Sources
 
-- **Real substrate files (HIGH — read directly):** `backend/app/services/tool_dispatcher.py` (ToolContext.available_tools:88, `_handle_task` subset gate:1091-1110, `dispatch_tool`:1495, registry:1465), `backend/app/services/task_service.py` (`run_task_sub_agent`:196 — the complete sub-agent loop; global cap Lua:58; `_stream_one_iteration`:162), `backend/app/services/ask_user_service.py` (pub/sub pause/resume), `backend/app/api/threads.py` (`agent_runner`:1423, ToolContext build:2632, dispatch call:2677, `_emit`:109, finalize:158), `backend/app/services/openai_service.py` (`get_tools`:768, `create_adaptive_streaming_chat`:1124), `frontend/src/providers/StreamsProvider.tsx` (Phase-086 panel handlers:674-702, per-thread Map demux), `supabase/migrations/054_workspace_files.sql` + `055_todos_table.sql` (RLS FK-chain pattern), `backend/app/api/panel.py` (reconcile endpoints), `backend/app/api/runs.py` (`/ask_user_response`:496, `replay_tail_consumer`).
-- **Design source (validated/refined):** `.planning/PRDs/v2.7.md` §3 Theme B + §5 (harness design — sound on tables/phase-config/SSE; corrected on migration numbers, `llm_agent` substrate, and `deep_mode_metadata`).
-- **Decisions:** `.planning/PROJECT.md` Key Decisions (D-v2.5-08 run-backed streaming, D-085 task/ask_user caps, PANEL-06, D-v2.8-01 scope, D-PRD-08 multi-worker).
-- **Library versions (HIGH — verified in venv):** pydantic 2.12.5, jsonschema 4.26.0, fastapi 0.115.6, redis>=5.2, asyncpg>=0.29, anthropic>=0.97.0, openai>=2.0.0.
-- **Memory:** `feedback_no_cross_provider_regressions`, `feedback_provider_uniform_ux`, `feedback_workflow_guardrails` (G-5), `feedback_regressions_during_075_3_uat`.
+- Live code (HIGH — grep/read, this session): `053_settings_unification.sql`, `068_workspace_template_ephemeral.sql`, `071_dm_foundations.sql`, `config.py:498-701`, `tool_dispatcher.py:248-276,707-960,1076-1123,3189`, `sandbox_service.py`, `skills.py:113-158`, `documents.py:473-1074`, `harness/scope.py`, `harness/phase_types.py:300-359`, `harness/emitters.py`, `admin.py:21-72`, `runs.py:1097`, `main.py:458`, `WorkflowsPage.tsx:515-847`, `ChatLayout.tsx:314`, `MessageItem.tsx:442`, `user_settings.py:302`
+- SEED files (HIGH — authoritative scope): `SEED-104`, `SEED-108`, `SEED-110`, `SEED-112`, `SEED-033`
+- `.planning/PROJECT.md` (current milestone v3.3 section) + `MEMORY.md` (v3.2 close-out state)
+- `.planning/PRDs/v3.2-operator-ux.md` §5/§6 — treated as **stale hypotheses**, corrected above (LOW confidence on its internals; business decisions D-PRD-* retained)
 
 ---
-*Architecture research for: harness state-machine integration with the Agentic-RAG platform*
-*Researched: 2026-05-30*
+*Integration architecture research for: v3.3 Operator UX (subsequent milestone)*
+*Researched: 2026-07-10*

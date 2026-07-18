@@ -56,12 +56,20 @@ from supabase import Client
 
 from app.api.runs import replay_tail_consumer
 from app.config import get_model_capability, get_per_call_timeout, settings
-from app.dependencies import get_current_user, get_redis, get_supabase
+from app.dependencies import get_current_user, get_redis, get_supabase, require_visible
 from app.services import skill_tuner_service
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/skills", tags=["skill-tuner"])
+# Phase 148 (VIS-01) — the Trigger Tuner is a Skill Studio surface (Operators-only). Gate the
+# whole router (every endpoint) so a non-operator is refused server-side (403 — D-03). No
+# carve-out: every tuner endpoint is authoring/management. require_visible is a no-op for
+# operators + Everyone features (is_operator is the ONE swappable audience boundary).
+router = APIRouter(
+    prefix="/skills",
+    tags=["skill-tuner"],
+    dependencies=[Depends(require_visible("skill_studio"))],
+)
 
 # ── Bounds (T-123-04-02 — DoS guard; no unbounded fan-out / cost blow-up) ────────
 MAX_CASES = 40          # cap benchmark cases per run (should_fire + should_not combined)

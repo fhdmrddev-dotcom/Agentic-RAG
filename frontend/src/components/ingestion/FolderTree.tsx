@@ -122,18 +122,20 @@ export function FolderTree({
     <div className="flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between px-2 mb-2">
-        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60">
+        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
           Folders
         </span>
         <Tooltip>
           <TooltipTrigger asChild>
             <button
+              type="button"
+              aria-label="New folder"
               className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
               onClick={() =>
                 setCreatingInParentId(selectedFolderId ?? "root")
               }
             >
-              <Plus className="h-4 w-4" />
+              <Plus className="h-4 w-4" aria-hidden="true" />
             </button>
           </TooltipTrigger>
           <TooltipContent>New Folder</TooltipContent>

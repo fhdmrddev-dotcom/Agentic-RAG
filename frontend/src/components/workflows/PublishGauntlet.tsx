@@ -745,12 +745,21 @@ export function PublishGauntlet({ definitionId, definition, onPublished }: Publi
           aria-label="Publish this workflow"
           data-testid="publish-modal"
           className="fixed inset-0 z-[9000] grid place-items-center bg-black/60 p-6 backdrop-blur-sm"
-          onMouseDown={(e) => {
-            // Click the dimmed backdrop (not the card) to close — blocked mid-publish.
-            if (e.target === e.currentTarget) requestClose()
-          }}
         >
-          <div className="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg border border-border bg-card shadow-lg">
+          {/* Phase 155 (A11Y-01): backdrop-dismiss lives on a dedicated tabIndex=-1
+              <button> instead of a mousedown handler on the role="dialog" element
+              (jsx-a11y/no-noninteractive-element-interactions). Click the dimmed
+              backdrop (not the card) to close — blocked mid-publish (requestClose
+              no-ops while loading). */}
+          <button
+            type="button"
+            data-testid="publish-modal-backdrop"
+            aria-label="Close dialog"
+            tabIndex={-1}
+            className="absolute inset-0 cursor-default"
+            onMouseDown={requestClose}
+          />
+          <div className="relative flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg border border-border bg-card shadow-lg">
             <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-4 py-3">
               <div className="flex items-center gap-2">
                 <span aria-hidden="true">◆</span>

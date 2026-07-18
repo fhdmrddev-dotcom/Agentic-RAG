@@ -342,6 +342,25 @@ async def propose(
     ``skill`` / ``base_version`` / ``source_run_id`` carry the route's (Plan 04) call context;
     the emission is driven entirely by the rendered ``evidence`` DATA block.
     """
+    # Phase 147 (FLAG-01 / D-04) — self-improvement kill-switch, SECOND seam. The
+    # save_skill TOOL is the primary self-improve surface (hidden + refused at the two
+    # tool seams in Deep chat); THIS proposer is the other self-improve entry — the
+    # eval → instruction-proposal DRAFT path (evals.py:837). Guard it fail-closed: when an
+    # operator has turned self-improvement OFF, draft NOTHING and return an honest ``None``
+    # (the route already maps a None proposal to a clean refusal). ``self_improve_enabled()``
+    # reads the plan-01 last-known-good TTL cache (default-ON on a blip — D-Q4), so a
+    # transient settings-read failure never blocks a legitimate draft.
+    from app.models.user_settings import self_improve_enabled  # function-local (Pitfall-4)
+
+    if not self_improve_enabled():
+        logger.info(
+            "skill_proposer.propose: self-improvement is disabled by the operator (FLAG-01) "
+            "— refusing to draft a proposal (skill=%s source_run=%s)",
+            (skill or {}).get("id"),
+            source_run_id,
+        )
+        return None
+
     from app.config import get_model_capability, settings  # function-local (Pitfall-4)
 
     model = resolve_skill_builder_model(settings)

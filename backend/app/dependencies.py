@@ -1,12 +1,17 @@
 import json
+import logging
+from datetime import datetime, timezone
 
 import asyncpg
 import redis.asyncio as aioredis
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from supabase import create_client, Client
 
 from app.config import settings
+from app.services.operator_service import is_operator, write_operator_audit
+
+logger = logging.getLogger(__name__)
 
 bearer_scheme = HTTPBearer()
 
@@ -100,6 +105,28 @@ async def get_pg_pool() -> asyncpg.Pool:
     return _pg_pool
 
 
+async def _is_banned(user_id: str) -> bool:
+    """Phase 148 (T-148-02 / T-148-04) — is this user disabled (banned_until in the future)?
+
+    Reads ``auth.users.banned_until`` via the singleton asyncpg pool (~1ms). Returns True
+    ONLY for a real FUTURE ``banned_until``; False for NULL / past. FAILS OPEN — any read
+    exception returns False so a transient DB blip can NEVER lock out every user (the
+    "no self-inflicted outage" polarity — matches the maintenance_mode default-OPEN
+    posture). The stateless-JWT window is already bounded and the ban is re-enforced on
+    the next successful read. Do NOT trust ``supabase.auth.get_user`` to reject a live
+    token's ban — it does not (Pitfall 1); this app-layer check is the enforcement seam.
+    """
+    try:
+        pool = await get_pg_pool()
+        row = await pool.fetchrow(
+            "SELECT banned_until FROM auth.users WHERE id = $1", user_id
+        )
+        bu = row and row["banned_until"]
+        return bu is not None and bu > datetime.now(timezone.utc)
+    except Exception:
+        return False  # fail-OPEN — re-enforced on the next successful read
+
+
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
     supabase: Client = Depends(get_supabase),
@@ -109,6 +136,197 @@ async def get_current_user(
         response = supabase.auth.get_user(token)
         if response.user is None:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
-        return {"id": response.user.id, "email": response.user.email}
+        identity = {"id": response.user.id, "email": response.user.email}
     except Exception:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
+    # Phase 148 (ADMIN-03 / T-148-02) — app-layer ban check. AFTER the token validates
+    # and OUTSIDE the auth try/except above (so this 403 is NOT folded into the 401).
+    # Closes the ~1h stateless-JWT window: a banned user's live token stays valid until
+    # exp, so only a per-request DB check locks them out. _is_banned fails OPEN.
+    if await _is_banned(identity["id"]):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This account is disabled — contact your administrator.",
+        )
+    return identity
+
+
+# ── Phase 146 (ADMIN-01) — operator gate + append-only audit floor ────────────
+# Byte-identical to Starlette's unknown-route 404 (non-discoverable). Do NOT
+# customize the body — the whole point is that a non-operator cannot tell an
+# /admin route exists-but-forbidden vs. simply not existing (404-not-403).
+_NOT_FOUND = HTTPException(status_code=404, detail="Not Found")
+
+# WR-02: /admin gets its OWN bearer scheme with auto_error=False, used ONLY by the
+# operator gate. The shared ``bearer_scheme`` (auto_error=True) raises 403 on an
+# ABSENT Authorization header — so a request with no JWT to a real /admin route
+# returned 403 while /admin/<unknown> returned 404, letting an anonymous scanner
+# enumerate gated routes (defeating the non-discoverability claim). auto_error=False
+# hands us ``None`` for absent credentials so we fold every auth failure into the
+# SAME byte-identical 404. The shared get_current_user path is unchanged.
+_admin_bearer_scheme = HTTPBearer(auto_error=False)
+
+# Plain-sentence label + machine action code, keyed by /admin path. Endpoints may
+# also set request.state.audit_label / audit_action explicitly; these are the
+# route-derived fallbacks the floor uses when they did not.
+_AUDIT_LABELS: dict[str, tuple[str, str]] = {
+    "/admin/backpressure": ("Viewed system health", "health.view"),
+    "/admin/audit": ("Viewed recent actions", "audit.view"),
+}
+
+
+# WR-03: the audit floor exists so a future /admin endpoint is audited "by
+# construction" even when its author forgets the explicit request.state.audit_*
+# enrichment. The route-derived fallback must therefore reflect the HTTP method:
+# a mutating method (POST/PUT/PATCH/DELETE) that forgot to set state must NOT be
+# recorded as a harmless ".view" read with no write mark — that under-reports
+# exactly the destructive actions the floor exists to catch.
+_WRITE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
+
+
+def _derive_plain_label(request: Request) -> str:
+    return _AUDIT_LABELS.get(request.url.path, ("Performed an operator action", ""))[0]
+
+
+def _derive_action(request: Request) -> str:
+    known = _AUDIT_LABELS.get(request.url.path)
+    if known:
+        return known[1]
+    # "<area>.<verb>" fallback: last non-'admin' path segment + method-derived verb
+    # (GET -> "view"; any mutating method -> "write") so the floor never labels a
+    # forgotten write endpoint as a read (WR-03).
+    parts = [p for p in request.url.path.split("/") if p and p != "admin"]
+    area = parts[-1] if parts else "admin"
+    verb = "view" if request.method == "GET" else "write"
+    return f"{area}.{verb}"
+
+
+async def authenticate_operator_request(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_admin_bearer_scheme),
+    supabase: Client = Depends(get_supabase),
+) -> dict:
+    """Resolve the caller for the /admin surface, folding EVERY auth failure into 404.
+
+    WR-02: the non-discoverability contract (404-not-403) must hold BEFORE auth, not
+    only after. This uses the dedicated ``_admin_bearer_scheme`` (auto_error=False) so
+    an ABSENT Authorization header yields ``None`` here (instead of the shared scheme's
+    403), and an invalid/expired token — or any resolution error — is folded into the
+    SAME byte-identical ``_NOT_FOUND``. An anonymous scanner therefore cannot tell a
+    gated /admin route (404) apart from a nonexistent one (404).
+
+    A dedicated dependency (rather than reusing ``get_current_user``) keeps the shared
+    auth path untouched AND gives tests a clean override seam (conftest overrides this
+    to inject a fake operator identity; the WR-02 regression pops the override to
+    exercise the real pre-auth 404 path).
+
+    WR-01 (Phase 148 review): the app-layer ban check must cover the /admin seam too.
+    ``get_current_user`` enforces ``_is_banned``, but /admin authenticates HERE and never
+    called it — so a disabled operator's still-valid JWT kept full /admin access until
+    token expiry (and could ``POST /admin/users/{self}/enable`` to lift their own ban, or
+    disable the operator who disabled them). A banned operator is folded into the SAME
+    byte-identical ``_NOT_FOUND`` — NEVER a discoverable 403 — so /admin stays
+    non-discoverable, and the check FAILS OPEN exactly like ``_is_banned`` (a transient DB
+    blip returns False, never locking operators out). The shared ``get_current_user`` flow
+    is not touched.
+    """
+    if credentials is None:
+        raise _NOT_FOUND
+    try:
+        response = supabase.auth.get_user(credentials.credentials)
+        user = getattr(response, "user", None)
+    except Exception:
+        raise _NOT_FOUND
+    if user is None:
+        raise _NOT_FOUND
+    # WR-01: fold a banned operator into the byte-identical 404 (fail-OPEN via _is_banned).
+    if await _is_banned(user.id):
+        raise _NOT_FOUND
+    return {"id": user.id, "email": user.email}
+
+
+async def require_operator(
+    request: Request,
+    current_user: dict = Depends(authenticate_operator_request),
+) -> dict:
+    """Router-level default-deny gate for every /admin route (Pattern 1).
+
+    ``authenticate_operator_request`` already folded an absent/invalid JWT into a
+    byte-identical 404 (WR-02). On non-membership raise the same byte-identical 404
+    (non-discoverable — 404-not-403). On membership, stash the operator on
+    ``request.state`` for the audit floor + the ``/admin/me`` probe, and return the
+    identity. The backend runs on the service-role key with NO RLS backstop, so this
+    gate is the SOLE authority (Pitfall 1). Attach at the ROUTER level (never
+    per-endpoint) so a future /admin endpoint cannot forget it.
+    """
+    if not await is_operator(current_user["id"]):
+        raise _NOT_FOUND
+    request.state.operator = current_user
+    return current_user
+
+
+async def operator_audit_floor(
+    request: Request,
+    supabase: Client = Depends(get_supabase),
+):
+    """Append-only audit floor as a yield-dependency (Pattern 2).
+
+    Attach PER-ACTION-ENDPOINT (never at the router level) so the ``GET /admin/me``
+    mount probe stays floor-EXEMPT (Pitfall 4 — probes must not spam the ledger). The
+    teardown runs AFTER the response (off the latency path): it reads an enrich
+    label/action/is_write from ``request.state`` (falling back to a route-derived plain
+    label/action), and writes exactly ONE ``operator_audit_log`` row — no UPDATE,
+    preserving immutability. Wrapped in try/except that logs and swallows — the floor
+    never raises into the request.
+    """
+    yield
+    try:
+        op = getattr(request.state, "operator", None)
+        if op is None:
+            return  # the gate already 404'd a non-operator — nothing to record
+        label = getattr(request.state, "audit_label", None) or _derive_plain_label(request)
+        action = getattr(request.state, "audit_action", None) or _derive_action(request)
+        # WR-03: floor is_write from the HTTP method when the endpoint didn't set it,
+        # so a forgotten write endpoint isn't recorded as a read (is_write=False).
+        is_write = getattr(request.state, "audit_is_write", None)
+        if is_write is None:
+            is_write = request.method in _WRITE_METHODS
+        await write_operator_audit(
+            operator_user_id=op["id"],
+            action=action,
+            label=label,
+            is_write=is_write,
+            metadata={},
+            supabase=supabase,
+        )
+    except Exception as exc:
+        logger.error("operator audit floor failed: %s", exc)  # swallow (D-05 precedent)
+
+
+# ── Phase 148 (VIS-01) — per-endpoint feature-visibility gate ──────────────────
+def require_visible(feature: str):
+    """VIS-01 API-layer visibility gate (D-03). A dependency FACTORY.
+
+    Returns an async dependency that is a literal NO-OP for operators AND for
+    Everyone-audience features (Deep Mode / the Run + chat-model-picker carve-outs stay
+    byte-identical), and raises **403 — NOT 404** for a non-operator hitting an
+    Operators-only feature. The /admin surface keeps its byte-identical 404; a governed
+    product feature is a deliberate 403 an end user can understand (these are features
+    they may legitimately have seen before a flip). ``is_operator`` is the ONE swappable
+    boundary — SEED-115 later flips it to "is in group X" with zero change here.
+
+    Attach PER-ENDPOINT on the governed authoring/management endpoints ONLY — never at a
+    router level that would gate a Run/chat carve-out (``GET /settings/providers``,
+    ``GET /workflows/published|starters``, the workflow launch). ``feature_audience`` is
+    lazy-imported inside the closure to avoid an import cycle (user_settings -> deps).
+    """
+    async def _dep(current_user: dict = Depends(get_current_user)):
+        if await is_operator(current_user["id"]):
+            return  # operator -> no-op
+        from app.models.user_settings import feature_audience
+        if feature_audience(feature) == "everyone":
+            return  # Everyone-audience feature -> no-op (carve-out byte-identical)
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This feature is available to administrators only.",
+        )
+    return _dep

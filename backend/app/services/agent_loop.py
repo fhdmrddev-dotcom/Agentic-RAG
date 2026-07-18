@@ -49,6 +49,7 @@ from app.services.openai_service import (
     get_explorer_tools,
     EXPLORER_SYSTEM_PROMPT,
     CallingMode,
+    resolve_calling_mode,
     get_tools,
     embed_texts,
 )
@@ -60,6 +61,10 @@ from app.services.openai_service import (
 from app.services.anthropic_service import stream_anthropic
 from app.services.google_service import stream_google
 from app.services.tool_parser import parse_structured_tool_calls
+from app.services.citation_markers import (
+    apply_citation_instruction,
+    normalize_citation_markers,
+)
 from app.services.tool_dispatcher import ToolContext, ToolResult, dispatch_tool
 # Phase 095.1-04 (D-095.1-03 / PROVIDER-ERR): the per-provider gateway-boundary
 # error classifier — replaces the billing-first keyword if-ladder in the outer
@@ -762,6 +767,44 @@ def _format_tool_list(tools: list[dict]) -> str:
                 arg_lines.append(f"  - `{arg_name}` ({arg_type}){req_flag}: {arg_desc}")
             lines.extend(arg_lines)
     return "\n".join(lines)
+
+
+def _should_pre_inject_structured(
+    active_provider: str, effective_model: str, user_settings
+) -> bool:
+    """Phase 149 Plan 11 (SC#1 second half / WR-05) — decide whether to pre-inject the
+    STRUCTURED-path ``TOOL_USAGE_INSTRUCTIONS`` into the system prompt BEFORE the first stream.
+
+    Returns True when EITHER:
+
+    (a) the OpenRouter XML strategy is active — the original deterministic structured path,
+        preserved byte-identically to the prior inline gate; OR
+    (b) the effective calling mode resolves ``STRUCTURED`` for a compat-path provider — i.e. an
+        operator flipped ``native_tools`` OFF (surfaced via the warm ``_model_overrides_cache``
+        that the sync ``resolve_calling_mode`` consults — round-1 fix 56945cca). The
+        anthropic/google native-SDK providers are EXCLUDED (WR-05 boundary): they dispatch to
+        always-native adapters that never read ``native_tools``, so injecting tool instructions
+        would pollute a real native tool-carrying request.
+
+    Pure: no ``await``, no I/O. Reads ``user_settings`` attrs via ``getattr`` defaults and calls
+    the sync ``resolve_calling_mode``. The caller must warm the override cache
+    (``await get_model_capability_async(effective_model)``) before this sync gate read so the DB
+    toggle is reflected.
+    """
+    # Branch (a): preserve the existing OpenRouter XML pre-injection exactly (mirrors the prior
+    # inline gate's getattr defaults so branch (a) is byte-identical).
+    if (
+        active_provider == "openrouter"
+        and getattr(user_settings, "openrouter_tool_strategy", "quality") == "xml"
+    ):
+        return True
+    # Branch (b): a compat-path model whose effective mode resolves STRUCTURED (e.g. an operator
+    # native_tools=False override). WR-05: NEVER for the anthropic/google native-SDK branches —
+    # they route always-native and must not see structured tool-instruction injection.
+    if active_provider not in ("anthropic", "google"):
+        if resolve_calling_mode(effective_model, user_settings) == CallingMode.STRUCTURED:
+            return True
+    return False
 
 
 CONFIDENCE_DISCLAIMER = (
@@ -1554,12 +1597,24 @@ async def run_agent_loop(
 
     try:  # outer try/finally — guarantees persist even on GeneratorExit (client disconnect)
       try:
-        # Pre-inject tool instructions only for OpenRouter XML strategy — the one
-        # deterministic structured-mode path. All other providers use native tool
-        # calling; unknown models get post-creation injection (next iteration).
-        _needs_pre_injection = (
-            getattr(user_settings, "active_provider", "") == "openrouter"
-            and getattr(user_settings, "openrouter_tool_strategy", "quality") == "xml"
+        # Phase 149 Plan 11 (SC#1 second half / WR-05): pre-inject tool instructions for the
+        # OpenRouter XML strategy AND for any compat-path model an operator flipped to STRUCTURED
+        # (native_tools=False). The STRUCTURED branch of the stream omits the native `tools` param,
+        # so without this the DB-flipped model has NO tool mechanism on iteration 0 and hallucinates
+        # a non-answer (the post-stream fallback never fires — no parsed tool call → no next
+        # iteration). anthropic/google native-SDK dispatch is excluded inside the gate (WR-05).
+        #
+        # Compute the effective model exactly as the compat branch streams it (mirrors line ~2044;
+        # the trailing settings.llm_model guards against None), then WARM the override cache before
+        # the SYNC gate read so resolve_calling_mode reflects the operator's DB toggle even on the
+        # body.provider-set branch where threads.py's warm-read is skipped. get_model_capability_async
+        # is already imported + TTL-cached + called per-iteration, so this is D-14-neutral for the
+        # no-override path (a native model still resolves NATIVE → no injection). We are inside the
+        # outer async try: here, so the await is legal.
+        _effective_model = body.model or user_settings.llm_model or settings.llm_model
+        await get_model_capability_async(_effective_model)
+        _needs_pre_injection = _should_pre_inject_structured(
+            getattr(user_settings, "active_provider", "") or "", _effective_model, user_settings
         )
         _structured_tools_injected = False
 
@@ -1755,6 +1810,21 @@ async def run_agent_loop(
                         }
                         _structured_tools_injected = True
                         break
+
+            # Phase 153 Seam B (D-12/SC#10): on retrieval turns ONLY, inject the
+            # citation-density instruction + numbered source manifest via the
+            # provider-uniform dual channel — the note is appended to BOTH
+            # active_system_prompt (reaches the native system_prompt= param at the
+            # GatewayRequest sites below) AND the messages[0] system entry (reaches
+            # the compat channel; Anthropic silently drops mid-list system messages,
+            # so both are required — Pitfall 1). Gated on retrieved_citations so every
+            # non-retrieval turn is byte-identical (D-14). Recomputed fresh each turn
+            # (the manifest grows as more sources are retrieved). No per-provider
+            # branch — the dual channel IS the provider-uniform seam.
+            if retrieved_citations:
+                active_system_prompt = apply_citation_instruction(
+                    active_system_prompt, messages, retrieved_citations
+                )
 
             while True:
                 try:
@@ -2728,6 +2798,14 @@ async def run_agent_loop(
 
       # Emit citations event (D-03, D-07: after sources, before confidence)
       unique_citations[:] = _deduplicate_citations(retrieved_citations)
+      # Phase 153 Seam A (D-02/D-03/D-05): the backend is the sole author of citation
+      # truth. Strip every out-of-range / non-member [n] the model emitted and align
+      # survivors to the finalized unique_citations footer order BEFORE persist. This
+      # is a plain rebind in the send_message scope; _persist_assistant_message() reads
+      # the normalized full_content at its _strip_nul() call. Empty set -> every [n] is
+      # stripped (correct: no retrieval this run -> no valid markers). No new SSE event
+      # — the existing terminal reconcile carries the normalized content live.
+      full_content = normalize_citation_markers(full_content, unique_citations)
       if unique_citations:
           # SSE payload truncates passage at 400 chars (D-04); full text stored in source_refs
           sse_citations = []

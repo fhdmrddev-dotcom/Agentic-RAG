@@ -161,8 +161,11 @@ export function SkillStudioPage({ skillId, tab, onTabChange, onBack }: Props) {
           skillVersion={liveVersionNumber}
         />
 
-        {/* Deep-linkable tab bar (Evals · Triggering · Versions). */}
-        <nav className="flex items-center gap-1" role="tablist" aria-label="Skill Studio tabs">
+        {/* Deep-linkable tab bar (Evals · Triggering · Versions). Phase 155
+            (A11Y-01): a <div> host, not <nav> — the interactive "tablist" role must
+            not override a <nav> landmark (jsx-a11y/no-noninteractive-element-to-
+            interactive-role). */}
+        <div className="flex items-center gap-1" role="tablist" aria-label="Skill Studio tabs">
           {TABS.map((t) => {
             const active = t.id === tab
             return (
@@ -183,7 +186,7 @@ export function SkillStudioPage({ skillId, tab, onTabChange, onBack }: Props) {
               </button>
             )
           })}
-        </nav>
+        </div>
       </header>
 
       {/* Active tab body — the live version + skillId thread down; the leaves self-fetch

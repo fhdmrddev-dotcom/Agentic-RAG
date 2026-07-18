@@ -3,9 +3,10 @@ from pydantic import BaseModel, Field
 from supabase import Client
 
 from app.config import MODEL_CAPABILITIES, _infer_provider_for
-from app.dependencies import get_current_user, get_supabase
+from app.dependencies import get_current_user, get_supabase, require_visible
 from app.models.user_settings import (
     KEY_PLACEHOLDER,
+    KNOWN_PROVIDERS,
     load_app_settings,
     load_app_settings_async,
     save_app_settings,
@@ -64,6 +65,19 @@ class FullSettingsResponse(BaseModel):
     web_search_max_results: int
     # Sandbox
     sandbox_enabled: bool
+    # Phase 147 (FLAG-01, migration 097) — operator control-plane kill-switches, exposed
+    # on the EXISTING settings read contract (no new endpoint) so the Control Plane
+    # capability grid has a flag-read source, consistent with the two capability booleans
+    # (web_search_enabled / sandbox_enabled) already served here. GET /settings serves
+    # them to any authed user; the operator WRITE path lands on /admin/flags in a later plan.
+    self_improve_enabled: bool
+    workflows_enabled: bool
+    maintenance_mode: bool
+    # Phase 159 (MODEL-03 / D-159-04) — the persisted discovery-panel utility-filter default,
+    # surfaced on the SAME settings read contract so the Control Room shell can read the operator's
+    # "filter on by default" preference (ControlRoomPage `capabilityFlags` idiom). GET /settings
+    # serves it; the operator WRITE rides the shipped PUT /admin/flags path (Plan 02).
+    model_discovery_filter_enabled: bool
     # Context & Sub-agent
     context_window_max_tokens: int
     sub_agent_max_output_tokens: int
@@ -96,6 +110,11 @@ class FullSettingsResponse(BaseModel):
     # without mirroring the inference table client-side — RESEARCH.md §6
     # Approach b, zero-drift over Approach a's 5-pattern client mirror).
     inferred_provider_for: dict[str, str]
+    # Phase 149 (MODEL-01 / D-149-05): the enabled models an operator has flagged
+    # deprecated (model_capabilities_overrides.deprecated). The picker reads this to
+    # light the informational "deprecated" badge — deprecated ≠ disabled, the model
+    # stays selectable (only `enabled` controls availability). Sorted for stable diffs.
+    deprecated_models: list[str]
 
 
 # ── Request models ────────────────────────────────────────────────────────────
@@ -169,6 +188,12 @@ async def _build_response(s=None) -> FullSettingsResponse:
     # publish judge. Function-local import keeps the harness validators registry off the
     # settings module-load path; NEVER introduce a second resolver (T-137.1-J2).
     from app.services.harness.validator_kinds import resolve_judge_model
+    # Phase 149 (MODEL-01 / D-149-05) — the enabled deprecated models for the picker badge.
+    # Reads the enabled-only hot cache (deprecated ≠ disabled — a deprecated model stays
+    # enabled); _load_model_overrides never raises (returns the stale/empty cache on a blip).
+    from app.models.user_settings import _load_model_overrides
+    _overrides = await _load_model_overrides()
+    deprecated_models = sorted(mid for mid, cap in _overrides.items() if cap.get("deprecated"))
     return FullSettingsResponse(
         active_provider=s.active_provider,
         llm_model=s.llm_model,
@@ -208,6 +233,12 @@ async def _build_response(s=None) -> FullSettingsResponse:
         web_search_has_api_key=bool(s.tavily_api_key),
         web_search_max_results=s.web_search_max_results,
         sandbox_enabled=s.sandbox_enabled,
+        # Phase 147 (FLAG-01) — the three operator kill-switches from the effective settings.
+        self_improve_enabled=s.self_improve_enabled,
+        workflows_enabled=s.workflows_enabled,
+        maintenance_mode=s.maintenance_mode,
+        # Phase 159 (MODEL-03 / D-159-04) — the persisted discovery-filter default (default-ON).
+        model_discovery_filter_enabled=s.model_discovery_filter_enabled,
         context_window_max_tokens=s.context_window_max_tokens,
         sub_agent_max_output_tokens=s.sub_agent_max_output_tokens,
         sub_agent_model=s.sub_agent_model,
@@ -238,6 +269,8 @@ async def _build_response(s=None) -> FullSettingsResponse:
             for m in p.models
             if m and m not in MODEL_CAPABILITIES
         },
+        # Phase 149 (MODEL-01 / D-149-05) — enabled deprecated models for the badge.
+        deprecated_models=deprecated_models,
     )
 
 
@@ -267,12 +300,24 @@ def _validate_confidence_buckets(high: float | None, medium: float | None) -> No
 
 # ── Routes ────────────────────────────────────────────────────────────────────
 
-@router.get("", response_model=FullSettingsResponse)
+# Phase 148 (VIS-01) — the model-registry / Settings surface is an Operators-only governed
+# feature (model_management). Gate PER-ENDPOINT (NEVER at the router level) so the Run carve-out
+# GET /settings/providers below stays ungated (Pitfall 3 — router-gating would 403 the chat model
+# picker). require_visible is a no-op for operators + Everyone-audience features; 403 (D-03) else.
+@router.get(
+    "",
+    response_model=FullSettingsResponse,
+    dependencies=[Depends(require_visible("model_management"))],
+)
 async def get_settings(current_user: dict = Depends(get_current_user)):
     return await _build_response()
 
 
-@router.put("", response_model=FullSettingsResponse)
+@router.put(
+    "",
+    response_model=FullSettingsResponse,
+    dependencies=[Depends(require_visible("model_management"))],  # Phase 148 (VIS-01) — model_management gate
+)
 async def update_settings(
     body: SettingsUpdate,
     background_tasks: BackgroundTasks,
@@ -289,6 +334,13 @@ async def update_settings(
     # D-17: Store provider model lists as JSONB dict instead of individual CSV keys
     provider_model_lists: dict[str, list[str]] = {}
     for p in body.providers:
+        # Phase 150 (CR-01, defense-in-depth): p.id is client input that becomes the raw
+        # column name f"{p.id}_api_key" downstream. Reject any unknown provider id at the
+        # boundary with 422 so a crafted id never reaches save_app_settings (whose own
+        # _VALID_COLUMN_NAME guard is the load-bearing fix). KNOWN_PROVIDERS is the same
+        # code-owned set GET /settings builds the provider list from.
+        if p.id not in KNOWN_PROVIDERS:
+            raise HTTPException(status_code=422, detail=f"Unknown provider: {p.id}")
         updates[f"{p.id}_api_key"] = p.api_key  # save_app_settings handles "***" skip
         if p.models:
             provider_model_lists[p.id] = p.models  # list, not CSV
@@ -413,7 +465,15 @@ async def update_settings(
     prev_model = prev_settings.embedding_model
     prev_dims = prev_settings.embedding_dimensions
 
-    await save_app_settings(updates)
+    # Phase 150 (SEC-01 / D-150-07 / SC#2) — surface the previously-ignored save bool as a
+    # real HTTP 500. save_app_settings SWALLOWS every DB-write exception and returns False (a
+    # pool blip / connection reset / an UndefinedColumn on an unmigrated secret column). The
+    # raise sits IMMEDIATELY after the save and BEFORE the audit write + the re-embed kick
+    # below, so a failed save never emits a false settings.update audit row or a spurious
+    # re-embed (Phase 147 CR-02 precedent; RESEARCH §Round-trip verification). Round-trip
+    # meaning (SC#2): save_app_settings encrypts-then-writes; the one read seam decrypts back.
+    if not await save_app_settings(updates):
+        raise HTTPException(status_code=500, detail="Failed to save settings")
     sanitized = {k: ("[REDACTED]" if "_key" in k or "_secret" in k else v) for k, v in updates.items()}
     background_tasks.add_task(
         write_audit_entry,
@@ -457,7 +517,11 @@ class ReembedProgressResponse(BaseModel):
     updated_at: float | None = None
 
 
-@router.get("/reembed-progress", response_model=ReembedProgressResponse)
+@router.get(
+    "/reembed-progress",
+    response_model=ReembedProgressResponse,
+    dependencies=[Depends(require_visible("model_management"))],  # Phase 148 (VIS-01) — model_management gate
+)
 async def get_reembed_progress(
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_supabase),
@@ -473,7 +537,11 @@ async def get_reembed_progress(
     return await reembed_progress(supabase, current_user["id"], s)
 
 
-@router.post("/reembed", response_model=ReembedProgressResponse)
+@router.post(
+    "/reembed",
+    response_model=ReembedProgressResponse,
+    dependencies=[Depends(require_visible("model_management"))],  # Phase 148 (VIS-01) — model_management gate
+)
 async def rekick_reembed(
     background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_user),
@@ -491,6 +559,9 @@ async def rekick_reembed(
     return await reembed_progress(supabase, current_user["id"], s)
 
 
+# Phase 148 (VIS-01) — RUN CARVE-OUT: DO NOT add require_visible here. This feeds the chat
+# model picker (ChatArea.tsx getProviders()); end users need it. Gating it would be a
+# self-inflicted end-user outage (Pitfall 3 / T-148-08). test_148_carveouts guards this.
 @router.get("/providers")
 async def get_providers(current_user: dict = Depends(get_current_user)):
     """Lightweight endpoint for the chat UI provider selector."""
@@ -500,4 +571,17 @@ async def get_providers(current_user: dict = Depends(get_current_user)):
         for p in s.providers
         if p.api_key  # only providers that have a key set
     ]
-    return {"active": s.active_provider, "active_model": s.llm_model, "providers": configured}
+    # Phase 149 (IN-01 / D-149-05): the deprecated-model id set for the chat picker's
+    # informational badge. Same comprehension as the /settings response so the chat composer's
+    # MessageInput can render the `deprecated` badge (deprecated ≠ disabled — a deprecated
+    # model stays enabled/selectable). load_all_model_overrides never raises (returns the
+    # stale/empty cache on a blip), so this can never break the end-user picker feed.
+    from app.models.user_settings import load_all_model_overrides  # function-local (Pitfall 4)
+    _overrides = await load_all_model_overrides()
+    deprecated_models = sorted(mid for mid, cap in _overrides.items() if cap.get("deprecated"))
+    return {
+        "active": s.active_provider,
+        "active_model": s.llm_model,
+        "providers": configured,
+        "deprecated_models": deprecated_models,
+    }

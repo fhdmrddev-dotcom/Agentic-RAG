@@ -152,17 +152,17 @@ export function ReembedStatusCard({ id }: { id?: string }) {
         <div className="mb-4 flex gap-6">
           <div>
             <div className="font-mono text-lg font-bold text-foreground">{done.toLocaleString()}</div>
-            <div className="text-[10px] uppercase tracking-wide text-muted-foreground/70">re-embedded</div>
+            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">re-embedded</div>
           </div>
           <div>
             <div className="font-mono text-lg font-bold text-foreground">{total.toLocaleString()}</div>
-            <div className="text-[10px] uppercase tracking-wide text-muted-foreground/70">total chunks</div>
+            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">total chunks</div>
           </div>
           <div>
             <div className="font-mono text-lg font-bold text-foreground">
               {isComplete ? "done" : remainingEta(progress)}
             </div>
-            <div className="text-[10px] uppercase tracking-wide text-muted-foreground/70">remaining</div>
+            <div className="text-[10px] uppercase tracking-wide text-muted-foreground">remaining</div>
           </div>
         </div>
 

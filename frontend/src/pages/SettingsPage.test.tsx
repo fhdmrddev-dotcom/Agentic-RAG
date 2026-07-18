@@ -43,6 +43,19 @@ vi.mock("@/components/settings/MemorySection", () => ({ MemorySection: () => nul
 vi.mock("@/components/settings/ReembedStatusCard", () => ({ ReembedStatusCard: () => null }))
 
 import { SettingsPage } from "./SettingsPage"
+// Phase 154 (LANG-01 / D-01) — SettingsPage now hosts the "Show technical names"
+// toggle via `useTechnicalNames()`, which THROWS outside its provider. Wrap the
+// render in the provider (the citationNav.test wrapper idiom applied at the render
+// helper — mirrors the 154-01 ControlRoomPage.test fix). Default OFF (plain).
+import { TechnicalNamesProvider } from "@/providers/TechnicalNamesProvider"
+
+function renderSettings() {
+  return render(
+    <TechnicalNamesProvider>
+      <SettingsPage />
+    </TechnicalNamesProvider>,
+  )
+}
 
 function mkSettings(overrides: Partial<FullAppSettings> = {}): FullAppSettings {
   return {
@@ -110,7 +123,7 @@ afterEach(() => {
 
 describe("SettingsPage — skill-builder model picker (123.1-03 / D-09 / D-10)", () => {
   it("lists a STRONG configured model (D-09) grouped under its provider", async () => {
-    render(<SettingsPage />)
+    renderSettings()
     const picker = (await screen.findByLabelText(/skill-builder model/i)) as HTMLSelectElement
     expect(picker.tagName).toBe("SELECT")
 
@@ -127,7 +140,7 @@ describe("SettingsPage — skill-builder model picker (123.1-03 / D-09 / D-10)",
   })
 
   it("does NOT render the removed IN-02 placeholder local ids", async () => {
-    render(<SettingsPage />)
+    renderSettings()
     const picker = (await screen.findByLabelText(/skill-builder model/i)) as HTMLSelectElement
     const optionValues = within(picker).getAllByRole("option").map((o) => (o as HTMLOptionElement).value)
     expect(optionValues).not.toContain("lm-studio/qwen3")
@@ -135,7 +148,7 @@ describe("SettingsPage — skill-builder model picker (123.1-03 / D-09 / D-10)",
   })
 
   it("derives the LOCAL option from the configured provider (no paid-provider SPOF)", async () => {
-    render(<SettingsPage />)
+    renderSettings()
     const picker = (await screen.findByLabelText(/skill-builder model/i)) as HTMLSelectElement
     // The local model comes from the user's real ollama provider, not a placeholder id.
     const optionValues = within(picker).getAllByRole("option").map((o) => (o as HTMLOptionElement).value)
@@ -143,7 +156,7 @@ describe("SettingsPage — skill-builder model picker (123.1-03 / D-09 / D-10)",
   })
 
   it("keeps the Auto default option (value=\"\"), pre-selected when unset (D-10)", async () => {
-    render(<SettingsPage />)
+    renderSettings()
     const picker = (await screen.findByLabelText(/skill-builder model/i)) as HTMLSelectElement
     const optionValues = within(picker).getAllByRole("option").map((o) => (o as HTMLOptionElement).value)
     expect(optionValues).toContain("")
@@ -153,7 +166,7 @@ describe("SettingsPage — skill-builder model picker (123.1-03 / D-09 / D-10)",
 
   it("keeps a custom persisted value selectable as (current) so a stored id never drops", async () => {
     mockGetSettings.mockResolvedValue(mkSettings({ skill_builder_model: "some/custom-unconfigured-id" }))
-    render(<SettingsPage />)
+    renderSettings()
     const picker = (await screen.findByLabelText(/skill-builder model/i)) as HTMLSelectElement
     await waitFor(() => expect(picker.value).toBe("some/custom-unconfigured-id"))
     const current = within(picker).getByText(/some\/custom-unconfigured-id \(current\)/i)
@@ -163,7 +176,7 @@ describe("SettingsPage — skill-builder model picker (123.1-03 / D-09 / D-10)",
   it("shows a SOFT amber hint for an unverified selected model — option NOT disabled (D-10)", async () => {
     // claude-opus-4 is configured but NOT in verified_models => soft hint, never a block.
     mockGetSettings.mockResolvedValue(mkSettings({ skill_builder_model: "claude-opus-4" }))
-    render(<SettingsPage />)
+    renderSettings()
     const picker = (await screen.findByLabelText(/skill-builder model/i)) as HTMLSelectElement
     await waitFor(() => expect(picker.value).toBe("claude-opus-4"))
 
@@ -179,7 +192,7 @@ describe("SettingsPage — skill-builder model picker (123.1-03 / D-09 / D-10)",
   })
 
   it("shows the strong resolved default label when the setting is unset", async () => {
-    render(<SettingsPage />)
+    renderSettings()
     await waitFor(() => {
       expect(screen.getByLabelText(/skill-builder model/i)).toBeInTheDocument()
     })

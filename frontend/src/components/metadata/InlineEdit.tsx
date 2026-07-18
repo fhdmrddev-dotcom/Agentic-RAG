@@ -31,7 +31,7 @@
  * so each editable value is disambiguated; never colour-alone (the empty state shows a
  * "+ add" word, not just a dashed border).
  */
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Pencil } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -120,6 +120,14 @@ export function InlineEdit({
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState("")
   const triggerRef = useRef<HTMLButtonElement>(null)
+  // Phase 155 (A11Y-01): focus the text control via ref when editing opens, instead
+  // of the declarative `autoFocus` prop (jsx-a11y/no-autofocus) — same behavior. The
+  // ref is set by a callback on whichever control (Input | Textarea) mounts, so it
+  // stays a single typed `HTMLElement | null` (avoids a union RefObject mismatch).
+  const editRef = useRef<HTMLElement | null>(null)
+  useEffect(() => {
+    if (editing) editRef.current?.focus()
+  }, [editing])
   // Set while Esc cancels so the control's onBlur doesn't ALSO commit.
   const cancelledRef = useRef(false)
   // WR-04: set ONLY by the explicit Enter / Cmd-Ctrl+Enter path. A blur that did
@@ -271,7 +279,7 @@ export function InlineEdit({
   if (fieldType === "summary") {
     return (
       <Textarea
-        autoFocus
+        ref={(el) => { editRef.current = el }}
         aria-label={`Edit ${field}`}
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
@@ -297,7 +305,7 @@ export function InlineEdit({
 
   return (
     <Input
-      autoFocus
+      ref={(el) => { editRef.current = el }}
       type={inputType}
       aria-label={`Edit ${field}`}
       value={draft}

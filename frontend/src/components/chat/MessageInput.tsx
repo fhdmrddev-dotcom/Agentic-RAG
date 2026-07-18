@@ -9,7 +9,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { MODEL_INFO } from "@/lib/model-info"
+import { providerLogo, modelLogo } from "@/lib/providerLogo"
 import { cn } from "@/lib/utils"
+// Phase 154 (LANG-01 / D-03) — General/Explorer keep their already-plain labels
+// (routed through the single-source term-map so nothing drifts) and gain a one-line
+// helper. Additive DISPLAY strings only — no render-flow / stream logic; the
+// "default"/"explorer" enum + MessageItem.tsx / StreamsProvider.tsx stay untouched (G-5).
+import { TERM_MAP, usePlainLabel } from "@/lib/termMap"
 
 interface Provider {
   id: string
@@ -33,6 +39,10 @@ interface Props {
   models?: string[]
   selectedModel?: string
   onModelChange?: (model: string) => void
+  /** Phase 149 (D-149-05): model_ids flagged `deprecated` in the registry. Members
+   *  render an informational `deprecated` badge but stay selectable. Optional —
+   *  absent → empty set → no badge (defensive; lights up once wired to the payload). */
+  deprecatedModels?: Set<string>
   agentMode?: "default" | "explorer"
   onAgentModeChange?: (mode: "default" | "explorer") => void
   prefillMessage?: string | null
@@ -76,6 +86,7 @@ export function MessageInput({
   models = [],
   selectedModel,
   onModelChange,
+  deprecatedModels,
   agentMode = "default",
   onAgentModeChange,
   prefillMessage,
@@ -117,6 +128,12 @@ export function MessageInput({
     }
   }, [prefillMessage, onClearPrefill])
 
+  // Phase 154 (LANG-01 / D-03) — the mode labels sourced from the term-map (plain
+  // by default; for these keys plain === technical, so the visible label is
+  // unchanged). The one-line helper text lives on the same term-map rows.
+  const generalLabel = usePlainLabel("agentmode.default")
+  const explorerLabel = usePlainLabel("agentmode.explorer")
+
   const handleSend = () => {
     const trimmed = value.trim()
     // Phase 092 (092-06 / F3 — D-05): a locked thread cannot type/send. The
@@ -152,6 +169,14 @@ export function MessageInput({
   const activeProviderLabel = selectedProvider
     ? (PROVIDER_LABELS[selectedProvider] ?? selectedProvider)
     : null
+
+  // Model-icons (extends the Phase 127 ICON CONVENTION) — the FOLDED selected-state marks:
+  // the collapsed provider pill shows the selected provider's logo, the collapsed
+  // model pill shows the selected model's OWN family mark (Claude sunburst / Gemini
+  // star / …), falling back to the provider mark, then the generic lucide glyph.
+  // Single-source @lobehub via providerLogo/modelLogo (Phase 127 ICON CONVENTION).
+  const SelectedProviderMark = providerLogo(selectedProvider)
+  const SelectedModelMark = modelLogo(selectedModel) ?? providerLogo(selectedProvider)
 
   return (
     <div className="px-4 pb-3 bg-transparent">
@@ -195,33 +220,44 @@ export function MessageInput({
                         "transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                       )}
                     >
-                      <Layers className="h-3 w-3 shrink-0" />
+                      {SelectedProviderMark ? (
+                        <SelectedProviderMark size={14} />
+                      ) : (
+                        <Layers className="h-3 w-3 shrink-0" />
+                      )}
                       <span>{activeProviderLabel}</span>
                       <ChevronDown className="h-3 w-3 shrink-0 opacity-50" />
                     </button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="start" side="top" className="min-w-[160px] mb-1">
-                    {providers.map((p) => (
-                      <DropdownMenuItem
-                        key={p.id}
-                        onSelect={() => onProviderChange!(p.id)}
-                        className={cn(
-                          "text-xs cursor-pointer gap-2",
-                          p.id === selectedProvider && "font-medium bg-accent",
-                        )}
-                      >
-                        <Layers className="h-3 w-3 shrink-0 text-muted-foreground" />
-                        {PROVIDER_LABELS[p.id] ?? p.id}
-                        {p.id === selectedProvider && (
-                          <span className="ml-auto text-[10px] text-primary font-semibold">active</span>
-                        )}
-                      </DropdownMenuItem>
-                    ))}
+                    {providers.map((p) => {
+                      const PMark = providerLogo(p.id)
+                      return (
+                        <DropdownMenuItem
+                          key={p.id}
+                          onSelect={() => onProviderChange!(p.id)}
+                          className={cn(
+                            "text-xs cursor-pointer gap-2",
+                            p.id === selectedProvider && "font-medium bg-accent",
+                          )}
+                        >
+                          {PMark ? (
+                            <PMark size={14} />
+                          ) : (
+                            <Layers className="h-3 w-3 shrink-0 text-muted-foreground" />
+                          )}
+                          {PROVIDER_LABELS[p.id] ?? p.id}
+                          {p.id === selectedProvider && (
+                            <span className="ml-auto text-[10px] text-primary font-semibold">active</span>
+                          )}
+                        </DropdownMenuItem>
+                      )
+                    })}
                   </DropdownMenuContent>
                 </DropdownMenu>
               ) : activeProviderLabel ? (
-                <span className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-muted-foreground/50">
-                  <Layers className="h-3 w-3" />
+                <span className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-muted-foreground">
+                  {SelectedProviderMark ? <SelectedProviderMark size={14} /> : <Layers className="h-3 w-3" />}
                   {activeProviderLabel}
                 </span>
               ) : null}
@@ -237,7 +273,11 @@ export function MessageInput({
                         "transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                       )}
                     >
-                      <Cpu className="h-3 w-3 shrink-0" />
+                      {SelectedModelMark ? (
+                        <SelectedModelMark size={14} />
+                      ) : (
+                        <Cpu className="h-3 w-3 shrink-0" />
+                      )}
                       <span>{displayName(selectedModel!)}</span>
                       <ChevronDown className="h-3 w-3 shrink-0 opacity-50" />
                     </button>
@@ -245,34 +285,45 @@ export function MessageInput({
                   <DropdownMenuContent align="start" side="top" className="min-w-[200px] mb-1">
                     {models.map((m) => {
                       const info = MODEL_INFO[m]
+                      const isDeprecated = deprecatedModels?.has(m) ?? false
+                      // Phase 149 (D-149-17) + model-icons pass: the model's OWN
+                      // family mark per row (Claude/Gemini/Llama/… — MORE specific than the
+                      // provider mark, and it differentiates rows within one provider, e.g.
+                      // OpenRouter), falling back to the provider mark, then the Cpu glyph.
+                      // Capability info stays DEMOTED to the hover tooltip so the model name
+                      // stays primary (the operator's "context info makes it not very good"
+                      // cleanup — visual-only). Single-source @lobehub (ICON CONVENTION).
+                      const ModelMark = modelLogo(m) ?? providerLogo(selectedProvider)
+                      const capTooltip = info
+                        ? `${(info.contextWindow / 1000).toFixed(0)}k context · ${info.maxOutputTokens.toLocaleString()} output · ${info.bestFor} · Cost tier: ${info.costTier === 'low' ? 'Low ($)' : info.costTier === 'mid' ? 'Mid ($$)' : 'High ($$$)'}`
+                        : undefined
                       return (
                         <DropdownMenuItem
                           key={m}
                           onSelect={() => onModelChange!(m)}
+                          title={capTooltip}
                           className={cn(
-                            "text-xs cursor-pointer items-start gap-2 py-2",
+                            "text-xs cursor-pointer items-center gap-2 py-1.5",
                             m === selectedModel && "font-medium bg-accent",
                           )}
                         >
-                          <Cpu className="h-3 w-3 shrink-0 text-muted-foreground mt-0.5" />
-                          <div className="flex flex-col gap-0.5 min-w-0 flex-1">
-                            <div className="flex items-center gap-1.5">
-                              <span>{m}</span>
-                              {m === selectedModel && (
-                                <span className="text-[10px] text-primary font-semibold">active</span>
-                              )}
-                            </div>
-                            {info && (
-                              <>
-                                <span className="text-[10px] text-muted-foreground/60 font-normal truncate">
-                                  {(info.contextWindow / 1000).toFixed(0)}k ctx · {info.maxOutputTokens.toLocaleString()} out · {info.bestFor}
-                                </span>
-                                <span className="text-[10px] text-muted-foreground/50 font-normal">
-                                  <span className="font-medium">Cost tier:</span> {info.costTier === 'low' ? 'Low ($)' : info.costTier === 'mid' ? 'Mid ($$)' : 'High ($$$)'}
-                                </span>
-                              </>
-                            )}
-                          </div>
+                          {ModelMark ? (
+                            <ModelMark size={13} />
+                          ) : (
+                            <Cpu className="h-3 w-3 shrink-0 text-muted-foreground" />
+                          )}
+                          <span className="min-w-0 flex-1 truncate">{m}</span>
+                          {isDeprecated && (
+                            <span
+                              className="text-[9px] font-medium text-amber-600 bg-amber-500/10 px-1.5 py-0.5 rounded-full ghost-border shrink-0"
+                              title="This model is deprecated. It still works, but consider moving to a newer model."
+                            >
+                              deprecated
+                            </span>
+                          )}
+                          {m === selectedModel && (
+                            <span className="text-[10px] text-primary font-semibold shrink-0">active</span>
+                          )}
                         </DropdownMenuItem>
                       )
                     })}
@@ -280,8 +331,8 @@ export function MessageInput({
                 </DropdownMenu>
               ) : (
                 selectedModel && (
-                  <span className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-muted-foreground/50">
-                    <Cpu className="h-3 w-3" />
+                  <span className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-muted-foreground">
+                    {SelectedModelMark ? <SelectedModelMark size={14} /> : <Cpu className="h-3 w-3" />}
                     {displayName(selectedModel)}
                   </span>
                 )
@@ -317,19 +368,31 @@ export function MessageInput({
                   <DropdownMenuContent align="start" side="top" className="min-w-[160px] mb-1">
                     <DropdownMenuItem
                       onSelect={() => onAgentModeChange("default")}
-                      className={cn("text-xs cursor-pointer gap-2", agentMode === "default" && "font-medium bg-accent")}
+                      className={cn("text-xs cursor-pointer gap-2 items-start", agentMode === "default" && "font-medium bg-accent")}
                     >
-                      <Cpu className="h-3 w-3 shrink-0 text-muted-foreground" />
-                      General
-                      {agentMode === "default" && <span className="ml-auto text-[10px] text-primary font-semibold">active</span>}
+                      <Cpu className="h-3 w-3 shrink-0 text-muted-foreground mt-0.5" />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span>{generalLabel}</span>
+                          {agentMode === "default" && <span className="ml-auto text-[10px] text-primary font-semibold">active</span>}
+                        </div>
+                        {/* Phase 154 — one-line plain helper off the term-map (additive). */}
+                        <p className="text-[10px] font-normal text-muted-foreground mt-0.5">{TERM_MAP["agentmode.default"].helper}</p>
+                      </div>
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onSelect={() => onAgentModeChange("explorer")}
-                      className={cn("text-xs cursor-pointer gap-2", agentMode === "explorer" && "font-medium bg-accent")}
+                      className={cn("text-xs cursor-pointer gap-2 items-start", agentMode === "explorer" && "font-medium bg-accent")}
                     >
-                      <Compass className="h-3 w-3 shrink-0 text-muted-foreground" />
-                      Explorer
-                      {agentMode === "explorer" && <span className="ml-auto text-[10px] text-primary font-semibold">active</span>}
+                      <Compass className="h-3 w-3 shrink-0 text-muted-foreground mt-0.5" />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span>{explorerLabel}</span>
+                          {agentMode === "explorer" && <span className="ml-auto text-[10px] text-primary font-semibold">active</span>}
+                        </div>
+                        {/* Phase 154 — one-line plain helper off the term-map (additive). */}
+                        <p className="text-[10px] font-normal text-muted-foreground mt-0.5">{TERM_MAP["agentmode.explorer"].helper}</p>
+                      </div>
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -340,7 +403,7 @@ export function MessageInput({
             {/* Right: stop (while streaming) or send button */}
             <div className="flex items-center gap-2.5">
               {!disabled && (
-                <span className="text-[10px] text-muted-foreground/40 hidden sm:block">
+                <span className="text-[10px] text-muted-foreground hidden sm:block">
                   Enter ↵ · Shift+Enter for newline
                 </span>
               )}
@@ -374,7 +437,7 @@ export function MessageInput({
           </div>
         </div>
 
-        <p className="text-[10px] text-muted-foreground/40 text-center mt-2.5">
+        <p className="text-[10px] text-muted-foreground text-center mt-2.5">
           AI can make mistakes. Verify important information.
         </p>
       </div>

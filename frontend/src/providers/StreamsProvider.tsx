@@ -723,6 +723,19 @@ export function makeStreamCallbacks(opts: {
         }),
       )
     },
+    // Phase 149 Plan 09 (D-149-10): stamp the honest disabled-model fallback notice on the
+    // streaming assistant message ONLY (id === assistantId), mirroring onSkillActivated. The
+    // backend `message` already names BOTH models; MessageItem renders it inline. Pre-fix this
+    // event had no consumer → the user saw a silent model swap (the UAT Test-7 root cause).
+    onModelDisabledFallback: (disabledModel, fallbackModel, message) => {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id !== assistantId
+            ? m
+            : { ...m, modelFallbackNotice: { disabledModel, fallbackModel, message } },
+        ),
+      )
+    },
     onSkillLoaded: (skillName, description) => {
       setMessages((prev) =>
         prev.map((m) => {

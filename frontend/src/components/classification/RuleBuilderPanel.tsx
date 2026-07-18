@@ -234,7 +234,7 @@ export function RuleBuilderPanel({
 
       {/* Rule name */}
       <label className="block space-y-1.5">
-        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">
+        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
           Rule name
         </span>
         <input
@@ -248,7 +248,7 @@ export function RuleBuilderPanel({
 
       {/* Condition chip strip — field op value + ＋condition, flat AND (029/114). */}
       <div className="space-y-2">
-        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">
+        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
           When a document matches
         </span>
         <div className="relative">
@@ -302,7 +302,7 @@ export function RuleBuilderPanel({
 
       {/* 📁 folder action — the ONLY action (D-118-1, the 🏷 tag radio is dropped). */}
       <label className="block space-y-1.5">
-        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">
+        <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
           📁 Suggest moving it to
         </span>
         <select
@@ -324,7 +324,7 @@ export function RuleBuilderPanel({
       {/* scope segmented — 👤 Only me / 🌐 Global (default Only me). Native radios
           so it is keyboard-operable + screen-reader legible (UX-01 / AA). */}
       <fieldset className="space-y-1.5">
-        <legend className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">
+        <legend className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
           Who can use this rule
         </legend>
         <div className="inline-flex rounded-lg border border-border bg-card p-0.5">
@@ -375,7 +375,7 @@ export function RuleBuilderPanel({
             </span>
           </label>
         </div>
-        <p className="text-[11px] text-muted-foreground/70">
+        <p className="text-[11px] text-muted-foreground">
           Global rules are seeded by an administrator.
         </p>
       </fieldset>

@@ -1,0 +1,114 @@
+# docker-compose.prod.yml — Phase 157 (DEPLOY-01) ALL-IN-ONE production reference stack (D-02).
+#
+# Three services, one command (`docker compose -f docker-compose.prod.yml up -d --build`):
+#   frontend  nginx serving the Vite `dist` + reverse-proxying /api/ -> backend:8000 (SSE-safe)
+#   backend   uvicorn via the existing backend/Dockerfile (reused AS-IS)
+#   redis     bundled ephemeral stream buffer (mirrors docker-compose.dev.yml)
+#
+# Supabase is ALWAYS external (cloud, or the operator's local instance via
+# host.docker.internal during the D-09 smoke) — it is NEVER a service in this file (D-02).
+#
+# Config comes from ONE gitignored root ./.env (copy it from deploy/onebox.env.example):
+#   * build-time  — the frontend VITE_* below are interpolated by compose at parse time
+#   * runtime     — the backend reads the SAME ./.env via env_file
+# The two mechanisms are DIFFERENT; VITE_* MUST be build args (a plain `up` won't rebuild).
+#
+# All three services share one user-defined bridge network (`agentic-rag`): frontend/nginx.conf
+# resolves the backend via Docker's embedded DNS (resolver 127.0.0.11) + a variable upstream
+# `backend:8000`, which only resolves on a user-defined network — NOT the default bridge.
+
+services:
+  # ── frontend ── nginx: static SPA + /api/ reverse proxy (net-new image, Plan 02) ──
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # BUILD-TIME: Vite inlines import.meta.env.VITE_* into the JS bundle at build.
+        # Interpolated from the root ./.env at parse time; change one => rebuild (`up --build`).
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
+        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api}
+    restart: unless-stopped
+    ports:
+      - "8080:80"           # published ingress — the ONLY required entry point
+    depends_on:
+      - backend             # start ordering only; nginx defers DNS + retries
+    networks:
+      - agentic-rag
+
+  # ── backend ── uvicorn via backend/Dockerfile, reused AS-IS (EXPOSE 8000) ──
+  backend:
+    build:
+      context: ./backend    # backend/Dockerfile — reused unchanged
+    restart: unless-stopped
+    env_file:
+      - ./.env              # the operator's filled-in one-box preset (root, gitignored)
+    environment:
+      # Phase 158 (DEPLOY-02) — pin the first-run install-wizard setup-store to the mounted
+      # setup_data volume below. Matches the code default (services/setup_store.py), set
+      # explicitly so the volume's purpose is self-documenting. `env_file: ./.env` above is
+      # read ONCE at container create; a wizard-configured box persists its infra tier in the
+      # store and the config overlay reads it at boot (D-01/D-02).
+      SETUP_STORE_PATH: /data/setup.json
+    depends_on:
+      redis:
+        condition: service_healthy
+    extra_hosts:
+      # Linux: lets the backend reach the operator's LOCAL Supabase during the D-09
+      # smoke (harmless for cloud Supabase; Docker Desktop resolves this name anyway).
+      - "host.docker.internal:host-gateway"
+    volumes:
+      # execute_code sandbox spawns sibling containers via the host daemon.
+      # The socket = HOST ROOT — SINGLE-TENANT boxes ONLY (documented loudly in OPERATOR.md).
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Phase 158 (DEPLOY-02) — first-run install-wizard setup-store; holds infra config +
+      # finalize marker + setup token (0600). `env_file: ./.env` is read ONCE at container
+      # create, so a wizard-configured box persists its infra tier here, overlaid onto config
+      # at boot. Named volume (declared under the top-level `volumes:` block below) so it
+      # survives `docker compose up -d --build` recreates and restarts.
+      - setup_data:/data
+    ports:
+      # Optional — lets the D-09 smoke curl http://localhost:8000/health directly.
+      # nginx (frontend :8080) is the only REQUIRED ingress; drop this on a locked-down box.
+      - "8000:8000"
+    networks:
+      - agentic-rag
+
+  # ── redis ── bundled ephemeral buffer, mirrored from docker-compose.dev.yml ──
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # No host port publish in prod: the backend reaches it at redis://redis:6379 over the
+    # compose network (never expose 6379 publicly without --requirepass).
+    # No persistence: run-backed streaming buffers are ephemeral (per-run TTL ~10 min);
+    # maxmemory + allkeys-lru bounds storage so a runaway producer can't OOM the host.
+    command: >
+      redis-server
+      --save ""
+      --appendonly no
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - agentic-rag
+
+networks:
+  # Shared user-defined bridge — required for nginx's `resolver 127.0.0.11` + variable
+  # upstream to resolve `backend` (Plan 02 carry-forward). Compose would create a default
+  # network anyway; naming it makes the contract explicit and self-documenting.
+  agentic-rag:
+    driver: bridge
+
+volumes:
+  # Phase 158 (DEPLOY-02) — persistent setup-store home for the first-run install wizard.
+  # Mounted at /data on the backend; the wizard writes /data/setup.json (0600) carrying the
+  # infra tier (Supabase/Postgres/Redis creds + SECRETS_ENCRYPTION_KEY) + the finalize marker
+  # + the setup token. A named volume (not a bind mount) so it survives `up -d --build` and
+  # restarts — a wizard-configured box keeps its config with zero host-path coupling.
+  # See docs/OPERATOR.md (the wizard path) and scripts/check-deploy-drift.sh check #4.
+  setup_data:
+    driver: local

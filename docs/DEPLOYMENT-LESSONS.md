@@ -94,6 +94,21 @@ from local. Most of these bugs were config/data, not code.*
 - **Prevention:** error ladder to diagnose — "code execution disabled" = `SANDBOX_ENABLED` off;
   "connection issue" = socket not mounted; `404 pull access denied` = image not on host.
   Security: a mounted `docker.sock` = host root; acceptable for a single-tenant box only.
+- **RECURRED 2026-07-12 — Coolify's Docker cleanup prunes the image.** Sandbox worked for
+  ~2 weeks, then broke with the same `404 pull access denied` right after a routine
+  `production` push. Nothing in the push touched the sandbox; the host image store showed
+  **no** `agentic-rag-sandbox` and only the newest app image left — Coolify's automatic
+  Docker cleanup (`docker image prune`-style, runs around deploys/on schedule) swept the
+  host-built image because sandbox containers are ephemeral, so nothing referenced it at
+  cleanup time. **Fix:** rebuild on the host (the Dockerfile is self-contained — heredoc it,
+  no repo clone needed), then **pin it**:
+  `docker create --name sandbox-image-keeper agentic-rag-sandbox:<tag>` — a never-started
+  container that references the image, so image-prune spares it (Coolify's container prune
+  only targets coolify-managed labels, so the keeper survives too). **Rule:** the keeper is
+  part of the sandbox install; every `SANDBOX_IMAGE` tag bump = rebuild on host + recreate
+  the keeper against the new tag (remove the old one: `docker rm sandbox-image-keeper`).
+  If this bites a third time, move the image to a private registry (GHCR) so the host can
+  re-pull instead of host-building.
 
 ### B3. Metadata extraction silently produced NULL (HIGH-VALUE)
 - **Symptom:** docs `status=completed` but `metadata=null`; chat worked fine.
@@ -153,5 +168,7 @@ from local. Most of these bugs were config/data, not code.*
 ---
 
 ## Changelog
+- **2026-07-12** — B2 recurrence logged: Coolify Docker cleanup pruned the host-built sandbox
+  image after a deploy; rebuilt + added the `sandbox-image-keeper` pin container.
 - **2026-06-29** — Created. Logged Part A (initial-deploy gotchas) + Part B (post-deploy bugs:
   CORS, sandbox, metadata, image-chunk embedding_model, chunk_count) + recurring themes.

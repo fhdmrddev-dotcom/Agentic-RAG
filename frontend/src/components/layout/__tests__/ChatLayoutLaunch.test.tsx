@@ -22,6 +22,8 @@ import { render, screen, within, waitFor, fireEvent } from "@testing-library/rea
 const {
   mockCreateThread,
   mockPostMessage,
+  mockUploadTemplate,
+  mockDeleteThread,
   mockListPublished,
   mockListDrafts,
   mockCreateDraft,
@@ -33,6 +35,8 @@ const {
 } = vi.hoisted(() => ({
   mockCreateThread: vi.fn(),
   mockPostMessage: vi.fn(),
+  mockUploadTemplate: vi.fn(),
+  mockDeleteThread: vi.fn(),
   mockListPublished: vi.fn(),
   mockListDrafts: vi.fn(),
   mockCreateDraft: vi.fn(),
@@ -49,6 +53,10 @@ const {
 vi.mock("@/lib/api", () => ({
   createThread: mockCreateThread,
   postMessage: mockPostMessage,
+  uploadWorkspaceTemplate: mockUploadTemplate,
+  // WR-04: doRun imports the raw deleteThread (aliased deleteLaunchThread) for
+  // best-effort orphan cleanup on a failed launch.
+  deleteThread: mockDeleteThread,
   listPublishedWorkflows: mockListPublished,
   listDraftWorkflows: mockListDrafts,
   createWorkflowDraft: mockCreateDraft,
@@ -105,6 +113,8 @@ beforeEach(() => {
   // doRun resolves a NEW thread, then posts the kickoff against it.
   mockCreateThread.mockResolvedValue({ id: "thread-new", title: "Vendor-risk review" })
   mockPostMessage.mockResolvedValue(undefined)
+  mockUploadTemplate.mockResolvedValue(undefined)
+  mockDeleteThread.mockResolvedValue(undefined)
   mockListPublished.mockResolvedValue([publishedDef])
   mockListDrafts.mockResolvedValue([])
   mockListFolders.mockResolvedValue([])
@@ -148,5 +158,32 @@ describe("ChatLayout — Workflows-page Run launches a workflow (SC#2, D-02/D-03
 
     // doRun: the user is switched to the thread to watch the run.
     await waitFor(() => expect(onNavigate).toHaveBeenCalledWith("chat"))
+
+    // WR-04 invariant: a SUCCESSFUL launch never deletes the created thread.
+    expect(mockDeleteThread).not.toHaveBeenCalled()
+  })
+
+  it("WR-04: a failed launch (postMessage rejects) best-effort deletes the created thread and re-throws (the modal's 422 still surfaces)", async () => {
+    // The routine 152 failure path: the launch step rejects (a template 422 or a
+    // postMessage 409/network error). doRun must clean up the created thread shell so
+    // retries don't accrue orphans, WITHOUT swallowing the error the modal renders.
+    mockPostMessage.mockRejectedValue(new Error("template failed validation (422)"))
+    renderLayout()
+
+    const cards = await screen.findAllByTestId("published-card")
+    fireEvent.click(within(cards[0]).getByTestId("published-run"))
+    const kickoff = await screen.findByTestId("run-kickoff")
+    fireEvent.change(kickoff, { target: { value: "review Acme Corp" } })
+    fireEvent.click(screen.getByTestId("run-confirm"))
+
+    // The thread was created, the launch step failed → best-effort cleanup with the
+    // created thread's id (fire-and-forget: it must not block the error surfacing).
+    await waitFor(() => expect(mockDeleteThread).toHaveBeenCalledWith("thread-new"))
+
+    // Re-throw preserved: RunModal catches the re-thrown error and renders the server's
+    // message VERBATIM (the inline role="alert" launch error) — surfacing must not regress.
+    expect(await screen.findByTestId("run-upload-error")).toHaveTextContent(
+      "template failed validation (422)",
+    )
   })
 })

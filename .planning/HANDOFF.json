@@ -1,39 +1,37 @@
 {
   "version": "1.0",
-  "timestamp": "2026-06-30T20:11:19.485Z",
-  "phase": "133",
-  "phase_name": "eval-runner-with-skill-vs-without-skill",
-  "phase_dir": ".planning/phases/133-eval-runner-with-skill-vs-without-skill",
-  "plan": 5,
+  "timestamp": "2026-07-12T21:49:34.821Z",
+  "phase": "149",
+  "phase_name": "model-registry-discovery",
+  "phase_dir": ".planning/phases/149-model-registry-discovery",
+  "plan": 12,
   "task": null,
   "total_tasks": null,
   "status": "paused",
-  "boundary": "clean-phase-boundary",
   "completed_tasks": [
-    {"id": "133", "name": "Eval Runner (EVAL-02) — all 5 plans", "status": "done", "commit": "12bdd6ee"},
-    {"id": "133-verify", "name": "VERIFICATION passed + live SC#10 cross-provider UAT", "status": "done", "commit": "306dd2d4"},
-    {"id": "post-133-a", "name": "Register claude-sonnet-5 (live /models)", "status": "done", "commit": "362672fb"},
-    {"id": "post-133-b", "name": "Capture eval follow-up bugs BUG-260701-01 + SEED-100", "status": "done", "commit": "79b7a4ed"}
+    {"id": "149-11", "name": "Structured-path pre-injection gate (_should_pre_inject_structured + run_agent_loop wiring)", "status": "done", "commit": "22161913"},
+    {"id": "149-12", "name": "Suggestion <think> strip (_strip_think_blocks before line-parse)", "status": "done", "commit": "01b92536"},
+    {"id": "review-r3", "name": "Code review round 3 (0 critical, 2 warnings, 4 info)", "status": "done", "commit": "48fd7cda"},
+    {"id": "verify-r3", "name": "Verifier round 3: 9/9 code-level must-haves, status human_needed", "status": "done", "commit": "8e99f95a"}
   ],
   "remaining_tasks": [
-    {"id": "next-1", "name": "/gsd:secure-phase 133 (retroactive threat verification)", "status": "not_started"},
-    {"id": "next-2", "name": "Phase 134 (EVAL-03/04)", "status": "not_started"},
-    {"id": "next-3", "name": "2 OPTIONAL operator lived-glances on Phase 133 (thin-UI live-progress render + parallel-thread feel)", "status": "not_started"}
+    {"id": "uat-row-1", "name": "LIVE re-test HUMAN-UAT row 1: native_tools OFF on OpenAI compat model -> 'list the top-level folders' must FIRE A TOOL (structured path); then flip back ON", "status": "not_started"},
+    {"id": "uat-row-7", "name": "LIVE re-test row-7 residual: MiniMax-served reply -> follow-up suggestion chips clean, no <think>", "status": "not_started"},
+    {"id": "phase-complete", "name": "If both pass: run gsd-sdk query phase.complete 149 + commit tracking (update_roadmap step of execute-phase)", "status": "not_started"},
+    {"id": "secure-phase", "name": "/gsd:secure-phase 149 (no 149-SECURITY.md exists yet; security enforcement on)", "status": "not_started"}
   ],
-  "blockers": [],
+  "blockers": [
+    {"description": "Operator's terminal wedged; PC restart required. All work committed — nothing at risk.", "type": "external", "workaround": "Restart, relaunch services, /gsd:resume-work"}
+  ],
   "human_actions_pending": [
-    {"action": "Backend RESTART (not just --reload) to load claude-sonnet-5 into MODEL_CAPABILITIES", "context": "config.py change 362672fb only takes effect on a full restart", "blocking": false},
-    {"action": "2 optional operator lived-glances on Phase 133 thin UI", "context": "engine isolation already confirmed; these are non-blocking polish glances", "blocking": false}
+    {"action": "Live re-test HUMAN-UAT rows 1 + 7 at http://localhost:5173/ (operator login)", "context": "Phase convention: MODEL-01/MODEL-02 close only on served-artifact proof, not green unit tests (CR-01 fired twice on helper-green wire bugs)", "blocking": true}
   ],
   "decisions": [
-    {"decision": "Pausing at a clean phase boundary, not mid-task", "rationale": "Phase 133 fully EXECUTED + VERIFIED passed; all phase work committed", "phase": "133"}
+    {"decision": "Verifier status human_needed (not passed) despite 9/9 code-level", "rationale": "Phase's explicit convention: live UAT rows 1+7 are the closing gate", "phase": "149"},
+    {"decision": "Schema-drift gate satisfied via live-DB evidence (mig 099 columns present), not supabase db push", "rationale": "Project policy: migrations via SQL editor only; db push banned", "phase": "149"},
+    {"decision": "Round-3 review scoped to plans 11-12 diff (base 493a12c1), mirroring round-2 convention", "rationale": "Rounds 1-2 already reviewed+resolved; full-phase re-review wasteful", "phase": "149"}
   ],
-  "stray_changes_triage": {
-    "status": "resolved",
-    "committed": {"commit": "80cd2f37", "what": "Phase 127 (WUX-03): phase_type threaded to historical timeline (threads.py, thread.py, StreamsProvider.tsx, PhaseCard.tsx) + energized publish-gauntlet spine (PublishGauntlet.tsx + test); 24/24 tests green"},
-    "reverted": {"file": "backend/README.md", "what": "deletion reverted (lost sandbox-setup notes); untracked backend/RUN-BACKEND.md cheat-sheet left in place for operator to decide"},
-    "left_as_noise": "screenshots/skill-creator* deletions, supabase/snippets/Untitled query *.sql, supabase/.temp, backend/scripts/115_*.json, backend/settings_override.json.migrated, scripts/ UAT scratch, .claude/ GSD framework update (342 files)"
-  },
-  "next_action": "Stray-changes triage DONE. Pick: /gsd:secure-phase 133 (close out 133) OR Phase 134 (EVAL-03/04) OR /gsd:complete-milestone later.",
-  "context_notes": "Session was /clear'd then /gsd:pause-work invoked at a clean boundary. No mid-task state. Stray uncommitted source changes were triaged and resolved (see stray_changes_triage). Two eval follow-up bugs are open: BUG-260630-01 (DeepSeek reasoning_content 400) + BUG-260701-01 (assistant-prefill 400 on sonnet-5/4.6+ family); both folded into SEED-100 (dedicated production-clean eval phase)."
+  "uncommitted_files": [".claude/** (pre-existing GSD tooling modifications — NOT phase work, present since session start; leave alone)"],
+  "next_action": "User performs live re-test of 149-HUMAN-UAT.md rows 1 and 7 (steps in that file's Current Test block). If both pass: flip the two fix-landed gaps to resolved, set HUMAN-UAT status: complete, run gsd-sdk query phase.complete 149, commit tracking, then /gsd:secure-phase 149. If either fails: /gsd:plan-phase 149 --gaps (round 4).",
+  "context_notes": "Executed /gsd:execute-phase 149 --gaps-only to completion of all automated gates. 12/12 plans have SUMMARYs. Gates: post-merge 48 passed; regression sweep 146-149 = 198 passed; review r3 = 0 critical/2 warnings; verifier 9/9 -> human_needed. WR-01 (advisory): new gate tests are helper-scoped, wiring deletion stays green — live UAT is the real proof. WR-02 (pre-existing, outside diff): backend/app/api/threads.py:761 title-path strip has \"<\\think>\" TAB-escape dead condition — one-line /gsd:quick candidate AFTER phase closes (threads.py is a G-5 hot file). Open bugs still tracked: BUG-260712-01 (killed-workflow empty card), BUG-260712-02 (duplicate user bubble)."
 }

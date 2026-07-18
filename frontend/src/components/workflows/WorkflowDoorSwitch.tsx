@@ -210,7 +210,7 @@ export function WorkflowDoorSwitch({
           </div>
           {/* The soul PREVIEW of the current draft/definition (D-05). */}
           <aside data-testid="describe-soul-preview" className="rounded-lg border border-border bg-card/40 p-4">
-            <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">
+            <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
               This workflow's soul
             </p>
             <WorkflowSoul def={previewDef} scale="card" />

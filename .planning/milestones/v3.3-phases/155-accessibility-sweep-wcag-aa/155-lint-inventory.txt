@@ -1,0 +1,1051 @@
+
+C:\Vibe Apps\Agentic RAG\frontend\@\components\ui\button.tsx
+  56:18  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\Vibe Apps\Agentic RAG\frontend\src\__tests__\components\MarkdownRenderer.memo.test.tsx
+  34:1  error  Definition for rule 'import/first' was not found  import/first
+
+C:\Vibe Apps\Agentic RAG\frontend\src\__tests__\components\MessageItem.memo.test.tsx
+  39:1  error  Definition for rule 'import/first' was not found  import/first
+  41:1  error  Definition for rule 'import/first' was not found  import/first
+  43:1  error  Definition for rule 'import/first' was not found  import/first
+
+C:\Vibe Apps\Agentic RAG\frontend\src\__tests__\components\Plan04.frontend.test.tsx
+  129:33  error  '_channel' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Vibe Apps\Agentic RAG\frontend\src\__tests__\hooks\useFolders.test.ts
+  217:13  error  'result' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+C:\Vibe Apps\Agentic RAG\frontend\src\__tests__\hooks\useMessages.test.ts
+  103:71  error  '_signal' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Vibe Apps\Agentic RAG\frontend\src\__tests__\providers\streamPool.test.tsx
+  360:7  error  Error: This value cannot be modified
+
+Modifying a variable defined outside a component or hook is not allowed. Consider using an effect.
+
+C:\Vibe Apps\Agentic RAG\frontend\src\__tests__\providers\streamPool.test.tsx:360:7
+  358 |
+  359 |     function EvictedThreadConsumer() {
+> 360 |       renderCount.evicted++
+      |       ^^^^^^^^^^^ value cannot be modified
+  361 |       const msgs = useThreadMessages("thread-A")
+  362 |       return <div data-testid="evicted">{msgs.length}</div>
+  363 |     }        react-hooks/immutability
+  365:7  error  Error: This value cannot be modified
+
+Modifying a variable defined outside a component or hook is not allowed. Consider using an effect.
+
+C:\Vibe Apps\Agentic RAG\frontend\src\__tests__\providers\streamPool.test.tsx:365:7
+  363 |     }
+  364 |     function BystanderConsumer() {
+> 365 |       renderCount.bystander++
+      |       ^^^^^^^^^^^ value cannot be modified
+  366 |       const msgs = useThreadMessages("thread-E")
+  367 |       return <div data-testid="bystander">{msgs.length}</div>
+  368 |     }  react-hooks/immutability
+
+C:\Vibe Apps\Agentic RAG\frontend\src\__tests__\providers\streamsProvider.test.tsx
+   90:7  error  '_signal' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                @typescript-eslint/no-unused-vars
+  838:7  error  Error: This value cannot be modified
+
+Modifying a variable defined outside a component or hook is not allowed. Consider using an effect.
+
+C:\Vibe Apps\Agentic RAG\frontend\src\__tests__\providers\streamsProvider.test.tsx:838:7
+  836 |
+  837 |     function ChatConsumer({ threadId }: { threadId: string }) {
+> 838 |       renderCount.chat++
+      |       ^^^^^^^^^^^ value cannot be modified
+  839 |       const msgs = useThreadMessages(threadId, "chat")
+  840 |       return <div data-testid="chat">{msgs.length}</div>
+  841 |     }               react-hooks/immutability
+  844:7  error  Error: This value cannot be modified
+
+Modifying a variable defined outside a component or hook is not allowed. Consider using an effect.
+
+C:\Vibe Apps\Agentic RAG\frontend\src\__tests__\providers\streamsProvider.test.tsx:844:7
+  842 |
+  843 |     function MockEvalConsumer({ threadId }: { threadId: string }) {
+> 844 |       renderCount.mockEval++
+      |       ^^^^^^^^^^^ value cannot be modified
+  845 |       const msgs = useThreadMessages(threadId, "mock-eval")
+  846 |       return <div data-testid="eval">{msgs.length}</div>
+  847 |     }  react-hooks/immutability
+
+C:\Vibe Apps\Agentic RAG\frontend\src\__tests__\providers\streamsProvider_067_5_regression.test.tsx
+  81:7  error  '_signal' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Vibe Apps\Agentic RAG\frontend\src\__tests__\providers\streamsProvider_075_7_reconcile_race.test.tsx
+  101:12  error  '_runId' is defined but never used   @typescript-eslint/no-unused-vars
+  101:28  error  '_since' is defined but never used   @typescript-eslint/no-unused-vars
+  101:44  error  '_cb' is defined but never used      @typescript-eslint/no-unused-vars
+  101:66  error  '_signal' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Vibe Apps\Agentic RAG\frontend\src\__tests__\providers\streamsProvider_bug_260707_01_streaming_flag.test.tsx
+  128:65  error  '_signal' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Vibe Apps\Agentic RAG\frontend\src\__tests__\providers\streamsProvider_bug_260707_03_final_answer_resolve.test.tsx
+  125:65  error  '_signal' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\admin\ActiveRunsSection.tsx
+  141:5   error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\admin\ActiveRunsSection.tsx:141:5
+  139 |   const [elapsedSec, setElapsedSec] = useState(() => elapsedSecondsSince(run.started_at))
+  140 |   useEffect(() => {
+> 141 |     setElapsedSec(elapsedSecondsSince(run.started_at))
+      |     ^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  142 |     const id = setInterval(() => setElapsedSec(elapsedSecondsSince(run.started_at)), 1000)
+  143 |     return () => clearInterval(id)
+  144 |   }, [run.started_at])  react-hooks/set-state-in-effect
+  193:26  error  Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\admin\ActiveRunsSection.tsx:193:26
+  191 |           )}
+  192 |         >
+> 193 |           {HeaderMark ? <HeaderMark size={18} /> : <Bot className="h-4 w-4 text-white" />}
+      |                          ^^^^^^^^^^ This component is created during render
+  194 |         </div>
+  195 |
+  196 |         <div className="min-w-0 flex-1">
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\admin\ActiveRunsSection.tsx:156:22
+  154 |   const notResponding = run.not_responding
+  155 |
+> 156 |   const HeaderMark = providerLogo(run.provider ?? undefined)
+      |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ The component is created during render here
+  157 |   const userLabel = userLabelFor(run)
+  158 |   const modelLabel = run.model || "unknown model"
+  159 |   const descId = `kill-confirm-${run.run_id}`                                                                                                                                                                               react-hooks/static-components
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\admin\ControlRoomPage.tsx
+  566:9  error  Non-interactive elements should not be assigned interactive roles  jsx-a11y/no-noninteractive-element-to-interactive-role
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\admin\ModelDiscoveryPanel.tsx
+  364:24  error  Error: Cannot call impure function during render
+
+`Date.now` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\admin\ModelDiscoveryPanel.tsx:364:24
+  362 | function RunTimer() {
+  363 |   const [elapsed, setElapsed] = useState(0)
+> 364 |   const start = useRef(Date.now())
+      |                        ^^^^^^^^^^ Cannot call impure function
+  365 |   useEffect(() => {
+  366 |     const id = window.setInterval(() => setElapsed((Date.now() - start.current) / 1000), 200)
+  367 |     return () => window.clearInterval(id)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          react-hooks/purity
+  400:20  error  Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\admin\ModelDiscoveryPanel.tsx:400:20
+  398 |       <div className="mb-1 flex items-center gap-1.5">
+  399 |         <span className="flex h-4 w-4 flex-none items-center justify-center">
+> 400 |           {Logo ? <Logo size={14} /> : <span className="text-[8px] font-bold">{provider.slice(0, 2).toUpperCase()}</span>}
+      |                    ^^^^ This component is created during render
+  401 |         </span>
+  402 |         <span className="truncate font-medium text-foreground">{provider}</span>
+  403 |       </div>
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\admin\ModelDiscoveryPanel.tsx:380:16
+  378 |  *  the VERBATIM error status (excluded, not failed). */
+  379 | function ProviderRunCard({ provider, status, ok }: { provider: string; status: string; ok: boolean }) {
+> 380 |   const Logo = providerLogo(provider)
+      |                ^^^^^^^^^^^^^^^^^^^^^^ The component is created during render here
+  381 |   const returnsCaps = ok && CAPS_PROVIDERS.has(provider)
+  382 |   const errored = !ok && status !== "no_key"
+  383 |  react-hooks/static-components
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\admin\ModelRegistryTab.tsx
+  437:9  error  The autoFocus prop should not be used, as it can reduce usability and accessibility for users  jsx-a11y/no-autofocus
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\chat\ActiveRunsTray.tsx
+  72:30  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\chat\ActiveRunsTray.tsx:72:30
+  70 |   // Auto-close + collapse when nothing is running anymore.
+  71 |   useEffect(() => {
+> 72 |     if (count === 0 && open) setOpen(false)
+     |                              ^^^^^^^ Avoid calling setState() directly within an effect
+  73 |   }, [count, open])
+  74 |
+  75 |   if (count === 0) return null  react-hooks/set-state-in-effect
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\chat\ChatArea.tsx
+  220:6  warning  React Hook useLayoutEffect has a missing dependency: 'setViewingThread'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\chat\CitedMarkdown.tsx
+  88:3  error  Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\chat\CitedMarkdown.tsx:88:3
+  86 |   // Refs keep the imperative (delegated) event handlers free of stale closures.
+  87 |   const pinnedRef = useRef(pinned)
+> 88 |   pinnedRef.current = pinned
+     |   ^^^^^^^^^^^^^^^^^ Cannot update ref during render
+  89 |   const citationsRef = useRef(citations)
+  90 |   citationsRef.current = citations
+  91 |   const activeMarkerRef = useRef<HTMLElement | null>(null)  react-hooks/refs
+  90:3  error  Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\chat\CitedMarkdown.tsx:90:3
+  88 |   pinnedRef.current = pinned
+  89 |   const citationsRef = useRef(citations)
+> 90 |   citationsRef.current = citations
+     |   ^^^^^^^^^^^^^^^^^^^^ Cannot update ref during render
+  91 |   const activeMarkerRef = useRef<HTMLElement | null>(null)
+  92 |
+  93 |   const html = useMemo(                                                                                           react-hooks/refs
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\chat\MessageInput.tsx
+   74:17  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            react-refresh/only-export-components
+  106:3   error  Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\chat\MessageInput.tsx:106:3
+  104 |   const prevDraftKeyRef = useRef(draftKey)
+  105 |   const valueRef = useRef(value)
+> 106 |   valueRef.current = value
+      |   ^^^^^^^^^^^^^^^^ Cannot update ref during render
+  107 |   useEffect(() => {
+  108 |     const prevKey = prevDraftKeyRef.current
+  109 |     if (prevKey === draftKey) return  react-hooks/refs
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\chat\RunCard.tsx
+   74:3   warning  Unused eslint-disable directive (no problems were reported from 'react-hooks/set-state-in-effect')
+  148:28  error    Error: Cannot call impure function during render
+
+`Date.now` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\chat\RunCard.tsx:148:28
+  146 |     // Observed streaming→terminal this session with no persisted completedAt →
+  147 |     // a legitimate same-session end-time.
+> 148 |     frozenEndRef.current = Date.now()
+      |                            ^^^^^^^^^^ Cannot call impure function
+  149 |   }
+  150 |   useEffect(() => {
+  151 |     if (!isStreamingNow) return  react-hooks/purity
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\chat\ToolCallPanel.tsx
+  155:15  error  Unexpected any. Specify a different type                                                                                                                                                    @typescript-eslint/no-explicit-any
+  563:45  error  React Hook "useState" is called conditionally. React Hooks must be called in the exact same order in every component render. Did you accidentally call a React Hook after an early return?  react-hooks/rules-of-hooks
+  584:45  error  React Hook "useState" is called conditionally. React Hooks must be called in the exact same order in every component render. Did you accidentally call a React Hook after an early return?  react-hooks/rules-of-hooks
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\chat\tool-bodies\ExecuteCodeBody.tsx
+  197:17  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\chat\tool-bodies\GenericBody.tsx
+  11:17  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\chat\tool-bodies\GlobBody.tsx
+   8:11  error  Unexpected any. Specify a different type                                                                                        @typescript-eslint/no-explicit-any
+  11:17  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+  22:18  error  Unexpected any. Specify a different type                                                                                        @typescript-eslint/no-explicit-any
+  28:25  error  Unexpected any. Specify a different type                                                                                        @typescript-eslint/no-explicit-any
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\chat\tool-bodies\GrepBody.tsx
+   8:11  error  Unexpected any. Specify a different type                                                                                        @typescript-eslint/no-explicit-any
+  11:17  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+  22:18  error  Unexpected any. Specify a different type                                                                                        @typescript-eslint/no-explicit-any
+  28:25  error  Unexpected any. Specify a different type                                                                                        @typescript-eslint/no-explicit-any
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\chat\tool-bodies\LsBody.tsx
+  27:11  error  Unexpected any. Specify a different type                                                                                        @typescript-eslint/no-explicit-any
+  30:17  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+  42:18  error  Unexpected any. Specify a different type                                                                                        @typescript-eslint/no-explicit-any
+  43:20  error  Unexpected any. Specify a different type                                                                                        @typescript-eslint/no-explicit-any
+  46:24  error  Unexpected any. Specify a different type                                                                                        @typescript-eslint/no-explicit-any
+  55:26  error  Unexpected any. Specify a different type                                                                                        @typescript-eslint/no-explicit-any
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\chat\tool-bodies\QueryDocumentsBody.tsx
+  11:17  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\chat\tool-bodies\ReadDocumentBody.tsx
+  11:11  error  Unexpected any. Specify a different type                                                                                        @typescript-eslint/no-explicit-any
+  14:17  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\chat\tool-bodies\SearchDocumentsBody.tsx
+   8:11  error  Unexpected any. Specify a different type                                                                                        @typescript-eslint/no-explicit-any
+  11:17  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+  28:27  error  Unexpected any. Specify a different type                                                                                        @typescript-eslint/no-explicit-any
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\chat\tool-bodies\ShikiCode.tsx
+  48:17  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\chat\tool-bodies\TreeBody.tsx
+   8:32  error  Unexpected any. Specify a different type                                                                                        @typescript-eslint/no-explicit-any
+  19:47  error  Unexpected any. Specify a different type                                                                                        @typescript-eslint/no-explicit-any
+  37:66  error  Unexpected any. Specify a different type                                                                                        @typescript-eslint/no-explicit-any
+  47:66  error  Unexpected any. Specify a different type                                                                                        @typescript-eslint/no-explicit-any
+  55:11  error  Unexpected any. Specify a different type                                                                                        @typescript-eslint/no-explicit-any
+  58:17  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+  69:15  error  Unexpected any. Specify a different type                                                                                        @typescript-eslint/no-explicit-any
+  75:25  error  Unexpected any. Specify a different type                                                                                        @typescript-eslint/no-explicit-any
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\chat\tool-bodies\WebSearchBody.tsx
+  12:17  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\classification\ClassificationRulesPage.tsx
+  71:10  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\classification\ClassificationRulesPage.tsx:71:10
+  69 |
+  70 |   useEffect(() => {
+> 71 |     void loadRules()
+     |          ^^^^^^^^^ Avoid calling setState() directly within an effect
+  72 |     // Folders (the builder's 📁 action options) + custom fields (the condition
+  73 |     // popover) load alongside; a failure degrades to an empty option set, never a
+  74 |     // page error  react-hooks/set-state-in-effect
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\health\HealthDocumentRow.tsx
+  195:19  error  '_newFolderId' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\ingestion\DocumentList.tsx
+  223:5  error  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  223:5  error  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+  298:7  error  Expected an assignment or function call and instead saw an expression                                                                                                                              @typescript-eslint/no-unused-expressions
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\ingestion\FilterBar.tsx
+  282:19  error  The autoFocus prop should not be used, as it can reduce usability and accessibility for users  jsx-a11y/no-autofocus
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\ingestion\FolderTree.tsx
+  49:7  error  Expected an assignment or function call and instead saw an expression  @typescript-eslint/no-unused-expressions
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\ingestion\NavRow.tsx
+   88:7   error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\ingestion\NavRow.tsx:88:7
+  86 |   useEffect(() => {
+  87 |     if (isEditing) {
+> 88 |       setEditValue(name)
+     |       ^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  89 |       setHint(null)
+  90 |     }
+  91 |   }, [isEditing, name])  react-hooks/set-state-in-effect
+  109:7   error  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            jsx-a11y/click-events-have-key-events
+  109:7   error  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         jsx-a11y/no-static-element-interactions
+  133:11  error  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            jsx-a11y/click-events-have-key-events
+  133:11  error  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         jsx-a11y/no-static-element-interactions
+  170:15  error  The autoFocus prop should not be used, as it can reduce usability and accessibility for users                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             jsx-a11y/no-autofocus
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\layout\ChatLayout.tsx
+   81:14  error  '_loading' is assigned a value but never used                                                                                                                                                      @typescript-eslint/no-unused-vars
+  226:9   error  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  226:9   error  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+  270:19  error  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  270:19  error  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\layout\NavPanel.tsx
+    3:10  error  'Button' is defined but never used                                                                                                                                                                 @typescript-eslint/no-unused-vars
+  161:17  error  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  161:17  error  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+  214:23  error  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  214:23  error  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\metadata\ConfidenceChip.tsx
+  38:14  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\metadata\DocumentDetailPanel.tsx
+  173:5  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\metadata\DocumentDetailPanel.tsx:173:5
+  171 |   // docId change).
+  172 |   useEffect(() => {
+> 173 |     setRelTotal(null)
+      |     ^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  174 |     setClassCount(null)
+  175 |   }, [doc.id])
+  176 |  react-hooks/set-state-in-effect
+  285:7  error  The element aside has an implicit role of complementary. Defining this explicitly is redundant and should be avoided                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        jsx-a11y/no-redundant-roles
+  297:5  error  The element aside has an implicit role of complementary. Defining this explicitly is redundant and should be avoided                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        jsx-a11y/no-redundant-roles
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\metadata\InlineEdit.tsx
+  274:9  error  The autoFocus prop should not be used, as it can reduce usability and accessibility for users  jsx-a11y/no-autofocus
+  300:7  error  The autoFocus prop should not be used, as it can reduce usability and accessibility for users  jsx-a11y/no-autofocus
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\panel\BatchResultList.tsx
+  46:69  error  Unnecessary escape character: \-  no-useless-escape
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\panel\FilePreview.tsx
+  218:7  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\panel\FilePreview.tsx:218:7
+  216 |     // Still backfilling the id from the GET listing → hold the spinner.
+  217 |     if (resolved.status === "resolving") {
+> 218 |       setContent(null)
+      |       ^^^^^^^^^^ Avoid calling setState() directly within an effect
+  219 |       setError(false)
+  220 |       setLoading(true)
+  221 |       return  react-hooks/set-state-in-effect
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\panel\FilesSection.tsx
+  135:7  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\panel\FilesSection.tsx:135:7
+  133 |
+  134 |     if (freshKey) {
+> 135 |       setFlashKey(freshKey)
+      |       ^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  136 |       const t = setTimeout(() => setFlashKey(null), 1500)
+  137 |       return () => clearTimeout(t)
+  138 |     }            react-hooks/set-state-in-effect
+  144:7  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\panel\FilesSection.tsx:144:7
+  142 |   useEffect(() => {
+  143 |     if (activeIndex > files.length - 1) {
+> 144 |       setActiveIndex(Math.max(0, files.length - 1))
+      |       ^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  145 |     }
+  146 |   }, [files.length, activeIndex])
+  147 |  react-hooks/set-state-in-effect
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\panel\PendingAskCard.tsx
+  164:9   warning  The 'options' logical expression could make the dependencies of useMemo Hook (at line 219) change on every render. To fix this, wrap the initialization of 'options' in its own useMemo() Hook                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    react-hooks/exhaustive-deps
+  185:49  error    Error: Cannot call impure function during render
+
+`Date.now` is an impure function. Calling an impure function can produce unstable results that update unpredictably when the component happens to re-render. (https://react.dev/reference/rules/components-and-hooks-must-be-pure#components-and-hooks-must-be-idempotent).
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\panel\PendingAskCard.tsx:185:49
+  183 |   // timeout_seconds. Ticks once a second while pending.
+  184 |   const initialRemaining = ask.created_at
+> 185 |     ? Math.max(0, timeout_seconds - Math.floor((Date.now() - Date.parse(ask.created_at)) / 1000))
+      |                                                 ^^^^^^^^^^ Cannot call impure function
+  186 |     : timeout_seconds
+  187 |   const [remaining, setRemaining] = useState<number>(initialRemaining)
+  188 |  react-hooks/purity
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\panel\PhaseCard.tsx
+  281:32  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\panel\PhaseCard.tsx:281:32
+  279 |   // a later failure re-expands). Only auto-drive; user toggles on terminal phases.
+  280 |   useEffect(() => {
+> 281 |     if (isRunning || isFailed) setOpen(true)
+      |                                ^^^^^^^ Avoid calling setState() directly within an effect
+  282 |   }, [isRunning, isFailed])
+  283 |
+  284 |   const headId = useId()                                                                                                                                                                                                                                                                                                                                                               react-hooks/set-state-in-effect
+  343:23  error  Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\panel\PhaseCard.tsx:343:23
+  341 |               Decorative — the label text carries the meaning (wrapper stays aria-hidden). */}
+  342 |           <span aria-hidden="true" className="flex-none leading-none text-panel-muted-foreground">
+> 343 |             {Glyph ? <Glyph className="h-4 w-4" /> : <span className="text-[13px]">{meta.glyph}</span>}
+      |                       ^^^^^ This component is created during render
+  344 |           </span>
+  345 |
+  346 |           {/* Phase identity: ordinal + type context for the ACTIVE step only; idle and
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\panel\PhaseCard.tsx:267:17
+  265 |   // The shared 3D phase-type glyph (icon-convention §2 — ONE source). `phaseGlyph`
+  266 |   // returns null on an unknown type → the unicode "•"/type fallback (meta.glyph).
+> 267 |   const Glyph = phaseGlyph(phase.phaseType)
+      |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^ The component is created during render here
+  268 |   // Engine chip — the honest per-phase provider from the sub-agent index. `subAgents`
+  269 |   // is [] for almost every phase today (no demux handler populates it), so the chip is
+  270 |   // honestly-ABSENT for most phases. Rendered ONLY on a running phase with a REAL  react-hooks/static-components
+  419:18  error  Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\panel\PhaseCard.tsx:419:18
+  417 |             {EngineMark && (
+  418 |               <span className="ml-auto flex-none" title={provider}>
+> 419 |                 <EngineMark size={16} />
+      |                  ^^^^^^^^^^ This component is created during render
+  420 |               </span>
+  421 |             )}
+  422 |           </div>
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\panel\PhaseCard.tsx:273:33
+  271 |   // provider; never a Bot fabrication on the live card (T-127-08).
+  272 |   const provider = phase.subAgents?.[0]?.provider
+> 273 |   const EngineMark = provider ? providerLogo(provider) : null
+      |                                 ^^^^^^^^^^^^^^^^^^^^^^ The component is created during render here
+  274 |
+  275 |   // Active (running) + failed phases auto-expand; done/pending/skipped collapse to
+  276 |   // a summary row. The running phase is FORCED open (aria-disabled, no-op toggle)                                                                                                                                                                                                                                                                                                                                     react-hooks/static-components
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\panel\PhaseTimeline.tsx
+  126:37  error    Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\panel\PhaseTimeline.tsx:126:37
+  124 |     counterFloorRef.current = 0
+  125 |   }, [threadId])
+> 126 |   const displayedCurrent = Math.max(counterFloorRef.current, counterCurrent)
+      |                                     ^^^^^^^^^^^^^^^^^^^^^^^ Passing a ref to a function may read its value during render
+  127 |   if (displayedCurrent > counterFloorRef.current) counterFloorRef.current = displayedCurrent
+  128 |
+  129 |   const runTerminal = frame?.run_status != null && TERMINAL_RUN_STATUSES.has(frame.run_status)                                              react-hooks/refs
+  127:26  error    Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\panel\PhaseTimeline.tsx:127:26
+  125 |   }, [threadId])
+  126 |   const displayedCurrent = Math.max(counterFloorRef.current, counterCurrent)
+> 127 |   if (displayedCurrent > counterFloorRef.current) counterFloorRef.current = displayedCurrent
+      |                          ^^^^^^^^^^^^^^^^^^^^^^^ Cannot access ref value during render
+  128 |
+  129 |   const runTerminal = frame?.run_status != null && TERMINAL_RUN_STATUSES.has(frame.run_status)
+  130 |   const anyRunning = phases.some((p) => p.status === "running" || p.status === "retrying")                     react-hooks/refs
+  127:51  error    Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\panel\PhaseTimeline.tsx:127:51
+  125 |   }, [threadId])
+  126 |   const displayedCurrent = Math.max(counterFloorRef.current, counterCurrent)
+> 127 |   if (displayedCurrent > counterFloorRef.current) counterFloorRef.current = displayedCurrent
+      |                                                   ^^^^^^^^^^^^^^^^^^^^^^^ Cannot update ref during render
+  128 |
+  129 |   const runTerminal = frame?.run_status != null && TERMINAL_RUN_STATUSES.has(frame.run_status)
+  130 |   const anyRunning = phases.some((p) => p.status === "running" || p.status === "retrying")  react-hooks/refs
+  157:6   warning  React Hook useEffect has a missing dependency: 'activePhase'. Either include it or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               react-hooks/exhaustive-deps
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\panel\VersionDiff.tsx
+  54:7  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\panel\VersionDiff.tsx:54:7
+  52 |     // Wait for a usable id; surface an error only if it can't be resolved.
+  53 |     if (resolved.status === "resolving") {
+> 54 |       setError(false)
+     |       ^^^^^^^^ Avoid calling setState() directly within an effect
+  55 |       return
+  56 |     }
+  57 |     if (resolved.status === "unresolved") {  react-hooks/set-state-in-effect
+  93:7  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\panel\VersionDiff.tsx:93:7
+  91 |     // guaranteed here; the empty-id guard is belt-and-suspenders.
+  92 |     if (!pair || pair.from === pair.to || !fileId) {
+> 93 |       setDiff(null)
+     |       ^^^^^^^ Avoid calling setState() directly within an effect
+  94 |       return
+  95 |     }
+  96 |     const controller = new AbortController()   react-hooks/set-state-in-effect
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\panel\WorkspacePanel.tsx
+  108:7   error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\panel\WorkspacePanel.tsx:108:7
+  106 |   useEffect(() => {
+  107 |     if (!threadId) {
+> 108 |       setDef(null)
+      |       ^^^^^^ Avoid calling setState() directly within an effect
+  109 |       return
+  110 |     }
+  111 |     let cancelled = false  react-hooks/set-state-in-effect
+  159:19  error  '_selectedThread' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          @typescript-eslint/no-unused-vars
+  321:7   error  The element aside has an implicit role of complementary. Defining this explicitly is redundant and should be avoided                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 jsx-a11y/no-redundant-roles
+  349:5   error  The element aside has an implicit role of complementary. Defining this explicitly is redundant and should be avoided                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 jsx-a11y/no-redundant-roles
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\panel\__tests__\FilePreview.test.tsx
+  47:1  error  Definition for rule 'import/first' was not found  import/first
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\panel\__tests__\FilesSection.test.tsx
+  43:1  error  Definition for rule 'import/first' was not found  import/first
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\panel\__tests__\TodosSection.test.tsx
+  27:1  error  Definition for rule 'import/first' was not found  import/first
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\panel\__tests__\WorkspacePanel.derived.test.tsx
+  77:1  error  Definition for rule 'import/first' was not found  import/first
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\panel\__tests__\WorkspacePanel.test.tsx
+  123:1  error  Definition for rule 'import/first' was not found  import/first
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\settings\EngineHealthCard.tsx
+  94:17  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\settings\MemorySection.tsx
+   36:5   error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\settings\MemorySection.tsx:36:5
+  34 |   // Load entries on mount
+  35 |   useEffect(() => {
+> 36 |     setLoading(true)
+     |     ^^^^^^^^^^ Avoid calling setState() directly within an effect
+  37 |     setError(null)
+  38 |     supabase
+  39 |       .from("user_memory")  react-hooks/set-state-in-effect
+  163:27  error  The autoFocus prop should not be used, as it can reduce usability and accessibility for users                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          jsx-a11y/no-autofocus
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\settings\ModelPillRow.tsx
+  87:12  error  Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\settings\ModelPillRow.tsx:87:12
+  85 |       {ProviderMark && providerLabel && (
+  86 |         <div className="flex items-center gap-1.5 text-[10px] font-medium text-muted-foreground/70">
+> 87 |           <ProviderMark size={13} />
+     |            ^^^^^^^^^^^^ This component is created during render
+  88 |           <span>{providerLabel}</span>
+  89 |         </div>
+  90 |       )}
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\settings\ModelPillRow.tsx:80:24
+  78 |   providerId,
+  79 | }: ModelPillRowProps) {
+> 80 |   const ProviderMark = providerLogo(providerId)
+     |                        ^^^^^^^^^^^^^^^^^^^^^^^^ The component is created during render here
+  81 |   const providerLabel = providerId ? (PROVIDER_LABELS[providerId] ?? providerId) : null
+  82 |
+  83 |   return (  react-hooks/static-components
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\settings\ProviderPicker.tsx
+  49:14  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+  74:14  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\settings\ReembedConfirmModal.tsx
+  78:5  error  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  78:5  error  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\skills\SkillCard.tsx
+  90:5  error  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  90:5  error  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\skills\SkillEvalSection.tsx
+  536:9  error  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\skills\SkillFormDialog.test.tsx
+   95:14  error  '_body' is defined but never used  @typescript-eslint/no-unused-vars
+  129:14  error  '_body' is defined but never used  @typescript-eslint/no-unused-vars
+  155:14  error  '_body' is defined but never used  @typescript-eslint/no-unused-vars
+  180:14  error  '_body' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\skills\SkillFormDialog.tsx
+   91:9   error  A form label must be associated with a control                                                 jsx-a11y/label-has-associated-control
+  153:11  error  A form label must be associated with a control                                                 jsx-a11y/label-has-associated-control
+  178:13  error  A form label must be associated with a control                                                 jsx-a11y/label-has-associated-control
+  241:13  error  The autoFocus prop should not be used, as it can reduce usability and accessibility for users  jsx-a11y/no-autofocus
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\skills\SkillTestCasesSection.tsx
+  125:11  error  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+  202:9   error  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\skills\studio\CaseEditor.tsx
+  154:9  error  A form label must be associated with a control  jsx-a11y/label-has-associated-control
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\skills\studio\RunHistory.tsx
+  269:12  error  Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\skills\studio\RunHistory.tsx:269:12
+  267 |       >
+  268 |         {Mark ? (
+> 269 |           <Mark size={16} />
+      |            ^^^^ This component is created during render
+  270 |         ) : (
+  271 |           <Bot data-testid="provider-fallback" aria-hidden className="h-4 w-4 text-muted-foreground" />
+  272 |         )}
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\skills\studio\RunHistory.tsx:142:16
+  140 | //    sub-rows (top-level so its local scope is stable across re-renders). ──
+  141 | function RunRow({ run, ctx }: { run: EvalRun; ctx: RowContext }) {
+> 142 |   const Mark = providerLogo(run.provider)
+      |                ^^^^^^^^^^^^^^^^^^^^^^^^^^ The component is created during render here
+  143 |   const expanded = ctx.expandedRunId === run.id
+  144 |   const isRunning = run.status === "running"
+  145 |   const isInterrupted = run.status === "interrupted"  react-hooks/static-components
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\skills\studio\VersionsTab.tsx
+  141:5  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\skills\studio\VersionsTab.tsx:141:5
+  139 |     currentSkillRef.current = skillId
+  140 |     const requested = skillId
+> 141 |     setLoading(true)
+      |     ^^^^^^^^^^ Avoid calling setState() directly within an effect
+  142 |     setError(null)
+  143 |     Promise.all([listSkillVersions(skillId), listEvalRuns(skillId), listProposals(skillId)])
+  144 |       .then(([v, r, p]) => {  react-hooks/set-state-in-effect
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\skills\tuner\CaseEditor.tsx
+  154:54  error  '_skill' is defined but never used  @typescript-eslint/no-unused-vars
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\skills\tuner\LiveRunCard.tsx
+  68:7  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\skills\tuner\LiveRunCard.tsx:68:7
+  66 |       // Capture the finish instant ONCE on the transition out of "running" (and keep it stable
+  67 |       // across reconciling→error/done — only a fresh "running" clears it below).
+> 68 |       setFrozenAt((prev) => prev ?? Date.now())
+     |       ^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  69 |       return
+  70 |     }
+  71 |     // Back to running (a fresh kickoff / reconnect) — drop any stale freeze + resume ticking  react-hooks/set-state-in-effect
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\ui\button.tsx
+  56:18  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\workflows\PhaseFormPanel.tsx
+  94:7  error  `tabIndex` should only be declared on interactive elements  jsx-a11y/no-noninteractive-tabindex
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\workflows\PhaseSpineGraph.tsx
+  78:17  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\Vibe Apps\Agentic RAG\frontend\src\components\workflows\PublishGauntlet.tsx
+  741:9  error  Non-interactive elements should not be assigned mouse or keyboard event listeners  jsx-a11y/no-noninteractive-element-interactions
+
+C:\Vibe Apps\Agentic RAG\frontend\src\hooks\useEffectiveFeatures.ts
+  56:7  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Vibe Apps\Agentic RAG\frontend\src\hooks\useEffectiveFeatures.ts:56:7
+  54 |     // same-tab user switch, and resolve immediately — fail-closed, no fetch.
+  55 |     if (!userId) {
+> 56 |       setFeatures({})
+     |       ^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  57 |       setLoading(false)
+  58 |       return () => {
+  59 |         cancelled = true  react-hooks/set-state-in-effect
+
+C:\Vibe Apps\Agentic RAG\frontend\src\hooks\useFolders.ts
+  30:5  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Vibe Apps\Agentic RAG\frontend\src\hooks\useFolders.ts:30:5
+  28 |
+  29 |   useEffect(() => {
+> 30 |     loadFolders().catch(console.error)
+     |     ^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  31 |
+  32 |     let cancelled = false
+  33 |  react-hooks/set-state-in-effect
+
+C:\Vibe Apps\Agentic RAG\frontend\src\hooks\useOperatorProbe.ts
+  55:7  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Vibe Apps\Agentic RAG\frontend\src\hooks\useOperatorProbe.ts:55:7
+  53 |     // immediately — fail-closed, no probe.
+  54 |     if (!userId) {
+> 55 |       setIdentity(null)
+     |       ^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  56 |       setLoading(false)
+  57 |       return () => {
+  58 |         cancelled = true  react-hooks/set-state-in-effect
+
+C:\Vibe Apps\Agentic RAG\frontend\src\hooks\useResolvedFileId.ts
+  42:7  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Vibe Apps\Agentic RAG\frontend\src\hooks\useResolvedFileId.ts:42:7
+  40 |     // Already have a usable id → nothing to reconcile.
+  41 |     if (file.id) {
+> 42 |       setState({ status: "ready", id: file.id })
+     |       ^^^^^^^^ Avoid calling setState() directly within an effect
+  43 |       return
+  44 |     }
+  45 |  react-hooks/set-state-in-effect
+
+C:\Vibe Apps\Agentic RAG\frontend\src\lib\PlainLabel.tsx
+  26:7  error  `tabIndex` should only be declared on interactive elements  jsx-a11y/no-noninteractive-tabindex
+
+C:\Vibe Apps\Agentic RAG\frontend\src\lib\citationNav.tsx
+   90:3   error  Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Vibe Apps\Agentic RAG\frontend\src\lib\citationNav.tsx:90:3
+  88 |   // stable across renders (the value is memoized on pendingDocumentId only).
+  89 |   const navigateRef = useRef(navigate)
+> 90 |   navigateRef.current = navigate
+     |   ^^^^^^^^^^^^^^^^^^^ Cannot update ref during render
+  91 |   const selectDocumentRef = useRef(selectDocument)
+  92 |   selectDocumentRef.current = selectDocument
+  93 |                            react-hooks/refs
+   92:3   error  Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+C:\Vibe Apps\Agentic RAG\frontend\src\lib\citationNav.tsx:92:3
+  90 |   navigateRef.current = navigate
+  91 |   const selectDocumentRef = useRef(selectDocument)
+> 92 |   selectDocumentRef.current = selectDocument
+     |   ^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot update ref during render
+  93 |
+  94 |   const openDocument = useCallback((documentId: string) => {
+  95 |     // 1. Record the one-shot intent a consumer reads to pre-select the doc  react-hooks/refs
+  119:17  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              react-refresh/only-export-components
+  132:17  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              react-refresh/only-export-components
+  189:17  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              react-refresh/only-export-components
+  197:17  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              react-refresh/only-export-components
+
+C:\Vibe Apps\Agentic RAG\frontend\src\pages\GovernancePage.tsx
+  153:5  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Vibe Apps\Agentic RAG\frontend\src\pages\GovernancePage.tsx:153:5
+  151 |
+  152 |   useEffect(() => {
+> 153 |     loadDocuments()
+      |     ^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  154 |     for (const key of CARD_KEYS) {
+  155 |       if (!initializedTabsRef.current.has(key)) {
+  156 |         initializedTabsRef.current.add(key)  react-hooks/set-state-in-effect
+
+C:\Vibe Apps\Agentic RAG\frontend\src\pages\IngestionPage.tsx
+  154:5  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Vibe Apps\Agentic RAG\frontend\src\pages\IngestionPage.tsx:154:5
+  152 |   useEffect(() => {
+  153 |     if (!pendingDocumentId) return
+> 154 |     setSelectedDocId(pendingDocumentId)
+      |     ^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  155 |     consumePendingDocument?.()
+  156 |   }, [pendingDocumentId, consumePendingDocument])
+  157 |  react-hooks/set-state-in-effect
+
+C:\Vibe Apps\Agentic RAG\frontend\src\pages\KnowledgeHealthPage.tsx
+  120:10  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  201:34  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  261:39  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  312:33  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Vibe Apps\Agentic RAG\frontend\src\pages\SkillStudioPage.tsx
+   74:5   error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Vibe Apps\Agentic RAG\frontend\src\pages\SkillStudioPage.tsx:74:5
+  72 |     currentSkillRef.current = skillId
+  73 |     // Reset on skill switch (no prior skill's gate/versions/cases leak — T-137-02).
+> 74 |     setGate(null)
+     |     ^^^^^^^ Avoid calling setState() directly within an effect
+  75 |     setVersions([])
+  76 |     setCases([])
+  77 |     if (!skillId) return  react-hooks/set-state-in-effect
+  165:50  error  Non-interactive elements should not be assigned interactive roles                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   jsx-a11y/no-noninteractive-element-to-interactive-role
+
+C:\Vibe Apps\Agentic RAG\frontend\src\pages\SkillTunerPage.test.tsx
+  264:83  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  292:83  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  310:83  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Vibe Apps\Agentic RAG\frontend\src\pages\SkillTunerPage.tsx
+  193:5  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+C:\Vibe Apps\Agentic RAG\frontend\src\pages\SkillTunerPage.tsx:193:5
+  191 |     // A's diff + Approve must never render inside skill B's results). The scoreboard/latestRun
+  192 |     // are NOT nulled here — getTunerLatest below reconciles them authoritatively (D-v2.5-03).
+> 193 |     setRunId(null)
+      |     ^^^^^^^^ Avoid calling setState() directly within an effect
+  194 |     setRunPhase("idle")
+  195 |     setLanes([])
+  196 |     setRunError(null)  react-hooks/set-state-in-effect
+
+C:\Vibe Apps\Agentic RAG\frontend\src\pages\SkillsPage.tsx
+  38:17  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\Vibe Apps\Agentic RAG\frontend\src\providers\StreamsProvider.tsx
+    74:3   error  'getActiveRuns' is defined but never used                                                                                       @typescript-eslint/no-unused-vars
+   205:23  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+   268:23  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+   324:23  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+   375:17  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+  2887:14  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+  2906:17  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+  2943:17  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+  2961:17  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+  2982:17  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+  3001:17  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+  3088:17  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+  3108:14  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+  3111:14  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+  3122:14  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+  3129:14  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+  3149:14  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+  3158:14  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+  3166:14  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+  3180:14  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+  3183:14  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+  3186:14  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+  3192:14  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+  3203:14  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\Vibe Apps\Agentic RAG\frontend\src\providers\TechnicalNamesProvider.tsx
+   90:17  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+  104:17  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\Vibe Apps\Agentic RAG\frontend\src\vitest-axe.d.ts
+  23:23  error  'T' is defined but never used             @typescript-eslint/no-unused-vars
+  23:27  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+C:\Vibe Apps\Agentic RAG\frontend\tests\e2e\fixtures\auth.fixture.ts
+  60:11  error  React Hook "use" is called in function "authedPage" that is neither a React function component nor a custom React Hook function. React component names must start with an uppercase letter. React Hook names must start with the word "use"  react-hooks/rules-of-hooks
+
+C:\Vibe Apps\Agentic RAG\frontend\tests\e2e\fixtures\langsmith.fixture.ts
+  53:5  warning  Unused eslint-disable directive (no problems were reported from 'no-console')
+  88:3  warning  Unused eslint-disable directive (no problems were reported from 'no-console')
+
+C:\Vibe Apps\Agentic RAG\frontend\tests\e2e\scenario-01-parallel-composers.spec.ts
+  145:7  warning  Unused eslint-disable directive (no problems were reported from 'no-console')
+
+C:\Vibe Apps\Agentic RAG\frontend\tests\e2e\scenario-02-gemini-thought-signature.spec.ts
+  157:7  warning  Unused eslint-disable directive (no problems were reported from 'no-console')
+
+C:\Vibe Apps\Agentic RAG\frontend\tests\e2e\scenario-03-openrouter-final-pptx.spec.ts
+  146:7  warning  Unused eslint-disable directive (no problems were reported from 'no-console')
+
+C:\Vibe Apps\Agentic RAG\frontend\tests\e2e\scenario-04-done-latency.spec.ts
+  126:7  warning  Unused eslint-disable directive (no problems were reported from 'no-console')
+
+C:\Vibe Apps\Agentic RAG\frontend\tests\e2e\scenario-05-unknown-model-inference.spec.ts
+  160:7  warning  Unused eslint-disable directive (no problems were reported from 'no-console')
+
+C:\Vibe Apps\Agentic RAG\frontend\tests\e2e\scenario-06-iteration-parity.spec.ts
+  164:7   warning  Unused eslint-disable directive (no problems were reported from 'no-console')
+  175:11  warning  Unused eslint-disable directive (no problems were reported from 'no-console')
+
+C:\Vibe Apps\Agentic RAG\frontend\tests\e2e\scenario-13-workspace-deep-flow.spec.ts
+  286:9  warning  Unused eslint-disable directive (no problems were reported from 'no-console')
+
+✖ 215 problems (201 errors, 14 warnings)
+  0 errors and 11 warnings potentially fixable with the `--fix` option.
+

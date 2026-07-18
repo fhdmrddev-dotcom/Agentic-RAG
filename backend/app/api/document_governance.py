@@ -46,13 +46,23 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.concurrency import run_in_threadpool
 from supabase import Client
 
-from app.dependencies import get_current_user, get_supabase
+from app.dependencies import get_current_user, get_supabase, require_visible
 from app.services.document_relationship_service import (
     _resolve_readable_latest,  # broken-edge classification: None == broken (D-119-3)
     _uid,                       # UUID-coerce-before-predicate (sole owner-scoping gate)
 )
 
-router = APIRouter(prefix="/document-governance", tags=["document-governance"])
+# Phase 148 (VIS-01 / A4) — governance_health maps to THIS router (the Phase 119 "Governance"
+# nav), not knowledge_health.py ("Library Health", a sibling read-only surface left ungated/
+# Everyone). Gate the whole router (every endpoint) so a non-operator is refused server-side
+# (403 — D-03). governance_health is an Everyone-audience feature day-one, so require_visible is
+# a no-op for everyone until an operator flips it to Operators-only (is_operator is the ONE
+# swappable audience boundary).
+router = APIRouter(
+    prefix="/document-governance",
+    tags=["document-governance"],
+    dependencies=[Depends(require_visible("governance_health"))],
+)
 
 DEFAULT_LIMIT = 20
 MAX_LIMIT = 100

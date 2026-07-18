@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sketch 063 — Control Plane Composition &amp; Live Health (Phase 147)</title>
+<link rel="stylesheet" href="../themes/default.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  body { overflow-x: hidden; }
+  #stage { margin: 0 auto; transition: max-width var(--dur-slow) var(--ease-out); }
+
+  .variant { display: none; }
+  .variant.active { display: block; animation: fadeSlideUp var(--dur-slow) var(--ease-out); }
+  .variant-meta {
+    padding: 10px 20px 0; font-size: var(--text-sm);
+    color: var(--color-text-muted); max-width: 1040px;
+  }
+  .variant-meta b { color: var(--color-text); font-weight: 600; }
+
+  .app-frame {
+    height: calc(100vh - 118px); min-height: 640px;
+    margin: 12px 20px 20px;
+    border: 1px solid var(--color-border); border-radius: var(--radius-lg);
+    overflow: hidden; background: var(--color-bg); box-shadow: var(--shadow-lg);
+    position: relative; display: flex; flex-direction: column;
+  }
+
+  /* ── locked 061-B operator band + tabs ── */
+  .op-band {
+    background: linear-gradient(180deg, hsl(38 92% 60% / 0.07), transparent), var(--color-bg-elev1);
+    border-bottom: 1px solid hsl(38 92% 60% / 0.25);
+    padding: 14px 22px 0; flex: 0 0 auto;
+  }
+  .band-top { display: flex; align-items: center; gap: 12px; }
+  .band-title {
+    display: flex; align-items: center; gap: 9px;
+    font-family: var(--font-headline); font-weight: 800;
+    font-size: var(--text-lg); color: var(--color-text);
+  }
+  .band-title svg { width: 18px; height: 18px; color: var(--color-warning); }
+  .band-identity { font-size: var(--text-xs); color: var(--color-text-dim); }
+  .band-top .spacer { flex: 1; }
+  .op-chip {
+    font-family: var(--font-mono); font-size: 10px; font-weight: 600; letter-spacing: 0.12em;
+    color: var(--color-warning); background: var(--color-warning-dim);
+    border: 1px solid hsl(38 92% 60% / 0.3); border-radius: var(--radius-sm); padding: 2px 7px;
+  }
+  .tech-toggle {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: var(--text-xs); color: var(--color-text-dim);
+    border: 1px solid var(--color-border); border-radius: var(--radius-full);
+    padding: 3px 10px; cursor: pointer; transition: all var(--dur-fast) var(--ease-out);
+    user-select: none; white-space: nowrap;
+  }
+  .tech-toggle:hover { color: var(--color-text-muted); border-color: var(--color-text-dim); }
+  .tech-toggle.on { color: var(--color-primary); border-color: var(--color-primary-glow); background: var(--color-primary-dim); }
+  .rec-marker {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: var(--text-xs); color: var(--color-text-dim); white-space: nowrap;
+    border-radius: var(--radius-full); padding: 3px 10px; transition: all var(--dur-base) var(--ease-out);
+  }
+  .rec-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--color-success); box-shadow: 0 0 6px hsl(142 71% 45% / 0.6); flex: 0 0 6px; }
+  .rec-marker.flash { background: var(--color-success-dim); color: var(--color-text-muted); }
+  .rec-marker.flash .rec-dot { animation: brandPulse 0.5s var(--ease-out) 2; }
+  .back-link { font-size: var(--text-sm); color: var(--color-text-muted); cursor: pointer; border-radius: var(--radius-sm); padding: 4px 8px; }
+  .back-link:hover { color: var(--color-text); background: var(--color-accent); }
+
+  .band-tabs { display: flex; gap: 2px; margin-top: 12px; flex-wrap: wrap; }
+  .band-tab {
+    display: inline-flex; align-items: center; gap: 7px; padding: 8px 13px;
+    font-size: var(--text-sm); color: var(--color-text-muted); cursor: pointer; position: relative;
+    border-bottom: 2px solid transparent; transition: all var(--dur-fast) var(--ease-out); user-select: none;
+  }
+  .band-tab:hover { color: var(--color-text); }
+  .band-tab.active { color: var(--color-primary); border-bottom-color: var(--color-primary); }
+  .band-tab.locked { color: var(--color-text-dim); cursor: not-allowed; }
+  .band-tab.locked:hover { color: var(--color-text-dim); }
+  .band-tab .lock { font-size: 10px; opacity: 0.6; }
+  .band-tab .count-pill {
+    font-family: var(--font-mono); font-size: 10px; background: var(--color-muted);
+    color: var(--color-text-muted); border-radius: var(--radius-full); padding: 1px 7px;
+  }
+  .band-tab.active .count-pill { background: var(--color-primary-dim); color: var(--color-primary); }
+
+  .body-scroll { flex: 1; overflow-y: auto; }
+  .cp-pad { padding: 20px 24px; }
+
+  /* ── section head ── */
+  .section-head { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; }
+  .section-head:not(:first-child) { margin-top: 22px; }
+  .section-head h2 { margin: 0; font-family: var(--font-headline); font-size: var(--text-lg); font-weight: 800; color: var(--color-text); }
+  .section-head .sub { font-size: var(--text-xs); color: var(--color-text-dim); }
+  .live-badge { font-family: var(--font-mono); font-size: 10px; font-weight: 500; color: var(--color-success); background: var(--color-success-dim); border-radius: var(--radius-sm); padding: 2px 6px; }
+  .wire-flag { font-family: var(--font-mono); font-size: 10px; color: var(--color-accent-violet); background: hsl(258 90% 66% / 0.12); border-radius: var(--radius-sm); padding: 2px 6px; }
+  .head-spacer { flex: 1; }
+
+  /* ── dependency health cards ── */
+  .dep-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .dep-card {
+    background: var(--color-surface); border: 1px solid var(--color-border);
+    border-radius: var(--radius-md); padding: 13px 15px; position: relative; overflow: hidden;
+    transition: border-color var(--dur-base) var(--ease-out);
+  }
+  .dep-card::before { content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background: var(--color-success); transition: background var(--dur-base) var(--ease-out); }
+  .dep-card.degraded::before { background: var(--color-warning); }
+  .dep-card.down::before { background: var(--color-danger); }
+  .dep-card.degraded { border-color: hsl(38 92% 60% / 0.4); }
+  .dep-card.down { border-color: hsl(0 72% 51% / 0.45); }
+  .dep-top { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .dep-name { font-weight: 600; color: var(--color-text); font-size: var(--text-base); }
+  .dep-plain { font-size: var(--text-xs); color: var(--color-text-dim); }
+  .dep-status { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: var(--text-xs); font-weight: 600; }
+  .dep-status .d { width: 7px; height: 7px; border-radius: 50%; }
+  .dep-card.healthy .dep-status { color: var(--color-success); }
+  .dep-card.healthy .dep-status .d { background: var(--color-success); box-shadow: 0 0 6px hsl(142 71% 45% / 0.7); }
+  .dep-card.degraded .dep-status { color: var(--color-warning); }
+  .dep-card.degraded .dep-status .d { background: var(--color-warning); box-shadow: 0 0 6px hsl(38 92% 60% / 0.7); animation: brandPulse 1.4s var(--ease-out) infinite; }
+  .dep-card.down .dep-status { color: var(--color-danger); }
+  .dep-card.down .dep-status .d { background: var(--color-danger); box-shadow: 0 0 6px hsl(0 72% 51% / 0.7); }
+  .dep-detail { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-text-muted); }
+
+  /* ── capacity row ── */
+  .cap-row { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 12px; }
+  .cap-item {
+    flex: 1 1 150px; background: var(--color-surface); border: 1px solid var(--color-border);
+    border-radius: var(--radius-md); padding: 11px 14px;
+  }
+  .cap-label { font-size: var(--text-xs); color: var(--color-text-muted); margin-bottom: 3px; }
+  .cap-val { font-family: var(--font-mono); font-size: var(--text-xl); font-weight: 600; color: var(--color-text); line-height: 1.1; }
+  .cap-sub { font-size: 10px; color: var(--color-text-dim); margin-top: 2px; }
+  .cap-bar { height: 3px; background: var(--color-muted); border-radius: 2px; margin-top: 8px; overflow: hidden; }
+  .cap-bar > i { display: block; height: 100%; background: var(--color-primary); border-radius: 2px; transition: width var(--dur-slow) var(--ease-out); }
+
+  .refresh-btn {
+    display: inline-flex; align-items: center; gap: 6px; background: var(--color-accent);
+    color: var(--color-text-muted); border: 1px solid var(--color-border); border-radius: var(--radius-sm);
+    padding: 5px 12px; font-size: var(--text-xs); font-family: var(--font-sans); cursor: pointer;
+    transition: all var(--dur-fast) var(--ease-out);
+  }
+  .refresh-btn:hover { color: var(--color-text); border-color: var(--color-text-dim); }
+  .refresh-btn.spin svg { animation: spin 0.6s linear; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* sketch-only scenario cycler */
+  .scenario {
+    display: inline-flex; align-items: center; gap: 2px; font-family: var(--font-mono);
+    font-size: 10px; border: 1px dashed var(--color-border); border-radius: var(--radius-full); padding: 2px;
+  }
+  .scenario .lbl { color: var(--color-text-dim); padding: 0 6px; }
+  .scenario button {
+    background: transparent; border: none; color: var(--color-text-dim); cursor: pointer;
+    font-family: inherit; font-size: inherit; padding: 3px 8px; border-radius: var(--radius-full);
+  }
+  .scenario button.on { background: var(--color-muted); color: var(--color-text); }
+
+  /* ── active runs (compact preview) ── */
+  .card {
+    background: var(--color-surface); border: 1px solid var(--color-border);
+    border-radius: var(--radius-md); padding: 14px 16px;
+  }
+  .card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .card-head h3 { margin: 0; font-family: var(--font-headline); font-size: var(--text-base); font-weight: 700; }
+  .card-foot { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--color-border-soft); font-size: var(--text-xs); color: var(--color-text-dim); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .card-link { color: var(--color-primary); cursor: pointer; font-size: var(--text-xs); }
+  .card-link:hover { text-decoration: underline; }
+
+  .run-row {
+    display: flex; align-items: center; gap: 12px; padding: 9px 2px;
+    border-bottom: 1px solid var(--color-border-soft); font-size: var(--text-sm);
+    transition: background var(--dur-fast) var(--ease-out);
+  }
+  .run-row:last-child { border-bottom: none; }
+  .run-prov { font-family: var(--font-mono); font-size: 10px; color: var(--color-text-dim); background: var(--color-muted); border-radius: var(--radius-sm); padding: 2px 7px; flex: 0 0 auto; }
+  .run-model { color: var(--color-text); font-weight: 500; }
+  .run-user { color: var(--color-text-dim); font-size: var(--text-xs); }
+  .run-elapsed { margin-left: auto; font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-text-muted); flex: 0 0 auto; }
+  .kill-btn {
+    flex: 0 0 auto; font-size: var(--text-xs); color: var(--color-text-dim);
+    background: transparent; border: 1px solid var(--color-border); border-radius: var(--radius-sm);
+    padding: 3px 10px; cursor: pointer; transition: all var(--dur-fast) var(--ease-out);
+  }
+  .kill-btn:hover { color: var(--color-danger); border-color: hsl(0 72% 51% / 0.5); background: var(--color-danger-dim); }
+  .kill-btn.arm { color: var(--color-danger); border-color: var(--color-danger); background: var(--color-danger-dim); }
+  .run-row.killed { opacity: 0.5; }
+  .run-row.killed .run-model { text-decoration: line-through; }
+  .run-cancelled { margin-left: auto; font-size: var(--text-xs); color: var(--color-danger); font-family: var(--font-mono); }
+
+  /* ── controls (compact) ── */
+  .ctrl-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .ctrl-row {
+    display: flex; align-items: center; gap: 12px; padding: 10px 12px;
+    background: var(--color-bg-elev1); border: 1px solid var(--color-border-soft); border-radius: var(--radius-sm);
+  }
+  .ctrl-row .c-label { font-size: var(--text-sm); color: var(--color-text); }
+  .ctrl-row .c-sub { font-size: 10px; color: var(--color-text-dim); }
+  .ctrl-row .spacer { flex: 1; }
+  .ctrl-row.off { border-color: hsl(0 72% 51% / 0.3); }
+  .ctrl-row.off .c-label::after { content: ' · off for everyone'; color: var(--color-danger); font-size: 10px; font-family: var(--font-mono); }
+  .switch { width: 36px; height: 20px; border-radius: var(--radius-full); background: var(--color-success-dim); border: 1px solid hsl(142 71% 45% / 0.5); position: relative; cursor: pointer; transition: all var(--dur-base) var(--ease-out); flex: 0 0 36px; }
+  .switch::after { content: ''; position: absolute; top: 2px; left: 18px; width: 14px; height: 14px; border-radius: 50%; background: var(--color-success); transition: all var(--dur-base) var(--ease-out); }
+  .switch.off { background: var(--color-muted); border-color: var(--color-border); }
+  .switch.off::after { left: 2px; background: var(--color-text-dim); }
+  .switch.maint { background: var(--color-muted); border-color: var(--color-border); }
+  .switch.maint::after { left: 2px; background: var(--color-text-dim); }
+  .switch.maint.on { background: var(--color-warning-dim); border-color: var(--color-warning); }
+  .switch.maint.on::after { left: 18px; background: var(--color-warning); }
+  .maint-banner {
+    display: none; align-items: center; gap: 8px; margin-top: 12px;
+    background: var(--color-warning-dim); border: 1px solid hsl(38 92% 60% / 0.35);
+    border-radius: var(--radius-md); padding: 9px 14px; font-size: var(--text-sm); color: var(--color-warning);
+  }
+  .maint-banner.on { display: flex; animation: fadeSlideUp var(--dur-base) var(--ease-out); }
+
+  /* ── ledger ── */
+  .audit-row { display: flex; align-items: baseline; gap: 10px; padding: 8px 2px; border-bottom: 1px solid var(--color-border-soft); font-size: var(--text-sm); animation: toolSlideIn var(--dur-base) var(--ease-out); }
+  .audit-row:last-child { border-bottom: none; }
+  .audit-plain { color: var(--color-text); flex: 0 0 auto; }
+  .audit-actor { color: var(--color-text-dim); font-size: var(--text-xs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .audit-when { margin-left: auto; color: var(--color-text-dim); font-size: var(--text-xs); flex: 0 0 auto; }
+  .audit-row.is-write .audit-plain::before { content: '✎ '; color: var(--color-warning); }
+
+  /* ── B: pinned health header ── */
+  .vitals {
+    flex: 0 0 auto; display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
+    padding: 12px 24px; background: var(--color-bg-elev1);
+    border-bottom: 1px solid var(--color-border);
+  }
+  .vital { display: inline-flex; align-items: center; gap: 8px; font-size: var(--text-sm); }
+  .vital .d { width: 8px; height: 8px; border-radius: 50%; background: var(--color-success); box-shadow: 0 0 6px hsl(142 71% 45% / 0.7); }
+  .vital.degraded .d { background: var(--color-warning); animation: brandPulse 1.4s var(--ease-out) infinite; }
+  .vital.down .d { background: var(--color-danger); }
+  .vital .vn { color: var(--color-text); font-weight: 500; }
+  .vital .vv { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-text-muted); }
+  .vital.sep { border-left: 1px solid var(--color-border); padding-left: 20px; }
+  .vitals .refresh-btn { margin-left: auto; }
+
+  /* ── C: sub-tabs ── */
+  .subtabs { flex: 0 0 auto; display: flex; gap: 4px; padding: 12px 24px 0; border-bottom: 1px solid var(--color-border); }
+  .subtab {
+    display: inline-flex; align-items: center; gap: 7px; padding: 8px 14px; cursor: pointer;
+    font-size: var(--text-sm); color: var(--color-text-muted); border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+    border: 1px solid transparent; border-bottom: none; transition: all var(--dur-fast) var(--ease-out); user-select: none;
+  }
+  .subtab:hover { color: var(--color-text); background: var(--color-accent); }
+  .subtab.active { color: var(--color-text); background: var(--color-surface); border-color: var(--color-border); position: relative; top: 1px; }
+  .subtab .count-pill { font-family: var(--font-mono); font-size: 10px; background: var(--color-muted); color: var(--color-text-muted); border-radius: var(--radius-full); padding: 1px 7px; }
+  .subtab .d { width: 6px; height: 6px; border-radius: 50%; background: var(--color-success); }
+  .subview { display: none; }
+  .subview.open { display: block; animation: fadeSlideUp var(--dur-base) var(--ease-out); }
+</style>
+</head>
+<body>
+
+<div class="variant-nav">
+  <span class="label">Sketch 063 · Control Plane Composition &amp; Live Health</span>
+  <button class="variant-tab" onclick="showVariant('a', event)">A: One-scroll instrument</button>
+  <button class="variant-tab active" onclick="showVariant('b', event)">B: Pinned health header <span class="star">★</span></button>
+  <button class="variant-tab" onclick="showVariant('c', event)">C: Sub-tabbed control plane</button>
+</div>
+
+<div id="stage"></div>
+
+<div class="sketch-toolbar">
+  <span>063</span>
+  <select onchange="document.querySelector('link[href*=themes]').href='../themes/'+this.value+'.css'">
+    <option value="default">Deep Midnight</option>
+  </select>
+  <button onclick="setStage('768px')" title="tablet">💻</button>
+  <button onclick="setStage('none')" title="desktop">🖥</button>
+</div>
+
+<script>
+/* ═══════════ shared state ═══════════ */
+const ME = 'fhdmrd@gmail.com';
+let techNames = false;
+
+const SCENARIOS = {
+  healthy: {
+    deps: [
+      { name:'Redis', plain:'Cache &amp; run coordination', status:'healthy', detail:'2 ms · 3 active runs' },
+      { name:'Database', plain:'Supabase Postgres', status:'healthy', detail:'8 ms · 1 / 10 connections' },
+      { name:'Code sandbox', plain:'Docker execution', status:'healthy', detail:'2 sessions warm' },
+    ]
+  },
+  degraded: {
+    deps: [
+      { name:'Redis', plain:'Cache &amp; run coordination', status:'healthy', detail:'2 ms · 3 active runs' },
+      { name:'Database', plain:'Supabase Postgres', status:'degraded', detail:'210 ms · 9 / 10 connections' },
+      { name:'Code sandbox', plain:'Docker execution', status:'healthy', detail:'2 sessions warm' },
+    ]
+  },
+  down: {
+    deps: [
+      { name:'Redis', plain:'Cache &amp; run coordination', status:'healthy', detail:'2 ms · 3 active runs' },
+      { name:'Database', plain:'Supabase Postgres', status:'healthy', detail:'8 ms · 1 / 10 connections' },
+      { name:'Code sandbox', plain:'Docker execution', status:'down', detail:'unreachable · last seen 40 s ago' },
+    ]
+  },
+};
+let scenario = 'healthy';
+
+const CAP = [
+  { plain:'Server capacity', tech:'anyio_threadpool_depth', val:'3 / 40', pct:8,  sub:'workers busy' },
+  { plain:'Agents working now', tech:'per_worker_run_count', val:'2', pct:20, sub:'across 2 workers' },
+  { plain:'Database connections', tech:'postgres_pool_in_use', val:'1 / 10', pct:10, sub:'in use' },
+];
+
+const RUNS0 = [
+  { id:'run_a91f', user:'fhdmrd@gmail.com', prov:'Anthropic', model:'Claude Sonnet 4.5', started: Date.now()-134000 },
+  { id:'run_7c02', user:'maria@acme.co',   prov:'OpenAI',    model:'GPT-5',            started: Date.now()-31000 },
+  { id:'run_3de8', user:'sam@acme.co',      prov:'Google',    model:'Gemini 2.5 Pro',   started: Date.now()-8000 },
+];
+
+const flags = { web_search:true, sandbox:true, self_improve:true, workflows:true, maintenance:false };
+
+/* per-variant independent state so counters stay honest */
+const V = {};
+['a','b','c'].forEach(v => V[v] = {
+  runs: RUNS0.map(r => ({...r, killed:false})),
+  feed: [
+    { plain:'Signed in to the Control Room', actor:ME, when:'just now', write:false },
+    { plain:'Operator access granted (initial setup)', actor:'system', when:'Jul 10 · 09:00', write:false },
+  ],
+  scenario: 'healthy',
+});
+
+/* ═══════════ surface renderers (shared) ═══════════ */
+function fmtElapsed(ms){ const s=Math.floor(ms/1000); const m=Math.floor(s/60); return m>0 ? `${m}m ${String(s%60).padStart(2,'0')}s` : `${s}s`; }
+
+function shield(){ return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>'; }
+
+function depGrid(v){
+  const deps = SCENARIOS[V[v].scenario].deps;
+  const word = { healthy:'Healthy', degraded:'Slow', down:'Down' };
+  return `<div class="dep-grid">` + deps.map(d => `
+    <div class="dep-card ${d.status}">
+      <div class="dep-top">
+        <div>
+          <div class="dep-name">${d.name}</div>
+          <div class="dep-plain">${d.plain}</div>
+        </div>
+        <span class="dep-status"><span class="d"></span>${word[d.status]}</span>
+      </div>
+      <div class="dep-detail">${d.detail}</div>
+    </div>`).join('') + `</div>`;
+}
+
+function capRow(){
+  return `<div class="cap-row">` + CAP.map(c => `
+    <div class="cap-item">
+      <div class="cap-label" data-plain="${c.plain}" data-tech="${c.tech}">${techNames ? c.tech : c.plain}</div>
+      <div class="cap-val">${c.val}</div>
+      <div class="cap-sub">${c.sub}</div>
+      <div class="cap-bar"><i style="width:${c.pct}%"></i></div>
+    </div>`).join('') + `</div>`;
+}
+
+function runRows(v, compact){
+  return V[v].runs.map(r => r.killed
+    ? `<div class="run-row killed" data-id="${r.id}">
+         <span class="run-prov">${r.prov}</span>
+         <span class="run-model">${r.model}</span>
+         <span class="run-cancelled">cancelled · recorded</span>
+       </div>`
+    : `<div class="run-row" data-id="${r.id}">
+         <span class="run-prov">${r.prov}</span>
+         <span><span class="run-model">${r.model}</span> &nbsp;<span class="run-user">${r.user}</span></span>
+         <span class="run-elapsed" data-started="${r.started}">${fmtElapsed(Date.now()-r.started)}</span>
+         <button class="kill-btn" onclick="killRun('${v}','${r.id}',this)">Kill</button>
+       </div>`).join('');
+}
+
+function runsCard(v){
+  const n = V[v].runs.filter(r=>!r.killed).length;
+  return `<div class="card">
+    <div class="card-head"><h3>Active runs</h3><span class="live-badge">live</span><span class="head-spacer"></span><span class="dep-plain">${n} running</span></div>
+    <div id="runs-${v}">${runRows(v)}</div>
+    <div class="card-foot"><span>Every user's in-flight agent run. Kill ends one immediately (recorded).</span><span class="wire-flag">net-new · 147</span></div>
+  </div>`;
+}
+
+function controlsCard(v){
+  const items = [
+    { key:'web_search', label:'Web search', sub:'Agents can search the internet' },
+    { key:'sandbox', label:'Code sandbox', sub:'Agents can run code' },
+    { key:'self_improve', label:'Self-improvement', sub:'Skills can propose their own edits' },
+    { key:'workflows', label:'Workflows', sub:'Multi-step automations can run' },
+  ];
+  return `<div class="card">
+    <div class="card-head"><h3>Platform controls</h3><span class="head-spacer"></span><span class="dep-plain">changes affect every user</span></div>
+    <div class="ctrl-grid">` + items.map(it => `
+      <div class="ctrl-row ${flags[it.key]?'':'off'}" id="ctrl-${v}-${it.key}">
+        <div><div class="c-label">${it.label}</div><div class="c-sub">${it.sub}</div></div>
+        <span class="spacer"></span>
+        <div class="switch ${flags[it.key]?'':'off'}" onclick="toggleFlag('${v}','${it.key}',this)"></div>
+      </div>`).join('') + `</div>
+    <div class="ctrl-row" style="margin-top:10px; background:var(--color-surface); border-color:hsl(38 92% 60% / 0.3);">
+      <div><div class="c-label">Maintenance mode</div><div class="c-sub">Users can read everything, but nothing new runs</div></div>
+      <span class="spacer"></span>
+      <div class="switch maint ${flags.maintenance?'on':''}" onclick="toggleMaint('${v}',this)"></div>
+    </div>
+    <div class="maint-banner ${flags.maintenance?'on':''}" id="banner-${v}">⚠ Maintenance mode is ON — users currently see the platform read-only.</div>
+  </div>`;
+}
+
+function ledgerCard(v){
+  return `<div class="card">
+    <div class="card-head"><h3>Recent operator actions</h3><span class="live-badge">live</span></div>
+    <div id="feed-${v}">${feedRows(v)}</div>
+    <div class="card-foot"><span>Everything an operator does here is recorded automatically.</span><span class="wire-flag">net-new · 146</span><span style="flex:1"></span><span class="card-link">View all ›</span></div>
+  </div>`;
+}
+function feedRows(v){
+  return V[v].feed.slice(0,5).map(r => `
+    <div class="audit-row${r.write?' is-write':''}">
+      <span class="audit-plain">${r.plain}</span>
+      <span class="audit-actor">${r.actor}</span>
+      <span class="audit-when">${r.when}</span>
+    </div>`).join('');
+}
+
+function scenarioCycler(v){
+  const opts = ['healthy','degraded','down'];
+  const word = { healthy:'All healthy', degraded:'One slow', down:'One down' };
+  return `<span class="scenario"><span class="lbl">preview</span>` +
+    opts.map(o => `<button class="${V[v].scenario===o?'on':''}" onclick="setScenario('${v}','${o}')">${word[o]}</button>`).join('') + `</span>`;
+}
+
+function refreshBtn(v){
+  return `<button class="refresh-btn" onclick="refresh('${v}',this)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg> Refresh</button>`;
+}
+
+/* ═══════════ band + tabs (locked 061-B) ═══════════ */
+function band(v){
+  return `<div class="op-band">
+    <div class="band-top">
+      <div class="band-title">${shield()} Control Room</div>
+      <span class="op-chip">OPERATOR</span>
+      <span class="band-identity">${ME}</span>
+      <span class="spacer"></span>
+      <span class="tech-toggle ${techNames?'on':''}" onclick="toggleTech(this)">⌥ Technical names</span>
+      <span class="rec-marker" id="rec-${v}"><span class="rec-dot"></span> every action recorded</span>
+      <span class="back-link">‹ Back to app</span>
+    </div>
+    <div class="band-tabs">
+      <span class="band-tab" title="the calm day-one landing">Overview</span>
+      <span class="band-tab active">Control Plane</span>
+      <span class="band-tab locked">Users &amp; Access <span class="lock">🔒 148</span></span>
+      <span class="band-tab locked">Model Registry <span class="lock">🔒 149</span></span>
+      <span class="band-tab locked">Secrets <span class="lock">🔒 150</span></span>
+      <span class="band-tab">Audit log <span class="count-pill">${V[v].feed.length}</span></span>
+    </div>
+  </div>`;
+}
+
+/* ═══════════ variant compositions ═══════════ */
+function variantA(v){  // one-scroll instrument
+  return `<div class="app-frame">${band(v)}
+    <div class="body-scroll scrollbar-thin"><div class="cp-pad">
+      <div class="section-head"><h2>System health</h2><span class="live-badge">live</span>${scenarioCycler(v)}<span class="head-spacer"></span>${refreshBtn(v)}</div>
+      ${depGrid(v)}
+      ${capRow()}
+      <div class="section-head"><h2>Active runs</h2></div>
+      ${runsCard(v)}
+      <div class="section-head"><h2>Controls</h2></div>
+      ${controlsCard(v)}
+      <div class="section-head"><h2>Activity</h2></div>
+      ${ledgerCard(v)}
+    </div></div>
+  </div>`;
+}
+
+function variantB(v){  // pinned health header + scrollable body
+  const deps = SCENARIOS[V[v].scenario].deps;
+  const word = { healthy:'Healthy', degraded:'Slow', down:'Down' };
+  const vitals = deps.map(d => `<span class="vital ${d.status}"><span class="d"></span><span class="vn">${d.name}</span><span class="vv">${word[d.status]}</span></span>`).join('');
+  return `<div class="app-frame">${band(v)}
+    <div class="vitals" id="vitals-${v}">
+      ${vitals}
+      <span class="vital sep"><span class="vn">Agents working</span> <span class="vv" id="vit-runs-${v}">${V[v].runs.filter(r=>!r.killed).length}</span></span>
+      <span class="vital"><span class="vn">Capacity</span> <span class="vv">3 / 40</span></span>
+      ${refreshBtn(v)}
+    </div>
+    <div class="body-scroll scrollbar-thin"><div class="cp-pad">
+      <div class="section-head"><h2>Details</h2><span class="sub">the vital signs above stay pinned as you scroll</span>${scenarioCycler(v)}</div>
+      ${depGrid(v)}
+      ${capRow()}
+      <div class="section-head"><h2>Active runs</h2></div>
+      ${runsCard(v)}
+      <div class="section-head"><h2>Controls</h2></div>
+      ${controlsCard(v)}
+      <div class="section-head"><h2>Activity</h2></div>
+      ${ledgerCard(v)}
+    </div></div>
+  </div>`;
+}
+
+function variantC(v){  // sub-tabbed
+  const n = V[v].runs.filter(r=>!r.killed).length;
+  return `<div class="app-frame">${band(v)}
+    <div class="subtabs">
+      <span class="subtab active" onclick="subgo('${v}','health',this)"><span class="d"></span> Health</span>
+      <span class="subtab" onclick="subgo('${v}','runs',this)">Active runs <span class="count-pill" id="sub-run-n-${v}">${n}</span></span>
+      <span class="subtab" onclick="subgo('${v}','controls',this)">Controls</span>
+      <span class="subtab" onclick="subgo('${v}','activity',this)">Activity <span class="count-pill">${V[v].feed.length}</span></span>
+    </div>
+    <div class="body-scroll scrollbar-thin"><div class="cp-pad">
+      <div class="subview open" id="sub-${v}-health">
+        <div class="section-head"><h2>System health</h2><span class="live-badge">live</span>${scenarioCycler(v)}<span class="head-spacer"></span>${refreshBtn(v)}</div>
+        ${depGrid(v)}
+        ${capRow()}
+      </div>
+      <div class="subview" id="sub-${v}-runs">
+        <div class="section-head"><h2>Active runs</h2><span class="live-badge">live</span></div>
+        ${runsCard(v)}
+      </div>
+      <div class="subview" id="sub-${v}-controls">
+        <div class="section-head"><h2>Platform controls</h2></div>
+        ${controlsCard(v)}
+      </div>
+      <div class="subview" id="sub-${v}-activity">
+        <div class="section-head"><h2>Recent operator actions</h2><span class="live-badge">live</span></div>
+        ${ledgerCard(v)}
+      </div>
+    </div></div>
+  </div>`;
+}
+
+const META = {
+  a: '<b>A — One-scroll instrument.</b> Everything lives on a single scroll in the Control Plane tab: health → capacity → active runs → controls → activity. The path of least resistance — directly extends the 062-A overview stacking. One surface, scroll to see it all.',
+  b: '<b>B — Pinned health header.</b> A compact "vital signs" strip pins at the top of the Control Plane and never scrolls away — dependency dots + agents-working + capacity are always in your eye, monitoring-posture. Details (runs, controls, activity) scroll below.',
+  c: '<b>C — Sub-tabbed control plane.</b> The Control Plane splits into its own inner nav — Health · Active runs · Controls · Activity — each getting full room. Scales best when the active-runs table and the audit browser grow past a preview.',
+};
+const BUILDERS = { a:variantA, b:variantB, c:variantC };
+
+/* mount */
+const stage = document.getElementById('stage');
+['a','b','c'].forEach(v => {
+  const wrap = document.createElement('div');
+  wrap.className = 'variant' + (v==='b'?' active':'');
+  wrap.id = 'variant-'+v;
+  wrap.innerHTML = `<p class="variant-meta">${META[v]}</p>` + BUILDERS[v](v);
+  stage.appendChild(wrap);
+});
+
+/* ═══════════ live behaviors ═══════════ */
+// elapsed ticking across all mounted variants
+setInterval(() => {
+  document.querySelectorAll('.run-elapsed[data-started]').forEach(el => {
+    el.textContent = fmtElapsed(Date.now() - Number(el.dataset.started));
+  });
+}, 1000);
+
+function rerender(v){
+  const wrap = document.getElementById('variant-'+v);
+  const wasActive = wrap.classList.contains('active');
+  wrap.innerHTML = `<p class="variant-meta">${META[v]}</p>` + BUILDERS[v](v);
+  if (!wasActive) wrap.classList.remove('active');
+}
+
+function recFlash(v){
+  const rec = document.getElementById('rec-'+v);
+  if(!rec) return;
+  rec.classList.remove('flash'); void rec.offsetWidth; rec.classList.add('flash');
+  setTimeout(()=>rec.classList.remove('flash'), 1400);
+}
+function logAction(v, plain, write){
+  V[v].feed.unshift({ plain, actor:ME, when:'just now', write });
+  const feed = document.getElementById('feed-'+v);
+  if (feed) feed.innerHTML = feedRows(v);
+  recFlash(v);
+}
+
+function refresh(v, btn){
+  btn.classList.add('spin'); setTimeout(()=>btn.classList.remove('spin'), 650);
+  logAction(v, 'Viewed system health', false);
+}
+
+function setScenario(v, s){
+  V[v].scenario = s;
+  rerender(v);
+}
+
+function killRun(v, id, btn){
+  if (!btn.classList.contains('arm')) {
+    btn.classList.add('arm'); btn.textContent = 'Confirm kill';
+    setTimeout(()=>{ if(btn.classList.contains('arm')){ btn.classList.remove('arm'); btn.textContent='Kill'; } }, 3000);
+    return;
+  }
+  const run = V[v].runs.find(r=>r.id===id);
+  if (run) run.killed = true;
+  document.getElementById('runs-'+v).innerHTML = runRows(v);
+  const n = V[v].runs.filter(r=>!r.killed).length;
+  const subn = document.getElementById('sub-run-n-'+v); if (subn) subn.textContent = n;
+  const vitn = document.getElementById('vit-runs-'+v); if (vitn) vitn.textContent = n;
+  logAction(v, `Killed a run — ${run ? run.model : ''} (${run ? run.user : ''})`, true);
+}
+
+function toggleFlag(v, key, sw){
+  flags[key] = !flags[key];
+  sw.classList.toggle('off', !flags[key]);
+  document.getElementById('ctrl-'+v+'-'+key).classList.toggle('off', !flags[key]);
+  const labels = { web_search:'Web search', sandbox:'Code sandbox', self_improve:'Self-improvement', workflows:'Workflows' };
+  logAction(v, `Turned ${flags[key]?'ON':'OFF'} ${labels[key]} for all users`, true);
+}
+
+function toggleMaint(v, sw){
+  flags.maintenance = !flags.maintenance;
+  sw.classList.toggle('on', flags.maintenance);
+  const banner = document.getElementById('banner-'+v);
+  if (banner) banner.classList.toggle('on', flags.maintenance);
+  logAction(v, flags.maintenance ? 'Turned ON maintenance mode — platform is read-only for users' : 'Turned OFF maintenance mode — platform back to normal', true);
+}
+
+function toggleTech(el){
+  techNames = !techNames;
+  ['a','b','c'].forEach(rerender);
+}
+
+/* ═══════════ nav ═══════════ */
+function subgo(v, view, el){
+  el.parentElement.querySelectorAll('.subtab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  ['health','runs','controls','activity'].forEach(x => {
+    document.getElementById('sub-'+v+'-'+x).classList.toggle('open', x===view);
+  });
+}
+function showVariant(id, ev){
+  document.querySelectorAll('.variant').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.variant-nav .variant-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('variant-'+id).classList.add('active');
+  if (ev) ev.target.classList.add('active');
+}
+function setStage(w){ document.getElementById('stage').style.maxWidth = (w==='none')?'none':w; }
+</script>
+</body>
+</html>

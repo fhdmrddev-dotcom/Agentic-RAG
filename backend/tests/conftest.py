@@ -12,6 +12,36 @@ os.environ.setdefault("SUPABASE_SERVICE_ROLE_KEY", "test-service-role-key")
 os.environ.setdefault("LLM_API_KEY", "test-llm-api-key")
 os.environ.setdefault("LANGSMITH_TRACING", "false")
 os.environ.setdefault("LANGSMITH_PROJECT", "test-project")
+# Phase 146 (ADMIN-01 / WR-04): neutralize the operator bootstrap seed for the
+# unit suite. The `client` fixture runs TestClient(app) as a context manager,
+# which executes the full lifespan — including seed_operators_from_env(). Settings
+# reads backend/.env and postgres_dsn defaults to the LIVE local Postgres
+# (127.0.0.1:54322), so without this guard, on a dev machine with the local stack
+# up and OPERATOR_EMAILS populated in .env, every TestClient startup would INSERT
+# real role-granting operator_users rows as a side effect of running unit tests.
+# A real env var takes precedence over .env in pydantic-settings, so the seed
+# short-circuits at the empty-list check with zero pool activity (exactly what
+# test_seed_noop_when_no_emails pins).
+os.environ.setdefault("OPERATOR_EMAILS", "")
+
+# Phase 158 (DEPLOY-02) — the unit suite runs as a FINALIZED box. main.py (158-07) registers
+# SetupMiddleware + a setup-mode-tolerant lifespan: on an UNFINALIZED boot the middleware 503s
+# every non-allowlisted route AND the lifespan skips the audit-drift guard + reconcilers. The
+# existing suite asserts the byte-identical CONFIGURED-box behavior, so point SETUP_STORE_PATH at
+# a finalized store file (the real gate authority `setup_store.setup_finalized()` reads it ->
+# True). Direct assignment (not setdefault) so a stray dev env var can't leave the suite
+# unfinalized. Per-test setup-mode proofs (test_setup_boot_tolerant / test_setup_gate) monkeypatch
+# their own finalized seam, and the `setup_store_path` fixture redirects SETUP_STORE_PATH to a
+# fresh tmp file, so the fresh-store proofs (test_setup_finalize / status / token) still see an
+# unfinalized store. The `reset_mocks` autouse fixture clears the monotonic finalized latch each
+# test so finalized state is always re-derived from the active SETUP_STORE_PATH.
+import json as _json  # noqa: E402
+import tempfile as _tempfile  # noqa: E402
+from pathlib import Path as _Path  # noqa: E402
+
+_FINALIZED_STORE = _Path(_tempfile.gettempdir()) / "gsd_test_setup_finalized.json"
+_FINALIZED_STORE.write_text(_json.dumps({"finalized": True}))
+os.environ["SETUP_STORE_PATH"] = str(_FINALIZED_STORE)
 
 from unittest.mock import MagicMock  # noqa: E402
 
@@ -75,10 +105,21 @@ mock_user_data = {"id": "00000000-0000-0000-0000-000000000001", "email": "test@e
 # ── Import app AFTER env vars are set ─────────────────────────────────────────
 
 from app.main import app  # noqa: E402
-from app.dependencies import get_current_user, get_supabase  # noqa: E402
+from app.dependencies import (  # noqa: E402
+    authenticate_operator_request,
+    get_current_user,
+    get_supabase,
+)
 
 app.dependency_overrides[get_current_user] = lambda: mock_user_data
 app.dependency_overrides[get_supabase] = lambda: _supabase
+# Phase 146 (ADMIN-01 / WR-02): the /admin gate resolves the caller via its own
+# auto_error=False dependency (folds absent/invalid JWTs into a 404). Override it
+# to inject a clean fake operator identity so gated-route tests reach the real
+# require_operator membership check with a JSON-serializable id (the real resolver
+# would return MagicMock ids from the supabase mock). The WR-02 regression pops
+# this override to exercise the genuine pre-auth 404 path.
+app.dependency_overrides[authenticate_operator_request] = lambda: mock_user_data
 
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
@@ -92,9 +133,30 @@ def reset_mocks():
     Also restores dependency_overrides so tests that swap get_supabase
     don't contaminate subsequent tests.
     """
+    # Phase 158 (DEPLOY-02) — reset the monotonic finalized latches so each test re-derives
+    # finalized state from its OWN SETUP_STORE_PATH (the global finalized store, or a fresh tmp
+    # via the setup_store_path fixture). Without this, a test that latches finalized True leaks
+    # into a later fresh-store proof (test_setup_finalized_false_on_fresh_store).
+    import app.services.setup_store as _setup_store_mod
+    import app.middleware.setup as _setup_mw_mod
+    _setup_store_mod._finalized_latch = False
+    _setup_mw_mod._finalized_latch = False
+
     # Restore canonical dependency overrides (tests may swap get_supabase locally)
     app.dependency_overrides[get_current_user] = lambda: mock_user_data
     app.dependency_overrides[get_supabase] = lambda: _supabase
+    # Phase 146 (ADMIN-01 / WR-02): restore the /admin auth override so a test that
+    # pops it (the pre-auth 404 regression) never contaminates the next test.
+    app.dependency_overrides[authenticate_operator_request] = lambda: mock_user_data
+
+    # Phase 146 (ADMIN-01): clear any leaked require_operator override so the
+    # operator-present branch of one test never contaminates the next. Guarded —
+    # require_operator lands in Plan 02; before then the import is absent (RED).
+    try:
+        from app.dependencies import require_operator as _require_operator
+        app.dependency_overrides.pop(_require_operator, None)
+    except Exception:
+        pass
 
     # Reset the execute result
     _execute_result.reset_mock()
@@ -160,6 +222,30 @@ def mock_execute_result():
 def mock_builder():
     """Expose the shared builder mock for side_effect configuration."""
     return _builder
+
+
+@pytest.fixture
+def operator_override():
+    """Phase 146 (ADMIN-01) — force the operator-present branch of the /admin gate.
+
+    Overrides ``require_operator`` -> a fake operator identity so a test reaches a
+    gated endpoint without a live ``operator_users`` row. Yields the identity; pops
+    the override on teardown so it never contaminates a later test (belt-and-braces
+    with the guarded pop in ``reset_mocks``).
+
+    NOTE: overriding ``require_operator`` bypasses ``request.state.operator = ...``, so
+    the audit floor teardown sees no operator and writes nothing. To exercise the
+    real gate + floor write path, drive the operator branch via the asyncpg pool mock
+    (``set_fetchrow_result({...})``) instead of this override.
+    """
+    from app.dependencies import require_operator
+
+    identity = {"id": "op-1", "email": "op@x.co"}
+    app.dependency_overrides[require_operator] = lambda: identity
+    try:
+        yield identity
+    finally:
+        app.dependency_overrides.pop(require_operator, None)
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -973,3 +1059,102 @@ def oversized_ooxml_bytes() -> bytes:
     base = _make_ooxml("word")
     pad = _TEMPLATE_MAX_FILE_SIZE + 1 - len(base)
     return base + b"\x00" * pad
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Phase 148 Wave-0 fixtures (Plan 148-01 Task 3) — governance / ban / visibility
+# ═══════════════════════════════════════════════════════════════════════
+#
+# Two shared fixtures every downstream 148 backend plan depends on:
+#   banned_user       -> the asyncpg-pool + future banned_until wiring for the
+#                        app-layer ban check (_is_banned / get_current_user, 148-02).
+#   feature_visibility -> the D-05 day-one app_settings.feature_visibility enum-record
+#                        map (NEVER booleans — SEED-115 forward-compat), for the
+#                        feature_audience resolver + GET /features (148-02/148-05).
+# Reuse the existing mock_asyncpg_pool + _supabase GoTrue-admin mock; append only.
+
+@pytest.fixture
+def banned_user(mock_asyncpg_pool, monkeypatch):
+    """A target whose ``auth.users.banned_until`` is in the future (a disabled user).
+
+    Wires ``app.dependencies._pg_pool`` -> ``mock_asyncpg_pool`` and seeds a future
+    ``banned_until`` so the 148-02 ``_is_banned(...)`` app-layer check resolves True even
+    against a still-valid JWT (closing the stateless-token window, Pitfall 1). Yields
+    ``{"id", "banned_until"}`` for the target.
+    """
+    import datetime as _dt
+
+    monkeypatch.setattr("app.dependencies._pg_pool", mock_asyncpg_pool)
+    banned_until = _dt.datetime.now(_dt.timezone.utc) + _dt.timedelta(days=3650)  # ~10y future
+    mock_asyncpg_pool.set_fetchrow_result({"banned_until": banned_until})
+    return {"id": "dddddddd-dddd-dddd-dddd-dddddddddddd", "banned_until": banned_until}
+
+
+@pytest.fixture
+def feature_visibility():
+    """The D-05 day-one ``app_settings.feature_visibility`` enum-record map.
+
+    Enum-shaped records ``{"audience": "operators"|"everyone"}`` — NEVER booleans (the
+    SEED-115 forward-compat contract that keeps the v3.4 roles path open). Skill Studio +
+    model management default to Operators-only; workflow authoring + governance health
+    default to Everyone (D-05/D-06 polarity).
+    """
+    return {
+        "skill_studio": {"audience": "operators"},
+        "model_management": {"audience": "operators"},
+        "workflow_authoring": {"audience": "everyone"},
+        "governance_health": {"audience": "everyone"},
+    }
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Phase 158 Wave-0 fixtures (Plan 158-01) — first-run install wizard scaffold
+# ═══════════════════════════════════════════════════════════════════════
+#
+# The three shared fixtures every test_setup_*.py contract consumes. All values
+# are throwaway / obviously-dummy — NO real secrets, DSNs, or tokens ever live in
+# a fixture (threat T-158-scaffold: the store writes to tmp_path only). The
+# submitted-value probes + operator/provider writes reuse the existing
+# mock_asyncpg_pool (SQL recorder, :564) and _reset_pg_pool_singleton (autouse,
+# event-loop-bound reset, :233) exactly as-is — this section only ADDS.
+
+@pytest.fixture
+def setup_store_path(tmp_path, monkeypatch):
+    """A throwaway ``SETUP_STORE_PATH`` so ``app.services.setup_store`` reads/writes a
+    disposable ``setup.json`` under ``tmp_path`` (never the real ``/data`` volume).
+
+    Sets the ``SETUP_STORE_PATH`` env var (the store's ``STORE_PATH`` reads it) to
+    ``tmp_path/setup.json`` and returns the ``Path``. Function-scoped so every test
+    gets a pristine store — the finalize-latch (D-05) + idempotency (D-14) proofs
+    must NOT leak a ``finalized`` marker or token across tests.
+    """
+    store = tmp_path / "setup.json"
+    monkeypatch.setenv("SETUP_STORE_PATH", str(store))
+    return store
+
+
+@pytest.fixture
+def mock_submitted_supabase():
+    """A MagicMock Supabase client for the operator-bootstrap + schema-sentinel probes.
+
+    Exposes the two surfaces the wizard's submitted-value path touches (D-11 / D-10):
+      - ``.auth.admin.create_user(...)`` -> a response whose ``.user.id`` is a dummy
+        UUID (so ``bootstrap_operator`` can assert ``email_confirm=True`` is passed
+        through and read back the new user id).
+      - ``.table(...).select(...).execute()`` -> a fluent schema-sentinel chain
+        returning ``.data == []`` (schema-absent by default).
+
+    Dummy identity only — no real service-role call is ever made (T-158-scaffold).
+    """
+    sb = MagicMock()
+    created = MagicMock()
+    created.user = MagicMock()
+    created.user.id = "00000000-0000-0000-0000-0000000000aa"
+    sb.auth.admin.create_user.return_value = created
+    # schema-sentinel `.table(...).select(...).execute()` fluent path
+    tbl = MagicMock()
+    tbl.select.return_value = tbl
+    tbl.eq.return_value = tbl
+    tbl.execute.return_value = MagicMock(data=[])
+    sb.table.return_value = tbl
+    return sb

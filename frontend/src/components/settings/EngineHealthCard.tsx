@@ -268,7 +268,7 @@ export function EngineHealthCard() {
             <b className="text-foreground/80">ENGINE health ≠ model quality</b> — a model may
             honestly fail the smoke case and still be a healthy engine.
           </p>
-          <p className="mt-0.5 text-[11px] text-muted-foreground/70">
+          <p className="mt-0.5 text-[11px] text-muted-foreground">
             The sweep is ≈24 LLM calls over a hidden built-in smoke case — no user data.
           </p>
         </div>

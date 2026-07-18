@@ -462,6 +462,23 @@ CREATE TABLE public.app_settings (
     skill_builder_model text DEFAULT ''::text NOT NULL,
     harness_judge_model text DEFAULT ''::text NOT NULL,
     skill_catalog_max_tokens integer DEFAULT 1500 NOT NULL,
+    self_improve_enabled boolean DEFAULT true,
+    workflows_enabled boolean DEFAULT true,
+    maintenance_mode boolean DEFAULT false,
+    feature_visibility jsonb DEFAULT '{}'::jsonb NOT NULL,
+    llm_model_locked boolean DEFAULT false NOT NULL,
+    openai_api_key text,
+    anthropic_api_key text,
+    google_api_key text,
+    openrouter_api_key text,
+    ollama_api_key text,
+    deepseek_api_key text,
+    moonshot_api_key text,
+    minimax_api_key text,
+    zhipu_api_key text,
+    tavily_api_key text,
+    setup_complete boolean DEFAULT false NOT NULL,
+    model_discovery_filter_enabled boolean DEFAULT true NOT NULL,
     CONSTRAINT app_settings_extraction_table_engine_pdf_check CHECK ((extraction_table_engine_pdf = ANY (ARRAY['camelot'::text, 'pdfplumber'::text])))
 );
 
@@ -665,8 +682,16 @@ CREATE TABLE public.documents (
     extractor text,
     document_type_norm text GENERATED ALWAYS AS (lower((metadata ->> 'document_type'::text))) STORED,
     date_typed date GENERATED ALWAYS AS (public.view_iso_to_date((metadata ->> 'date'::text))) STORED,
+    org_id uuid,
     CONSTRAINT documents_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'processing'::text, 'completed'::text, 'failed'::text])))
 );
+
+
+--
+-- Name: COLUMN documents.org_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.documents.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v3.3; no FK until org schema exists.';
 
 
 --
@@ -814,8 +839,16 @@ CREATE TABLE public.folders (
     parent_id uuid,
     is_global boolean DEFAULT false NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    org_id uuid
 );
+
+
+--
+-- Name: COLUMN folders.org_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.folders.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v3.3; no FK until org schema exists.';
 
 
 --
@@ -929,7 +962,46 @@ CREATE TABLE public.model_capabilities_overrides (
     native_tools boolean,
     enabled boolean DEFAULT true,
     created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now()
+    updated_at timestamp with time zone DEFAULT now(),
+    deprecated boolean DEFAULT false NOT NULL,
+    deprecated_reason text
+);
+
+
+--
+-- Name: operator_audit_log; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.operator_audit_log (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    operator_user_id uuid NOT NULL,
+    action text NOT NULL,
+    label text NOT NULL,
+    is_write boolean DEFAULT false NOT NULL,
+    target_type text,
+    target_id text,
+    metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
+    org_id uuid,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: COLUMN operator_audit_log.org_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.operator_audit_log.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v3.3; no FK until org schema exists.';
+
+
+--
+-- Name: operator_users; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.operator_users (
+    user_id uuid NOT NULL,
+    granted_at timestamp with time zone DEFAULT now() NOT NULL,
+    granted_by uuid,
+    note text
 );
 
 
@@ -1211,8 +1283,16 @@ CREATE TABLE public.skills (
     is_global boolean DEFAULT false NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    is_system boolean DEFAULT false NOT NULL
+    is_system boolean DEFAULT false NOT NULL,
+    org_id uuid
 );
+
+
+--
+-- Name: COLUMN skills.org_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.skills.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v3.3; no FK until org schema exists.';
 
 
 --
@@ -1227,8 +1307,16 @@ CREATE TABLE public.threads (
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     folder_id uuid,
     active_workflow_run_id uuid,
-    is_eval boolean DEFAULT false NOT NULL
+    is_eval boolean DEFAULT false NOT NULL,
+    org_id uuid
 );
+
+
+--
+-- Name: COLUMN threads.org_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.threads.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v3.3; no FK until org schema exists.';
 
 
 --
@@ -1661,6 +1749,22 @@ ALTER TABLE ONLY public.metadata_field_definitions
 
 ALTER TABLE ONLY public.model_capabilities_overrides
     ADD CONSTRAINT model_capabilities_overrides_pkey PRIMARY KEY (model_id);
+
+
+--
+-- Name: operator_audit_log operator_audit_log_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.operator_audit_log
+    ADD CONSTRAINT operator_audit_log_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: operator_users operator_users_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.operator_users
+    ADD CONSTRAINT operator_users_pkey PRIMARY KEY (user_id);
 
 
 --
@@ -2154,6 +2258,13 @@ CREATE INDEX idx_metadata_field_definitions_user_id ON public.metadata_field_def
 
 
 --
+-- Name: idx_operator_audit_created; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_operator_audit_created ON public.operator_audit_log USING btree (created_at DESC);
+
+
+--
 -- Name: idx_pdf_extraction_runs_document_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2340,6 +2451,13 @@ CREATE INDEX idx_workspace_versions_file ON public.workspace_file_versions USING
 --
 
 CREATE INDEX message_feedback_user_created_idx ON public.message_feedback USING btree (user_id, created_at DESC);
+
+
+--
+-- Name: skill_files_skill_filename_uniq; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX skill_files_skill_filename_uniq ON public.skill_files USING btree (skill_id, filename);
 
 
 --
@@ -2773,6 +2891,14 @@ ALTER TABLE ONLY public.messages
 
 ALTER TABLE ONLY public.metadata_field_definitions
     ADD CONSTRAINT metadata_field_definitions_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: operator_users operator_users_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.operator_users
+    ADD CONSTRAINT operator_users_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
 
 
 --
@@ -3817,6 +3943,18 @@ ALTER TABLE public.model_capabilities_overrides ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY model_overrides_read_all ON public.model_capabilities_overrides FOR SELECT TO authenticated USING (true);
 
+
+--
+-- Name: operator_audit_log; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.operator_audit_log ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: operator_users; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.operator_users ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: pdf_extraction_runs; Type: ROW SECURITY; Schema: public; Owner: -

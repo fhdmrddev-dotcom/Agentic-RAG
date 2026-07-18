@@ -49,6 +49,12 @@ def _fake_settings(**overrides):
         tavily_api_key="",
         web_search_max_results=5,
         sandbox_enabled=True,
+        # Phase 147 (FLAG-01) — operator kill-switches now read by _build_response.
+        self_improve_enabled=True,
+        workflows_enabled=True,
+        maintenance_mode=False,
+        # Phase 159 (MODEL-03 / D-159-04) — discovery-filter default now read by _build_response.
+        model_discovery_filter_enabled=True,
         context_window_max_tokens=120000,
         sub_agent_max_output_tokens=8192,
         sub_agent_model="claude-haiku-4-5-20251001",
@@ -210,6 +216,7 @@ async def test_update_settings_persists_registry_judge_model(monkeypatch):
 
     async def _fake_save(updates):
         captured.update(updates)
+        return True  # real save_app_settings returns True on success (D-150-07: falsy => 500)
 
     async def _fake_load():
         return _fake_settings()

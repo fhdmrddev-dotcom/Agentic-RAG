@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v3.2
-milestone_name: Skill Eval Studio + Self-Improving — 🔨 IN PROGRESS
+milestone: v3.3
+milestone_name: Operator UX
 status: Awaiting next milestone
-last_updated: "2026-07-10T13:50:59.438Z"
-last_activity: 2026-07-10 — Milestone v3.2 completed and archived
+last_updated: "2026-07-18T06:57:49.580Z"
+last_activity: 2026-07-18 — Milestone v3.3 completed and archived
 progress:
-  total_phases: 30
-  completed_phases: 24
-  total_plans: 120
-  completed_plans: 121
-  percent: 80
+  total_phases: 27
+  completed_phases: 14
+  total_plans: 95
+  completed_plans: 95
+  percent: 52
 ---
 
 # Project State
@@ -19,17 +19,31 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-07-10 — v3.2 Skill Eval Studio + Self-Improving SHIPPED + archived; FILE-01 deferred → v3.3)
+See: .planning/PROJECT.md (updated 2026-07-18 — v3.3 Operator UX SHIPPED + archived)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** v3.2 SHIPPED 2026-07-10 (16 phases / 81 plans; FILE-01 → v3.3). Planning next milestone → `/gsd:new-milestone` (v3.3 Operator UX; workflow-file cluster SEED-110/112 + FILE-01).
+**Current focus:** **v3.3 Operator UX SHIPPED + archived 2026-07-18** (14 phases / 95 plans / 212 tasks; 20/20 requirements; tag `v3.3`). Planning next milestone — v3.4 Multi-tenancy per `PRDs/SEQUENCE.md` (start via `/gsd:new-milestone`).
+
+## Deferred Items
+
+Items acknowledged and deferred at milestone close on 2026-07-18 (44 open `audit-open` artifacts — all noise or by-design backlog; none block v3.3):
+
+| Category | Count | Disposition |
+|----------|-------|-------------|
+| Seeds (dormant) | 9 | By-design v3.4+ backlog — 003 deploy-flexibility, 004 org-multi-tenancy, 040 model-registry-self-service, 041 conversation-compaction, 042 chat-input-modalities, 043 sandbox-package-mgmt, 045 ui-ux-polish, 046 library-health, 084 starter-workflow-library. Preserved with re-open triggers. |
+| Quick tasks (missing) | 22 | Stale legacy index refs (Jan–May 2026); underlying files gone. Noise, not open work. |
+| Todo (empty) | 1 | Malformed/empty entry. Noise. |
+| UAT gaps | 7 | All terminal-positive (resolved / passed / accepted) — none failing. |
+| Verification gaps | 5 | All `human_needed` — satisfied by phase-level live UAT this milestone. |
+
+**Open reported bugs rolling forward** to a planned post-v3.3 chat-polish phase (none were folded into 146–159): BUG-260708-01/-02 (major), BUG-260714-01 (major), BUG-260712-02, BUG-260718-02/-03/-04, BUG-260609-02/-04, BUG-260610-01, BUG-260623-01, BUG-260706-01, BUG-260707-03; deferred BUG-260626-02/-03, BUG-260711-02; external BUG-260714-02 (OpenRouter). BUG-260718-01 CLOSED (folded into 159).
 
 ## Current Position
 
-Phase: Milestone v3.2 complete
+Phase: Milestone v3.3 complete
 Plan: —
 Status: Awaiting next milestone
-Last activity: 2026-07-10 — Milestone v3.2 completed and archived
+Last activity: 2026-07-18 — Milestone v3.3 completed and archived
 
 ### Quick Tasks Completed
 
@@ -41,6 +55,15 @@ Last activity: 2026-07-10 — Milestone v3.2 completed and archived
 | 260705-nfu | Fix silent data-loss bug in skill ZIP import — one colliding flattened filename (e.g. duplicate `__init__.py` from different folders) used to throw an unhandled exception that killed the rest of the upload loop, silently dropping every later file (confirmed live: the real imported docx skill was missing 6 files, incl. its whole templates/ folder). `_upload_skill_files` is now per-file resilient (try/except, logs, returns errors) + `import_skill` de-dups colliding flattened names (`_dedup_flattened_name`) before upload; sync-path failures surface via the existing `errors` response channel, background-path failures are logged. Folder-tree fidelity itself stays unchanged/deferred. | 2026-07-05 | `0402fa6b` | Verified — 18/18 new+existing tests green + 37/37 across the full skills suite (independently re-run after Docker/backend came back up); plan-checked 0 blockers (2 passes, 1 trivial self-corrected); scope-contained to `skills.py` + its test file | [260705-nfu-fix-a-silent-data-loss-bug-in-skill-zip-](./quick/260705-nfu-fix-a-silent-data-loss-bug-in-skill-zip-/) |
 
 ### Recent Completed Phases
+
+**Guardrail overrides:**
+
+- **G-5 / Phase 149 (2026-07-12, plan-phase):** `backend/app/api/threads.py` (ledger: "G-5 fires — extraction due") is touched by plan 149-06 Task 3 with a minimal in-place fallback-notice guard at the single shared model-resolution point for the locked D-149-10 enabled-enforcement decision. Accepted at plan verification (operator-confirmed): guard only, no new endpoint, no file growth beyond the guard, no per-provider fork, shared SSE emitter untouched — all new operator endpoints live in `admin.py`. Mirrors the Phase-147 override shape. The threads.py extraction refactor remains due.
+- **G-5 / Phase 147 (2026-07-11, plan-phase):** `backend/app/api/threads.py` (ledger: "G-5 fires — extraction due") is touched by plan 147-04 Task 2 with a minimal in-place workflow-kickoff guard for the D-05 workflows kill-switch. Accepted at plan verification: conditional guard only, no new endpoint, no file growth beyond the guard — all new operator endpoints live in `admin.py`. The threads.py extraction refactor remains due.
+
+**Phase 156 — Everyday UX Polish (STRETCH) (POLISH-01) — COMPLETE (2026-07-16).** 4/4 plans (Wave 0 shared `threadGroups` engine → Wave 1 permanent 58px icon rail + dedicated `ChatHistoryColumn` → Wave 2 hand-rolled ⌘K palette [no `cmdk`] → Wave 3 mobile drawer search + optional Date⇄Folder toggle) + an operator-requested **collapsible-layout refinement** (`8486e0c3`: pinned `☰` rail-expand 58⇄210 [NOT hover-driven] + fold-away history + `▷` reopen, both persisted). VERIFICATION `verified` (10/10 code truths + all 5 felt-experience items live). **verify-work 9/9 PASS** (`156-UAT.md` — operator batch-confirm of the live Chrome-DevTools UAT: 399 threads / 7 folders, both themes, zero h-overflow 390→3440px). **secure-phase `threats_open: 0` — 6/6 CLOSED** (`156-SECURITY.md`: 4 `mitigate` verified in code [T-156-01 XSS `dangerouslySetInnerHTML`=0 / T-156-03 Radix focus-trap / T-156-05 operator-shield outside `NAV_ITEMS` / T-156-SC no-`cmdk`] + 2 `accept` [T-156-02/04 client-not-a-trust-boundary]; short-circuit — register@plan-time, grep+lock-test verified; frontend-only, 11 files, no backend/py/auth). **POLISH-01 → complete; BUG-260711-01 `folded → closed`** (`verified_closed_by: 156` — the thin rail verifiably stops starving the history column at 399-thread scale). Frontend-only — NO backend/migration/cloud-parity. **Next: STRETCH 157 (Deployment Presets & Runbook, DEPLOY-01) / 158 (First-Run Install Wizard, DEPLOY-02) — gated behind CORE + budget; `/gsd:discuss-phase 157` when resumed.**
+
+**Phase 153 — Inline Citations (CITE-01) — COMPLETE (2026-07-15).** 5/5 plans, all TDD, sequential on main tree. VERIFICATION `passed`; HUMAN-UAT 7/7 (0 issues) operator-accepted on the **Anthropic `claude-sonnet-5` SC#10 proof** (152 precedent — the native provider the research flagged for the mid-list-system-drop trap; dual-channel `active_system_prompt`+`messages[0]` injection survived, markers rendered). DB set-membership corroborated live (thread `c7a3eed5`: markers `[1..9]` = 9 `source_refs`, **0 out-of-range**). SECURE-PHASE **`threats_open: 0` — 27/27 CLOSED** (`153-SECURITY.md`, `539b1f0d`): 23 `mitigate` verified in code + 4 `accept` justified; `threads.py` + `StreamsProvider.tsx` confirmed absent from the phase diff (D-08/D-14/G-5 RED LINES held); 0 new deps. **RED LINES held; no migration, no new package.** **Seeds planted 2026-07-15:** SEED-118 (weak-model tool-loop harness — dedup guard + early force-answer + per-model budget) · SEED-119 (citation footer = retrieval superset of inline markers → make cited-vs-retrieved legible). **Advisory (non-blocking, in `153-SECURITY.md`):** MD-01 Open-doc dead-end (fail-safe UX), LW-02 `_strip_citation_note` literal-sentinel spoof (RLS-scoped self-inflicted). **Cross-provider breadth (OpenAI/Google/OpenRouter) + full-doc-peek/parallel-thread/long-message axes recommended for a future live spot-check (all unit-covered).** **Next: Phase 154 (Plain-Language Layer, LANG-01) — G-2 sketch not required (label layer); `/gsd:discuss-phase 154`.**
 
 **Phase 123 — Skill Triggering Quality (TRIG-01 / TRIG-03 / CTX-03) — COMPLETE (2026-06-26).** All 3 gates clear: secure-phase 29/29 threats CLOSED (threats_open 0, `fc17016b`) · validate-phase NYQUIST-COMPLIANT 12/12 Per-Task COVERED (148 backend + 40 frontend = 188 tests green, `06ae19dc`) · verify 12/12 must-haves + **SC#10 4-axis live UAT 4/4 PASS** (2026-06-26): Axis 1 cross-provider D-01 fidelity · Axis 2 multi-tool pin durability (surfaced+fixed render bugs BUG-260626-01/-04 — shared `dedupMessagesByRunId` helper, `2a48fea4`/`6ec8be77`, verified live) · Axis 3 parallel-thread isolation (3-run Redis snapshot, no pin leak) · Axis 4 long-message pin + honest `_TRIM_MARKER` eviction (forced real 8000-tok overflow). `123-VERIFICATION.md` flipped `human_needed` → `passed`; `123-HUMAN-UAT.md` status passed (4/4). **Deferred (NOT 123 blockers):** BUG-260626-02 (Phase-120 baseline leak into live final-emit) + BUG-260626-03 (run-end todo finalizer) → **SEED-094** (backend run-end honesty). Follow-up candidate: LangSmith not emitting since 2026-06-20 (raw-SDK `wrap_openai` path). **Next: Phase 124 (Workflow Studio UX) — G-2 sketch-gated; run `/gsd:sketch 124`.**
 
@@ -102,6 +125,45 @@ Items acknowledged and deferred at the **v3.2 milestone close on 2026-07-10** (4
 **FILE-01 (Phase 144, Agent-Driven Skill File Attachment)** — the one undelivered requirement; **deferred → v3.3** (gated STRETCH, not executed). Rolls forward with the workflow-file cluster (SEED-110 template upload, SEED-112 folder-scope).
 
 **Open `surface: Agentic-RAG` reports (roll forward into the v3.3 UAT blast radius):** BUG-260609-02/-04, BUG-260610-01, BUG-260623-01, BUG-260706-01, BUG-260707-03, BUG-260708-01/-02, BUG-260710-01/-02 (nav/display + provider-polish), plus the deferred agent-loop / todo-loop notes. Cross-check at `/gsd:discuss-phase` per the reported-bugs mandate.
+
+## Roadmap shape (v3.3, created 2026-07-10)
+
+Numbering continues from v3.2's last phase (145) → **CORE Phases 146-155**, then **STRETCH Phases 156-158** (gated behind CORE — ship only if CORE lands clean; v2.9 105-109 / v3.1 125-131 / v3.2 138-144 precedent). **Phase 144 is BURNED** (held the deferred v3.2 FILE-01 phase, never executed, archived to `.planning/milestones/v3.2-phases/`; FILE-01 gets a fresh number — Phase 151). 144/145 are never reused. Scope source: `.planning/REQUIREMENTS.md` (19 reqs — 16 CORE + 3 STRETCH). Research: `.planning/research/SUMMARY.md`.
+
+**CORE (committed) — Phases 146-155:**
+
+| Phase | Name | REQ-IDs | SC# | Flags |
+|---|---|---|---|---|
+| 146 | Operator Foundation | ADMIN-01 | 4 | **G-2 sketch**; threat model (service-role / no-RLS-backstop, default-deny 404); one-way-door `operator_users` schema; `org_id` stubs; UI hint |
+| 147 | Operator Control Plane | ADMIN-02, FLAG-01 | 4 | **SC#10** (active-runs + Kill); **G-2 sketch**; fail-closed kill-switches; UI hint |
+| 148 | Governance — Audit, Users & Feature Visibility | ADMIN-03, VIS-01 | 4 | threat model (cross-user reads); **G-2 sketch**; VIS-01 API-enforced; impersonation → STRETCH/named-trigger; UI hint |
+| 149 | Model Registry & Discovery | MODEL-01, MODEL-02 | 4 | **SC#10**; **G-2 sketch**; propose-not-auto-enable; read path already live (mig 053); UI hint |
+| 150 | Secrets at Rest | SEC-01 | 4 | threat model (secrets); app-layer `cryptography` (NOT pgsodium); env-fallback preserved; round-trip-verified |
+| 151 | Agent File Tools | FILE-02, FILE-01 | 4 | **SC#10** (new agent tools); threat model FILE-01 (WRITE) + FILE-02 (RAG→sandbox); order FILE-02→FILE-01 |
+| 152 | Workflow Run Inputs | WFIN-01, WFIN-02, WFIN-03 | 3 | **SC#10**; **G-2 sketch** (Run modal); threat model WFIN-01 (upload/SSTI); SEED-112 scope-shape = discuss/sketch; UI hint |
+| 153 | Inline Citations | CITE-01 | 4 | **G-2 sketch** (mandatory); **G-5** (`MessageItem.tsx`/`StreamsProvider.tsx`); **SC#10**; Pitfall 14 (set-membership); UI hint |
+| 154 | Plain-Language Layer | LANG-01 | 3 | Pitfall 15 (no enum/API/audit break; Deep byte-identical); extends Phase-124 two-door; UI hint |
+| 155 | Accessibility Sweep — WCAG AA | A11Y-01 | 3 | LAST (audits all net-new surfaces); new dev deps `@axe-core/playwright` + `eslint-plugin-jsx-a11y`; UI hint |
+
+**STRETCH (gated behind CORE) — Phases 156-158:**
+
+| Phase | Name | REQ-IDs | SC# | Depends |
+|---|---|---|---|---|
+| 156 | Everyday UX Polish | POLISH-01 | 3 | — (SEED-045 anchors; gated on CORE); UI hint |
+| 157 | Deployment Presets & Runbook | DEPLOY-01 | 3 | — (docs/config; gated on CORE) |
+| 158 | First-Run Install Wizard | DEPLOY-02 | 3 | 157 (uses presets); biggest lift → first to cut; UI hint |
+
+- **Coverage:** 19/19 requirements mapped (16 CORE + 3 STRETCH); 0 unmapped. Every requirement → exactly one phase.
+- **Sequencing rationale:** Operator foundation FIRST (146 — ADMIN-01 keystone; locks the v3.4 one-way-door role schema). Model registry + discovery early (149 — highest ROI, read path live since mig 053); secrets-at-rest (150) as the separable Track-3 security sub-phase. Workflow file cluster with internal order FILE-02 (read) → FILE-01 (write, reference threat pattern) in 151, then WFIN-01+WFIN-02 together on the shared run-input channel + WFIN-03 (safe delete) in 152. UX track last: CITE-01 (153, largest lift, G-5 hot files, G-2 sketch), LANG-01 (154, app-wide relabel), A11Y-01 (155, audits everything last).
+- **SC#10 (cross-provider mandate):** 147 (active-runs/Kill), 149 (model-registry UI state → provider routing), 151 (two new agent tools), 152 (run-input channel + folder scope), 153 (inline citations).
+- **UI hint:** 146, 147, 148, 149, 152, 153, 154, 155 (CORE) + 156, 158 (STRETCH).
+- **G-2 sketch-gated:** 146, 147, 148, 149, 152, 153 (+ 156 if visual). `/gsd:sketch` before `/gsd:spec-phase` / `/gsd:discuss-phase`.
+- **Threat models (new WRITE/upload surfaces):** FILE-01 + FILE-02 (151), WFIN-01 (152); plus the standing admin-isolation threat model on 146/148 (service-role, no RLS backstop).
+- **G-5 hot files:** `MessageItem.tsx` + `StreamsProvider.tsx` (153 inline citations — do NOT regress the shared render path); `threads.py` stays untouched (new agent tools register in the flat `_TOOL_REGISTRY`).
+- **Red line:** never fork the shared path — provider differences at the gateway/adapter/sanitizer boundary (D-14). Deep Mode byte-identical; no new runtime.
+- **Reported-bugs:** 10 open `surface: Agentic-RAG` reports roll into the v3.3 UAT blast radius; cross-check at each `/gsd:discuss-phase`. v3.2 verification debt (140/141/142/143) must not regress.
+
+Roadmap detail: `.planning/ROADMAP.md` (active v3.3 section). Requirements + traceability: `.planning/REQUIREMENTS.md`. Research base: `.planning/research/SUMMARY.md`.
 
 ## Roadmap shape (v3.2, created 2026-06-28)
 
@@ -297,6 +359,19 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 143 P02 | 9min | 2 tasks | 2 files |
 | Phase 143 P03 | 6min | 3 tasks | 4 files |
 | Phase 143 P04 | 6min | 2 tasks | 3 files |
+| Phase 146 P01 | 9min | 3 tasks | 3 files |
+| Phase 146 P02 | 11min | 3 tasks | 8 files |
+| Phase 146 P146-04 | 2min | 2 tasks | 3 files |
+| Phase 146 P05 | 3min | 3 tasks | 5 files |
+| Phase 146 P06 | 10min | 3 tasks | 6 files |
+| Phase 148 P01 | 40 | 3 tasks | 15 files |
+| Phase 148 P03 | ~6min | 1 auto task (Task 1 = operator human-action) | 1 file |
+| Phase 149 P09 | 7min | 2 tasks | 7 files |
+| Phase 149 P11 | 18min | 2 tasks | 2 files |
+| Phase 149 P12 | 12min | 1 tasks | 2 files |
+| Phase 150 P02 | 2 | 2 tasks | 2 files |
+| Phase 159 P01 | 13 | 2 tasks | 3 files |
+| Phase 159 P06 | 12min | 3 tasks | 4 files |
 
 ## Decisions
 
@@ -364,6 +439,27 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase ?]: 143-02: owned_only additive default-off param on list_published_workflows (Published shelf narrows to mine; picker/WorkspacePanel/threads.py keep globals default — D-143-2b); Starters shelf = own list_starter_workflows curated-globals query + GET /workflows/starters
 - [Phase ?]: Phase 143 Plan 03: 3 curated starters authored as seed migration 094 with DISTINCT slugs (pm-* would UNIQUE-collide); promote = TRANSFORM (strip folder binding+scope, re-home template to seed _library, category='starter', keep strict citation gates); storage bytes via scripts/seed-starters.py --upload
 - [Phase ?]: Phase 143 scope-narrowing threaded as a 3rd positional options param on listPublishedWorkflows (not a 2nd-arg options object) so WorkspacePanel's signal-as-2nd-arg call stays byte-identical (D-143-2b)
+- [Phase 146-01]: operator_users carries NO org_id (D-06 org-agnostic principal) — protects the v3.4 one-way door
+- [Phase 146-01]: operator_audit_log.action is free-text with NO CHECK (A4); actor is PLAIN uuid NO FK (tamper-resistant, mig-059 idiom)
+- [Phase 146-01]: org_id stubs on documents/folders/threads/skills with NO index — harness_audit shape per D-05, not the DM-era indexed shape
+- [Phase ?]: Phase 146-02: require_operator is a ROUTER-level gate returning a byte-identical 404 on non-membership (non-discoverable, sole authority, no RLS backstop); old BACKPRESSURE_ADMIN_USER_IDS + dev fail-open deleted (D-02), OPERATOR_EMAILS replaces it.
+- [Phase ?]: Phase 146-02: operator_audit_floor is a per-action yield-dependency (probe-EXEMPT) writing one append-only row per gated action; membership seam is asyncpg (patch _pg_pool in tests, not the supabase mock — Pitfall 6).
+- [Phase ?]: 146-04: operator probe is render-only (getOperatorProbe 404→null); backend require_operator 404 gate stays the sole authority (Pitfall 13)
+- [Phase 146]: 146-05: shipped the five Control Room presentational leaves (OperatorBand/HealthSignals/LockedTab/TechnicalNamesToggle/RecentActionsCard) — sketch winners 061-B + 062-A, pure prop-driven leaves typed against the Plan-04 api.ts contract, composed by the Plan-06 shell
+- [Phase 146]: 146-05: LockedTab keeps NO phase-number token in shipped copy OR source comments (T-146-10 grep treats any 'phase 1xx' substring as a leak); amber operator zone uses Tailwind amber-* tokens (StatusPill precedent), not a bespoke warning utility
+- [Phase 146]: Control Room reachable via the probe-gated shield rendered OUTSIDE NAV_ITEMS (D-07 byte-identity, regression-locked); the 061-B shell's manual ↻ Refresh honesty beat (no auto-poll) visibly prepends the operator's own 'Viewed system health' ledger row (D-04/D-08)
+- [Phase ?]: 148-01: Nyquist Wave-0 scaffold — 14 RED test_148 files + banned_user/feature_visibility fixtures; wave-ownership split
+- [Phase 148]: 148-04: governance_service.py cross-user reads (query_platform_audit, list_users_roster) swallow-and-log to [] (best-effort feed); only the CSV over-cap refusal (AuditExportTooLarge, >_CSV_MAX_ROWS=50000) propagates as a deliberate 4xx — never truncates. Every filter a NULL-guarded $N bind (user scope / action_type text[] ANY / half-open [since,until) window); page_size clamped <=100 at the service boundary (SC#4 no-full-tenant-leak).
+- [Phase 148]: 148-04: export CSV returns the COUNT-probe value as the exact filtered count (not len(rows)) — the authoritative set size that gates the cap and 148-06 stamps onto audit.export; belt-and-suspenders LIMIT (==cap) never truncates a validated under-cap set. grant_operator idempotent ON CONFLICT DO UPDATE re-stamps granted_by; revoke_operator refuses self-revoke (409) BEFORE any pool access (Pitfall 7 lockout-proof).
+- [Phase 148]: 148-04: skipped requirements.mark-complete for ADMIN-03 — service layer built + unit-tested (10/10 service tests GREEN) but not yet wired to any router (148-06 endpoints / 148-07 UI); marking now would be false-green. Completes at phase verify-work (mirrors 148-02 substrate posture). Controller-level tests (disable/enable/view_platform_recorded) stay expected-RED, owned by 148-06.
+- [Phase 148]: 148-05 (VIS-01): require_visible attached at ROUTER level for the no-carve-out governed routers (evals.py both routers, skill_tuner.py, skill_test_cases.py, document_governance.py) so EVERY endpoint is gated safe-by-construction (require_operator precedent — a future endpoint cannot forget it); PER-ENDPOINT (decorator dependencies=[]) only on the carve-out routers settings.py (4 model_management gates) + workflows.py (6 workflow_authoring gates), because router-gating them would 403 the Run carve-outs (RESEARCH anti-pattern is scoped to exactly those two files). GET /settings/providers, GET /workflows/published|starters, and the threads.py workflow launch left ungated (Run stays for everyone — D-05); threads.py untouched.
+- [Phase 148]: 148-05: skipped requirements.mark-complete for VIS-01 — the API enforcement WALL is done (GET /features + require_visible gates GREEN) but VIS-01's frontend hide/bounce half (148-07) is unshipped; marking now would be false-green. Completes at phase verify-work (mirrors the 148-02/148-04 substrate posture).
+- [Phase 148]: 148-03 (VIS-01): operator applied migration 098 to the live LOCAL DB via the SQL editor (NEVER db push/reset — preserves dev data); full-schema.sql regenerated (no --reset, live-DB dump) — feature_visibility jsonb column captured at line 468, a 1-insertion dump delta not a hand-edit (commit edfcc1a0). CLOUD PARITY: mig 098 (column + D-05 seed UPDATE) MUST be pasted into the CLOUD Supabase SQL editor at the next promotion — local + cloud each carry their own app_settings.global row (docs/DEPLOYMENT-WORKFLOW.md §5 parity checklist + the standing v3.3 cloud-migrations rule; mirrors mig 097). Skipped requirements.mark-complete for VIS-01 (multi-plan feature; marked at phase verify-work — same posture as 148-02/04/05).
+- [Phase 149]: 149-11: agent_loop pre-injection gate now fires for compat-path STRUCTURED (operator native_tools=False OVR) via _should_pre_inject_structured — warmed by get_model_capability_async before the sync resolve_calling_mode read; anthropic/google native-SDK excluded (WR-05); openrouter+xml and no-override paths byte-identical (D-14).
+- [Phase 149]: 149-12: suggestion chips strip <think> reasoning blocks before the line-parse (module-private _strip_think_blocks mirrored from the threads.py sibling, not imported — avoids api->service inversion + G-5 hot-file import); strip runs BEFORE clamp-to-3 so reasoning never fills chip slots; closes round-2 UAT Test-7 minor gap on the D-149-10 fallback path.
+- [Phase 159]: D-159-01 realized (159-01): UTILITY_MODEL_EXCLUDE is the single shared chat-filter constant; curate imports it; discovery new entries carry a display-only utility tag that never mutates the confirmable diff (SC#3).
+- [Phase 159]: 159-06 (D-159-04): the discovery suitability filter is DISPLAY-only — `visibleNew`/`hiddenNewCount` feed the render only; `accepted`/`enableNow`/`drafts`/`buildChanges` still read the FULL `result.new`, so a hidden utility model stays in the confirmable payload (SC#3 / T-159-13, test-locked). Default-on, persisted via `handleSetDiscoveryFilter` → `setFlag("model_discovery_filter_enabled")` → settings re-fetch; honest "N utility models hidden" + a non-destructive ephemeral "Show all".
+- [Phase 159]: 159-06 (D-159-03): family-default pre-fill via draft-SEEDING on run (`seedDraftsFromDefaults`) — `isComplete`/`buildChanges` unchanged; `enableNow` stays default-off so `buildChanges` yields `enabled:false` (never auto-enable, T-159-12). "default — confirm" keyed on the static `familyDefaults(id)[field]!=null`; `native_tools` maps true→native / null→unseeded, never "none" (SC#3 by construction). All 6 plans shipped; MODEL-03 flips at `/gsd:verify-work 159` (phase-spanning STRETCH, false-green-avoidance).
 
 ## Operator Next Steps
 

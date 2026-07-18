@@ -218,7 +218,7 @@ function RunRow({ run, ctx }: { run: EvalRun; ctx: RowContext }) {
     const judge = results.find((r) => r.judge_model)?.judge_model
     return (
       <div data-testid="run-cases" className="flex flex-col gap-1 pb-1">
-        <p className="pt-2 font-mono text-[10px] text-muted-foreground/70">
+        <p className="pt-2 font-mono text-[10px] text-muted-foreground">
           {judge ? `judge ${judge} · ` : ""}
           {new Date(run.created_at).toLocaleDateString()}
         </p>
@@ -271,7 +271,7 @@ function RunRow({ run, ctx }: { run: EvalRun; ctx: RowContext }) {
           <Bot data-testid="provider-fallback" aria-hidden className="h-4 w-4 text-muted-foreground" />
         )}
         <span className="text-xs font-semibold text-foreground">{run.model}</span>
-        <span className="font-mono text-[10px] text-muted-foreground/70">
+        <span className="font-mono text-[10px] text-muted-foreground">
           ver {run.skill_version_id.slice(0, 8)}
         </span>
         {run.feeds_gate && (
@@ -316,7 +316,7 @@ function RunRow({ run, ctx }: { run: EvalRun; ctx: RowContext }) {
               style={{ width: `${bar.pct}%` }}
             />
           </div>
-          <span className="font-mono text-[10px] text-muted-foreground/70">{bar.caption}</span>
+          <span className="font-mono text-[10px] text-muted-foreground">{bar.caption}</span>
         </div>
       )}
 
@@ -362,7 +362,7 @@ function MatrixFooter({ skillId }: { skillId: string }) {
       data-testid="matrix-aggregation-footer"
       className="mt-1 flex flex-col gap-2 border-t border-primary/20 pt-2"
     >
-      <p className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground/70">
+      <p className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
         Aggregation · per config, from run history
       </p>
       {agg.configs.length === 0 ? (
@@ -397,7 +397,7 @@ function MatrixFooter({ skillId }: { skillId: string }) {
                   <Bot aria-hidden className="h-3 w-3 text-muted-foreground" />
                 )}
                 <span className="text-[11px] font-semibold text-foreground">{c.model}</span>
-                <span className="font-mono text-[9px] text-muted-foreground/60">
+                <span className="font-mono text-[9px] text-muted-foreground">
                   {c.run_count} {c.run_count === 1 ? "run" : "runs"}
                 </span>
               </div>
@@ -410,7 +410,7 @@ function MatrixFooter({ skillId }: { skillId: string }) {
                       ± <span className="text-foreground">{c.with_stddev.toFixed(2)}</span>
                     </>
                   ) : (
-                    <span className="italic text-muted-foreground/70">
+                    <span className="italic text-muted-foreground">
                       {" "}
                       · first run — no spread yet
                     </span>
@@ -477,7 +477,7 @@ function MatrixCard({ groupId, arms, ctx }: { groupId: string; arms: EvalRun[]; 
           ⧉
         </span>
         <span className="text-xs font-semibold text-foreground">Matrix run</span>
-        <span className="font-mono text-[10px] text-muted-foreground/70">
+        <span className="font-mono text-[10px] text-muted-foreground">
           · {n} configs · {m} cases
         </span>
         <span className="ml-auto flex items-center gap-1.5 text-[10px] font-semibold">

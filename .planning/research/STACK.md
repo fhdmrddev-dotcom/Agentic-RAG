@@ -1,301 +1,258 @@
-# Stack Research
+# Stack Research — v3.3 Operator UX
 
-**Domain:** Deterministic / durable / resumable LLM **workflow state-machine runtime** ("Harness Engine") on an existing FastAPI + asyncpg + Redis + Supabase substrate, multi-worker, 6 native LLM providers, no LangChain/LangGraph
-**Researched:** 2026-05-30
-**Confidence:** HIGH
+**Domain:** Self-hosted B2B agentic-RAG platform (React/Vite + FastAPI + Supabase + Redis) — adding an operator/admin tier, dynamic model+secrets management, workflow file inputs, and a plain-language/a11y UX layer to a shipped app.
+**Researched:** 2026-07-10
+**Confidence:** HIGH (existing-stack facts verified against live code + migrations; external facts verified against official Supabase/PyPI/npm sources; versions checked 2026-07)
 
 ---
 
-## TL;DR for the planner
+## Headline finding: v3.3 is a near-zero-new-runtime-dependency milestone
 
-**Net new third-party dependencies required: ZERO.**
+The biggest surprise from reading the live codebase is how much of the v3.3 substrate **already exists** and how little genuinely new library surface is required. Concretely:
 
-The v2.8 Harness Engine needs **no new runtime libraries**. Everything the hard parts require is already installed and battle-tested in this codebase:
+| The stale PRD assumed… | Reality in the live code | Impact on v3.3 stack |
+|---|---|---|
+| "API keys persisted to disk as plain text in `settings_override.json`" | `settings_override.json` was **deleted in Phase 081.1 / migration 053**. Settings (incl. provider API keys) now live as columns in the `app_settings` DB row, read via asyncpg with a 30s TTL cache (`backend/app/models/user_settings.py`). | The secrets task is **at-rest column encryption**, not "move off disk." Smaller, cleaner scope. |
+| Encrypt secrets "via `pgsodium`" | pgsodium is **pending deprecation** at Supabase (verified below). | pgsodium is now a **do-not-add**. Use app-layer `cryptography` (already installed) or Supabase Vault. |
+| Build a `model_capabilities_overrides` editor from scratch | The **table + hot-path read already ship** (migration 053; `_load_model_overrides()` with 30s TTL cache). | Only the **discovery service + write UI** are missing. |
+| Discovery is greenfield | `scripts/curate_models.py` **already implements live `/models` discovery for all 8 providers** with per-provider auth + response-shape parsing. | Lift the offline script into a backend service on `httpx` (already a dep). No new lib. |
+| Needs `pgsodium`/PyJWT/magic libs added | `cryptography 46.0.7`, `filetype 1.2.0`, `defusedxml 0.7.1`, `pyjwt 2.12.1` are **already installed transitively** in `backend/venv`. | Secrets encryption, content-sniffing file validation, and impersonation JWTs need **0 new runtime installs** — just pin them in `requirements.txt`. |
+| Admin surface is greenfield | An `admin.router` + `GET /admin/backpressure` JSON + `test_backpressure.py` already exist (v2.6 WORKER-LIFT-04). | The `/admin` frontend + operator RBAC gate sit on an existing backend seam. |
 
-- **State machine** → hand-rolled, Postgres-backed (`pydantic 2.12.5` for the config/transition models). Do **not** add `transitions` or `python-statemachine`.
-- **Phase configs + validator specs** → `pydantic 2.12.5` (already the project's structured-output standard).
-- **Durable / resumable phase state** → `asyncpg >= 0.29` + the existing `runs` table + `run:{run_id}` Redis Streams. Do **not** add a durable-execution library.
-- **Validation gates** → `jsonschema 4.26.0` (already installed) for `json_schema`; stdlib `re` for `regex_match`; a plain Python registry dict (mirroring `_TOOL_REGISTRY`) for `programmatic`; an asyncpg `SELECT` for `workspace_file_exists`.
-- **Immutable-on-publish** → a Postgres `BEFORE UPDATE` trigger (raw SQL migration), no library.
-
-The v2.7 PRD §5 already reached this same conclusion ("New SDK / library deps: none ... harness state machine is implemented directly in Python"). This research **confirms and grounds that call with version evidence and a concrete integration map**, and refines two points the PRD left implicit (see §"Refinements to the v2.7 PRD design").
-
-This is the rare correct case of "no new infra" — not a default-hedge, but the evidence-backed answer, because the four hard problems (cross-worker durability, pause/resume, fair-share concurrency, per-subset tool refusal) were **already solved** in v2.7's `runs`/Redis substrate, `ask_user_service`, `task_service`, and `tool_dispatcher` respectively.
+**Net:** the only truly-new packages worth adding are two dev-only frontend a11y tools and one optional/gated backend malware scanner. Everything else is "declare what's already resolved + write code."
 
 ---
 
 ## Recommended Stack
 
-### Core Technologies (all ALREADY INSTALLED — verify, don't add)
+### Core additions (backend — mostly declare-what's-already-installed)
 
-| Technology | Version (installed) | Purpose in the harness | Why this is the right choice |
-|------------|---------------------|------------------------|------------------------------|
-| **pydantic** | **2.12.5** (verified in venv) | Typed models for `PhaseConfig`, `ValidatorSpec`, `WorkflowDefinition`, `OnFailure`, the 5 phase-type discriminated union, and structured `programmatic`-phase I/O | Already the project's mandated structured-output tool (CLAUDE.md: "Use Pydantic for structured LLM outputs"). Discriminated unions (`Field(discriminator=...)`) model the 5 phase types cleanly; `model_validate(jsonb)` parses `workflow_definitions.phases` on load; `model_dump(mode="json")` round-trips to jsonb. Zero new dep, zero new mental model. |
-| **asyncpg** | **>= 0.29** (project pin) | Persist + read `workflow_runs` / `workflow_phases` rows on the hot path; the per-phase `available_tools` whitelist read; phase-transition writes | This IS the resumability substrate. v2.6 WORKER-LIFT-02 already moved streaming hot paths to the asyncpg pool (`get_pg_pool()`); phase state is the same shape. D-v2.5-01 compliant (no blocking I/O in async handlers). Postgres is the durable, cross-worker source of truth — any worker can resume a run by reading `workflow_phases`. |
-| **redis (redis-py asyncio)** | **>= 5.2, < 6** (project pin) | Phase-lifecycle SSE events ride the existing `run:{run_id}` XADD stream; `llm_human_input` pause/resume reuses pub/sub; `llm_batch_agents` global fair-share reuses the Lua atomic counter | Run-backed streaming (D-v2.5-08) means EVERY new harness SSE event (`workflow_phase_start`, `workflow_transition`, gate-check, etc.) rides the SAME stream — no new namespace, no new substrate (PRD §5 "New Redis key patterns: none"). pub/sub + Lua counter already proven in `ask_user_service.py` / `task_service.py`. |
-| **jsonschema** | **4.26.0** (verified in venv) | The `json_schema` validator kind — validate a phase's structured output against a declared schema | Already a transitive/used dep (installed in venv; the skills ZIP-import standard and plugin-manifest validation lean on it). Full Draft 2020-12 support. `Draft202012Validator(schema).iter_errors(instance)` gives structured, multi-error feedback that can be fed back into the LLM context on gate failure. |
-| **Postgres triggers (raw SQL)** | n/a (DB feature) | Immutable-on-publish enforcement for `workflow_definitions` (block UPDATE once `published_at IS NOT NULL`) | Enforcement at the data layer survives any application bug or direct SQL edit. Mirrors the migration-trigger style already in the repo (`017_skills.sql` ships `skills_set_updated_at`; INSERT-only RLS on `audit_log` / `message_feedback` is the same "lock the row" instinct). No library. |
+| Technology | Version | Purpose | Why Recommended |
+|------------|---------|---------|-----------------|
+| `cryptography` (Fernet / `AESGCM`) | already installed **46.0.7** (latest 49.0.0) | App-layer envelope encryption of provider API keys + secrets in `app_settings` | DB-portable (works identically on local Supabase, cloud Supabase, any Postgres — matches the project's local↔cloud env-var switch); sidesteps pgsodium's deprecation; integrates cleanly with the existing asyncpg-direct-read + sync TTL cache (Supabase Vault's decrypt-via-SQL-view fights that path). Master key from env matches CLAUDE.md "env only for secrets/infra." |
+| `filetype` | already installed **1.2.0** | Magic-byte content sniffing for the new template/skill upload surfaces | **Pure-Python, zero system deps** — critical vs `python-magic`, which needs the `libmagic` C library on the host + Docker image (awkward on the Windows dev box). Covers all the app's binary formats (PDF/DOCX/PPTX/XLSX/EPUB→zip). |
+| `defusedxml` | already installed **0.7.1** | XXE-safe parsing of uploaded OOXML/XML (template threat model) | Drop-in hardening for any XML read of an uploaded `.docx`/`.xlsx`. The real template threat is XXE + zip-bomb + Jinja SSTI, not classic AV. |
+| `pyjwt` | already installed **2.12.1** | Mint/introspect short-lived impersonation JWTs ("Sign in as user") | Already present. Prefer the Supabase Auth Admin API (service-role) for session generation where possible; use PyJWT only if hand-signing against the Supabase JWT secret is unavoidable. |
+| `httpx` | already a dep **>=0.28** | Live `/models` discovery HTTP client (lift `curate_models.py`) | Already the app's async HTTP client. **Do not** re-introduce `requests` (the offline script's dep) into the service path. |
 
-### Supporting Libraries (stdlib — no install)
+### Core additions (frontend — dev-only)
 
-| Library | Version | Purpose | When to use |
-|---------|---------|---------|-------------|
-| **`re`** (stdlib) | stdlib | `regex_match` validator kind | Phase output text must match a declared pattern. Compile once per validator spec; `re.search`. |
-| **`difflib`** (stdlib) | stdlib | Already used by `workspace_service` for `delta_from_prev` | If a `programmatic` validator needs structural text comparison. No new use required by the harness core. |
-| **`enum` / `typing.Literal`** (stdlib) | stdlib | Phase-type tag, status enums, `on_failure` action tag | Back the pydantic discriminated union and the status columns. |
-| **`uuid`, `json`, `asyncio`** (stdlib) | stdlib | Run IDs, jsonb (de)serialization, the phase-execution loop | Same primitives the agent loop and `task_service` already use. |
+| Technology | Version | Purpose | Why Recommended |
+|------------|---------|---------|-----------------|
+| `@axe-core/playwright` | **4.12.1** | Milestone-close a11y gate — axe scan of every `/admin/*` route + install wizard in the existing Playwright suite | Standard WCAG A/AA automation; `AxeBuilder.withTags(['wcag2a','wcag2aa','wcag21a','wcag21aa'])`. Needs `@playwright/test` (have 1.60.0). Caveat: the E2E suite is rotted (SEED-049) — reviving it is a prerequisite for this gate. |
+| `eslint-plugin-jsx-a11y` | **6.10.2** | Shift-left a11y linting during the WCAG AA pass | Cheapest, highest-leverage a11y win; plugs into the existing ESLint 9 flat config (`eslint 9.39.4`). Catches missing labels/roles before compile. |
 
-### Development Tools
+### Optional / gated (do not put in CORE)
 
-| Tool | Purpose | Notes |
-|------|---------|-------|
-| **pytest + AsyncMock** (already in dev deps) | Unit-test phase executors, validators, the transition engine, and the dispatcher per-phase refusal | Follow `feedback_mock_completeness` — mock ALL network deps; set MagicMock attrs explicitly. The transition engine and validators are PURE functions → trivially unit-testable without a live DB (the v2.7 PRD's HARNESS-GATE-01 / HARNESS-ENFORCE-01 are integration-test shaped, but the core logic should have pure-function unit coverage first). |
-| **Playwright E2E** (v2.6 075.4 backstop) | HARNESS-RUN-01 "kill uvicorn, restart, resume" durability test | The resumability claim is the load-bearing one; it needs a real cross-process test, not a mock. |
-| **`scripts/eval_cross_provider.py`** (SEED-034, folded into v2.8) | Regression gate that the per-phase tool whitelist + budget guard don't break any of the 6 native providers | The harness adds a tool-refusal path on the shared dispatch route — this is exactly the "shared-path edit that cascades cross-provider" risk the 075.x history warns about. The eval harness is the guardrail. |
+| Technology | Version | Purpose | When to Use |
+|------------|---------|---------|-------------|
+| `clamd` (+ `clamav/clamav` Docker container) | **1.0.2** | Malware scanning of user-uploaded templates/skill files | Gate behind a `MALWARE_SCAN_ENABLED` flag / Enterprise deployment preset. Uploaded files are NOT host-executed (they go to Storage + the Docker sandbox, or trusted-path docxtpl render), so AV is defense-in-depth for the "one user uploads, another downloads" case — real, but STRETCH, not a v3.3 CORE blocker. Self-hosting ClamAV is genuine work (no REST API, raw socket, signature-DB updates, a daemon to run). |
+| `unist-util-visit` | latest (tiny) | Clean remark/rehype plugin for inline-citation AST transforms | Optional — you can override react-markdown component renderers without it. Add only if you write a dedicated remark plugin. |
+
+### Reused as-is (no addition — already in the stack)
+
+| Existing capability | Serves v3.3 feature |
+|---|---|
+| `app_settings` DB row + 30s TTL cache + `invalidate_settings_cache()` (`user_settings.py`) | **Feature flags / kill-switch / maintenance mode** substrate (see §e) |
+| `model_capabilities_overrides` table + `_load_model_overrides()` hot read (mig 053) | **Dynamic model registry** write target (see §c) |
+| `scripts/curate_models.py` per-provider `/models` logic | **Live model discovery** service source (see §c) |
+| `admin.router` + `GET /admin/backpressure` + `test_backpressure.py` (v2.6) | **Admin shell** backend seam |
+| `dompurify 3.3.3` + `react-markdown 10.1.0` + `remark-gfm 4.0.1` | **Inline citation** rendering + XSS sanitization (see §f) |
+| `@radix-ui/react-alert-dialog` (present) | WCAG 2.4.3 focus-trap confirmation modals (typed "APPLY", "kill run") — accessible by default |
+| `vitest-axe 0.1.0` (present) | Component-level a11y assertions |
+| Redis single-flight lock pattern (`run_claim`, `setup:lock`) | Single-worker-safe audit pruner (see "do not add APScheduler") |
+| Supabase Auth + Postgres RLS | **Operator role tier** (see §b) — no RBAC library needed |
+
+---
+
+## The seven questions, answered
+
+### (a) Secrets management — recommend app-layer `cryptography`, NOT pgsodium
+
+**Verified status:** Supabase **does not recommend any new pgsodium usage**; the extension is entering a deprecation cycle ([Supabase pgsodium docs](https://supabase.com/docs/guides/database/extensions/pgsodium)). Supabase **Vault** remains the recommended DB-native option and its API is stable even as its internals migrate off pgsodium ([Vault docs](https://supabase.com/docs/guides/database/vault)); Vault is available self-hosted but requires a `VAULT_ENC_KEY` in the Docker env and exposes decryption through the `vault.decrypted_secrets` SQL view.
+
+**Recommendation: application-layer envelope encryption with `cryptography` (Fernet, or `AESGCM` for AAD).** Encrypt provider keys/secrets on write in `save_app_settings`, decrypt on read in `_build_providers`; master key from a new env var (e.g. `SECRETS_ENCRYPTION_KEY`), versioned ciphertext prefix for rotation. Rationale:
+1. **DB-portability is a first-class project value** — the app is a pure env-var switch between local Supabase, cloud Supabase, and (in principle) any Postgres. Vault's key management + decrypt-view differ per environment; app-layer crypto is identical everywhere.
+2. **It fits the existing read path.** Settings are read via asyncpg-direct SQL into a *sync* 30s TTL cache. Vault's `decrypted_secrets` view + wrapper-function-for-authz model fights that; app-layer decrypt is a function call on the cached value.
+3. **pgsodium deprecation signals Supabase is moving away from DB-layer crypto primitives** — building on Vault's pgsodium internals is a (small) forward risk; app-layer crypto has none.
+4. **`cryptography` is already installed** (46.0.7, transitively). Master-key-in-env matches CLAUDE.md's secrets rule.
+
+Keep a thin `SecretsBackend` interface (as the stale PRD proposed) so a Vault or HashiCorp-Vault adapter can land later for Enterprise, but ship **app-layer as the default**. **Supabase Vault is the legitimate alternative** — choose it if you want DB-native encryption, are willing to route reads through `vault.decrypted_secrets`, and accept Supabase coupling.
+
+Integration points: `backend/app/models/user_settings.py` (`save_app_settings` write, `_build_providers` read), `backend/app/dependencies.py` (secrets-backend singleton), a new secrets-column encryption helper. No new migration strictly required if you encrypt the existing `*_api_key` columns in place (store ciphertext as text).
+
+### (b) Operator role tier — dedicated `operator_users` table + RLS, NOT JWT claims (yet)
+
+**Verified:** Supabase's documented RBAC path is a **Custom Access Token Auth Hook** that injects a `user_role` claim into the JWT, read in RLS via `auth.jwt()` ([Custom Claims & RBAC](https://supabase.com/docs/guides/database/postgres/custom-claims-and-role-based-access-control-rbac), [Custom Access Token Hook](https://supabase.com/docs/guides/auth/auth-hooks/custom-access-token-hook)).
+
+**Recommendation: a dedicated `operator_users` table (system-level `super_admin`/`operator`), enforced by a FastAPI `get_current_operator` dependency for `/admin/*` routes + a `SECURITY DEFINER` `is_operator(uid)` helper for RLS.** Do **not** put the system role in `auth.users.user_metadata`/`app_metadata` or bake it into the JWT via the token hook **right now**. Rationale:
+- **v3.4 multi-tenancy owns the RLS rewrite and will need the JWT-claim + token-hook mechanism for per-org RBAC.** If v3.3 consumes that mechanism for *system* roles, the two layers collide. A separate table keeps system-level roles **orthogonal** to org-level RBAC — the exact "nothing in v3.3 may make the RLS rewrite harder" constraint from PROJECT.md.
+- System operator roles are **low-cardinality and global** — a table lookup (O(1), TTL-cacheable) is fine; JWT claims buy nothing here and add a token-refresh coupling.
+- Bootstrap via `BOOTSTRAP_SUPER_ADMIN_EMAIL` env var on first run (idempotent).
+
+**Critical security note:** admin endpoints will use the **service-role client, which bypasses RLS**. The operator-tier check MUST run in the FastAPI dependency *before* any service-role call; non-operators get **404 (non-discoverable)**, not 403. This is a no-new-library answer: Supabase Auth + Postgres RLS + one table + FastAPI deps. Also ship nullable `org_id` stub columns where cheap so v3.4's RLS shift is a policy change, not a column add.
+
+Do NOT add a policy-engine library (Casbin / oso / Permit.io) — it would duplicate and fight the Supabase RLS model the whole app is built on.
+
+### (c) Live `/models` discovery — lift the existing script; only 2 of 8 providers return capability metadata
+
+`scripts/curate_models.py` already solves the hard part (per-provider auth + response shapes). Lift it into a `model_discovery_service.py` on `httpx`; write results into the existing `model_capabilities_overrides` table (which the hot path already reads). Per-provider reality:
+
+| Provider | Endpoint | Auth | Metadata returned | Usable? |
+|---|---|---|---|---|
+| OpenAI | `/v1/models` | Bearer | `{id, created, owned_by}` — **IDs + created epoch only** | Yes (list only) |
+| Anthropic | `/v1/models` | `x-api-key` + `anthropic-version` | `{id, display_name, created_at}`, paginated (`has_more`/`last_id`) | Yes (list + display name) |
+| Google Gemini | `/v1beta/models` | `?key=` query | `{name, displayName, inputTokenLimit, outputTokenLimit, supportedGenerationMethods}` — **richest** | Yes (list + token limits) |
+| DeepSeek | `/models` | Bearer | OpenAI-compat `{id}` — IDs only | Yes (list only) |
+| Moonshot (Kimi) | `/v1/models` | Bearer | OpenAI-compat — IDs only | Yes (list only) |
+| Zhipu/GLM | `/api/paas/v4/models` | Bearer | OpenAI-compat — IDs only | Yes (list only) |
+| MiniMax | `/v1/models` | Bearer | shape varies; needs defensive probing | **Best-effort** (may not expose reliably) |
+| OpenRouter | `/api/v1/models` | public | `{id, name, context_length, pricing, architecture}` — **rich**, hundreds of models | Yes, but **best-effort/experimental** per project posture |
+
+**Key framing for the roadmap:** live discovery gives you the **model list**; only Google + OpenRouter return capability fields (token limits). `max_output_tokens`, `native_tools`, `context_window`, `default_temperature` for the other six must be **human-curated** into `model_capabilities_overrides` — which is exactly what that table + the new write UI are for. So: **discovery = list refresh + newest-first sort; overrides table = the curated capability layer.** MiniMax + OpenRouter must degrade gracefully (never block the other providers — the script already does `CURATE_SKIP <provider> <reason>` per-provider). Ollama (local) uses a different endpoint (`/api/tags`) if you want local-model discovery.
+
+### (d) File-upload validation — content-sniff (`filetype`) + XXE guard (`defusedxml`); AV is gated
+
+Current state (`backend/app/api/documents.py`): validates via **client-supplied `content_type` + extension override + 50 MB cap** — **no magic-byte check**. For the new template (SEED-110) and skill-file (FILE-01) surfaces with a threat model, add content-based validation:
+
+1. **`filetype.guess()` on the first ~2048 bytes** → cross-check the sniffed MIME against the declared `content_type` + allowlist → reject **415** on mismatch (the "declared vs sniffed" best practice; client `Content-Type` is spoofable). `filetype` is pure-Python (no libmagic) — already installed.
+2. **OOXML nuance:** `.docx/.xlsx/.pptx/.epub` sniff as `application/zip` — verify internal structure (the app already does extension normalization for these). For docxtpl templates, additionally validate well-formed OOXML.
+3. **`defusedxml`** for any XML parse of an uploaded OOXML (XXE safety) — already installed.
+4. **Zip-bomb guard:** cap decompressed size when opening OOXML/zip containers.
+5. **Jinja SSTI:** docxtpl renders via Jinja2 — keep the render on the **trusted/whitelist-gated path** the app already uses (per memory `reference_render_template_workflow_only`); never render attacker-controlled template *logic*.
+6. **Per-surface size caps** (templates are small; make the 50 MB constant configurable).
+7. **Malware (ClamAV/`clamd`)** — gate behind a flag / Enterprise preset (see optional table). Not a CORE blocker.
+
+### (e) Feature-flag / kill-switch — build on `app_settings`, do NOT add a library
+
+The app already has the substrate: the `app_settings` DB row, a 30s TTL cache with cross-worker `invalidate_settings_cache()`, and a proven single-boolean-gate pattern (`document_management_enabled()`, `sandbox_enabled`).
+
+**Recommendation: build on `app_settings`; do NOT add Unleash / Flagsmith / LaunchDarkly / GrowthBook.** Rationale:
+- Flags here are **low-cardinality, global** booleans (maintenance mode, runs-paused kill-switch, role-gated feature visibility) — not per-user %-rollouts or A/B experiments.
+- The 30s TTL cache already gives near-real-time cross-worker propagation.
+- A flag SaaS/service = a whole new service + DB + SDK for a handful of booleans — violates the app's "don't add infra when `app_settings` suffices" ethos.
+
+Shape: a `feature_flags jsonb` column (or a small `feature_flags` table if you want per-flag audit metadata) on the settings substrate; the admin shell writes flags + an `operator_audit_log` row. **Maintenance mode** = a global flag checked in FastAPI middleware returning 503 for non-operators. **Run kill-switch** = the existing `cancel_run` + a `runs_paused` flag gating new run creation. Revisit a library only if per-org gradual rollout is needed (v3.4+).
+
+### (f) Inline citation rendering — no new library
+
+The pieces already exist: citation cards (v2.2 F-01), `react-markdown 10` + `remark-gfm`, `dompurify 3.3.3` (XSS), and the v3.0 document detail panel to link into.
+
+**Recommendation: 0 required new deps.** Inline citations are a rendering + data-contract problem:
+- **Backend:** ensure the agent emits stable inline markers (e.g. `[^doc:uuid]` / `[n]`) tied to retrieved chunk IDs (the system prompt already guides structured citations — v2.1 Phase 23; retrieval already returns citation data).
+- **Frontend:** a custom `react-markdown` component override (or a small remark/rehype plugin) maps markers → an interactive `<CitationChip>` superscript that opens the existing citation card / document detail panel. Reuse the `ConfidenceChip` visual pattern from v3.0.
+- `dompurify` already sanitizes. Optionally add `unist-util-visit` only if writing a dedicated remark plugin.
+
+This is a **G-2 sketch-first** surface (live chat UI, "feels like").
+
+### (g) a11y tooling — add 2 dev tools; lean on Radix
+
+- **`@axe-core/playwright 4.12.1`** (dev) — the milestone-close automated gate (scan `/admin/*` + wizard). Rides on E2E-suite revival (SEED-049).
+- **`eslint-plugin-jsx-a11y 6.10.2`** (dev) — shift-left linting on the existing ESLint 9 config.
+- **Keep `vitest-axe 0.1.0`** (present) for component tests.
+- **Lean on Radix primitives** (already deps) — they ship accessible focus traps / ARIA / keyboard nav. Build the admin shell's dialogs/menus/confirmations on `@radix-ui/react-alert-dialog` etc. rather than hand-rolling; this satisfies WCAG 2.4.3 (focus trap + Esc) for the typed-confirmation modals for free.
+- **Reality check:** axe automates only ~50% of WCAG A/AA — the manual keyboard-only walkthrough (CLAUDE.md lived-experience UAT) is still required.
+
+---
 
 ## Installation
 
 ```bash
-# NOTHING TO INSTALL. All required libraries are already present:
-#   pydantic   2.12.5   (verified)
-#   jsonschema 4.26.0   (verified)
-#   asyncpg    >=0.29   (project pin)
-#   redis      >=5.2,<6 (project pin)
-#
-# The harness engine is new application code under:
-#   backend/app/services/harness/        (new package — engine, phase executors, validators)
-#   backend/app/models/harness.py        (new pydantic models)
-#   supabase/migrations/056..NNN_*.sql   (new tables + immutable trigger)
-#
-# If you want jsonschema pinned explicitly in requirements.txt (it is currently
-# only transitively present), add ONE line — this is a pin, not a new dep:
-echo "jsonschema>=4.26,<5" >> backend/requirements.txt
+# Backend — pin what's already resolved in the venv (no new install for these 4):
+#   cryptography, filetype, defusedxml, pyjwt
+# Add to backend/requirements.txt:
+#   cryptography>=44,<50      # already 46.0.7
+#   filetype>=1.2,<2          # already 1.2.0
+#   defusedxml>=0.7           # already 0.7.1
+#   pyjwt>=2.10,<3            # already 2.12.1
+# Optional / gated (only if malware scanning is enabled):
+#   clamd>=1.0.2              # + a clamav/clamav Docker service behind MALWARE_SCAN_ENABLED
+
+# Frontend — genuinely new (dev-only):
+npm install -D @axe-core/playwright@4.12.1 eslint-plugin-jsx-a11y@6.10.2
+# Optional, only if writing a remark citation plugin:
+# npm install unist-util-visit
 ```
-
----
-
-## The five sub-questions, answered concretely
-
-### (a) State machine: hand-rolled vs a light library — **HAND-ROLLED wins, decisively**
-
-**Recommendation: hand-rolled, Postgres-persisted, no library.**
-
-The harness is a **linear, ordered, locked** phase list (PRD Theme B: "the LLM cannot skip phases, reorder them, or terminate early"). The only transitions are: `pending → active → gate_validating → (completed | failed | skipped)`, plus `on_failure` routing (`fail_run` / `retry` / `skip_to_phase:<slug>`). This is **not** a rich statechart — it is a cursor (`workflow_runs.current_phase_id` / `workflow_phases.phase_index`) advancing through an array, with a validator gate at each boundary. The transition logic is ~50–100 lines of pure Python.
-
-**Why the two candidate libraries are a poor fit (despite being good libraries):**
-
-| Library | Latest version | Why it does NOT earn its keep here |
-|---------|----------------|------------------------------------|
-| **`python-statemachine`** (fgmacedo) | **3.1.2** (2026-05-19) | Models states/transitions **in the Python class definition** (declarative, in-memory). The harness's authoritative state lives in **Postgres** (`workflow_phases`) so it survives uvicorn restart and is cross-worker — the library's in-memory machine would have to be **reconstructed from DB rows on every resume**, which means you write the persistence/rehydration layer ANYWAY and the library becomes decorative. Its 2026 strengths (mermaid/dot/rst rendering, statecharts with parallel regions, history) solve problems the harness does not have. Adds a dependency to manage for negative value. |
-| **`transitions`** (pytransitions) | **0.9.x** (0.9.2/0.9.3) | Same core mismatch: it's an **in-memory, object-bound** FSM. It has a `MachinePersistence`/pickle story and a `markup` extension, but persisting a workflow run means serializing the machine, which is strictly worse than the explicit Postgres rows the PRD already designs (queryable, RLS-able, resumable by ANY worker, auditable via `harness_audit`). The "diagram backend" value is irrelevant to a backend runtime. |
-
-**The disqualifier both libraries share:** they keep the source of truth **in process memory**. The harness's hard requirement is **durable, cross-worker, resumable** state. The moment the source of truth must be Postgres rows (it must — HARNESS-RUN-01: "kill uvicorn, restart, resume; assert no state loss"), an in-memory FSM library is a second, redundant representation you have to keep in sync with the DB. That's strictly more code and a new drift-bug surface, for a state graph this codebase can express in a `match` statement.
-
-**The hand-rolled shape (grounded in the real substrate):**
-- A pydantic `WorkflowDefinition.phases: list[PhaseConfig]` is the immutable program.
-- `workflow_runs.current_phase_id` + `workflow_phases` rows are the durable program counter + per-phase state.
-- A `HarnessEngine.advance(run_id)` async function: read current phase → execute by type → run validators → on pass write next phase row + emit `workflow_transition` → on fail apply `on_failure`. Pure transition decision, isolated and unit-testable.
-- This mirrors a pattern the codebase ALREADY runs: `task_service.run_task_sub_agent` is effectively a bounded, hand-rolled step loop (`for step in range(max_steps)`) with explicit DB row lifecycle (`insert_run` → loop → `finalize_run`). The harness phase executor for `llm_agent` is a near-clone of this loop with the `available_tools` whitelist applied.
-
-Confidence: **HIGH** (grounded in PRD §5 + real `task_service.py` precedent + the durability requirement).
-
-### (b) Pydantic models for phase configs + validator specs — **pydantic 2.12.5, discriminated unions**
-
-Model `workflow_definitions.phases` jsonb as a typed tree. Recommended shape (refining PRD Theme B's phase-config sub-bullet):
-
-```python
-# backend/app/models/harness.py  (illustrative — exact text load-bearing for the union tag)
-from typing import Literal, Annotated, Union
-from pydantic import BaseModel, Field
-
-class ValidatorSpec(BaseModel):
-    kind: Literal["json_schema", "regex_match", "workspace_file_exists", "programmatic"]
-    config: dict  # shape depends on kind; validated by the validator registry at run time
-
-class BasePhase(BaseModel):
-    slug: str
-    available_tools: list[str] = []          # canonical whitelist the dispatcher reads
-    validators: list[ValidatorSpec] = []
-    gate_blocking: bool = True
-    on_failure: Literal["fail_run", "retry"] | str = "fail_run"  # or "skip_to_phase:<slug>"
-    max_steps: int = 5
-    max_duration_seconds: int | None = None
-
-class ProgrammaticPhase(BasePhase):  phase_type: Literal["programmatic"]; fn_name: str
-class LlmSinglePhase(BasePhase):     phase_type: Literal["llm_single"];  prompt_template: str; model_override: str | None = None
-class LlmAgentPhase(BasePhase):      phase_type: Literal["llm_agent"];   prompt_template: str; model_override: str | None = None
-class LlmBatchAgentsPhase(BasePhase):phase_type: Literal["llm_batch_agents"]; prompt_template: str; merge_strategy: Literal["concat","dedupe","vote"]="concat"; max_parallel_agents: int = 5
-class LlmHumanInputPhase(BasePhase): phase_type: Literal["llm_human_input"]; prompt: str; options: list[str] | None = None
-
-PhaseConfig = Annotated[
-    Union[ProgrammaticPhase, LlmSinglePhase, LlmAgentPhase, LlmBatchAgentsPhase, LlmHumanInputPhase],
-    Field(discriminator="phase_type"),
-]
-```
-
-**Why pydantic discriminated union:** one `model_validate` over the jsonb gives a fully typed phase with per-type required fields enforced (e.g. `merge_strategy` only on batch phases). The validator config stays a `dict` at the model layer and is validated **by the validator registry at execution time** against the kind — keeps the model decoupled from validator internals, exactly like `tool_dispatcher` keeps tool args as `dict` and lets each `_handle_*` validate. `programmatic`-phase function I/O can ALSO be pydantic models for the in-process registry contract.
-
-Integration cost: **low** — one new `models/harness.py`, parsed once when a `workflow_runs` row is instantiated from its `workflow_definition`.
-
-Confidence: **HIGH**.
-
-### (c) Durable / resumable phase state — **hand-rolled on the EXISTING asyncpg + runs/Redis substrate is correct**
-
-**Recommendation: persist phase state to Postgres (`workflow_phases`), stream via the existing `run:{run_id}` Redis Stream. Do NOT add a durable-execution library.**
-
-The question "does a lightweight durable-execution lib earn its keep?" — **No**, and the reason is structural: a durable-execution library (Temporal SDK, restate, DBOS, `durabletask`, etc.) earns its keep when you need **automatic checkpointing of arbitrary in-process control flow** (replaying a Python function deterministically after a crash). The harness does NOT need that. Its unit of durability is the **phase boundary**, which is **coarse, explicit, and already a DB row**. After each phase completes you UPSERT a `workflow_phases` row and advance `current_phase_id`; on restart you read those rows and continue from the next `pending` phase. That is durable execution at exactly the granularity the product needs, with zero magic.
-
-What the existing substrate already gives you, for free:
-- **Cross-worker durability**: `workflow_phases` in Postgres + the `runs` row pattern (`insert_run`/`finalize_run` in `db/runs.py`) means any of the N uvicorn workers can resume (D-PRD-08 multi-worker readiness, already lifted in v2.6).
-- **Survive uvicorn restart**: state is in Postgres, not memory — the HARNESS-RUN-01 requirement is satisfied by the persistence design itself.
-- **Streaming + replay**: `run:{run_id}` XADD + `GET /runs/{id}/stream?since=N` replay-and-tail already exists; harness phase events ride it unchanged (PRD §5: "ALL new SSE event types ride this SAME stream").
-- **Pause/resume for human input**: `ask_user_service.py` pub/sub (SUBSCRIBE-first ordering, cross-worker cancel/shutdown sentinels) is **reusable verbatim** for `llm_human_input` — the PRD already notes the `llm_human_input` phase emits `ask_user_prompt` and resumes on response. This is the single trickiest piece of any durable workflow engine (durable timers / external-event wait), and it is **already built and hardened** in this repo.
-
-A durable-execution server (Temporal/restate) would, in addition to being explicitly out of scope, **duplicate** the runs-table + Redis-stream substrate this codebase already operates, add a new always-on process to the deployment, and fight the "stateless chat completions, no provider-side thread state" discipline. The hand-rolled-on-Postgres approach is not a compromise here — it is the architecturally cleaner fit because the durability boundary is coarse and explicit.
-
-One refinement worth flagging to the planner (see Refinements): the PRD's §6 mitigation "phase row UPSERT first; SSE emit second; consumer tolerates brief lag" is the right ordering, and it means the **DB write is the commit point, the SSE event is a best-effort hint** — consistent with D-v2.5-03 (Realtime is a hint, reconcile via fetch). Resume logic must read Postgres, never trust the stream tail.
-
-Confidence: **HIGH** (every claim grounds to a real file: `task_service.py`, `ask_user_service.py`, `db/runs.py`, the `run:{run_id}` stream).
-
-### (d) Validation-gate building blocks — **jsonschema 4.26.0 + stdlib `re` + a Python validator registry**
-
-| Validator kind | Building block | Version | Integration |
-|----------------|----------------|---------|-------------|
-| `json_schema` | **`jsonschema`** | **4.26.0** (installed) | `Draft202012Validator(spec.config["schema"])`. Cache the compiled validator per (definition, phase) — definitions are immutable-on-publish so the compiled validator can be memoized for the life of the process. `list(validator.iter_errors(output))` yields structured errors → feed the messages back to the LLM on gate failure (self-correction), exactly as the dispatcher feeds `tool_not_available_in_phase` back. |
-| `regex_match` | **`re`** (stdlib) | stdlib | `re.compile(spec.config["pattern"])` once per spec; `.search(output_text)`. |
-| `workspace_file_exists` | **asyncpg SELECT** | n/a | `SELECT 1 FROM workspace_files WHERE thread_id=$1 AND path=$2`. Reuses the v2.7 `workspace_service` surface; no new code beyond one query. |
-| `programmatic` | **plain dict registry** | n/a | `VALIDATOR_REGISTRY: dict[str, Callable[[dict, ctx], ValidatorResult]]` — a **direct clone of `_TOOL_REGISTRY`** (`tool_dispatcher.py:1465`) and the planned `PROGRAMMATIC_PHASE_REGISTRY`. Custom Python validators register here at import. Same proven registry-dispatch pattern the whole tool layer uses. |
-
-**Why `jsonschema` (4.26.0) and not `fastjsonschema`:** `fastjsonschema` is ~100× faster (codegen) BUT (1) validators run **once per phase boundary** — a handful of times per workflow run, never in a tight loop — so the perf delta is irrelevant here; (2) `jsonschema` is ALREADY installed and used; adding `fastjsonschema` is a new dep for zero practical gain; (3) `jsonschema.iter_errors` gives rich, multi-error, path-annotated feedback that is genuinely better for LLM self-correction than fastjsonschema's first-error-raises model. Choose the clarity-and-already-present option.
-
-Validator return contract: define a tiny pydantic `ValidatorResult(passed: bool, errors: list[str])` so all four kinds return the same shape the gate logic and `workflow_phase_gate_check` SSE event consume uniformly.
-
-Integration cost: **low**. The whole validator layer is one module (`harness/validators.py`) + a registry dict.
-
-Confidence: **HIGH**.
-
-### (e) Immutable-on-publish enforcement — **Postgres `BEFORE UPDATE` trigger (raw SQL migration)**
-
-**Recommendation: a DB trigger, in the `127_workflow_definitions.sql`-equivalent migration (renumbered to the real 056+ head).**
-
-```sql
--- illustrative; exact predicate is load-bearing
-CREATE OR REPLACE FUNCTION block_published_workflow_update()
-RETURNS trigger AS $$
-BEGIN
-  IF OLD.published_at IS NOT NULL THEN
-    RAISE EXCEPTION 'workflow_definitions row is immutable after publish (slug=%, version=%); create a new semver',
-      OLD.slug, OLD.version;
-  END IF;
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER workflow_definitions_immutable_on_publish
-  BEFORE UPDATE ON workflow_definitions
-  FOR EACH ROW EXECUTE FUNCTION block_published_workflow_update();
-```
-
-**Why a trigger, not application code:** enforcement at the data layer is unbypassable — it survives application bugs, a second service, or a direct SQL edit in the Supabase studio. This is the same defense-in-depth instinct already in the repo: `017_skills.sql` ships a `skills_set_updated_at` trigger; `audit_log` and `message_feedback` are INSERT-only via RLS. The PRD references a "`skill_versions` immutable trigger" as the mirror; **NOTE for the planner: no `skill_versions` table/trigger actually exists in the migrations yet** (grep of `supabase/migrations/` finds the *concept* of immutability only in RLS/trigger patterns, not a literal `skill_versions` immutable trigger). So the harness should ship this trigger fresh, modeled on the **pattern** (D-PRD-13 semver + immutable-on-publish), not by copying a non-existent artifact. The UNIQUE `(slug, version)` constraint + this trigger together deliver "edit requires a new semver" (HARNESS-DEF-01).
-
-Apply per CLAUDE.md migration rule: paste into Supabase SQL editor (never `db push`/`db reset`), then `bash scripts/regenerate-full-schema.sh`.
-
-Confidence: **HIGH** (grounded in the actual trigger style in `017_skills.sql` + the migration-head reality at 055).
-
----
-
-## Refinements to the v2.7 PRD §3 Theme B design (where evidence suggests improvement)
-
-The PRD §3/§5 harness design is **fundamentally sound** and this research endorses it: jsonb phase configs, the 5 phase types, validator kinds, the dispatcher whitelist enforcement, Postgres phase persistence, run-backed SSE, and the immutable trigger are all the right calls. Two evidence-based refinements:
-
-1. **The per-phase whitelist enforcement belongs IN the dispatcher, gated by `ToolContext.available_tools` — not a new pre-check in `threads.py`.** The PRD §6 row 1 proposes adding a pre-check at `threads.py:1059`. But `tool_dispatcher.ToolContext` **already carries `available_tools: list[str]`** and `_handle_task` **already enforces a subset-refusal precedent** (lines 1090-1116: "tools not available to sub-agent ... must be subset"). The cleanest integration is: when a workflow is active, agent_runner populates `tool_ctx.available_tools` from `workflow_phases.available_tools` (instead of the full `get_tools()` list it currently builds at `threads.py:2656-2659`), and `dispatch_tool` gains a 3-line guard at the top: `if ctx.available_tools and tool_name not in ctx.available_tools: return ToolResult(result="tool_not_available_in_phase: ...")`. This puts enforcement on the ALREADY-SHARED dispatch route, reuses the existing field, and keeps `threads.py` from growing another special-case branch (G-5 hygiene — `threads.py` is already flagged for extraction). It also means sub-agent and harness whitelisting use ONE mechanism. **This is the single most important integration recommendation.**
-
-2. **Whitelist read must be cached per-run, refreshed on transition (PRD §6 already says this — make it a hard requirement, not a "mitigation").** The whitelist is consulted on EVERY tool call; a Postgres round-trip per tool call is unacceptable latency. Since the phase only changes at a backend-driven transition, cache `available_tools` in the in-memory `ToolContext` for the life of a phase and refresh it when the engine advances. The cache lifetime is the phase, the invalidation event is `workflow_transition`. (Same discipline as the settings 5s TTL cache pattern already in the repo.)
-
-3. **`llm_human_input` should reuse `ask_user_service` channel naming verbatim, but the harness — not the LLM — owns the pause.** In Deep Mode the LLM calls `ask_user()` as a tool. In a `llm_human_input` phase the **engine** emits the prompt and blocks on the same pub/sub channel (`ask_user:{run_id}:{...}`). The existing `subscribe_for_response` helper in `ask_user_service.py` is the reuse point (it's already factored out for "tests + cancel + shutdown paths"). No new pause primitive.
 
 ---
 
 ## Alternatives Considered
 
-| Recommended | Alternative | When the alternative would be right (it is NOT, here) |
-|-------------|-------------|------------------------------------------------------|
-| Hand-rolled Postgres state machine | **`python-statemachine` 3.1.2** | If state lived in-process and you needed rich statecharts (parallel regions, history states, diagram export) AND did not need cross-worker DB-resumable runs. The harness needs the opposite of all three. |
-| Hand-rolled Postgres state machine | **`transitions` 0.9.x** | If you wanted a quick in-memory FSM for a single-process tool with optional pickle persistence. Loses to explicit DB rows the moment durability + multi-worker + RLS + audit are requirements. |
-| asyncpg + runs/Redis durability | **Temporal / restate / DBOS / `durabletask`** | If you needed automatic replay of arbitrary in-process control flow across crashes at sub-step granularity, OR cross-service orchestration. The harness's durability boundary is the **phase** (coarse, explicit, already a row) — auto-replay machinery is overkill and duplicates the existing runs/stream substrate. Also explicitly out of scope (no new server/broker). |
-| `jsonschema` 4.26.0 | **`fastjsonschema`** | If you validated thousands of payloads/sec in a hot loop. Validators run a few times per workflow run — perf is a non-issue; `iter_errors` clarity + already-installed win. |
-| Postgres `BEFORE UPDATE` trigger | Application-layer immutability check | Never preferable for a hard invariant — app checks are bypassable by a second writer or direct SQL. |
-| Plain dict `VALIDATOR_REGISTRY` / `PROGRAMMATIC_PHASE_REGISTRY` | A plugin/entry-point registration framework | The v2.7 plugin contract (which WOULD generalize these registries) is **deferred to v2.9**. For v2.8, the plain dict mirroring `_TOOL_REGISTRY` is exactly right and forward-compatible. |
+| Recommended | Alternative | When to Use Alternative |
+|-------------|-------------|-------------------------|
+| App-layer `cryptography` (Fernet/AESGCM) for secrets | **Supabase Vault** (`vault.create_secret` + `decrypted_secrets` view) | You want DB-native encryption, are Supabase-hosted-only, and will route reads through the SQL view. Still needs `VAULT_ENC_KEY` self-hosted. |
+| App-layer `cryptography` | **pgcrypto** | You want in-DB encrypt/decrypt functions and accept keys passing through SQL. Weaker than app-layer key isolation. |
+| `operator_users` table + FastAPI dep | **Custom Access Token Hook + JWT `user_role` claim** | The *right* tool for v3.4 per-org RBAC — reserve it for then, not v3.3 system roles. |
+| `filetype` (pure-Python) | **python-magic** (libmagic) | You need libmagic's much larger signature set AND can install the C lib on host + Docker (Linux-only deployments). Overkill for the app's known format set. |
+| Build flags on `app_settings` | **Unleash / Flagsmith (self-host) / GrowthBook** | You need per-user/per-org %-rollouts, A/B experiments, or targeting rules — a v3.4+ multi-tenancy concern, not v3.3. |
+| In-process asyncio pruner + Redis lock | **APScheduler** | You need cron-expression scheduling with persistence — deferred to the v3.4 real scheduler; don't pull it in for one daily DELETE. |
+| Reuse `react-markdown` for citations | A dedicated citation/annotation lib | Never for this app — you'd fragment the single markdown-render path. |
 
 ---
 
 ## What NOT to Use
 
-| Avoid | Why (specific) | Use instead |
-|-------|----------------|-------------|
-| **LangGraph** | Hard project rule (CLAUDE.md: "No LangChain, no LangGraph — raw SDK calls only"). It would metastasize across the agent loop once introduced, and it owns the control flow the harness must own deterministically. | Hand-rolled engine over the existing agent loop / `task_service` loop pattern. |
-| **LangChain** | Same rule. The 6-provider routing is already handled at the service boundary; LangChain's abstractions would fight the proven per-provider adapters. | Existing `MODEL_CAPABILITIES` registry + native SDK calls. |
-| **Temporal server / SDK** | Adds an always-on orchestration server + worker process to the deployment; duplicates the `runs` table + `run:{run_id}` stream durability already operating; fights "no provider-side thread state". Out of scope by milestone constraint. | `workflow_phases` Postgres rows + asyncpg + the existing run-backed streaming. |
-| **Celery (+ broker)** | A task queue solves a problem the harness doesn't have (distributed background job dispatch). Workflow phases run **inside the existing `agent_runner` producer task** (PRD §5: "New background processes: none"). Adding Celery means a new broker, new worker pool, new failure modes. | The existing producer-task model + Redis as the (already-present) coordination layer. |
-| **A new message broker (RabbitMQ/Kafka/NATS)** | Redis Streams + pub/sub already cover event buffering, replay-and-tail, and cross-worker pause/resume. A second broker is pure operational tax. | Existing Redis (`run:{run_id}` streams, `ask_user:*` pub/sub, `tasks:global:active` Lua counter). |
-| **`fastjsonschema`** | New dep for ~0 practical benefit (validators are not hot); worse error ergonomics for LLM self-correction. | Already-installed `jsonschema` 4.26.0. |
-| **`python-statemachine` / `transitions`** | In-memory source of truth conflicts with the durable/cross-worker/resumable requirement; their headline features (diagrams, statecharts) are irrelevant to a backend runtime. | Hand-rolled cursor over `workflow_phases` rows. |
-| **A separate scheduler process / cron** | Time-based triggers are v3.4 Automations scope; v2.8 workflows are user/skill-initiated and run in-band. | Nothing — out of scope; don't pre-build it. |
-| **SQLAlchemy / an ORM / Alembic** | The codebase uses asyncpg directly + numbered SQL migrations applied via Supabase SQL editor (CLAUDE.md). Introducing an ORM/migration tool now is a foreign pattern and a migration-tooling fork. | Raw asyncpg + numbered `supabase/migrations/056+_*.sql`. |
+| Avoid | Why | Use Instead |
+|-------|-----|-------------|
+| **pgsodium** (directly) | Pending deprecation at Supabase; no new usage recommended | App-layer `cryptography` (default) or Supabase Vault (stable API) |
+| **HashiCorp Vault / Doppler / 1Password Connect / Infisical** | Real infra for a handful of secrets; over-scoped for v3.3 | App-layer `cryptography` now; keep a `SecretsBackend` interface so an Enterprise adapter lands later without churn |
+| **JWT `user_role` claim / token hook for system operator roles** | Collides with v3.4 org-RBAC, which owns the claim+hook mechanism | `operator_users` table + FastAPI dependency + RLS helper |
+| **Casbin / oso / Permit.io (policy engine)** | Duplicates + fights the Supabase RLS model the whole app is built on; complicates the v3.4 RLS rewrite | Postgres RLS + `is_operator()` + FastAPI deps |
+| **python-magic (libmagic)** | Needs a C system library on host + Docker image (Windows-dev-hostile) | `filetype` (pure-Python, already installed) |
+| **Feature-flag SaaS/services** (Unleash/Flagsmith/LaunchDarkly/GrowthBook) | New service + DB + SDK for global booleans the `app_settings` cache already handles | `app_settings` `feature_flags` column/table + 30s TTL cache |
+| **APScheduler** (as a new heavy dep for the audit pruner) | The app has no scheduler; v3.4 owns the real one — don't add a dep for one daily job | In-process asyncio task in lifespan + existing Redis single-flight lock |
+| **`requests`** in the discovery service path | The offline `curate_models.py` uses it, but the app standard is async `httpx` | `httpx` (already a dep) |
+| **ClamAV as a CORE/hard dependency** | Self-hosting is genuine ops work; uploaded files aren't host-executed | Gate `clamd` behind `MALWARE_SCAN_ENABLED` / Enterprise preset (STRETCH) |
+| **A new markdown/citation renderer** | Fragments the single sanitized render path | Custom `react-markdown` component override + existing `dompurify` |
+| **LangChain / LangGraph** (for any admin/agent tooling temptation) | Project red-line rule — raw SDKs only | Raw provider SDKs (already the pattern) |
+| **k8s/Helm deps (`pyhelm3`, etc.) in CORE** | Enterprise presets are the "biggest lift / natural STRETCH-defer" per PROJECT.md | Keep k8s tooling out of the CORE dependency set; ship compose first |
+| **`prometheus_client` (speculative)** | Only if the `/metrics` endpoint is actually scoped this milestone | Add only when the observability-endpoint requirement is confirmed CORE |
 
 ---
 
 ## Stack Patterns by Variant
 
-**If the phase is `programmatic`:**
-- Pure Python from `PROGRAMMATIC_PHASE_REGISTRY[fn_name]`, no LLM call, typed pydantic I/O.
-- Because: deterministic transforms (schema validation, format conversion) must not burn tokens or vary.
+**If the operator picks Supabase Vault over app-layer crypto:**
+- Route secret reads through a `SECURITY DEFINER` wrapper over `vault.decrypted_secrets` (never call `vault.create_secret`/decrypt directly from user-scoped paths).
+- Provision `VAULT_ENC_KEY` in the self-hosted Docker env, stored separately from DB backups.
+- Accept that the 30s TTL sync cache path needs a decrypt-at-read adapter.
 
-**If the phase is `llm_agent` / `llm_batch_agents`:**
-- Reuse the `task_service.run_task_sub_agent` loop shape (bounded `for step in range(max_steps)`, own `runs` row + stream), with `available_tools` set from the phase whitelist; `llm_batch_agents` fans out via the existing `task` tool + the `tasks:global:active` Lua fair-share counter (SEED-036a fold).
-- Because: the sub-agent loop is already the proven, concurrency-capped, cross-provider-safe execution primitive — the harness should clone it, not reinvent it.
+**If malware scanning is enabled (Enterprise preset):**
+- Run `clamav/clamav` as a compose service alongside Redis; point `clamd` at its socket/TCP.
+- Scan template/skill uploads *before* Storage write; fail closed on scanner-unreachable only if `MALWARE_SCAN_REQUIRED=true`, else warn-and-pass.
 
-**If the phase is `llm_human_input`:**
-- Engine emits `ask_user_prompt` + blocks on `ask_user_service.subscribe_for_response`; resumes the run on POST.
-- Because: pause/resume across workers/restarts is already hardened in `ask_user_service.py`.
-
-**If a gate fails and `on_failure == "retry"`:**
-- Re-run the same phase up to a retry cap; feed the validator `iter_errors` back into the phase prompt for `llm_*` phases (self-correction).
-- Because: structured validator feedback is the cheap path to a passing gate without human intervention.
+**If per-org/gradual feature rollout is ever needed (v3.4+):**
+- Revisit a self-hosted flag service (Flagsmith/Unleash) — but only once org-level targeting is a real requirement, not before.
 
 ---
 
 ## Version Compatibility
 
-| Package | Compatible with | Notes |
+| Package | Compatible With | Notes |
 |---------|-----------------|-------|
-| pydantic 2.12.5 | FastAPI 0.115.6, pydantic-settings 2.7.0 | Already the project baseline; discriminated unions are stable since pydantic 2.x. |
-| jsonschema 4.26.0 | Python 3.12 (project runtime) | Full Draft 2020-12; `Draft202012Validator` is the explicit validator class. Optional explicit pin `>=4.26,<5`. |
-| asyncpg >= 0.29 | Postgres 15+ (Supabase) | Hot-path pool already in production since v2.6 WORKER-LIFT-02. |
-| redis-py >= 5.2,<6 | Redis 7 (docker-compose.dev / Upstash) | Streams + pub/sub + Lua eval all in use today. |
-| Postgres triggers | Supabase Postgres | Apply via SQL editor per CLAUDE.md; regenerate `full-schema.sql` after. |
+| `cryptography` 46.0.7 (installed; latest 49.0.0) | Python 3.11+, existing supabase/httpx/pyjwt stack | Already resolved transitively — pinning is a formality; ships as wheels. |
+| `filetype` 1.2.0 | Any Python 3; no deps | Pure-Python; no libmagic. |
+| `defusedxml` 0.7.1 | Any Python 3; stdlib xml | Already installed. |
+| `pyjwt` 2.12.1 | Supabase JWT secret (HS256) | Prefer Supabase Admin API for session generation; PyJWT only if hand-signing. |
+| `@axe-core/playwright` 4.12.1 | `@playwright/test` 1.60.0 (present) | Uses `AxeBuilder`; needs E2E suite revival (SEED-049). |
+| `eslint-plugin-jsx-a11y` 6.10.2 | ESLint 9.39.4 flat config (present) | Add to the flat-config plugins array. |
+| `clamd` 1.0.2 | A running `clamd` daemon (Docker) | No daemon → import is inert; gate on env flag. |
 
 ---
 
 ## Sources
 
-- **Live codebase (HIGH — primary evidence):**
-  - `backend/app/services/tool_dispatcher.py` — `_TOOL_REGISTRY` dict + `dispatch_tool()` entry; `ToolContext.available_tools` field; `_handle_task` subset-refusal precedent (lines 88, 1090-1116, 1465-1500).
-  - `backend/app/services/task_service.py` — bounded sub-agent loop, own `runs` row + `run:{sub_run_id}` stream, per-run `asyncio.Semaphore` + Redis Lua global cap (lines 58-91, 196-436).
-  - `backend/app/services/ask_user_service.py` — pub/sub pause/resume, SUBSCRIBE-first ordering, cancel/shutdown sentinels (whole file).
-  - `backend/app/services/openai_service.py:768-784` — `get_tools()` registration site for the tool-count budget + per-phase whitelist wrap.
-  - `backend/app/api/threads.py:2632-2677` — agent_runner `ToolContext` construction + single `dispatch_tool()` call site (the integration point).
-  - `supabase/migrations/` — head at **055** (`055_todos_table.sql`); trigger style in `017_skills.sql` (`skills_set_updated_at`); INSERT-only RLS in `audit_log`/`message_feedback`. **No `skill_versions` immutable trigger exists** (PRD reference is to the pattern, not an artifact).
-  - venv verification: `pydantic 2.12.5`, `jsonschema 4.26.0` installed; `asyncpg>=0.29`, `redis>=5.2,<6`, `sse-starlette==2.4.1` in `requirements.txt`.
-- **`.planning/PRDs/v2.7.md` §3 Theme B + §5 + §6 + §10/§11 (HIGH — design source):** the harness table design, phase-config shape, "New SDK/library deps: none", LangGraph/YAML/Temporal rejections, §6 dispatcher-whitelist + caching mitigation. Endorsed with the 3 refinements above.
-- **`.planning/PROJECT.md` (HIGH):** v2.8 milestone scope (plugins deferred to v2.9), migration head 056+, G-5 threads.py extraction first, 6 native providers, multi-worker discipline.
-- **`CLAUDE.md` (HIGH — binding constraints):** no LangChain/LangGraph; Pydantic for structured output; RLS on all tables; `run_in_threadpool`/asyncpg for blocking I/O; migrations via SQL editor.
-- **Web (MEDIUM — version verification, 2026-05-30):**
-  - [python-statemachine · PyPI](https://pypi.org/project/python-statemachine/) — latest **3.1.2** (2026-05-19); in-class declarative FSM/statecharts.
-  - [transitions · PyPI](https://pypi.org/project/transitions/) / [pytransitions GitHub](https://github.com/pytransitions/transitions) — latest **0.9.x**; in-memory object-bound FSM.
-  - [jsonschema · PyPI](https://pypi.org/project/jsonschema/) — **4.26.0** (2026-01-07), full Draft 2020-12.
-  - [fastjsonschema docs](https://horejsek.github.io/python-fastjsonschema/) — ~100× faster via codegen; first-error-raises model (rejected: not hot-path, worse LLM feedback).
+- [Supabase — pgsodium (pending deprecation) docs](https://supabase.com/docs/guides/database/extensions/pgsodium) — HIGH: confirms pgsodium deprecation + "no new usage recommended," Vault as successor.
+- [Supabase — Vault docs](https://supabase.com/docs/guides/database/vault) — HIGH: Vault API stable through pgsodium migration; `decrypted_secrets` view.
+- [Supabase — Self-hosting with Docker](https://supabase.com/docs/guides/self-hosting/docker) + [self-hosted Vault guide](https://www.supascale.app/blog/secrets-management-for-selfhosted-supabase-a-complete-vault-) — MEDIUM: `VAULT_ENC_KEY` requirement, key-separation guidance.
+- [Supabase — Custom Claims & RBAC](https://supabase.com/docs/guides/database/postgres/custom-claims-and-role-based-access-control-rbac) + [Custom Access Token Hook](https://supabase.com/docs/guides/auth/auth-hooks/custom-access-token-hook) — HIGH: the JWT-claim RBAC path (reserved for v3.4).
+- [cryptography — Fernet docs](https://cryptography.io/en/latest/fernet/) — HIGH: app-layer symmetric encryption.
+- [Playwright — Accessibility testing](https://playwright.dev/docs/accessibility-testing) — HIGH: `@axe-core/playwright` + `withTags` for WCAG A/AA.
+- File-validation best practices (magic bytes vs Content-Type; `filetype` vs `python-magic`) — MEDIUM (multiple corroborating sources): [MIME/magic-bytes guide](https://zerotool.dev/blog/mime-type-lookup-guide/), [python-magic](https://codecut.ai/python-magic-file-type-detection/).
+- ClamAV self-hosting tradeoffs — MEDIUM: [ClamAV docs](https://docs.clamav.net/), [antivirus-API comparison](https://www.attachmentscanner.com/blog/best_antivirus_api_malware_scanning_comparison).
+- Live-code verification (HIGH): `backend/app/models/user_settings.py` (settings/secrets read path, `_load_model_overrides`), `supabase/migrations/053_settings_unification.sql` (`model_capabilities_overrides` table), `scripts/curate_models.py` (8-provider `/models` discovery), `backend/app/api/documents.py` (current upload validation), `backend/venv/Lib/site-packages` (cryptography 46.0.7 / filetype 1.2.0 / defusedxml 0.7.1 / pyjwt 2.12.1 already installed), `frontend/package.json` (vitest-axe present; dompurify/react-markdown present).
+- Package versions verified 2026-07-10 via npm registry + PyPI JSON API.
 
 ---
-*Stack research for: deterministic/durable/resumable LLM workflow state-machine runtime (v2.8 Harness Engine), no LangChain/LangGraph/Temporal/Celery*
-*Researched: 2026-05-30*
+*Stack research for: v3.3 Operator UX (admin shell, dynamic model/secrets management, workflow file inputs, plain-language/a11y UX)*
+*Researched: 2026-07-10*
