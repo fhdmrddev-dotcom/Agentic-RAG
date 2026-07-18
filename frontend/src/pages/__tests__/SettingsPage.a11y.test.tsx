@@ -94,6 +94,7 @@ function mkSettings(overrides: Partial<FullAppSettings> = {}): FullAppSettings {
     self_improve_enabled: true,
     workflows_enabled: true,
     maintenance_mode: false,
+    model_discovery_filter_enabled: true,
     context_window_max_tokens: 0,
     sub_agent_max_output_tokens: 8192,
     sub_agent_model: "",

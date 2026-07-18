@@ -2199,6 +2199,13 @@ export interface FullAppSettings {
   self_improve_enabled: boolean
   workflows_enabled: boolean
   maintenance_mode: boolean
+  // Phase 159 (MODEL-03 / D-159-04) — the persisted operator toggle that hides known
+  // non-chat "utility" model ids (embeddings / audio / image / …) from the model-
+  // discovery panel by default. Default true (migration 103). Rides the same
+  // `getSettings()` read + `setFlag("model_discovery_filter_enabled", …)` write path as
+  // the FLAG-01 booleans above; purely a display/curation concern (never gates the
+  // confirmable diff — 149 red line). ControlRoomPage passes it to ModelDiscoveryPanel.
+  model_discovery_filter_enabled: boolean
   context_window_max_tokens: number
   sub_agent_max_output_tokens: number
   sub_agent_model: string
@@ -4062,6 +4069,9 @@ export type FlagKey =
   | "self_improve_enabled"
   | "workflows_enabled"
   | "maintenance_mode"
+  // Phase 159 (MODEL-03 / D-159-04) — the discovery-panel utility filter toggle. Rides
+  // `PUT /admin/flags` verbatim (backend added the key to `_FLAG_HUMAN_NAMES`).
+  | "model_discovery_filter_enabled"
 
 /** Read the live active-runs list (`GET /admin/runs`, Plan 147-02). Plain authed
  *  GET — the router gate returns 404 to non-operators. The backend returns an
@@ -4181,6 +4191,24 @@ export interface ModelCapabilityPatch {
   llm_call_timeout_seconds?: number
 }
 
+/** The request body for `POST /admin/models` (Plan 02 — the D-159-02 add-by-ID write).
+ *  Adds ONE model as a DB-only `model_capabilities_overrides` row from the operator's
+ *  EXPLICIT `provider` pick (validated server-side against the native-7 + openrouter
+ *  roster). The capability fields are optional pre-fills (every column is null-safe on
+ *  the table). There is deliberately NO `enabled` field — the server FORCES
+ *  `enabled=false` (the 149 opt-in-enable rule / SC#3: an add never auto-enables; the
+ *  operator flips it on from the registry table afterward). Mirrors the backend
+ *  `AddModelRequest` pydantic shape exactly. */
+export interface AddModelBody {
+  model_id: string
+  provider: string
+  context_window_tokens?: number | null
+  max_output_tokens?: number | null
+  native_tools?: boolean | null
+  deprecated?: boolean
+  deprecated_reason?: string | null
+}
+
 // ── Plan-07 shape reconciliation (149-06 SUMMARY handoff) ─────────────────────
 // The Plan-04 `DiscoveryResult` stub (`{providers:[{new_models,…}]}`) was an
 // interface-first placeholder. The Plan-06 backend actually returns
@@ -4202,6 +4230,13 @@ export interface DiscoveredNewModel {
   provider: string
   model_id: string
   enabled: boolean
+  /** Phase 159 (MODEL-03 / D-159-01) — a DISPLAY-ONLY tag: `true` when the backend's
+   *  `is_utility_model` matched this id as non-chat "utility" noise (embeddings / audio /
+   *  image / moderation / rerank / …). The discovery panel (Plan 06) hides utility-flagged
+   *  entries by default behind the persisted `model_discovery_filter_enabled` toggle, but it
+   *  NEVER gates the confirmable diff (149 red line — propose, humans confirm). Optional for
+   *  backward-compat: an older backend response without the field → undefined → not hidden. */
+  utility?: boolean
   capabilities: Record<string, number | boolean | string>
 }
 
@@ -4264,6 +4299,23 @@ export async function setModelCapability(
     body: JSON.stringify(patch),
   })
   if (!res.ok) throw new ApiError(await errorDetail(res, "Failed to update the model."), res.status)
+}
+
+/** Add ONE model by explicit id + provider (`POST /admin/models`, Plan 02 — the
+ *  D-159-02 add-by-ID write). Writes a DB-only override row that lands `enabled=false`
+ *  (SC#3 — the server forces it; `AddModelBody` carries NO `enabled` field). A 409
+ *  ("already in the registry") or 422 (bad provider / wrong-typed capability) surfaces
+ *  as `ApiError` carrying the server `detail` so the add-by-ID form can show the
+ *  plain-language refusal (mirrors `setModelCapability`). The client adds NO authority —
+ *  the router 404-gates non-operators server-side. */
+export async function addModelById(body: AddModelBody): Promise<void> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/admin/models`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) throw new ApiError(await errorDetail(res, "Failed to add the model."), res.status)
 }
 
 /** Lock/unlock + pin the org default (`PUT /admin/models/{id}/lock`, Plan 06) — the
