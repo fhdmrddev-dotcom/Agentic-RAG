@@ -113,4 +113,220 @@ BEGIN
 END;
 $$;
 
--- =====  §B (batched backfill) and §C (NOT-NULL flips) are appended below by Plan 162-01 Tasks 2 and 3.  =====
+-- ================================================================================================
+-- §B — BATCHED org_id BACKFILL  (D-07 / D-09 / D-10)
+-- One reusable batching PROCEDURE with a per-batch COMMIT (the lock-storm mitigation, T-162-02 —
+-- the COMMIT is legal only in the autocommit / non-atomic apply context; see the header apply note),
+-- then one CALL per target with its EXPLICIT resolver, in THREE ordered waves. Children resolve from
+-- the parent's ALREADY-backfilled org_id, so wave order is load-bearing (Wave 3 after Wave 2 after
+-- Wave 1). Every UPDATE keeps WHERE org_id IS NULL (idempotent re-run) + a LIMIT $1 batch bound.
+-- Resolution is purely via user_id / created_by / parent org_id — the sharing flags are NEVER read or
+-- written (D-04 HANDS-OFF, T-162-04), so no flip can orphan a shared or system resource. The two
+-- Phase-163-deferred vector tables + the org-agnostic operator audit table are NOT targets.
+-- ================================================================================================
+CREATE OR REPLACE PROCEDURE public._mig105_backfill(p_sql text, p_batch int DEFAULT 10000)
+  LANGUAGE plpgsql
+  AS $$
+DECLARE
+  v_rows int;
+  v_iter int := 0;
+BEGIN
+  LOOP
+    EXECUTE p_sql USING p_batch;             -- p_sql is a migration-authored UPDATE … LIMIT $1 (never user input)
+    GET DIAGNOSTICS v_rows = ROW_COUNT;
+    v_iter := v_iter + 1;
+    RAISE NOTICE '_mig105_backfill batch % -> % rows', v_iter, v_rows;
+    COMMIT;                                  -- releases the lock window between batches
+    EXIT WHEN v_rows = 0;
+  END LOOP;
+END;
+$$;
+
+-- ── WAVE 1 — 31 direct-owner targets ─────────────────────────────────────────────────────────────
+-- 28 resolved via own user_id -> org_members.org_id (each user has exactly ONE membership at 162 time,
+-- so pm.org_id is unambiguous):
+CALL public._mig105_backfill($SQL$
+  UPDATE public.audit_log t SET org_id = pm.org_id FROM public.org_members pm
+  WHERE pm.user_id = t.user_id AND t.org_id IS NULL
+    AND t.id IN (SELECT id FROM public.audit_log WHERE org_id IS NULL LIMIT $1)
+$SQL$);
+CALL public._mig105_backfill($SQL$
+  UPDATE public.classification_rules t SET org_id = pm.org_id FROM public.org_members pm
+  WHERE pm.user_id = t.user_id AND t.org_id IS NULL
+    AND t.id IN (SELECT id FROM public.classification_rules WHERE org_id IS NULL LIMIT $1)
+$SQL$);
+CALL public._mig105_backfill($SQL$
+  UPDATE public.code_executions t SET org_id = pm.org_id FROM public.org_members pm
+  WHERE pm.user_id = t.user_id AND t.org_id IS NULL
+    AND t.id IN (SELECT id FROM public.code_executions WHERE org_id IS NULL LIMIT $1)
+$SQL$);
+CALL public._mig105_backfill($SQL$
+  UPDATE public.document_images t SET org_id = pm.org_id FROM public.org_members pm
+  WHERE pm.user_id = t.user_id AND t.org_id IS NULL
+    AND t.id IN (SELECT id FROM public.document_images WHERE org_id IS NULL LIMIT $1)
+$SQL$);
+CALL public._mig105_backfill($SQL$
+  UPDATE public.document_relationships t SET org_id = pm.org_id FROM public.org_members pm
+  WHERE pm.user_id = t.user_id AND t.org_id IS NULL
+    AND t.id IN (SELECT id FROM public.document_relationships WHERE org_id IS NULL LIMIT $1)
+$SQL$);
+CALL public._mig105_backfill($SQL$
+  UPDATE public.document_tables t SET org_id = pm.org_id FROM public.org_members pm
+  WHERE pm.user_id = t.user_id AND t.org_id IS NULL
+    AND t.id IN (SELECT id FROM public.document_tables WHERE org_id IS NULL LIMIT $1)
+$SQL$);
+CALL public._mig105_backfill($SQL$
+  UPDATE public.document_views t SET org_id = pm.org_id FROM public.org_members pm
+  WHERE pm.user_id = t.user_id AND t.org_id IS NULL
+    AND t.id IN (SELECT id FROM public.document_views WHERE org_id IS NULL LIMIT $1)
+$SQL$);
+CALL public._mig105_backfill($SQL$
+  UPDATE public.documents t SET org_id = pm.org_id FROM public.org_members pm
+  WHERE pm.user_id = t.user_id AND t.org_id IS NULL
+    AND t.id IN (SELECT id FROM public.documents WHERE org_id IS NULL LIMIT $1)
+$SQL$);
+CALL public._mig105_backfill($SQL$
+  UPDATE public.eval_ratings t SET org_id = pm.org_id FROM public.org_members pm
+  WHERE pm.user_id = t.user_id AND t.org_id IS NULL
+    AND t.id IN (SELECT id FROM public.eval_ratings WHERE org_id IS NULL LIMIT $1)
+$SQL$);
+CALL public._mig105_backfill($SQL$
+  UPDATE public.eval_results t SET org_id = pm.org_id FROM public.org_members pm
+  WHERE pm.user_id = t.user_id AND t.org_id IS NULL
+    AND t.id IN (SELECT id FROM public.eval_results WHERE org_id IS NULL LIMIT $1)
+$SQL$);
+CALL public._mig105_backfill($SQL$
+  UPDATE public.eval_runs t SET org_id = pm.org_id FROM public.org_members pm
+  WHERE pm.user_id = t.user_id AND t.org_id IS NULL
+    AND t.id IN (SELECT id FROM public.eval_runs WHERE org_id IS NULL LIMIT $1)
+$SQL$);
+CALL public._mig105_backfill($SQL$
+  UPDATE public.folders t SET org_id = pm.org_id FROM public.org_members pm
+  WHERE pm.user_id = t.user_id AND t.org_id IS NULL
+    AND t.id IN (SELECT id FROM public.folders WHERE org_id IS NULL LIMIT $1)
+$SQL$);
+CALL public._mig105_backfill($SQL$
+  UPDATE public.harness_audit t SET org_id = pm.org_id FROM public.org_members pm
+  WHERE pm.user_id = t.user_id AND t.org_id IS NULL
+    AND t.id IN (SELECT id FROM public.harness_audit WHERE org_id IS NULL LIMIT $1)
+$SQL$);
+CALL public._mig105_backfill($SQL$
+  UPDATE public.message_feedback t SET org_id = pm.org_id FROM public.org_members pm
+  WHERE pm.user_id = t.user_id AND t.org_id IS NULL
+    AND t.id IN (SELECT id FROM public.message_feedback WHERE org_id IS NULL LIMIT $1)
+$SQL$);
+CALL public._mig105_backfill($SQL$
+  UPDATE public.messages t SET org_id = pm.org_id FROM public.org_members pm
+  WHERE pm.user_id = t.user_id AND t.org_id IS NULL
+    AND t.id IN (SELECT id FROM public.messages WHERE org_id IS NULL LIMIT $1)
+$SQL$);
+CALL public._mig105_backfill($SQL$
+  UPDATE public.pdf_extraction_runs t SET org_id = pm.org_id FROM public.org_members pm
+  WHERE pm.user_id = t.user_id AND t.org_id IS NULL
+    AND t.id IN (SELECT id FROM public.pdf_extraction_runs WHERE org_id IS NULL LIMIT $1)
+$SQL$);
+CALL public._mig105_backfill($SQL$
+  UPDATE public.runs t SET org_id = pm.org_id FROM public.org_members pm
+  WHERE pm.user_id = t.user_id AND t.org_id IS NULL
+    AND t.id IN (SELECT id FROM public.runs WHERE org_id IS NULL LIMIT $1)
+$SQL$);
+CALL public._mig105_backfill($SQL$
+  UPDATE public.sandbox_files t SET org_id = pm.org_id FROM public.org_members pm
+  WHERE pm.user_id = t.user_id AND t.org_id IS NULL
+    AND t.id IN (SELECT id FROM public.sandbox_files WHERE org_id IS NULL LIMIT $1)
+$SQL$);
+CALL public._mig105_backfill($SQL$
+  UPDATE public.skill_files t SET org_id = pm.org_id FROM public.org_members pm
+  WHERE pm.user_id = t.user_id AND t.org_id IS NULL
+    AND t.id IN (SELECT id FROM public.skill_files WHERE org_id IS NULL LIMIT $1)
+$SQL$);
+CALL public._mig105_backfill($SQL$
+  UPDATE public.skill_proposals t SET org_id = pm.org_id FROM public.org_members pm
+  WHERE pm.user_id = t.user_id AND t.org_id IS NULL
+    AND t.id IN (SELECT id FROM public.skill_proposals WHERE org_id IS NULL LIMIT $1)
+$SQL$);
+CALL public._mig105_backfill($SQL$
+  UPDATE public.skill_publish_overrides t SET org_id = pm.org_id FROM public.org_members pm
+  WHERE pm.user_id = t.user_id AND t.org_id IS NULL
+    AND t.id IN (SELECT id FROM public.skill_publish_overrides WHERE org_id IS NULL LIMIT $1)
+$SQL$);
+CALL public._mig105_backfill($SQL$
+  UPDATE public.skill_test_cases t SET org_id = pm.org_id FROM public.org_members pm
+  WHERE pm.user_id = t.user_id AND t.org_id IS NULL
+    AND t.id IN (SELECT id FROM public.skill_test_cases WHERE org_id IS NULL LIMIT $1)
+$SQL$);
+CALL public._mig105_backfill($SQL$
+  UPDATE public.skill_versions t SET org_id = pm.org_id FROM public.org_members pm
+  WHERE pm.user_id = t.user_id AND t.org_id IS NULL
+    AND t.id IN (SELECT id FROM public.skill_versions WHERE org_id IS NULL LIMIT $1)
+$SQL$);
+CALL public._mig105_backfill($SQL$
+  UPDATE public.skills t SET org_id = pm.org_id FROM public.org_members pm
+  WHERE pm.user_id = t.user_id AND t.org_id IS NULL
+    AND t.id IN (SELECT id FROM public.skills WHERE org_id IS NULL LIMIT $1)
+$SQL$);
+CALL public._mig105_backfill($SQL$
+  UPDATE public.threads t SET org_id = pm.org_id FROM public.org_members pm
+  WHERE pm.user_id = t.user_id AND t.org_id IS NULL
+    AND t.id IN (SELECT id FROM public.threads WHERE org_id IS NULL LIMIT $1)
+$SQL$);
+CALL public._mig105_backfill($SQL$
+  UPDATE public.tuner_runs t SET org_id = pm.org_id FROM public.org_members pm
+  WHERE pm.user_id = t.user_id AND t.org_id IS NULL
+    AND t.id IN (SELECT id FROM public.tuner_runs WHERE org_id IS NULL LIMIT $1)
+$SQL$);
+CALL public._mig105_backfill($SQL$
+  UPDATE public.user_memory t SET org_id = pm.org_id FROM public.org_members pm
+  WHERE pm.user_id = t.user_id AND t.org_id IS NULL
+    AND t.id IN (SELECT id FROM public.user_memory WHERE org_id IS NULL LIMIT $1)
+$SQL$);
+CALL public._mig105_backfill($SQL$
+  UPDATE public.user_settings t SET org_id = pm.org_id FROM public.org_members pm
+  WHERE pm.user_id = t.user_id AND t.org_id IS NULL
+    AND t.id IN (SELECT id FROM public.user_settings WHERE org_id IS NULL LIMIT $1)
+$SQL$);
+-- 2 resolved via created_by -> org_members.org_id (these two carry created_by, not user_id):
+CALL public._mig105_backfill($SQL$
+  UPDATE public.workflow_definitions t SET org_id = pm.org_id FROM public.org_members pm
+  WHERE pm.user_id = t.created_by AND t.org_id IS NULL
+    AND t.id IN (SELECT id FROM public.workflow_definitions WHERE org_id IS NULL LIMIT $1)
+$SQL$);
+CALL public._mig105_backfill($SQL$
+  UPDATE public.workspace_files t SET org_id = pm.org_id FROM public.org_members pm
+  WHERE pm.user_id = t.created_by AND t.org_id IS NULL
+    AND t.id IN (SELECT id FROM public.workspace_files WHERE org_id IS NULL LIMIT $1)
+$SQL$);
+-- 1 nullable-owner resolved via user_id (0 NULL-owner rows live; the §C self-guard catches any straggler):
+CALL public._mig105_backfill($SQL$
+  UPDATE public.metadata_field_definitions t SET org_id = pm.org_id FROM public.org_members pm
+  WHERE pm.user_id = t.user_id AND t.org_id IS NULL
+    AND t.id IN (SELECT id FROM public.metadata_field_definitions WHERE org_id IS NULL LIMIT $1)
+$SQL$);
+
+-- ── WAVE 2 — 3 owner-less / nullable-owner children resolved via parent's ALREADY-backfilled org_id ──
+-- (Wave-1 parents threads + workspace_files are committed above; child.org_id = parent.org_id is the
+--  RLS-join invariant 163 relies on.)
+CALL public._mig105_backfill($SQL$
+  UPDATE public.workflow_runs c SET org_id = p.org_id FROM public.threads p
+  WHERE p.id = c.thread_id AND c.org_id IS NULL AND p.org_id IS NOT NULL
+    AND c.id IN (SELECT id FROM public.workflow_runs WHERE org_id IS NULL LIMIT $1)
+$SQL$);
+CALL public._mig105_backfill($SQL$
+  UPDATE public.todos c SET org_id = p.org_id FROM public.threads p
+  WHERE p.id = c.thread_id AND c.org_id IS NULL AND p.org_id IS NOT NULL
+    AND c.id IN (SELECT id FROM public.todos WHERE org_id IS NULL LIMIT $1)
+$SQL$);
+CALL public._mig105_backfill($SQL$
+  UPDATE public.workspace_file_versions c SET org_id = p.org_id FROM public.workspace_files p
+  WHERE p.id = c.workspace_file_id AND c.org_id IS NULL AND p.org_id IS NOT NULL
+    AND c.id IN (SELECT id FROM public.workspace_file_versions WHERE org_id IS NULL LIMIT $1)
+$SQL$);
+
+-- ── WAVE 3 — workflow_phases resolves via workflow_runs.org_id (MUST run AFTER the Wave-2 workflow_runs CALL) ──
+CALL public._mig105_backfill($SQL$
+  UPDATE public.workflow_phases wp SET org_id = p.org_id FROM public.workflow_runs p
+  WHERE p.id = wp.workflow_run_id AND wp.org_id IS NULL AND p.org_id IS NOT NULL
+    AND wp.id IN (SELECT id FROM public.workflow_phases WHERE org_id IS NULL LIMIT $1)
+$SQL$);
+
+-- =====  §C (NOT-NULL flips + DROP) is appended below by Plan 162-01 Task 3.  =====
