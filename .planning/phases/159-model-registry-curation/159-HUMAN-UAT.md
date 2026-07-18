@@ -32,12 +32,16 @@ result: [pending]
 expected: No duplicate/confusing state between the add-by-ID and discovery entry points; the 409 "already in the registry" detail is visible to the operator in-form
 result: [pending]
 
+### 6. Discovery add-one-not-all: opt-in select + search (BUG-260718-01 fix)
+expected: After a scan, NO new models are pre-selected ("0 selected"); the search box finds a specific model by id; "Select all" (respects the filter + search) and "Clear" work; Confirm adds ONLY the model(s) you ticked (not all ~400)
+result: [pending]
+
 ## Summary
 
-total: 5
+total: 6
 passed: 0
 issues: 0
-pending: 5
+pending: 6
 skipped: 0
 blocked: 0
 
