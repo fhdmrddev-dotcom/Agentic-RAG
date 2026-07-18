@@ -1,178 +1,156 @@
-# Stack Research — v3.3 Operator UX
+# Stack Research — v3.4 Multi-Tenancy & Org Access
 
-**Domain:** Self-hosted B2B agentic-RAG platform (React/Vite + FastAPI + Supabase + Redis) — adding an operator/admin tier, dynamic model+secrets management, workflow file inputs, and a plain-language/a11y UX layer to a shipped app.
-**Researched:** 2026-07-10
-**Confidence:** HIGH (existing-stack facts verified against live code + migrations; external facts verified against official Supabase/PyPI/npm sources; versions checked 2026-07)
+**Domain:** Org-level multi-tenancy + SSO retrofit onto an existing single-tenant per-user RAG platform (React/Vite + FastAPI + Supabase + Redis)
+**Researched:** 2026-07-18
+**Confidence:** HIGH (versions + Supabase SAML tier + self-hosted GoTrue + asyncpg RLS pattern verified against official docs; MEDIUM on the per-org-OIDC gap and the exact `set_config` `is_local` flag — both flagged for live verification)
+
+> Scope: ONLY the NEW stack for v3.4 multi-tenancy + SSO. The existing stack (React/Vite, FastAPI, Supabase Postgres+pgvector+Storage+Auth, Redis Streams, raw LLM SDKs, `WORKER_COUNT=2` uvicorn, app-layer Fernet secrets) is unchanged and NOT re-researched. **The headline: the biggest change is a *pattern* (per-request user-JWT DB context), not a pile of new libraries.** The stale v3.4 brief's marquee dependency (`python3-saml`) is explicitly dropped.
 
 ---
 
-## Headline finding: v3.3 is a near-zero-new-runtime-dependency milestone
+## Headline finding: v3.4 SSO adds ~zero hard runtime deps
 
-The biggest surprise from reading the live codebase is how much of the v3.3 substrate **already exists** and how little genuinely new library surface is required. Concretely:
-
-| The stale PRD assumed… | Reality in the live code | Impact on v3.3 stack |
+| The stale brief (`PRDs/v3.3-multi-tenancy.md` §5) assumed… | Reality verified 2026-07-18 | Impact |
 |---|---|---|
-| "API keys persisted to disk as plain text in `settings_override.json`" | `settings_override.json` was **deleted in Phase 081.1 / migration 053**. Settings (incl. provider API keys) now live as columns in the `app_settings` DB row, read via asyncpg with a 30s TTL cache (`backend/app/models/user_settings.py`). | The secrets task is **at-rest column encryption**, not "move off disk." Smaller, cleaner scope. |
-| Encrypt secrets "via `pgsodium`" | pgsodium is **pending deprecation** at Supabase (verified below). | pgsodium is now a **do-not-add**. Use app-layer `cryptography` (already installed) or Supabase Vault. |
-| Build a `model_capabilities_overrides` editor from scratch | The **table + hot-path read already ship** (migration 053; `_load_model_overrides()` with 30s TTL cache). | Only the **discovery service + write UI** are missing. |
-| Discovery is greenfield | `scripts/curate_models.py` **already implements live `/models` discovery for all 8 providers** with per-provider auth + response-shape parsing. | Lift the offline script into a backend service on `httpx` (already a dep). No new lib. |
-| Needs `pgsodium`/PyJWT/magic libs added | `cryptography 46.0.7`, `filetype 1.2.0`, `defusedxml 0.7.1`, `pyjwt 2.12.1` are **already installed transitively** in `backend/venv`. | Secrets encryption, content-sniffing file validation, and impersonation JWTs need **0 new runtime installs** — just pin them in `requirements.txt`. |
-| Admin surface is greenfield | An `admin.router` + `GET /admin/backpressure` JSON + `test_backpressure.py` already exist (v2.6 WORKER-LIFT-04). | The `/admin` frontend + operator RBAC gate sit on an existing backend seam. |
+| Add `python3-saml>=1.16` as our SAML SP | **Supabase Auth IS the SAML SP** — native SAML 2.0 (Cloud Pro+ / self-hosted GoTrue), incl. attribute→claim mapping | **Drop `python3-saml` entirely** — avoids the `xmlsec1` system dep + its CVE surface on every Docker/Coolify build |
+| Add `authlib>=1.3` for OIDC | Per-org OIDC is **not** a native Supabase feature; needed **only if** per-org OIDC ships in v1 | Add **Authlib 1.7.2** *scope-gated*; else defer |
+| Per-request user-JWT client is a new mechanism | The **asyncpg pool already exists** (`get_pg_pool`); RLS context = `SET LOCAL request.jwt.claims` + `SET LOCAL ROLE authenticated` | **No new pool, no new dep** — one per-request transaction wrapper |
+| JWT decode needs a new lib | **PyJWT is already transitive** via `gotrue` (`pyjwt>=2.10.1`); Supabase asymmetric **ES256 + JWKS** is GA | Local token verify + claims extraction = **0 new installs** (pin PyJWT explicit) |
+| Email provider TBD | `resend` 2.34.0 (async via our httpx) / SES / `none` | One optional dep behind an env switch |
 
-**Net:** the only truly-new packages worth adding are two dev-only frontend a11y tools and one optional/gated backend malware scanner. Everything else is "declare what's already resolved + write code."
+**Net new hard deps: 0–2** (`resend` optional; `authlib` only if OIDC in v1). Everything else is pattern + config.
+
+---
+
+## Answers to the 6 questions (executive)
+
+1. **Supabase SAML SSO:** native, **SAML 2.0 only** for per-org enterprise SSO, gated to **Pro ($25/mo) and above** on Cloud (50 SSO MAUs included on Pro & Team, then $0.015/MAU; Team $599 bundles SOC2/SAML/HIPAA). **Self-hosted GoTrue does SAML SSO with no tier gate** (`GOTRUE_SAML_ENABLED=true` + a signing key) — this carries isolation-via-deployment enterprise. **Per-org OIDC is NOT native** — the one place Authlib may be needed. JIT: Supabase auto-creates `auth.users` on SSO login; **our backend owns the `org_members` insert.**
+2. **Python SAML/OIDC libs:** **Drop `python3-saml`** (Supabase is the SP). Add **Authlib 1.7.2** *only if* per-org OIDC lands in v1. Minimal SSO set = **zero new hard deps**.
+3. **Per-request user-JWT DB client:** reuse the existing **asyncpg** pool with `SET LOCAL request.jwt.claims` + `SET LOCAL ROLE authenticated` in a per-request transaction — native-async (no `run_in_threadpool`), RLS-enforced, one seam in `dependencies.py`. supabase-py per-request client is the fallback (sync → threadpool + extra PostgREST hop).
+4. **Org switcher:** **hybrid** — bake the *membership set* into the JWT via a custom-access-token hook (cheap RLS, no per-request join) + carry the *active org* as a server-validated **`X-Org-Id` header** (instant switch, no token refresh).
+5. **Invitation email:** env-driven adapter — **`resend` 2.34.0** default on cloud, **`none`/log-only** default for local dev, **AWS SES (`boto3`)** only for enterprise-on-AWS. Don't add boto3 unless SES is chosen.
+6. **SCIM:** correctly **DEFERRED** — SAML + OIDC JIT covers enterprise onboarding for v1; Supabase provides no SCIM server, so it's a full app-layer build not worth it until a customer requires automated offboarding.
 
 ---
 
 ## Recommended Stack
 
-### Core additions (backend — mostly declare-what's-already-installed)
+### Core Technologies (additions / pattern changes)
 
 | Technology | Version | Purpose | Why Recommended |
 |------------|---------|---------|-----------------|
-| `cryptography` (Fernet / `AESGCM`) | already installed **46.0.7** (latest 49.0.0) | App-layer envelope encryption of provider API keys + secrets in `app_settings` | DB-portable (works identically on local Supabase, cloud Supabase, any Postgres — matches the project's local↔cloud env-var switch); sidesteps pgsodium's deprecation; integrates cleanly with the existing asyncpg-direct-read + sync TTL cache (Supabase Vault's decrypt-via-SQL-view fights that path). Master key from env matches CLAUDE.md "env only for secrets/infra." |
-| `filetype` | already installed **1.2.0** | Magic-byte content sniffing for the new template/skill upload surfaces | **Pure-Python, zero system deps** — critical vs `python-magic`, which needs the `libmagic` C library on the host + Docker image (awkward on the Windows dev box). Covers all the app's binary formats (PDF/DOCX/PPTX/XLSX/EPUB→zip). |
-| `defusedxml` | already installed **0.7.1** | XXE-safe parsing of uploaded OOXML/XML (template threat model) | Drop-in hardening for any XML read of an uploaded `.docx`/`.xlsx`. The real template threat is XXE + zip-bomb + Jinja SSTI, not classic AV. |
-| `pyjwt` | already installed **2.12.1** | Mint/introspect short-lived impersonation JWTs ("Sign in as user") | Already present. Prefer the Supabase Auth Admin API (service-role) for session generation where possible; use PyJWT only if hand-signing against the Supabase JWT secret is unavoidable. |
-| `httpx` | already a dep **>=0.28** | Live `/models` discovery HTTP client (lift `curate_models.py`) | Already the app's async HTTP client. **Do not** re-introduce `requests` (the offline script's dep) into the service path. |
+| **Supabase Auth native SAML 2.0** | Platform feature (Cloud **Pro+** / self-hosted GoTrue) | Enterprise SSO service-provider — Supabase *is* the SAML SP | We do NOT hand-roll a SAML SP. Multi-tenant per-org connections are configured via the **Supabase CLI** (`supabase sso add/update/list`); each gets a unique `sso_provider_id` exposed in the JWT (`auth.jwt()#>>'{amr,0,provider}'`). Attribute→claim mapping is built-in (`--attribute-mapping-file`), landing mapped attrs in the access token + `auth.identities.identity_data`. Eliminates the `python3-saml`/`xmlsec1` dependency the stale brief assumed. |
+| **asyncpg** (per-request user-JWT RLS context) | **already present** `>=0.29` | Run hot-path queries under the user's identity so membership-RLS enforces | The seam that replaces the service-role bypass. Pool already exists (`backend/app/dependencies.py::get_pg_pool`, min 2/max 10, JSONB codec, `command_timeout=30`). Add a `SET LOCAL request.jwt.claims` + `SET LOCAL ROLE authenticated` per-request transaction wrapper — native async, no `run_in_threadpool`, no new dependency, no new pool. |
+| **PyJWT** | **2.13.0** (already transitive via `gotrue` `pyjwt>=2.10.1`) | Verify the Supabase JWT locally + extract claims to build `request.jwt.claims` | Supabase **asymmetric JWT signing keys (ES256 + JWKS)** are GA (`/auth/v1/.well-known/jwks.json`). Verify locally (fetch JWKS on startup via `PyJWKClient`, cache, `kid` lookup) → drops the per-request `supabase.auth.get_user()` GoTrue round-trip in `get_current_user`, AND yields the claims dict we must feed to `set_config`. Already installed transitively — **promote to an explicit pin**, don't add a new package. |
+| **Authlib** *(scope-gated)* | **1.7.2** (Python ≥3.10; pulls `cryptography`, already a dep) | Per-org **OIDC** client — the one thing Supabase per-org SSO does NOT cover | Pure-Python OAuth2/OIDC client (`authlib.integrations.httpx_client`), no system deps, reuses our existing `httpx`. Add **only if** per-org OIDC connections are v1 scope. If v1 is SAML-only (recommended), **defer Authlib** to the OIDC slice. |
+| **resend** *(cloud default)* | **2.34.0** (Python ≥3.7) | Transactional invitation email | Modern DX, `resend.Emails.send()` + `send_async()` (async via our `httpx`), single `RESEND_API_KEY`. Behind an env-driven provider switch so local dev needs no key. |
 
-### Core additions (frontend — dev-only)
+### Supporting Libraries / Platform Features
 
-| Technology | Version | Purpose | Why Recommended |
-|------------|---------|---------|-----------------|
-| `@axe-core/playwright` | **4.12.1** | Milestone-close a11y gate — axe scan of every `/admin/*` route + install wizard in the existing Playwright suite | Standard WCAG A/AA automation; `AxeBuilder.withTags(['wcag2a','wcag2aa','wcag21a','wcag21aa'])`. Needs `@playwright/test` (have 1.60.0). Caveat: the E2E suite is rotted (SEED-049) — reviving it is a prerequisite for this gate. |
-| `eslint-plugin-jsx-a11y` | **6.10.2** | Shift-left a11y linting during the WCAG AA pass | Cheapest, highest-leverage a11y win; plugs into the existing ESLint 9 flat config (`eslint 9.39.4`). Catches missing labels/roles before compile. |
+| Library / Feature | Version | Purpose | When to Use |
+|---------|---------|---------|-------------|
+| **Supabase custom-access-token hook** | Platform feature (Cloud + self-hosted; GA) | Inject the user's **org membership set** into JWT `app_metadata` so RLS reads `auth.jwt()` with no per-request join | Postgres function; self-hosted enables via `GOTRUE_HOOK_CUSTOM_ACCESS_TOKEN_ENABLED=true` + `GOTRUE_HOOK_CUSTOM_ACCESS_TOKEN_URI="pg-functions://postgres/public/custom_access_token_hook"`. Bake the *set* of orgs, NOT the active org (active org is session state → header). |
+| **boto3 (AWS SES)** | 1.43.51 | Invitation email for enterprise-on-AWS / high volume | ONLY when `INVITATION_EMAIL_PROVIDER=ses`. Sync API → wrap in `run_in_threadpool` (D-v2.5-01). Do not add to `requirements.txt` unless SES is actually selected. |
+| **Supabase self-hosted SAML** | GoTrue env config | SAML SSO for dedicated/on-prem enterprise (isolation-via-deployment) | `GOTRUE_SAML_ENABLED=true` + `GOTRUE_SAML_PRIVATE_KEY` (Base64 PKCS#1 DER RSA, 2048-bit min); per-IdP config via the Auth admin API (no restart). Same client `signInWithSSO()` as Cloud — one app codepath serves both postures. |
 
-### Optional / gated (do not put in CORE)
+### Development Tools / System Dependencies
 
-| Technology | Version | Purpose | When to Use |
-|------------|---------|---------|-------------|
-| `clamd` (+ `clamav/clamav` Docker container) | **1.0.2** | Malware scanning of user-uploaded templates/skill files | Gate behind a `MALWARE_SCAN_ENABLED` flag / Enterprise deployment preset. Uploaded files are NOT host-executed (they go to Storage + the Docker sandbox, or trusted-path docxtpl render), so AV is defense-in-depth for the "one user uploads, another downloads" case — real, but STRETCH, not a v3.3 CORE blocker. Self-hosting ClamAV is genuine work (no REST API, raw socket, signature-DB updates, a daemon to run). |
-| `unist-util-visit` | latest (tiny) | Clean remark/rehype plugin for inline-citation AST transforms | Optional — you can override react-markdown component renderers without it. Add only if you write a dedicated remark plugin. |
-
-### Reused as-is (no addition — already in the stack)
-
-| Existing capability | Serves v3.3 feature |
-|---|---|
-| `app_settings` DB row + 30s TTL cache + `invalidate_settings_cache()` (`user_settings.py`) | **Feature flags / kill-switch / maintenance mode** substrate (see §e) |
-| `model_capabilities_overrides` table + `_load_model_overrides()` hot read (mig 053) | **Dynamic model registry** write target (see §c) |
-| `scripts/curate_models.py` per-provider `/models` logic | **Live model discovery** service source (see §c) |
-| `admin.router` + `GET /admin/backpressure` + `test_backpressure.py` (v2.6) | **Admin shell** backend seam |
-| `dompurify 3.3.3` + `react-markdown 10.1.0` + `remark-gfm 4.0.1` | **Inline citation** rendering + XSS sanitization (see §f) |
-| `@radix-ui/react-alert-dialog` (present) | WCAG 2.4.3 focus-trap confirmation modals (typed "APPLY", "kill run") — accessible by default |
-| `vitest-axe 0.1.0` (present) | Component-level a11y assertions |
-| Redis single-flight lock pattern (`run_claim`, `setup:lock`) | Single-worker-safe audit pruner (see "do not add APScheduler") |
-| Supabase Auth + Postgres RLS | **Operator role tier** (see §b) — no RBAC library needed |
-
----
-
-## The seven questions, answered
-
-### (a) Secrets management — recommend app-layer `cryptography`, NOT pgsodium
-
-**Verified status:** Supabase **does not recommend any new pgsodium usage**; the extension is entering a deprecation cycle ([Supabase pgsodium docs](https://supabase.com/docs/guides/database/extensions/pgsodium)). Supabase **Vault** remains the recommended DB-native option and its API is stable even as its internals migrate off pgsodium ([Vault docs](https://supabase.com/docs/guides/database/vault)); Vault is available self-hosted but requires a `VAULT_ENC_KEY` in the Docker env and exposes decryption through the `vault.decrypted_secrets` SQL view.
-
-**Recommendation: application-layer envelope encryption with `cryptography` (Fernet, or `AESGCM` for AAD).** Encrypt provider keys/secrets on write in `save_app_settings`, decrypt on read in `_build_providers`; master key from a new env var (e.g. `SECRETS_ENCRYPTION_KEY`), versioned ciphertext prefix for rotation. Rationale:
-1. **DB-portability is a first-class project value** — the app is a pure env-var switch between local Supabase, cloud Supabase, and (in principle) any Postgres. Vault's key management + decrypt-view differ per environment; app-layer crypto is identical everywhere.
-2. **It fits the existing read path.** Settings are read via asyncpg-direct SQL into a *sync* 30s TTL cache. Vault's `decrypted_secrets` view + wrapper-function-for-authz model fights that; app-layer decrypt is a function call on the cached value.
-3. **pgsodium deprecation signals Supabase is moving away from DB-layer crypto primitives** — building on Vault's pgsodium internals is a (small) forward risk; app-layer crypto has none.
-4. **`cryptography` is already installed** (46.0.7, transitively). Master-key-in-env matches CLAUDE.md's secrets rule.
-
-Keep a thin `SecretsBackend` interface (as the stale PRD proposed) so a Vault or HashiCorp-Vault adapter can land later for Enterprise, but ship **app-layer as the default**. **Supabase Vault is the legitimate alternative** — choose it if you want DB-native encryption, are willing to route reads through `vault.decrypted_secrets`, and accept Supabase coupling.
-
-Integration points: `backend/app/models/user_settings.py` (`save_app_settings` write, `_build_providers` read), `backend/app/dependencies.py` (secrets-backend singleton), a new secrets-column encryption helper. No new migration strictly required if you encrypt the existing `*_api_key` columns in place (store ciphertext as text).
-
-### (b) Operator role tier — dedicated `operator_users` table + RLS, NOT JWT claims (yet)
-
-**Verified:** Supabase's documented RBAC path is a **Custom Access Token Auth Hook** that injects a `user_role` claim into the JWT, read in RLS via `auth.jwt()` ([Custom Claims & RBAC](https://supabase.com/docs/guides/database/postgres/custom-claims-and-role-based-access-control-rbac), [Custom Access Token Hook](https://supabase.com/docs/guides/auth/auth-hooks/custom-access-token-hook)).
-
-**Recommendation: a dedicated `operator_users` table (system-level `super_admin`/`operator`), enforced by a FastAPI `get_current_operator` dependency for `/admin/*` routes + a `SECURITY DEFINER` `is_operator(uid)` helper for RLS.** Do **not** put the system role in `auth.users.user_metadata`/`app_metadata` or bake it into the JWT via the token hook **right now**. Rationale:
-- **v3.4 multi-tenancy owns the RLS rewrite and will need the JWT-claim + token-hook mechanism for per-org RBAC.** If v3.3 consumes that mechanism for *system* roles, the two layers collide. A separate table keeps system-level roles **orthogonal** to org-level RBAC — the exact "nothing in v3.3 may make the RLS rewrite harder" constraint from PROJECT.md.
-- System operator roles are **low-cardinality and global** — a table lookup (O(1), TTL-cacheable) is fine; JWT claims buy nothing here and add a token-refresh coupling.
-- Bootstrap via `BOOTSTRAP_SUPER_ADMIN_EMAIL` env var on first run (idempotent).
-
-**Critical security note:** admin endpoints will use the **service-role client, which bypasses RLS**. The operator-tier check MUST run in the FastAPI dependency *before* any service-role call; non-operators get **404 (non-discoverable)**, not 403. This is a no-new-library answer: Supabase Auth + Postgres RLS + one table + FastAPI deps. Also ship nullable `org_id` stub columns where cheap so v3.4's RLS shift is a policy change, not a column add.
-
-Do NOT add a policy-engine library (Casbin / oso / Permit.io) — it would duplicate and fight the Supabase RLS model the whole app is built on.
-
-### (c) Live `/models` discovery — lift the existing script; only 2 of 8 providers return capability metadata
-
-`scripts/curate_models.py` already solves the hard part (per-provider auth + response shapes). Lift it into a `model_discovery_service.py` on `httpx`; write results into the existing `model_capabilities_overrides` table (which the hot path already reads). Per-provider reality:
-
-| Provider | Endpoint | Auth | Metadata returned | Usable? |
-|---|---|---|---|---|
-| OpenAI | `/v1/models` | Bearer | `{id, created, owned_by}` — **IDs + created epoch only** | Yes (list only) |
-| Anthropic | `/v1/models` | `x-api-key` + `anthropic-version` | `{id, display_name, created_at}`, paginated (`has_more`/`last_id`) | Yes (list + display name) |
-| Google Gemini | `/v1beta/models` | `?key=` query | `{name, displayName, inputTokenLimit, outputTokenLimit, supportedGenerationMethods}` — **richest** | Yes (list + token limits) |
-| DeepSeek | `/models` | Bearer | OpenAI-compat `{id}` — IDs only | Yes (list only) |
-| Moonshot (Kimi) | `/v1/models` | Bearer | OpenAI-compat — IDs only | Yes (list only) |
-| Zhipu/GLM | `/api/paas/v4/models` | Bearer | OpenAI-compat — IDs only | Yes (list only) |
-| MiniMax | `/v1/models` | Bearer | shape varies; needs defensive probing | **Best-effort** (may not expose reliably) |
-| OpenRouter | `/api/v1/models` | public | `{id, name, context_length, pricing, architecture}` — **rich**, hundreds of models | Yes, but **best-effort/experimental** per project posture |
-
-**Key framing for the roadmap:** live discovery gives you the **model list**; only Google + OpenRouter return capability fields (token limits). `max_output_tokens`, `native_tools`, `context_window`, `default_temperature` for the other six must be **human-curated** into `model_capabilities_overrides` — which is exactly what that table + the new write UI are for. So: **discovery = list refresh + newest-first sort; overrides table = the curated capability layer.** MiniMax + OpenRouter must degrade gracefully (never block the other providers — the script already does `CURATE_SKIP <provider> <reason>` per-provider). Ollama (local) uses a different endpoint (`/api/tags`) if you want local-model discovery.
-
-### (d) File-upload validation — content-sniff (`filetype`) + XXE guard (`defusedxml`); AV is gated
-
-Current state (`backend/app/api/documents.py`): validates via **client-supplied `content_type` + extension override + 50 MB cap** — **no magic-byte check**. For the new template (SEED-110) and skill-file (FILE-01) surfaces with a threat model, add content-based validation:
-
-1. **`filetype.guess()` on the first ~2048 bytes** → cross-check the sniffed MIME against the declared `content_type` + allowlist → reject **415** on mismatch (the "declared vs sniffed" best practice; client `Content-Type` is spoofable). `filetype` is pure-Python (no libmagic) — already installed.
-2. **OOXML nuance:** `.docx/.xlsx/.pptx/.epub` sniff as `application/zip` — verify internal structure (the app already does extension normalization for these). For docxtpl templates, additionally validate well-formed OOXML.
-3. **`defusedxml`** for any XML parse of an uploaded OOXML (XXE safety) — already installed.
-4. **Zip-bomb guard:** cap decompressed size when opening OOXML/zip containers.
-5. **Jinja SSTI:** docxtpl renders via Jinja2 — keep the render on the **trusted/whitelist-gated path** the app already uses (per memory `reference_render_template_workflow_only`); never render attacker-controlled template *logic*.
-6. **Per-surface size caps** (templates are small; make the 50 MB constant configurable).
-7. **Malware (ClamAV/`clamd`)** — gate behind a flag / Enterprise preset (see optional table). Not a CORE blocker.
-
-### (e) Feature-flag / kill-switch — build on `app_settings`, do NOT add a library
-
-The app already has the substrate: the `app_settings` DB row, a 30s TTL cache with cross-worker `invalidate_settings_cache()`, and a proven single-boolean-gate pattern (`document_management_enabled()`, `sandbox_enabled`).
-
-**Recommendation: build on `app_settings`; do NOT add Unleash / Flagsmith / LaunchDarkly / GrowthBook.** Rationale:
-- Flags here are **low-cardinality, global** booleans (maintenance mode, runs-paused kill-switch, role-gated feature visibility) — not per-user %-rollouts or A/B experiments.
-- The 30s TTL cache already gives near-real-time cross-worker propagation.
-- A flag SaaS/service = a whole new service + DB + SDK for a handful of booleans — violates the app's "don't add infra when `app_settings` suffices" ethos.
-
-Shape: a `feature_flags jsonb` column (or a small `feature_flags` table if you want per-flag audit metadata) on the settings substrate; the admin shell writes flags + an `operator_audit_log` row. **Maintenance mode** = a global flag checked in FastAPI middleware returning 503 for non-operators. **Run kill-switch** = the existing `cancel_run` + a `runs_paused` flag gating new run creation. Revisit a library only if per-org gradual rollout is needed (v3.4+).
-
-### (f) Inline citation rendering — no new library
-
-The pieces already exist: citation cards (v2.2 F-01), `react-markdown 10` + `remark-gfm`, `dompurify 3.3.3` (XSS), and the v3.0 document detail panel to link into.
-
-**Recommendation: 0 required new deps.** Inline citations are a rendering + data-contract problem:
-- **Backend:** ensure the agent emits stable inline markers (e.g. `[^doc:uuid]` / `[n]`) tied to retrieved chunk IDs (the system prompt already guides structured citations — v2.1 Phase 23; retrieval already returns citation data).
-- **Frontend:** a custom `react-markdown` component override (or a small remark/rehype plugin) maps markers → an interactive `<CitationChip>` superscript that opens the existing citation card / document detail panel. Reuse the `ConfidenceChip` visual pattern from v3.0.
-- `dompurify` already sanitizes. Optionally add `unist-util-visit` only if writing a dedicated remark plugin.
-
-This is a **G-2 sketch-first** surface (live chat UI, "feels like").
-
-### (g) a11y tooling — add 2 dev tools; lean on Radix
-
-- **`@axe-core/playwright 4.12.1`** (dev) — the milestone-close automated gate (scan `/admin/*` + wizard). Rides on E2E-suite revival (SEED-049).
-- **`eslint-plugin-jsx-a11y 6.10.2`** (dev) — shift-left linting on the existing ESLint 9 config.
-- **Keep `vitest-axe 0.1.0`** (present) for component tests.
-- **Lean on Radix primitives** (already deps) — they ship accessible focus traps / ARIA / keyboard nav. Build the admin shell's dialogs/menus/confirmations on `@radix-ui/react-alert-dialog` etc. rather than hand-rolling; this satisfies WCAG 2.4.3 (focus trap + Esc) for the typed-confirmation modals for free.
-- **Reality check:** axe automates only ~50% of WCAG A/AA — the manual keyboard-only walkthrough (CLAUDE.md lived-experience UAT) is still required.
+| Tool | Purpose | Notes |
+|------|---------|-------|
+| **Supabase CLI** | Provision per-org SAML connections + attribute mapping | `supabase sso add --project-ref … --type saml --metadata-url … --domains … --attribute-mapping-file map.json`. The dashboard exposes only ONE SAML field; **multi-tenant requires the CLI** — bake into the org-admin SSO provisioning flow or an operator runbook. |
+| **`xmlsec1` / `libxmlsec1-dev`** | ❌ **AVOIDED** | Would be required by `python3-saml`. Using Supabase native SAML skips this system dep + its build-toolchain + CVE-tracking burden on every Coolify/Docker build. Explicit non-goal. |
 
 ---
 
 ## Installation
 
 ```bash
-# Backend — pin what's already resolved in the venv (no new install for these 4):
-#   cryptography, filetype, defusedxml, pyjwt
-# Add to backend/requirements.txt:
-#   cryptography>=44,<50      # already 46.0.7
-#   filetype>=1.2,<2          # already 1.2.0
-#   defusedxml>=0.7           # already 0.7.1
-#   pyjwt>=2.10,<3            # already 2.12.1
-# Optional / gated (only if malware scanning is enabled):
-#   clamd>=1.0.2              # + a clamav/clamav Docker service behind MALWARE_SCAN_ENABLED
+# --- Backend (add to requirements.txt) ---
+# Promote the already-transitive JWT lib to an explicit pin (local JWKS verification):
+pyjwt>=2.10.1              # already pulled by gotrue; pin explicit for local ES256 verify
 
-# Frontend — genuinely new (dev-only):
-npm install -D @axe-core/playwright@4.12.1 eslint-plugin-jsx-a11y@6.10.2
-# Optional, only if writing a remark citation plugin:
-# npm install unist-util-visit
+# Invitation email (default cloud provider) — optional, provider-switched:
+resend>=2.34.0
+
+# Per-org OIDC — ADD ONLY IF OIDC is in v1 scope (else defer to the OIDC slice):
+# authlib>=1.7.2
+
+# AWS SES — ADD ONLY IF INVITATION_EMAIL_PROVIDER=ses is chosen:
+# boto3>=1.43.0
+
+# --- NO new SAML dependency ---  (Supabase Auth is the SAML SP; python3-saml NOT added)
+# --- NO new frontend dependency --- (supabase-js already ships signInWithSSO;
+#     org-switcher = existing shadcn/ui <Select>; org-admin shell = existing v3.3 shell pattern)
 ```
+
+**New env vars to declare** (in `backend/.env.example` + the Phase-157 deploy artifacts — same-commit rule, `scripts/check-deploy-drift.sh`):
+
+```bash
+# SSO (SAML handled by Supabase; these support our JIT + local JWT verify)
+SUPABASE_JWKS_URL=          # default: <SUPABASE_URL>/auth/v1/.well-known/jwks.json
+SUPABASE_JWT_ISSUER=        # <SUPABASE_URL>/auth/v1 — for local ES256 verification
+OIDC_DISCOVERY_TIMEOUT_SECONDS=10   # only if per-org OIDC ships (per-org IdP config lives in sso_configs, not env)
+
+# Invitation email
+INVITATION_EMAIL_PROVIDER=none      # none | resend | ses   (none = log link to backend log)
+INVITATION_EMAIL_FROM=              # From: address
+RESEND_API_KEY=                     # only when provider=resend
+INVITATION_TOKEN_TTL_HOURS=168      # 7 days
+# AWS_* creds only when provider=ses (prefer an instance role over static keys)
+```
+
+> Deployment-artifact parity: every var above must also land in `deploy/onebox.env.example`, `docs/OPERATOR.md` Step-3, and `docker-compose.prod.yml` in the SAME commit, or `scripts/check-deploy-drift.sh` fails CI (Phase 158 / D-16).
+
+---
+
+## The load-bearing change: per-request user-JWT DB context (Q3, detailed)
+
+Today `get_supabase()` returns a **service-role singleton** (`dependencies.py:21-25`) — RLS is effectively bypassed and the real boundary is per-callsite `.eq("user_id", …)` filters. Membership-RLS is decorative unless queries run under the user's identity. Two ways:
+
+### Recommended: asyncpg `SET LOCAL` (native-async, RLS-enforced)
+
+The pool already exists (`get_pg_pool`). Add ONE per-request helper beside it:
+
+```python
+# Pattern (verify exact set_config flags with a live two-user leak test — see traps)
+async with (await get_pg_pool()).acquire() as conn:
+    async with conn.transaction():                       # REQUIRED — scopes the SETs
+        await conn.execute(
+            "SELECT set_config('request.jwt.claims', $1, true)",  # is_local=true → resets at COMMIT
+            claims_json,                                  # {"sub": uid, "role": "authenticated", "active_org_id": …}
+        )
+        await conn.execute("SET LOCAL ROLE authenticated")  # ⚠️ MANDATORY — see trap #1
+        rows = await conn.fetch("SELECT … FROM documents WHERE …")  # RLS now enforces
+    # transaction ends → SET LOCAL auto-resets → connection safe to return to pool
+```
+
+Why this over supabase-py: **native async** (no `run_in_threadpool`, honors D-v2.5-01 for free), **no extra PostgREST/HTTP hop** (direct SQL), and it reuses the JSONB-codec pool. `claims_json` is built from the **locally-verified** JWT (PyJWT + JWKS) so there's no GoTrue round-trip.
+
+**Two traps to verify — this is where multi-tenancy leaks are born:**
+
+1. **`SET LOCAL ROLE authenticated` is mandatory.** The pool connects via `POSTGRES_DSN`, almost certainly as `postgres`/service-role — which **owns the tables / has BYPASSRLS, so RLS does NOT apply no matter what claims you set.** Switching to the non-privileged `authenticated` role is the actual thing that turns RLS on. This is the real meaning of "RLS bypassed" in the community threads — it's the *role*, not the claims.
+2. **Reset discipline on a pooled connection.** `is_local=true` inside an explicit transaction auto-resets at COMMIT (exactly how PostgREST does it). A *missing* claim fails **closed** (`auth.uid()` → NULL → zero rows), not open — but a *stale* claim from a prior borrower on a session-level (`is_local=false`) SET would **leak across users**. Keep everything transaction-scoped; never use `is_local=false` without an explicit `RESET`/`DISCARD ALL` before release.
+
+> Confidence note: the transaction-wrapped `is_local=true` + `SET LOCAL ROLE` shape matches PostgREST's reference behavior and the Supabase "direct connection" discussion. One source paraphrased "`set_config` third arg must be `false`" — I judge that lossy (it conflates the role-bypass issue with the flag). **The phase MUST ship a live two-user RLS test** (user A cannot read user B's rows; A→B connection reuse doesn't leak) as the acceptance gate — do not take the flag on faith.
+
+### Fallback: supabase-py per-request client
+
+`create_client(url, ANON_KEY, options=ClientOptions(headers={"Authorization": f"Bearer {jwt}"}))` per request, or `client.postgrest.auth(jwt)`. Downsides for hot paths: supabase-py is **synchronous** → every call needs `run_in_threadpool`; routes through PostgREST (extra network hop); per-request client construction adds overhead. **Keep supabase-py's service-role singleton ONLY for explicit cross-tenant ops** (JIT `org_members` insert during SSO callback, operator/audit writes) behind a hardened wrapper that demands an explicit `org_id`.
+
+### Connection-pool math under `WORKER_COUNT=2`
+Pool is min 2 / max 10 **per worker** → effective ceiling ~20 connections (the existing `dependencies.py` comment already sizes for this). The `SET LOCAL` pattern acquires → transaction → set → query → release; it adds **one transaction per request** but **no new connections and no new pool**. Watch: long-lived SSE streaming requests must NOT hold a pooled connection for the whole stream lifetime — acquire per DB operation, not per request, on `runs.py`/`threads.py send_message`. Re-run CONCUR-01 (`test_058_concurrency.py`) on the rewrite branch.
+
+---
+
+## Org switcher / active-org context (Q4)
+
+| Option | Mechanism | Pros | Cons |
+|--------|-----------|------|------|
+| **A. JWT custom claim** | Custom-access-token hook writes active org into JWT | RLS reads `auth.jwt()` directly, zero per-request join | JWT is minted at login/refresh → **switching active org needs a token refresh** (laggy UX); hook runs on every issuance |
+| **B. `X-Org-Id` header** | Client sends header; backend validates vs `org_members` | **Instant switch, no refresh**; active org is honest per-request state | One membership check per request (cheap w/ `org_members(user_id, org_id)` index); MUST be validated server-side + injected into `request.jwt.claims` |
+| **✅ Hybrid (recommended)** | Hook bakes the **membership SET** (`app_metadata.org_ids`) into the JWT for cheap RLS; **`X-Org-Id` header** carries the **active org**, validated against that set, then injected as `active_org_id` into the per-request `set_config` claims | Cheap RLS (`org_id = ANY(app_metadata.org_ids)`) **and** instant switch | Slightly more moving parts; the header→claims injection is the same seam as the RLS pattern above, so near-zero extra cost |
+
+The hybrid maps onto the stale brief's "active org in localStorage + JWT custom claim + `X-Org-Id` validated against `org_members`" — it just sharpens *which* half goes where: **membership → JWT (durable), active org → header (session).**
 
 ---
 
@@ -180,13 +158,12 @@ npm install -D @axe-core/playwright@4.12.1 eslint-plugin-jsx-a11y@6.10.2
 
 | Recommended | Alternative | When to Use Alternative |
 |-------------|-------------|-------------------------|
-| App-layer `cryptography` (Fernet/AESGCM) for secrets | **Supabase Vault** (`vault.create_secret` + `decrypted_secrets` view) | You want DB-native encryption, are Supabase-hosted-only, and will route reads through the SQL view. Still needs `VAULT_ENC_KEY` self-hosted. |
-| App-layer `cryptography` | **pgcrypto** | You want in-DB encrypt/decrypt functions and accept keys passing through SQL. Weaker than app-layer key isolation. |
-| `operator_users` table + FastAPI dep | **Custom Access Token Hook + JWT `user_role` claim** | The *right* tool for v3.4 per-org RBAC — reserve it for then, not v3.3 system roles. |
-| `filetype` (pure-Python) | **python-magic** (libmagic) | You need libmagic's much larger signature set AND can install the C lib on host + Docker (Linux-only deployments). Overkill for the app's known format set. |
-| Build flags on `app_settings` | **Unleash / Flagsmith (self-host) / GrowthBook** | You need per-user/per-org %-rollouts, A/B experiments, or targeting rules — a v3.4+ multi-tenancy concern, not v3.3. |
-| In-process asyncio pruner + Redis lock | **APScheduler** | You need cron-expression scheduling with persistence — deferred to the v3.4 real scheduler; don't pull it in for one daily DELETE. |
-| Reuse `react-markdown` for citations | A dedicated citation/annotation lib | Never for this app — you'd fragment the single markdown-render path. |
+| Supabase native SAML (SP) | `python3-saml` 1.16.0 as our own SP | Only if we abandon Supabase Auth for SSO entirely (we don't). Brings `xmlsec1` system dep + CVE tracking — not worth it. |
+| asyncpg `SET LOCAL` RLS context | supabase-py per-request client (`postgrest.auth`) | Endpoints already on supabase-py where an asyncpg rewrite is too costly this milestone — acceptable as a bridge, but wrap in `run_in_threadpool`. |
+| Local JWKS verify (PyJWT, ES256) | Keep `supabase.auth.get_user()` per request | Fine short-term; but it's a network hop per request and doesn't hand you the claims dict for `set_config`. Prefer local verify once asymmetric keys are enabled. |
+| resend | AWS SES (`boto3`) | Enterprise already on AWS, high volume, or wanting deliverability under their own domain/IAM. |
+| resend | Supabase Auth built-in email (`inviteUserByEmail`) | Supabase's built-in invite covers *auth* invites but NOT our org-membership semantics (role, dept, token). Use our own `org_invitations` + a transactional provider. |
+| Hybrid (JWT set + header active) | Pure JWT-claim active org | Single-org-per-user installs where users never switch — then the header is unnecessary. |
 
 ---
 
@@ -194,65 +171,76 @@ npm install -D @axe-core/playwright@4.12.1 eslint-plugin-jsx-a11y@6.10.2
 
 | Avoid | Why | Use Instead |
 |-------|-----|-------------|
-| **pgsodium** (directly) | Pending deprecation at Supabase; no new usage recommended | App-layer `cryptography` (default) or Supabase Vault (stable API) |
-| **HashiCorp Vault / Doppler / 1Password Connect / Infisical** | Real infra for a handful of secrets; over-scoped for v3.3 | App-layer `cryptography` now; keep a `SecretsBackend` interface so an Enterprise adapter lands later without churn |
-| **JWT `user_role` claim / token hook for system operator roles** | Collides with v3.4 org-RBAC, which owns the claim+hook mechanism | `operator_users` table + FastAPI dependency + RLS helper |
-| **Casbin / oso / Permit.io (policy engine)** | Duplicates + fights the Supabase RLS model the whole app is built on; complicates the v3.4 RLS rewrite | Postgres RLS + `is_operator()` + FastAPI deps |
-| **python-magic (libmagic)** | Needs a C system library on host + Docker image (Windows-dev-hostile) | `filetype` (pure-Python, already installed) |
-| **Feature-flag SaaS/services** (Unleash/Flagsmith/LaunchDarkly/GrowthBook) | New service + DB + SDK for global booleans the `app_settings` cache already handles | `app_settings` `feature_flags` column/table + 30s TTL cache |
-| **APScheduler** (as a new heavy dep for the audit pruner) | The app has no scheduler; v3.4 owns the real one — don't add a dep for one daily job | In-process asyncio task in lifespan + existing Redis single-flight lock |
-| **`requests`** in the discovery service path | The offline `curate_models.py` uses it, but the app standard is async `httpx` | `httpx` (already a dep) |
-| **ClamAV as a CORE/hard dependency** | Self-hosting is genuine ops work; uploaded files aren't host-executed | Gate `clamd` behind `MALWARE_SCAN_ENABLED` / Enterprise preset (STRETCH) |
-| **A new markdown/citation renderer** | Fragments the single sanitized render path | Custom `react-markdown` component override + existing `dompurify` |
-| **LangChain / LangGraph** (for any admin/agent tooling temptation) | Project red-line rule — raw SDKs only | Raw provider SDKs (already the pattern) |
-| **k8s/Helm deps (`pyhelm3`, etc.) in CORE** | Enterprise presets are the "biggest lift / natural STRETCH-defer" per PROJECT.md | Keep k8s tooling out of the CORE dependency set; ship compose first |
-| **`prometheus_client` (speculative)** | Only if the `/metrics` endpoint is actually scoped this milestone | Add only when the observability-endpoint requirement is confirmed CORE |
+| **`python3-saml` / `python-saml`** | The stale brief's headline dep. Drags in `xmlsec1`/`libxmlsec1-dev` system libs + a build toolchain on every Docker/Coolify build, plus an ongoing CVE surface (historic SAML signature-wrapping / XXE classes). Redundant — **Supabase Auth is already the SAML SP**, incl. attribute mapping. | Supabase native SAML + read the mapped claims from the verified JWT to do the `org_members` JIT insert. |
+| **A brand-new Postgres pool / pgbouncer layer for tenancy** | The asyncpg pool already exists and is `WORKER_COUNT=2`-sized. A parallel pool multiplies connection pressure and splits the codec/config story. | Reuse `get_pg_pool`; add a per-request `SET LOCAL` wrapper only. |
+| **Baking *active org* into the JWT** | Forces a token refresh on every org switch → sluggish UX + hook cost. | Membership SET in JWT (durable) + active org via validated header (session). |
+| **Service-role client on hot read/write paths** | It's the current RLS-bypass; leaving it means membership-RLS is decorative and `.eq("user_id")` filters remain the sole boundary. | Per-request user-JWT context (asyncpg `SET LOCAL`); service-role retained ONLY for cross-tenant ops behind an explicit-`org_id` wrapper. |
+| **SCIM libs / building a SCIM 2.0 server now** | Supabase provides no SCIM server; it's a full app-layer build. SAML+OIDC JIT already covers onboarding. YAGNI until a customer contractually needs automated offboarding. | Defer (Out of Scope, matches stale brief). Revisit when the first enterprise requires IdP-driven deprovisioning. |
+| **A policy engine (Casbin / oso / Permit.io)** | Duplicates + fights the Postgres RLS model the whole tenancy design rests on; complicates the RLS predicates. | Postgres RLS + membership tables + FastAPI deps. |
+| **New frontend auth/SSO packages** | supabase-js already exposes `signInWithSSO({ domain })`; the switcher + org-admin shell reuse existing shadcn/ui + the v3.3 admin shell pattern. | Existing `@supabase/supabase-js` + shadcn `<Select>` + existing shell. |
 
 ---
 
 ## Stack Patterns by Variant
 
-**If the operator picks Supabase Vault over app-layer crypto:**
-- Route secret reads through a `SECURITY DEFINER` wrapper over `vault.decrypted_secrets` (never call `vault.create_secret`/decrypt directly from user-scoped paths).
-- Provision `VAULT_ENC_KEY` in the self-hosted Docker env, stored separately from DB backups.
-- Accept that the 30s TTL sync cache path needs a decrypt-at-read adapter.
+**If deployment = co-tenant SaaS (default, hybrid posture D-PRD-02):**
+- Supabase **Cloud Pro+** for SAML (budget the 50-MAU included tier + $0.015/MAU overage into pricing).
+- Custom-access-token hook + `X-Org-Id` header + asyncpg `SET LOCAL` RLS — the full membership-RLS machinery is load-bearing.
+- `INVITATION_EMAIL_PROVIDER=resend`.
 
-**If malware scanning is enabled (Enterprise preset):**
-- Run `clamav/clamav` as a compose service alongside Redis; point `clamd` at its socket/TCP.
-- Scan template/skill uploads *before* Storage write; fail closed on scanner-unreachable only if `MALWARE_SCAN_REQUIRED=true`, else warn-and-pass.
+**If deployment = dedicated / on-prem enterprise (isolation-via-deployment):**
+- **Self-hosted GoTrue SAML** (`GOTRUE_SAML_ENABLED=true` + `GOTRUE_SAML_PRIVATE_KEY`) — **no Supabase tier gate**, customer owns the IdP trust. Same `signInWithSSO()` app codepath.
+- Isolation is largely at the deployment boundary (customer-owned Supabase), but the org/dept/role + RLS model still runs (a single-org install still needs departments).
+- `INVITATION_EMAIL_PROVIDER=ses` (customer AWS) or `none`.
 
-**If per-org/gradual feature rollout is ever needed (v3.4+):**
-- Revisit a self-hosted flag service (Flagsmith/Unleash) — but only once org-level targeting is a real requirement, not before.
+**If per-org OIDC is required in v1:**
+- Add **Authlib 1.7.2**; store per-org IdP discovery/client config in `sso_configs`; handle the OIDC dance at the app layer (Supabase per-org SSO won't); attach the Supabase session after. Otherwise **defer Authlib**.
+
+**If local dev:**
+- `INVITATION_EMAIL_PROVIDER=none` (logs the invite link), no SAML/OIDC IdP, email+password sign-in unchanged. Nothing new to install beyond `pyjwt` (already present).
 
 ---
 
 ## Version Compatibility
 
-| Package | Compatible With | Notes |
-|---------|-----------------|-------|
-| `cryptography` 46.0.7 (installed; latest 49.0.0) | Python 3.11+, existing supabase/httpx/pyjwt stack | Already resolved transitively — pinning is a formality; ships as wheels. |
-| `filetype` 1.2.0 | Any Python 3; no deps | Pure-Python; no libmagic. |
-| `defusedxml` 0.7.1 | Any Python 3; stdlib xml | Already installed. |
-| `pyjwt` 2.12.1 | Supabase JWT secret (HS256) | Prefer Supabase Admin API for session generation; PyJWT only if hand-signing. |
-| `@axe-core/playwright` 4.12.1 | `@playwright/test` 1.60.0 (present) | Uses `AxeBuilder`; needs E2E suite revival (SEED-049). |
-| `eslint-plugin-jsx-a11y` 6.10.2 | ESLint 9.39.4 flat config (present) | Add to the flat-config plugins array. |
-| `clamd` 1.0.2 | A running `clamd` daemon (Docker) | No daemon → import is inert; gate on env flag. |
+| Package / Feature | Compatible With | Notes |
+|-----------|-----------------|-------|
+| PyJWT 2.13.0 | `gotrue` 2.12.4 (`pyjwt>=2.10.1,<3`), supabase 2.31.0 | Already transitive — explicit pin won't conflict. Use `PyJWKClient` for JWKS/ES256. |
+| Authlib 1.7.2 | Python ≥3.10, our `httpx>=0.28`, `cryptography>=44` | Backend is Python ≥3.10 (uses `X \| None` unions). Pulls `cryptography` — already a direct dep (Phase 150). No system deps. |
+| resend 2.34.0 | Python ≥3.7, `httpx` (async extra) | `send_async()` shares our httpx. |
+| asyncpg ≥0.29 | Existing pool, Postgres 15 (Supabase) | No change; add the `SET LOCAL` wrapper only. |
+| Supabase native SAML | Cloud **Pro+** OR self-hosted GoTrue | Cloud tier gate is the #1 gotcha — flag in pricing + the ADR. Multi-tenant config is **CLI-only**. |
+| Supabase asymmetric JWT (ES256/JWKS) | supabase-py, PyJWT `PyJWKClient` | GA; enabling requires migrating the project to signing keys. Cache JWKS ≤10 min; handle `kid` rotation. |
+| Custom-access-token hook | Cloud + self-hosted GoTrue | Self-hosted needs the two `GOTRUE_HOOK_CUSTOM_ACCESS_TOKEN_*` env vars. |
+
+---
+
+## Gotchas flagged for the ADR / roadmap (with citations)
+
+- **Two different "Supabase SSO" features — do not conflate.** "Enable SSO for Your Organization" (`/docs/guides/platform/sso`) is SSO into the *Supabase dashboard account*; the one we want is "Single Sign-On with SAML 2.0 for Projects" (`/docs/guides/auth/enterprise-sso/auth-sso-saml`) — SSO for *our app's end users*.
+- **SAML is Pro+ on Cloud** (50 SSO MAUs included on Pro/Team, then $0.015/MAU) — a real line item for the co-tenant tier. Self-hosted has no such gate.
+- **Per-org OIDC is not native.** Supabase per-org enterprise SSO is SAML-only; "generic OIDC/Custom OIDC provider" is a *project-wide* config, not per-tenant. Per-org OIDC = app-layer (Authlib). [MEDIUM confidence — verified via two Supabase docs; confirm against the current `signInWithSSO` reference during Phase 0.]
+- **Multi-tenant SAML is CLI-only** — the dashboard shows one field; provisioning N org IdPs needs `supabase sso add`. Wire into org-admin provisioning or an operator runbook.
+- **JIT split:** Supabase auto-creates `auth.users` on SSO login; **the `org_members` insert (role from `sso_configs.jit_provisioning_default_role_id`, dept from attribute mapping) is ours** — at the SSO callback / first-authenticated-request seam.
+- **RLS ON depends on `SET LOCAL ROLE authenticated`, not just claims** — the service-role/owner connection bypasses RLS; single most likely leak. Gate the phase on a live two-user RLS test.
 
 ---
 
 ## Sources
 
-- [Supabase — pgsodium (pending deprecation) docs](https://supabase.com/docs/guides/database/extensions/pgsodium) — HIGH: confirms pgsodium deprecation + "no new usage recommended," Vault as successor.
-- [Supabase — Vault docs](https://supabase.com/docs/guides/database/vault) — HIGH: Vault API stable through pgsodium migration; `decrypted_secrets` view.
-- [Supabase — Self-hosting with Docker](https://supabase.com/docs/guides/self-hosting/docker) + [self-hosted Vault guide](https://www.supascale.app/blog/secrets-management-for-selfhosted-supabase-a-complete-vault-) — MEDIUM: `VAULT_ENC_KEY` requirement, key-separation guidance.
-- [Supabase — Custom Claims & RBAC](https://supabase.com/docs/guides/database/postgres/custom-claims-and-role-based-access-control-rbac) + [Custom Access Token Hook](https://supabase.com/docs/guides/auth/auth-hooks/custom-access-token-hook) — HIGH: the JWT-claim RBAC path (reserved for v3.4).
-- [cryptography — Fernet docs](https://cryptography.io/en/latest/fernet/) — HIGH: app-layer symmetric encryption.
-- [Playwright — Accessibility testing](https://playwright.dev/docs/accessibility-testing) — HIGH: `@axe-core/playwright` + `withTags` for WCAG A/AA.
-- File-validation best practices (magic bytes vs Content-Type; `filetype` vs `python-magic`) — MEDIUM (multiple corroborating sources): [MIME/magic-bytes guide](https://zerotool.dev/blog/mime-type-lookup-guide/), [python-magic](https://codecut.ai/python-magic-file-type-detection/).
-- ClamAV self-hosting tradeoffs — MEDIUM: [ClamAV docs](https://docs.clamav.net/), [antivirus-API comparison](https://www.attachmentscanner.com/blog/best_antivirus_api_malware_scanning_comparison).
-- Live-code verification (HIGH): `backend/app/models/user_settings.py` (settings/secrets read path, `_load_model_overrides`), `supabase/migrations/053_settings_unification.sql` (`model_capabilities_overrides` table), `scripts/curate_models.py` (8-provider `/models` discovery), `backend/app/api/documents.py` (current upload validation), `backend/venv/Lib/site-packages` (cryptography 46.0.7 / filetype 1.2.0 / defusedxml 0.7.1 / pyjwt 2.12.1 already installed), `frontend/package.json` (vitest-axe present; dompurify/react-markdown present).
-- Package versions verified 2026-07-10 via npm registry + PyPI JSON API.
+- Supabase Docs — *Single Sign-On with SAML 2.0 for Projects* (Pro+, SAML-only, CLI multi-tenant, `--attribute-mapping-file`, `sso_provider_id` in JWT): https://supabase.com/docs/guides/auth/enterprise-sso/auth-sso-saml — HIGH
+- Supabase Docs — *Enterprise Single Sign-On* (SAML 2.0 = the enterprise SSO protocol): https://supabase.com/docs/guides/auth/enterprise-sso — HIGH
+- Supabase Pricing (SAML Pro+, 50 SSO MAUs, $0.015/MAU overage, Team $599 SOC2/SAML/HIPAA): https://supabase.com/pricing — HIGH
+- Supabase Docs — *Configure SAML SSO (self-hosting)* (`GOTRUE_SAML_ENABLED`, `GOTRUE_SAML_PRIVATE_KEY` PKCS#1 DER 2048-bit, per-IdP via admin API, same `signInWithSSO()`): https://supabase.com/docs/guides/self-hosting/self-hosted-saml-sso — HIGH
+- Supabase Docs — *Custom Access Token Hook* (GA; self-hosted `GOTRUE_HOOK_CUSTOM_ACCESS_TOKEN_ENABLED` + `_URI`): https://supabase.com/docs/guides/auth/auth-hooks/custom-access-token-hook — HIGH
+- Supabase Docs — *JWT Signing Keys* (asymmetric ES256, JWKS at `/auth/v1/.well-known/jwks.json`, local `kid` verify, ≤10-min cache): https://supabase.com/docs/guides/auth/signing-keys — HIGH
+- Supabase Discussion #30124 — *Run queries as authenticated user with direct connection* (`set_config('request.jwt.claims', …)` + role, parameterized, in-connection): https://github.com/orgs/supabase/discussions/30124 — HIGH
+- PostgREST Docs — *Authentication* (claims via `current_setting('request.jwt.claims', true)::json`; impersonated-role behavior): https://docs.postgrest.org/en/v12/references/auth.html — MEDIUM (excerpt didn't fully quote the `set_config`/transaction internals; transaction-scoped `is_local=true` inferred from PostgREST reference behavior — flagged for live verification)
+- PyPI (versions verified 2026-07-18): `python3-saml` **1.16.0**, `resend` **2.34.0**, `Authlib` **1.7.2** (Python ≥3.10), `boto3` **1.43.51**, `PyJWT` **2.13.0**, `gotrue` **2.12.4** (`pyjwt>=2.10.1,<3`), `supabase` **2.31.0** — HIGH
+- Context7 `/authlib/authlib` (OAuth/OIDC client capability confirmation) — HIGH
+- python3-saml (SAML-Toolkits) — `xmlsec1`/`python-xmlsec` system dependency + CVE history (CVE-2017-11427 fixed 1.4.0; defusedxml XXE since 1.2.6): https://github.com/SAML-Toolkits/python3-saml — MEDIUM (rationale for AVOIDING it)
+- Live-code verification (HIGH): `backend/app/dependencies.py` (service-role singleton `get_supabase`; existing asyncpg `get_pg_pool` min2/max10 + JSONB codec; `get_current_user` GoTrue round-trip), `backend/requirements.txt` (asyncpg/supabase/httpx/cryptography present; no authlib/python3-saml/email libs).
 
 ---
-*Stack research for: v3.3 Operator UX (admin shell, dynamic model/secrets management, workflow file inputs, plain-language/a11y UX)*
-*Researched: 2026-07-10*
+*Stack research for: v3.4 Multi-Tenancy & Org Access — new-stack-only (SSO + per-request RLS)*
+*Researched: 2026-07-18*

@@ -1,414 +1,421 @@
 # Pitfalls Research
 
-**Domain:** Adding an operator/admin tier + secrets/model-registry management + run-time file-input surfaces + plain-language/citation UX to a mature, single-service-role, multi-provider RAG platform (v3.3 Operator UX)
-**Researched:** 2026-07-10
-**Confidence:** HIGH (grounded in the live codebase — `dependencies.py:19` service-role client, `template_render_service.py` provenance boundary, `user_settings.py` secrets-in-DB, `config.py` model registry + `model_capabilities_overrides` read path — cross-checked against SEED-024/078/104/108 and the four project landmines in the milestone brief). MEDIUM on the generic file-security facts (SSTI / zip-bomb / path-traversal), which are well-established and verified against this codebase's own existing defenses.
+**Domain:** Org multi-tenancy + membership-based RLS rewrite + SSO retrofit onto an existing single-tenant, per-user RAG platform (Agentic RAG v3.4)
+**Researched:** 2026-07-18
+**Confidence:** HIGH on the codebase-specific traps (verified against live `supabase/full-schema.sql`, `backend/app/dependencies.py`, `backend/app/services/sql_service.py`, mig 096); HIGH on the SSO CVE class (verified external); MEDIUM on supabase-py per-request-JWT ergonomics (verified pattern, un-benchmarked here).
 
-> **Scope note.** These are pitfalls specific to ADDING these features to *this* system, not a generic security checklist. Every prevention names a real file/seam and an owning phase-track. Generic "admin panels are risky" advice is omitted. Where a defense already exists in the codebase, the pitfall is the *regression risk* of the new surface breaking it — not re-deriving the defense.
+> **Phase routing note.** The v3.4 roadmap is not numbered yet (milestone is research-first; phases continue from 159, so ~160+). Pitfalls route to **phase ROLES** aligned to the stale PRD's §12 outline; the roadmapper assigns real numbers. The stale PRD's migration numbers (075–094) and phase numbers (088–100) are **obsolete** — live migration head is 103; org_id stubs already shipped in mig 095/096. Use the roles below, not the PRD's numbers.
+>
+> | Role tag | What it owns |
+> |---|---|
+> | **P0-ADR** | Tenancy-model ADR (ratify D-PRD-02 hybrid; does not re-litigate) |
+> | **P1-SCHEMA** | orgs / departments / roles / role_permissions / org_members / dept_members / org_invitations / sso_configs + RLS-from-day-1 |
+> | **P2-BACKFILL** | Personal-org backfill migration + `is_global`→`is_org_shared` rename + NOT-NULL flip |
+> | **P3-RLS+CLIENT** | Membership RLS predicate rewrite on every user-facing table **+ the per-request user-JWT client swap, atomic in one branch** |
+> | **P4-SECDEF** | SECURITY DEFINER retrieval audit (all 4 fns) + `query_user_documents` / regex removal |
+> | **P5-SSO** | SAML + OIDC + JIT provisioning + invitation accept |
+> | **P6-ORGUI** | Org-admin / dept-admin shells + `<OrgContext>` + org switcher |
+> | **P7-INVITE-AUDIT** | Invitations + org-scoped audit view |
+> | **P8-ISOLATION** | Two-org isolation test suite + full regression sweep |
 
-> **Phase-track legend (v3.3 roadmap isn't created yet — this research feeds it). The four milestone tracks map to these working labels:**
-> - **P-ADMIN** — operator role tier + `/admin` shell + impersonation + role-gated visibility (Track 2; SEED-012/095/099). **Must land FIRST** — the `require_operator` boundary that every other write-UI sits behind.
-> - **P-KILL** — kill-switch / maintenance-mode / feature-flag control plane (Track 2; SEED-078).
-> - **P-REGISTRY** — dynamic model registry + live `/models` discovery (Track 3; SEED-088/040).
-> - **P-SECRETS** — settings unification + secrets hardening (Track 3; SEED-024).
-> - **P-FILE** — run-time template upload (SEED-110) + per-workflow KB folder-scope (SEED-112) + RAG→sandbox original-bytes bridge (SEED-108) (Track 1).
-> - **P-ATTACH** — agent-driven skill file attachment, a WRITE-capable tool (Track 1; FILE-01 / SEED-104).
-> - **P-INSTALL** — install wizard + Solo/Team/Enterprise presets (Track 3, STRETCH; SEED-003).
-> - **P-UX** — plain-language relabel (SEED-085) + inline citation attribution (SEED-033) + a11y (SEED-092).
+---
 
 ## Critical Pitfalls
 
-### Pitfall 1: The service-role client is the ONLY isolation gate — `/admin` routes have no RLS backstop
+### Pitfall 1: The service-role singleton silently bypasses the new RLS — RLS is worthless until the client swap lands WITH the rewrite
 
 **What goes wrong:**
-A new `/admin` route (user list, audit browser, "view this user's threads") ships with a role decorator but a missing or wrong `.eq("user_id", …)` filter, and silently returns *every* user's data. Teams assume "RLS will catch a cross-user query." On this backend it will not.
+The team writes beautiful membership-based RLS policies on all ~20 tables, ships them, and **nothing is actually enforced**, because every hot-path query still runs through the service-role Supabase singleton (`get_supabase()`, `backend/app/dependencies.py:21-25`). The service-role key bypasses RLS unconditionally — Supabase confirms: *"A Supabase client with the Authorization header set to the service role API key will ALWAYS bypass RLS."* The real tenant boundary today is the ~40+ hand-written `.eq("user_id", current_user["id"])` filters, not RLS. If the RLS predicates ship but the client is still service-role, you have written policies the database never evaluates. A route that forgets its `.eq` filter leaks **every org's data**, and the test suite (which seeds one org) stays green.
 
 **Why it happens:**
-`get_supabase()` builds the client with `settings.supabase_service_role_key` (`backend/app/dependencies.py:19`). **The entire backend already bypasses Postgres RLS.** Per-user isolation today is enforced purely by explicit application-layer `WHERE user_id = current_user.id` filters in each route. RLS policies exist in the schema but only bite the frontend's anon-key path and Realtime — never the FastAPI service path. So an `/admin` route that *intends* to read across users has zero database-level backstop: the WHERE clause plus the role check ARE the entire boundary.
+The RLS rewrite naturally splits into "SQL migrations" (write policies) and "backend refactor" (swap the client). It's tempting to land the migrations first ("the policies are the hard part") and swap the client "in a follow-up." That ordering produces false safety: the policies exist, so isolation *looks* done, but the enforcement path is still bypassed. The stale PRD even lists this as RLS-REWRITE-03 as if it were *separate* from RLS-REWRITE-01 — it must not be sequenced separately.
 
 **How to avoid:**
-Treat every `/admin` route as "one typo from a full-tenant leak." (1) A single `require_operator` FastAPI dependency, default-deny, applied at the router level — not per-handler. (2) Cross-user reads go through a *small, reviewed* set of operator query helpers, never ad-hoc `.select()` in the handler. (3) Add a test that hits every `/admin` route with a normal user's JWT and asserts 403. (4) Do NOT rely on adding real per-user Postgres RLS as the fix now — that's the v3.4 rewrite (Pitfall 3); in v3.3 the discipline is explicit, audited, reviewed WHERE clauses.
+- **Ship the per-request user-JWT client swap in the SAME atomic branch as the predicate rewrite** (PRD Q-v3.2-08 says "atomic"; extend it — atomic includes the client swap, not just the SQL). A membership policy has zero value until the invoker is a user identity.
+- Use the **verified supabase-py pattern**: do NOT construct a fresh `create_client()` per request (connection fanout — Pitfall 4/perf). Reuse one client and **override the `Authorization` header / call `postgrest.auth(jwt)` per request** with the caller's JWT, cached at process level via FastAPI DI.
+- Keep the service-role client **only** for explicit cross-tenant ops (SSO JIT provisioning, operator/audit writes) behind a wrapper that **requires an explicit `org_id` argument** and refuses to construct without it.
+- Leave the `.eq("user_id", ...)` filters in place as **belt-and-suspenders** — do NOT delete them in the same pass (Pitfall 8).
 
 **Warning signs:**
-An `/admin` handler with a raw `.select("*")` and no user scoping; an endpoint that returns data for a normal-user JWT; a code review that says "RLS protects this."
+Grep shows `get_supabase` still injected on any `/threads`, `/documents`, `/runs`, `/kb`, `/skills`, retrieval, or SQL-tool endpoint after the RLS branch; the isolation test seeds only one org; "RLS is done" claimed while `dependencies.py:21-25` is unchanged; an endpoint reads data correctly with a JWT whose `sub` ≠ row owner.
 
-**Phase to address:** P-ADMIN (build the `require_operator` boundary before any operator query lands).
+**Phase to address:** **P3-RLS+CLIENT** (atomic — this IS the phase; do not let it split into "policies now, client later").
 
 ---
 
-### Pitfall 2: Impersonation that mints a real victim session or drops the operator's identity from the audit trail
+### Pitfall 2: The SECURITY DEFINER retrieval surface is FOUR functions, not one — the stale PRD names only `match_document_chunks`
 
 **What goes wrong:**
-"View as user" is implemented by minting the target user's Supabase JWT (or by swapping `current_user.id` mid-request). Every downstream write — `audit_log`, `messages`, `documents`, settings — is then attributed to the *impersonated* user, not the operator. You permanently lose "operator X acted as user Y," which is exactly the record an insider-abuse or support investigation needs. Worse, a minted victim session over the service-role backend can do anything the victim can, with no dual-control.
+The plan rewrites `match_document_chunks` to add an org filter, declares the retrieval bypass closed, and ships. But hybrid search has **two legs** and skills have their own retrieval fn — all `SECURITY DEFINER`, all keyed on a **caller-supplied `match_user_id`**, all added at different times:
+
+| Function | file:line | Body gate | `search_path` pinned? | In stale PRD? |
+|---|---|---|---|---|
+| `match_document_chunks` | full-schema.sql:163 | `WHERE dc.user_id = match_user_id` | **NO** | yes |
+| `keyword_search_chunks` (BM25/tsquery leg of RRF) | full-schema.sql:136 | `WHERE dc.user_id = match_user_id` | **NO** | **NO** |
+| `match_skills` (Phase 140, mig 073) | full-schema.sql:188 | `WHERE (s.user_id = match_user_id OR s.is_global = true)` | yes | **NO** |
+| `folder_is_globally_visible` | full-schema.sql:97 | recursive `is_global` ancestor walk (no user check at all) | yes | yes (as `folder_is_org_shared`) |
+
+Fix only `match_document_chunks` and **keyword search still returns cross-org chunks**, and **`match_skills` still leaks the skill catalog cross-org**. Because these run `SECURITY DEFINER`, RLS on `document_chunks`/`skills` does NOT save you — the function executes with owner privilege and the *only* gate is its inlined WHERE clause. `match_skills`'s own comment (full-schema.sql:212) says it verbatim: *"as a SECURITY DEFINER body it is the ONLY cross-user gate (T-140-01) — never widen it."*
 
 **Why it happens:**
-Supabase Auth makes it easy (`auth.admin.generateLink`, service-role token minting), and "just become the user" is the shortest path to a working demo. The audit gap is invisible until someone asks "who did this?"
+The PRD was authored 2026-05-10; `keyword_search_chunks` and `match_skills` postdate it (Phase 140 embeddings/skill-retrieval work). Anyone planning from the PRD inherits its blind spot. Retrieval "feels like one function" but is a fan-out.
 
 **How to avoid:**
-Impersonation is a **dual-identity, read-mostly** server context: the request carries `actor_id = operator` AND `subject_id = target_user`, and BOTH are stamped into `operator_audit_log` on every action. Never mint the target's real session. Default impersonation to read-only; any write-as-user requires a second explicit confirmation and is logged as `operator_acting_as`. Put a persistent, un-dismissable "You are viewing as <user>" banner in the UI so an operator can't forget they're impersonating.
+- Audit **every** `SECURITY DEFINER` function in `full-schema.sql`, not the PRD's list. The retrieval-relevant set is the four above; also present: `resize_embedding_column`, `handle_new_user`, and the skill/embedding triggers (`capture_skill_version`, `stale_skill_embedding*`) — triggers are lower-risk but review each for org-column handling.
+- For each retrieval fn, add the org predicate **inside the body** (derive `org_id` from the membership of `match_user_id`, or add `org_id` to the chunk/skill row and filter it) AND, where feasible, flip to `SECURITY INVOKER` so table RLS becomes defense-in-depth — but only once the caller is a user-JWT client (Pitfall 1).
+- **Pin `search_path`** on `match_document_chunks` and `keyword_search_chunks` in the same change (both lack it — a DEFINER function without a pinned `search_path` is a privilege-escalation vector via search-path hijack).
+- Rewrite `match_skills`'s `is_global = true` clause to the org-shared / system-global model — this is exactly where a careless "widen" reopens cross-org skill sharing (an explicit anti-feature).
 
 **Warning signs:**
-Audit rows during impersonation show only the victim's id; there's a code path that generates or returns a token for another user; impersonation grants write with no distinct log action.
+A retrieval isolation test asserts only against vector search, never keyword or skills; `grep -c "SECURITY DEFINER" full-schema.sql` exceeds the number of functions the plan touches; `is_global` still appears in a DEFINER body after the `is_org_shared` migration.
 
-**Phase to address:** P-ADMIN.
+**Phase to address:** **P4-SECDEF** (all four fns in one audit; coordinate the chunk-org-column dependency with P3).
 
 ---
 
-### Pitfall 3: Modeling the operator role in a shape that poisons the v3.4 multi-tenancy RLS rewrite (one-way door)
+### Pitfall 3: `query_user_documents` is ALREADY `SECURITY INVOKER` — the leak is the service-role CALLER + a regex string-rewriter, not the function
 
 **What goes wrong:**
-v3.3 adds the operator tier as an `is_admin` boolean on the user row, or as "a user who belongs to a special org." Then v3.4 — the multi-tenancy RLS rewrite across ~18 tables, the highest-risk apply the platform will ever do — has to special-case the operator inside every new org-scoped policy, or unwind the boolean. The role model chosen in v3.3 is a one-way door the milestone brief explicitly flags.
+The stale PRD says "rewrite `query_user_documents` SECURITY DEFINER → INVOKER." **It is already INVOKER** (full-schema.sql:219 has no `SECURITY` clause = INVOKER default; mig 012 set it explicitly). Planning the wrong fix wastes a phase and misses the real problem: the text-to-SQL RPC is called through the **service-role client** (`sql_service.py:113`), so INVOKER buys nothing, and the *actual* tenant scoping is a **regex that rewrites the model's SQL string** (`_inject_user_id`, `sql_service.py:31-68`). That regex:
+- injects `user_id = '{uuid}'` via **f-string interpolation** into arbitrary model-generated SQL;
+- detects table aliases with a hand-maintained keyword skip-list (`sql_service.py:23-25`);
+- injects the predicate by replacing only the **first** `\bwhere\b` (`re.sub(..., count=1)`) — a CTE, a subquery, or a second `WHERE` is left **unscoped**;
+- has **zero org awareness** — it scopes `user_id` only.
+
+A model that emits `SELECT ... FROM documents WHERE id IN (SELECT id FROM documents ...)` gets the outer query scoped and the inner subquery reading unscoped. Under multi-tenancy that is now a **cross-org** leak. (The code's own comments admit the setup: sql_service.py:34 "The service role client bypasses RLS, so we must scope manually.")
 
 **Why it happens:**
-The SYSTEM operator (super_admin / operator — governs the deployment) and the future ORG roles (owner/admin/member/viewer — govern a tenant's data) *feel* like the same "roles" feature, so they get one table/column. D-PRD-14 already distinguishes them; it's easy to collapse under time pressure.
+The PRD's factual error ("it's DEFINER") sends planning down the wrong road, and regex-rewriting of LLM-generated SQL feels like a guard but is a fundamentally leaky abstraction.
 
 **How to avoid:**
-Model the SYSTEM operator as a **separate principal**, orthogonal to org membership — a distinct `operator_users` table keyed to the auth user, with deployment-global scope and no dependence on `org_id`. Ship cheap `org_id` stub columns where the brief calls for them, but the operator's *identity and authority must not be expressed through org shape*. Write down the invariant: "an operator is not a user-in-an-org; the v3.4 RLS policies will scope *users* by org and leave the operator principal untouched."
+- Correct the record in the roadmap: the fix is **(a) call the RPC with the user-JWT client** (so the already-INVOKER function's RLS actually applies) and **(b) delete `_inject_user_id` / `_inject_folder_scope`** rather than extend them to org. Do NOT "add org_id to the regex" — that doubles the fragility.
+- If a user-JWT path isn't viable for the tool-dispatch caller in one step, the interim guard must scope org **and** user inside the DB function body (parameterized), never in Python string rewriting.
+- Add a regression test replaying subquery/CTE payloads that defeat first-`WHERE` injection, asserting zero cross-org rows.
 
 **Warning signs:**
-An `is_admin`/`role` column on the `users`/`user_settings` table; operator permission checks that read org membership; any place the operator's authority is derived from what org they're in.
+A plan task says "change `query_user_documents` to SECURITY INVOKER" (already there — smell of planning-from-stale-PRD); `_inject_user_id` gains an `org_id` parameter instead of being deleted; the text-to-SQL tool still receives a service-role `Client`.
 
-**Phase to address:** P-ADMIN (schema shape locked here; verified against the v3.4 RLS plan).
+**Phase to address:** **P4-SECDEF** (correct the PRD; delete the regex; move the caller to user-JWT).
 
 ---
 
-### Pitfall 4: A new run-time template-upload path that breaks the existing provenance→engine security boundary (SSTI)
+### Pitfall 4: The dual data-access story — the asyncpg pool bypasses RLS entirely, no JWT swap can fix it
 
 **What goes wrong:**
-SEED-110 turns template upload from v2.9's one-run ephemeral into a repeatable run-time input. A new upload handler infers the fill engine from file *content* or *extension*, or a "save this run's template to my library" feature promotes an uploaded file to a trusted `AssetRef` — and an untrusted upload reaches the Jinja/`docxtpl` engine. Now a user-supplied `{{ ''.__class__.__mro__[1].__subclasses__() }}` payload executes server-side template injection inside the render.
+This codebase has **two** DB access mechanisms, and "per-request user-JWT client" only works for one:
+1. **supabase-py / PostgREST** (`get_supabase`) — RLS-via-JWT works by swapping the `Authorization` header.
+2. **raw asyncpg pool** (`get_pg_pool`, `dependencies.py:79-105`, added Phase 073) — connects as the **DSN's Postgres role** directly. `auth.uid()` is NULL on this path; **RLS policies keyed on `auth.uid()` never match, so they either block everything or (if the role owns the tables / has BYPASSRLS) bypass everything.** There is no "user-JWT client" for asyncpg — you must `SET LOCAL role authenticated` + `SET LOCAL request.jwt.claims = '{"sub":"<uuid>",...}'` inside each transaction for `auth.uid()` to resolve.
+
+If the plan treats "swap to user-JWT client" as one uniform change, every query flowing through the asyncpg pool (the JSONB-heavy run/message/tool_call paths that `_init_pg_connection` exists for) silently keeps today's behavior — which for a privileged DSN role is **full bypass**, org isolation absent.
 
 **Why it happens:**
-The existing defense is *structural but invisible*: `select_engine()` in `backend/app/services/template_render_service.py:936` routes by **provenance, not content** — `kind='template_input'` (untrusted) → `run_replace` (non-Jinja, scalar-only), a library `AssetRef` (trusted) → `docxtpl`/Jinja, with a hard `assert engine != "docxtpl"` on the untrusted branch (D-02). A new code path that doesn't stamp `kind='template_input'`, or that promotes uploads into the library, silently defeats it. `SandboxedEnvironment(autoescape=True)` is defense-in-depth, not the primary control.
+The stale PRD predates Phase 073's asyncpg pool, so it models a single client. The two paths conflate easily because both "talk to Postgres."
 
 **How to avoid:**
-Every run-time upload is stamped `kind='template_input'` at the ingress boundary and can *only* route to `run_replace`. Library promotion (upload → reusable trusted template) is NOT an implicit provenance carry — it must be an explicit author/review action that re-stamps provenance deliberately. Add a test that feeds a Jinja-payload upload and asserts it renders literally (never evaluates) and that `select_engine('template_input')` can never return `docxtpl`.
+- Inventory which hot paths use supabase-py vs asyncpg (`get_pg_pool` callers). Decide per path: PostgREST paths get the JWT header swap; asyncpg paths get **`SET LOCAL` role + `request.jwt.claims` per transaction**, OR stay an explicit trusted service-role path with **mandatory in-query `org_id` + `user_id` predicates** (documented as such, guarded by CI).
+- Verify the DSN role's privileges: if asyncpg connects as a table owner / superuser, RLS is bypassed regardless. A non-owner `authenticated`-like role is required for RLS to bind.
+- Keep this compatible with **D-v2.5-01** (no blocking I/O in async handlers) and the `WORKER_COUNT=2` singleton discipline — the pool is a singleton bound to the event loop.
 
 **Warning signs:**
-Any engine selection keyed off extension/MIME/content; a "save to library" that copies the upload's provenance; a new render entry point that imports `docxtpl`/`jinja2` for an upload path.
+A query through `get_pg_pool()` returns rows for a user whose JWT was never set on the connection; no `SET LOCAL request.jwt.claims` anywhere yet asyncpg paths "respect RLS"; isolation tests only exercise PostgREST endpoints.
 
-**Phase to address:** P-FILE.
+**Phase to address:** **P3-RLS+CLIENT** (both mechanisms audited together; asyncpg path is a distinct sub-task).
 
 ---
 
-### Pitfall 5: File-upload surface trusts MIME/extension → zip bombs, decompression bombs, path traversal, oversized files
+### Pitfall 5: Recursive RLS on `org_members` — infinite recursion (42P17), and the SECURITY DEFINER helper that fixes it
 
 **What goes wrong:**
-`.docx`/`.pptx`/`.xlsx` are ZIP containers. A malicious "template" is a renamed executable, a zip bomb (a few KB that decompresses to GB), or carries entries with `../../` paths. The template-variable parser opens `zipfile.ZipFile(io.BytesIO(data))` on the raw bytes (`template_render_service.py:381`), and the sandbox render unzips it again — a crafted archive OOMs the worker or (if any code extracts to a path derived from an entry name) writes outside the intended directory.
+The natural membership predicate is `org_id IN (SELECT org_id FROM org_members WHERE user_id = auth.uid())`. Put a policy of that shape **on `org_members` itself** and Postgres recurses: to check whether you may read an `org_members` row it must query `org_members`, which fires the same policy, which queries `org_members`… → `ERROR: infinite recursion detected in policy for relation "org_members"` (SQLSTATE 42P17). Every membership check across the app then fails closed — the whole product 500s on the first authenticated query.
 
 **Why it happens:**
-Extension/MIME are attacker-controlled and easy to trust. `zipfile` will happily open a bomb; the decompression ratio isn't checked unless you check it. This isn't hypothetical here — the platform already hit real OOM on legitimate large files (the thesis-PDF `MemoryError` in the PyMuPDF subprocess, PROJECT.md Phase 071.2).
+The same predicate is copy-pasted onto every table, including the membership table it depends on. It works on the leaf tables and blows up only on the self-referential one, so it can pass a quick smoke and fail under real evaluation.
 
 **How to avoid:**
-At the upload boundary: (1) validate magic bytes, not extension; (2) hard-cap raw file size; (3) before extract, cap total *uncompressed* size and compression ratio (reject > ~100:1); (4) reject any zip entry whose normalized path is absolute or escapes the target dir; (5) cap member count. The existing parser already fails *safe* on a corrupt zip (returns `None`, never crashes) — extend that posture to *malicious* zips, not just malformed ones.
+- Resolve a user's org set through a **`SECURITY DEFINER` helper function with a pinned `search_path`** — e.g. `auth_user_org_ids() RETURNS uuid[]` reading `org_members` with owner privilege (no policy recursion) — and reference that helper in every *other* table's policy instead of sub-selecting `org_members`.
+- `org_members`'s own policy must be **non-recursive**: gate it directly on `user_id = auth.uid()` (you can always see your own membership rows), plus an org-admin branch that also goes through a DEFINER helper, never a self-select.
+- This helper doubles as the **performance** fix (Pitfall 6) — resolve the org set once per statement instead of re-joining `org_members` per row.
 
 **Warning signs:**
-`zipfile.ZipFile(untrusted_bytes)` with no prior size/ratio guard; extraction to `os.path.join(dir, entry.filename)` without path normalization; upload accepted purely on `content-type`.
+42P17 the moment the `org_members` policy is enabled; a policy body that references its own table; login / first authenticated query 500s after the membership migration.
 
-**Phase to address:** P-FILE.
+**Phase to address:** **P1-SCHEMA** (ship the DEFINER helper + non-recursive `org_members` policy in the same migration as the table).
 
 ---
 
-### Pitfall 6: The RAG→sandbox file bridge (SEED-108) as a cross-user exfiltration / RLS-scope hole
+### Pitfall 6: Per-row membership-join RLS collapses retrieval perf — and mig 096 deliberately shipped NO `org_id` index
 
 **What goes wrong:**
-A `fetch_document_file` tool that copies a KB document's original bytes into the sandbox resolves `documents.file_path` and streams Storage bytes **without re-applying the owner/global scope that `read_document` uses** — so an agent (steered by prompt injection in a shared document) fetches another user's file by id. Or the materialized confidential file is written out to the `sandbox-outputs` bucket and surfaced as a downloadable output card, exfiltrating it. Or a large file streamed into the container OOMs it.
+A membership-join predicate evaluated **per row** turns every large scan into a nested membership lookup. On `document_chunks` (the pgvector hot path) a retrieval touching 100k candidate chunks evaluates the org predicate 100k times. Two codebase facts make this worse than generic:
+1. **mig 096 explicitly added NO index on `org_id`** ("Deliberately does NOT add idx_*_org_id indexes … follows the leaner harness_audit shape") — an org predicate hits a **sequential scan** until indexes are added.
+2. **`document_chunks` has no `org_id` column at all** — mig 096 stubbed only documents / folders / threads / skills (the 4 owned roots); "child tables (messages, chunks, skill_files …) inherit org through their parent FK — NOT stubbed." Scoping chunks means either adding+backfilling+indexing `org_id` on `document_chunks`, or an extra `JOIN documents` per row on the hottest query.
+
+Symptom: retrieval latency regresses (PRD flags ~20%; realistically worse with no index), the CONCUR-01 binding gate wobbles, p95 balloons under parallel runs.
 
 **Why it happens:**
-The backend is service-role (Pitfall 1), so the Storage read has no DB-level owner check — the tool must re-implement the scope check that `_handle_read_document` already applies (`tool_dispatcher.py:237`). SEED-108 flags all three: RLS scope, size/streaming, and that the *write* direction (`copy_from_runtime`) already exists so the exfil path is one hop away. Sandbox sessions are cached per-thread (CLAUDE.md), so a mis-keyed cache could also leak a materialized file across threads.
+"Add `org_id` everywhere and filter on it" reads as trivial; the missing index, the missing column on child tables, and the pgvector interaction are invisible until measured.
 
 **How to avoid:**
-The bridge tool reuses the **same** owner/global resolver as `read_document` — centralize it so the two can't drift. Cap bytes and stream to disk (never into model context — SEED-108 already specifies this). Key the materialization path by `user_id` + `thread_id` so a cached sandbox session can't serve another owner's file. Treat "materialize KB file" as read-scoped exactly like `read_document`; never widen it to global. SC#10 applies (new tool on the agent loop) — prove all four providers call it correctly and none leak cross-user.
+- Add `org_id` to the child/secondary tables the rewrite actually scopes (start: `document_chunks`, `document_images`, `document_tables`, `messages`, `skill_files`, `runs`, plus the memory/eval/tuner tables mig 096 "deferred to the v3.4 planner"). Backfill from the parent, then index.
+- Add a **partial/composite index** aligned to the query: `document_chunks(org_id)` (or `(org_id, user_id)`) alongside the existing HNSW vector index so the org filter pre-narrows before the vector distance sort.
+- Prefer resolving `org_id` from a **JWT custom claim or the per-statement DEFINER helper** (Pitfall 5) so RLS compares against a constant array, not a correlated sub-select per row.
+- **Benchmark before merge** against CONCUR-01 (`test_058_concurrency.py`) — the gate proves the cross-tab GET stays <1s while a stream is in flight; the RLS join must not push it over.
 
 **Warning signs:**
-The bridge resolves a doc by id without an owner/global check; bytes flow into the model context; a materialized file appears in `sandbox-outputs`; no size cap.
+`EXPLAIN` shows a seq scan on `document_chunks` / a per-row `org_members` sub-plan; retrieval p95 climbs after the rewrite; the migration adds `org_id` columns but no `CREATE INDEX`.
 
-**Phase to address:** P-FILE (bridge tool; cross-links `sandbox_service.copy_from_runtime`).
+**Phase to address:** **P3-RLS+CLIENT** (columns + indexes with the predicate); **P8-ISOLATION** (perf gate verification).
 
 ---
 
-### Pitfall 7: The agent-driven skill-attach tool is a WRITE-capable, cross-tenant surface shipped without its own threat model
+### Pitfall 7: Personal-org backfill — lock storms, `is_global`→`is_org_shared` data loss, non-idempotent re-runs, and the NOT-NULL flip ordering
 
 **What goes wrong:**
-`attach_skill_file` (FILE-01 / SEED-104) lets the agent write a file into a skill. If it can target a **global** skill, an agent driven by a poisoned document writes attacker-controlled content into a skill *other users load* → stored prompt-injection / supply-chain across tenants. Or it overwrites a built-in protected skill (skill-creator), or attaches to a skill the user doesn't own, because the *tool* path bypasses the permission checks that live only on the HTTP endpoint.
+The one-shot "every user gets a personal org, backfill `org_id` everywhere, then `SET NOT NULL`" migration is where a multi-tenancy launch most often corrupts or locks production:
+- **Lock storms:** a single `UPDATE documents SET org_id = ... WHERE org_id IS NULL` over a large table takes a long write lock and stalls the app during deploy.
+- **NOT-NULL flip ordering:** `ALTER TABLE … SET NOT NULL` before the backfill completes (or before a straggler row written mid-migration is scoped) fails the migration or blocks new writes.
+- **`is_global` → `is_org_shared` mishandled = silent loss of sharing:** if the column is dropped/recreated instead of `RENAME`d, or the rename isn't value-preserving, every previously-global folder/skill silently becomes private (users "lose" shared docs) — or the seeded `skill-creator` (mig 018) loses cross-org visibility and every user's skill catalog breaks.
+- **Non-idempotent re-runs:** re-running the migration (a normal recovery action) creates a *second* personal org per user or duplicate `org_members` rows.
+- **Workflow constraint (CLAUDE.md):** migrations here are applied by **pasting into the Supabase SQL editor** (never `db push`/`db reset`) against a live dev DB holding real data — a destructive or non-idempotent backfill can't be casually re-run from clean.
 
 **Why it happens:**
-The only skill-file write path today is `_upload_skill_files` in `backend/app/api/skills.py` — reachable only from an authenticated browser request. A new tool wired into `tool_dispatcher` is a *different* entry point that must re-assert every check the HTTP endpoint enforces. SEED-104 explicitly calls this out: "a new WRITE-capable tool is a real security-relevant surface" and defers it precisely so it gets its own discuss→plan→execute with a threat model.
+Backfills are written against a tiny dev dataset where locks and idempotency never bite, then meet a real table.
 
 **How to avoid:**
-Owner-scoped only — the tool can never write to a global skill or a built-in protected skill (SEED-101). Reuse the existing `skill_files` table + `skill-files` bucket (don't invent a new store), and put the RLS/owner check *in the tool dispatcher*, not just the HTTP layer. Size/type caps; no silent overwrite (version or refuse). SC#10 cross-provider proof that all providers call it correctly (a mis-formatted tool call must fail closed, not write garbage).
+- **Batch** the backfill (e.g. 10k rows per `UPDATE` in a loop, `WHERE org_id IS NULL`) to keep lock windows short; run in a low-traffic window.
+- **Idempotent by construction:** `INSERT … ON CONFLICT (org_id, user_id) DO NOTHING` for memberships; gate personal-org creation on "user has no personal org yet"; every `UPDATE` filtered `WHERE org_id IS NULL`. Model it on the Phase 146 `OPERATOR_EMAILS` startup seed (idempotent, WORKER_COUNT=2-safe).
+- **Order:** add nullable `org_id` → backfill in batches → verify zero NULLs → **then** `SET NOT NULL`. Never flip NOT-NULL first.
+- **`is_global` → `is_org_shared` is a value-preserving `RENAME COLUMN`** (or add-new + copy + verify + drop-old), plus an explicit `is_system_global` allow-list migration that re-flags the seeded `skill-creator`. Add a fixture test asserting a pre-migration global folder/skill is still shared post-migration.
+- **Stage on a copy of prod**, measure the window, and keep the personal-org auto-create hooked so **new** SSO/JIT users also get an org (coordinate with the `handle_new_user` DEFINER trigger, full-schema.sql:120 — today it only inserts a `profiles` row).
+- Re-run **`scripts/regenerate-full-schema.sh`** after applying (CLAUDE.md).
 
 **Warning signs:**
-The tool can name a `skill_id` the caller doesn't own; global skills are writable via the tool; the tool path doesn't share the endpoint's validation; no cross-provider UAT on the new tool.
+A bare `UPDATE … SET org_id` with no batching / no `WHERE org_id IS NULL`; `SET NOT NULL` before the backfill statements; `is_global` handled with `DROP`/`ADD COLUMN` instead of `RENAME`; re-running doubles `orgs`/`org_members` rows; new post-deploy users have no org.
 
-**Phase to address:** P-ATTACH.
+**Phase to address:** **P2-BACKFILL** (owns the backfill, the rename, the NOT-NULL flip; ships the `handle_new_user` / JIT auto-org hook or hands it to P5-SSO).
 
 ---
 
-### Pitfall 8: Planning secrets work against the STALE brief — re-solving a shipped problem while missing the real gap (plaintext keys in Postgres)
+### Pitfall 8: A route forgets the org predicate — belt-and-suspenders vs sole-defense inversion
 
 **What goes wrong:**
-The v3.3 brief (authored 2026-05-10, flagged STALE in PROJECT.md) says "migrate secrets off a plain-text json file." But **Phase 081.1 already eliminated `settings_override.json`** (`user_settings.py` docstring: "Phase 081.1 Plan 03: file-based settings_override.json eliminated"). A team that plans against the brief writes a task to "delete the json file" that's already done, and *misses the actual remaining risk*: provider API keys now live as **plaintext columns in the `app_settings` DB row** (`openai_api_key`, `anthropic_api_key`, …) with no encryption-at-rest. A DB dump or service-role leak exposes every provider key.
+Today the `.eq("user_id", ...)` filters are the **sole** boundary (service-role bypasses RLS). After P3, RLS becomes primary and the `.eq` filters become **belt-and-suspenders**. The trap is the transition window plus the temptation to "clean up now-redundant filters." If a developer deletes the `.eq` filters in the same pass that swaps the client — and one endpoint slips back to a service-role client (or the asyncpg path, Pitfall 4) — that endpoint has **neither** defense and leaks cross-org.
 
 **Why it happens:**
-The brief is a year stale (PROJECT.md warns the internals must be "re-authored against the live codebase during requirements"). Planning from the brief instead of the code re-derives solved problems.
+The 40+ `.eq("user_id", ...)` callsites in `threads.py` alone (the ~1850-LOC `send_message` god function) look like dead weight once RLS exists; removing them feels like hygiene. But they're the fallback for exactly the case where the client swap regresses.
 
 **How to avoid:**
-Verify live state first: keys are already read from DB with an env fallback (`env_key = getattr(env_settings, key_field, "")`, `user_settings.py:397`), masked from the frontend ("real key — never sent to frontend"), and sentinel-guarded on write (`save_app_settings` rejects invalid/sentinel keys). The *real* v3.3 secrets work is: (1) encryption-at-rest or a secret-ref indirection for the DB columns; (2) extend the "never to frontend" invariant to **logs and audit rows**; (3) the settings *unification* + env-var live-vs-restart classification inventory (SEED-024 §strengthen). Do NOT remove the env fallback (Pitfall 9).
+- **Do not delete the `user_id` filters in the tenancy milestone.** Keep them — they cost nothing and are the second layer. (The stale PRD §6 agrees: "every existing filter is now belt-and-suspenders … NOT the primary boundary.") Route `delete_folder`/`move_document` defense-in-depth cleanup to a *later* code-quality pass.
+- Add an **`org_id` predicate alongside** each `user_id` filter on write/INSERT paths (reads are covered by RLS; writes must set `org_id` from validated `X-Org-Id`).
+- Add a **grep-based CI check / test** that fails if a hot-path router imports `get_supabase` (service-role) instead of the user-JWT dependency.
 
 **Warning signs:**
-A plan task named "delete settings_override.json"; scoping that assumes secrets are on disk; a readback path that returns the real key; a provider key appearing in a log line or `operator_audit_log`.
+A tenancy PR with large deletions of `.eq("user_id", ...)` lines; a new endpoint added during the milestone with neither an org filter nor a user-JWT client.
 
-**Phase to address:** P-SECRETS.
+**Phase to address:** **P3-RLS+CLIENT** (keep filters, add org predicate, CI guard); cleanup deferred out of milestone.
 
 ---
 
-### Pitfall 9: Secrets migration that breaks the local↔cloud env-var switch (local dev must keep working)
+### Pitfall 9: SSO — SAML XML-signature-wrapping / XXE, JIT duplicate-membership races, OIDC discovery SSRF, and the email/password fallback disabled by accident
 
 **What goes wrong:**
-Hardening secrets, the team makes the DB the *only* source of provider keys and removes the env fallback. Local dev — which has no DB-stored key and relies on `backend/.env` — stops booting or silently loses provider access. This violates the CLAUDE.md red line: "local vs cloud is a pure env-var switch; no hardcoded URLs/paths/keys."
+- **SAML XSW (XML Signature Wrapping):** an attacker restructures the SAML response so the IdP's signature still validates but the SP reads a *different, unsigned* assertion — full auth bypass / impersonation. This is a **recurring, still-live class**: python3-saml `CVE-2017-11427` (DOM-traversal/canonicalization bypass, fixed 1.4.0+) and `CVE-2016-1000251` (signature wrapping pre-1.2.0); the class keeps reappearing (e.g. CVE-2025-47949 samlify, CVE-2026-47201 authentik). XXE via the SAML/metadata XML parser is the sibling risk.
+- **JIT provisioning race:** two near-simultaneous first-logins for the same SSO user both find "no membership" and both `INSERT org_members` → duplicate-key error or duplicate membership (same for auto-creating the user/org).
+- **OIDC discovery SSRF:** fetching an org-admin-supplied `.well-known/openid-configuration` / JWKS URL from the backend lets a malicious/misconfigured `sso_configs` row point the server at internal metadata endpoints (`169.254.169.254`, internal services).
+- **Email/password fallback disabled by accident:** flipping an org to SSO in a way that disables password login *before* SSO is proven working locks the whole org out with no break-glass path.
 
 **Why it happens:**
-"Secrets belong in the secret store, not env" is a good cloud instinct that forgets the local-first contract. The env→DB precedence (`_val(row, key_field, key_field, env_key)`) is load-bearing for local dev and must survive any hardening.
+SAML is a 15-year-old XML-DSig format whose safety depends entirely on the library and its version; JIT races only appear under concurrency; discovery-doc fetching is an obvious SSRF sink disguised as a benign HTTP GET; and "SSO enforcement" toggles are one-way footguns.
 
 **How to avoid:**
-Keep the precedence: DB value if present, else env fallback. Any encryption/secret-ref layer wraps the DB column only; env stays the plaintext local path. Add a boot test: with an empty `app_settings` and keys only in `.env`, the backend resolves providers. Never make a DB read *mandatory* for a secret that env can supply.
+- **Pin `python3-saml` to a current patched release** and ensure `xmlsec1` is installed in the backend image; use a hardened / `defusedxml`-backed parser (never a raw `lxml.etree.fromstring` on IdP XML); validate that the assertion the SP consumes is the *signed* one (reference/schema hardening).
+- **JIT provisioning must be idempotent:** `INSERT … ON CONFLICT (org_id, user_id) DO NOTHING`, and wrap user+membership creation in one transaction (or an advisory lock keyed on the email) so concurrent first-logins converge to one membership. Reuse Pitfall 7's idempotency discipline.
+- **OIDC discovery SSRF guard:** allowlist/validate the discovery host, block link-local/private ranges, set `OIDC_CLIENT_DISCOVERY_TIMEOUT`, treat `sso_configs.idp_metadata` as untrusted input.
+- **Keep email/password fallback ON for v3.4** (SSO *enforcement* is explicitly deferred per PRD §10/§11). Any future enforcement flip needs a preview/verify step + a break-glass operator override (the v3.3 Control Room is the natural home).
+- SSO callbacks run in-request → keep the JIT DB work off the event loop (`run_in_threadpool`, D-v2.5-01).
 
 **Warning signs:**
-Local backend fails to reach a provider after a secrets change; a code path that raises when the DB key is absent instead of falling back to env; SETUP.md needing new manual DB-seeding steps to run locally.
+`python3-saml` unpinned or old; no `xmlsec1` in the image; raw `lxml` parse of IdP XML; JIT insert is a plain `INSERT` with no `ON CONFLICT` (duplicate-membership errors under load); the backend fetches an admin-supplied URL with no host validation; an org can reach "SSO required but not verified."
 
-**Phase to address:** P-SECRETS.
+**Phase to address:** **P5-SSO** (library pinning + XSW/XXE hardening + idempotent JIT + SSRF guard + fallback preserved).
 
 ---
 
-### Pitfall 10: Settings/secrets save that swallows errors — the silent-failure trap, already hit once
+### Pitfall 10: Org-switch leaks — stale streams/Realtime across the switch, and localStorage `X-Org-Id` spoofing
 
 **What goes wrong:**
-The provider-key UI returns a success-looking response but persists nothing. The operator believes the key is set; provider calls fail with auth errors *later*, disconnected from the cause. This exact class already bit the project: "AI-Model save silently failed (no DB column, errors swallowed). Fixed mig 078" (memory).
+- **Stale streams across an org switch:** a run started in Org A keeps streaming (Redis `run:{run_id}`) while the user switches to Org B; if the frontend doesn't abort subscriptions, Org A's tool-call/message events render inside Org B. Because **Supabase Realtime is best-effort only (D-v2.5-03)**, an org-filtered Realtime channel is NOT authoritative — a leaked event can still arrive. The canonical rule (D-v2.5-03) is *reconcile via fetch on (re)connect*; an org switch is a reconnect boundary and must **abort in-flight subscriptions + refetch**, never trust Realtime filtering.
+- **`X-Org-Id` spoofing:** the active org persists in localStorage and rides on the `X-Org-Id` header. localStorage is client-controlled — a user can set `X-Org-Id` to an org they don't belong to. If the backend trusts the header without checking `org_members`, that's a direct cross-tenant read/write.
 
 **Why it happens:**
-The write hits a validation reject (the sentinel guard `save_app_settings` *correctly* rejects an invalid/sentinel key) or a schema gap, and the error is caught-and-ignored so the UI shows 200. The guard doing the right thing at the DB layer is worthless if the UI doesn't surface the rejection.
+The streams stack (StreamsProvider, per-thread buckets, LRU stream pool) was built for a single tenant where "all my threads are mine." Adding an org axis without an explicit teardown boundary lets old subscriptions survive. And headers *feel* server-controlled but aren't.
 
 **How to avoid:**
-Never swallow a settings/secret write error — surface the sentinel-guard rejection to the UI verbatim. Round-trip verify: write → read back → confirm the masked key prefix changed. Show "saved" only after the readback confirms persistence. This is also the honest-save contract for every new admin knob, not just keys.
+- On org switch: `subscriptionsRef.forEach(c => c.abort())`, null the streaming-thread ref, clear per-thread stream buckets, then **refetch** the new org's threads/docs (reconcile-via-fetch, D-v2.5-03). Preserve the Phase 067.5 Branch D-3 `clearMessages`/`clearThreadBucket` guard — wrap `<OrgContext>` **outside** `<StreamsProvider>` so streams can read active org but the provider lift (G-5 `StreamsProvider.tsx`) is not regressed.
+- **Server-side validate `X-Org-Id` against `org_members` on every request** (fail closed to the user's default/personal org, or 403). The header selects *which* of the caller's orgs is active; it can never grant membership. RLS is still the backstop, but the header must be validated before it's used to set `org_id` on writes.
+- Bind the active org to a **JWT custom claim** where possible so it's server-attested, with the header as a hint validated against membership.
 
 **Warning signs:**
-A save returns 200 but readback shows the old/sentinel value; try/except around the write with a bare `pass`/log-only; the UI has no "saved & verified" state distinct from "request sent."
+After switching orgs, a previously-streaming run's events still paint the panel; the backend uses `X-Org-Id` to scope a query with no membership check; a Realtime channel filter is treated as the isolation boundary.
 
-**Phase to address:** P-SECRETS (pattern reused by P-REGISTRY, P-ADMIN, P-KILL writes).
+**Phase to address:** **P6-ORGUI** (switch teardown + `<OrgContext>` placement); **P3-RLS+CLIENT** (server-side `X-Org-Id` validation).
 
 ---
 
-### Pitfall 11: Live `/models` discovery auto-enables models with GUESSED capabilities → silent loss of native tools
+### Pitfall 11: Regressing the RED LINES — CONCUR-01, Deep-mode byte-identical (D-14), the G-5 hot files, and Redis `run:{run_id}` implicit org-scoping
 
 **What goes wrong:**
-A discovery sweep pulls model IDs from each provider's `/models` and auto-enables them with default/inferred capabilities. But `/models` returns *IDs, not capabilities* — native-tool support, context window, forced-emit tier are not discoverable. If the guess is wrong, or the discovered `model_id`'s case/spelling doesn't exactly match a `MODEL_CAPABILITIES` key, the model silently degrades to no-tools: the agent makes zero tool calls with no error. This is the exact case-sensitivity trap that already happened ("zhipu/minimax lose native tools on case-sensitive MODEL_CAPABILITIES miss", memory).
+The tenancy rewrite is the largest internals change in the project's history and it lands on the most protected surfaces:
+- **CONCUR-01** (`test_058_concurrency.py`): membership-join RLS + per-request client construction must not push the cross-tab GET over 1s during streaming (the gate depends on `aexec`/`run_in_threadpool` keeping the event loop free — a synchronous per-request `create_client()` or an extra asyncpg `SET LOCAL` round-trip on the hot path can regress it).
+- **Deep-mode byte-identical (D-14):** the shared agent/streaming path must stay byte-identical; org scoping enters at the service boundary (retrieval scope, client construction), never by forking the shared streaming path.
+- **G-5 hot files:** `backend/app/api/threads.py` (already G-5-firing, extraction due) and `frontend/src/providers/StreamsProvider.tsx` must not regress. Threading `org_id` through the ~1850-LOC `send_message` and wrapping `<OrgContext>` around StreamsProvider are exactly the edits that trip G-5.
+- **Redis `run:{run_id}` implicit org-scoping:** run buffers are keyed only by `run_id`, no org in the key. Isolation relies on RLS on the `runs` table gating who can resolve a `run_id`; if a run's `org_id` is unset/mis-set, or `stream_run`/`cancel_run` ownership SELECTs regress to a bypassing client, cross-org run enumeration/streaming opens.
 
 **Why it happens:**
-Discovery *looks* complete when the picker fills with models. The registry read path already merges `model_capabilities_overrides` (enabled rows) into `MODEL_CAPABILITIES` via `get_model_capability_async` (`config.py:669`), and `get_model_capability` falls back to *inferred* capabilities on a miss (`confidence="inferred"`) — a silent, tool-losing default. Provider drift compounds it: a model present this sweep vanishes next sweep, leaving enabled rows pointing at dead IDs.
+Cross-cutting changes touch protected files by necessity; the guardrails (G-5) fire precisely here; and Redis keys carry no tenant, so tenant safety is entirely inherited from the `runs`-row gate.
 
 **How to avoid:**
-Discovery **proposes**, a human **confirms** capabilities before enable — the Phase 096 D-05 precedent (operator-approved diff, newest-first, `CURATE_STALE` accounting). Exact-match the registry key with case-normalization at the boundary (the documented sanitize point). Never auto-enable native-tool support — default `native_tools`/`forced_emission` to the SAFE (off) side and require explicit opt-in. Flag `confidence="inferred"` rows in the admin UI as "capabilities unverified."
+- Run CONCUR-01 + the SC#10 4-axis cross-provider UAT (cross-provider × multi-tool × parallel-thread × long-message) on the rewrite branch **before merge**; the parallel-thread axis is where cross-org stream bleed surfaces.
+- Keep org logic at the **service boundary** (retrieval scope resolution, client factory) — no `if org` branches inside the shared streaming loop (protects D-14).
+- Honor **G-5**: if threading org through `threads.py` needs real surgery, propose the overdue extraction refactor *first* (G-5 fires on `threads.py`).
+- Set `runs.org_id` at run creation from validated active-org; keep `stream_run`/`cancel_run` ownership SELECTs on the user-JWT client so the 404-not-403 invariant holds (RLS-blocked row → not visible → 404).
 
 **Warning signs:**
-A known tool-capable model makes zero tool calls in a run; a production model served with `confidence="inferred"`; enabled registry rows for models the latest `/models` sweep didn't return.
+CONCUR-01 flakes or exceeds 1s on the branch; any diff to the shared streaming consumer in `agent_loop` / provider gateway; `runs` rows with NULL `org_id`; a run streamable by a non-member; the G-5 ledger not consulted before editing `threads.py`.
 
-**Phase to address:** P-REGISTRY.
+**Phase to address:** **P3-RLS+CLIENT** (client + runs.org_id + CONCUR-01); **P8-ISOLATION** (full regression + SC#10); refactor-first per **G-5** before P3 touches `threads.py`.
 
 ---
 
-### Pitfall 12: Kill-switch / maintenance mode wired to a restart-required knob, or failing OPEN
+### Pitfall 12: "It's isolated" claimed from a one-org test — the two-org fixture suite is the only proof
 
 **What goes wrong:**
-The operator flips "disable web_search" (or the panic switch) and nothing happens — because the flag was read at import/startup like `WORKER_COUNT`/`SANDBOX_ENABLED`, which genuinely can't hot-reload. Or the capability check FAILS OPEN: when the flag read errors, the capability runs anyway, so a melting-down provider stays live during the exact incident the switch exists for. SEED-078's rule: "a kill-switch that needs a restart is not a kill-switch."
+Every existing test seeds a single user/tenant, so it stays green even if isolation is completely broken — there is no second org for data to leak *into*. Shipping tenancy without a **two-org adversarial suite** leaves the highest-severity bug class (cross-org read/write) unverified. This is the difference between "looks done" and "is done."
 
 **Why it happens:**
-The hot-reload substrate exists (the `app_settings` row read through a ~30s TTL cache, `user_settings.py`), so it's tempting to add flags anywhere — including next to knobs that bind at worker boot. And "on error, allow" is the accidental default of most `try/except`-wrapped checks.
+The existing suite's fixtures are single-user by construction; adding a second tenant is extra scaffolding that's easy to defer.
 
 **How to avoid:**
-Flags live in `app_settings.feature_flags` (JSONB), read through the TTL cache with targeted invalidation on write, so a flip propagates ≤30s with no restart. Capability-boundary checks FAIL CLOSED where disabling is the safe default (sandbox fleet, web_search, provider quarantine). Use the SEED-024 env-var classification inventory to mark each knob `live` vs `restart-required` at the point of edit — never wire a kill-switch to a `restart-required` value. Honest UX when a capability is off ("temporarily disabled by your operator"), not a cryptic error.
+Build `test_v3_4_org_isolation.py`: seed **User A ∈ Org X** and **User B ∈ Org Y**, and for **every** user-facing table assert A cannot `SELECT/UPDATE/DELETE` B's rows (and vice versa). Explicitly cover the four DEFINER retrieval fns — `match_document_chunks`, `keyword_search_chunks`, `match_skills` each return **0** cross-org rows; `query_user_documents` replayed with subquery/CTE payloads returns 0 cross-org rows. Add a member-vs-org-admin audit-log visibility case. Exercise **both** the PostgREST and asyncpg paths (Pitfall 4). Assert `X-Org-Id` spoofing (User A sends Org Y's id) is rejected.
 
 **Warning signs:**
-A flag flip that "doesn't take effect"; a disabled capability that still runs when the flag read throws; a maintenance mode that either kills in-flight runs or fails to stop new ones.
+Isolation "verified" but the fixture seeds one org; no test names a second org/user; DEFINER retrieval fns absent from the isolation suite.
 
-**Phase to address:** P-KILL.
+**Phase to address:** **P8-ISOLATION** (this suite is the milestone's exit gate).
 
 ---
-
-### Pitfall 13: Role-gated visibility retrofitted in the UI but not at the API boundary
-
-**What goes wrong:**
-The admin nav item / button is hidden in React for non-operators, but the FastAPI route is ungated — any authenticated user hits it directly (curl, devtools). Combined with the service-role backend (Pitfall 1), an ungated `/admin` endpoint returns cross-user data to any logged-in user. Retrofit gating also drifts: some surfaces gated, some not, because the check is duplicated per-component.
-
-**Why it happens:**
-Hiding UI is the visible, demoable half; the API check is the invisible, load-bearing half. Retrofitting onto an existing app means the check is added surface-by-surface instead of at a chokepoint.
-
-**How to avoid:**
-Gate at the API boundary FIRST with the single `require_operator` dependency (Pitfall 1); UI hiding is cosmetic-only and never the security control. One source of truth for "is operator." Default-deny for any new `/admin` route (router-level dependency, not opt-in per handler). Entitlement/feature gating (tier visibility) rides the same flag substrate as P-KILL (SEED-078/080) — one home, not a fourth ad-hoc boolean.
-
-**Warning signs:**
-An `/admin` route reachable with a normal JWT; a feature check that exists only in the frontend; per-component role logic that varies across surfaces.
-
-**Phase to address:** P-ADMIN (boundary) + P-KILL (shared gating substrate).
-
----
-
-### Pitfall 14: Inline citation attribution that fabricates provenance (post-hoc citation)
-
-**What goes wrong:**
-An inline source chip (SEED-033) is attached to a sentence the model didn't actually derive from that source, or cites a retrieved chunk that wasn't used — because attribution is generated by a *second* "which source fits?" LLM pass rather than from what was actually retrieved/used. The platform already saw this exact overclaim: DeepSeek/MiniMax said "converted your docx / real page layout" when they had *reconstructed from text* (SEED-108) — attribution dishonesty erodes the trust the whole RAG product sells.
-
-**Why it happens:**
-Post-hoc "cite this answer" is easy and looks authoritative. But an LLM asked to justify its own output will confidently attach a plausible-looking source it never used.
-
-**How to avoid:**
-Adopt the discipline the template-fill path already proved: `check_coverage()` in `template_render_service.py` marks a value CITED **only if its `source_chunk_id` was actually in the retrieved set** — an invented/absent citation counts as uncited. Inline chat citation must key attribution to the run's retrieval-set / tool-result provenance (a set-membership test), not a re-ask. When provenance is unknown, show "no source" — never a guessed one. Cross-provider honesty parity (the SRH-01 / emit-honesty precedent) so attribution behaves the same across all providers.
-
-**Warning signs:**
-A citation pointing at a chunk not in the run's `retrieved_ids`; identical answer text attributed to different sources across providers; a "cite" step that's a separate LLM call over the finished answer.
-
-**Phase to address:** P-UX (attribution engine), cross-links P-FILE honesty (SEED-108).
-
----
-
-### Pitfall 15: Plain-language relabeling that breaks muscle memory, API contracts, or audit history
-
-**What goes wrong:**
-The two-audience plain-language layer (SEED-085) renames a mode, button, or field. Users can't find a feature they knew. Worse, if the label doubles as an enum value, `operator_audit_log` action name, or API field, the rename breaks stored audit rows, integrations, and history queries. And a11y-blind renames leave stale `aria-label`s.
-
-**Why it happens:**
-"Just rename it to something friendlier" treats display strings as free text, but some of them are load-bearing keys. The Deep/Explorer/Harness pill history (v3.1 removed the Harness pill) shows mode renames need care.
-
-**How to avoid:**
-Relabel the **display layer only**; keep enum/action/DB/API values stable behind a display map. Provide a transition affordance ("formerly X"). Update `aria-label`s with the visible label. Critically, a UX relabel of the composer/mode must not touch Deep Mode's runtime — Deep Mode stays byte-identical (gated no-op; the milestone red line). Verify the blob-hash/no-op invariant after any composer relabel.
-
-**Warning signs:**
-A display string used as a dict key, audit action, or DB enum; a rename that changes a persisted value; an audit query that returns fewer rows after a relabel; Deep Mode behavior shifting after a "cosmetic" change.
-
-**Phase to address:** P-UX (cross-links the Deep-byte-identical landmine).
 
 ## Technical Debt Patterns
 
-Shortcuts that seem reasonable but create long-term problems.
-
 | Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
 |----------|-------------------|----------------|-----------------|
-| Operator as an `is_admin` boolean on the user row | 1-line role model | Poisons the v3.4 RLS rewrite (18 tables); can't separate SYSTEM vs ORG authority (Pitfall 3) | **Never** — use a separate `operator_users` principal |
-| Auto-enable `/models`-discovered models with inferred capabilities | Zero-touch model list | Silent no-tools degradation + dead-model rows (Pitfall 11) | **Never** — discovery proposes, human confirms |
-| Hide admin UI without gating the API | Fast demo | Ungated service-role route = full-tenant leak (Pitfall 13) | **Never** for `/admin` |
-| Provider keys as plaintext `app_settings` columns (current state) | Works today; env fallback keeps local dev | No encryption-at-rest; DB dump = all keys leak (Pitfall 8) | OK for single-tenant self-host; **not** for the hosted multi-tenant SaaS line |
-| Impersonation by minting the target's session | Reuses existing auth | Audit attributes actions to the victim; no dual-control (Pitfall 2) | **Never** — dual-identity context only |
-| Promote an uploaded template to the library by carrying its provenance | Nice "reuse my template" UX | Reopens the SSTI door (Pitfall 4) | **Never** — explicit re-stamp on promotion |
-| Kill-switch/flag stored next to import-bound env knobs | One flag namespace | A switch that needs a restart isn't a switch (Pitfall 12) | **Never** — live knobs only, classified via the env inventory |
-| One big `app_settings` JSONB blob for all new admin knobs | Fast to add rows | No per-key audit/rollback; write contention; concurrent-write clobber | Only if each key still has `updated_by`/`updated_at` + targeted invalidation |
+| Ship RLS policies now, swap the client "next phase" | Migrations land fast; isolation *looks* done | RLS inert; a forgotten `.eq` leaks all orgs; false confidence (Pitfall 1) | **Never** — client swap is atomic with the predicate rewrite |
+| Extend `_inject_user_id` regex to also inject `org_id` | Reuses existing "guard"; no caller rewrite | Doubles a leaky string-rewriter; CTE/subquery bypass now leaks cross-org (Pitfall 3) | **Never** — move caller to user-JWT + delete the regex |
+| Fix only `match_document_chunks`, treat retrieval as "done" | One function, quick | `keyword_search_chunks` + `match_skills` keep leaking cross-org (Pitfall 2) | **Never** — all 4 DEFINER retrieval fns or none |
+| Keep asyncpg pool as a trusted service-role path with in-query predicates | No `SET LOCAL` complexity; preserves Phase 073 perf | RLS never binds on that path; a missed predicate = silent leak (Pitfall 4) | Only if **every** asyncpg query has mandatory `org_id`+`user_id` predicates AND a CI guard enforces it |
+| Delete the now-"redundant" `user_id` filters during the rewrite | Cleaner diffs in `threads.py` | Removes the only fallback when a client swap regresses (Pitfall 8) | **Never in this milestone** — defer to a later code-quality pass |
+| Ship `org_id` columns without indexes (mirroring mig 096's lean shape) | Smaller migration | Seq scans on `document_chunks`; retrieval p95 blows up; CONCUR-01 regresses (Pitfall 6) | Only for tiny/rarely-scanned tables; never on chunk/message/run tables |
+| Trust Realtime's org filter as the isolation boundary | No teardown code on org switch | Best-effort Realtime (D-v2.5-03) leaks stale-org events; not authoritative (Pitfall 10) | **Never** — reconcile via fetch; abort subscriptions on switch |
+| Auto-flag any seeded skill as `is_system_global` | `skill-creator` "just works" cross-org | A private skill seeded via SQL becomes a cross-org backdoor | **Never** — hardcoded allow-list in the migration only |
 
 ## Integration Gotchas
 
-Common mistakes when connecting to the platform's own external services.
-
 | Integration | Common Mistake | Correct Approach |
 |-------------|----------------|------------------|
-| Supabase (service-role client) | Assume RLS protects `/admin` cross-user queries | RLS is inert on the backend path (`dependencies.py:19`); enforce in app + `require_operator`, reviewed WHERE clauses |
-| Supabase Auth (impersonation) | Mint the target user's JWT / session | Dual-identity server context (actor + subject), stamp both to audit, never a real victim session |
-| Supabase Realtime | Push admin state (active runs, kill-switch, maintenance banner) and trust delivery | Best-effort hint only (D-v2.5-03) — reconcile via fetch on (re)connect; a kill-switch must NOT depend on Realtime delivery |
-| `llm_sandbox` (per-thread cached) | Materialize a KB file into a shared/mis-keyed session; write it to `sandbox-outputs` | Scope by `user_id`+`thread_id`, size-cap, stream-to-disk, no exfil to output bucket (Pitfall 6) |
-| Provider `/models` endpoints | Trust returned "capabilities"; loose ID matching | IDs only — author capabilities, exact-case key match, human-confirm before enable (Pitfall 11) |
-| `app_settings` TTL cache | Expect an instant flag flip; hot-reload an import-bound knob | ≤30s propagation + targeted invalidation; env-bound knobs (`WORKER_COUNT`, `SANDBOX_ENABLED`) never hot-reload (Pitfall 12) |
-| Supabase Storage (`documents.file_path`, `skill-files`) | Read/write by path without owner re-check (backend is service-role) | Re-apply the `read_document`/skill owner scope in the tool path, not just the HTTP endpoint |
+| supabase-py (PostgREST) | `create_client()` per request for the user JWT | Reuse one client; swap `Authorization` / `postgrest.auth(jwt)` per request; cache at process level via FastAPI DI (avoids connection fanout under `WORKER_COUNT=2`) |
+| asyncpg pool (`get_pg_pool`) | Assume "user-JWT client" applies; expect RLS to bind | RLS ignores this path (DSN role, `auth.uid()` NULL). Use `SET LOCAL role authenticated` + `SET LOCAL request.jwt.claims` per txn, or mandatory in-query `org_id`+`user_id` predicates |
+| Supabase Realtime | Filter channel by `org_id` and trust it | Best-effort only (D-v2.5-03); abort + refetch on org switch/reconnect |
+| Redis run buffers | Assume `run:{run_id}` needs an org in the key | Key stays `run_id`-only; isolation inherited from `runs.org_id` RLS + ownership SELECT on the user-JWT client. Ensure `runs.org_id` is set at creation |
+| `handle_new_user` trigger (auth.users→profiles, DEFINER) | Personal-org auto-create hooked only in the backfill; new SSO/JIT users get no org | Extend the new-user path (trigger or SSO callback) to create membership idempotently (`ON CONFLICT DO NOTHING`) |
+| SAML IdP (python3-saml + xmlsec1) | Unpinned lib; raw XML parse; consume unsigned assertion | Pin patched `python3-saml`; `xmlsec1` in image; defusedxml; validate the signed assertion is the one read (XSW/XXE) |
+| OIDC discovery fetch | Backend GETs admin-supplied discovery/JWKS URL unvalidated | Allowlist host, block link-local/private ranges, timeout — treat `sso_configs` as untrusted (SSRF) |
+| Migration workflow (CLAUDE.md) | `supabase db push`/`db reset`; hand-edit `full-schema.sql`; letter-suffix filenames (`088b`) | Paste into Supabase SQL editor; `scripts/regenerate-full-schema.sh`; digits-only filenames; deploy-artifact same-commit parity |
 
 ## Performance Traps
 
-Patterns that work at small scale but fail as usage grows. This product targets org-scale production (`project_target_scale`).
-
 | Trap | Symptoms | Prevention | When It Breaks |
 |------|----------|------------|----------------|
-| Audit-log browser does a full-table scan | `/admin` audit page slow; timeouts | Index on `(created_at, actor_id, action)`; keyset pagination, not OFFSET | ~100k+ audit rows |
-| Live `/models` called on every registry read | Slow settings page; provider rate-limit 429s | Cache discovery; scheduled sweep, not per-request; read from `model_capabilities_overrides` | N providers × frequent reads |
-| Sandbox materialization of large KB files | Container OOM (echoes thesis-PDF `MemoryError`) | Size cap + stream-to-disk; never into model context | Files > ~100MB or many concurrent bridges |
-| Zip decompression on upload without a guard | Memory spike / worker DoS from one request | Uncompressed-size + ratio cap before extract | A single crafted zip bomb |
-| Feature-flag / entitlement check per request without cache | DB hammering under load | The existing ~30s TTL cache substrate | High RPS across workers |
-| Operator "view all users' threads/runs" unpaginated | Memory blowup; slow render | Server-side pagination + scoping from day one | Thousands of users/runs |
+| Per-row `org_members` sub-select in every table's RLS | Retrieval/list p95 climbs; CONCUR-01 flakes | Resolve org set once via DEFINER helper / JWT claim; compare against a constant array | ~100s concurrent users × multi-org membership |
+| No `org_id` index (mig 096 shipped none) | `EXPLAIN` shows seq scan on `document_chunks` | Partial/composite `org_id` index beside the vector index; org filter pre-narrows | ~100k+ chunks per retrieval |
+| `document_chunks` scoped via per-row `JOIN documents` (no own `org_id`) | Extra join on the hottest vector path | Add+backfill+index `org_id` on `document_chunks` directly | Any real corpus under parallel runs |
+| Per-request `create_client()` construction on the hot path | Connection fanout; event-loop stalls; CONCUR-01 >1s | Reuse client + header swap; keep `aexec`/`run_in_threadpool` (D-v2.5-01) | 50+ parallel runs |
+| asyncpg `SET LOCAL` round-trips added to the hot path | Extra RTT per query erodes the CONCUR-01 margin | Batch within one txn; measure against the 1s gate before merge | Streaming + cross-tab GET concurrency |
+| Backfill `UPDATE` unbatched over large tables | Deploy-time app stall / lock storm | 10k-row batches, `WHERE org_id IS NULL`, low-traffic window | A user/org with 100k+ documents |
 
 ## Security Mistakes
 
-Domain-specific issues beyond OWASP basics.
-
 | Mistake | Risk | Prevention |
 |---------|------|------------|
-| Ungated `/admin` route on a service-role backend | Any authenticated user reads ALL users' data | `require_operator` router dependency, default-deny, 403 test per route |
-| Untrusted upload reaches the Jinja engine | Server-side template injection (RCE-in-sandbox) | Preserve provenance routing (`select_engine` → `run_replace` for uploads); library promotion re-stamps explicitly |
-| Trusting MIME/extension on docx/pptx/xlsx uploads | Zip bomb DoS; path-traversal write; renamed executable | Magic-byte check + uncompressed-size/ratio caps + entry-path validation + file-size cap |
-| Agent skill-attach tool can write a global skill | Cross-tenant stored prompt-injection / supply-chain | Owner-scoped only; no global/built-in write; RLS check in the tool dispatcher |
-| RAG→sandbox bridge without owner re-check | Cross-user file read; exfil via output card | Reuse `read_document`'s owner/global resolver; no write to `sandbox-outputs` |
-| Provider key in logs / audit rows / frontend readback | Full key leak | Extend "never to frontend" to logs + audit; mask everywhere; encrypt-at-rest the DB column |
-| Impersonation without dual-identity audit | Insider abuse invisible; repudiation | Stamp actor + subject on every impersonated action |
-| Citation attached to an unused/absent source | User trusts a fabricated source; RAG-trust collapse | Attribution from the run's retrieval-set only (set-membership, like `check_coverage`) |
+| Service-role client left on hot paths after RLS ships | RLS inert; a forgotten filter leaks **all** orgs | User-JWT client swap atomic with the predicate rewrite (Pitfall 1) |
+| Fixing 1 of 4 DEFINER retrieval fns | Keyword search + skill catalog leak cross-org | Audit all `SECURITY DEFINER` fns in `full-schema.sql`; scope every retrieval fn (Pitfall 2) |
+| `match_document_chunks` / `keyword_search_chunks` with no pinned `search_path` | Search-path hijack privilege escalation on a DEFINER fn | `SET search_path` on both in the same change |
+| Regex SQL rewriting as the tenant guard | CTE/subquery bypass → cross-org SQL read (Pitfall 3) | Delete `_inject_user_id`; user-JWT + already-INVOKER `query_user_documents` |
+| `X-Org-Id` header trusted without membership check | localStorage spoof → cross-tenant read/write | Validate header against `org_members` server-side; RLS backstop (Pitfall 10) |
+| SAML assertion consumed without XSW/XXE hardening | Auth bypass / impersonation (CVE-2017-11427 class) | Patched `python3-saml` + xmlsec1 + defusedxml + signed-assertion validation |
+| OIDC discovery URL fetched unvalidated | SSRF to internal metadata / services | Host allowlist + private-range block + timeout |
+| Global-resource owner-UUID leak (SEED-091) survives the rewrite | Non-owner org members see the seeding owner's `auth.users.id` (+ `folder_scope`) on shared folders/skills/views | In each list/serialize path null owner fields on shared rows the caller doesn't own — apply uniformly to folders+skills+views |
+| JIT provisioning non-idempotent | Duplicate memberships / unique-violation on concurrent first-login | `INSERT … ON CONFLICT DO NOTHING` + txn/advisory-lock (Pitfall 9) |
 
 ## UX Pitfalls
 
 | Pitfall | User Impact | Better Approach |
 |---------|-------------|-----------------|
-| Relabel that breaks muscle memory | Users can't find known features | Display-layer rename only + "formerly X" transition tooltip |
-| Kill-switch with no honest "disabled by operator" state | Users hit cryptic errors when a capability is off | Explicit disabled-state messaging (SEED-078) |
-| Over-citation (a chip on every sentence) | Noise; paradoxically lowers trust | Cite where provenance is real; blank where unknown |
-| a11y retrofit only on new `/admin` surfaces | Deep Midnight glass/gradient theme still fails WCAG AA | Audit contrast app-wide, not just new pages (SEED-092) |
-| Maintenance/drain mode with no banner | Confusing rejected writes | Drain new runs, let in-flight finish, show a banner |
-| Model picker floods with every discovered model | Choice overload; typo/dead models selectable | Curated + explicit "custom" badge for user-added mappings (SEED-024 §6) |
-| Admin knobs with no live-vs-restart marker | Operator changes a value, nothing happens, guesses why | Per-row `live` / `restart required` marker at the point of edit (SEED-024 §strengthen) |
+| Backfill mishandles `is_global` | Users "lose" previously-shared docs/skills after deploy | Value-preserving `RENAME`; fixture test proving shared-stays-shared |
+| Org switch doesn't tear down streams | Org A's run events paint inside Org B | Abort subscriptions + refetch on switch; `<OrgContext>` outside `<StreamsProvider>` |
+| SSO enforcement flipped before SSO verified | Whole org locked out, no recovery | Keep email/password fallback (v3.4); preview + break-glass before any enforcement |
+| No active-org affordance / identity anchor | User unsure which tenant they're acting in | Profile-menu identity anchor + org switcher (SEED-113) |
+| New user lands with no org after signup | Empty app, confusing first-run | Idempotent personal-org creation on the new-user / JIT path |
 
 ## "Looks Done But Isn't" Checklist
 
-- [ ] **`/admin` routes:** often missing the API-boundary role check (only UI hidden) — verify a normal-user JWT gets **403 on every** `/admin` route.
-- [ ] **Impersonation:** often missing dual-identity audit — verify `operator_audit_log` records **both** actor and subject on an impersonated action, and no victim session is minted.
-- [ ] **Operator role model:** often missing v3.4-compatibility — verify the operator is a **separate principal**, not an `is_admin` flag or org member.
-- [ ] **Secrets UI:** often missing round-trip verify + env fallback — verify save→read shows the masked prefix, sentinel rejects surface to the UI, AND local dev with keys only in `.env` still boots.
-- [ ] **Template upload:** often missing provenance stamp + zip guard — verify an uploaded template routes to `run_replace` (never `docxtpl`) and a zip bomb / traversal entry is rejected.
-- [ ] **Skill-attach tool:** often missing tool-dispatcher RLS check + SC#10 — verify all 4 providers call it, owner-scoped, no global/built-in write.
-- [ ] **RAG→sandbox bridge:** often missing owner re-check + size cap — verify a cross-user doc id 404s and a huge file streams (not OOMs), and never lands in `sandbox-outputs`.
-- [ ] **Model registry:** often missing capability confirmation — verify a discovered model isn't auto-enabled with inferred native tools; case-mismatch doesn't silently drop tools.
-- [ ] **Kill-switch:** often missing fail-closed + hot-reload — verify a flip takes effect ≤30s with no restart, and a flag-read error **disables** (not enables) the capability.
-- [ ] **Citation:** often missing provenance-set check — verify every cited chunk was actually in the run's `retrieved_ids`.
-- [ ] **Deep Mode:** often missing byte-identical proof after a UX relabel — verify the gated no-op / blob hash is unchanged.
-- [ ] **SC#10 cross-provider:** any new tool (bridge, attach) or agent-loop/UI-state change — verify the 4-axis UAT (4 providers × multi-tool × parallel-thread × long-message) is authored under VALIDATION.md.
+- [ ] **RLS policies written:** Verify the **client swapped to user-JWT** on every hot path (`get_supabase` gone from `/threads`, `/documents`, `/runs`, `/kb`, `/skills`, retrieval, SQL tool) — policies are inert under service-role.
+- [ ] **Retrieval isolation:** Verify **all four** DEFINER fns scoped (`match_document_chunks`, `keyword_search_chunks`, `match_skills`, `folder_is_globally_visible`) — not just vector search.
+- [ ] **Text-to-SQL:** Verify `_inject_user_id` **deleted** and the RPC called with a user-JWT client — not "regex extended to org_id."
+- [ ] **asyncpg path:** Verify RLS actually binds (or mandatory predicates + CI guard) — a "user-JWT client" does nothing for `get_pg_pool` queries.
+- [ ] **Indexes:** Verify `org_id` **indexed** on `document_chunks`/`messages`/`runs` (mig 096 shipped none) — and that `document_chunks` even *has* an `org_id` column.
+- [ ] **Backfill:** Verify **idempotent re-run** (no duplicate orgs/memberships), **batched**, NOT-NULL flipped **after** backfill, `is_global` `RENAME`d not dropped, `skill-creator` still cross-org visible.
+- [ ] **`X-Org-Id`:** Verify the server **validates against `org_members`** — not trusted from localStorage.
+- [ ] **`runs.org_id`:** Verify set at creation; `stream_run`/`cancel_run` ownership on user-JWT client (404-not-403 preserved).
+- [ ] **SSO:** Verify `python3-saml` pinned + `xmlsec1` present + XSW/XXE hardened; JIT `ON CONFLICT`; OIDC discovery SSRF-guarded; email/password fallback **still works**.
+- [ ] **Two-org proof:** Verify `test_v3_4_org_isolation.py` seeds **two** orgs and covers every table + all DEFINER fns + both DB paths + header spoof.
+- [ ] **Red lines:** Verify CONCUR-01 <1s, Deep byte-identical (D-14), G-5 files unregressed, SC#10 4-axis UAT green on the branch.
 
 ## Recovery Strategies
 
 | Pitfall | Recovery Cost | Recovery Steps |
 |---------|---------------|----------------|
-| Cross-user leak via ungated `/admin` route | HIGH | Revoke route; audit access logs (hard to know what leaked); add `require_operator`; notify affected; add 403 regression test |
-| SSTI via mis-provenanced upload | HIGH | Sandbox containment limits blast radius (network-less), but rotate any secret reachable in the render env; patch the provenance boundary; audit rendered outputs |
-| Operator role shape poisons v3.4 RLS | HIGH | Schema unwind mid-rewrite (the highest-risk apply) — avoid by choosing the separate-principal model **now** |
-| Plaintext provider-key DB leak | HIGH | Rotate ALL provider keys immediately; add encryption-at-rest; audit `operator_audit_log`/logs for prior exposure |
-| Silent no-tools model degradation | LOW | Fix the registry key case-match; re-enable native tools; re-run the eval scoreboard |
-| Fabricated inline citation shipped | MEDIUM | Switch attribution to retrieval-set membership; re-verify cross-provider; add a "cited chunk ∈ retrieved" assertion |
-| Kill-switch that didn't fire (import-bound / fail-open) | MEDIUM | Move the flag to the `app_settings` live substrate; flip the check to fail-closed; reclassify the knob live-vs-restart |
+| RLS shipped but client still service-role | HIGH | Emergency: confirm the `.eq("user_id")` filters weren't deleted (fallback intact); hot-fix the client dependency; audit access logs for cross-org reads during the window |
+| One DEFINER retrieval fn missed | MEDIUM | Add org filter + `search_path` to the missed fn; re-run two-org retrieval assertions; check logs for cross-org citations |
+| Backfill created duplicate orgs/memberships | MEDIUM | Dedup by `(org_id,user_id)` / oldest personal org per user; make the migration idempotent; re-run against a prod copy first |
+| `is_global` sharing lost in backfill | HIGH | Restore from pre-migration snapshot; re-apply value-preserving `RENAME`; re-flag the `is_system_global` allow-list |
+| `org_members` recursion (42P17) in prod | LOW-MEDIUM | Replace the self-selecting policy with a DEFINER-helper predicate; redeploy the single policy migration |
+| CONCUR-01 regressed | MEDIUM | Add `org_id` indexes; move org resolution to a JWT claim/helper; revert per-request `create_client()` to header-swap; re-benchmark |
+| Cross-org leak found post-ship | HIGH | Feature-flag/rollback the tenancy branch (atomic branch makes this cleaner); the two-org suite becomes the regression gate before re-ship |
 
 ## Pitfall-to-Phase Mapping
 
-| Pitfall | Prevention Phase | Verification |
-|---------|------------------|--------------|
-| 1. Service-role is the only gate | P-ADMIN | 403 for normal JWT on every `/admin` route; reviewed operator query helpers |
-| 2. Impersonation identity/audit | P-ADMIN | Dual-id (actor+subject) in `operator_audit_log`; no minted victim session |
-| 3. Operator role poisons v3.4 RLS | P-ADMIN | Separate `operator_users` principal; org-agnostic authority; checked against v3.4 RLS plan |
-| 4. Upload breaks provenance boundary | P-FILE | Jinja-payload upload renders literally; `select_engine('template_input')` can't return `docxtpl` |
-| 5. MIME/zip-bomb/traversal | P-FILE | Magic-byte + ratio/size caps + entry-path validation on a crafted archive |
-| 6. RAG→sandbox exfil/scope | P-FILE | Cross-user doc id 404s; size cap; no `sandbox-outputs` write; SC#10 4-axis |
-| 7. Skill-attach WRITE tool | P-ATTACH | Owner-scoped, no global write, dispatcher-level RLS, SC#10 all providers |
-| 8. Stale-brief / plaintext keys | P-SECRETS | Verify live state; encrypt-at-rest; keys absent from logs/audit/frontend |
-| 9. Local↔cloud env switch | P-SECRETS | Backend boots with keys only in `.env`, empty `app_settings` |
-| 10. Silent save failure | P-SECRETS | Save→readback verify; sentinel reject surfaced to UI |
-| 11. Model discovery capability guessing | P-REGISTRY | Human-confirm before enable; exact-case match; inferred rows flagged |
-| 12. Kill-switch restart/fail-open | P-KILL | ≤30s hot-reload, no restart; fail-closed on read error |
-| 13. UI-only role gating | P-ADMIN + P-KILL | API-boundary gate; single source of truth; default-deny new routes |
-| 14. Fabricated citation | P-UX | Cited chunk ∈ `retrieved_ids`; cross-provider parity |
-| 15. Relabel breaks contracts | P-UX | Display-only rename; enum/audit/DB values stable; Deep Mode byte-identical |
+| Pitfall | Prevention Phase (role) | Verification |
+|---------|-------------------------|--------------|
+| 1 — Service-role bypasses RLS | **P3-RLS+CLIENT** (atomic w/ predicates) | No `get_supabase` on hot paths; two-org read blocked with a JWT whose sub ≠ owner |
+| 2 — 4 DEFINER retrieval fns | **P4-SECDEF** | Two-org suite: each of the 4 fns returns 0 cross-org rows; `search_path` pinned |
+| 3 — `query_user_documents` INVOKER-but-service-role + regex | **P4-SECDEF** | `_inject_user_id` deleted; subquery/CTE replay returns 0 cross-org rows |
+| 4 — asyncpg bypasses RLS | **P3-RLS+CLIENT** | asyncpg path returns 0 rows for a user whose claims weren't set |
+| 5 — `org_members` recursion | **P1-SCHEMA** | No 42P17; policy references DEFINER helper, not self |
+| 6 — membership-join perf / no index | **P3-RLS+CLIENT** + **P8-ISOLATION** | `EXPLAIN` uses `org_id` index; CONCUR-01 <1s on branch |
+| 7 — backfill lock/idempotency/NOT-NULL/`is_global` | **P2-BACKFILL** | Re-run idempotent; batched; shared-stays-shared fixture; new users get an org |
+| 8 — forgotten org predicate / belt-and-suspenders | **P3-RLS+CLIENT** | Filters retained; CI guard fails on service-role import |
+| 9 — SSO XSW/XXE/JIT/SSRF/fallback | **P5-SSO** | Patched lib + xmlsec1; JIT `ON CONFLICT`; SSRF guard; fallback UAT |
+| 10 — org-switch streams / `X-Org-Id` spoof | **P6-ORGUI** + **P3-RLS+CLIENT** | Switch aborts+refetches; header validated vs `org_members` |
+| 11 — RED LINES (CONCUR-01/D-14/G-5/Redis) | **P3-RLS+CLIENT** + **P8-ISOLATION** | CONCUR-01 + SC#10 4-axis green; `runs.org_id` set; G-5 consulted |
+| 12 — one-org test false-green | **P8-ISOLATION** | `test_v3_4_org_isolation.py` seeds two orgs across every table + both DB paths |
 
 ## Sources
 
-- **Live codebase (HIGH):** `backend/app/dependencies.py:19` (service-role client — RLS bypass), `backend/app/services/template_render_service.py` (`select_engine` provenance boundary :936, `check_coverage` citation-set membership :416, `SandboxedEnvironment(autoescape=True)` :657, `zipfile` on untrusted bytes :381), `backend/app/models/user_settings.py` (settings_override.json eliminated, plaintext key columns + env fallback :397, sentinel guard `save_app_settings`, `model_capabilities_overrides` read :316), `backend/app/config.py` (`get_model_capability`/`_async` :498/:669, `confidence="inferred"` fallback), `backend/app/services/tool_dispatcher.py` (`_handle_read_document` owner scope :237).
-- **Seeds (HIGH):** SEED-108 (RAG→sandbox bridge — RLS/size/exfil), SEED-104 (agent skill-attach WRITE tool threat model), SEED-024 (settings unification, env live-vs-restart classification, model-picker surfacing), SEED-078 (kill-switch/maintenance/feature-flag substrate, fail-closed, D-PRD-14 SYSTEM-vs-ORG role split).
-- **Project memory / decisions (HIGH):** service-role RLS bypass; case-sensitive `MODEL_CAPABILITIES` miss drops native tools; settings save silent-failure (mig 078); Deep-Mode byte-identical red line; SC#10 4-axis cross-provider mandate; Supabase Realtime best-effort (D-v2.5-03); thesis-PDF `MemoryError` (large-file OOM precedent).
-- **Established security knowledge (MEDIUM, verified against this codebase's own defenses):** Jinja SSTI via `SandboxedEnvironment` escapes; OOXML/ZIP decompression bombs and path traversal in office-document uploads; post-hoc LLM citation fabrication.
+- **Live codebase (HIGH):** `supabase/full-schema.sql` (DEFINER fns at :97 `folder_is_globally_visible`, :136 `keyword_search_chunks`, :163 `match_document_chunks`, :188 `match_skills`, :219 `query_user_documents` INVOKER, :212 the "ONLY cross-user gate — never widen it" comment); `backend/app/dependencies.py` (:21-25 service-role singleton, :79-105 asyncpg pool); `backend/app/services/sql_service.py` (:31-68 `_inject_user_id` regex, :34/:92 "service role bypasses RLS" comments); `supabase/migrations/096_org_id_stub_sweep.sql` (4-root stub, no FK/index/backfill, "child tables … NOT stubbed"); `supabase/migrations/012_query_documents_fn.sql` (INVOKER since day 1); `backend/tests/integration/test_058_concurrency.py` (CONCUR-01 gate).
+- **Planning intent (HIGH):** `.planning/PROJECT.md` (v3.4 scope, ratify-not-relitigate ADR, SEED-091 folds here); `.planning/PRDs/v3.3-multi-tenancy.md` (§3–§13 intent — **numbers stale**, mine for intent only: §6 belt-and-suspenders, §10 rejected enforcement/cross-org-sharing, §13 Q-v3.2-08 atomic); `.planning/seeds/SEED-004-org-multi-tenancy.md` (entry plan, RLS-shift, DEFINER audit); `.planning/seeds/SEED-091-global-resource-owner-identity-disclosure.md` (owner-UUID leak + minimal fix); `CLAUDE.md` (D-v2.5-01 threadpool, D-v2.5-03 Realtime best-effort, D-14 Deep byte-identical, G-5 hot files, WORKER_COUNT=2, migration-via-SQL-editor).
+- **SSO CVE class (HIGH, external):** python3-saml CVE-2017-11427 (auth bypass via DOM-traversal/canonicalization, fixed 1.4.0+) and CVE-2016-1000251 (signature wrapping pre-1.2.0); recurring class — CVE-2025-47949 (samlify), CVE-2026-47201 (authentik XSW). [Snyk: CVE-2017-11427](https://security.snyk.io/vuln/SNYK-PYTHON-PYTHON3SAML-40775) · [PortSwigger — The Fragile Lock: SAML bypasses](https://portswigger.net/research/the-fragile-lock) · [SAML-Toolkits/python3-saml](https://github.com/SAML-Toolkits/python3-saml)
+- **supabase-py per-request JWT (MEDIUM, external):** service-role key ALWAYS bypasses RLS; reuse one client + override Authorization per operation (do not create-client-per-request); cache clients at process level. [Supabase Discussion #33811 — FastAPI + Supabase](https://github.com/orgs/supabase/discussions/33811) · [Supabase Docs — service role & RLS](https://supabase.com/docs/guides/troubleshooting/why-is-my-service-role-key-client-getting-rls-errors-or-not-returning-data-7_1K9z) · [Supabase RLS best practices (multi-tenant)](https://makerkit.dev/blog/tutorials/supabase-rls-best-practices)
 
 ---
-*Pitfalls research for: v3.3 Operator UX — admin tier, secrets/model-registry management, run-time file inputs, plain-language/citation UX on a service-role multi-provider RAG platform*
-*Researched: 2026-07-10*
+*Pitfalls research for: org multi-tenancy + RLS rewrite + SSO retrofit onto a single-tenant per-user RAG platform (Agentic RAG v3.4)*
+*Researched: 2026-07-18*

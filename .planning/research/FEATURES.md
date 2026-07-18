@@ -1,421 +1,390 @@
-# Feature Research — v3.3 Operator UX
+# Feature Research — v3.4 Multi-Tenancy & Org Access
 
-**Domain:** Enterprise Agentic-RAG platform (workflow inputs + KB scoping · admin/operator console · model registry · inline citations · plain-language UX)
-**Researched:** 2026-07-10
-**Confidence:** MEDIUM-HIGH (competitor claims sourced from their OWN current 2026 docs/marketing + third-party reviews via WebSearch/WebFetch; marketing-glossy claims marked MEDIUM. Existing-app facts from milestone context = HIGH.)
+**Domain:** Org-aware multi-tenant enterprise Agentic-RAG platform (orgs / departments / roles / memberships · membership-based RLS · SSO + onboarding · org-admin & dept-admin shells · role/group feature greenlists · per-user preference layer · commercial footholds · permission-aware RAG)
+**Researched:** 2026-07-18
+**Confidence:** MEDIUM-HIGH. Competitor claims (Glean/Beam) from their OWN current 2026 docs, fetched 2026-07 (some marketing-glossy → MEDIUM). Supabase SSO + permission-aware-RAG mechanism from official docs fetched 2026-07-18 → HIGH. Multi-tenant RBAC patterns cross-confirmed across WorkOS/Auth0/Clerk → HIGH. Existing-app facts from milestone context + seeds + stale PRD → HIGH.
 
-> This file supersedes a stale v2.8 FEATURES.md (2026-05-30, Harness milestone) that occupied this slot — prior content preserved in git history.
-
-**Operator directive answered:** the Glean + Beam AI study (sub-questions a–f) is the headline section below, ahead of the standard landscape, because requirements definition needs the competitor patterns FIRST. Lighter cross-checks against Perplexity Enterprise, Microsoft Copilot, Dust, and Onyx (open-source Danswer) are woven in where they beat or clarify the two named competitors.
+> **This file supersedes the v3.3 Operator UX FEATURES.md** (2026-07-10) that occupied this slot — the Glean/Beam study it contained (its "Part 1c" that SEED-115 cites) is **carried forward and deepened here** for the org/RBAC lens. Prior content preserved in git history.
 
 ---
 
-## PART 1 — GLEAN & BEAM AI FINDINGS (operator directive)
+## PART 0 — SCOPE FRAME (read first)
 
-> North star (operator, restated in SEED-112): *enhance UX / simplify while keeping workflows accurate, smooth, error-free.* For each sub-question: what they do, the concrete flow, and the takeaway for us.
+### What this milestone is
 
-### Who these two actually are (don't conflate)
+Turn Agentic RAG from a **per-user** app into an **org-aware multi-tenant platform** — the load-bearing one-way-door milestone. Locked posture (**D-PRD-02**): **hybrid SaaS** = co-tenant (`org_id` + membership RLS) by default, isolation-via-deployment for enterprise. Glean is the primary reference competitor (**D-PRD-05**); pricing is 3-tier per-named-user + add-ons (**D-PRD-10**).
 
-- **Glean** — enterprise search + "Work AI" assistant + agent builder. Permissions-enforced RAG over 100+ connectors. Closest analog to *our* product (KB-grounded chat + agents + admin governance). This is the primary pattern source. Confidence HIGH — rich public docs at docs.glean.com.
-- **Beam AI** (beam.ai) — agentic *process automation* ("AI workforce"): long multi-step agents that act on CRM/ERP/tickets, human-in-the-loop review, an "AI Agent Hub" operator console. Less KB-RAG, more workflow-ops + governance. Note: NOT `beam.cloud` (a separate serverless-Python infra company) — I filtered those results out. Confidence MEDIUM — mostly marketing pages, thinner public docs.
+### What is ALREADY built — do NOT re-propose (dependency substrate)
 
----
-
-### (a) How they let a user point a workflow/agent at a SUBSET of the knowledge base
-
-**Glean — knowledge sources are a first-class, attachable object.** An agent (or a step, or a tool) attaches a mix of three categories:
-1. **Connectors** — a whole system (Confluence, Google Drive, Salesforce…)
-2. **Containers** — "like folders: they contain other containers or documents" (spaces, workspaces, drives). *Nested* containers supported for only 4 connectors (Confluence, Google Drive, OneDrive, SharePoint).
-3. **Documents** — individual pinned files/pages.
-
-Flow (Agent builder): **Auto mode proposes** knowledge sources from the agent's described purpose; **the user then chooses which to include** ("Auto mode may propose knowledge sources, although you choose which ones to include"). Scope can be set **per step** — a Read/Think/Respond step can link specific documents, or use natural-language instructions when exact sources aren't known at build time. At query time, **filters** (connector, container, date, status, assignee) narrow the result set before the agent iterates.
-
-**Dust — "Spaces" are the scope primitive.** Each agent sees only what its space exposes: *public* spaces = company-wide, *private* spaces = specific teams/roles. At build time you "select specific channels, folders, or repositories" per data source so agents "only access relevant information."
-
-**Perplexity Enterprise — cleanest RUN-TIME scope toggle.** A *Space* holds uploaded files/connectors; threads in that Space use them as sources. Per query the user toggles: **deselect Web** → files-only, **deselect Org Files** → web-only, **deselect both** → no external sources. This 3-way source switch is the simplest run-time scope UX seen.
-
-**Onyx (open-source) — "Document Sets."** Curators group connectors/docs into named sets and bind them to Assistants; document permissions mirror the source system.
-
-**Takeaway for us (SEED-112):** the universal pattern is *scope = a named, attachable knowledge object chosen from folders/containers*, with an optional per-run override. We already have the substrate (per-thread folder-scope dropdown + server-side bound-folder resolution from v2.9 Phase 098). The gap is purely **making the workflow's bound-folder user-selectable** (author-time default + run-time override) rather than a read-only chip. Perplexity's "sources: [Web] [Org files] [This folder]" toggle is the model to copy for the Run modal. **Do NOT invent a second retrieval path** — reuse Phase 098's ⊆-asserted scope resolver.
-
----
-
-### (b) How they take RUN INPUTS, including file uploads
-
-**Glean — two distinct input models depending on agent shape:**
-- **Task/workflow agents** declare **typed input fields** at build time: *"anything that you need the user to provide should become an input field."* At run, the user fills those fields (Library run form or a shared link). This is the exact model SEED-110 needs.
-- **Conversational agents** auto-ingest attachments: *"any documents in the user message are automatically read into memory."*
-- **Chat file upload** is a real, admin-gated feature: upload files "for context"; `@filename` attaches a local file (CLI); **zip/archive analysis** runs in an *Agent Sandbox* (Thinking mode only, may be usage-priced); OCR toggle for scanned PDFs; uploads follow chat-history retention (no separate retention policy).
-
-**Beam AI — inputs arrive via triggers + documents.** Agents sit in standby until a trigger fires (webhook, schedule, queue message, manual run). Data-extraction agents "pull values from task inputs and documents." Inputs are less "user fills a form," more "a system/document hands the agent a payload."
-
-**Perplexity — file upload to a Space + connectors** (Google Drive etc.) so org data is available "without repeated manual uploads."
-
-**Takeaway for us (SEED-110 + FILE-01):** the table-stakes pattern is (1) **declared typed inputs** rendered as a run form, plus (2) **a file-attach affordance on the run** that lands in owner-scoped storage with a size/MIME allowlist. Glean's "input fields" concept maps 1:1 onto our workflow definition — a workflow declares inputs, the Run modal renders them, and a `file` input type wires the uploaded artifact into the whitelist-gated `render_template` path. Glean's sandbox-gated archive handling is a good precedent for *threat-modeling* untrusted uploads (isolate + limit + usage-gate).
-
----
-
-### (c) Their ADMIN / OPERATOR consoles (model mgmt, user mgmt, governance)
-
-**Glean Admin Console — the reference implementation.** Distinct, self-serve sections:
-
-| Section | What the admin does |
-|---|---|
-| **Data sources / Connectors** | add/remove connectors, adjust permissions + access levels, monitor sync |
-| **People / Users** | see adoption stages (not-yet-invited / pending / active), invite, manage |
-| **Roles & Permissions (RBAC)** | three admin tiers — **Setup Admin · Admin · Super Admin**; content-moderator grant; **group-based permissions inherited from IdP groups**; **feature greenlists** (gate feature access per group) |
-| **Model management** | configure supported LLMs, **control model availability + deprecation**; Glean-hosted model choice surfaced to users where enabled (e.g. Claude Opus 4.8) |
-| **Search governance** | check whether a user can access a doc; **hide documents** from results |
-| **Feature config** | toggle GenAI features (chat/answers/summarization), SSO/IdP auth |
-| **Insights / Analytics** | usage dashboards, active-user + deployment metrics |
-| **Agent governance** | define how broadly agents can be shared; **per-request permission checks** ("returns only what the user can access"); **agent alignment models** score each action vs the agent's declared purpose; agent access policies; security controls for scheduled/background agents |
-
-**Beam AI — "AI Agent Hub" = operator command center.** Central dashboard to *manage the AI workforce*: review history, monitor current tasks, plan future work. Standout operator affordances:
-- **Jump-to-attention**: "jump straight to the parts of your agent that need attention directly from the dashboard"; **alerts** prompt the operator to connect a missing integration and **re-run** the workflow.
-- **Lifecycle control**: **agent versioning + controlled rollouts + rollback**; tune **autonomy levels + human handoffs** to a risk profile.
-- **Governance stack shipped as standard**: **RBAC, OAuth-scoped tool access, immutable audit trails for every agent action**, token-usage + cost attribution by workflow, "which agent accessed which data, when, at what cost."
-- **Self-healing**: on a failed eval, auto-retry with an improved prompt (recovers without manual intervention).
-
-**Onyx / Dust cross-check:** Onyx ships admin/curator/basic roles + doc-permission mirroring out of the box (MIT, self-host). Dust configures tools at the Admin level and gates them into spaces.
-
-**Takeaway for us (admin shell — SEED-012/095/099/078):** the competitor consoles converge on **six operator surfaces**: (1) data/connectors, (2) users + roles (RBAC + IdP groups), (3) model management, (4) usage/analytics, (5) governance/audit browser, (6) **active-runs monitoring with jump-to-attention + re-run + disable**. Two patterns worth stealing directly: Glean's **feature greenlists** (this IS SEED-099 role-gated visibility — advanced features rendered per group) and Beam's **jump-to-attention + alert + re-run** operator loop. Note: **neither competitor markets a "kill-switch / maintenance mode"** — that's an ops-hygiene feature (ours), whereas they express control as *disable-agent / rollback-version / autonomy-throttle*. Frame our kill-switch as "pause all runs / maintenance mode," and add per-run kill (which Beam's active-task monitor implies).
-
----
-
-### (d) Their CITATION / attribution UX
-
-**Glean — sentence-fragment-level inline markers + a sources panel.** Concrete behavior:
-- Inline citation chips sit **immediately after the statement**, attached to *specific sentence fragments*, not whole paragraphs — "every factual claim links back to a specific document."
-- A **"View sources" section** lists all sources used.
-- **Hover** → passage preview with surrounding context (cited text highlighted).
-- **Click** → a preview interface to confirm, then open in the native app (Drive/Confluence/SharePoint).
-- **Deep-linked citations** (admin-enabled) jump to the *exact passage* — page number shown, or the specific slide for decks.
-- **Grounded-vs-ungrounded is signalled by presence/absence only:** citations appear when the answer used enterprise or web sources; when the model decides a query is "generic enough to answer without searching," it uses pre-trained knowledge and **has no citations to show.** *No explicit "from your docs / general knowledge" label.*
-
-**Cross-checks (validate the universal pattern):**
-- **Perplexity Enterprise** — numbered inline `[1]` per-claim markers for internal files; "you know exactly where the information is coming from."
-- **Microsoft Copilot** — citation pills with source links + an **"Allow ungrounded responses" toggle** (org can block ungrounded answers entirely).
-- **NotebookLM** — inline `[n]`, click navigates to the source passage.
-
-**Takeaway for us (SEED-033):** the industry has fully converged and it exactly matches SEED-033's plan — **inline per-claim/sentence markers + a sources panel + hover preview + click-to-exact-passage; the ABSENCE of a marker IS the "general knowledge" signal (no explicit label).** We already ship citations as collapsible passage cards *below* the answer (v2.2) — the v3.3 upgrade is **moving markers INLINE, per-claim**, and letting absence-of-marker distinguish org-sourced from model-knowledge claims *within* a mixed answer (the exact Phase-081 gap that planted SEED-033). Copilot's "block ungrounded" toggle is an optional admin differentiator worth noting for the governance track. **Anti-pattern warning (Glean's own research + arXiv 2605.06635 "Cited but Not Verified"):** bad/hallucinated citations damage trust more than none — precision > coverage; prefer generation-time markers the model actually grounds, verified against retrieved chunk IDs.
-
----
-
-### (e) What makes them feel SIMPLE / user-friendly
-
-**Glean:** one everyday surface — **Assistant** (a single ask box) — kept separate from the admin console and the agent builder. **Auto mode** proposes agent config; an **"Enhance prompt"** button improves instruction reliability. End users never see schema.
-
-**Beam AI:** markets a **"clutter-free, easy-to-navigate"** workspace; a **no/low-code visual workflow builder for non-technical users**; **pre-built agent templates** ("get started in minutes"); optional API/SDK reserved for advanced users. Autonomy is a *slider*, not a config file.
-
-**Dust:** progressive disclosure in the agent builder — "more accessible for new builders while providing power users with advanced capabilities"; improved tool-selection dialog.
-
-**Perplexity:** one search box; sources toggled on/off with a click.
-
-**Takeaway for us (SEED-085 + SEED-099):** three reinforcing moves — (1) **separate the everyday surface (chat / run) from authoring + admin**; (2) **templates + auto/enhance to kill the blank-page problem** (we already have the Starter Workflow Library + NL authoring + Trigger Tuner — parity here); (3) **progressive disclosure** — simple default, advanced one click away. Our Workflow Studio's **strict↔loose two-door** ("Describe & run" / "Author & govern", Phase 124) is *already* this pattern and is genuinely competitive — extend it app-wide as the SEED-085 two-audience contract. **No competitor exposes schema jargon to end users** — that validates SEED-085 (plain labels + on-demand technical reveal) and SEED-099 (advanced features like eval are admin-gated, not on end-user surfaces).
-
----
-
-### (f) Business packaging (tiers, personas: end-user vs admin)
-
-**Glean:** opaque, sales-led pricing (~$40–75/user/mo, **~100-user minimum**, annual/multi-year; SaaS-hosted vs customer-hosted). **"Enterprise Flex"** adds pooled **FlexCredits** for pay-per-use advanced capabilities across the org. Personas map to roles: **end-user (Assistant) · builder (agent builder) · admin (Setup/Admin/Super Admin)**; feature greenlists gate capabilities per group.
-
-**Beam AI:** Free trial / **Starter (custom)** / **Enterprise (custom)**; outcome/agent-oriented framing ("AI workforce," agents-as-employees); template marketplace as an on-ramp.
-
-**Onyx:** **MIT open-source Community Edition** (self-host, "you own the deployment, your data stays yours") + cloud/enterprise tiers — the relevant model for our hybrid-SaaS + licensing-TBD posture and our local↔cloud env-var switch.
-
-**Dust:** per-seat workspace pricing; **builder vs member** roles; spaces as the team/access unit.
-
-**Takeaway for us:** every serious player runs a **three-persona model — end-user (runs/chats) · builder (authors) · admin/operator (configures org, models, users, governance)** — with advanced features gated to the admin tier. This is exactly SEED-099 + the deferred ROLE-01 tier. For v3.3 we only need the **operator role + end-user default** split (multi-tenant/billing stays at v3.4); the persona vocabulary above should drive the role model. Onyx's self-host-and-own-your-data framing is a differentiator we already have structurally (env-var local/cloud switch, RLS) and should market.
-
----
-
-## PART 2 — "BEAT THEM" GAP TABLES
-
-### They have it, we lack it (adopt in v3.3)
-
-| Capability | Glean | Beam AI | Others | Our status | v3.3 action |
-|---|---|---|---|---|---|
-| **User-selectable per-workflow/per-run KB scope** | ✅ attachable knowledge sources per agent/step | partial (system-fed) | Perplexity 3-way toggle; Dust spaces; Onyx doc-sets | Read-only bound-folder chip only | **CORE** — SEED-112 make it selectable (author default + run override) |
-| **Declared typed run inputs (form fields)** | ✅ input fields | ✅ task inputs | — | Kickoff textarea only | **CORE** — SEED-110/FILE-01 add typed inputs incl. `file` |
-| **Run-time file upload as input** | ✅ chat upload + sandbox archive | ✅ docs into agents | Perplexity Space upload | None on Run modal | **CORE** — SEED-110 |
-| **Admin console (users/roles/connectors/models/usage)** | ✅ full self-serve console | ✅ AI Agent Hub | Onyx admin/curator | Per-user Settings only, no `/admin` | **CORE** — admin shell |
-| **Active-runs monitor + kill/re-run + jump-to-attention** | ✅ agent governance | ✅ AI Agent Hub alerts+re-run | — | No operator run view | **CORE** — admin health/backpressure/active-runs |
-| **Model management UI (availability/deprecation)** | ✅ | ✅ swap models | — | `model_capabilities_overrides` table + read path live (mig 053); **write UI missing** | **CORE** — thin UI over existing table |
-| **Role-gated feature visibility (greenlists)** | ✅ feature greenlists | ✅ RBAC | Dust spaces | None (all features visible) | **CORE** — SEED-099 |
-| **Inline per-claim citation markers** | ✅ sentence-fragment | — | Perplexity/NotebookLM/Copilot | Passage cards *below* answer | **CORE** — SEED-033 move inline |
-| **Deep-link citation to exact passage** | ✅ (admin-enabled) | — | NotebookLM | Passage card shows retrieved text | STRETCH — we have the chunk; add jump |
-| **IdP/SSO group-based permissions** | ✅ | ✅ OAuth-scoped | Onyx | Supabase Auth (JWT), no IdP groups | DEFER → v3.4 (multi-tenant) |
-| **Block-ungrounded-answers toggle** | — | — | Copilot | None | STRETCH (governance track) |
-| **Immutable audit trail browser (admin UI)** | ✅ search governance | ✅ audit-ready traces | Onyx | Audit-log *table* exists (v2.2 F-06); no admin browser | CORE-lite — admin audit browser over existing log |
-
-### We have it, they (mostly) lack it (defend + market)
-
-| Our capability | Why it's an edge | Glean/Beam |
+| Existing capability | Shipped | How v3.4 builds on it |
 |---|---|---|
-| **Sandboxed code execution the agent drives** (Docker, matplotlib/pandas/pptx/docx…) | Agent computes + produces real deliverables, not just retrieves | Glean has an Agent Sandbox for *archive analysis* only; Beam runs tools, not general code |
-| **Skill Eval Studio (A/B with-vs-without, dual-arm judge, per-provider scoreboard, versioning, self-improve loop)** | Rigorous, honest, iterative skill quality — genuinely ahead | Neither markets a comparable eval+versioning studio |
-| **8-provider routing via MODEL_CAPABILITIES + cross-provider honesty parity** | Provider-agnostic; no lock-in; native SDKs | Glean picks hosted models; Beam swaps but not 8-native-provider-parity |
-| **Teachable skills that persist + share (open ZIP standard)** | Users extend the agent's behavior durably | Beam has templates; neither has an agentskills.io-style portable skill bundle |
-| **Deterministic locked Harness + publish gauntlet with judge hard-wall** | Accuracy/error-free guarantee the operator's north star demands | Beam has retries/self-heal; neither markets a publish-blocking golden-run judge |
-| **Self-host, own-your-data, pure env-var local↔cloud switch + RLS** | Data-sovereignty story (Onyx-like) without Glean's price floor | Glean SaaS/customer-hosted but ~100-seat, ~$50/user floor |
-| **Workflow Studio strict↔loose two-door + NL authoring + Trigger Tuner** | Progressive disclosure already shipped | Dust/Beam have builders; two-door disclosure is ours |
+| Binary visibility: private (`user_id`) vs `is_global` folders/skills | v1.0 | **Replaced** by membership-keyed org/dept/role visibility |
+| `org_id` **stub columns** on documents / folders / threads / skills | mig 096 (v3.3) | The RLS rewrite fills + enforces them; the one-way door is pre-poured |
+| `operator_users` — org-**agnostic** platform-operator principal (deny-all RLS) + gated `/admin` Control Room + append-only operator audit ledger | Phase 146 (v3.3) | Operator sits **above** all orgs; org-admin / dept-admin are **new tiers WITHIN an org**. The profile menu is the user-side counterpart to the operator shield |
+| **VIS-01** feature-visibility map: binary "Everyone \| Operators-only" audience, shaped as an **extensible enum**, `require_visible` resolves through **ONE swappable function** | Phase 148 (v3.3) | **The literal seed of role/group greenlists** — the audience picker grows to accept roles/groups; "is operator" → "is in group X" at one boundary |
+| Solo / Team / Enterprise **deploy presets** + `OPERATOR.md` + install wizard | Phases 157/158 (v3.3) | The **isolation-via-deployment** half of the hybrid posture |
+| **CITE-01** — per-claim inline citations keyed to the **real retrieval set** | Phase 153 (v3.3) | The surface permission-aware RAG must not leak through |
+| App-wide **plain-language layer** behind an advanced reveal (LANG-01) | Phase 154 (v3.3) | Org-admin / dept-admin shells inherit the two-audience contract |
+| Supabase Auth (JWT) + per-user owner-keyed RLS everywhere | base | SSO extends Auth; RLS predicate is re-keyed membership-based |
+| `user_settings` / `app_settings` + Settings UI; operator allowed-set→lock pattern (SEED-116 resolved) | v3.3 | The per-user preference layer + org-settings tier land here |
 
-### Patterns worth copying verbatim (design adoption)
+### KNOWN ANTI-FEATURES — decided up front (details in Part 4)
 
-1. **Glean "input fields"** → declared typed workflow inputs rendered as a run form (incl. a `file` type). *(SEED-110/FILE-01)*
-2. **Perplexity 3-way source toggle** `[Web] [Org files] [This folder]` → the cleanest Run-modal scope control. *(SEED-112)*
-3. **Glean "Auto mode proposes, user confirms"** → for scope + inputs, pre-fill smart defaults, let the user accept/edit (reduces blank-page). *(SEED-051 authoring)*
-4. **Beam "jump-to-attention + alert + re-run"** → the operator active-runs loop. *(admin shell)*
-5. **Glean feature greenlists** → role-gated feature visibility map. *(SEED-099)*
-6. **Glean "Enhance prompt"** → a one-click instruction-improver (we already have NL authoring; add an enhance affordance).
-7. **Progressive disclosure everywhere** (Dust/Beam) → plain default + "advanced" one click away = the SEED-085 two-audience contract, extending our Phase-124 two-door.
+These are **explicitly NOT built in v3.4**. Surfacing them here so requirements never re-litigate:
 
----
-
-## PART 3 — FEATURE LANDSCAPE (per v3.3 track)
-
-### Track 1 — Workflow run inputs + KB scoping
-
-**Table stakes**
-
-| Feature | Why expected | Complexity | Dependencies (existing) |
-|---|---|---|---|
-| User-selectable KB scope on a workflow (author default + run override) | Every competitor scopes retrieval to a chosen subset; operator explicitly asked | MEDIUM | Reuse Phase 098 server-side ⊆-asserted scope resolver + chat folder-scope path; needs SC#10 cross-provider proof |
-| Declared typed run inputs rendered in the Run modal | Glean/Beam both declare inputs; kickoff textarea alone is below par | MEDIUM | Workflow definition schema + Run modal (`WorkflowsPage → RunModal`) |
-| Run-time file upload as an input (template-fill) | Table-stakes for "fill this DOCX" class; no home today | MEDIUM-HIGH | Storage bucket + owner-scoped RLS + size/MIME allowlist; wire into whitelist-gated `render_template`; threat model |
-| Absent scope = whole-KB (starters stay unscoped) | Preserve D-143-4b starter behavior | LOW | Optional field, default None (no-op) |
-
-**Differentiators**
-
-| Feature | Value | Complexity | Notes |
-|---|---|---|---|
-| 3-way source toggle (KB folder / whole-KB / web) on the run | Perplexity-clean simplicity; matches our Tavily web-search tool | MEDIUM | Compose scope + existing web_search |
-| RAG↔sandbox original-bytes bridge (SEED-108) | Agent operates on a KB doc's ORIGINAL file, not just chunks — unlocks true document ops (fill/transform the real file) | HIGH | Storage read + sandbox mount; genuinely ahead of Glean/Beam |
-| Agent-driven skill file attachment (FILE-01) | Author attaches files to a skill mid-authoring | MEDIUM | Shared upload/storage/threat pattern with SEED-110 |
-
-**Anti-features**
-
-| Feature | Why requested | Why problematic | Alternative |
-|---|---|---|---|
-| Ingesting run-upload templates into the KB | "Keep the file" | Pollutes KB with one-off templates; retention/permission mess (Glean keeps chat uploads ephemeral) | Ephemeral run-scoped storage, never KB-ingested (matches existing 101.1 ephemeral-template design) |
-| Free-text DSL for scope/filters | "Power users want it" | Reintroduces the jargon we removed; injection surface | Reuse the closed-registry filter-AST + no-DSL builder from v3.0 virtual folders |
-| A second retrieval path for scoped runs | "Simpler to bolt on" | Divergence from chat scope = cross-provider drift | Reuse the ONE Phase-098 resolver |
-
-### Track 2 — Admin / operator console
-
-**Table stakes**
-
-| Feature | Why expected | Complexity | Dependencies |
-|---|---|---|---|
-| Operator role tier (end-user vs operator) | Every competitor has an admin persona; prerequisite for everything else in this track | MEDIUM | New role model; keep `org_id` stub for v3.4; RLS-safe |
-| `/admin` surface: health + active runs + kill | Beam/Glean both monitor + control runs | MEDIUM | `runs`/`runs:active` Redis sets + `workflow_runs` already track state |
-| User management (list/invite/role-assign) | Glean People + Onyx roles | MEDIUM | Supabase Auth users |
-| Audit browser (admin UI over existing log) | Glean search-governance / Beam audit traces | LOW-MEDIUM | Audit-log table already exists (F-06); add operator view + filters |
-| Role-gated feature visibility (greenlists) | Glean greenlists; SEED-099 (hide eval etc. from end users) | MEDIUM | Role model + per-feature map; Phase 137 eval surface is first consumer |
-
-**Differentiators**
-
-| Feature | Value | Complexity | Notes |
-|---|---|---|---|
-| Kill-switch / maintenance mode | Ops safety valve neither competitor markets | LOW-MEDIUM | Global flag → block new runs, drain active |
-| Backpressure / worker-health view | Ties to WORKER_COUNT multi-worker model; operator-scale story | MEDIUM | `runs:active`, Redis stream depth |
-| Jump-to-attention + re-run failed run (Beam pattern) | Operator recovers stuck/failed runs fast | MEDIUM | Run status + existing resume/claim CAS |
-
-**Anti-features**
-
-| Feature | Why requested | Why problematic | Alternative |
-|---|---|---|---|
-| Full multi-tenant org/billing in v3.3 | "Do it once" | One-way door; explicitly v3.4; would fight the RLS rewrite | Ship operator role + `org_id` stub only |
-| Per-user granular ACL matrix UI | "Enterprise wants it" | Huge surface; premature before IdP groups | Coarse role tiers now; IdP groups at v3.4 |
-| Live infra dashboards (Grafana-in-app) | "Observability" | Rebuilds LangSmith/ops tooling badly | Link out to LangSmith; keep admin to app-level health |
-
-### Track 3 — Model & settings management
-
-**Table stakes**
-
-| Feature | Why expected | Complexity | Dependencies |
-|---|---|---|---|
-| Model management UI (enable/disable, capabilities) | Glean/Beam both let admins control model availability | LOW-MEDIUM | **`model_capabilities_overrides` table + read path already live since mig 053 — only the write UI is missing** (biggest ROI, lowest cost) |
-| Live `/models` discovery per provider | Keep the registry current without code edits | MEDIUM | Provider `/models` endpoints; curation flow exists (Phase 096 D-05) |
-| Settings unification (one coherent home) | SEED-024; 5-tab settings + scattered app_settings need consolidation | MEDIUM | Existing Settings page + `app_settings`/`user_settings` |
-
-**Differentiators**
-
-| Feature | Value | Complexity | Notes |
-|---|---|---|---|
-| Secrets management UI (off plain-text disk) | SEED-024; security posture | MEDIUM-HIGH | Careful threat model; env still holds infra secrets |
-| Per-model cost/rate registry (SEED-073) | Cost attribution like Beam's per-workflow cost | MEDIUM | New registry table |
-| Newest-first model curation w/ live validation | Matches operator's "prioritize newest models" memory | LOW | Reuse Phase 096 curation script |
-
-**Anti-features**
-
-| Feature | Why requested | Why problematic | Alternative |
-|---|---|---|---|
-| Install wizard + Solo/Team/Enterprise presets (SEED-003) | "One-click deploy" | Biggest lift in the milestone; natural STRETCH/defer | Defer; document presets as env-var bundles |
-| Moving ALL secrets to DB | "Central management" | Some infra secrets must stay in env (bootstrap) | Hybrid: app secrets in UI/vault, infra secrets in env |
-
-### Track 4 — Inline citations + plain-language UX
-
-**Table stakes**
-
-| Feature | Why expected | Complexity | Dependencies |
-|---|---|---|---|
-| Inline per-claim/sentence citation markers | Universal across Glean/Perplexity/Copilot/NotebookLM | MEDIUM-HIGH | Message schema (`citations` JSONB), agent prompt, streaming pipeline, MessageItem; stable post-075.x stream |
-| Absence-of-marker = general knowledge (implicit) | Universal convention; no explicit label | LOW | Convention only; no UI for uncited text |
-| Sources panel + hover preview + click-through | We already have passage cards; upgrade to hover + inline linkage | MEDIUM | Reuse v2.2 CitationCards; link markers→cards |
-| Plain-language default labels (two-audience) | No competitor shows schema to end users | MEDIUM | SEED-085 glossary/term-map; extend Phase-124 two-door app-wide |
-| WCAG AA pass | Baseline accessibility; SEED-092 | MEDIUM | App-wide audit |
-
-**Differentiators**
-
-| Feature | Value | Complexity | Notes |
-|---|---|---|---|
-| Deep-link citation to exact passage/page | Glean's admin-gated feature; we already store the chunk | MEDIUM | Add jump-to-chunk from marker |
-| Admin "block ungrounded answers" toggle | Copilot parity; governance track | LOW-MEDIUM | Policy flag on the agent loop |
-| Technical-reveal (ⓘ / admin toggle) on plain labels | SEED-085 two-audience contract done right | MEDIUM | Term-map single source of truth |
-
-**Anti-features**
-
-| Feature | Why requested | Why problematic | Alternative |
-|---|---|---|---|
-| Explicit "From your docs / General knowledge" labels | "Be transparent" | **No major platform does this** — noisy, and the marker's presence already signals it (SEED-033) | Presence/absence of inline marker IS the signal |
-| Post-hoc semantic citation matching for coverage | "Cite everything" | Heavier + raises hallucinated-citation risk (11–57% rates; "bad citations hurt more than none") | Generation-time markers verified against retrieved chunk IDs; precision > coverage |
-| Per-user free-form terminology overrides | "Let users rename things" | Drift; support nightmare | One curated glossary, two audiences (plain / technical) |
+1. **Cross-org sharing** — ANTI-FEATURE (permanent). Orgs are isolated by default; any cross-org share re-opens the exact leak class the RLS rewrite closes. The **only** legitimate cross-org visibility is the seeded system-skill allow-list (`skill-creator`).
+2. **Custom / arbitrary role tiers** — DEFER. v3.4 ships **4 fixed tiers** (super-admin / org-admin / dept-admin / member); org-admins may extend permission *grants* but not mint new role *tiers*.
+3. **SCIM provisioning** — DEFER. SAML JIT covers v1 enterprise onboarding; SCIM lands when a customer needs directory-driven **de**-provisioning/offboarding.
+4. **Per-resource ACLs beyond folder-level** — DEFER. The doc-permission unit is the **folder** (our KB container). Per-document / per-field ACLs are vertical-pack / Tier-B territory.
+5. **SSO enforcement** (no email/password fallback for org members) — DEFER to a follow-on. v3.4 ships SSO **+ fallback**.
+6. **Billing / payment surface** (Stripe, invoicing, dunning, proration) — DEFER. v3.4 ships the entitlement *columns + reusable check foothold*; the checkout surface consumes it later.
+7. **Impersonation ("sign in as user")** — DEFER (SEED-115). Role-scoped, heavy-audit; ships with a later roles pass.
+8. **Retention / rate-limit ENFORCEMENT** — DEFER (v3.5 config pass / v3.6 Automations). v3.4 ships the **data-layer footholds + admin surfaces only**.
 
 ---
 
-## PART 4 — FEATURE DEPENDENCIES
+## PART 1 — THE REFERENCE MODELS (Glean primary · Beam thinner · classic DMS)
+
+> Operator directive (SEED-115): study how best-in-class DMS + Glean/Beam manage org access, and make v3.3's forward-compat shapes fit. All claims below are from the competitors' own current docs unless marked.
+
+### 1.1 Glean — the closest analog, three-tier access model (Confidence HIGH — docs.glean.com, fetched 2026-07)
+
+Glean layers org access in exactly the three tiers this milestone must build:
+
+**Tier 1 — Identity & groups inherited from the IdP directory.** Users + departments/groups are **synced from the IdP (SSO/SCIM), never hand-maintained in-app**. "Glean automatically syncs group membership changes from your IdP" — SAML/SCIM in near-real-time, OIDC "up to three hours of sync delay." Adoption states surface on the People page: **not-yet-invited / pending / active**.
+
+**Tier 2 — Admin role tiers + group-based feature greenlists.** Three admin tiers with increasing scope (verbatim from the roles doc):
+- **Setup Admin** — most restrictive: connect/manage connectors, manage SSO/auth settings, initiate crawls, indexing tokens only.
+- **Admin** — intermediate: user role management (excluding Super Admin assignment), UI customization, API tokens (excluding global scope).
+- **Super Admin** — full access, incl. assigning Admin-Search + DLP-moderator roles and global-scope tokens. **Requires written CISO authorization; disabled by default.**
+- Plus a specialized **Sensitive Content Moderator** (manage document visibility in search, access sensitive/admin search) — a *content-scoped* grant orthogonal to the admin tier.
+
+Admin roles **can be assigned to IdP groups** ("an Azure AD group of IT admins"), so users **inherit** admin permissions from group membership. **Feature access is gated per group via "greenlist-style provisioning"**: "you can now select **groups as principals** in addition to individual users" for **Glean access**, **feature rollouts**, and **connector test groups**. Multi-group precedence merge: primary role = highest-precedence wins (**Super Admin → Admin → Setup Admin → Member**); secondary roles = **union** of all direct + group assignments.
+
+**Tier 3 — Permission-aware document access.** Per-request permission checks — retrieval "**returns only what the user can access**"; **source-ACL mirroring per connector** (Glean re-derives each connected system's ACLs); **search governance** — admins can **check whether a user can access a doc** and **hide documents** from results. Agent governance adds per-request permission checks on agent actions + alignment scoring.
+
+**→ Our mapping:** Glean's three tiers map 1:1 onto v3.4's three problems — (1) org/dept/group model + SSO import, (2) admin tiers + role/group greenlists (the VIS-01 generalization), (3) permission-aware RAG (Part 3). We do NOT have 100+ connectors, so "source-ACL mirroring" collapses to **folder-level ACL** (our single container type) — dramatically simpler than Glean's per-connector mirror.
+
+### 1.2 Beam AI — thinner, workspace/team + HITL governance (Confidence MEDIUM — marketing + reviews)
+
+Beam is **agentic process automation**, not KB-RAG. Access control is **workspace/team-based** with **human-in-the-loop governance**: RBAC, OAuth-scoped tool access, immutable audit trails per agent action, cost attribution by workflow, agent versioning + rollback + autonomy throttle. It **confirms the direction** (RBAC + workspaces + audit) but adds little org-schema detail. Takeaway: Beam validates that **audit + RBAC + workspace-scope** is table-stakes; it does NOT model departments/nested-groups the way Glean (or we) must.
+
+### 1.3 Classic DMS (SharePoint / Box / Egnyte) — the folder-inheritance precedent (Confidence MEDIUM — general knowledge)
+
+The DMS canon is **RBAC + groups + folder-permission inheritance**: permissions attach to a folder and **inherit down the subtree**, with optional break-inheritance per subfolder. This is the precedent for our model — we already have **nested folders + folder-subtree scope resolution** (v1.0 Phase 8, reused by Phase 098). v3.4's job is to make folder permission **membership/dept/role-scoped** instead of binary private/global, inheriting down the subtree we already resolve.
+
+### 1.4 Multi-tenant RBAC canon (Confidence HIGH — WorkOS / Auth0 / Clerk / SuperTokens agree)
+
+- **Org = tenant.** Roles are **scoped per-org**, never global: check "is user admin *in this org*," not "is user admin." A user can be in **multiple orgs with different roles**.
+- **Schema strategy at our scale:** "each table has a **tenant column** for isolation that scales to tens of thousands of tenants" (vs schema-per-tenant ~hundreds, db-per-tenant = max isolation). Co-tenant + `org_id` column + **RLS** is the documented right choice for our band (hundreds–thousands of users/org, D-PRD-01).
+- **Isolation must be enforced at multiple layers** (token / middleware / policy / **database RLS** / encryption) — belt-and-suspenders, not RLS alone.
+- **Fixed role sets are fine for SMB; enterprises eventually want custom roles** ("Billing Admin," "Compliance Auditor"). → validates our "fixed 4 tiers now, custom-roles DEFER" cut, and flags custom roles as the first post-v3.4 RBAC ask.
+
+---
+
+## PART 2 — FEATURE CATALOG (by category · CORE-v1 / STRETCH / ANTI-FEATURE)
+
+Legend — **Tag:** CORE-v1 (in approved v3.4 scope) · STRETCH (add if capacity / research-gated) · ANTI (do not build) · DEFER (later milestone). **Cx:** complexity LOW/MED/HIGH. **Dep:** dependency on existing substrate.
+
+### Category A — Org / Department / Role / Membership model
+
+| # | Feature | Tag | Cx | Dependency on existing |
+|---|---|---|---|---|
+| A1 | **`organizations` table** — id, name, slug, `is_personal`, `subscription_tier` (default 'standard'), `add_ons jsonb`, timestamps | CORE-v1 | MED | Fills `org_id` stub cols (mig 096); tier/add-on cols per D-PRD-10 |
+| A2 | **`departments` table** — org_id FK, name, **nullable `parent_id` self-FK (nesting)**; **one auto-created default dept per org** | CORE-v1 | MED | Net-new; the "one schema, both sizes" keystone (see below) |
+| A3 | **`org_members` join** — (org_id, user_id) PK, `role` tier, `joined_via` (invitation / sso_jit / personal_auto / admin_create) | CORE-v1 | MED | New; keys the whole RLS predicate |
+| A4 | **`dept_members` join** — (dept_id, user_id) PK, role; a user may be in many depts | CORE-v1 | MED | New; optional layer (default-dept case never needs it) |
+| A5 | **Fixed 4-tier role model** — super-admin / org-admin / dept-admin / member (enum on membership row) | CORE-v1 | LOW | New enum; **NOT** arbitrary custom tiers (A11 is ANTI) |
+| A6 | **`role_permissions` seed table** — data-driven permission grants per tier (`org:manage`, `org:audit_view`, `documents:read/write`, `skills:share_dept`, `dept:manage`, …) | CORE-v1 | MED | New; lets org-admins extend *grants* without new *tiers* |
+| A7 | **Membership-based RLS predicate rewrite** on every user-facing table (owner-within-org OR org-shared OR dept-shared) | CORE-v1 | **HIGH** | The riskiest change; own phase + isolation test harness. Rewrites ~20+ tables incl. the v2.7–3.0 workflow/workspace/doc-mgmt tables |
+| A8 | **Per-request user-JWT Supabase client** + `SECURITY DEFINER → INVOKER` audit (`match_document_chunks`, `folder_is_globally_visible`, `query_user_documents`) | CORE-v1 | **HIGH** | Closes the text-to-SQL + chunk-match bypass classes **and** the SEED-091 global-resource owner-UUID leak (the one bug that folds here); replaces service-role singleton on hot paths |
+| A9 | **`is_global` → `is_org_shared` retirement** on folders/skills + `is_system_global` allow-list (only legit cross-org visibility) | CORE-v1 | MED | Data migration + column rename; preserves seeded `skill-creator` |
+| A10 | **Org context on every request** — active-org resolution (`X-Org-Id` header or JWT claim) validated against `org_members` | CORE-v1 | MED | New middleware seam; feeds RLS + writes |
+| A11 | **Custom/arbitrary role tiers** with user-defined permission graphs | **ANTI (defer)** | HIGH | Enterprises want it eventually (canon 1.4) — first post-v3.4 RBAC ask, not now |
+| A12 | **Department-targeted skill/automation availability** (private / dept / org / system-global) | STRETCH | MED | Rides A9 + skill catalog; SEED-004's "genuinely new" piece. Fold if skills RLS is already being rewritten |
+
+**The "one schema serves both small AND large org" design (SEED-004 §28, the v1 decision that avoids a rewrite):**
+- Every org gets **exactly one auto-created default department** at creation. A **small org** lives entirely in that default dept — the dept UI can be collapsed/hidden, and `dept_members` is never touched (membership at the org level suffices).
+- A **large org** adds departments freely; `parent_id` (nullable self-FK) gives arbitrary **nesting** with zero schema change. Roles are per-membership-row, so the same tables express "5-person team, no structure" and "2,000-person org, 40 nested depts."
+- **Recommendation (from SEED-115): roles before departments.** Ship the role enum on the membership row first (the greenlist audience picker grows to accept it); treat departments/groups as **directory-sourced objects** (SSO/SCIM import first, manual CRUD fallback). This keeps the schema honest without over-investing in dept UX before a customer needs nested depts.
+
+### Category B — Onboarding flows
+
+| # | Feature | Tag | Cx | Dependency on existing |
+|---|---|---|---|---|
+| B1 | **Personal-org backfill migration** — every existing user → their own `is_personal` org + default dept + org-admin membership; backfill `org_id` on all rows; nothing breaks, no user action | CORE-v1 | **HIGH** | The migration story for the whole milestone. Idempotent, transactional-batched (lock-storm risk on large tables). This is the "nothing breaks" contract |
+| B2 | **Email invitations** — org-admin sends `{email, role, dept?}`; hashed token; expiry; accept via sign-in-or-sign-up → `org_members` (joined_via=invitation) | CORE-v1 | MED | New `org_invitations` table + transactional email provider (Resend/SES via env; `none` mode logs link for dev) |
+| B3 | **Link-based invitations** — same accept handler, org-admin generates a shareable link without sending email (paste-into-Slack) | CORE-v1 | LOW | Shares B2's accept path |
+| B4 | **SSO JIT provisioning** — first SSO login with no `auth.users` row auto-creates the user + `org_members` (joined_via=sso_jit) using the org's default role; attribute-map claim→dept | CORE-v1 | MED | Rides SSO (B7); Supabase "auto-provisioning" toggle is the native hook |
+| B5 | **Adoption states on a People surface** — not-yet-invited / pending / active (Glean's model) rendered as a roster column | CORE-v1 | LOW-MED | Extends Phase-148 user roster (already a chip-set role column, extensible by design) |
+| B6 | **Roster shows role + department as additive chips** | CORE-v1 | LOW | Phase-148 roster already chip-shaped for exactly this (Running Design Decision 59) |
+| B7 | **SSO — SAML 2.0** via Supabase Auth (per-org via email-domain) + JIT | CORE-v1 | MED | **Native Supabase (Pro+ managed OR self-hosted SAML).** See SSO note below |
+| B8 | **SSO — OIDC / OpenID Connect** enterprise org SSO | **STRETCH** | HIGH | **NOT native** to Supabase enterprise SSO (SAML-only) — needs a custom SP (Authlib). See SSO note — this REVISES the stale PRD's "SAML + OIDC both via Supabase" claim |
+| B9 | **SSO enforcement** (disable email/password for SSO orgs) | DEFER | MED | v3.4 ships SSO **+ fallback**; the enforce flag flips later |
+| B10 | **SCIM provisioning / directory-driven offboarding** | **ANTI (defer)** | HIGH | SAML JIT covers onboarding; SCIM lands on first offboarding-driven customer ask |
+
+**SSO note (HIGH confidence, revises stale PRD — official Supabase docs fetched 2026-07-18):** Supabase Auth **enterprise SSO supports SAML 2.0 only** ("Supabase Auth supports enterprise-level SSO for any identity providers compatible with the SAML 2.0 protocol"; "offered on plans Pro and above"). Per-org routing is by **email domain**; an **auto-provisioning toggle** gives JIT-style membership on login. **OIDC is NOT offered as an enterprise/org SSO protocol** (OIDC exists only as a per-app *social* login provider, not the domain-routed org-SSO flow). Self-hosted Supabase has a **separate self-hosted SAML SSO** path (good for the on-prem enterprise half of D-PRD-02). **→ Recommendation: SAML = CORE; OIDC enterprise SSO = STRETCH** behind a custom Authlib SP, or fast-follow — do not promise "SAML + OIDC both native."
+
+### Category C — App-shell surfaces (identity + admin)
+
+| # | Feature | Tag | Cx | Dependency on existing |
+|---|---|---|---|---|
+| C1 | **Profile / identity anchor** (SEED-113) — top-right menu: name, email, **role/tier badge**, link to Settings, **sign-out** | CORE-v1 | MED | User-side counterpart to Phase-146 operator shield; G-2 sketch-gated (pairs with nav-crowding BUG-260711-01). Native "who am I" the app lacks today |
+| C2 | **Org switcher** — multi-org users switch active org; persists (localStorage + JWT claim); switch clears thread/stream state for the new scope | CORE-v1 | MED | Lives in the profile anchor; wraps OUTSIDE StreamsProvider so streams read active org; must preserve the Branch-D3 clear guard |
+| C3 | **Org-admin shell (7 tabs)** — Members & Invitations / Departments & Roles / SSO / Audit (org-scope) / Subscription & Add-ons / Retention / Settings; gated on `org:manage` | CORE-v1 | HIGH | Extends the Phase-146/147 permission-gated shell pattern; a NEW org-scoped surface distinct from the platform `/admin` Control Room |
+| C4 | **Dept-admin shell (narrower)** — Dept Members / Dept Skills / Dept Retention / Dept Audit; gated on `dept:manage` | CORE-v1 | MED | Same shell pattern, narrower permission |
+| C5 | **Org-scoped audit view** — org-admin sees all members' audit rows in-org (never cross-org); member sees own | CORE-v1 | MED | Adds `org_id` to existing `audit_log` (not a new table, SEED-004 §7) + permission-gated read |
+| C6 | **Settings IA split** — personal preferences stay user-scoped (move to profile menu); org controls behind `org:manage`; platform controls stay in Control Room | CORE-v1 | MED | Resolves the SEED-116 three-surface boundary (Control Room / Settings / Profile) |
+| C7 | **Impersonation ("sign in as user")** | DEFER | MED | SEED-115 — role-scoped, heavy-audit; ships with a later roles pass |
+
+### Category D — The Glean permission-aware model (see Part 3 for the RAG call)
+
+| # | Feature | Tag | Cx | Dependency on existing |
+|---|---|---|---|---|
+| D1 | **Groups/departments importable from the IdP directory** (SSO attribute-map → dept membership) | CORE-v1 (basic) | MED | Rides B4/B7; full SCIM directory-sync is DEFER (B10) |
+| D2 | **Admin tiers assignable to groups** (Glean pattern) — a group grants an admin role | STRETCH | MED | Rides A5/A6 + greenlists; nice-to-have vs per-user grants |
+| D3 | **Folder-level ACL = the doc-permission unit** (share a folder to dept/role, inherit down subtree) | CORE-v1 | HIGH | Our KB container = folder (Glean's "container" precedent); reuses Phase-098 subtree resolution |
+| D4 | **Permission-aware retrieval** — retrieval returns only chunks the asker can access | **CORE-v1 (org-level) / STRETCH (intra-org folder-ACL)** | HIGH | **See Part 3 — the headline recommendation** |
+| D5 | **Search governance — "hide documents" / "check user access"** (Glean) — admin verifies/masks doc access; citations never name inaccessible docs | **STRETCH (research-gated)** | HIGH | Touches CITE-01; the citation-surface hardening half of permission-aware RAG |
+| D6 | **Per-connector source-ACL mirroring** (Glean's 100+ connectors) | **ANTI (N/A)** | — | We have no connectors; collapses to folder-ACL (D3). Do not build a mirror layer |
+
+### Category E — Feature visibility by role/group (generalize VIS-01)
+
+| # | Feature | Tag | Cx | Dependency on existing |
+|---|---|---|---|---|
+| E1 | **Role/group greenlists** — generalize the binary "Everyone \| Operators-only" audience into a **per-feature audience set that lists roles and/or groups** (Glean greenlist-style) | CORE-v1 | MED | **VIS-01 is the exact seed**: audience is already an extensible enum; `require_visible` already resolves through ONE swappable function — "is operator" → "is in group X / has role Y" at that one boundary |
+| E2 | **Advanced/admin features role-gated off end-user surfaces** (eval, model curation, cost internals) | CORE-v1 | LOW-MED | SEED-099; first consumers already flagged (Phase-137 eval surface). Rides E1 |
+| E3 | **Greenlist precedence merge** — user in multiple groups = union of grants; highest role wins for primary tier (Glean's documented rule) | CORE-v1 | LOW | Pure resolver logic at the one boundary |
+| E4 | **Per-group feature-rollout / beta gating** (Glean "feature rollouts" greenlist) | STRETCH | LOW | Same mechanism as E1, different audience — cheap add once E1 exists |
+
+### Category F — Per-user preference layer (allowed-set → preference)
+
+| # | Feature | Tag | Cx | Dependency on existing |
+|---|---|---|---|---|
+| F1 | **Revive `user_settings.preferences`** (dead since mig 011) as the per-user preference store | CORE-v1 | LOW | SEED-117 §2; the column exists, just unused |
+| F2 | **Two-layer allowed-set → preference pattern** — operator/org defines the ALLOWED SET (+ optional lock); user picks their **default within it** (canonical example: model default within org-enabled models) | CORE-v1 | MED | Already the SEED-116-resolved pattern (operator allowed-set+lock → user preference → gated visibility); F2 makes it real for model + a few knobs |
+| F3 | **Org-level default that a user may override** (unless locked) | CORE-v1 | MED | Rides F2 + org settings (C6) |
+| F4 | **Per-user free-form terminology / arbitrary setting overrides** | ANTI | — | Drift + support nightmare; one curated glossary, two audiences (LANG-01 already decided this) |
+
+### Category G — Commercial surfaces (footholds now, enforcement later)
+
+| # | Feature | Tag | Cx | Dependency on existing |
+|---|---|---|---|---|
+| G1 | **`subscription_tier` + `add_ons jsonb` on every org from day 1** | CORE-v1 | LOW | D-PRD-10; ships with A1. Pure schema |
+| G2 | **Reusable entitlement check primitive** — `require_tier('pro')` / `require_add_on('governance')` as one FastAPI dependency (replaces the lying `_is_tier_pro_or_higher` stub that returns True) | CORE-v1 (foothold) | MED | **SEED-080** — one home before N ad-hoc gates. Reads tier/add-on via the existing TTL-cache settings pattern; shares the flag substrate |
+| G3 | **Per-org retention policy — data layer + admin UI** (retention_policies table; per-dept or org-wide; action-at-expiry) | CORE-v1 (foothold) | MED | SEED-005 Tier-B foothold; **enforcement sweeper DEFER to v3.6 Automations** |
+| G4 | **Per-org rate-limit — data layer + admin UI** (org_rate_limits table; per-endpoint RPM) | CORE-v1 (foothold) | LOW-MED | **Enforcement (Redis token-bucket) DEFER to v3.5 Open Platform** |
+| G5 | **Honest "this is a Pro/Enterprise feature" refusal surface** (one component, not per-feature copy) | STRETCH | LOW | Rides G2; makes gating upgrade-legible + auditable as one matrix |
+| G6 | **Billing / checkout / invoicing / dunning surface** (Stripe) | DEFER | HIGH | Consumes G2; separate monetization milestone |
+| G7 | **Named-seat counting + shadow-user enforcement** | DEFER | MED | D-PRD-10 sub-concern; needs the billing surface |
+| G8 | **Cost / spend-cap enforcement** | DEFER | HIGH | SEED-117 §3 — needs duration telemetry (SEED-023); maps to tier via G2 but is cost, not entitlement |
+
+---
+
+## PART 3 — PERMISSION-AWARE RAG: CORE vs STRETCH (the headline recommendation)
+
+**The downstream question:** should permission-aware RAG — folder-level ACL so retrieval only **cites** what the asking user may access — be CORE or a research-gated STRETCH?
+
+**Recommendation: SPLIT the concern into three parts with different verdicts.** A flat "CORE" or "STRETCH" is the wrong shape because the pieces have very different cost and risk.
+
+### 3a. Org-level retrieval isolation → **CORE (non-negotiable, already inside the RLS rewrite)**
+
+Cross-**org** chunk isolation is **not optional and not separable** — it *is* the milestone's security thesis. The `match_document_chunks` SECURITY DEFINER→INVOKER audit (A8) is already CORE. Supabase's own guidance is explicit and directly usable: **RLS on the chunks table is applied implicitly to the vector similarity search** — "semantic search over these sections will continue to respect these RLS policies" ([Supabase RAG-with-permissions](https://supabase.com/docs/guides/ai/rag-with-permissions)). So once `document_chunks` carries an org-scoped RLS predicate and the match function runs SECURITY INVOKER, **retrieval returning only the asker's-org chunks falls out for free**. Skipping it would leave a cross-tenant leak — the entire reason v3.4 exists. **Verdict: CORE.**
+
+### 3b. Intra-org folder-ACL retrieval FILTER → **CORE-adjacent (fold in — near-free, and skipping it is a latent leak)**
+
+Here is the key insight the "CORE vs STRETCH" framing usually misses: **because A7 is already re-authoring the RLS predicate on `document_chunks`, authoring it to mirror the FULL folder-visibility model (owner OR org-shared OR dept-shared) gives folder-ACL-aware retrieval as a near-free consequence** — the same implicit-RLS-on-similarity-search mechanism from 3a. The industry consensus is emphatic that this belongs in the retrieval layer, not the app layer: "most enterprise RAG systems enforce access control in the application layer and **most of them leak** confidential documents to the wrong users as a result" ([TianPan](https://tianpan.co/blog/2026-05-04-permission-aware-retrieval-enterprise-rag-access-control)); pre-filter (RLS/WHERE) beats post-filter, which "breaks the contract of request-k-get-k and introduces information leakage" ([Pinecone](https://www.pinecone.io/learn/rag-access-control/)). **If `document_chunks` RLS diverges from `documents`/`folders` RLS, that divergence is itself the bug.** **Verdict: fold the retrieval-filter half into CORE** — it is cheaper to do correctly once (during the rewrite) than to bolt on later, and doing it wrong later means the chunk predicate lies relative to the doc predicate.
+
+### 3c. The permission-aware CITATION surface + perf/recall gate + search-governance → **STRETCH (research-gated — this is the genuinely hard, CITE-01-touching part)**
+
+What genuinely deserves a research gate, and what the operator should treat as slippable STRETCH:
+
+1. **CITE-01 citation-surface hardening.** v3.3 shipped CITE-01: per-claim inline citations keyed to the *real* retrieval set. If retrieval is folder-ACL-filtered, the citation surface must **never reveal even the existence or title** of a doc the asker can't open (Glean's "hide-documents / check-user-access"). A citation chip that names an inaccessible file **is a leak** — and half-right here is *worse than not doing it*. This is precision-critical and deserves its own threat model, not a bolt-on. **STRETCH.**
+2. **pgvector performance + recall unknown.** Supabase's guide warns "**RLS is latency-sensitive** — use the query plan analyzer" and gives **no guidance on RLS combined with ivfflat/hnsw**. A richer per-row folder-visibility predicate over the vector index is an **unmeasured** latency/recall interaction (the stale PRD flagged ~20% for org-only; folder-level is heavier, and pre-filtering can degrade ANN recall). Needs a **benchmark gate** before the guarantee is promised. **Research-gated.**
+3. **Search-governance admin controls** (Glean's check-access / hide-documents admin tools). Nice, not load-bearing for v1. **STRETCH.**
+
+### Bottom line for requirements
+
+- **Commit as CORE:** org-isolation at retrieval (3a) **and** authoring `document_chunks` RLS to mirror the folder-visibility model so the retrieval FILTER is consistent (3b). These are inseparable from the RLS rewrite and cheaper to do once.
+- **Research-gate as STRETCH (may slip without breaking the security guarantee):** the CITE-01 "only *cites* what you can access" hardening (3c#1), the retrieval latency/recall **benchmark gate** (3c#2), and search-governance admin controls (3c#3). Org isolation already prevents cross-tenant leaks regardless, and the intra-org fallback is coarse-but-safe (the same RLS predicate that governs all of the user's access also governs their citations).
+- **Sequencing:** 3c depends on **D3 (folder-level dept/role sharing) landing and stabilizing first** — you cannot ACL-filter on a visibility dimension that doesn't exist yet. So even if capacity allows, permission-aware *citations* come **after** the schema + folder-sharing + RLS rewrite are green.
+- **Flag for phase research:** the permission-aware-RAG phase needs its own research spike (CITE-01 leak threat model + pgvector-RLS benchmark) and a G-5 hot-file check (`retrieval_service.py`, `threads.py`, `MessageItem.tsx`, the citation renderer).
+
+---
+
+## PART 4 — ANTI-FEATURES (explicit, with alternatives)
+
+| Anti-feature | Why it gets requested | Why it's problematic | Instead |
+|---|---|---|---|
+| **Cross-org sharing** (share a folder/skill/doc to another org) | "Partner orgs want to collaborate" | Re-opens the exact cross-tenant leak class the RLS rewrite closes; unbounded blast radius | Isolation by default; only the seeded system-skill allow-list (`is_system_global`) crosses orgs. B2B2C bounded-guest access is a later vertical-pack ask |
+| **Custom / arbitrary role tiers** | "Enterprises want Billing Admin, Compliance Auditor…" (canon 1.4 confirms) | Huge surface; permission-graph editor + audit; premature before the fixed model proves out | Fixed 4 tiers now; org-admins extend permission *grants* on the seeded roles; custom *tiers* = first post-v3.4 RBAC ask |
+| **SCIM provisioning** | "Directory-driven user lifecycle" | Full SCIM server + de-provisioning semantics; large; SAML JIT covers onboarding | SAML JIT now; SCIM when a customer needs offboarding-via-directory |
+| **Per-resource ACLs beyond folder-level** (per-doc, per-field) | "Fine-grained control" | Explodes the permission model + retrieval predicate; Tier-B / vertical-pack territory | Folder is the ACL unit (inherits down subtree); per-doc later |
+| **Per-connector source-ACL mirroring** (Glean-style) | "Mirror SharePoint/Box ACLs" | We have **no connectors**; a mirror layer with nothing to mirror | Folder-ACL is our single container type |
+| **SSO enforcement in v1** (no email/password fallback) | "Enterprises mandate SSO-only" | Lockout risk during rollout; migration hazard | Ship SSO **+ fallback**; add an enforce flag later |
+| **Billing / checkout surface** (Stripe, dunning, proration) | "Monetize now" | Separate monetization concern; consumes the entitlement check rather than being it | Ship tier/add-on columns + reusable check foothold (G2); checkout later |
+| **Retention / rate-limit ENFORCEMENT** | "Make the policy real" | Needs a scheduler (v3.6) / Redis token-bucket (v3.5) + duration telemetry (SEED-023) | Data-layer + admin UI now (G3/G4); enforcement follows |
+| **Impersonation without heavy audit** | "Support wants to see what the user sees" | Privilege-escalation + trust hazard if under-audited | Defer to a roles pass with mandatory audit trail (SEED-115) |
+| **Explicit per-user setting free-text overrides / renaming** | "Let users customize everything" | Config drift, support burden | Curated glossary + two-audience reveal (LANG-01 decided) |
+
+---
+
+## PART 5 — FEATURE DEPENDENCIES
 
 ```
-Operator role tier (Track 2)
-    └──enables──> /admin surface (health, users, audit, kill-switch)
-    └──enables──> Role-gated feature visibility / greenlists (SEED-099)
-                      └──first consumer──> hide eval/model-mgmt from end users
+Org/Dept/Role schema (A1-A6)  ── fills ──> org_id stubs (mig 096, LIVE)
+    └──enables──> Membership RLS rewrite (A7)  [the risky keystone]
+                      └──requires──> per-request user-JWT client + SECDEF→INVOKER audit (A8)
+                      └──requires──> Personal-org backfill (B1)  [must precede NOT NULL org_id]
+                      └──produces──> org-level retrieval isolation (D4/3a)  [CORE, near-free]
+                      └──produces──> folder-ACL retrieval filter (D4/3b)  [CORE-adjacent, author RLS once]
 
-Model management UI (Track 3)
-    └──rides on──> model_capabilities_overrides table (LIVE, mig 053)   [write UI only]
-    └──rides on──> live /models curation flow (Phase 096 D-05)
+is_global → is_org_shared (A9)  ──requires──> folder-sharing-to-dept/role (D3)
+    └──enables──> permission-aware CITATIONS (D5/3c)  [STRETCH — needs D3 stable first]
+                      └──touches──> CITE-01 (LIVE)  [leak-critical citation surface]
+                      └──gated-by──> pgvector+RLS latency/recall benchmark  [research spike]
 
-User-selectable KB scope (Track 1, SEED-112)
-    └──reuses──> Phase 098 server-side ⊆-asserted scope resolver
-    └──reuses──> chat per-thread folder-scope path
-    └──reuses──> v3.0 closed-registry filter-AST (no-DSL)
+SSO SAML (B7) ──native──> Supabase Auth (Pro+/self-hosted)
+    └──enables──> JIT provisioning (B4) ──feeds──> dept import (D1)
+    └──OIDC (B8) is NOT native ──needs──> custom Authlib SP  [STRETCH]
 
-Typed run inputs + file upload (Track 1, SEED-110/FILE-01)
-    └──reuses──> whitelist-gated render_template fill engine (no new fill runtime)
-    └──needs────> owner-scoped Storage bucket + size/MIME allowlist + threat model
-    └──shares───> upload/storage pattern with FILE-01 (skill file attach)
+VIS-01 map (LIVE, one swappable fn) ──generalizes-to──> role/group greenlists (E1)
+    └──first consumer──> hide advanced features from end users (E2, SEED-099)
 
-RAG↔sandbox bridge (Track 1, SEED-108)
-    └──needs────> Storage read of original bytes + sandbox mount
+user_settings.preferences (dead, mig 011) ──revived──> per-user preference (F1)
+    └──sits-under──> operator/org allowed-set + lock (F2, SEED-116 pattern)
 
-Inline citations (Track 4, SEED-033)
-    └──requires──> messages.citations JSONB column
-    └──requires──> stable streaming pipeline (post-075.x)  [SATISFIED]
-    └──enhances──> existing v2.2 passage cards (link markers → cards)
+orgs.subscription_tier + add_ons (G1) ──read-by──> entitlement check (G2, SEED-080)
+    └──replaces──> _is_tier_pro_or_higher stub (returns True today)
+    └──maps-to──> retention/rate-limit footholds (G3/G4)  [enforcement deferred]
 
-Plain-language two-audience layer (Track 4, SEED-085)
-    └──requires──> role tier (technical reveal = operator/admin)  [ties Track 2]
-    └──extends──> Phase-124 strict↔loose two-door
-    └──single-source──> glossary/term-map (friendly ↔ schema ↔ helper)
+Profile identity anchor (C1, SEED-113) ──hosts──> org switcher (C2), role badge, sign-out
+Org-admin shell (C3) ──gated-on──> org:manage ; Dept-admin (C4) ──gated-on──> dept:manage
 ```
 
-**Critical ordering for the roadmap:** the **operator role tier is the keystone** — role-gated visibility (SEED-099), the technical-reveal half of SEED-085, and the whole admin shell all depend on it. Sequence it first in Track 2. The **model-management UI is the cheapest high-ROI win** (table + read path already live — write UI only). SEED-110 and FILE-01 **share one upload/storage/threat-model** — plan them together. Inline citations (SEED-033) is the **largest single-feature lift** (streaming + schema + prompt + frontend) and touches the G-5 hot files (`threads.py`, `MessageItem.tsx`, `StreamsProvider.tsx`) — flag for deeper phase research + the refactor-first guardrail check.
+**Critical ordering:** (1) schema (A1-A6) → (2) personal-org backfill (B1) → (3) RLS rewrite + SECDEF audit (A7/A8) as ONE atomic, isolation-tested change → (4) `is_global` retirement + folder-sharing (A9/D3) → (5) SSO + onboarding (B) + shells (C) → (6) greenlists (E) + preference layer (F) + commercial footholds (G) → (7) **research-gated** permission-aware citations (3c). The Phase-0 ADR **ratifies** the co-tenant + isolation-via-deployment posture (pre-decided by v3.3's stubs/presets) — it does not re-litigate.
 
 ---
 
-## PART 5 — MVP / SCOPE RECOMMENDATION
+## PART 6 — MVP / SCOPE RECOMMENDATION
 
-The milestone context flags ~2–3 milestones of matched work → requirements must trim to CORE vs STRETCH. Recommended cut:
+### CORE-v1 (approved v3.4 scope)
+- [ ] Org / dept / role / membership schema (A1–A6, A9, A10) + department "one-schema-both-sizes" default-dept design
+- [ ] Membership-based RLS rewrite + per-request user-JWT client + SECDEF→INVOKER audit (A7, A8) — **own phase + isolation harness**; folds SEED-091
+- [ ] Personal-org backfill migration (B1) — the "nothing breaks" contract
+- [ ] Email + link invitations (B2, B3) + adoption states/roster (B5, B6)
+- [ ] **SAML 2.0 SSO** + JIT provisioning (B7, B4) — native Supabase
+- [ ] Profile identity anchor + org switcher (C1, C2, SEED-113) — G-2 sketch-gated
+- [ ] Org-admin 7-tab + dept-admin shells + org-scoped audit + Settings IA split (C3–C6)
+- [ ] Role/group feature greenlists generalizing VIS-01 (E1–E3) + advanced-feature gating (E2)
+- [ ] Per-user preference layer + allowed-set→preference two-layer (F1–F3)
+- [ ] Commercial footholds: tier/add-on columns + reusable entitlement check + retention/rate-limit data-layer + admin UI (G1–G4)
+- [ ] Folder-level ACL sharing to dept/role (D3) + org-level & folder-ACL retrieval FILTER (3a/3b — fold into the RLS rewrite)
 
-### CORE (v3.3 launch)
+### STRETCH (add if capacity / research-gated)
+- [ ] **Permission-aware CITATIONS** — "only *cites* what you can access" (D5/3c) — CITE-01 leak-threat-model + pgvector-RLS benchmark gate FIRST
+- [ ] OIDC enterprise SSO via custom Authlib SP (B8)
+- [ ] Department-targeted skill/automation availability (A12) — fold if skills RLS already rewritten
+- [ ] Admin tiers assignable to groups (D2), per-group beta rollouts (E4)
+- [ ] Honest Pro/Enterprise refusal surface (G5)
 
-- [ ] **Operator role tier + `/admin` shell** (health, active runs + kill, user list, audit browser) — keystone; unblocks the rest
-- [ ] **Role-gated feature visibility** (SEED-099) — hide eval/model-mgmt/advanced from end users (Glean greenlists pattern)
-- [ ] **Model-management write UI** over the live `model_capabilities_overrides` table — highest ROI/lowest cost
-- [ ] **User-selectable KB scope** on workflows (SEED-112) — the operator's headline ask; reuse Phase 098
-- [ ] **Typed run inputs + run-time file upload** (SEED-110 + FILE-01, shared upload/threat pattern)
-- [ ] **Inline per-claim citations** (SEED-033) — universal table-stakes; the one big lift (deeper research + G-5 check)
-- [ ] **Plain-language two-audience labels** (SEED-085) — extend the Phase-124 two-door app-wide
-
-### STRETCH (add if capacity)
-
-- [ ] Kill-switch / maintenance mode + backpressure view
-- [ ] RAG↔sandbox original-bytes bridge (SEED-108) — differentiator, HIGH complexity
-- [ ] Deep-link citation to exact passage
-- [ ] Secrets-management UI (SEED-024) + per-model cost registry (SEED-073)
-- [ ] Block-ungrounded-answers admin toggle
-- [ ] Live `/models` discovery (curation flow exists; auto-discovery UI is the add)
-- [ ] WCAG AA app-wide pass (SEED-092)
-
-### DEFER → v3.4+
-
-- [ ] Install wizard + Solo/Team/Enterprise presets (SEED-003) — biggest lift
-- [ ] IdP/SSO group-based permissions + multi-tenant org model (one-way door, v3.4)
-- [ ] Per-user granular ACL matrix
+### DEFER → v3.5+ / later
+- [ ] SSO enforcement (B9), SCIM (B10), impersonation (C7)
+- [ ] Custom role tiers (A11), per-resource ACLs, per-connector mirror (D6)
+- [ ] Retention/rate-limit ENFORCEMENT (G3/G4 sweeper+bucket), billing surface (G6), seat counting (G7), spend caps (G8)
+- [ ] The pure "retrofit every knob into Control Room" + prompt-governance + cost-caps + scheduler (SEED-117 §1/§3 → v3.5 config pass)
 
 ---
 
-## PART 6 — FEATURE PRIORITIZATION MATRIX
+## PART 7 — FEATURE PRIORITIZATION MATRIX
 
-| Feature | User Value | Impl. Cost | Priority |
+| Feature | User/Buyer Value | Impl. Cost | Priority |
 |---|---|---|---|
-| Operator role + `/admin` shell | HIGH | MEDIUM | P1 |
-| Model-management write UI (table live) | HIGH | LOW | P1 |
-| User-selectable KB scope (SEED-112) | HIGH | MEDIUM | P1 |
-| Typed run inputs + file upload (SEED-110/FILE-01) | HIGH | MEDIUM-HIGH | P1 |
-| Role-gated feature visibility (SEED-099) | MEDIUM | MEDIUM | P1 |
-| Inline citations (SEED-033) | HIGH | HIGH | P1 (deeper research) |
-| Plain-language two-audience (SEED-085) | HIGH | MEDIUM | P1 |
-| Audit browser (log exists) | MEDIUM | LOW-MEDIUM | P2 |
-| Kill-switch / maintenance mode | MEDIUM | LOW-MEDIUM | P2 |
-| RAG↔sandbox bridge (SEED-108) | HIGH | HIGH | P2 |
-| Deep-link citation | MEDIUM | MEDIUM | P2 |
-| Secrets UI (SEED-024) | MEDIUM | MEDIUM-HIGH | P2 |
-| WCAG AA (SEED-092) | MEDIUM | MEDIUM | P2 |
-| Install wizard / presets (SEED-003) | MEDIUM | HIGH | P3 |
-| IdP groups / multi-tenant | HIGH | HIGH | P3 (v3.4) |
+| Org/dept/role schema (A1–A6) | HIGH | MEDIUM | P1 |
+| Membership RLS rewrite + SECDEF audit (A7/A8) | HIGH (security thesis) | HIGH | P1 |
+| Personal-org backfill (B1) | HIGH (nothing breaks) | HIGH | P1 |
+| SAML SSO + JIT (B7/B4) | HIGH (enterprise gate) | MEDIUM | P1 |
+| Invitations + adoption states (B2/B3/B5) | HIGH | MEDIUM | P1 |
+| Profile anchor + org switcher (C1/C2) | HIGH | MEDIUM | P1 |
+| Org-admin + dept-admin shells (C3/C4) | HIGH | HIGH | P1 |
+| Role/group greenlists (E1–E3) | MEDIUM-HIGH | MEDIUM | P1 |
+| Per-user preference layer (F1–F3) | MEDIUM | MEDIUM | P1 |
+| Commercial footholds (G1–G4) | MEDIUM (revenue substrate) | MEDIUM | P1 |
+| Folder-ACL sharing + retrieval filter (D3/3a/3b) | HIGH | HIGH | P1 |
+| Permission-aware citations (D5/3c) | HIGH | HIGH | P2 (research-gated) |
+| OIDC SSO (B8) | MEDIUM | HIGH | P2 |
+| Dept-targeted skill availability (A12) | MEDIUM | MEDIUM | P2 |
+| Pro/Enterprise refusal surface (G5) | LOW-MED | LOW | P2 |
+| SSO enforcement / SCIM / impersonation | MEDIUM | HIGH | P3 |
+| Custom role tiers / per-resource ACL | MEDIUM | HIGH | P3 |
+| Retention/rate-limit enforcement, billing | MEDIUM | HIGH | P3 |
 
 ---
 
-## PART 7 — COMPETITOR FEATURE ANALYSIS (summary matrix)
+## PART 8 — COMPETITOR FEATURE ANALYSIS (org/RBAC lens)
 
-| Feature | Glean | Beam AI | Perplexity Ent. | Dust | Onyx (OSS) | Our approach |
-|---|---|---|---|---|---|---|
-| KB scope selection | Attachable knowledge sources per agent/step | System-fed inputs | 3-way source toggle | Spaces (public/private) | Document Sets | Selectable folder scope reusing Phase 098 resolver + Perplexity-style toggle |
-| Run inputs / file upload | Typed input fields + chat upload + sandbox archive | Task inputs + docs | Space upload + connectors | Data-source attach | Connector sync | Typed inputs incl. `file`; ephemeral run-scoped storage |
-| Admin console | Full self-serve (users/roles/models/gov/insights) | AI Agent Hub (monitor/version/rollback/audit) | Enterprise admin | Admin tool/space config | admin/curator/basic | `/admin` shell: health, runs, users, audit, kill-switch |
-| Model management | Availability + deprecation, hosted model choice | Swap models per job | Managed | Managed | Bring-your-LLM | Write UI over live `model_capabilities_overrides` |
-| Role-gated visibility | Feature greenlists | RBAC + OAuth scopes | Role-based | Spaces | Role tiers | SEED-099 per-feature visibility map |
-| Inline citations | Sentence-fragment markers + View sources + deep-link | (ops traces, not chat) | Numbered `[n]` per-claim | Cite-consulted-docs | Cited answers | Inline per-claim markers; absence = general knowledge |
-| Grounded/ungrounded signal | Presence/absence (no label) | n/a | Presence | Presence | Presence | Presence/absence (SEED-033 — no explicit label) |
-| Simplicity approach | Assistant box + Auto mode + Enhance prompt | Clutter-free + templates + autonomy slider | One box + toggles | Progressive-disclosure builder | Chat UI | Two-door + templates + NL authoring (have); extend two-audience |
-| Personas / packaging | end-user/builder/admin; ~$50/user, 100-seat min; Flex credits | Free/Starter/Enterprise; AI-workforce | Pro/Enterprise Pro | Per-seat + roles | MIT OSS + cloud | Operator + end-user roles now; self-host/own-data edge |
-| Self-host / data ownership | SaaS or customer-hosted | SaaS | SaaS | SaaS | ✅ MIT self-host | ✅ env-var local↔cloud + RLS (edge) |
+| Capability | Glean | Beam AI | Classic DMS | Multi-tenant canon | Our v3.4 approach |
+|---|---|---|---|---|---|
+| Org / tenant model | Org + IdP groups | Workspace/team | Org + groups | `org_id` column + RLS (10k+ tenants) | Co-tenant `org_id` + RLS; isolation-via-deployment for enterprise |
+| Departments / nesting | IdP-synced groups | Team | Folder-group inheritance | Team/dept scope | `departments` + nullable `parent_id`; one default dept per org |
+| Role tiers | Setup/Admin/Super Admin + content-moderator | RBAC | Admin/curator/member | Per-org scoped roles | Fixed 4 tiers (super/org/dept-admin/member); custom = defer |
+| Group→role / greenlists | Groups as principals, greenlist provisioning | RBAC | Group perms | Reusable permission sets | Generalize VIS-01 one-fn map → role/group greenlists |
+| SSO | SAML/OIDC/SCIM sync | OAuth-scoped | SSO | IdP-federated | SAML CORE (native Supabase); OIDC STRETCH; SCIM defer |
+| Onboarding states | not-invited/pending/active | invite | invite | invite | Adoption states on roster (Glean model) |
+| Permission-aware retrieval | Per-request checks; source-ACL mirror; hide-documents | HITL governance | Folder inheritance | Retrieval-layer ACL (pre-filter) | Org-isolation CORE; folder-ACL filter CORE-adjacent; citations STRETCH |
+| Audit | Search governance | Immutable per-action | Access logs | Per-tenant audit | Org-scoped audit view (extend existing log) |
+| Packaging | ~$50/user, 100-seat min, Flex credits | Free/Starter/Enterprise | Per-user tiers | Tier + add-ons | 3-tier per-named-user + add-ons (columns + check foothold) |
+| Data ownership | SaaS or customer-hosted | SaaS | On-prem/cloud | Varies | Self-host + env-var local↔cloud + RLS (edge) |
 
 ---
 
 ## Sources
 
-**Glean (primary — own docs, current 2026):**
-- [How agents work](https://docs.glean.com/agents/how-agents-work) · [Create a more powerful agent](https://docs.glean.com/agents/create-powerful-agent) · [Knowledge Source Types](https://docs.glean.com/agents/knowledge-source-types) · [Company Search](https://docs.glean.com/tools/glean/company-search) · [Advanced search filters](https://docs.glean.com/user-guide/advanced/advanced-search-filter)
-- [About the Admin Console](https://docs.glean.com/administration/about) · [Administrator Roles](https://docs.glean.com/administration/identity/roles/admin-roles) · [Group-based permissions](https://docs.glean.com/administration/identity/roles/group-based-permissions) · [Agent access policies](https://docs.glean.com/administration/protect/ai-security/agent-access-policies) · [Agent Governance](https://www.glean.com/product/agent-governance)
-- [Citations (Help Center)](https://docs.glean.com/user-guide/assistant/glean-chat/glean-chat-citations/glean-citations) · [File upload](https://docs.glean.com/administration/assistant/features/file-upload) · [Top AI assistants for accurate source citations](https://www.glean.com/perspectives/top-ai-assistants-for-accurate-source-citations)
-- [Glean Enterprise Flex pricing](https://docs.glean.com/glean-enterprise-flex-pricing) · [Glean pricing explained (gosearch)](https://www.gosearch.ai/blog/glean-pricing-explained/) — MEDIUM (third-party)
+**Glean (primary reference — own current docs, fetched 2026-07; HIGH):**
+- [Administrator Roles](https://docs.glean.com/administration/identity/roles/admin-roles) — Setup/Admin/Super Admin tiers, Sensitive Content Moderator, CISO-gated Super Admin
+- [Group-based permissions](https://docs.glean.com/administration/identity/roles/group-based-permissions) — greenlist-style provisioning, groups as principals, IdP sync cadence (SAML/SCIM near-real-time, OIDC ≤3h), precedence merge
+- [About the Admin Console](https://docs.glean.com/administration/about) · [Agent Governance](https://www.glean.com/product/agent-governance) · [Citations](https://docs.glean.com/user-guide/assistant/glean-chat/glean-chat-citations/glean-citations) — permission-aware access, hide-documents, per-request checks (carried from the 2026-07-10 study)
 
-**Beam AI (own marketing + reviews — MEDIUM):**
-- [Platform](https://beam.ai/platform) · [Agentic Workflows](https://beam.ai/agentic-workflows) · [AI Agents](https://beam.ai/ai-agents) · [Changelog](https://beam.ai/resources/changelog) · [How to audit AI agents](https://beam.ai/agentic-insights/how-to-audit-ai-agents-before-enterprise-security-review)
-- [Beam AI 2025 guide (skywork)](https://skywork.ai/skypage/en/Beam-AI-In-Depth:-Your-2025-Guide-to-Agentic-Process-Automation/1975589906492878848) · [Capterra pricing](https://www.capterra.com/p/10017154/Beam-AI/) — MEDIUM (third-party)
+**Beam AI (own marketing + reviews; MEDIUM):**
+- [Platform](https://beam.ai/platform) · [How to audit AI agents](https://beam.ai/agentic-insights/how-to-audit-ai-agents-before-enterprise-security-review) — workspace/team RBAC + HITL governance + immutable audit
 
-**Cross-checks:**
-- Perplexity Enterprise — [Internal Knowledge Search & Spaces](https://www.perplexity.ai/hub/blog/introducing-internal-knowledge-search-and-spaces) · [What is Internal Knowledge Search](https://www.perplexity.ai/help-center/en/articles/10352914-what-is-internal-knowledge-search)
-- Dust — [Managing datasources](https://docs.dust.tt/docs/managing-datasources) · [2025 product recap](https://dust.tt/blog/2025-dust-product-update-recap)
-- Onyx (Danswer, OSS) — [GitHub](https://github.com/onyx-dot-app/onyx) · [Docs](https://docs.onyx.app/welcome)
-- Microsoft Copilot grounding toggle + NotebookLM — via SEED-033 domain table (2026-05-27), re-confirmed by [AI citation UI patterns 2026 (AYDesign)](https://www.aydesign.ai/blog/ai-citation-source-ui-patterns-2026)
-- Citation-precision caution — [arXiv 2605.06635 "Cited but Not Verified"](https://arxiv.org/html/2605.06635v1)
+**Supabase (official docs, fetched 2026-07-18; HIGH):**
+- [Enterprise SSO with SAML 2.0](https://supabase.com/docs/guides/auth/enterprise-sso/auth-sso-saml) + [Enterprise SSO index](https://supabase.com/docs/guides/auth/enterprise-sso) — **SAML-only** for org SSO, Pro+, domain-routed, auto-provisioning toggle (OIDC NOT offered for enterprise SSO)
+- [Self-hosted SAML SSO](https://supabase.com/docs/guides/self-hosting/self-hosted-saml-sso) — on-prem enterprise SSO path
+- [RAG with Permissions](https://supabase.com/docs/guides/ai/rag-with-permissions) — **RLS on the chunks table is applied implicitly to similarity search**; join-table for many-to-many; "RLS is latency-sensitive — use the query plan analyzer"
 
-**Internal (existing app — HIGH):** milestone context; SEED-033/085/099/110/112; PROJECT.md; CLAUDE.md (mig 053 `model_capabilities_overrides`, Phase 098 scope resolver, Phase 124 two-door, v2.2 F-06 audit log + citations).
+**Permission-aware RAG (multiple sources agree; mechanism HIGH, perf-at-scale MEDIUM/unmeasured):**
+- [Permission-aware retrieval must live in the vector layer (TianPan, 2026-05)](https://tianpan.co/blog/2026-05-04-permission-aware-retrieval-enterprise-rag-access-control) · [Pinecone — RAG access control](https://www.pinecone.io/learn/rag-access-control/) · [Cerbos — access control for RAG](https://www.cerbos.dev/features-benefits-and-use-cases/access-control-for-rag) — app-layer ACL leaks; pre-filter > post-filter
+
+**Multi-tenant RBAC canon (cross-confirmed; HIGH):**
+- [WorkOS — multi-tenant RBAC](https://workos.com/blog/how-to-design-multi-tenant-rbac-saas) · [Auth0 — authorization model for multi-tenant SaaS](https://auth0.com/blog/how-to-choose-the-right-authorization-model-for-your-multi-tenant-saas-application/) · [Clerk — multitenant SaaS architecture](https://clerk.com/blog/how-to-design-multitenant-saas-architecture) — org=tenant, per-org roles, tenant-column+RLS at our scale, fixed-vs-custom roles
+
+**Internal (existing app — HIGH):** `.planning/PROJECT.md` (Current Milestone v3.4 scope cut) · SEED-004 (org multi-tenancy anchor) · SEED-115 (Glean/Beam ref + greenlist/doc-ACL shape) · SEED-113 (profile anchor) · SEED-099 (role-gated visibility) · SEED-080 (entitlement primitive) · SEED-117 §2 (preference layer) · `PRDs/v3.3-multi-tenancy.md` (stale brief — schema/RLS/SSO/shell shapes, migration range obsolete) · `PRDs/SEQUENCE.md` · `prd-reset/DECISIONS.md` (D-PRD-01/02/05/10) · prior `research/FEATURES.md` Part 1 (Glean/Beam study 2026-07-10) · CLAUDE.md.
 
 ---
-*Feature research for: v3.3 Operator UX (Agentic-RAG platform)*
-*Researched: 2026-07-10*
+
+## Confidence Assessment
+
+| Area | Confidence | Reason |
+|---|---|---|
+| Org/dept/role schema + one-schema-both-sizes | HIGH | Multi-tenant canon + SEED-004 + stale-PRD shape all agree; nullable-parent + default-dept is textbook |
+| Onboarding (invitations, JIT, adoption states, backfill) | HIGH | Glean People model + Supabase auto-provisioning + established personal-org-backfill pattern |
+| SSO protocol reality (SAML native, OIDC not) | HIGH | Supabase official docs fetched today, confirmed twice — revises the stale PRD |
+| App-shell surfaces (profile anchor, switcher, shells) | HIGH | SEED-113 + Phase-146/148 substrate + stale-PRD 7-tab shape |
+| Glean reference model (tiers/greenlists/permission-aware) | MEDIUM-HIGH | Own current docs fetched 2026-07; some agent-governance claims marketing-glossy |
+| Feature visibility greenlists (VIS-01 generalization) | HIGH | VIS-01 is the literal seed; Glean greenlist mechanism confirmed |
+| Per-user preference layer | HIGH | SEED-116 pattern resolved; `user_settings.preferences` column exists |
+| Commercial footholds | MEDIUM-HIGH | D-PRD-10 locked; SEED-080 owns the check; scope-cut keeps it to footholds |
+| Permission-aware RAG (retrieval filter) | HIGH mechanism / MEDIUM perf | RLS+pgvector native mechanism is documented; RLS+ivfflat/hnsw latency/recall at our scale is UNMEASURED → research gate |
+| Permission-aware RAG (citation-surface leak) | MEDIUM | CITE-01 interaction is real and leak-critical but unbuilt; needs a threat-model spike |
+
+## Gaps to address in phase-specific research
+- **pgvector + RLS benchmark** (latency + ANN recall under a folder-visibility predicate) — gates the permission-aware-citations STRETCH; no vendor guidance exists.
+- **CITE-01 leak threat model** — can a citation chip name/preview a doc the asker can't open? Needs the hide-documents / check-access design before promising "only cites what you can access."
+- **RLS rewrite blast radius** — the live table count grew past the stale PRD's "18" (v2.7–3.0 added workflow/workspace/todos/doc-mgmt tables); re-author against live schema before planning (already flagged in PROJECT.md).
+- **OIDC enterprise SSO** — if a customer needs OIDC, scope the custom Authlib SP; not native to Supabase.
+- **Dept UX threshold** — when does a small org "graduate" to visible departments? Roles-before-departments (SEED-115) suggests deferring dept UI until a customer needs nesting.
+
+---
+*Feature research for: v3.4 Multi-Tenancy & Org Access (Agentic-RAG platform)*
+*Researched: 2026-07-18*
