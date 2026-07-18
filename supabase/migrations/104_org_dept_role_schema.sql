@@ -406,3 +406,115 @@ INSERT INTO public.role_permissions (role, permission_key) VALUES
   ('org-admin', 'org:invite'),
   ('dept-admin', 'dept:manage')
 ON CONFLICT (role, permission_key) DO NOTHING;
+
+-- ================================================================================================
+-- SECTION 4 — NULLABLE org_id SWEEP on the 23 remaining user-facing tables (SC#3 / D-05 discretion).
+-- Additive + byte-identical: each org_id is NULLABLE, with no foreign key and no not-null constraint
+-- (that hardening lands in Phase 162/163). Unlike mig 096 (which added no index), this phase adds a
+-- plain btree index per the CONTEXT discretion (cheap on all-NULL columns; ready for the 162 backfill
+-- + 163 RLS). Column + comment shape = 096_org_id_stub_sweep.sql:18-26; index shape =
+-- idx_classification_rules_org_id (full-schema.sql:2103).
+--
+-- Sweep set derived from the LIVE head-103 dump (RE-VERIFIED at execution): 42 CREATE TABLE total
+--   - 13 already carry org_id (classification_rules, document_relationships, document_views,
+--       documents, folders, harness_audit, metadata_field_definitions, operator_audit_log, skills,
+--       threads, workflow_definitions, workflow_phases, workflow_runs) — NOT touched
+--   - 4 system/identity, NOT user-facing (app_settings, model_capabilities_overrides, operator_users,
+--       profiles) — EXCLUDED (stubbing operator_users' org_id would poison the one-way door, 095:5-8)
+--   - 2 Phase-163-deferred (document_chunks, skill_embeddings) — EXCLUDED (their org_id denormalize +
+--       composite index is TEN-04, the perf-gated crux)
+--   = 23 swept below.
+-- (The 9 existing un-indexed org_id columns are deliberately NOT back-indexed — scope kept tight.)
+-- ================================================================================================
+
+ALTER TABLE public.audit_log ADD COLUMN IF NOT EXISTS org_id uuid;
+CREATE INDEX IF NOT EXISTS idx_audit_log_org_id ON public.audit_log USING btree (org_id);
+COMMENT ON COLUMN public.audit_log.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v3.4; no FK until backfill/RLS (Phase 162/163).';
+
+ALTER TABLE public.code_executions ADD COLUMN IF NOT EXISTS org_id uuid;
+CREATE INDEX IF NOT EXISTS idx_code_executions_org_id ON public.code_executions USING btree (org_id);
+COMMENT ON COLUMN public.code_executions.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v3.4; no FK until backfill/RLS (Phase 162/163).';
+
+ALTER TABLE public.document_images ADD COLUMN IF NOT EXISTS org_id uuid;
+CREATE INDEX IF NOT EXISTS idx_document_images_org_id ON public.document_images USING btree (org_id);
+COMMENT ON COLUMN public.document_images.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v3.4; no FK until backfill/RLS (Phase 162/163).';
+
+ALTER TABLE public.document_tables ADD COLUMN IF NOT EXISTS org_id uuid;
+CREATE INDEX IF NOT EXISTS idx_document_tables_org_id ON public.document_tables USING btree (org_id);
+COMMENT ON COLUMN public.document_tables.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v3.4; no FK until backfill/RLS (Phase 162/163).';
+
+ALTER TABLE public.eval_ratings ADD COLUMN IF NOT EXISTS org_id uuid;
+CREATE INDEX IF NOT EXISTS idx_eval_ratings_org_id ON public.eval_ratings USING btree (org_id);
+COMMENT ON COLUMN public.eval_ratings.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v3.4; no FK until backfill/RLS (Phase 162/163).';
+
+ALTER TABLE public.eval_results ADD COLUMN IF NOT EXISTS org_id uuid;
+CREATE INDEX IF NOT EXISTS idx_eval_results_org_id ON public.eval_results USING btree (org_id);
+COMMENT ON COLUMN public.eval_results.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v3.4; no FK until backfill/RLS (Phase 162/163).';
+
+ALTER TABLE public.eval_runs ADD COLUMN IF NOT EXISTS org_id uuid;
+CREATE INDEX IF NOT EXISTS idx_eval_runs_org_id ON public.eval_runs USING btree (org_id);
+COMMENT ON COLUMN public.eval_runs.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v3.4; no FK until backfill/RLS (Phase 162/163).';
+
+ALTER TABLE public.message_feedback ADD COLUMN IF NOT EXISTS org_id uuid;
+CREATE INDEX IF NOT EXISTS idx_message_feedback_org_id ON public.message_feedback USING btree (org_id);
+COMMENT ON COLUMN public.message_feedback.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v3.4; no FK until backfill/RLS (Phase 162/163).';
+
+ALTER TABLE public.messages ADD COLUMN IF NOT EXISTS org_id uuid;
+CREATE INDEX IF NOT EXISTS idx_messages_org_id ON public.messages USING btree (org_id);
+COMMENT ON COLUMN public.messages.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v3.4; no FK until backfill/RLS (Phase 162/163).';
+
+ALTER TABLE public.pdf_extraction_runs ADD COLUMN IF NOT EXISTS org_id uuid;
+CREATE INDEX IF NOT EXISTS idx_pdf_extraction_runs_org_id ON public.pdf_extraction_runs USING btree (org_id);
+COMMENT ON COLUMN public.pdf_extraction_runs.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v3.4; no FK until backfill/RLS (Phase 162/163).';
+
+ALTER TABLE public.runs ADD COLUMN IF NOT EXISTS org_id uuid;
+CREATE INDEX IF NOT EXISTS idx_runs_org_id ON public.runs USING btree (org_id);
+COMMENT ON COLUMN public.runs.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v3.4; no FK until backfill/RLS (Phase 162/163).';
+
+ALTER TABLE public.sandbox_files ADD COLUMN IF NOT EXISTS org_id uuid;
+CREATE INDEX IF NOT EXISTS idx_sandbox_files_org_id ON public.sandbox_files USING btree (org_id);
+COMMENT ON COLUMN public.sandbox_files.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v3.4; no FK until backfill/RLS (Phase 162/163).';
+
+ALTER TABLE public.skill_files ADD COLUMN IF NOT EXISTS org_id uuid;
+CREATE INDEX IF NOT EXISTS idx_skill_files_org_id ON public.skill_files USING btree (org_id);
+COMMENT ON COLUMN public.skill_files.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v3.4; no FK until backfill/RLS (Phase 162/163).';
+
+ALTER TABLE public.skill_proposals ADD COLUMN IF NOT EXISTS org_id uuid;
+CREATE INDEX IF NOT EXISTS idx_skill_proposals_org_id ON public.skill_proposals USING btree (org_id);
+COMMENT ON COLUMN public.skill_proposals.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v3.4; no FK until backfill/RLS (Phase 162/163).';
+
+ALTER TABLE public.skill_publish_overrides ADD COLUMN IF NOT EXISTS org_id uuid;
+CREATE INDEX IF NOT EXISTS idx_skill_publish_overrides_org_id ON public.skill_publish_overrides USING btree (org_id);
+COMMENT ON COLUMN public.skill_publish_overrides.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v3.4; no FK until backfill/RLS (Phase 162/163).';
+
+ALTER TABLE public.skill_test_cases ADD COLUMN IF NOT EXISTS org_id uuid;
+CREATE INDEX IF NOT EXISTS idx_skill_test_cases_org_id ON public.skill_test_cases USING btree (org_id);
+COMMENT ON COLUMN public.skill_test_cases.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v3.4; no FK until backfill/RLS (Phase 162/163).';
+
+ALTER TABLE public.skill_versions ADD COLUMN IF NOT EXISTS org_id uuid;
+CREATE INDEX IF NOT EXISTS idx_skill_versions_org_id ON public.skill_versions USING btree (org_id);
+COMMENT ON COLUMN public.skill_versions.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v3.4; no FK until backfill/RLS (Phase 162/163).';
+
+ALTER TABLE public.todos ADD COLUMN IF NOT EXISTS org_id uuid;
+CREATE INDEX IF NOT EXISTS idx_todos_org_id ON public.todos USING btree (org_id);
+COMMENT ON COLUMN public.todos.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v3.4; no FK until backfill/RLS (Phase 162/163).';
+
+ALTER TABLE public.tuner_runs ADD COLUMN IF NOT EXISTS org_id uuid;
+CREATE INDEX IF NOT EXISTS idx_tuner_runs_org_id ON public.tuner_runs USING btree (org_id);
+COMMENT ON COLUMN public.tuner_runs.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v3.4; no FK until backfill/RLS (Phase 162/163).';
+
+ALTER TABLE public.user_memory ADD COLUMN IF NOT EXISTS org_id uuid;
+CREATE INDEX IF NOT EXISTS idx_user_memory_org_id ON public.user_memory USING btree (org_id);
+COMMENT ON COLUMN public.user_memory.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v3.4; no FK until backfill/RLS (Phase 162/163).';
+
+ALTER TABLE public.user_settings ADD COLUMN IF NOT EXISTS org_id uuid;
+CREATE INDEX IF NOT EXISTS idx_user_settings_org_id ON public.user_settings USING btree (org_id);
+COMMENT ON COLUMN public.user_settings.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v3.4; no FK until backfill/RLS (Phase 162/163).';
+
+ALTER TABLE public.workspace_file_versions ADD COLUMN IF NOT EXISTS org_id uuid;
+CREATE INDEX IF NOT EXISTS idx_workspace_file_versions_org_id ON public.workspace_file_versions USING btree (org_id);
+COMMENT ON COLUMN public.workspace_file_versions.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v3.4; no FK until backfill/RLS (Phase 162/163).';
+
+ALTER TABLE public.workspace_files ADD COLUMN IF NOT EXISTS org_id uuid;
+CREATE INDEX IF NOT EXISTS idx_workspace_files_org_id ON public.workspace_files USING btree (org_id);
+COMMENT ON COLUMN public.workspace_files.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v3.4; no FK until backfill/RLS (Phase 162/163).';
