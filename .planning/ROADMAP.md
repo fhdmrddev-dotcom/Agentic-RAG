@@ -63,8 +63,8 @@ Ship only if CORE lands clean and budget remains. First-to-cut ordering: SSO/OID
 ### Phase Checklist
 
 - [x] **Phase 160: Tenancy-Model ADR** — ratify D-PRD-02 co-tenant posture + lock `is_system`→`is_system_global` reuse + 104+ renumbering (ADR-01)
-- [ ] **Phase 161: Org / Dept / Role Schema** — 8 org tables + `current_user_org_ids()` helper + non-recursive `org_members` policy + nullable `org_id` on the ~26 remaining tables, RLS from day one (ORG-01, ORG-02)
-- [ ] **Phase 162: Personal-Org Backfill** — one personal org + default dept + org-admin membership per user; batched idempotent `org_id` backfill; value-preserving `is_global` RENAME; NOT-NULL only after zero-NULL (MIG-01)
+- [x] **Phase 161: Org / Dept / Role Schema** — 8 org tables + `current_user_org_ids()` helper + non-recursive `org_members` policy + nullable `org_id` on the ~26 remaining tables, RLS from day one (ORG-01, ORG-02)
+- [x] **Phase 162: Personal-Org Backfill** — one personal org + default dept + org-admin membership per user; batched idempotent `org_id` backfill; org_id auto-fill net (mig 106) so nothing breaks; NOT-NULL only after zero-NULL (MIG-01)
 - [ ] **Phase 163: RLS Rewrite + User-JWT Client Swap — THE ATOMIC CRUX** — `threads.py` extraction (Wave 0) → membership RLS across 38 tables + user-JWT client on BOTH paths (supabase-py JWT-header + asyncpg `SET LOCAL ROLE authenticated`) + `document_chunks`/`skill_embeddings` `org_id` denormalize+index (TEN-01, TEN-02, TEN-04)
 - [ ] **Phase 164: SECDEF Audit + Cross-Org Isolation Suite** — 4 SECDEF functions org-scoped + `search_path` pinned + `_inject_user_id` deleted; `test_v3_4_org_isolation.py` two-org exit gate; folder-ACL retrieval isolation; SEED-091 closed (TEN-03, TEN-05, TEN-06, PRAG-01)
 - [ ] **Phase 165: `is_global` Retirement Cleanup** — `is_global`→`is_org_shared` rename across SQL / `folder_utils.py` / Storage policy + UI copy; migration-only `is_system_global` allow-list for the seeded skill-creator (MIG-02)
@@ -113,9 +113,10 @@ Ship only if CORE lands clean and budget remains. First-to-cut ordering: SSO/OID
   2. `org_id` is backfilled non-NULL across every user-facing table (batched ~10k-row windows; owner-less child tables resolved through their parent FK), and the `NOT NULL` flip happens only after a verified zero-NULL check.
   3. All existing data is preserved and every previously-visible resource stays visible — no user has to do anything, and nothing they could see before disappears.
   4. Re-running the migration (a normal SQL-editor-paste recovery action) neither lock-storms production nor duplicates orgs/memberships.
-**Plans**: 2 plans
+**Plans**: 3 plans
 - [x] 162-01-PLAN.md — Author migration 105: personal-org provisioning + defensive handle_new_user trigger + batched org_id backfill (35 targets) + self-guarded NOT-NULL flips
 - [x] 162-02-PLAN.md — Apply migration 105 (non-atomic) + prove SC#1–4 + idempotent re-paste + regenerate full-schema.sql + same-commit
+- [x] 162-03-PLAN.md — [gap-closure] Author + apply migration 106: BEFORE-INSERT org_id auto-fill net across the 35 backfilled tables — closes the 162→163 insert-break seam so the "nothing breaks" goal holds while org_id stays NOT NULL; regenerate full-schema + same-commit
 
 #### Phase 163: RLS Rewrite + Per-Request User-JWT Client Swap — THE ATOMIC CRUX
 **Goal**: Membership-based RLS and the per-request user-JWT DB context land TOGETHER across both data-access paths, so RLS becomes actually enforceable (not decorative) — the single load-bearing security transition of the milestone — with `threads.py` extracted FIRST (Wave 0) and retrieval performance held under the CONCUR-01 gate.
@@ -243,8 +244,8 @@ Ship only if CORE lands clean and budget remains. First-to-cut ordering: SSO/OID
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 160. Tenancy-Model ADR | 1/1 | Complete | 2026-07-18 |
-| 161. Org / Dept / Role Schema | 0/? | Not started | - |
-| 162. Personal-Org Backfill | 3/3 | Ready for verification (162-03 gap-closure: mig 106 org_id auto-fill net) | - |
+| 161. Org / Dept / Role Schema | 2/2 | Complete | 2026-07-18 |
+| 162. Personal-Org Backfill | 3/3 | Complete | 2026-07-18 |
 | 163. RLS Rewrite + User-JWT Client Swap (CRUX) | 0/? | Not started | - |
 | 164. SECDEF Audit + Cross-Org Isolation Suite | 0/? | Not started | - |
 | 165. `is_global` Retirement Cleanup | 0/? | Not started | - |

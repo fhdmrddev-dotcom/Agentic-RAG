@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v3.4
 milestone_name: Multi-Tenancy & Org Access
-status: verifying
-last_updated: "2026-07-18T21:38:57.577Z"
+status: ready_to_plan
+last_updated: 2026-07-18T21:58:56.600Z
 last_activity: 2026-07-18
 progress:
   total_phases: 27
@@ -11,6 +11,7 @@ progress:
   total_plans: 6
   completed_plans: 6
   percent: 11
+stopped_at: Phase 162 complete (3/3) — ready to discuss Phase 163
 ---
 
 # Project State
@@ -22,7 +23,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-18 — v3.3 Operator UX SHIPPED + archived)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 162 — personal-org-backfill
+**Current focus:** Phase 163 — rls rewrite + per request user jwt client swap — the atomic crux
 
 ## Deferred Items
 
@@ -40,9 +41,9 @@ Items acknowledged and deferred at milestone close on 2026-07-18 (44 open `audit
 
 ## Current Position
 
-Phase: 162 (personal-org-backfill) — EXECUTING
-Plan: 3 of 3 (162-03 gap-closure complete — mig 106 org_id auto-fill BEFORE-INSERT net)
-Status: Phase complete — ready for verification
+Phase: 163
+Plan: Not started
+Status: Ready to plan
 Last activity: 2026-07-18
 
 Progress: [██████████] 100%
