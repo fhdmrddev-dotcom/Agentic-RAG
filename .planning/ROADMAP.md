@@ -502,7 +502,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 159-04-PLAN.md — Frontend client seam (addModelById, utility, settings field) + per-family default table (D-159-02/03/04)
+- [x] 159-04-PLAN.md — Frontend client seam (addModelById, utility, settings field) + per-family default table (D-159-02/03/04)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -534,7 +534,7 @@ Plans:
 | 156 (STRETCH). Everyday UX Polish | 4/4 | Complete | 2026-07-16 |
 | 157 (STRETCH). Deployment Presets & Runbook | 5/5 | Complete (D-09 smoke passed via 158 UAT) | 2026-07-17 |
 | 158 (STRETCH). First-Run Install Wizard | 12/12 | Complete (live wizard UAT passed) | 2026-07-17 |
-| 159 (STRETCH). Model Registry Curation | 0/6 | Planned (execute) | — |
+| 159 (STRETCH). Model Registry Curation | 4/6 | In Progress | — |
 
 **Coverage:** 20/20 requirements mapped (16 CORE + 4 STRETCH); 0 unmapped. Every requirement → exactly one phase.
 
