@@ -112,14 +112,39 @@ CREATE POLICY "workspace_storage_delete_own" ON storage.objects FOR DELETE TO au
 -- ============================================================
 -- 3. Auth: auto-create a profile row on signup (trigger on auth.users)
 -- ============================================================
+-- NOTE: keep this body in sync with migration 105 §D (public.handle_new_user). pg_dump emits
+-- handle_new_user in the public dump ABOVE, but this supplement copy is appended LAST, so this is
+-- the definition a greenfield paste actually keeps. It must therefore carry the SAME mig-105
+-- extension: provision a personal org for every new signup (identical logic to mig 105 §A), wrapped
+-- in an inner EXCEPTION-WHEN-OTHERS swallow so org-creation failure can NEVER abort the auth.users
+-- INSERT / break signup (T-162-05). KEEP security definer + pinned search_path (T-162-06). If a future
+-- migration changes handle_new_user, update this copy in the SAME commit or greenfield deploys drift.
 create or replace function public.handle_new_user()
-returns trigger
-language plpgsql
-security definer set search_path = public
-as $$
+  returns trigger
+  language plpgsql
+  security definer set search_path = public
+  as $$
+declare
+  v_org_id uuid;
 begin
   insert into public.profiles (id, display_name)
-  values (new.id, new.raw_user_meta_data->>'display_name');
+  values (new.id, new.raw_user_meta_data->>'display_name')
+  on conflict (id) do nothing;
+
+  -- defensive personal-org provisioning — identical logic to mig 105 §A, swallowed so a failure
+  -- logs a WARNING and returns normally instead of aborting the signup INSERT.
+  begin
+    if not exists (select 1 from public.org_members m where m.user_id = new.id) then
+      v_org_id := public.create_org_with_default_dept(
+                    coalesce(new.email, new.id::text) || '''s Organization', null, 'General');
+      insert into public.org_members (org_id, user_id, role)
+      values (v_org_id, new.id, 'org-admin')
+      on conflict (org_id, user_id) do nothing;
+    end if;
+  exception when others then
+    raise warning 'handle_new_user: personal-org creation failed for %: %', new.id, sqlerrm;
+  end;
+
   return new;
 end;
 $$;

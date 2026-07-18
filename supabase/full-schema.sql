@@ -175,11 +175,31 @@ CREATE FUNCTION public.handle_new_user() RETURNS trigger
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO 'public'
     AS $$
-begin
-  insert into public.profiles (id, display_name)
-  values (new.id, new.raw_user_meta_data->>'display_name');
-  return new;
-end;
+DECLARE
+  v_org_id uuid;
+BEGIN
+  -- Existing behavior, hardened with ON CONFLICT so a re-fire can't duplicate the profile row
+  -- (profiles PK = id — verified live).
+  INSERT INTO public.profiles (id, display_name)
+  VALUES (new.id, new.raw_user_meta_data->>'display_name')
+  ON CONFLICT (id) DO NOTHING;
+
+  -- NEW: defensive personal-org provisioning — identical logic to §A, wrapped in a swallow so a
+  -- failure logs a WARNING and returns normally instead of aborting the signup INSERT.
+  BEGIN
+    IF NOT EXISTS (SELECT 1 FROM public.org_members m WHERE m.user_id = new.id) THEN
+      v_org_id := public.create_org_with_default_dept(
+                    COALESCE(new.email, new.id::text) || '''s Organization', NULL, 'General');
+      INSERT INTO public.org_members (org_id, user_id, role)
+      VALUES (v_org_id, new.id, 'org-admin')
+      ON CONFLICT (org_id, user_id) DO NOTHING;
+    END IF;
+  EXCEPTION WHEN OTHERS THEN
+    RAISE WARNING 'handle_new_user: personal-org creation failed for %: %', new.id, SQLERRM;
+  END;
+
+  RETURN new;
+END;
 $$;
 
 
@@ -568,7 +588,7 @@ CREATE TABLE public.audit_log (
     action_type text NOT NULL,
     metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    org_id uuid,
+    org_id uuid NOT NULL,
     CONSTRAINT audit_log_action_type_check CHECK ((action_type = ANY (ARRAY['document.upload'::text, 'document.delete'::text, 'search.query'::text, 'code.execute'::text, 'skill.load'::text, 'thread.create'::text, 'thread.delete'::text, 'settings.update'::text, 'memory.remember'::text, 'memory.recall'::text, 'feedback.submit'::text, 'view.create'::text, 'view.delete'::text, 'relationship.create'::text, 'relationship.delete'::text, 'classification.apply'::text, 'classification.rule.create'::text, 'metadata.update'::text, 'metadata.field.create'::text])))
 );
 
@@ -587,7 +607,7 @@ COMMENT ON COLUMN public.audit_log.org_id IS 'Forward-compat (D-PRD-02/D-11): or
 CREATE TABLE public.classification_rules (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     user_id uuid NOT NULL,
-    org_id uuid,
+    org_id uuid NOT NULL,
     name text NOT NULL,
     match_expr jsonb NOT NULL,
     suggest_folder_id uuid,
@@ -616,7 +636,7 @@ CREATE TABLE public.code_executions (
     exit_code integer,
     duration_ms integer,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    org_id uuid
+    org_id uuid NOT NULL
 );
 
 
@@ -690,7 +710,7 @@ CREATE TABLE public.document_images (
     description text DEFAULT ''::text NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     bbox jsonb,
-    org_id uuid
+    org_id uuid NOT NULL
 );
 
 
@@ -708,7 +728,7 @@ COMMENT ON COLUMN public.document_images.org_id IS 'Forward-compat (D-PRD-02/D-1
 CREATE TABLE public.document_relationships (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     user_id uuid NOT NULL,
-    org_id uuid,
+    org_id uuid NOT NULL,
     source_doc_id uuid NOT NULL,
     target_doc_id uuid NOT NULL,
     rel_type text NOT NULL,
@@ -740,7 +760,7 @@ CREATE TABLE public.document_tables (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     bbox jsonb,
     extractor text,
-    org_id uuid
+    org_id uuid NOT NULL
 );
 
 
@@ -758,7 +778,7 @@ COMMENT ON COLUMN public.document_tables.org_id IS 'Forward-compat (D-PRD-02/D-1
 CREATE TABLE public.document_views (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     user_id uuid NOT NULL,
-    org_id uuid,
+    org_id uuid NOT NULL,
     name text NOT NULL,
     filter_expr jsonb DEFAULT '{}'::jsonb NOT NULL,
     folder_scope uuid,
@@ -800,7 +820,7 @@ CREATE TABLE public.documents (
     extractor text,
     document_type_norm text GENERATED ALWAYS AS (lower((metadata ->> 'document_type'::text))) STORED,
     date_typed date GENERATED ALWAYS AS (public.view_iso_to_date((metadata ->> 'date'::text))) STORED,
-    org_id uuid,
+    org_id uuid NOT NULL,
     CONSTRAINT documents_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'processing'::text, 'completed'::text, 'failed'::text])))
 );
 
@@ -823,7 +843,7 @@ CREATE TABLE public.eval_ratings (
     rating text NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    org_id uuid,
+    org_id uuid NOT NULL,
     CONSTRAINT eval_ratings_rating_check CHECK ((rating = ANY (ARRAY['up'::text, 'down'::text])))
 );
 
@@ -867,7 +887,7 @@ CREATE TABLE public.eval_results (
     judge_model text,
     duration_ms integer,
     case_feedback text,
-    org_id uuid,
+    org_id uuid NOT NULL,
     CONSTRAINT eval_results_status_check CHECK ((status = ANY (ARRAY['completed'::text, 'failed'::text, 'timed_out'::text, 'cancelled'::text]))),
     CONSTRAINT eval_results_variant_check CHECK ((variant = ANY (ARRAY['with_skill'::text, 'without_skill'::text]))),
     CONSTRAINT eval_results_verdict_state_check CHECK ((verdict_state = ANY (ARRAY['graded'::text, 'not_measured'::text, 'judge_error'::text])))
@@ -930,7 +950,7 @@ CREATE TABLE public.eval_runs (
     verdict_summary text,
     matrix_group_id uuid,
     feeds_gate boolean DEFAULT false NOT NULL,
-    org_id uuid,
+    org_id uuid NOT NULL,
     CONSTRAINT eval_runs_status_check CHECK ((status = ANY (ARRAY['running'::text, 'completed'::text, 'failed'::text, 'cancelled'::text, 'interrupted'::text])))
 );
 
@@ -982,7 +1002,7 @@ CREATE TABLE public.folders (
     is_global boolean DEFAULT false NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    org_id uuid
+    org_id uuid NOT NULL
 );
 
 
@@ -1003,7 +1023,7 @@ CREATE TABLE public.harness_audit (
     run_id uuid,
     event_type text NOT NULL,
     metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
-    org_id uuid,
+    org_id uuid NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT harness_audit_event_type_check CHECK ((event_type = ANY (ARRAY['phase_started'::text, 'phase_completed'::text, 'phase_transition'::text, 'gate_passed'::text, 'gate_failed'::text, 'tool_refused'::text, 'run_started'::text, 'run_completed'::text, 'run_failed'::text, 'emit_forced'::text, 'emit_recovered'::text, 'emit_validated'::text, 'emit_rejected'::text, 'emit_rendered'::text, 'emit_integrity_failed'::text, 'emit_failed'::text, 'judge_verdict'::text, 'publish_attempted'::text, 'publish_blocked'::text, 'publish_succeeded'::text, 'policy_applied'::text, 'validator_ask_user_approved'::text])))
 );
@@ -1027,7 +1047,7 @@ CREATE TABLE public.message_feedback (
     rating character varying(16) NOT NULL,
     reason character varying(32),
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    org_id uuid,
+    org_id uuid NOT NULL,
     CONSTRAINT message_feedback_rating_check CHECK (((rating)::text = ANY ((ARRAY['positive'::character varying, 'negative'::character varying])::text[]))),
     CONSTRAINT message_feedback_reason_check CHECK (((reason)::text = ANY ((ARRAY['wrong_answer'::character varying, 'not_from_documents'::character varying, 'incomplete'::character varying, 'other'::character varying])::text[])))
 );
@@ -1059,7 +1079,7 @@ CREATE TABLE public.messages (
     confidence_disclaimer text,
     reasoning_content text,
     origin text DEFAULT 'deep'::text NOT NULL,
-    org_id uuid,
+    org_id uuid NOT NULL,
     CONSTRAINT messages_origin_check CHECK ((origin = ANY (ARRAY['deep'::text, 'harness'::text]))),
     CONSTRAINT messages_role_check CHECK ((role = ANY (ARRAY['user'::text, 'assistant'::text, 'system'::text])))
 );
@@ -1088,7 +1108,7 @@ COMMENT ON COLUMN public.messages.org_id IS 'Forward-compat (D-PRD-02/D-11): org
 CREATE TABLE public.metadata_field_definitions (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     user_id uuid,
-    org_id uuid,
+    org_id uuid NOT NULL,
     field_key text NOT NULL,
     field_type text DEFAULT 'string'::text NOT NULL,
     description text,
@@ -1243,7 +1263,7 @@ CREATE TABLE public.pdf_extraction_runs (
     table_count integer,
     image_count integer,
     error text,
-    org_id uuid
+    org_id uuid NOT NULL
 );
 
 
@@ -1309,7 +1329,7 @@ CREATE TABLE public.runs (
     spawned_by_worker text,
     parent_run_id uuid,
     continues_used integer DEFAULT 0 NOT NULL,
-    org_id uuid,
+    org_id uuid NOT NULL,
     CONSTRAINT runs_status_check CHECK ((status = ANY (ARRAY['streaming'::text, 'cap_paused'::text, 'completed'::text, 'failed'::text, 'cancelled'::text, 'timed_out'::text])))
 );
 
@@ -1347,7 +1367,7 @@ CREATE TABLE public.sandbox_files (
     storage_path text NOT NULL,
     file_size bigint DEFAULT 0 NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    org_id uuid
+    org_id uuid NOT NULL
 );
 
 
@@ -1393,7 +1413,7 @@ CREATE TABLE public.skill_files (
     file_size bigint DEFAULT 0 NOT NULL,
     mime_type text DEFAULT ''::text NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    org_id uuid
+    org_id uuid NOT NULL
 );
 
 
@@ -1427,7 +1447,7 @@ CREATE TABLE public.skill_proposals (
     proposed_description text,
     scoreboard_snapshot jsonb,
     source_tuner_run_id uuid,
-    org_id uuid,
+    org_id uuid NOT NULL,
     CONSTRAINT skill_proposals_kind_check CHECK ((kind = ANY (ARRAY['instruction'::text, 'description'::text]))),
     CONSTRAINT skill_proposals_kind_fields CHECK ((((kind = 'instruction'::text) AND (proposed_instructions IS NOT NULL) AND (proposed_description IS NULL)) OR ((kind = 'description'::text) AND (proposed_description IS NOT NULL) AND (proposed_instructions IS NULL)))),
     CONSTRAINT skill_proposals_status_check CHECK ((status = ANY (ARRAY['proposed'::text, 'rejected'::text, 'approved'::text, 're_evaling'::text, 'promoted'::text, 'not_promoted'::text, 'interrupted'::text])))
@@ -1495,7 +1515,7 @@ CREATE TABLE public.skill_publish_overrides (
     gate_state text NOT NULL,
     gate_snapshot jsonb DEFAULT '{}'::jsonb NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    org_id uuid
+    org_id uuid NOT NULL
 );
 
 
@@ -1527,7 +1547,7 @@ CREATE TABLE public.skill_test_cases (
     name text,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    org_id uuid
+    org_id uuid NOT NULL
 );
 
 
@@ -1559,7 +1579,7 @@ CREATE TABLE public.skill_versions (
     instructions text DEFAULT ''::text NOT NULL,
     source text DEFAULT 'manual'::text NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    org_id uuid,
+    org_id uuid NOT NULL,
     CONSTRAINT skill_versions_source_check CHECK ((source = ANY (ARRAY['manual'::text, 'import'::text, 'tuner'::text, 'self_improve'::text, 'backfill'::text])))
 );
 
@@ -1593,7 +1613,7 @@ CREATE TABLE public.skills (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     is_system boolean DEFAULT false NOT NULL,
-    org_id uuid
+    org_id uuid NOT NULL
 );
 
 
@@ -1639,7 +1659,7 @@ CREATE TABLE public.threads (
     folder_id uuid,
     active_workflow_run_id uuid,
     is_eval boolean DEFAULT false NOT NULL,
-    org_id uuid
+    org_id uuid NOT NULL
 );
 
 
@@ -1664,7 +1684,7 @@ CREATE TABLE public.todos (
     order_index integer DEFAULT 0 NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    org_id uuid,
+    org_id uuid NOT NULL,
     CONSTRAINT todos_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'in_progress'::text, 'completed'::text])))
 );
 
@@ -1691,7 +1711,7 @@ CREATE TABLE public.tuner_runs (
     case_count integer DEFAULT 0 NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    org_id uuid
+    org_id uuid NOT NULL
 );
 
 
@@ -1720,7 +1740,7 @@ CREATE TABLE public.user_memory (
     value text NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    org_id uuid
+    org_id uuid NOT NULL
 );
 
 
@@ -1740,7 +1760,7 @@ CREATE TABLE public.user_settings (
     created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
     updated_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
     preferences jsonb DEFAULT '{}'::jsonb,
-    org_id uuid
+    org_id uuid NOT NULL
 );
 
 
@@ -1765,7 +1785,7 @@ CREATE TABLE public.workflow_definitions (
     definition jsonb DEFAULT '{}'::jsonb NOT NULL,
     created_by uuid NOT NULL,
     is_global boolean DEFAULT false NOT NULL,
-    org_id uuid,
+    org_id uuid NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     skill_snapshots jsonb,
@@ -1798,7 +1818,7 @@ CREATE TABLE public.workflow_phases (
     slug text NOT NULL,
     status text DEFAULT 'pending'::text NOT NULL,
     output jsonb DEFAULT '{}'::jsonb NOT NULL,
-    org_id uuid,
+    org_id uuid NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT workflow_phases_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'active'::text, 'completed'::text, 'failed'::text, 'skipped'::text])))
@@ -1822,7 +1842,7 @@ CREATE TABLE public.workflow_runs (
     definition_id uuid NOT NULL,
     status text DEFAULT 'active'::text NOT NULL,
     current_phase_id uuid,
-    org_id uuid,
+    org_id uuid NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     claimed_at timestamp with time zone,
@@ -1898,7 +1918,7 @@ CREATE TABLE public.workspace_file_versions (
     size_bytes bigint DEFAULT 0 NOT NULL,
     delta_from_prev jsonb,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    org_id uuid
+    org_id uuid NOT NULL
 );
 
 
@@ -1927,7 +1947,7 @@ CREATE TABLE public.workspace_files (
     kind text,
     expires_at timestamp with time zone,
     run_claim text,
-    org_id uuid,
+    org_id uuid NOT NULL,
     CONSTRAINT workspace_files_kind_check CHECK (((kind IS NULL) OR (kind = ANY (ARRAY['template_input'::text, 'agent'::text])))),
     CONSTRAINT workspace_files_path_length CHECK ((char_length(path) <= 500)),
     CONSTRAINT workspace_files_size_limit CHECK ((size_bytes <= 10485760))
@@ -5390,14 +5410,39 @@ CREATE POLICY "workspace_storage_delete_own" ON storage.objects FOR DELETE TO au
 -- ============================================================
 -- 3. Auth: auto-create a profile row on signup (trigger on auth.users)
 -- ============================================================
+-- NOTE: keep this body in sync with migration 105 §D (public.handle_new_user). pg_dump emits
+-- handle_new_user in the public dump ABOVE, but this supplement copy is appended LAST, so this is
+-- the definition a greenfield paste actually keeps. It must therefore carry the SAME mig-105
+-- extension: provision a personal org for every new signup (identical logic to mig 105 §A), wrapped
+-- in an inner EXCEPTION-WHEN-OTHERS swallow so org-creation failure can NEVER abort the auth.users
+-- INSERT / break signup (T-162-05). KEEP security definer + pinned search_path (T-162-06). If a future
+-- migration changes handle_new_user, update this copy in the SAME commit or greenfield deploys drift.
 create or replace function public.handle_new_user()
-returns trigger
-language plpgsql
-security definer set search_path = public
-as $$
+  returns trigger
+  language plpgsql
+  security definer set search_path = public
+  as $$
+declare
+  v_org_id uuid;
 begin
   insert into public.profiles (id, display_name)
-  values (new.id, new.raw_user_meta_data->>'display_name');
+  values (new.id, new.raw_user_meta_data->>'display_name')
+  on conflict (id) do nothing;
+
+  -- defensive personal-org provisioning — identical logic to mig 105 §A, swallowed so a failure
+  -- logs a WARNING and returns normally instead of aborting the signup INSERT.
+  begin
+    if not exists (select 1 from public.org_members m where m.user_id = new.id) then
+      v_org_id := public.create_org_with_default_dept(
+                    coalesce(new.email, new.id::text) || '''s Organization', null, 'General');
+      insert into public.org_members (org_id, user_id, role)
+      values (v_org_id, new.id, 'org-admin')
+      on conflict (org_id, user_id) do nothing;
+    end if;
+  exception when others then
+    raise warning 'handle_new_user: personal-org creation failed for %: %', new.id, sqlerrm;
+  end;
+
   return new;
 end;
 $$;

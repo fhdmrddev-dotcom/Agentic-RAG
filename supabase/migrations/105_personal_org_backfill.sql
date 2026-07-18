@@ -225,10 +225,11 @@ CALL public._mig105_backfill($SQL$
   WHERE pm.user_id = t.user_id AND t.org_id IS NULL
     AND t.id IN (SELECT id FROM public.pdf_extraction_runs WHERE org_id IS NULL LIMIT $1)
 $SQL$);
+-- NB: public.runs has NO `id` column — its PK is `run_id`; batch-page by run_id (MIG105 apply-time fix).
 CALL public._mig105_backfill($SQL$
   UPDATE public.runs t SET org_id = pm.org_id FROM public.org_members pm
   WHERE pm.user_id = t.user_id AND t.org_id IS NULL
-    AND t.id IN (SELECT id FROM public.runs WHERE org_id IS NULL LIMIT $1)
+    AND t.run_id IN (SELECT run_id FROM public.runs WHERE org_id IS NULL LIMIT $1)
 $SQL$);
 CALL public._mig105_backfill($SQL$
   UPDATE public.sandbox_files t SET org_id = pm.org_id FROM public.org_members pm
@@ -255,11 +256,21 @@ CALL public._mig105_backfill($SQL$
   WHERE pm.user_id = t.user_id AND t.org_id IS NULL
     AND t.id IN (SELECT id FROM public.skill_test_cases WHERE org_id IS NULL LIMIT $1)
 $SQL$);
+-- MIG105 apply-time fix (Bug 2): public.skill_versions carries skill_versions_no_update — an
+-- immutability trigger that rejects ANY UPDATE, so it blocks this one-time org_id backfill. Surgically
+-- DISABLE only that ONE named trigger around the CALL, then re-ENABLE it immediately, so row
+-- immutability is fully restored the instant the backfill finishes (it stays intact for every normal
+-- app operation). postgres OWNS this table, so ALTER TABLE … DISABLE/ENABLE TRIGGER needs table-
+-- ownership only (NOT superuser) → cloud-safe (session_replication_role='replica' was ruled out:
+-- postgres is not superuser). Re-paste-safe: on a re-apply the CALL updates 0 rows (WHERE org_id IS
+-- NULL) and a DISABLE/ENABLE around a no-op is harmless; the trigger ends ENABLED either way.
+ALTER TABLE public.skill_versions DISABLE TRIGGER skill_versions_no_update;
 CALL public._mig105_backfill($SQL$
   UPDATE public.skill_versions t SET org_id = pm.org_id FROM public.org_members pm
   WHERE pm.user_id = t.user_id AND t.org_id IS NULL
     AND t.id IN (SELECT id FROM public.skill_versions WHERE org_id IS NULL LIMIT $1)
 $SQL$);
+ALTER TABLE public.skill_versions ENABLE TRIGGER skill_versions_no_update;
 CALL public._mig105_backfill($SQL$
   UPDATE public.skills t SET org_id = pm.org_id FROM public.org_members pm
   WHERE pm.user_id = t.user_id AND t.org_id IS NULL
@@ -280,17 +291,27 @@ CALL public._mig105_backfill($SQL$
   WHERE pm.user_id = t.user_id AND t.org_id IS NULL
     AND t.id IN (SELECT id FROM public.user_memory WHERE org_id IS NULL LIMIT $1)
 $SQL$);
+-- NB: public.user_settings has NO `id` column — its PK is `user_id`; batch-page by user_id (MIG105 apply-time fix).
 CALL public._mig105_backfill($SQL$
   UPDATE public.user_settings t SET org_id = pm.org_id FROM public.org_members pm
   WHERE pm.user_id = t.user_id AND t.org_id IS NULL
-    AND t.id IN (SELECT id FROM public.user_settings WHERE org_id IS NULL LIMIT $1)
+    AND t.user_id IN (SELECT user_id FROM public.user_settings WHERE org_id IS NULL LIMIT $1)
 $SQL$);
 -- 2 resolved via created_by -> org_members.org_id (these two carry created_by, not user_id):
+-- MIG105 apply-time fix (Bug 2): public.workflow_definitions carries workflow_definitions_block_published,
+-- which rejects an org_id change on PUBLISHED rows. Surgically DISABLE only that ONE named trigger
+-- around the CALL, then re-ENABLE it immediately (published-row immutability restored at once). Do NOT
+-- touch workflow_definitions_set_updated_at (the other, unrelated trigger on this table). postgres OWNS
+-- the table, so DISABLE/ENABLE TRIGGER needs table-ownership only (cloud-safe). Re-paste-safe: a
+-- re-apply updates 0 rows and the trigger ends ENABLED. NB: the workspace_files CALL just below is NOT
+-- wrapped — it carries no immutability trigger.
+ALTER TABLE public.workflow_definitions DISABLE TRIGGER workflow_definitions_block_published;
 CALL public._mig105_backfill($SQL$
   UPDATE public.workflow_definitions t SET org_id = pm.org_id FROM public.org_members pm
   WHERE pm.user_id = t.created_by AND t.org_id IS NULL
     AND t.id IN (SELECT id FROM public.workflow_definitions WHERE org_id IS NULL LIMIT $1)
 $SQL$);
+ALTER TABLE public.workflow_definitions ENABLE TRIGGER workflow_definitions_block_published;
 CALL public._mig105_backfill($SQL$
   UPDATE public.workspace_files t SET org_id = pm.org_id FROM public.org_members pm
   WHERE pm.user_id = t.created_by AND t.org_id IS NULL
