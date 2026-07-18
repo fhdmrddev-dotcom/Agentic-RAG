@@ -30,9 +30,10 @@
 // `rows === null` → a calm loading placeholder (honest, mirrors UsersAndAccess).
 // ─────────────────────────────────────────────────────────────────────────────
 import { useEffect, useMemo, useRef, useState } from "react"
-import { Check, ChevronDown, Loader2, Lock, RotateCcw, Unlock } from "lucide-react"
+import { Check, ChevronDown, Loader2, Lock, Plus, RotateCcw, Unlock } from "lucide-react"
 
-import { ApiError, type ModelCapabilityPatch, type ModelRegistryRow } from "@/lib/api"
+import { ApiError, type AddModelBody, type ModelCapabilityPatch, type ModelRegistryRow } from "@/lib/api"
+import { familyDefaults } from "@/lib/model-defaults"
 import { providerLogo } from "@/lib/providerLogo"
 import { cn } from "@/lib/utils"
 
@@ -46,6 +47,13 @@ interface ModelRegistryTabProps {
   /** Lock/unlock the org default → `PUT /admin/models/{id}/lock`. Only ever called for an
    *  ENABLED row (the leaf gates the control on `✕ hidden` rows). */
   onLock: (modelId: string, locked: boolean) => Promise<void>
+  /** Add ONE model by explicit id + provider → `POST /admin/models` (D-159-02). The body
+   *  NEVER carries `enabled` (`AddModelBody` has no such field — the server forces
+   *  `enabled=false`; the model lands disabled and is enabled from the table, SC#3). Rejects
+   *  with an `ApiError(409/422, detail)` so the form surfaces the plain-language refusal.
+   *  Optional so the leaf renders byte-identical where the shell hasn't wired it yet — the
+   *  "+ Add model by ID" affordance appears ONLY when the shell provides this handler. */
+  onAddModel?: (body: AddModelBody) => Promise<void>
   /** When true, reveal the raw column names (⌥ LANG-01 reveal). */
   showTechnical: boolean
 }
@@ -89,6 +97,7 @@ export function ModelRegistryTab({
   rows,
   onSetCapability,
   onLock,
+  onAddModel,
   showTechnical,
 }: ModelRegistryTabProps) {
   const groups = useMemo(() => (rows ? groupByProvider(rows) : []), [rows])
@@ -124,7 +133,11 @@ export function ModelRegistryTab({
   }
 
   return (
-    <section aria-label="Model registry" className="space-y-2.5">
+    <div className="space-y-4">
+      {/* D-159-02: the "+ Add model by ID" affordance sits ABOVE the (byte-identical)
+          provider-grouped table. Rendered only when the shell wires `onAddModel`. */}
+      {onAddModel && <AddModelSection onAddModel={onAddModel} />}
+      <section aria-label="Model registry" className="space-y-2.5">
       {groups.map(([provider, providerRows]) => {
         const isCollapsed = collapsed.has(provider)
         const Logo = providerLogo(provider)
@@ -198,7 +211,8 @@ export function ModelRegistryTab({
           </div>
         )
       })}
-    </section>
+      </section>
+    </div>
   )
 }
 
@@ -732,5 +746,338 @@ function RowToggle({
         )}
       />
     </button>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// D-159-02 / D-159-03 — the "+ Add model by ID" vertical (the 070-A idiom).
+//
+// Generalizes the SEED-088 GPT-5.6 hand-add into a first-class UI path: type an id,
+// pick the provider (the 8-cloud roster), set the 3 capability knobs pre-filled from
+// the per-family default table (source-honest labels), submit → a DB-only override row
+// that lands DISABLED (SC#3 — the server forces `enabled=false`; there is deliberately
+// no `enabled` field on `AddModelBody`). Graded-guard 066: add-by-ID is reversible + has
+// no victim → direct submit + ✎ receipt (no arm-to-confirm). A 409/422 refusal renders
+// in-form; never a silent failure.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** The 8-cloud provider roster the operator picks from — the native-7 + OpenRouter,
+ *  matching the backend add-by-ID allowlist + the setup wizard's OTHER_PROVIDER_ROWS
+ *  order (openrouter last). A native `<option>` can only hold text, so the SELECTED
+ *  provider's `@lobehub` mark renders beside the select (the icon convention realized
+ *  for a native picker — an SVG can't live inside an `<option>`). */
+const ADD_PROVIDER_ROSTER = [
+  "openai",
+  "anthropic",
+  "google",
+  "deepseek",
+  "moonshot",
+  "zhipu",
+  "minimax",
+  "openrouter",
+] as const
+
+/** The three honest capability sources (D-159-03). */
+type CapSource = "default" | "operator" | "blank"
+
+/** The three-way source badge — extends the 2-state `SourceTag` (OVR/DEF) to a third
+ *  operator-typed state: amber "default — confirm" (the untouched family suggestion the
+ *  operator must review), primary "you set it" (the operator edited it), or nothing at all
+ *  when `familyDefaults` returned null (a blank input the operator fills). */
+function CapSourceTag({ source }: { source: CapSource }) {
+  if (source === "blank") return null
+  return (
+    <span
+      className={cn(
+        "rounded px-1 py-px font-mono text-[9px] tracking-wide",
+        source === "operator" ? "bg-primary/15 text-primary" : "bg-warning/15 text-warning",
+      )}
+    >
+      {source === "operator" ? "you set it" : "default — confirm"}
+    </span>
+  )
+}
+
+/** One labeled capability control + its source badge (a small column). */
+function CapField({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="text-[11px] font-medium text-muted-foreground">{label}</span>
+      <div className="flex items-center gap-1.5">{children}</div>
+    </div>
+  )
+}
+
+/** The header affordance: a button that reveals the inline add-by-ID form, plus the
+ *  post-add ✎ receipt (shown in the header for 3500ms after the form clears + collapses,
+ *  so the confirmation survives the collapse). */
+function AddModelSection({ onAddModel }: { onAddModel: (body: AddModelBody) => Promise<void> }) {
+  const [open, setOpen] = useState(false)
+  const [receipt, setReceipt] = useState(false)
+
+  function handleAdded() {
+    setOpen(false)
+    setReceipt(true)
+    window.setTimeout(() => setReceipt(false), 3500)
+  }
+
+  return (
+    <div className="overflow-hidden rounded-[12px] border border-border/70 bg-surface">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="flex w-full items-center gap-2 px-4 py-3 text-left transition-colors hover:bg-accent/40"
+      >
+        <Plus className="h-4 w-4 flex-none text-primary" aria-hidden="true" />
+        <span className="font-semibold text-foreground">Add model by ID</span>
+        <span className="hidden text-xs text-muted-foreground sm:inline">
+          type an id, pick a provider, set its capabilities
+        </span>
+        <span className="flex-1" />
+        {receipt && (
+          <span className="inline-flex items-center gap-1 text-[11px] font-medium text-warning" role="status">
+            <Check className="h-3 w-3 text-success" aria-hidden="true" />✎ recorded
+          </span>
+        )}
+        <ChevronDown
+          className={cn(
+            "h-4 w-4 flex-none text-muted-foreground transition-transform",
+            !open && "-rotate-90",
+          )}
+          aria-hidden="true"
+        />
+      </button>
+      {open && (
+        <AddModelForm onAddModel={onAddModel} onCancel={() => setOpen(false)} onAdded={handleAdded} />
+      )}
+    </div>
+  )
+}
+
+/** The inline add-by-ID form. Capabilities pre-fill from `familyDefaults(model_id || provider)`
+ *  and are rendered with three source-honest labels (D-159-03). The write chokepoint mirrors
+ *  `ModelRow.write`: busy → `onAddModel` → ✎ receipt + collapse, or the server refusal in-form.
+ *  The body is built by CONDITIONAL INCLUSION (mirrors `ModelDiscoveryPanel.coerce`): a numeric
+ *  cap is sent only when a finite value is present; `native_tools` is sent ONLY when the tri-state
+ *  select is `native` (true) or `none` (false) and is OMITTED on `unknown` (never a bare false —
+ *  an unmatched-family model then lands NULL and the server serves the inferred default, SC#3).
+ *  `enabled` is NEVER in the body (`AddModelBody` has no such field). */
+function AddModelForm({
+  onAddModel,
+  onCancel,
+  onAdded,
+}: {
+  onAddModel: (body: AddModelBody) => Promise<void>
+  onCancel: () => void
+  onAdded: () => void
+}) {
+  const [modelId, setModelId] = useState("")
+  const [provider, setProvider] = useState<string>("openai")
+  // Per-field drafts + touched flags. Touched ⇒ the operator's value wins over the family
+  // pre-fill AND the source badge flips to "you set it".
+  const [ctxDraft, setCtxDraft] = useState("")
+  const [outDraft, setOutDraft] = useState("")
+  const [toolsDraft, setToolsDraft] = useState<"unknown" | "native" | "none">("unknown")
+  const [touched, setTouched] = useState({ ctx: false, out: false, tools: false })
+  const [note, setNote] = useState("")
+  const [busy, setBusy] = useState(false)
+  const [errorDetail, setErrorDetail] = useState<string | null>(null)
+
+  // The reviewed family pre-fill — recomputed each render (pure; the id wins over the provider,
+  // so typing "kimi-k3" resolves the Kimi family regardless of the selected provider).
+  const defaults = familyDefaults(modelId.trim() || provider)
+
+  // Effective per-field value + source (touched ⇒ operator; else the family default; else blank).
+  const ctxSource: CapSource = touched.ctx ? "operator" : defaults.context !== null ? "default" : "blank"
+  const ctxValue = touched.ctx ? ctxDraft : defaults.context !== null ? String(defaults.context) : ""
+  const outSource: CapSource = touched.out ? "operator" : defaults.maxOutput !== null ? "default" : "blank"
+  const outValue = touched.out ? outDraft : defaults.maxOutput !== null ? String(defaults.maxOutput) : ""
+  const toolsSource: CapSource = touched.tools ? "operator" : defaults.tools !== null ? "default" : "blank"
+  const toolsValue: "unknown" | "native" | "none" = touched.tools
+    ? toolsDraft
+    : defaults.tools === true
+      ? "native"
+      : defaults.tools === false
+        ? "none"
+        : "unknown"
+
+  const ProviderMark = providerLogo(provider)
+
+  /** A controlled numeric string → a finite number, or undefined (omit the field). */
+  function numOrUndef(s: string): number | undefined {
+    const n = parseInt(s, 10)
+    return Number.isFinite(n) ? n : undefined
+  }
+
+  async function submit() {
+    if (busy) return
+    const id = modelId.trim()
+    if (!id) {
+      setErrorDetail("Enter a model id.")
+      return
+    }
+    setBusy(true)
+    setErrorDetail(null)
+    // Build by conditional inclusion — start from {model_id, provider}; NEVER add `enabled`.
+    const body: AddModelBody = { model_id: id, provider }
+    const ctx = numOrUndef(ctxValue)
+    if (ctx !== undefined) body.context_window_tokens = ctx
+    const out = numOrUndef(outValue)
+    if (out !== undefined) body.max_output_tokens = out
+    if (toolsValue === "native") body.native_tools = true
+    else if (toolsValue === "none") body.native_tools = false
+    // OMIT native_tools entirely on "unknown" (never a bare false).
+    const trimmedNote = note.trim()
+    if (trimmedNote) {
+      body.deprecated = true
+      body.deprecated_reason = trimmedNote
+    }
+    try {
+      await onAddModel(body)
+      onAdded()
+    } catch (err) {
+      setErrorDetail(err instanceof ApiError ? err.message : "Couldn’t add that model — try again.")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <form
+      aria-label="Add model by ID"
+      onSubmit={(e) => {
+        e.preventDefault()
+        void submit()
+      }}
+      className="space-y-4 border-t border-border/60 px-4 py-4"
+    >
+      {/* id + provider (the selected provider's @lobehub mark sits beside the native select). */}
+      <div className="flex flex-wrap items-end gap-4">
+        <label className="flex flex-col gap-1">
+          <span className="text-[11px] font-medium text-muted-foreground">Model ID</span>
+          <input
+            type="text"
+            value={modelId}
+            onChange={(e) => setModelId(e.target.value)}
+            placeholder="e.g. kimi-k3"
+            aria-label="Model ID"
+            className="w-64 rounded-[6px] border border-border bg-background px-2 py-1 font-mono text-sm text-foreground placeholder:text-muted-foreground/50"
+          />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-[11px] font-medium text-muted-foreground">Provider</span>
+          <div className="flex items-center gap-1.5">
+            <span className="flex h-6 w-6 flex-none items-center justify-center rounded-md bg-muted text-muted-foreground">
+              {ProviderMark ? <ProviderMark size={14} /> : provider.slice(0, 2).toUpperCase()}
+            </span>
+            <select
+              value={provider}
+              onChange={(e) => setProvider(e.target.value)}
+              aria-label="Provider"
+              className="rounded-[6px] border border-border bg-background px-2 py-1 text-sm text-foreground"
+            >
+              {ADD_PROVIDER_ROSTER.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+            </select>
+          </div>
+        </label>
+      </div>
+
+      {/* the 3 capability knobs, each with its three-way source label. */}
+      <div className="flex flex-wrap gap-5">
+        <CapField label="Context">
+          <input
+            type="number"
+            value={ctxValue}
+            placeholder="set…"
+            aria-label="Context window tokens"
+            onChange={(e) => {
+              setTouched((t) => ({ ...t, ctx: true }))
+              setCtxDraft(e.target.value)
+            }}
+            className="w-28 rounded-[6px] border border-border bg-background px-2 py-1 font-mono text-xs text-foreground placeholder:text-muted-foreground/50"
+          />
+          <CapSourceTag source={ctxSource} />
+        </CapField>
+        <CapField label="Max output">
+          <input
+            type="number"
+            value={outValue}
+            placeholder="set…"
+            aria-label="Max output tokens"
+            onChange={(e) => {
+              setTouched((t) => ({ ...t, out: true }))
+              setOutDraft(e.target.value)
+            }}
+            className="w-28 rounded-[6px] border border-border bg-background px-2 py-1 font-mono text-xs text-foreground placeholder:text-muted-foreground/50"
+          />
+          <CapSourceTag source={outSource} />
+        </CapField>
+        <CapField label="Native tools">
+          <select
+            value={toolsValue}
+            aria-label="Native tools"
+            onChange={(e) => {
+              setTouched((t) => ({ ...t, tools: true }))
+              setToolsDraft(e.target.value as "unknown" | "native" | "none")
+            }}
+            className="rounded-[6px] border border-border bg-background px-2 py-1 font-mono text-xs text-foreground"
+          >
+            <option value="unknown">unknown</option>
+            <option value="native">native ✓</option>
+            <option value="none">none</option>
+          </select>
+          <CapSourceTag source={toolsSource} />
+        </CapField>
+      </div>
+
+      {/* optional deprecation note (a non-empty note marks the added model deprecated). */}
+      <label className="flex flex-col gap-1">
+        <span className="text-[11px] font-medium text-muted-foreground">
+          Deprecation note (optional — marks it deprecated)
+        </span>
+        <input
+          type="text"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder="reason (optional)"
+          aria-label="Deprecation note"
+          className="w-80 rounded-[6px] border border-border bg-background px-2 py-1 text-xs text-foreground placeholder:text-muted-foreground/50"
+        />
+      </label>
+
+      {/* the lands-disabled copy (D-159-02 — the opt-in-enable rule made visible). */}
+      <p className="text-[11px] text-muted-foreground">
+        Added <span className="font-medium text-foreground">disabled</span> — enable it from the table.
+      </p>
+
+      {/* actions + the in-form refusal (never a silent failure). */}
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="submit"
+          disabled={busy}
+          className="inline-flex items-center gap-1.5 rounded-md border border-primary/40 bg-primary/10 px-3.5 py-1.5 text-sm font-medium text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
+          Add model
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="rounded-md border border-border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+        >
+          Cancel
+        </button>
+        {errorDetail && (
+          <span className="text-[11px] font-medium text-destructive" role="alert">
+            {errorDetail}
+          </span>
+        )}
+      </div>
+    </form>
   )
 }

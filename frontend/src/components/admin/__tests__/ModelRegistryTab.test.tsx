@@ -406,3 +406,118 @@ describe("ModelRegistryTab (070-A) — instrument table + the two-layer coupling
     expect(onSet).toHaveBeenCalledWith("gpt-5.6-sol", { context_window_tokens: null })
   })
 })
+
+// ── Phase 159 Plan 05 (MODEL-03 / D-159-02 / D-159-03) — the + Add model by ID form ──
+// Locks the add-by-ID vertical: the 070-A affordance appears only when the shell wires
+// onAddModel; opening it reveals model_id + the 8-cloud provider select + the 3 capability
+// knobs; the caps pre-fill from familyDefaults with three source-honest labels; the submit
+// builds the body by conditional inclusion (NEVER `enabled`; OMIT native_tools on "unknown"),
+// lands the model disabled per the copy, and surfaces a server refusal in-form.
+describe("ModelRegistryTab (070-A) — the + Add model by ID form (D-159-02 / D-159-03)", () => {
+  const baseRows = [makeRow()]
+
+  async function openForm(onAddModel = vi.fn().mockResolvedValue(undefined)) {
+    const user = userEvent.setup()
+    render(
+      <ModelRegistryTab
+        rows={baseRows}
+        onSetCapability={noop}
+        onLock={noop}
+        onAddModel={onAddModel}
+        showTechnical={false}
+      />,
+    )
+    await user.click(screen.getByRole("button", { name: /add model by id/i }))
+    return { user, onAddModel }
+  }
+
+  it("renders NO add affordance when the shell wires no onAddModel (the leaf stays byte-identical)", () => {
+    render(<ModelRegistryTab rows={baseRows} onSetCapability={noop} onLock={noop} showTechnical={false} />)
+    expect(screen.queryByRole("button", { name: /add model by id/i })).not.toBeInTheDocument()
+  })
+
+  it("opening the form shows model_id + a provider select with the 8-cloud roster + the 3 capability inputs", async () => {
+    await openForm()
+    expect(screen.getByRole("textbox", { name: /model id/i })).toBeInTheDocument()
+    const providerSelect = screen.getByRole("combobox", { name: /provider/i })
+    expect(within(providerSelect).getAllByRole("option")).toHaveLength(8)
+    expect(screen.getByRole("spinbutton", { name: /context window tokens/i })).toBeInTheDocument()
+    expect(screen.getByRole("spinbutton", { name: /max output tokens/i })).toBeInTheDocument()
+    expect(screen.getByRole("combobox", { name: /native tools/i })).toBeInTheDocument()
+  })
+
+  it("selecting moonshot pre-fills the caps as amber 'default — confirm'; editing a field flips it to 'you set it'", async () => {
+    const { user } = await openForm()
+    await user.selectOptions(screen.getByRole("combobox", { name: /provider/i }), "moonshot")
+
+    // Kimi family defaults pre-fill the numeric caps + the tools select…
+    expect(screen.getByRole("spinbutton", { name: /context window tokens/i })).toHaveDisplayValue("256000")
+    expect(screen.getByRole("spinbutton", { name: /max output tokens/i })).toHaveDisplayValue("65536")
+    expect(screen.getByRole("combobox", { name: /native tools/i })).toHaveValue("native")
+    // …each labeled amber "default — confirm".
+    expect(screen.getAllByText(/default — confirm/i).length).toBeGreaterThanOrEqual(1)
+
+    // Editing the context flips ITS label to the operator-typed style.
+    const ctx = screen.getByRole("spinbutton", { name: /context window tokens/i })
+    await user.clear(ctx)
+    await user.type(ctx, "300000")
+    expect(screen.getByText(/you set it/i)).toBeInTheDocument()
+  })
+
+  it("a null-family provider (openrouter) shows a blank numeric input + the tools select resting on 'unknown' (never a defaulted false)", async () => {
+    const { user } = await openForm()
+    await user.selectOptions(screen.getByRole("combobox", { name: /provider/i }), "openrouter")
+
+    expect(screen.getByRole("spinbutton", { name: /context window tokens/i })).toHaveDisplayValue("")
+    expect(screen.getByRole("combobox", { name: /native tools/i })).toHaveValue("unknown")
+    // No family default anywhere → no amber "default — confirm" badge.
+    expect(screen.queryByText(/default — confirm/i)).not.toBeInTheDocument()
+  })
+
+  it("submitting sends {model_id, provider} + the family caps and NO enabled key (native_tools=true when native)", async () => {
+    const { user, onAddModel } = await openForm()
+    await user.type(screen.getByRole("textbox", { name: /model id/i }), "kimi-k3")
+    await user.selectOptions(screen.getByRole("combobox", { name: /provider/i }), "moonshot")
+    await user.click(screen.getByRole("button", { name: /^add model$/i }))
+
+    expect(onAddModel).toHaveBeenCalledTimes(1)
+    const body = onAddModel.mock.calls[0][0]
+    expect(body).toMatchObject({
+      model_id: "kimi-k3",
+      provider: "moonshot",
+      context_window_tokens: 256000,
+      max_output_tokens: 65536,
+      native_tools: true,
+    })
+    expect(body).not.toHaveProperty("enabled")
+  })
+
+  it("an unknown-family add with native_tools left 'unknown' OMITS native_tools from the body (SC#3 — never a bare false)", async () => {
+    const { user, onAddModel } = await openForm()
+    await user.type(screen.getByRole("textbox", { name: /model id/i }), "opaque-model-1")
+    await user.selectOptions(screen.getByRole("combobox", { name: /provider/i }), "openrouter")
+    await user.click(screen.getByRole("button", { name: /^add model$/i }))
+
+    expect(onAddModel).toHaveBeenCalledTimes(1)
+    const body = onAddModel.mock.calls[0][0]
+    expect(body).toEqual({ model_id: "opaque-model-1", provider: "openrouter" })
+    expect(body).not.toHaveProperty("native_tools")
+    expect(body).not.toHaveProperty("enabled")
+  })
+
+  it("a rejected submit (ApiError) renders the server detail in-form — no crash, no silent success", async () => {
+    const onAddModel = vi.fn().mockRejectedValue(new ApiError("kimi-k3 is already in the registry.", 409))
+    const { user } = await openForm(onAddModel)
+    await user.type(screen.getByRole("textbox", { name: /model id/i }), "kimi-k3")
+    await user.click(screen.getByRole("button", { name: /^add model$/i }))
+
+    expect(await screen.findByText(/already in the registry/i)).toBeInTheDocument()
+    // The form stays open (not collapsed) so the operator can correct + retry.
+    expect(screen.getByRole("textbox", { name: /model id/i })).toBeInTheDocument()
+  })
+
+  it("the form copy states the model is added disabled and enabled from the table", async () => {
+    await openForm()
+    expect(screen.getByText(/enable it from the table/i)).toBeInTheDocument()
+  })
+})
