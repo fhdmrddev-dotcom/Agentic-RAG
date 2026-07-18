@@ -135,6 +135,11 @@ export function ModelDiscoveryPanel({
   // the next time discovery runs.
   const [showAllThisView, setShowAllThisView] = useState(false)
 
+  // Add-one-not-all: a text filter over the NEW-models list so the operator can find a specific
+  // model instead of scrolling ~400 rows. Display-only (like the utility filter) — it narrows what
+  // "Select all (matches)" targets and what's rendered, never what's already ticked. Reset each run.
+  const [newSearch, setNewSearch] = useState("")
+
   // WR-02 (Phase 159 review): surface a persist failure on the filter toggle. The sibling add /
   // capability write paths all show refusals; a silently-reverting checkbox on a failed setFlag
   // (e.g. a pending-migration 500) is dishonest. Cleared on the next attempt.
@@ -155,9 +160,11 @@ export function ModelDiscoveryPanel({
     try {
       const res = await onRunDiscovery()
       setResult(res)
-      // New + changed default to accepted; enable-now defaults OFF (never auto-enable).
+      // NEW models default UNSELECTED (opt-in) — the operator searches + ticks only what they
+      // want, so Confirm never bulk-adds the whole ~400-model discovery pull (add-one-not-all).
+      // 'changed' (updates to models ALREADY in the registry) keeps accept-by-default. enable-now
+      // defaults OFF (never auto-enable). "Select all (matches)" / "Clear" cover the bulk case.
       const acc = new Set<string>()
-      res.new.forEach((m) => acc.add(m.model_id))
       res.changed.forEach((m) => acc.add(m.model_id))
       setAccepted(acc)
       setEnableNow(new Set())
@@ -167,6 +174,7 @@ export function ModelDiscoveryPanel({
       setDrafts(seedDraftsFromDefaults(res.new))
       setVanished({})
       setShowAllThisView(false)
+      setNewSearch("")
       setPhase("done")
     } catch {
       setRunError("Couldn’t run discovery — try again.")
@@ -272,13 +280,38 @@ export function ModelDiscoveryPanel({
   // computed from the FULL result, so a hidden utility row can never be silently confirmed
   // nor dropped from the confirmable payload (149 red line: discovery proposes, humans confirm).
   const hidingUtility = filterEnabled && !showAllThisView
+  const searchQuery = newSearch.trim().toLowerCase()
   const visibleNew = result
-    ? hidingUtility
-      ? result.new.filter((m) => m.utility !== true)
-      : result.new
+    ? result.new.filter((m) => {
+        if (hidingUtility && m.utility === true) return false
+        if (searchQuery && !m.model_id.toLowerCase().includes(searchQuery)) return false
+        return true
+      })
     : []
   const hiddenNewCount =
     result && hidingUtility ? result.new.filter((m) => m.utility === true).length : 0
+  const selectedNewCount = result
+    ? result.new.filter((m) => accepted.has(m.model_id)).length
+    : 0
+
+  // Bulk selection helpers (opt-in default): "Select all" targets only the currently VISIBLE new
+  // rows (utility-filter + search applied); "Clear" removes every new-model tick. Both leave the
+  // 'changed'/'vanished' selections untouched.
+  function selectAllVisibleNew() {
+    setAccepted((prev) => {
+      const next = new Set(prev)
+      visibleNew.forEach((m) => next.add(m.model_id))
+      return next
+    })
+  }
+  function clearNewSelection() {
+    if (!result) return
+    setAccepted((prev) => {
+      const next = new Set(prev)
+      result.new.forEach((m) => next.delete(m.model_id))
+      return next
+    })
+  }
 
   return (
     <section aria-label="Model discovery" className="space-y-4">
@@ -371,6 +404,37 @@ export function ModelDiscoveryPanel({
                   </span>
                 )}
               </div>
+              {/* Add-one-not-all: search the new-models list + explicit bulk controls. Nothing is
+                  pre-selected (opt-in), so Confirm writes ONLY what the operator ticks below. */}
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  type="text"
+                  value={newSearch}
+                  onChange={(e) => setNewSearch(e.target.value)}
+                  placeholder="Search new models by id…"
+                  aria-label="Search new models by id"
+                  className="h-7 min-w-[12rem] flex-1 rounded-md border border-border bg-surface px-2 text-xs text-foreground placeholder:text-muted-foreground/70 focus:border-primary focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={selectAllVisibleNew}
+                  disabled={visibleNew.length === 0}
+                  className="rounded border border-border px-2 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Select all{searchQuery ? " (matches)" : ""}
+                </button>
+                <button
+                  type="button"
+                  onClick={clearNewSelection}
+                  disabled={selectedNewCount === 0}
+                  className="rounded border border-border px-2 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Clear
+                </button>
+                <span className="text-[11px] text-muted-foreground/80" data-testid="new-selected-count">
+                  {selectedNewCount} selected · showing {visibleNew.length} of {result.new.length}
+                </span>
+              </div>
               <DiffGroup glyph="✚" tone="success" title="New models" note="not in the registry yet">
                 {visibleNew.map((m) => (
                   <NewModelRow
@@ -392,6 +456,14 @@ export function ModelDiscoveryPanel({
                     onDraft={(field, value) => setDraft(m.model_id, field, value)}
                   />
                 ))}
+                {searchQuery && visibleNew.length === 0 && (
+                  <div
+                    data-testid="new-search-empty"
+                    className="px-3 py-2 text-xs text-muted-foreground"
+                  >
+                    No new models match “{newSearch.trim()}”.
+                  </div>
+                )}
                 {hiddenNewCount > 0 && (
                   <div
                     data-testid="utility-hidden-count"

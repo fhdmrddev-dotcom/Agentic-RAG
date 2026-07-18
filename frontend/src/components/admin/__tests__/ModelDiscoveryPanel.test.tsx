@@ -136,15 +136,17 @@ describe("ModelDiscoveryPanel (071-A) — SC#3 propose-only hero", () => {
     expect(screen.queryByRole("button", { name: /delete/i })).toBeNull()
   })
 
-  it("confirming routes the chosen changes through onConfirm", async () => {
+  it("confirming routes the chosen changes through onConfirm (new models opt-in via Select all)", async () => {
     const onConfirm = vi.fn().mockResolvedValue(undefined)
     const { user } = await runDiscovery(onConfirm)
 
+    // Opt-in: new models start UNselected — pick them (Select all covers the visible set, filter off).
+    await user.click(screen.getByRole("button", { name: /select all/i }))
     await user.click(screen.getByRole("button", { name: /apply confirmed changes/i }))
 
     expect(onConfirm).toHaveBeenCalledTimes(1)
     const changes = onConfirm.mock.calls[0][0] as Array<{ modelId: string }>
-    // New + changed default to accepted → at least the two new models + the changed one.
+    // The now-selected new models + the accept-by-default changed one.
     expect(changes.map((c) => c.modelId)).toEqual(
       expect.arrayContaining(["gemini-3-pro", "z-ai/glm-5.1"]),
     )
@@ -253,9 +255,10 @@ describe("ModelDiscoveryPanel (071-A) — SC#3 truthful per-model provenance suf
 // Phase 159 Plan 06 (MODEL-03 / D-159-04) — the default-on suitability filter.
 // The discovery panel hides known non-chat "utility" `new` models by default (with an
 // honest hidden-count + a non-destructive "Show all"), persisting the toggle via
-// onSetFilter. CRITICAL SC#3 invariant: the filter is DISPLAY-only — a hidden utility
-// model is still in `accepted`/`buildChanges`, so it can never be silently confirmed nor
-// dropped from the confirm payload (149 red line: discovery proposes, humans confirm).
+// onSetFilter. SC#3 red line (discovery proposes, humans confirm): with opt-in selection,
+// NOTHING is added unless the operator ticks it, and "Select all" targets only the VISIBLE
+// rows — so the filter can never silently sweep hidden utility models into the confirm payload
+// (the add-one-not-all fix). Revealing them via "Show all" then selecting is the explicit path.
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** A diff with two utility `new` models (utility:true) + one chat model (utility:false). */
@@ -351,16 +354,27 @@ describe("ModelDiscoveryPanel (159) — D-159-04 default-on suitability filter",
     expect(screen.queryByText(/utility models hidden/i)).toBeNull()
   })
 
-  it("the confirm payload is filter-INDEPENDENT — hidden utility models stay in the diff (SC#3)", async () => {
-    // Only gpt-5.6-chat is visible (filter on), but all three new models are accepted-by-default
-    // in state; the display filter must never drop the hidden ones from the confirmable payload.
+  it("opt-in + filter on: 'Select all' confirms only the VISIBLE row — hidden utility models are NOT added (SC#3 honesty)", async () => {
+    // Only gpt-5.6-chat is visible (filter on); the two utility models are hidden. Opt-in + a
+    // filter-respecting "Select all" means the operator adds exactly what they can see — the
+    // add-one-not-all fix: hidden utility rows are never silently swept into the payload.
     const { user, onConfirm } = await runFiltered(true)
+    await user.click(screen.getByRole("button", { name: /select all/i }))
     await user.click(screen.getByRole("button", { name: /apply confirmed changes/i }))
     expect(onConfirm).toHaveBeenCalledTimes(1)
     const ids = (onConfirm.mock.calls[0][0] as Array<{ modelId: string }>).map((c) => c.modelId)
-    expect(ids).toEqual(
-      expect.arrayContaining(["gpt-5.6-chat", "text-embedding-4", "whisper-2"]),
-    )
+    expect(ids).toContain("gpt-5.6-chat")
+    expect(ids).not.toContain("text-embedding-4")
+    expect(ids).not.toContain("whisper-2")
+  })
+
+  it("opt-in + 'Show all' then 'Select all': revealed utility rows ARE confirmable when explicitly chosen", async () => {
+    const { user, onConfirm } = await runFiltered(true)
+    await user.click(screen.getByRole("button", { name: /show all/i }))
+    await user.click(screen.getByRole("button", { name: /select all/i }))
+    await user.click(screen.getByRole("button", { name: /apply confirmed changes/i }))
+    const ids = (onConfirm.mock.calls[0][0] as Array<{ modelId: string }>).map((c) => c.modelId)
+    expect(ids).toEqual(expect.arrayContaining(["gpt-5.6-chat", "text-embedding-4", "whisper-2"]))
   })
 
   it("leaves the changed/vanished groups intact (the filter touches only the New group)", async () => {
@@ -375,6 +389,53 @@ describe("ModelDiscoveryPanel (159) — D-159-04 default-on suitability filter",
     expect(container.querySelector('[data-changed-model="z-ai/glm-6"]')).not.toBeNull()
     expect(container.querySelector('[data-vanished-model="gpt-4-turbo"]')).not.toBeNull()
     expect(screen.getByText(/2 utility models hidden/i)).toBeInTheDocument()
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 159 (UAT follow-up) — add-one-not-all. Live testing surfaced that the ~400-model
+// discovery pull came back ALL pre-selected, so Confirm would add every row. Fix: NEW models
+// default UNSELECTED (opt-in); a text search narrows the list; Select all / Clear cover bulk.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("ModelDiscoveryPanel (159) — add-one-not-all: opt-in + search", () => {
+  it("new models start UNSELECTED after a scan — Confirm sends only the accept-by-default changed group", async () => {
+    const onConfirm = vi.fn().mockResolvedValue(undefined)
+    const { user } = await runDiscovery(onConfirm)
+    // No selection made → new models are NOT in the payload (opt-in); the changed model still is.
+    await user.click(screen.getByRole("button", { name: /apply confirmed changes/i }))
+    const ids = (onConfirm.mock.calls[0][0] as Array<{ modelId: string }>).map((c) => c.modelId)
+    expect(ids).not.toContain("gemini-3-pro")
+    expect(ids).not.toContain("gpt-5.6-nova")
+    expect(ids).toContain("z-ai/glm-5.1")
+  })
+
+  it("the search box narrows the new list and 'Select all' targets only the matches", async () => {
+    const onConfirm = vi.fn().mockResolvedValue(undefined)
+    const { user } = await runDiscovery(onConfirm)
+    await user.type(screen.getByRole("textbox", { name: /search new models/i }), "gemini")
+    await user.click(screen.getByRole("button", { name: /select all/i }))
+    await user.click(screen.getByRole("button", { name: /apply confirmed changes/i }))
+    const ids = (onConfirm.mock.calls[0][0] as Array<{ modelId: string }>).map((c) => c.modelId)
+    expect(ids).toContain("gemini-3-pro")
+    expect(ids).not.toContain("gpt-5.6-nova")
+  })
+
+  it("shows a 'no matches' note when the search matches nothing", async () => {
+    const { user } = await runDiscovery()
+    await user.type(screen.getByRole("textbox", { name: /search new models/i }), "zzz-nonexistent")
+    expect(screen.getByTestId("new-search-empty")).toBeInTheDocument()
+  })
+
+  it("'Clear' deselects the new group back to the opt-in baseline", async () => {
+    const onConfirm = vi.fn().mockResolvedValue(undefined)
+    const { user } = await runDiscovery(onConfirm)
+    await user.click(screen.getByRole("button", { name: /select all/i }))
+    await user.click(screen.getByRole("button", { name: /^clear$/i }))
+    await user.click(screen.getByRole("button", { name: /apply confirmed changes/i }))
+    const ids = (onConfirm.mock.calls[0][0] as Array<{ modelId: string }>).map((c) => c.modelId)
+    expect(ids).not.toContain("gemini-3-pro")
+    expect(ids).toContain("z-ai/glm-5.1")
   })
 })
 
@@ -453,6 +514,8 @@ describe("ModelDiscoveryPanel (159) — D-159-03 family-default pre-fill (three-
 
   it("confirms an accepted-but-un-ticked pre-filled model as enabled:false, sending the reviewed values", async () => {
     const { user, onConfirm } = await runWith(CLAUDE_NEO)
+    // Opt-in: select the model (but never tick "Enable now").
+    await user.click(screen.getByRole("button", { name: /select all/i }))
     await user.click(screen.getByRole("button", { name: /apply confirmed changes/i }))
     const changes = onConfirm.mock.calls[0][0] as Array<{ modelId: string; patch: Record<string, unknown> }>
     const claude = changes.find((c) => c.modelId === "claude-neo-1")!
