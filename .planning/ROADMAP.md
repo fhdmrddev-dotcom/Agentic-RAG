@@ -506,7 +506,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 159-05-PLAN.md — “+ Add model by ID” form (070-A) + ControlRoomPage add-wiring (D-159-02, D-159-03)
+- [x] 159-05-PLAN.md — “+ Add model by ID” form (070-A) + ControlRoomPage add-wiring (D-159-02, D-159-03)
 
 **Wave 4** *(blocked on Wave 3 completion)*
 

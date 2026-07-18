@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.3
 milestone_name: Operator UX
 status: executing
-last_updated: "2026-07-18T01:45:36.762Z"
+last_updated: "2026-07-18T02:17:50.522Z"
 last_activity: 2026-07-18
 progress:
   total_phases: 27
   completed_phases: 13
   total_plans: 95
-  completed_plans: 93
+  completed_plans: 94
   percent: 48
 ---
 
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-07-10 — v3.2 Skill Eval Studio + Self-
 **159 added (2026-07-18):** Phase 159 appended to v3.3 STRETCH via `gsd-sdk phase.add` (SDK dropped the skeleton after the archived milestones — the known window quirk — hand-relocated into the v3.3 window: STRETCH table + checklist + detail + progress + MODEL-03 in REQUIREMENTS.md; also fixed the stale 157/158 checkboxes→[x] + DEPLOY-01/02 traceability→Complete).
 
 Phase: 159 (model-registry-curation) — EXECUTING
-Plan: 5 of 6
+Plan: 6 of 6
 Status: Ready to execute
 Last activity: 2026-07-18
 
