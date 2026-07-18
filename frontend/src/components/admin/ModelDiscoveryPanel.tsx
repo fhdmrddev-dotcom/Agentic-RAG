@@ -39,6 +39,16 @@ interface ModelDiscoveryPanelProps {
   /** Apply the operator's confirmed changes (the shell routes each to setModelCapability
    *  per model, then re-fetches the registry + pulses the receipt). */
   onConfirm: (changes: Array<{ modelId: string; patch: ModelCapabilityPatch }>) => Promise<void>
+  /** Phase 159 (D-159-04): the persisted, default-on suitability filter state (read by the
+   *  shell from app_settings `model_discovery_filter_enabled`). DISPLAY-ONLY — when true,
+   *  known non-chat "utility" `new` models are hidden; it NEVER mutates the confirmable diff
+   *  (accepted / enableNow / drafts / buildChanges are untouched — 149's "propose, humans
+   *  confirm" red line). */
+  filterEnabled: boolean
+  /** Persist a new filter default (the shell writes setFlag("model_discovery_filter_enabled", …)
+   *  then re-fetches settings — the server is the source of truth; this is NOT the ephemeral
+   *  per-view "Show all" reveal). */
+  onSetFilter: (enabled: boolean) => Promise<void>
 }
 
 // The ONLY two providers whose /models exposes capability metadata (mirrors the backend
@@ -62,7 +72,12 @@ const isUnknown = (v: number | boolean | string): boolean => v === DISCOVERY_UNK
 type VanishedDecision = "deprecate" | "disable" | "keep"
 
 /** The 071-A propose→confirm panel. */
-export function ModelDiscoveryPanel({ onRunDiscovery, onConfirm }: ModelDiscoveryPanelProps) {
+export function ModelDiscoveryPanel({
+  onRunDiscovery,
+  onConfirm,
+  filterEnabled,
+  onSetFilter,
+}: ModelDiscoveryPanelProps) {
   const [phase, setPhase] = useState<"idle" | "running" | "done">("idle")
   const [result, setResult] = useState<DiscoveryResult | null>(null)
   const [runError, setRunError] = useState<string | null>(null)
@@ -76,6 +91,12 @@ export function ModelDiscoveryPanel({ onRunDiscovery, onConfirm }: ModelDiscover
   const [confirming, setConfirming] = useState(false)
   const [confirmError, setConfirmError] = useState<string | null>(null)
   const [applied, setApplied] = useState(false)
+
+  // D-159-04: an EPHEMERAL per-view "Show all" reveal (default off, reset on each run). It
+  // reveals the utility models hidden by the persisted filter WITHOUT changing the persisted
+  // default — it never calls onSetFilter, so it's an honest, non-destructive peek that resets
+  // the next time discovery runs.
+  const [showAllThisView, setShowAllThisView] = useState(false)
 
   async function run() {
     setPhase("running")
@@ -92,6 +113,7 @@ export function ModelDiscoveryPanel({ onRunDiscovery, onConfirm }: ModelDiscover
       setEnableNow(new Set())
       setDrafts({})
       setVanished({})
+      setShowAllThisView(false)
       setPhase("done")
     } catch {
       setRunError("Couldn’t run discovery — try again.")
@@ -192,6 +214,19 @@ export function ModelDiscoveryPanel({ onRunDiscovery, onConfirm }: ModelDiscover
 
   const changeCount = result ? buildChanges().length : 0
 
+  // D-159-04: the default-on suitability filter is a DISPLAY concern over `result.new` only.
+  // It NEVER touches accepted / enableNow / drafts / buildChanges — `changeCount` above is
+  // computed from the FULL result, so a hidden utility row can never be silently confirmed
+  // nor dropped from the confirmable payload (149 red line: discovery proposes, humans confirm).
+  const hidingUtility = filterEnabled && !showAllThisView
+  const visibleNew = result
+    ? hidingUtility
+      ? result.new.filter((m) => m.utility !== true)
+      : result.new
+    : []
+  const hiddenNewCount =
+    result && hidingUtility ? result.new.filter((m) => m.utility === true).length : 0
+
   return (
     <section aria-label="Model discovery" className="space-y-4">
       <div>
@@ -258,30 +293,66 @@ export function ModelDiscoveryPanel({ onRunDiscovery, onConfirm }: ModelDiscover
             ))}
           </div>
 
-          {/* ✚ New models. */}
+          {/* ✚ New models — with the D-159-04 suitability filter (default-on, persisted). The
+              toggle persists the operator default (onSetFilter → app_settings); "Show all" is a
+              per-view reveal. The filter is DISPLAY-only — a hidden utility row stays in the
+              confirmable diff, it is simply not rendered. */}
           {result.new.length > 0 && (
-            <DiffGroup glyph="✚" tone="success" title="New models" note="not in the registry yet">
-              {result.new.map((m) => (
-                <NewModelRow
-                  key={m.model_id}
-                  model={m}
-                  accepted={accepted.has(m.model_id)}
-                  enableNow={enableNow.has(m.model_id)}
-                  complete={isComplete(m)}
-                  draftFor={(field) => drafts[m.model_id]?.[field] ?? ""}
-                  onToggleAccept={() => toggleAccept(m.model_id)}
-                  onToggleEnable={() =>
-                    setEnableNow((prev) => {
-                      const next = new Set(prev)
-                      if (next.has(m.model_id)) next.delete(m.model_id)
-                      else next.add(m.model_id)
-                      return next
-                    })
-                  }
-                  onDraft={(field, value) => setDraft(m.model_id, field, value)}
-                />
-              ))}
-            </DiffGroup>
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs text-foreground">
+                  <input
+                    type="checkbox"
+                    checked={filterEnabled}
+                    onChange={() => void onSetFilter(!filterEnabled)}
+                    className="h-3.5 w-3.5 flex-none accent-primary"
+                  />
+                  Filter to chat/tool models
+                </label>
+                <span className="text-[11px] text-muted-foreground/80">
+                  hides utility models (embeddings, audio, image, moderation, rerank…)
+                </span>
+              </div>
+              <DiffGroup glyph="✚" tone="success" title="New models" note="not in the registry yet">
+                {visibleNew.map((m) => (
+                  <NewModelRow
+                    key={m.model_id}
+                    model={m}
+                    accepted={accepted.has(m.model_id)}
+                    enableNow={enableNow.has(m.model_id)}
+                    complete={isComplete(m)}
+                    draftFor={(field) => drafts[m.model_id]?.[field] ?? ""}
+                    onToggleAccept={() => toggleAccept(m.model_id)}
+                    onToggleEnable={() =>
+                      setEnableNow((prev) => {
+                        const next = new Set(prev)
+                        if (next.has(m.model_id)) next.delete(m.model_id)
+                        else next.add(m.model_id)
+                        return next
+                      })
+                    }
+                    onDraft={(field, value) => setDraft(m.model_id, field, value)}
+                  />
+                ))}
+                {hiddenNewCount > 0 && (
+                  <div
+                    data-testid="utility-hidden-count"
+                    className="flex flex-wrap items-center gap-2 rounded-md border border-dashed border-border/60 bg-surface px-3 py-2 text-xs text-muted-foreground"
+                  >
+                    <span className="font-medium text-foreground">
+                      {hiddenNewCount} utility model{hiddenNewCount === 1 ? "" : "s"} hidden
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowAllThisView(true)}
+                      className="rounded border border-border px-2 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                    >
+                      Show all
+                    </button>
+                  </div>
+                )}
+              </DiffGroup>
+            </div>
           )}
 
           {/* ± Changed. */}

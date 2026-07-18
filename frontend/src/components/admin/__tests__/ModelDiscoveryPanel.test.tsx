@@ -60,7 +60,14 @@ const RESULT: DiscoveryResult = {
 async function runDiscovery(onConfirm = vi.fn().mockResolvedValue(undefined)) {
   const user = userEvent.setup()
   const onRun = vi.fn().mockResolvedValue(RESULT)
-  const view = render(<ModelDiscoveryPanel onRunDiscovery={onRun} onConfirm={onConfirm} />)
+  const view = render(
+    <ModelDiscoveryPanel
+      onRunDiscovery={onRun}
+      onConfirm={onConfirm}
+      filterEnabled={false}
+      onSetFilter={vi.fn().mockResolvedValue(undefined)}
+    />,
+  )
   await user.click(screen.getByRole("button", { name: /run discovery/i }))
   // Wait for the resolved diff to render.
   await screen.findByText(/propose-only/i)
@@ -143,10 +150,17 @@ async function runWith(result: DiscoveryResult) {
   const user = userEvent.setup()
   const onRun = vi.fn().mockResolvedValue(result)
   const onConfirm = vi.fn().mockResolvedValue(undefined)
-  const view = render(<ModelDiscoveryPanel onRunDiscovery={onRun} onConfirm={onConfirm} />)
+  const view = render(
+    <ModelDiscoveryPanel
+      onRunDiscovery={onRun}
+      onConfirm={onConfirm}
+      filterEnabled={false}
+      onSetFilter={vi.fn().mockResolvedValue(undefined)}
+    />,
+  )
   await user.click(screen.getByRole("button", { name: /run discovery/i }))
   await screen.findByText(/propose-only/i)
-  return { user, ...view }
+  return { user, onConfirm, ...view }
 }
 
 describe("ModelDiscoveryPanel (071-A) — SC#3 truthful per-model provenance suffix", () => {
@@ -215,5 +229,134 @@ describe("ModelDiscoveryPanel (071-A) — SC#3 truthful per-model provenance suf
     const row = container.querySelector<HTMLElement>('[data-new-model="gpt-5.6-nova"]')!
     expect(within(row).getByText(/returned IDs only/i)).toBeInTheDocument()
     expect(within(row).queryByText(/returned full capabilities/i)).toBeNull()
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 159 Plan 06 (MODEL-03 / D-159-04) — the default-on suitability filter.
+// The discovery panel hides known non-chat "utility" `new` models by default (with an
+// honest hidden-count + a non-destructive "Show all"), persisting the toggle via
+// onSetFilter. CRITICAL SC#3 invariant: the filter is DISPLAY-only — a hidden utility
+// model is still in `accepted`/`buildChanges`, so it can never be silently confirmed nor
+// dropped from the confirm payload (149 red line: discovery proposes, humans confirm).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** A diff with two utility `new` models (utility:true) + one chat model (utility:false). */
+const FILTER_RESULT: DiscoveryResult = {
+  new: [
+    {
+      provider: "openai",
+      model_id: "gpt-5.6-chat",
+      enabled: false,
+      utility: false,
+      capabilities: { context: 400000, max_output: 32000, native_tools: true },
+    },
+    {
+      provider: "openai",
+      model_id: "text-embedding-4",
+      enabled: false,
+      utility: true,
+      capabilities: {
+        context: DISCOVERY_UNKNOWN,
+        max_output: DISCOVERY_UNKNOWN,
+        native_tools: DISCOVERY_UNKNOWN,
+      },
+    },
+    {
+      provider: "openai",
+      model_id: "whisper-2",
+      enabled: false,
+      utility: true,
+      capabilities: {
+        context: DISCOVERY_UNKNOWN,
+        max_output: DISCOVERY_UNKNOWN,
+        native_tools: DISCOVERY_UNKNOWN,
+      },
+    },
+  ],
+  changed: [],
+  vanished: [],
+  providers: [{ provider: "openai", status: "ok", ok: true }],
+}
+
+async function runFiltered(filterEnabled: boolean, result = FILTER_RESULT) {
+  const user = userEvent.setup()
+  const onRun = vi.fn().mockResolvedValue(result)
+  const onConfirm = vi.fn().mockResolvedValue(undefined)
+  const onSetFilter = vi.fn().mockResolvedValue(undefined)
+  const view = render(
+    <ModelDiscoveryPanel
+      onRunDiscovery={onRun}
+      onConfirm={onConfirm}
+      filterEnabled={filterEnabled}
+      onSetFilter={onSetFilter}
+    />,
+  )
+  await user.click(screen.getByRole("button", { name: /run discovery/i }))
+  await screen.findByText(/propose-only/i)
+  return { user, onRun, onConfirm, onSetFilter, ...view }
+}
+
+describe("ModelDiscoveryPanel (159) — D-159-04 default-on suitability filter", () => {
+  it("hides utility 'new' models by default and shows an honest hidden-count", async () => {
+    const { container } = await runFiltered(true)
+    // The chat model renders; the two utility models are NOT rendered…
+    expect(container.querySelector('[data-new-model="gpt-5.6-chat"]')).not.toBeNull()
+    expect(container.querySelector('[data-new-model="text-embedding-4"]')).toBeNull()
+    expect(container.querySelector('[data-new-model="whisper-2"]')).toBeNull()
+    // …and the honest count names exactly how many were hidden.
+    expect(screen.getByText(/2 utility models hidden/i)).toBeInTheDocument()
+  })
+
+  it("'Show all' reveals the hidden utility rows WITHOUT changing the persisted default", async () => {
+    const { user, onSetFilter, container } = await runFiltered(true)
+    await user.click(screen.getByRole("button", { name: /show all/i }))
+    expect(container.querySelector('[data-new-model="text-embedding-4"]')).not.toBeNull()
+    expect(container.querySelector('[data-new-model="whisper-2"]')).not.toBeNull()
+    // The hidden-count line is gone (nothing hidden anymore)…
+    expect(screen.queryByText(/utility models hidden/i)).toBeNull()
+    // …and the persisted default was NEVER touched (Show all is an ephemeral reveal).
+    expect(onSetFilter).not.toHaveBeenCalled()
+  })
+
+  it("toggling 'Filter to chat/tool models' persists the new default via onSetFilter(false)", async () => {
+    const { user, onSetFilter } = await runFiltered(true)
+    await user.click(screen.getByRole("checkbox", { name: /filter to chat\/tool models/i }))
+    expect(onSetFilter).toHaveBeenCalledTimes(1)
+    expect(onSetFilter).toHaveBeenCalledWith(false)
+  })
+
+  it("with the filter off, every 'new' row renders and no hidden-count shows", async () => {
+    const { container } = await runFiltered(false)
+    expect(container.querySelector('[data-new-model="gpt-5.6-chat"]')).not.toBeNull()
+    expect(container.querySelector('[data-new-model="text-embedding-4"]')).not.toBeNull()
+    expect(container.querySelector('[data-new-model="whisper-2"]')).not.toBeNull()
+    expect(screen.queryByText(/utility models hidden/i)).toBeNull()
+  })
+
+  it("the confirm payload is filter-INDEPENDENT — hidden utility models stay in the diff (SC#3)", async () => {
+    // Only gpt-5.6-chat is visible (filter on), but all three new models are accepted-by-default
+    // in state; the display filter must never drop the hidden ones from the confirmable payload.
+    const { user, onConfirm } = await runFiltered(true)
+    await user.click(screen.getByRole("button", { name: /apply confirmed changes/i }))
+    expect(onConfirm).toHaveBeenCalledTimes(1)
+    const ids = (onConfirm.mock.calls[0][0] as Array<{ modelId: string }>).map((c) => c.modelId)
+    expect(ids).toEqual(
+      expect.arrayContaining(["gpt-5.6-chat", "text-embedding-4", "whisper-2"]),
+    )
+  })
+
+  it("leaves the changed/vanished groups intact (the filter touches only the New group)", async () => {
+    const { container } = await runFiltered(true, {
+      ...FILTER_RESULT,
+      changed: [
+        { provider: "openrouter", model_id: "z-ai/glm-6", changes: { context: { from: 128000, to: 200000 } } },
+      ],
+      vanished: [{ provider: "openai", model_id: "gpt-4-turbo" }],
+    })
+    // The filter hid the two utility New rows, but changed + vanished render untouched.
+    expect(container.querySelector('[data-changed-model="z-ai/glm-6"]')).not.toBeNull()
+    expect(container.querySelector('[data-vanished-model="gpt-4-turbo"]')).not.toBeNull()
+    expect(screen.getByText(/2 utility models hidden/i)).toBeInTheDocument()
   })
 })

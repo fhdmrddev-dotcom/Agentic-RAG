@@ -76,7 +76,14 @@ function assertIconsDecorativeOrLabeled(container: HTMLElement) {
 async function runToDone(onConfirm = vi.fn().mockResolvedValue(undefined)) {
   const user = userEvent.setup()
   const onRun = vi.fn().mockResolvedValue(RESULT)
-  const view = render(<ModelDiscoveryPanel onRunDiscovery={onRun} onConfirm={onConfirm} />)
+  const view = render(
+    <ModelDiscoveryPanel
+      onRunDiscovery={onRun}
+      onConfirm={onConfirm}
+      filterEnabled={false}
+      onSetFilter={vi.fn().mockResolvedValue(undefined)}
+    />,
+  )
   await user.click(screen.getByRole("button", { name: /run discovery/i }))
   await screen.findByText(/propose-only/i)
   return { user, ...view }
@@ -93,6 +100,8 @@ describe("ModelDiscoveryPanel a11y — WCAG 2.1 AA (structural) across honest st
       <ModelDiscoveryPanel
         onRunDiscovery={vi.fn().mockResolvedValue(RESULT)}
         onConfirm={vi.fn().mockResolvedValue(undefined)}
+        filterEnabled={false}
+        onSetFilter={vi.fn().mockResolvedValue(undefined)}
       />,
     )
     await screen.findByRole("button", { name: /run discovery/i })
@@ -104,7 +113,12 @@ describe("ModelDiscoveryPanel a11y — WCAG 2.1 AA (structural) across honest st
     let resolveRun!: (r: DiscoveryResult) => void
     const onRun = vi.fn(() => new Promise<DiscoveryResult>((r) => { resolveRun = r }))
     const { container } = render(
-      <ModelDiscoveryPanel onRunDiscovery={onRun} onConfirm={vi.fn().mockResolvedValue(undefined)} />,
+      <ModelDiscoveryPanel
+        onRunDiscovery={onRun}
+        onConfirm={vi.fn().mockResolvedValue(undefined)}
+        filterEnabled={false}
+        onSetFilter={vi.fn().mockResolvedValue(undefined)}
+      />,
     )
     await user.click(screen.getByRole("button", { name: /run discovery/i }))
     await screen.findByRole("status")
@@ -125,7 +139,14 @@ describe("ModelDiscoveryPanel a11y — loading + error honest-state roles", () =
     const user = userEvent.setup()
     let resolveRun!: (r: DiscoveryResult) => void
     const onRun = vi.fn(() => new Promise<DiscoveryResult>((r) => { resolveRun = r }))
-    render(<ModelDiscoveryPanel onRunDiscovery={onRun} onConfirm={vi.fn().mockResolvedValue(undefined)} />)
+    render(
+      <ModelDiscoveryPanel
+        onRunDiscovery={onRun}
+        onConfirm={vi.fn().mockResolvedValue(undefined)}
+        filterEnabled={false}
+        onSetFilter={vi.fn().mockResolvedValue(undefined)}
+      />,
+    )
     await user.click(screen.getByRole("button", { name: /run discovery/i }))
     expect(await screen.findByRole("status")).toHaveTextContent(/querying providers/i)
     resolveRun(RESULT)
@@ -135,7 +156,14 @@ describe("ModelDiscoveryPanel a11y — loading + error honest-state roles", () =
   it("a failed discovery run is announced via role=alert (never a silent failure)", async () => {
     const user = userEvent.setup()
     const onRun = vi.fn().mockRejectedValue(new Error("boom"))
-    render(<ModelDiscoveryPanel onRunDiscovery={onRun} onConfirm={vi.fn().mockResolvedValue(undefined)} />)
+    render(
+      <ModelDiscoveryPanel
+        onRunDiscovery={onRun}
+        onConfirm={vi.fn().mockResolvedValue(undefined)}
+        filterEnabled={false}
+        onSetFilter={vi.fn().mockResolvedValue(undefined)}
+      />,
+    )
     await user.click(screen.getByRole("button", { name: /run discovery/i }))
     const alert = await screen.findByRole("alert")
     expect(alert).toHaveTextContent(/couldn.t run discovery/i)
