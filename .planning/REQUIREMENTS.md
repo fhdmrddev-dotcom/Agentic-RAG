@@ -17,8 +17,8 @@ Requirements for the v3.4 release. Each maps to exactly one roadmap phase.
 
 ### Org Foundation
 
-- [ ] **ORG-01**: The org/dept/role/membership schema ships — `organizations` (incl. `subscription_tier` + `add_ons jsonb` from day one), `departments` (nullable `parent_id` self-FK; one auto-created default department per org so a 5-person team and a 2,000-person org share ONE schema), `org_members`, `dept_members`, `roles` + `role_permissions` with a **fixed 4-tier** role enum (super-admin / org-admin / dept-admin / member) — all with RLS, FKs, and indexes from creation.
-- [ ] **ORG-02**: A `current_user_org_ids()` `SECURITY DEFINER` helper + a non-recursive self-rows-only policy on `org_members` prevent infinite RLS recursion (`42P17`); every other table's membership predicate calls the helper rather than inlining a subquery against `org_members`.
+- [x] **ORG-01**: The org/dept/role/membership schema ships — `organizations` (incl. `subscription_tier` + `add_ons jsonb` from day one), `departments` (nullable `parent_id` self-FK; one auto-created default department per org so a 5-person team and a 2,000-person org share ONE schema), `org_members`, `dept_members`, `roles` + `role_permissions` with a **fixed 4-tier** role enum (super-admin / org-admin / dept-admin / member) — all with RLS, FKs, and indexes from creation.
+- [x] **ORG-02**: A `current_user_org_ids()` `SECURITY DEFINER` helper + a non-recursive self-rows-only policy on `org_members` prevent infinite RLS recursion (`42P17`); every other table's membership predicate calls the helper rather than inlining a subquery against `org_members`.
 
 ### Tenancy Isolation — the atomic crux
 
@@ -113,8 +113,8 @@ Populated during roadmap creation (each requirement maps to exactly one phase; n
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | ADR-01 | 160 | Complete |
-| ORG-01 | 161 | Pending |
-| ORG-02 | 161 | Pending |
+| ORG-01 | 161 | Complete |
+| ORG-02 | 161 | Complete |
 | MIG-01 | 162 | Pending |
 | TEN-01 | 163 | Pending |
 | TEN-02 | 163 | Pending |

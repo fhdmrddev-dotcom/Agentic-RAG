@@ -101,7 +101,7 @@ Ship only if CORE lands clean and budget remains. First-to-cut ordering: SSO/OID
   3. Nullable `org_id` is present on every user-facing table still lacking it (the ~26 tables beyond the 12 already stubbed), added additively so existing behavior stays byte-identical.
   4. A 5-person team and a 2,000-person org are served by the SAME schema — small orgs never touch `dept_members`; large orgs nest via `departments.parent_id` — with no schema change either way.
 **Plans**: 2 plans (Wave 1 authoring → Wave 2 apply/verify)
-- [ ] 161-01-PLAN.md — Author migration 104: 8 org tables + 3 SECDEF helpers (current_user_org_ids/current_user_has_permission/create_org_with_default_dept) + membership RLS + permission-catalog seed + the 23-table org_id sweep (Wave 1, autonomous)
+- [x] 161-01-PLAN.md — Author migration 104: 8 org tables + 3 SECDEF helpers (current_user_org_ids/current_user_has_permission/create_org_with_default_dept) + membership RLS + permission-catalog seed + the 23-table org_id sweep (Wave 1, autonomous)
 - [ ] 161-02-PLAN.md — [BLOCKING] Operator SQL-editor apply + full-schema regeneration + live 42P17/RLS/seed verification + same-commit (Wave 2, autonomous:false)
 
 #### Phase 162: Personal-Org Backfill

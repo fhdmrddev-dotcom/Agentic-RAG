@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.4
 milestone_name: Multi-Tenancy & Org Access
 status: executing
-last_updated: "2026-07-18T15:32:57.133Z"
-last_activity: 2026-07-18 -- Phase 161 planning complete
+last_updated: "2026-07-18T16:07:48.717Z"
+last_activity: 2026-07-18
 progress:
   total_phases: 27
   completed_phases: 1
   total_plans: 3
-  completed_plans: 1
+  completed_plans: 2
   percent: 4
 ---
 
@@ -22,7 +22,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-18 — v3.3 Operator UX SHIPPED + archived)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 161 — org / dept / role schema
+**Current focus:** Phase 161 — org-dept-role-schema
 
 ## Deferred Items
 
@@ -40,12 +40,12 @@ Items acknowledged and deferred at milestone close on 2026-07-18 (44 open `audit
 
 ## Current Position
 
-Phase: 161
-Plan: Not started
+Phase: 161 (org-dept-role-schema) — EXECUTING
+Plan: 2 of 2
 Status: Ready to execute
-Last activity: 2026-07-18 -- Phase 161 planning complete
+Last activity: 2026-07-18
 
-Progress: [░░░░░░░░░░] 4%
+Progress: [███████░░░] 67%
 
 ### Quick Tasks Completed
 
@@ -421,6 +421,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 159 P01 | 13 | 2 tasks | 3 files |
 | Phase 159 P06 | 12min | 3 tasks | 4 files |
 | Phase 160 P160-01 | 6 | 2 tasks | 3 files |
+| Phase 161 P01 | 11min | 3 tasks | 1 files |
 
 ## Decisions
 
@@ -510,6 +511,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase 159]: 159-06 (D-159-04): the discovery suitability filter is DISPLAY-only — `visibleNew`/`hiddenNewCount` feed the render only; `accepted`/`enableNow`/`drafts`/`buildChanges` still read the FULL `result.new`, so a hidden utility model stays in the confirmable payload (SC#3 / T-159-13, test-locked). Default-on, persisted via `handleSetDiscoveryFilter` → `setFlag("model_discovery_filter_enabled")` → settings re-fetch; honest "N utility models hidden" + a non-destructive ephemeral "Show all".
 - [Phase 159]: 159-06 (D-159-03): family-default pre-fill via draft-SEEDING on run (`seedDraftsFromDefaults`) — `isComplete`/`buildChanges` unchanged; `enableNow` stays default-off so `buildChanges` yields `enabled:false` (never auto-enable, T-159-12). "default — confirm" keyed on the static `familyDefaults(id)[field]!=null`; `native_tools` maps true→native / null→unseeded, never "none" (SC#3 by construction). All 6 plans shipped; MODEL-03 flips at `/gsd:verify-work 159` (phase-spanning STRETCH, false-green-avoidance).
 - [Phase 160]: D-v3.4-01: Tenancy-Model ADR ratifies D-PRD-02 co-tenant + isolation-via-deployment posture + the binding 4-tier deployment-flexibility contract (per-phase enforcement 161-173; SEED-120 forward-compat); locks is_system_global / is_org_shared / slot 104+ naming for phases 161-168. ADR: .planning/phases/160-tenancy-model-adr/160-ADR.md
+- [Phase 161]: Plan 161-01: authored mig 104 (org/dept/role schema) — 8 org tables + current_user_org_ids() 42P17 recursion-break helper + membership-correct RLS + seeded 4-tier permission catalog + 23-table nullable org_id sweep. Authored, NOT applied (Plan 02 applies/verifies).
 
 ## Operator Next Steps
 
