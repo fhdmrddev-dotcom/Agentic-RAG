@@ -102,7 +102,7 @@ Ship only if CORE lands clean and budget remains. First-to-cut ordering: SSO/OID
   4. A 5-person team and a 2,000-person org are served by the SAME schema — small orgs never touch `dept_members`; large orgs nest via `departments.parent_id` — with no schema change either way.
 **Plans**: 2 plans (Wave 1 authoring → Wave 2 apply/verify)
 - [x] 161-01-PLAN.md — Author migration 104: 8 org tables + 3 SECDEF helpers (current_user_org_ids/current_user_has_permission/create_org_with_default_dept) + membership RLS + permission-catalog seed + the 23-table org_id sweep (Wave 1, autonomous)
-- [ ] 161-02-PLAN.md — [BLOCKING] Operator SQL-editor apply + full-schema regeneration + live 42P17/RLS/seed verification + same-commit (Wave 2, autonomous:false)
+- [x] 161-02-PLAN.md — [BLOCKING] Operator SQL-editor apply + full-schema regeneration + live 42P17/RLS/seed verification + same-commit (Wave 2, autonomous:false)
 
 #### Phase 162: Personal-Org Backfill
 **Goal**: Every existing user silently gets a personal org + default department + org-admin membership and `org_id` is backfilled across every table, so the RLS rewrite can go live without any user action and with zero data loss.
