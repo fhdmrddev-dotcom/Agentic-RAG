@@ -244,7 +244,7 @@ Ship only if CORE lands clean and budget remains. First-to-cut ordering: SSO/OID
 |-------|----------------|--------|-----------|
 | 160. Tenancy-Model ADR | 1/1 | Complete | 2026-07-18 |
 | 161. Org / Dept / Role Schema | 0/? | Not started | - |
-| 162. Personal-Org Backfill | 2/2 | Ready for verification | - |
+| 162. Personal-Org Backfill | 3/3 | Ready for verification (162-03 gap-closure: mig 106 org_id auto-fill net) | - |
 | 163. RLS Rewrite + User-JWT Client Swap (CRUX) | 0/? | Not started | - |
 | 164. SECDEF Audit + Cross-Org Isolation Suite | 0/? | Not started | - |
 | 165. `is_global` Retirement Cleanup | 0/? | Not started | - |
