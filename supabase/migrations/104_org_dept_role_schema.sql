@@ -22,7 +22,7 @@
 --     `db reset` (preserves dev data).
 --   * This file is IDEMPOTENT / re-paste-safe: every table is CREATE TABLE IF NOT EXISTS, every
 --     function is CREATE OR REPLACE, every index is CREATE ... INDEX IF NOT EXISTS, every policy is
---     DROP POLICY IF EXISTS + CREATE POLICY (CREATE POLICY has no IF NOT EXISTS), and every seed is
+--     a drop-guard then a policy create (the latter has no IF NOT EXISTS), and every seed uses
 --     INSERT ... ON CONFLICT DO NOTHING. Re-running the whole paste is a safe recovery step.
 --   * AFTER applying: run `bash scripts/regenerate-full-schema.sh` (no --reset) and commit the
 --     migration AND the regenerated supabase/full-schema.sql together. NEVER hand-edit full-schema.sql.
@@ -225,3 +225,184 @@ BEGIN
   RETURN v_org_id;
 END;
 $$;
+
+-- ================================================================================================
+-- SECTION 3 — MEMBERSHIP-CORRECT RLS ON ALL 8 NEW TABLES  (D-08 correct-from-birth; these 8 are
+--             EXCLUDED from Phase 163's 38-existing-table rewrite per D-09).
+-- Idempotency idiom: a policy create has no IF NOT EXISTS, so each is drop-guarded first (015/019/029/030).
+-- Every membership predicate routes through public.current_user_org_ids() / current_user_has_permission()
+-- — no policy inlines an org_members subquery (the 42P17 contract, T-161-01).
+-- ================================================================================================
+
+-- (a) Enable RLS on all 8 tables (095:62-63 shape).
+ALTER TABLE public.organizations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.departments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.org_members ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.dept_members ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.roles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.role_permissions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.org_invitations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.sso_configs ENABLE ROW LEVEL SECURITY;
+
+-- (b) Policies.
+
+-- org_members — the LOCKED non-recursive pair (D-10 / ORG-02 / SC#2 / T-161-01). The self-rows-only
+-- SELECT is a DIRECT column compare with NO org_members subquery (this is what breaks 42P17); the
+-- org-roster read path routes through the SECDEF helper (any co-member sees the roster — tighten to
+-- current_user_has_permission(org_id,'org:manage') later if roster visibility must be admin-only).
+-- Writes are role-gated via current_user_has_permission (SECDEF → bypasses org_members RLS → no
+-- recursion). Bootstrap of the FIRST member is a Phase 162/167 concern (via a SECDEF path).
+DROP POLICY IF EXISTS org_members_self_select ON public.org_members;
+CREATE POLICY org_members_self_select ON public.org_members
+  FOR SELECT TO authenticated USING (user_id = auth.uid());
+
+DROP POLICY IF EXISTS org_members_admin_select ON public.org_members;
+CREATE POLICY org_members_admin_select ON public.org_members
+  FOR SELECT TO authenticated USING (org_id IN (SELECT public.current_user_org_ids()));
+
+DROP POLICY IF EXISTS org_members_insert ON public.org_members;
+CREATE POLICY org_members_insert ON public.org_members
+  FOR INSERT TO authenticated
+  WITH CHECK (public.current_user_has_permission(org_id, 'org:manage') AND org_id IN (SELECT public.current_user_org_ids()));
+
+DROP POLICY IF EXISTS org_members_update ON public.org_members;
+CREATE POLICY org_members_update ON public.org_members
+  FOR UPDATE TO authenticated
+  USING (public.current_user_has_permission(org_id, 'org:manage'))
+  WITH CHECK (public.current_user_has_permission(org_id, 'org:manage') AND org_id IN (SELECT public.current_user_org_ids()));
+
+DROP POLICY IF EXISTS org_members_delete ON public.org_members;
+CREATE POLICY org_members_delete ON public.org_members
+  FOR DELETE TO authenticated USING (public.current_user_has_permission(org_id, 'org:manage'));
+
+-- organizations — keyed by id (its own id IS the org id, so membership predicate reads `id IN ...`).
+-- Conservative writes (D-10): NO INSERT policy (creation via create_org_with_default_dept() SECDEF,
+-- a user-JWT INSERT is a Phase 167 seam) and NO DELETE policy (org teardown is an operator/166 seam).
+DROP POLICY IF EXISTS organizations_select ON public.organizations;
+CREATE POLICY organizations_select ON public.organizations
+  FOR SELECT TO authenticated USING (id IN (SELECT public.current_user_org_ids()));
+
+DROP POLICY IF EXISTS organizations_update ON public.organizations;
+CREATE POLICY organizations_update ON public.organizations
+  FOR UPDATE TO authenticated
+  USING (public.current_user_has_permission(id, 'org:manage'))
+  WITH CHECK (public.current_user_has_permission(id, 'org:manage') AND id IN (SELECT public.current_user_org_ids()));
+
+-- departments — org-scoped; read = member of the org, write = org:manage. Every INSERT/UPDATE pins
+-- org_id to the caller's orgs in the write-check clause (no cross-org write, T-161-02).
+DROP POLICY IF EXISTS departments_select ON public.departments;
+CREATE POLICY departments_select ON public.departments
+  FOR SELECT TO authenticated USING (org_id IN (SELECT public.current_user_org_ids()));
+
+DROP POLICY IF EXISTS departments_insert ON public.departments;
+CREATE POLICY departments_insert ON public.departments
+  FOR INSERT TO authenticated
+  WITH CHECK (public.current_user_has_permission(org_id, 'org:manage') AND org_id IN (SELECT public.current_user_org_ids()));
+
+DROP POLICY IF EXISTS departments_update ON public.departments;
+CREATE POLICY departments_update ON public.departments
+  FOR UPDATE TO authenticated
+  USING (public.current_user_has_permission(org_id, 'org:manage'))
+  WITH CHECK (public.current_user_has_permission(org_id, 'org:manage') AND org_id IN (SELECT public.current_user_org_ids()));
+
+DROP POLICY IF EXISTS departments_delete ON public.departments;
+CREATE POLICY departments_delete ON public.departments
+  FOR DELETE TO authenticated USING (public.current_user_has_permission(org_id, 'org:manage'));
+
+-- dept_members — org-scoped (via the denormalized org_id); write = org:manage.
+DROP POLICY IF EXISTS dept_members_select ON public.dept_members;
+CREATE POLICY dept_members_select ON public.dept_members
+  FOR SELECT TO authenticated USING (org_id IN (SELECT public.current_user_org_ids()));
+
+DROP POLICY IF EXISTS dept_members_insert ON public.dept_members;
+CREATE POLICY dept_members_insert ON public.dept_members
+  FOR INSERT TO authenticated
+  WITH CHECK (public.current_user_has_permission(org_id, 'org:manage') AND org_id IN (SELECT public.current_user_org_ids()));
+
+DROP POLICY IF EXISTS dept_members_update ON public.dept_members;
+CREATE POLICY dept_members_update ON public.dept_members
+  FOR UPDATE TO authenticated
+  USING (public.current_user_has_permission(org_id, 'org:manage'))
+  WITH CHECK (public.current_user_has_permission(org_id, 'org:manage') AND org_id IN (SELECT public.current_user_org_ids()));
+
+DROP POLICY IF EXISTS dept_members_delete ON public.dept_members;
+CREATE POLICY dept_members_delete ON public.dept_members
+  FOR DELETE TO authenticated USING (public.current_user_has_permission(org_id, 'org:manage'));
+
+-- org_invitations — org-scoped; write = org:invite (D-02 key). token_hash never leaves this table.
+DROP POLICY IF EXISTS org_invitations_select ON public.org_invitations;
+CREATE POLICY org_invitations_select ON public.org_invitations
+  FOR SELECT TO authenticated USING (org_id IN (SELECT public.current_user_org_ids()));
+
+DROP POLICY IF EXISTS org_invitations_insert ON public.org_invitations;
+CREATE POLICY org_invitations_insert ON public.org_invitations
+  FOR INSERT TO authenticated
+  WITH CHECK (public.current_user_has_permission(org_id, 'org:invite') AND org_id IN (SELECT public.current_user_org_ids()));
+
+DROP POLICY IF EXISTS org_invitations_update ON public.org_invitations;
+CREATE POLICY org_invitations_update ON public.org_invitations
+  FOR UPDATE TO authenticated
+  USING (public.current_user_has_permission(org_id, 'org:invite'))
+  WITH CHECK (public.current_user_has_permission(org_id, 'org:invite') AND org_id IN (SELECT public.current_user_org_ids()));
+
+DROP POLICY IF EXISTS org_invitations_delete ON public.org_invitations;
+CREATE POLICY org_invitations_delete ON public.org_invitations
+  FOR DELETE TO authenticated USING (public.current_user_has_permission(org_id, 'org:invite'));
+
+-- sso_configs — org-scoped; write = sso:manage (D-02 key).
+DROP POLICY IF EXISTS sso_configs_select ON public.sso_configs;
+CREATE POLICY sso_configs_select ON public.sso_configs
+  FOR SELECT TO authenticated USING (org_id IN (SELECT public.current_user_org_ids()));
+
+DROP POLICY IF EXISTS sso_configs_insert ON public.sso_configs;
+CREATE POLICY sso_configs_insert ON public.sso_configs
+  FOR INSERT TO authenticated
+  WITH CHECK (public.current_user_has_permission(org_id, 'sso:manage') AND org_id IN (SELECT public.current_user_org_ids()));
+
+DROP POLICY IF EXISTS sso_configs_update ON public.sso_configs;
+CREATE POLICY sso_configs_update ON public.sso_configs
+  FOR UPDATE TO authenticated
+  USING (public.current_user_has_permission(org_id, 'sso:manage'))
+  WITH CHECK (public.current_user_has_permission(org_id, 'sso:manage') AND org_id IN (SELECT public.current_user_org_ids()));
+
+DROP POLICY IF EXISTS sso_configs_delete ON public.sso_configs;
+CREATE POLICY sso_configs_delete ON public.sso_configs
+  FOR DELETE TO authenticated USING (public.current_user_has_permission(org_id, 'sso:manage'));
+
+-- roles + role_permissions — GLOBAL reference data (D-04 / T-161-03): read-all-authenticated +
+-- NO write policy at all (INSERT/UPDATE/DELETE denied to EVERY JWT; only this migration, which runs
+-- as owner/service-role and bypasses RLS, seeds them). An org-admin cannot grant themselves
+-- super-admin perms. Byte-identical to model_overrides_read_all (full-schema.sql:3944).
+DROP POLICY IF EXISTS roles_read_all ON public.roles;
+CREATE POLICY roles_read_all ON public.roles
+  FOR SELECT TO authenticated USING (true);
+
+DROP POLICY IF EXISTS role_permissions_read_all ON public.role_permissions;
+CREATE POLICY role_permissions_read_all ON public.role_permissions
+  FOR SELECT TO authenticated USING (true);
+
+-- (c) Seed the CORE permission catalog (D-02/D-03). ON CONFLICT DO NOTHING = re-paste-safe (094:59-60).
+
+-- The 4 fixed tiers (D-03).
+INSERT INTO public.roles (role, description) VALUES
+  ('super-admin', 'Cross-org system administrator — all permissions.'),
+  ('org-admin', 'Organization administrator — manages org settings, members, and invitations.'),
+  ('dept-admin', 'Department administrator — manages a department within an org.'),
+  ('member', 'Baseline member — no management permissions.')
+ON CONFLICT (role) DO NOTHING;
+
+-- Default per-tier grants over the 5 milestone-known OPEN-STRING keys (D-02):
+--   super-admin -> all 5; org-admin -> the 3 org:* keys; dept-admin -> the 1 dept:* key; member -> none.
+-- `member` is intentionally absent (baseline = no manage perms). 168 MAY later additively INSERT an
+-- org-admin -> sso:manage grant — do NOT seed it now (the whole point of open-string keys, D-03).
+INSERT INTO public.role_permissions (role, permission_key) VALUES
+  ('super-admin', 'org:manage'),
+  ('super-admin', 'org:audit_view'),
+  ('super-admin', 'dept:manage'),
+  ('super-admin', 'org:invite'),
+  ('super-admin', 'sso:manage'),
+  ('org-admin', 'org:manage'),
+  ('org-admin', 'org:audit_view'),
+  ('org-admin', 'org:invite'),
+  ('dept-admin', 'dept:manage')
+ON CONFLICT (role, permission_key) DO NOTHING;
