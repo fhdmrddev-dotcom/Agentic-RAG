@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.3
 milestone_name: Operator UX
 status: executing
-last_updated: "2026-07-17T23:28:17.221Z"
-last_activity: 2026-07-17
+last_updated: "2026-07-18T01:25:33.753Z"
+last_activity: 2026-07-18
 progress:
   total_phases: 27
   completed_phases: 13
   total_plans: 95
-  completed_plans: 90
+  completed_plans: 92
   percent: 48
 ---
 
@@ -31,9 +31,9 @@ See: .planning/PROJECT.md (updated 2026-07-10 — v3.2 Skill Eval Studio + Self-
 **159 added (2026-07-18):** Phase 159 appended to v3.3 STRETCH via `gsd-sdk phase.add` (SDK dropped the skeleton after the archived milestones — the known window quirk — hand-relocated into the v3.3 window: STRETCH table + checklist + detail + progress + MODEL-03 in REQUIREMENTS.md; also fixed the stale 157/158 checkboxes→[x] + DEPLOY-01/02 traceability→Complete).
 
 Phase: 159 (model-registry-curation) — EXECUTING
-Plan: 3 of 6
+Plan: 4 of 6
 Status: Ready to execute
-Last activity: 2026-07-17
+Last activity: 2026-07-18
 
 **158 verify+secure+fix (2026-07-17) — AUTONOMOUS:** ran gsd-verifier + gsd-security-auditor + gsd-code-reviewer in parallel on the shipped code. **secure-phase: SECURED, threats_open:0** — all T-158-01..11 mitigations verified in code (7 POST writes all token+latch gated [409→429→401], constant-time compare, `/public-config` leaks nothing, SSRF sanitized, secrets via Phase-150 seam, 0600 store, boot-resilient). **Code review + verifier CONVERGED on 2 Criticals** (byte-identical invariant otherwise proven 3 ways incl. a full 2705-test pre/post regression diff = identical): **CR-02** (OPERATOR-OBSERVED LIVE — the 503: `SetupMiddleware` + `main.py _setup_mode` keyed off the finalize-MARKER alone, so every env-configured box [real supabase_url, no wizard marker — the operator's dev box + every existing deploy] got 503'd into setup mode; frontend said "log in" while backend 503'd every API) → FIXED `8047d172` (both key off `needs_setup()` = marker-absent AND infra-placeholder; regression test `test_configured_via_env_is_never_gated`); **CR-01** (would BRICK a wizard-finalized box on its mandated restart — `apply_setup_overlay` setattr'd 3 undeclared Supabase Settings fields → Pydantic ValueError at import → crash-loop; also emptied `/public-config` anon key; missed because `test_setup_overlay` used a SimpleNamespace that can't raise) → FIXED `ea232a71` (declared the 3 fields + `hasattr`/`model_fields` overlay guard + real-Settings reproduction tests). gsd-code-fixer also closed **WR-01** (operator-bootstrap self-heals on retry), **WR-02** (WORKER_COUNT=2 token converges), **WR-03** (redis probe sanitized-down), **WR-04** (`/operator` DB-error sanitized, GoTrue verbatim kept), **WR-05** (schema auto-runner→copy-guide fallback on ANY failure), **WR-06** (`useAuth` re-binds after runtime-config rehydrate) — each atomic-committed (`f09100af`..`7880f350`); IN-01 correctly REJECTED (would break real `<project-ref>` placeholder detection). **LESSONS:** (a) a green unit suite missed BOTH Criticals — the operator's live eyeball caught CR-02, the goal-backward verifier + adversarial review caught CR-01; lived-experience UAT is not optional on a gate/middleware/config surface. (b) test doubles that can't raise (SimpleNamespace for a Pydantic model) structurally hide whole bug classes — drive the REAL type. (c) a first-run gate must key off "genuinely needs setup" (marker AND placeholder), never the finalize-marker alone, or it breaks every already-configured box.
 
