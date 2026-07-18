@@ -413,7 +413,7 @@ export function ModelDiscoveryPanel({
                   onChange={(e) => setNewSearch(e.target.value)}
                   placeholder="Search new models by id…"
                   aria-label="Search new models by id"
-                  className="h-7 min-w-[12rem] flex-1 rounded-md border border-border bg-surface px-2 text-xs text-foreground placeholder:text-muted-foreground/70 focus:border-primary focus:outline-none"
+                  className="h-7 min-w-[12rem] flex-1 rounded-[6px] border border-border bg-background px-2 text-xs text-foreground placeholder:text-muted-foreground/50 focus:border-primary focus:outline-none"
                 />
                 <button
                   type="button"
