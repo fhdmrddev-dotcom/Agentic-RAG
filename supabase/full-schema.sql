@@ -48,6 +48,79 @@ CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA public;
 
 
 --
+-- Name: autofill_org_id_by_owner(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.autofill_org_id_by_owner() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO ''
+    AS $$
+DECLARE
+  v_owner_col text := TG_ARGV[0];      -- 'user_id' (GROUP 1) or 'created_by' (GROUP 2)
+  v_owner_id  uuid;
+  v_org_id    uuid;
+BEGIN
+  -- Forward-compat NO-OP: org_id already provided (e.g. Phase 163) -> keep it verbatim.
+  IF NEW.org_id IS NOT NULL THEN
+    RETURN NEW;
+  END IF;
+
+  -- Dynamic owner-column read (one shared fn for all owner-based targets). to_jsonb / ->> / ::uuid
+  -- all live in pg_catalog, which is implicitly first on the path even with search_path=''.
+  v_owner_id := (to_jsonb(NEW) ->> v_owner_col)::uuid;
+  IF v_owner_id IS NULL THEN
+    RETURN NEW;                          -- fail-safe: no owner -> org_id stays NULL -> NOT NULL rejects
+  END IF;
+
+  -- One membership per user at 162 time (verified) -> LIMIT 1 is unambiguous pre-167.
+  SELECT om.org_id INTO v_org_id
+  FROM public.org_members om
+  WHERE om.user_id = v_owner_id
+  LIMIT 1;
+
+  NEW.org_id := v_org_id;                -- may stay NULL (owner has no membership) -> fail-safe reject
+  RETURN NEW;
+END;
+$$;
+
+
+--
+-- Name: autofill_org_id_from_parent(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.autofill_org_id_from_parent() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO ''
+    AS $_$
+DECLARE
+  v_fk_col     text := TG_ARGV[0];               -- FK column on NEW (e.g. 'thread_id')
+  v_parent_tbl text := TG_ARGV[1];               -- parent table in public (e.g. 'threads')
+  v_parent_pk  text := COALESCE(TG_ARGV[2], 'id');-- parent PK column (all 4 parents use 'id')
+  v_fk_val     uuid;
+  v_org_id     uuid;
+BEGIN
+  IF NEW.org_id IS NOT NULL THEN
+    RETURN NEW;                          -- forward-compat no-op
+  END IF;
+
+  v_fk_val := (to_jsonb(NEW) ->> v_fk_col)::uuid;
+  IF v_fk_val IS NULL THEN
+    RETURN NEW;                          -- fail-safe: no parent ref -> NOT NULL rejects
+  END IF;
+
+  -- Resolve the parent row's org_id. public.%I is schema-qualified (pinned empty search_path); %I quotes
+  -- the identifiers; the args are migration-authored constants (never user input) -> injection-safe.
+  EXECUTE format('SELECT org_id FROM public.%I WHERE %I = $1 LIMIT 1', v_parent_tbl, v_parent_pk)
+    INTO v_org_id
+    USING v_fk_val;
+
+  NEW.org_id := v_org_id;                -- may stay NULL (parent missing / parent.org_id NULL) -> reject
+  RETURN NEW;
+END;
+$_$;
+
+
+--
 -- Name: capture_skill_version(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -3214,6 +3287,69 @@ CREATE INDEX user_memory_user_updated_idx ON public.user_memory USING btree (use
 
 
 --
+-- Name: audit_log audit_log_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER audit_log_autofill_org_id BEFORE INSERT ON public.audit_log FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
+-- Name: classification_rules classification_rules_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER classification_rules_autofill_org_id BEFORE INSERT ON public.classification_rules FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
+-- Name: code_executions code_executions_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER code_executions_autofill_org_id BEFORE INSERT ON public.code_executions FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
+-- Name: document_images document_images_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER document_images_autofill_org_id BEFORE INSERT ON public.document_images FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
+-- Name: document_relationships document_relationships_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER document_relationships_autofill_org_id BEFORE INSERT ON public.document_relationships FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
+-- Name: document_tables document_tables_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER document_tables_autofill_org_id BEFORE INSERT ON public.document_tables FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
+-- Name: document_views document_views_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER document_views_autofill_org_id BEFORE INSERT ON public.document_views FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
+-- Name: documents documents_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER documents_autofill_org_id BEFORE INSERT ON public.documents FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
+-- Name: eval_ratings eval_ratings_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER eval_ratings_autofill_org_id BEFORE INSERT ON public.eval_ratings FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
 -- Name: eval_ratings eval_ratings_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -3221,10 +3357,80 @@ CREATE TRIGGER eval_ratings_set_updated_at BEFORE UPDATE ON public.eval_ratings 
 
 
 --
+-- Name: eval_results eval_results_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER eval_results_autofill_org_id BEFORE INSERT ON public.eval_results FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
+-- Name: eval_runs eval_runs_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER eval_runs_autofill_org_id BEFORE INSERT ON public.eval_runs FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
+-- Name: folders folders_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER folders_autofill_org_id BEFORE INSERT ON public.folders FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
 -- Name: folders folders_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
 --
 
 CREATE TRIGGER folders_set_updated_at BEFORE UPDATE ON public.folders FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: harness_audit harness_audit_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER harness_audit_autofill_org_id BEFORE INSERT ON public.harness_audit FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
+-- Name: message_feedback message_feedback_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER message_feedback_autofill_org_id BEFORE INSERT ON public.message_feedback FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
+-- Name: messages messages_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER messages_autofill_org_id BEFORE INSERT ON public.messages FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
+-- Name: metadata_field_definitions metadata_field_definitions_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER metadata_field_definitions_autofill_org_id BEFORE INSERT ON public.metadata_field_definitions FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
+-- Name: pdf_extraction_runs pdf_extraction_runs_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER pdf_extraction_runs_autofill_org_id BEFORE INSERT ON public.pdf_extraction_runs FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
+-- Name: runs runs_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER runs_autofill_org_id BEFORE INSERT ON public.runs FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
+-- Name: sandbox_files sandbox_files_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER sandbox_files_autofill_org_id BEFORE INSERT ON public.sandbox_files FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
 
 
 --
@@ -3249,10 +3455,38 @@ CREATE TRIGGER set_threads_updated_at BEFORE UPDATE ON public.threads FOR EACH R
 
 
 --
+-- Name: skill_files skill_files_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER skill_files_autofill_org_id BEFORE INSERT ON public.skill_files FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
+-- Name: skill_proposals skill_proposals_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER skill_proposals_autofill_org_id BEFORE INSERT ON public.skill_proposals FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
 -- Name: skill_proposals skill_proposals_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
 --
 
 CREATE TRIGGER skill_proposals_set_updated_at BEFORE UPDATE ON public.skill_proposals FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: skill_publish_overrides skill_publish_overrides_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER skill_publish_overrides_autofill_org_id BEFORE INSERT ON public.skill_publish_overrides FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
+-- Name: skill_test_cases skill_test_cases_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER skill_test_cases_autofill_org_id BEFORE INSERT ON public.skill_test_cases FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
 
 
 --
@@ -3263,10 +3497,24 @@ CREATE TRIGGER skill_test_cases_set_updated_at BEFORE UPDATE ON public.skill_tes
 
 
 --
+-- Name: skill_versions skill_versions_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER skill_versions_autofill_org_id BEFORE INSERT ON public.skill_versions FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
 -- Name: skill_versions skill_versions_no_update; Type: TRIGGER; Schema: public; Owner: -
 --
 
 CREATE TRIGGER skill_versions_no_update BEFORE UPDATE ON public.skill_versions FOR EACH ROW EXECUTE FUNCTION public.skill_versions_block_mutation();
+
+
+--
+-- Name: skills skills_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER skills_autofill_org_id BEFORE INSERT ON public.skills FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
 
 
 --
@@ -3298,6 +3546,20 @@ CREATE TRIGGER stale_skill_embedding_from_case AFTER INSERT OR DELETE OR UPDATE 
 
 
 --
+-- Name: threads threads_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER threads_autofill_org_id BEFORE INSERT ON public.threads FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
+-- Name: todos todos_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER todos_autofill_org_id BEFORE INSERT ON public.todos FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_from_parent('thread_id', 'threads', 'id');
+
+
+--
 -- Name: document_chunks trg_update_search_vector; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -3305,10 +3567,38 @@ CREATE TRIGGER trg_update_search_vector BEFORE INSERT OR UPDATE OF content ON pu
 
 
 --
+-- Name: tuner_runs tuner_runs_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER tuner_runs_autofill_org_id BEFORE INSERT ON public.tuner_runs FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
+-- Name: user_memory user_memory_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER user_memory_autofill_org_id BEFORE INSERT ON public.user_memory FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
 -- Name: user_memory user_memory_updated_at; Type: TRIGGER; Schema: public; Owner: -
 --
 
 CREATE TRIGGER user_memory_updated_at BEFORE UPDATE ON public.user_memory FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: user_settings user_settings_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER user_settings_autofill_org_id BEFORE INSERT ON public.user_settings FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
+-- Name: workflow_definitions workflow_definitions_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER workflow_definitions_autofill_org_id BEFORE INSERT ON public.workflow_definitions FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('created_by');
 
 
 --
@@ -3326,6 +3616,13 @@ CREATE TRIGGER workflow_definitions_set_updated_at BEFORE UPDATE ON public.workf
 
 
 --
+-- Name: workflow_phases workflow_phases_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER workflow_phases_autofill_org_id BEFORE INSERT ON public.workflow_phases FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_from_parent('workflow_run_id', 'workflow_runs', 'id');
+
+
+--
 -- Name: workflow_phases workflow_phases_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -3333,10 +3630,31 @@ CREATE TRIGGER workflow_phases_set_updated_at BEFORE UPDATE ON public.workflow_p
 
 
 --
+-- Name: workflow_runs workflow_runs_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER workflow_runs_autofill_org_id BEFORE INSERT ON public.workflow_runs FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_from_parent('thread_id', 'threads', 'id');
+
+
+--
 -- Name: workflow_runs workflow_runs_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
 --
 
 CREATE TRIGGER workflow_runs_set_updated_at BEFORE UPDATE ON public.workflow_runs FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: workspace_file_versions workspace_file_versions_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER workspace_file_versions_autofill_org_id BEFORE INSERT ON public.workspace_file_versions FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_from_parent('workspace_file_id', 'workspace_files', 'id');
+
+
+--
+-- Name: workspace_files workspace_files_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER workspace_files_autofill_org_id BEFORE INSERT ON public.workspace_files FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('created_by');
 
 
 --
