@@ -146,7 +146,7 @@ Ship only if CORE lands clean and budget remains. First-to-cut ordering: SSO/OID
   4. `org_id` is denormalized + partial/composite-indexed on `document_chunks` and `skill_embeddings` alongside the vector index, and a benchmark shows membership-RLS retrieval keeps the CONCUR-01 <1s cross-tab-GET-during-streaming gate GREEN (measured before merge).
   5. Deep Mode stays byte-identical on the native-7 (SC#10 — no shared-path fork; org context rides the request seam, not the provider path); the `threads.py` producer extraction (Phase 162.5) landed byte-identical BEFORE `org_id` is threaded through `send_message`.
 **Plans**: 10 plans, 5 waves (Wave 1 foundation → Wave 2 authoring → Wave 3 apply gate → Wave 4 flip → Wave 5 crux gate)
-- [ ] 163-01-PLAN.md — Front B factories (get_user_pg_connection / get_user_supabase / get_service_role_supabase) + two-user/two-org fixtures + shared RLS harness (Wave 1)
+- [x] 163-01-PLAN.md — Front B factories (get_user_pg_connection / get_user_supabase / get_service_role_supabase) + two-user/two-org fixtures + shared RLS harness (Wave 1)
 - [ ] 163-02-PLAN.md — TEN-04 migration 107: org_id denormalize + backfill + btree + autofill on document_chunks/skill_embeddings (Wave 2)
 - [ ] 163-03-PLAN.md — TEN-01 migration 108: 37-table membership-RLS rewrite in 6 per-cluster bundles + 6 cluster tests (Wave 2)
 - [ ] 163-04-PLAN.md — D-08 core leak (asyncpg + supabase-py) + role-swap-noop / spoof / fail-closed tests (Wave 2)
