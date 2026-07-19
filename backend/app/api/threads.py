@@ -71,22 +71,12 @@ from app.services.workflow_kickoff import (
     _ensure_skill_snapshots,
     preflight_workflow_kickoff,
 )
-# The harness run-context build seam (Plan 02 Task 2) is referenced via the module
-# object rather than a by-name import, so its identifier appears exactly once in this
-# file — at its single call site in agent_runner's harness branch (clean call-site check).
-from app.services import workflow_kickoff as _workflow_kickoff
 # Phase 092 (MODE-01): the net-new run-creation + picker-feed helpers. db-layer
 # imports are cycle-safe (db/workflows.py imports only models). run_workflow +
 # _load_run_definition are imported LOCALLY inside the producer branch to keep
 # the heavier service graph (agent_loop/tool_dispatcher) off the module-load path.
 from app.db.workflows import create_workflow_run, list_published_workflows
 from app.models.thread import ThreadWorkflowState, WorkflowPhaseState
-from app.utils.folder_utils import fetch_visible_folders
-from app.services.harness.scope import resolve_project_subtree, assert_folder_scopes_subset, resolve_run_scope_root
-# 099 WFSKILL-01: imported as a MODULE (not bound names) so the kickoff helper calls
-# validate_skill_refs / materialize_skill_snapshots_if_needed through the module
-# object — keeps the seam patchable + the hot file free of inline gate/copy logic (G-5).
-from app.services.harness import skill_snapshot as _skill_snapshot
 from app.models.user_settings import (
     load_all_model_overrides,
     load_user_settings,
