@@ -49,6 +49,18 @@ from app.services.run_lifecycle import register_run_start, finalize_run_terminal
 # still intercepts, and send_message injects this module-global into maybe_autotitle_thread
 # (title_fn=generate_thread_title, emit=_emit) — behavior byte-identical.
 from app.services.thread_title import generate_thread_title, maybe_autotitle_thread
+# Phase 162.5 Plan 01 (D-A2 / D-A4) — the disabled-model fallback + provider-resolution
+# transform extracted to a leaf module. Re-imported at module scope so test_149's
+# `from app.api.threads import _resolve_enabled_model` + threads_mod._reresolve_fallback_provider
+# / _apply_fallback_to_request still resolve; send_message calls resolve_run_model. The moved
+# bodies resolve load_all_model_overrides / get_model_capability_async / override_provider LATE
+# off this module (kept imported below), so patch("app.api.threads.*") still intercepts.
+from app.services.run_model_resolution import (
+    _resolve_enabled_model,
+    _reresolve_fallback_provider,
+    _apply_fallback_to_request,
+    resolve_run_model,
+)
 # Phase 092 (MODE-01): the net-new run-creation + picker-feed helpers. db-layer
 # imports are cycle-safe (db/workflows.py imports only models). run_workflow +
 # _load_run_definition are imported LOCALLY inside the producer branch to keep
@@ -198,133 +210,14 @@ async def _emit_terminal(redis, run_id: _uuid_mod.UUID, type: str, **fields) -> 
     )
 
 
-async def _resolve_enabled_model(resolved_model: str, org_default: str) -> tuple[str, dict | None]:
-    """Phase 149 (D-149-10) enabled-enforcement at the ONE shared model-resolution seam.
-
-    If ``resolved_model`` was operator-DISABLED, fall back to the org default and return
-    ``(org_default, notice)`` where ``notice`` names BOTH models for an honest inline SSE
-    event; otherwise return ``(resolved_model, None)`` — byte-identical to before (the
-    shared Deep/workflow path is untouched for the common enabled case; no per-provider
-    fork, D-14 red line).
-
-    The disabled check reads the CACHED all-rows override set (``load_all_model_overrides``
-    — 30s TTL, no per-request DB read on a warm cache; the enabled-only hot cache is NOT
-    touched). A model is disabled ONLY when its override row carries ``enabled=false``; an
-    absent override defaults enabled. The org default is guaranteed ENABLED by the Plan-06
-    Task-1 guards (the disable guard refuses disabling it; the lock guard refuses locking a
-    disabled model), so the fallback target can never itself be disabled — no dead default.
-    A settings-read blip is swallowed (returns the model unchanged) so this never breaks
-    send_message.
-    """
-    try:
-        overrides = await load_all_model_overrides()
-    except Exception:  # noqa: BLE001 — an override-read blip must never sink send_message
-        return resolved_model, None
-    is_disabled = (overrides.get(resolved_model) or {}).get("enabled") is False
-    if is_disabled and org_default and org_default != resolved_model:
-        notice = {
-            "disabled_model": resolved_model,
-            "fallback_model": org_default,
-            "message": (
-                f"{resolved_model} was disabled by your administrator — "
-                f"this reply used {org_default}."
-            ),
-        }
-        # WR-03/WR-04 defense-in-depth: re-verify the fallback target (the org default) is
-        # itself ENABLED. The Plan-06 write-side guards keep the org default enabled, but a
-        # multi-worker 30s-cache-staleness window could leave a DEAD default. If the org
-        # default is ALSO disabled we KEEP the honest notice (never a silent route to a
-        # disabled model) and log the anomaly — we do not pretend the fallback is a clean route.
-        if (overrides.get(org_default) or {}).get("enabled") is False:
-            logger.warning(
-                "_resolve_enabled_model: org default %r is itself disabled — a dead default "
-                "(WR-03 multi-worker window); surfacing the honest fallback notice, not a "
-                "silent route to a disabled model.",
-                org_default,
-            )
-        return org_default, notice
-    return resolved_model, None
-
-
-async def _reresolve_fallback_provider(effective_model: str, current_provider: str) -> str:
-    """Phase 149 Plan 09 (D-149-10 bookkeeping honesty) — after a disabled-model fallback,
-    re-resolve the RECORDED provider from the EFFECTIVE (fallback) model's capability so
-    ``runs.provider`` matches the model that actually served the run.
-
-    The send_message provider-resolution block leaves ``_resolved_provider`` as the
-    PRE-fallback value on a fallback (the ``body.provider`` branch and the non-registry
-    ``else`` branch both keep the original ``active_provider``) — a MiniMax-served fallback
-    would otherwise record ``provider='anthropic'`` (the UAT Test-7 wart). This returns the
-    effective model's provider ONLY when the capability is a VERIFIED entry
-    (``capability_source`` in ``registry`` / ``db_override``), else the current provider
-    UNCHANGED. WR-01 (review round 2): post-075.3, ``get_model_capability_async`` never
-    returns ``provider="unknown"`` for a non-empty id — a registry/DB miss returns a
-    pattern-INFERRED provider (slashed ids → ``openrouter``, garbage → the ``ollama``
-    bucket) with ``capability_source="inferred"``, so a source check (the same D-075.3-08
-    semantics the pre-existing provider-resolution block enforces 20 lines below the call
-    site) is what actually delivers the "a garbage / absent capability never yanks the
-    recorded provider" promise. Without it, an org default absent from the registry/DB
-    (legacy env-CSV model, mis-cased id) would yank ``runs.provider`` AND live SDK routing
-    to an inference bucket — e.g. a slashed local-model default routed to OpenRouter (the
-    BUG-260616-01 data-egress class: a name cannot identify the endpoint).
-    ``db_override`` is accepted alongside ``registry`` because a discovery-confirmed
-    DB-only model is operator-verified. Reads through the same cached
-    ``get_model_capability_async`` the handler already calls (no new per-request DB read
-    on a warm cache); routing itself is unchanged.
-    """
-    capability = await get_model_capability_async(effective_model) or {}
-    provider = capability.get("provider")
-    source = capability.get("capability_source", "")
-    if provider and provider != "unknown" and source in ("registry", "db_override"):
-        return provider
-    return current_provider
-
-
-async def _apply_fallback_to_request(
-    body, resolved_model: str, resolved_provider: str, user_settings
-):
-    """Phase 149 review round-2 CR-01 — apply a fired disabled-model fallback to the
-    OUTBOUND request. Called ONLY when ``_model_fallback_notice`` is truthy (the enabled /
-    no-fallback path never enters — byte-identical, D-14).
-
-    Returns ``(body, resolved_provider, user_settings)``:
-
-    - ``body`` is rebuilt with ``body.model`` = the EFFECTIVE (fallback) model. This is
-      THE CR-01 fix: the model actually sent to the LLM is always ``body.model``
-      (``agent_loop.py:1937`` native path, ``:2005``/``:2032`` compat path → the gateway's
-      ``model=request.model``); ``ctx.resolved_model`` is a dead local there. Without the
-      rewrite every fallback-fired run still sent the DISABLED model on the wire — the
-      plan-09 provider flip then aimed that disabled model at the fallback model's
-      provider (cross-provider fallback → provider 400/404 hard-fail, the exact UAT
-      Test-7 shape), and a same-provider fallback silently served the disabled model
-      while the inline notice claimed the fallback model replied. Post-seam
-      ``body.model`` readers audited: the title-gen read (threads.py ~:1325), the
-      RunContext/agent_loop request sites, and the suggestion-gen reads all correctly
-      want the EFFECTIVE model.
-    - ``resolved_provider`` / ``user_settings`` carry the plan-09 provider re-resolve
-      (bookkeeping honesty — ``runs.provider`` names who actually serves the run) via
-      the same canonical ``override_provider`` mutation path the registry branch uses.
-      WR-02 (review round 2): the re-resolved provider is committed ONLY when the
-      credentials switch actually applied — ``override_provider`` returns the settings
-      UNCHANGED (same object) when the target provider has no configured API key, and
-      recording the fallback provider in that case would make ``runs.provider`` name a
-      provider that did not serve the run (the exact runs-row dishonesty plan 09 set out
-      to fix, in the opposite direction).
-    """
-    fallback_provider = await _reresolve_fallback_provider(resolved_model, resolved_provider)
-    if fallback_provider != resolved_provider:
-        # Align user_settings so any downstream reader (agent_runner SDK selection)
-        # stays consistent with the recorded provider — same canonical mutation path
-        # the registry branch uses. Identity check: override_provider returns
-        # `effective` unchanged on refusal (no key configured for the target).
-        switched = override_provider(user_settings, fallback_provider)
-        if switched is not user_settings:
-            user_settings = switched
-            resolved_provider = fallback_provider
-    # CR-01: the producer's closure-captured body must carry the EFFECTIVE model —
-    # this is the value the agent loop / provider gateway put on the wire.
-    body = body.model_copy(update={"model": resolved_model})
-    return body, resolved_provider, user_settings
+# Phase 162.5 Plan 01 (G-5 leaf extraction): the disabled-model fallback + provider-resolution
+# helpers — _resolve_enabled_model, _reresolve_fallback_provider, _apply_fallback_to_request —
+# MOVED VERBATIM to app.services.run_model_resolution and re-imported at the top of this module
+# (one canonical copy, no duplicate). They stay patchable/importable as app.api.threads.* via
+# that re-import; their moved bodies resolve load_all_model_overrides / get_model_capability_async
+# / override_provider LATE off this module (still imported above) so those patches still apply.
+# The inline model/provider resolution block (below, in send_message) moved with them into
+# run_model_resolution.resolve_run_model.
 
 
 # Phase 089 Plan 03 (G-5 verbatim move): _is_transient_provider_error,
@@ -1082,65 +975,16 @@ async def send_message(
         _user_settings = override_provider(_user_settings, body.provider)
 
     run_id = _uuid_mod.uuid4()
-    _resolved_model = body.model if getattr(body, "model", None) else _user_settings.llm_model
-    # Phase 149 (D-149-10) — enabled-enforcement at the ONE shared resolution seam: a user
-    # whose selected model was just operator-DISABLED runs on the org default instead, with
-    # an honest inline SSE notice naming BOTH models (emitted below, once the run stream
-    # exists). Single-seam additive guard; for an enabled / no-override model this is a
-    # no-op and the shared path stays byte-identical (no per-provider fork — D-14).
-    _resolved_model, _model_fallback_notice = await _resolve_enabled_model(
-        _resolved_model, _user_settings.llm_model
+    # Phase 149 (D-149-10) enabled-enforcement + D-067.3-N01 provider resolution + Plan-09/CR-01
+    # disabled-model fallback. Phase 162.5 Plan 01 (G-5 leaf extraction): the inline model/provider
+    # resolution transform moved VERBATIM to run_model_resolution.resolve_run_model. It returns the
+    # (possibly mutated) body + user_settings so the EFFECTIVE fallback model on the wire + the
+    # fallback-aligned provider credentials flow into register_run_start and the producer closure
+    # unchanged; get_model_capability_async / override_provider resolve LATE off this module so the
+    # provider-router patches still intercept. Behavior byte-identical (D-14).
+    _resolved_model, _resolved_provider, _model_fallback_notice, body, _user_settings = await resolve_run_model(
+        body=body, user_settings=_user_settings
     )
-    # D-067.3-N01-01: Resolution order — explicit body.provider (already
-    # applied to _user_settings.active_provider above via override_provider) >
-    # MODEL_CAPABILITIES[model]["provider"] > active_provider fallback.
-    # Repro: run 6eab949f-78da-4ea4-ac01-f04b16c9be7d (claude model + openai
-    # default active_provider → routed to OpenAI SDK → 404). Fix uses the
-    # existing get_model_capability helper which returns provider='unknown'
-    # for unknown models so the fallback chain is naturally safe (D-067.3-N01-02).
-    if body.provider:
-        # Explicit override already applied to _user_settings.active_provider above.
-        _resolved_provider = _user_settings.active_provider
-    else:
-        _capability = await get_model_capability_async(_resolved_model) or {}
-        _capability_provider = _capability.get("provider", "unknown")
-        # Phase 075.3 D-075.3-08: only override the active provider when the
-        # registry has a verified entry. After 075.3 get_model_capability no
-        # longer returns provider="unknown" for unknown model_ids — it returns
-        # a pattern-inferred provider (gpt-* → openai, gemini-* → google, etc.)
-        # with capability_source="inferred". Falling through to active-provider
-        # for inferred entries preserves D-067.3-N01-02 semantics: a totally
-        # garbage model_id (which falls into the ollama fallback bucket)
-        # shouldn't yank routing to Ollama when the user has an explicit
-        # active_provider set.
-        _capability_source = _capability.get("capability_source", "registry")
-        if _capability_provider != "unknown" and _capability_source == "registry":
-            _resolved_provider = _capability_provider
-            # Align _user_settings so downstream agent_runner reads see the
-            # resolved provider for SDK selection (D-067.3-N01-04). The
-            # inner-shadowed `user_settings = _user_settings` at the top of
-            # agent_runner picks this mutation up for free. Use override_provider
-            # to keep the canonical mutation path.
-            _user_settings = override_provider(_user_settings, _resolved_provider)
-        else:
-            _resolved_provider = _user_settings.active_provider
-
-    # Phase 149 Plan 09 (D-149-10 bookkeeping honesty) + review round-2 CR-01 — when a
-    # disabled-model fallback fired, _resolved_model is now the org-default fallback but
-    # BOTH the outbound request model (body.model — what the agent loop / gateway actually
-    # send) and _resolved_provider still hold PRE-fallback values. _apply_fallback_to_request
-    # re-resolves the recorded provider from the EFFECTIVE fallback model (a MiniMax-served
-    # fallback records "minimax", not the stale "anthropic") AND rewrites body.model to the
-    # effective model so the fallback model is what actually goes on the wire (CR-01: without
-    # the rewrite, a cross-provider fallback hard-failed and a same-provider fallback silently
-    # served the disabled model under a false notice). Minimal additive guard at the existing
-    # seam (threads.py is a G-5 hot file — no refactor, no per-provider fork); for the
-    # no-fallback case _model_fallback_notice is falsy → a no-op and the shared path stays
-    # byte-identical (D-14).
-    if _model_fallback_notice:
-        body, _resolved_provider, _user_settings = await _apply_fallback_to_request(
-            body, _resolved_model, _resolved_provider, _user_settings
-        )
 
     try:
         # Phase 145-03 (D-145-09) — the runs INSERT + both ZADD mirrors are now ONE
