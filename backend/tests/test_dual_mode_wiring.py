@@ -695,7 +695,13 @@ async def test_locked_thread_deep_send_refused_409(fake_redis, mock_asyncpg_pool
     app.dependency_overrides[get_supabase] = lambda: sb
     app.dependency_overrides[get_redis] = lambda: fake_redis
     try:
+        # Phase 163 (T-163-06c): the anchor lock-check now reads workflow_runs.status on
+        # the RLS user-JWT connection (get_user_pg_connection → app.dependencies.get_pg_pool),
+        # so patch THAT seam too — the mock pool's fetchval ("active", set above) drives the
+        # non-terminal 409. The app.api.threads.get_pg_pool patch stays for the other sites.
         with patch("app.api.threads.get_pg_pool",
+                   AsyncMock(return_value=mock_asyncpg_pool)), \
+             patch("app.dependencies.get_pg_pool",
                    AsyncMock(return_value=mock_asyncpg_pool)):
             async with httpx.AsyncClient(
                 transport=ASGITransport(app=app), base_url="http://test"
@@ -1526,9 +1532,20 @@ def test_get_thread_workflow_latest_producer_none_when_terminal(
 
 
 def patch_get_pg_pool(pool):
+    from contextlib import contextmanager
     from unittest.mock import AsyncMock, patch
 
-    return patch("app.api.threads.get_pg_pool", AsyncMock(return_value=pool))
+    @contextmanager
+    def _both():
+        # Phase 163: get_thread_workflow's reconcile reads moved to get_user_pg_connection
+        # (app.dependencies.get_pg_pool) under RLS, so patch THAT seam too. The
+        # app.api.threads.get_pg_pool patch stays for any co-resident callers. get_current_user
+        # is dependency-overridden in these tests, so _is_banned never consumes the fetchrow queue.
+        with patch("app.api.threads.get_pg_pool", AsyncMock(return_value=pool)), \
+             patch("app.dependencies.get_pg_pool", AsyncMock(return_value=pool)):
+            yield
+
+    return _both()
 
 
 # ═════════════════════════════════════════════════════════════════════════════

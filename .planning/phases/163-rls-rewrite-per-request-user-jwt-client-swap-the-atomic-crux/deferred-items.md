@@ -52,3 +52,24 @@ unrelated files during an additive plan).
   + the other 21 `test_threads.py`/integration tests pass GREEN with the swap in place.
 - **Disposition:** out of scope for 163-06. Candidate for a test-infra refresh that re-targets
   the moved patch seams (`run_producer` / `agent_loop` / `db.runs`). Not a blocker.
+
+**`tests/test_dual_mode_wiring.py` — 10 failing tests (same 162.5 source-drift rot).**
+
+- 8 tests fail at `patch("app.api.threads.insert_run")` SETUP — same removed-symbol rot as
+  above (`test_producer_branches_harness_when_anchor_set`, `test_harness_failure_...`,
+  `test_user_cancel_...`, `test_deep_run_failure_...`, the 4 `test_harness_final_*`). `insert_run`
+  is not a `threads.py` module attr on the base (`git show 99d6020a` — same import line).
+- `test_cap_paused_is_not_in_cancel_idempotency_terminal_set` inspects `cancel_run` source for
+  the terminal-status tuple `("completed", "failed", "cancelled", "timed_out")` — that tuple moved
+  to `run_lifecycle._cancel_run_internals` in Phase 147, so it is absent from `cancel_run` on the
+  base too (`git show 99d6020a:backend/app/api/runs.py` → 0 matches inside cancel_run). Pre-147 rot.
+- `test_published_workflows_list_endpoint` asserts the `/workflows/published` response equals
+  `{id, slug, name}` but the row carries `definition` — this tests `workflows.py`/`db.workflows`,
+  neither touched by 163-06; the base `list_published_workflows` already references `definition`.
+- **Proven pre-existing:** these are a SUBSET of the 162.5 close-out's documented differential
+  ("19 failed / 55 passed IDENTICAL both sides — zero net-new"). My only 163-06 regression here —
+  `test_get_thread_workflow_surfaces_latest_producer_when_live` (its `patch_get_pg_pool` helper
+  now targets `app.dependencies.get_pg_pool` since the reconcile reads moved to
+  get_user_pg_connection) — is FIXED in this plan. `test_locked_thread_deep_send_refused_409`
+  (the T-163-06c blocker-fix path) + all 67 `test_147_*` pass GREEN.
+- **Disposition:** out of scope for 163-06 (test-infra refresh — re-target the moved patch seams). Not a blocker.

@@ -217,6 +217,13 @@ async def maybe_autotitle_thread(
     still intercepts (D-A4). The ordering invariant is preserved: the ``fallback_model``
     emit fires BEFORE the ``title`` emit; the nested try/except keep the identical
     ``logger.warning`` shapes so a title-gen failure never blocks the run.
+
+    Phase 163 (D-03 — Warning #2, EXPLICIT client classification, NOT silent inheritance):
+    this is REQUEST-SCOPED — its ONLY caller is ``send_message`` (threads.py), which awaits
+    it INLINE (before the producer task is spawned) and passes its own request-injected
+    ``supabase`` = the swapped ``get_user_supabase_client``. So the ``threads`` title
+    read (:233) + write (:253) run under the caller's RLS (owner's own thread). It is NOT
+    invoked from the producer, so it never needs ``get_service_role_supabase(org_id)``.
     """
     # D-067.2-05: Auto-title fires AFTER the first-user-message INSERT (line ~903)
     # but BEFORE the agent producer task starts (asyncio.create_task at the bottom

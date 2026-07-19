@@ -737,6 +737,7 @@ async def get_messages(
 async def send_message(
     thread_id: str,
     body: MessageCreate,
+    request: Request,  # Phase 163: threaded into preflight_workflow_kickoff for its RLS lock-check
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_user_supabase_client),
     # Phase 163 (D-05/D-09): the service-role client handed to the PRODUCER only.
@@ -774,6 +775,7 @@ async def send_message(
     # LATE off this module inside the seam so patch("app.api.threads.workflows_enabled")
     # (test_147) + the app.api.threads.get_pg_pool patch still intercept (D-A4).
     _kickoff_definition, _kickoff_definition_id = await preflight_workflow_kickoff(
+        request=request,  # Phase 163 (T-163-06c): RLS lock-check on the user-JWT connection
         body=body,
         thread_id=thread_id,
         thread_row=thread_resp.data,

@@ -120,7 +120,7 @@ async def _ensure_skill_snapshots(
         )
 
 
-async def preflight_workflow_kickoff(*, body, thread_id, thread_row, supabase, current_user):
+async def preflight_workflow_kickoff(*, request, body, thread_id, thread_row, supabase, current_user):
     """Phase 162.5 Plan 02 — the ``send_message`` workflow-kickoff preflight, moved verbatim.
 
     Holds the anchor 409-lock check + the ``body.workflow_definition_id is not None``
@@ -131,6 +131,12 @@ async def preflight_workflow_kickoff(*, body, thread_id, thread_row, supabase, c
     refused-launch path makes exactly ONE DB call: the thread-ownership SELECT in the
     caller). ``workflows_enabled`` / ``get_pg_pool`` resolve LATE off ``app.api.threads``
     so the test patch surface still intercepts (D-A4). Byte-identical to the inline block.
+
+    Phase 163 (D-02/D-03): ``request`` is threaded in from ``send_message`` so the anchor
+    lock-check ``workflow_runs`` status read runs under RLS on the per-request user-JWT
+    connection (T-163-06c — the BLOCKER fix). ``supabase`` is send_message's swapped
+    user-JWT client, so the ``workflow_definitions`` resolve + the 098/099 gates already
+    run under RLS.
     """
     # ── Phase 092 MODE-01 / MODE-02 — server-side lock + workflow kickoff ──────
     # This is the AUTHORITATIVE workflow lock (the grayed client toggle is courtesy
@@ -141,15 +147,19 @@ async def preflight_workflow_kickoff(*, body, thread_id, thread_row, supabase, c
     _kickoff_definition = None          # parsed WorkflowDefinition when kicking off
     _kickoff_definition_id = None       # workflow_definitions.id for the kickoff
     if _existing_anchor is not None:
-        # get_pg_pool resolved LATE off threads so patch("app.api.threads.get_pg_pool")
-        # (test_dual_mode_wiring) still intercepts the relocated body (D-A4).
-        from app.api.threads import get_pg_pool
-        # A run currently holds the lock — is it still live (non-terminal)?
-        _pool = await get_pg_pool()
-        _anchor_status = await _pool.fetchval(
-            "SELECT status FROM workflow_runs WHERE id = $1",
-            UUID(_existing_anchor) if isinstance(_existing_anchor, str) else _existing_anchor,
-        )
+        # Phase 163 (D-02 / T-163-06c — THE BLOCKER FIX): this ``workflow_runs`` status
+        # read is called SYNCHRONOUSLY request-scoped from send_message (threads.py:753)
+        # BEFORE any INSERT, so after the Wave-4 client swap it MUST run under RLS — a raw
+        # ``get_pg_pool().fetchval`` here read a TEN-01 table as postgres/BYPASSRLS (the
+        # D-02 / Pitfall-6 cross-org leak signature). Run it on the per-request user-JWT
+        # connection (SET LOCAL ROLE authenticated + both GUC forms); request/current_user
+        # are threaded from send_message. A run currently holds the lock — still live?
+        from app.dependencies import get_user_pg_connection
+        async with get_user_pg_connection(request, current_user) as _conn:
+            _anchor_status = await _conn.fetchval(
+                "SELECT status FROM workflow_runs WHERE id = $1",
+                UUID(_existing_anchor) if isinstance(_existing_anchor, str) else _existing_anchor,
+            )
         _TERMINAL_WORKFLOW = ("completed", "failed", "cancelled")
         if _anchor_status is not None and _anchor_status not in _TERMINAL_WORKFLOW:
             # The lock holds. Refuse a Deep send AND a different-workflow send
@@ -266,6 +276,16 @@ async def preflight_workflow_kickoff(*, body, thread_id, thread_row, supabase, c
         # formula) lives in template_service (G-5: no inline query/Storage call in this
         # hot file). D-11: a thread with no template_input row → the write no-ops.
         from app.services import template_service as _template_service
+        # Phase 163 (D-05 — CLASSIFIED request-scoped exception, RLS conversion DEFERRED):
+        # this is a best-effort "extend expiry to cover the run" UPDATE on the caller's OWN
+        # template_input rows, keyed by thread_id — and the thread was ALREADY RLS-ownership-
+        # gated upstream in send_message (the user-JWT thread SELECT ran before this preflight).
+        # pin_templates_for_run lives in template_service.py, which is OUT OF THIS PLAN'S SCOPE
+        # (no swap plan owns it); it takes a raw ``pool``. It stays on the service-role pool
+        # here (resolved LATE off app.api.threads so patch("app.api.threads.get_pg_pool") in
+        # test_dual_mode_wiring still intercepts). Full RLS conversion rides along when
+        # template_service is swapped (a later Wave-4 plan) — the single pool.execute is
+        # already conn-duck-typed for it.
         from app.api.threads import get_pg_pool
         await _template_service.pin_templates_for_run(
             pool=await get_pg_pool(),
@@ -306,6 +326,15 @@ async def build_harness_run_context(
     stays a LOCAL lazy import (dodges the import cycle, matches the original inline lazy import).
     ``run_id`` in the SimpleNamespace stays the workflow_run id (``active_workflow_run_id``);
     ``producer_run_id`` is the producer ``runs.run_id`` (Facet A).
+
+    Phase 163 (D-05/D-09 — CLASSIFIED background/producer path): this runs INSIDE the
+    detached agent-loop producer task (invoked from ``run_producer``), NOT request-scoped —
+    no auth.uid() off-request. So its injected ``supabase`` + ``pool`` are the SERVICE-ROLE
+    clients the producer holds, and are deliberately NOT converted to the per-request
+    user-JWT client / get_user_pg_connection. Retrieval stays owner-scoped via the
+    ``.eq("user_id")`` belt-and-suspenders inside the scope helpers (D-14). No connectionless
+    ``pool.fetch``/``get_pg_pool()`` lives here — it reads via ``aexec(supabase…)`` + the
+    scope helpers and only threads ``pool`` onto ``wf_ctx``.
     """
     # D-04 (site 1): the shared resolve-never-mutate (D-05) wrapper —
     # resolve the effective ctx model from the run owner's active
