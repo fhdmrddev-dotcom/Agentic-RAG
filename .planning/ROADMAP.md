@@ -145,7 +145,17 @@ Ship only if CORE lands clean and budget remains. First-to-cut ordering: SSO/OID
   3. `get_service_role_supabase(org_id)` refuses to construct without an explicit org and is retained only for legitimate cross-tenant ops (SSO JIT, org-admin cross-member reads, the fully-async agent/eval/harness/re-embed writes whose `.eq("user_id")` filters widen to org-aware); the `.eq("user_id")` filters are KEPT as belt-and-suspenders (not deleted this milestone).
   4. `org_id` is denormalized + partial/composite-indexed on `document_chunks` and `skill_embeddings` alongside the vector index, and a benchmark shows membership-RLS retrieval keeps the CONCUR-01 <1s cross-tab-GET-during-streaming gate GREEN (measured before merge).
   5. Deep Mode stays byte-identical on the native-7 (SC#10 — no shared-path fork; org context rides the request seam, not the provider path); the `threads.py` producer extraction (Phase 162.5) landed byte-identical BEFORE `org_id` is threaded through `send_message`.
-**Plans**: TBD
+**Plans**: 10 plans, 5 waves (Wave 1 foundation → Wave 2 authoring → Wave 3 apply gate → Wave 4 flip → Wave 5 crux gate)
+- [ ] 163-01-PLAN.md — Front B factories (get_user_pg_connection / get_user_supabase / get_service_role_supabase) + two-user/two-org fixtures + shared RLS harness (Wave 1)
+- [ ] 163-02-PLAN.md — TEN-04 migration 107: org_id denormalize + backfill + btree + autofill on document_chunks/skill_embeddings (Wave 2)
+- [ ] 163-03-PLAN.md — TEN-01 migration 108: 37-table membership-RLS rewrite in 6 per-cluster bundles + 6 cluster tests (Wave 2)
+- [ ] 163-04-PLAN.md — D-08 core leak (asyncpg + supabase-py) + role-swap-noop / spoof / fail-closed tests (Wave 2)
+- [ ] 163-05-PLAN.md — [BLOCKING] operator SQL-editor apply 107→108 + regenerate full-schema + live-DB assert + test_163_* suite GREEN (Wave 3)
+- [ ] 163-06-PLAN.md — Chat/streaming client swap (threads.py-centric, both DB paths) + agent-loop writer widen (Wave 4)
+- [ ] 163-07-PLAN.md — Documents/DM cluster client swap (retrieval RPCs left to Phase 164) (Wave 4)
+- [ ] 163-08-PLAN.md — Skills + workflow-eval + identity/settings/audit router client swap (Wave 4)
+- [ ] 163-09-PLAN.md — Widen eval-runner / harness / re-embed async writers to org-aware service-role (D-05) (Wave 4)
+- [ ] 163-10-PLAN.md — [BLOCKING] CONCUR-01 <1s benchmark + operator-run D-08 live two-user leak test + SC#10 4-axis UAT (Wave 5)
 
 #### Phase 164: SECDEF Audit + Cross-Org Isolation Test Suite
 **Goal**: The four `SECURITY DEFINER` retrieval/sharing functions carry an in-body org predicate + pinned `search_path`, the fragile regex is deleted, and a two-org adversarial test suite proves zero cross-org leakage — the milestone's verifiable isolation gate.
@@ -264,7 +274,7 @@ Ship only if CORE lands clean and budget remains. First-to-cut ordering: SSO/OID
 | 161. Org / Dept / Role Schema | 2/2 | Complete | 2026-07-18 |
 | 162. Personal-Org Backfill | 3/3 | Complete | 2026-07-18 |
 | 162.5. threads.py Producer Extraction (G-5) | 4/4 | Complete | 2026-07-19 |
-| 163. RLS Rewrite + User-JWT Client Swap (CRUX) | 0/? | Not started | - |
+| 163. RLS Rewrite + User-JWT Client Swap (CRUX) | 0/10 | Not started | - |
 | 164. SECDEF Audit + Cross-Org Isolation Suite | 0/? | Not started | - |
 | 165. `is_global` Retirement Cleanup | 0/? | Not started | - |
 | 166. Org-Admin Shell + Switcher + Profile + Audit + Settings Split | 0/? | Not started | - |
