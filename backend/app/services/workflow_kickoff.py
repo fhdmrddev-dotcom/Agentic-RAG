@@ -33,14 +33,22 @@ two harness-only surfaces that used to live inline in ``send_message`` /
   ``app.services.harness.skill_snapshot`` (test_099's kickoff-wiring tests) still
   intercepts the relocated body.
 """
+import asyncio
 import json
 import logging
+from types import SimpleNamespace
 from uuid import UUID
 
 from fastapi import HTTPException, status
 
+from app.config import settings
 from app.utils.db import aexec
-from app.services.harness.scope import assert_folder_scopes_subset
+from app.utils.folder_utils import fetch_visible_folders
+from app.services.harness.scope import (
+    assert_folder_scopes_subset,
+    resolve_project_subtree,
+    resolve_run_scope_root,
+)
 # Imported as a MODULE (not bound names) so the kickoff seam calls
 # validate_skill_refs / materialize_skill_snapshots_if_needed / graft_skill_snapshots
 # THROUGH the module object — keeps the seam patchable (test_099 monkeypatches
@@ -266,3 +274,179 @@ async def preflight_workflow_kickoff(*, body, thread_id, thread_row, supabase, c
         )
 
     return _kickoff_definition, _kickoff_definition_id
+
+
+async def build_harness_run_context(
+    *,
+    active_workflow_run_id,
+    producer_run_id,
+    kickoff_definition,
+    thread_id,
+    body,
+    current_user,
+    user_settings,
+    supabase,
+    redis,
+    pool,
+    harness_emit,
+    spawn,
+):
+    """Phase 162.5 Plan 02 — the ``agent_runner`` harness run-context/scope BUILD, moved verbatim.
+
+    Assembles the loose ``SimpleNamespace`` ``wf_ctx`` the harness engine threads through:
+    the thread-folder / project-subtree scope resolution (``resolve_run_scope_root`` →
+    ``resolve_project_subtree`` → ``fetch_visible_folders`` path-walk producing
+    ``folder_subtree_ids`` + ``scoped_folder_path``), the WR-03 bound-workflow fail-closed
+    guard (``scope_resolution_failed`` emit + ``RuntimeError`` for a BOUND workflow; UNBOUND
+    falls through to unscoped), and the ``wf_ctx`` field assembly. Byte-identical to the
+    inline block. Only the BUILD moves — the ``run_workflow`` call itself STAYS in the
+    producer (threads.py, Plan 03 owns it). ``run_workflow`` / ``_load_run_definition`` /
+    ``_harness_emit`` are loaded in threads.py and ``_harness_emit`` + the module-level
+    ``_spawn`` are threaded IN (``harness_emit`` / ``spawn``); ``resolve_workflow_ctx_model``
+    stays a LOCAL lazy import (dodges the import cycle, matches the original inline lazy import).
+    ``run_id`` in the SimpleNamespace stays the workflow_run id (``active_workflow_run_id``);
+    ``producer_run_id`` is the producer ``runs.run_id`` (Facet A).
+    """
+    # D-04 (site 1): the shared resolve-never-mutate (D-05) wrapper —
+    # resolve the effective ctx model from the run owner's active
+    # provider (a stale cross-provider llm_model falls back to the
+    # provider default rather than leaking to the wrong client). Lazy
+    # import inside the harness branch (matches the pattern above);
+    # threaded onto wf_ctx.model below. Phase-level precedence is
+    # unchanged downstream: phase.config.model or ctx.model.
+    from app.services.sub_agent_models import resolve_workflow_ctx_model
+    # F5 (092-07) + 098 (GOV-01/PROJ-02 — site 1 kickoff): resolve the
+    # run-start retrieval scope. For a BOUND workflow
+    # (kickoff_definition.project_folder_id set) the scope is the
+    # PROJECT subtree, sourced from the binding the model cannot supply
+    # (GOV-01) — NOT the thread folder. For an UNBOUND/legacy workflow
+    # the scope stays the thread-folder subtree (unchanged — SC#1). Both
+    # branches resolve through the shared scope.resolve_project_subtree
+    # helper, so the inline recursive subtree walk is REMOVED
+    # (G-5: threads.py must shrink, not grow). The scoped_folder_path is
+    # the human-readable ls/tree/grep default-path hint (display only —
+    # the real scope enforcement is folder_subtree_ids).
+    _wf_folder_subtree_ids: list[str] | None = None
+    _wf_scoped_folder_path: str | None = None
+    try:
+        _wf_thread_data = await aexec(
+            supabase.table("threads").select("folder_id").eq("id", thread_id).single()
+        )
+        _wf_thread_folder = _wf_thread_data.data.get("folder_id") if _wf_thread_data.data else None
+        # 152 WFIN-02: owned-override > author > thread precedence + D-05 gate in the helper (G-5).
+        _wf_scope_root = await resolve_run_scope_root(
+            kickoff_definition,
+            run_inputs={"folder_id": str(body.folder_id)} if body.folder_id else None,
+            thread_folder_id=_wf_thread_folder,
+            supabase=supabase, user_id=current_user["id"],
+        )
+        if _wf_scope_root:
+            _wf_folder_subtree_ids = await resolve_project_subtree(
+                _wf_scope_root, supabase=supabase, user_id=current_user["id"]
+            )
+            _wf_all_folders = await fetch_visible_folders(
+                supabase, current_user["id"]
+            )
+            _wf_folder_map = {f["id"]: f for f in _wf_all_folders}
+            _wf_path_parts: list[str] = []
+            _wf_current_fid = _wf_scope_root
+            while _wf_current_fid:
+                _f = _wf_folder_map.get(_wf_current_fid)
+                if not _f:
+                    break
+                _wf_path_parts.append(_f.get("name", ""))
+                _wf_current_fid = _f.get("parent_id")
+            _wf_scoped_folder_path = (
+                "/" + "/".join(reversed(_wf_path_parts))
+                if _wf_path_parts else None
+            )
+    except Exception:
+        # WR-03 (098 secure-phase): a scope-resolution failure must not
+        # silently widen a BOUND workflow to the whole KB. The Plan-05
+        # clip + scope_violation emit are gated on
+        # `folder_subtree_ids is not None`, so on a None fallback neither
+        # narrows nor fires — the degradation would be INVISIBLE. Kickoff
+        # is the one site where the run has NOT started yet, so for a
+        # bound workflow we fail CLOSED (emit + raise → a clean `failed`
+        # terminal via the producer's outer `except Exception` below)
+        # rather than run unscoped. An UNBOUND/legacy workflow keeps the
+        # historical fall-through to whole-KB (SC#1 — losing the
+        # thread-folder default hint is not a governance violation).
+        _wf_bound = kickoff_definition.project_folder_id is not None
+        logger.exception(
+            "harness run-start scope resolution failed for thread %s "
+            "(bound=%s)", thread_id, _wf_bound,
+        )
+        if _wf_bound:
+            try:
+                await harness_emit(
+                    redis,
+                    active_workflow_run_id,
+                    "scope_resolution_failed",
+                    site="kickoff",
+                    bound=True,
+                    detail=(
+                        "project-scope resolution failed at run start; "
+                        "failing closed to avoid whole-KB retrieval"
+                    ),
+                )
+            except Exception:  # noqa: BLE001 — emit is best-effort
+                logger.debug(
+                    "kickoff: scope_resolution_failed emit failed for run %s",
+                    active_workflow_run_id,
+                )
+            raise RuntimeError(
+                "bound workflow scope resolution failed at run start "
+                "(failing closed to avoid whole-KB retrieval)"
+            )
+        # unbound → fall through to unscoped (None) search (unchanged)
+    wf_ctx = SimpleNamespace(
+        run_id=active_workflow_run_id,
+        # Facet A (092-07): the producer runs.run_id is the FK target
+        # for sub-agent parent_run_id; ctx.run_id stays the workflow_run
+        # id for audit/terminal/definition/resume-match.
+        producer_run_id=producer_run_id,
+        thread_id=thread_id,
+        current_user=current_user,
+        user_settings=user_settings,
+        # D-04 (site 1): the effective ctx model resolved from the run
+        # owner's active provider (resolve-never-mutate, D-05). user_settings
+        # is the live request's effective settings — resolve from it so a
+        # stale cross-provider llm_model cannot leak to the wrong client.
+        # Phase-level precedence stays phase.config.model or ctx.model
+        # (phase_types._effective_model) — this only sets ctx.model.
+        model=resolve_workflow_ctx_model(user_settings),
+        # F8 (092-07): the consumption half of SEED-047. create_workflow_run
+        # STORED the user's kickoff question in workflow_runs.inputs.kickoff_prompt
+        # (:995 above) but the phase executors never read it — the FIRST phase
+        # (research) ran with an empty user turn and asked "send me the topic…".
+        # Mirror EXACTLY what was persisted so live ctx.inputs == the durable
+        # inputs jsonb the resume builders read back (152: mirror the folder
+        # override too). ctx.inputs["kickoff_prompt"] is the first phase's user
+        # turn / sub-agent task; programmatic split_topic reads ctx.inputs at :178.
+        inputs={"kickoff_prompt": body.content, **({"folder_id": str(body.folder_id)} if body.folder_id else {})},
+        redis=redis,
+        pool=pool,
+        emit=harness_emit,
+        retry_feedback=None,
+        # F5 (092-07): the tool-context fields every Supabase tool
+        # reads via ctx.<field> (search_documents/hybrid/ls/tree/grep/
+        # glob/fetch_document/skills/code-exec logging). Sourced from
+        # the SAME in-scope values the Deep RunContext + run_agent_loop
+        # use: supabase=supabase (threads.py:1190), spawn=_spawn
+        # (threads.py:1198, the module-level _spawn — threaded in here).
+        # Without these _build_phase_tool_context forwards None →
+        # ctx.supabase.rpc raises AttributeError on the first search_documents (F5).
+        supabase=supabase,
+        folder_subtree_ids=_wf_folder_subtree_ids,
+        scoped_folder_path=_wf_scoped_folder_path,
+        spawn=spawn,
+        # Per-run task() concurrency gate — mirrors the Deep
+        # run_agent_loop local (_per_run_task_semaphore,
+        # agent_loop.py:1234). A fresh per-run semaphore is correct
+        # (this is a fresh top-level workflow run).
+        per_run_task_semaphore=asyncio.Semaphore(
+            settings.task_per_run_concurrency
+        ),
+    )
+    return wf_ctx
