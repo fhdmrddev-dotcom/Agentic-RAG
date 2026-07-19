@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.4
 milestone_name: Multi-Tenancy & Org Access
 status: executing
-last_updated: "2026-07-19T07:22:22.317Z"
+last_updated: "2026-07-19T08:02:43.457Z"
 last_activity: 2026-07-19
 progress:
   total_phases: 28
   completed_phases: 3
   total_plans: 10
-  completed_plans: 8
+  completed_plans: 9
   percent: 11
 ---
 
@@ -41,11 +41,11 @@ Items acknowledged and deferred at milestone close on 2026-07-18 (44 open `audit
 ## Current Position
 
 Phase: 162.5 (threads-py-producer-extraction) — EXECUTING
-Plan: 3 of 4
+Plan: 4 of 4
 Status: Ready to execute
-Last activity: 2026-07-19 -- Phase 162.5 Plan 02 SHIPPED (workflow_kickoff.py extracted: preflight_workflow_kickoff + _ensure_skill_snapshots + build_harness_run_context; threads.py 2119->1851 LOC; byte-identical, app.api.threads.* patch surface preserved via D-A4 late imports; test_099/147/098 24 passed, dual-mode/scope sets 0 new failures vs baseline). NEXT: Plan 03 (run_producer.py — the byte-identical producer heart)
+Last activity: 2026-07-19
 
-Progress: [████████░░] 80%
+Progress: [█████████░] 90%
 
 ### Quick Tasks Completed
 
@@ -426,6 +426,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 162 P01 | 19min | 3 tasks | 1 files |
 | Phase 162 P162-02 | ~48min | 3 tasks | 4 files |
 | Phase 162.5 P02 | 30 | 2 tasks | 3 files |
+| Phase 162.5 P03 | ~50min | 2 tasks | 5 files |
 
 ## Decisions
 
@@ -522,6 +523,8 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase ?]: 162 (D-11 resolved): operator_audit_log EXCLUDED from org_id backfill + kept NULLABLE (no owning auth.users); 163 RLS must handle its NULL org_id. metadata_field_definitions gets a guarded (not unconditional) NOT-NULL flip — flips iff apply-time zero-NULL (A1 cloud caveat)- [Phase 162]: 162-02 (MIG-01 COMPLETE): mig 105 applied to LOCAL via psycopg2 autocommit (never db push/reset); SC#1-4 PASS — 8 users -> 8 personal orgs + default depts + org-admin memberships, 0 dup, 0 multi-default, zero SC#3 row/census delta, idempotent re-apply; only operator_audit_log stays org_id-nullable; metadata_field_definitions flipped NOT NULL. Cloud owed at next operator push (099-105 + SECRETS_ENCRYPTION_KEY).
 - [Phase 162]: 162-02 apply-time deviations: Bug-1 page runs by run_id + user_settings by user_id (neither has an id column); Bug-2 surgically DISABLE/ENABLE the skill_versions + workflow_definitions immutability triggers around their one-time backfill CALL (re-enabled immediately; cloud-safe via table ownership). Rule 1/2: full-schema supplement handle_new_user was stale pre-105 and clobbered the extension in a greenfield paste -> updated supplement to mirror mig 105 §D.
 - [Phase 162.5]: Plan 02 extracted workflow-kickoff machinery (kickoff preflight + harness run-context build) to workflow_kickoff.py; threads.py 2119->1851 LOC, byte-identical, app.api.threads.* patch surface preserved via D-A4 late imports
+- [Phase ?]: D-A3 unification (162.5-03): producer _shielded_finalize + continuation _finalize collapsed onto ONE shared run_producer._finalize_producer_run; harness-F2 + cap_paused divergences are params not a forked order; the two finalize orderings can no longer drift
+- [Phase ?]: 162.5-03: threads.py 2444->1214 LOC; producer heart is now a parameterized run_producer() seam for Phase 163 org_id threading (TEN-02); agent_loop.run_agent_loop byte-unchanged (Deep red line)
 
 ## Operator Next Steps
 

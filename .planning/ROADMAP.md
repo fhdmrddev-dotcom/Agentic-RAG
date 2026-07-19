@@ -132,7 +132,7 @@ Ship only if CORE lands clean and budget remains. First-to-cut ordering: SSO/OID
 **Plans**: 4 plans (sequential — file-ownership on threads.py forces serialization; order = leaves → kickoff → producer → BLOCKING gate)
 - [x] 162.5-01-PLAN.md — Leaf extractions: thread_title.py (title subsystem + auto-title emit) + run_model_resolution.py (disabled-model fallback + provider resolution)
 - [x] 162.5-02-PLAN.md — workflow_kickoff.py: _ensure_skill_snapshots + kickoff-preflight + harness run-context/scope build
-- [ ] 162.5-03-PLAN.md — run_producer.py: agent_runner + _shielded_finalize UNIFIED with spawn_continuation_run over one shared finalizer (8 invariants preserved)
+- [x] 162.5-03-PLAN.md — run_producer.py: agent_runner + _shielded_finalize UNIFIED with spawn_continuation_run over one shared finalizer (8 invariants preserved)
 - [ ] 162.5-04-PLAN.md — [BLOCKING] Deep byte-identical gate (Phase-089 harness + full live suite + native-provider 4-axis smoke; autonomous:false)
 
 #### Phase 163: RLS Rewrite + Per-Request User-JWT Client Swap — THE ATOMIC CRUX
