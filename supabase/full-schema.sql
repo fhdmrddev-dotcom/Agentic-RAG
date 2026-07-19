@@ -4590,7 +4590,7 @@ CREATE POLICY "Users can insert own skill test cases" ON public.skill_test_cases
 -- Name: skills Users can insert own skills; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can insert own skills" ON public.skills FOR INSERT TO authenticated WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
+CREATE POLICY "Users can insert own skills" ON public.skills FOR INSERT TO authenticated WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id) AND (is_system = false)));
 
 
 --
@@ -4716,7 +4716,7 @@ CREATE POLICY "Users can update own skill test cases" ON public.skill_test_cases
 -- Name: skills Users can update own skills; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can update own skills" ON public.skills FOR UPDATE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
+CREATE POLICY "Users can update own skills" ON public.skills FOR UPDATE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id))) WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id) AND (is_system = false)));
 
 
 --
@@ -4765,23 +4765,25 @@ CREATE POLICY "Users can update their own threads" ON public.threads FOR UPDATE 
 -- Name: skill_files Users can view files on own or global skills; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can view files on own or global skills" ON public.skill_files FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND ((auth.uid() = user_id) OR (EXISTS ( SELECT 1
+CREATE POLICY "Users can view files on own or global skills" ON public.skill_files FOR SELECT TO authenticated USING (((EXISTS ( SELECT 1
    FROM public.skills
-  WHERE ((skills.id = skill_files.skill_id) AND (skills.is_global = true)))))));
+  WHERE ((skills.id = skill_files.skill_id) AND (skills.is_system = true)))) OR ((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND ((auth.uid() = user_id) OR (EXISTS ( SELECT 1
+   FROM public.skills
+  WHERE ((skills.id = skill_files.skill_id) AND (skills.is_global = true))))))));
 
 
 --
 -- Name: classification_rules Users can view own and global classification_rules; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can view own and global classification_rules" ON public.classification_rules FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND ((auth.uid() = user_id) OR (is_global = true))));
+CREATE POLICY "Users can view own and global classification_rules" ON public.classification_rules FOR SELECT TO authenticated USING (((is_global = true) OR ((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id))));
 
 
 --
 -- Name: document_views Users can view own and global document_views; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can view own and global document_views" ON public.document_views FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND ((auth.uid() = user_id) OR (is_global = true))));
+CREATE POLICY "Users can view own and global document_views" ON public.document_views FOR SELECT TO authenticated USING (((is_global = true) OR ((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id))));
 
 
 --
@@ -4795,21 +4797,21 @@ CREATE POLICY "Users can view own and global folders" ON public.folders FOR SELE
 -- Name: metadata_field_definitions Users can view own and global metadata_field_definitions; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can view own and global metadata_field_definitions" ON public.metadata_field_definitions FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND ((auth.uid() = user_id) OR (is_global = true))));
+CREATE POLICY "Users can view own and global metadata_field_definitions" ON public.metadata_field_definitions FOR SELECT TO authenticated USING (((is_global = true) OR ((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id))));
 
 
 --
 -- Name: skills Users can view own and global skills; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can view own and global skills" ON public.skills FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND ((auth.uid() = user_id) OR (is_global = true))));
+CREATE POLICY "Users can view own and global skills" ON public.skills FOR SELECT TO authenticated USING (((is_system = true) OR ((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND ((auth.uid() = user_id) OR (is_global = true)))));
 
 
 --
 -- Name: workflow_definitions Users can view own and global workflow definitions; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can view own and global workflow definitions" ON public.workflow_definitions FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND ((auth.uid() = created_by) OR (is_global = true))));
+CREATE POLICY "Users can view own and global workflow definitions" ON public.workflow_definitions FOR SELECT TO authenticated USING (((is_global = true) OR ((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = created_by))));
 
 
 --
@@ -4935,9 +4937,11 @@ CREATE POLICY "Users can view their own threads" ON public.threads FOR SELECT TO
 -- Name: tuner_runs Users can view tuner runs on own or global skills; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can view tuner runs on own or global skills" ON public.tuner_runs FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND ((auth.uid() = user_id) OR (EXISTS ( SELECT 1
+CREATE POLICY "Users can view tuner runs on own or global skills" ON public.tuner_runs FOR SELECT TO authenticated USING (((EXISTS ( SELECT 1
    FROM public.skills
-  WHERE ((skills.id = tuner_runs.skill_id) AND (skills.is_global = true)))))));
+  WHERE ((skills.id = tuner_runs.skill_id) AND (skills.is_system = true)))) OR ((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND ((auth.uid() = user_id) OR (EXISTS ( SELECT 1
+   FROM public.skills
+  WHERE ((skills.id = tuner_runs.skill_id) AND (skills.is_global = true))))))));
 
 
 --
