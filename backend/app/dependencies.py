@@ -1,12 +1,15 @@
 import json
 import logging
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+from typing import AsyncIterator
 
 import asyncpg
+import httpx
 import redis.asyncio as aioredis
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from supabase import create_client, Client
+from supabase import create_client, Client, ClientOptions
 
 from app.config import settings
 from app.services.operator_service import is_operator, write_operator_audit
@@ -103,6 +106,126 @@ async def get_pg_pool() -> asyncpg.Pool:
             command_timeout=30,
         )
     return _pg_pool
+
+
+# ── Phase 163 (TEN-01/TEN-02) — Front-B per-request DB-context factories ───────
+# THE atomic-crux seam: turn a validated request identity into an RLS-ENFORCED DB
+# context. These are ADDITIVE + dead-until-wired — Wave-4 plans swap the router
+# ``Depends`` seams onto them; nothing here changes app behavior yet. The existing
+# ``get_supabase()`` / ``get_pg_pool()`` / ``get_current_user()`` seams stay the
+# source of truth and are byte-unchanged.
+#
+# D-04 note: local JWKS / ES256 verification (PyJWT ``PyJWKClient``) is an OPTIONAL
+# future latency optimization on ``get_current_user()``'s GoTrue round-trip — it is
+# NOT wired here and is NOT a blocker. The ``SET LOCAL`` claims below come straight
+# from the already-validated ``current_user["id"]``; GoTrue validation stays the
+# fallback. The role swap + claims are decoupled from that optimization by design.
+
+
+async def _apply_rls_user_context(conn: asyncpg.Connection, uid: str) -> None:
+    """Turn RLS ON for ``uid`` on an ACQUIRED connection inside an OPEN transaction.
+
+    THE load-bearing sequence (do not reorder):
+
+    1. ``SET LOCAL ROLE authenticated`` FIRST — the pool DSN role is ``postgres``
+       (BYPASSRLS), so setting claims WITHOUT this role swap is a silent no-op
+       (Pitfall 1). This is the single line that actually turns RLS on; a
+       bare-claims connection keeps ``current_user = postgres`` and sees every row.
+    2. BOTH GUC forms, PARAMETERIZED (never string-interpolated — SQLi): the legacy
+       per-claim ``request.jwt.claim.sub`` (local-safe) AND the JSON blob
+       ``request.jwt.claims`` (cloud). Setting both makes ``auth.uid()`` resolve
+       regardless of which variant THIS database's ``auth.uid()`` reads (D-02).
+    3. ``is_local := true`` (the 3rd ``set_config`` arg) — MANDATORY on the shared
+       pool: every ``SET LOCAL`` auto-reverts at COMMIT, so claims can never leak to
+       the next pool borrower (Pitfall 3). ``false`` would leak identity across users.
+
+    Reused verbatim by the Phase-163 test harness (``tests/integration/_rls_harness``)
+    so the request factory and the leak / cluster tests can never drift on the exact
+    role-first + both-GUC-forms shape.
+    """
+    await conn.execute("SET LOCAL ROLE authenticated")
+    await conn.execute(
+        "SELECT set_config('request.jwt.claim.sub', $1, true)", str(uid)
+    )
+    await conn.execute(
+        "SELECT set_config('request.jwt.claims', $1, true)",
+        json.dumps({"sub": str(uid), "role": "authenticated"}),
+    )
+
+
+@asynccontextmanager
+async def get_user_pg_connection(
+    request: Request, current_user: dict
+) -> AsyncIterator[asyncpg.Connection]:
+    """Acquire an RLS-enforced asyncpg connection for the current user (D-02).
+
+    Reuses the EXISTING singleton pool (``get_pg_pool()`` — no new pool, no new DSN).
+    Opens a transaction, applies the role swap + both-GUC-forms context, and yields
+    the connection; the COMMIT at context exit auto-reverts every ``SET LOCAL``.
+
+    ``request`` is accepted for the router ``Depends`` contract (Wave-4 wiring). The
+    claims come SOLELY from ``current_user["id"]`` — already validated by
+    ``get_current_user`` — so this is decoupled from the optional D-04 JWKS path.
+    """
+    uid = current_user["id"]
+    pool = await get_pg_pool()
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            await _apply_rls_user_context(conn, uid)
+            yield conn
+
+
+_shared_httpx: httpx.Client | None = None
+
+
+def _get_shared_httpx() -> httpx.Client:
+    """Lazy shared SYNC httpx transport for the per-request user-JWT supabase clients.
+
+    Reusing ONE transport across per-request clients avoids a connection-pool fanout
+    under load (Pitfall 2). Mirrors the ``get_redis()`` / ``get_pg_pool()`` lazy
+    singleton shape; the app lifespan closes it best-effort alongside them.
+    """
+    global _shared_httpx
+    if _shared_httpx is None:
+        _shared_httpx = httpx.Client()
+    return _shared_httpx
+
+
+def get_user_supabase(request: Request, current_user: dict, token: str) -> Client:
+    """Build a NEW per-request supabase-py client bound to the caller's JWT (D-03).
+
+    Uses the ANON key + an ``Authorization: Bearer <token>`` header so PostgREST runs
+    as ``authenticated`` and RLS is ENFORCED. It NEVER mutates the shared
+    ``get_supabase()`` singleton — mutating that singleton's PostgREST auth header
+    races across concurrent requests / ``WORKER_COUNT=2`` workers and bleeds one
+    user's identity into another's request (Pitfall 2). A shared httpx transport
+    avoids per-request connection fanout.
+
+    supabase-py calls still BLOCK — callers keep their ``run_in_threadpool`` wrapper
+    (D-v2.5-01); do NOT remove it.
+    """
+    return create_client(
+        settings.supabase_url,
+        settings.supabase_anon_key,  # ANON key — NOT service_role (which BYPASSES RLS)
+        options=ClientOptions(
+            headers={"Authorization": f"Bearer {token}"},
+            httpx_client=_get_shared_httpx(),
+        ),
+    )
+
+
+def get_service_role_supabase(org_id: str) -> Client:
+    """Hardened service-role (BYPASSRLS) client factory — REFUSES a missing org (D-05).
+
+    Mirrors ``get_supabase()`` construction but RAISES when ``org_id`` is falsy: a
+    BYPASSRLS client must never be built without an explicit org scope. Retained ONLY
+    for the four fully-async writers (agent loop, eval runner, harness engine,
+    re-embed) + legitimate cross-tenant ops, whose queries add an ``org_id``
+    predicate. Mirrors the refuse-without-scope posture of ``require_operator``.
+    """
+    if not org_id:
+        raise ValueError("get_service_role_supabase requires an explicit org_id")
+    return create_client(settings.supabase_url, settings.supabase_service_role_key)
 
 
 async def _is_banned(user_id: str) -> bool:
