@@ -10,7 +10,15 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse, StreamingResponse
 from supabase import Client
 
-from app.dependencies import get_current_user, get_supabase
+# Phase 163 (TEN-02 / D-03): the skills CRUD + files + import/export handlers run on the
+# per-request user-JWT client (RLS-ENFORCED). skills / skill_files have authenticated own+global
+# SELECT + owner-scoped INSERT/UPDATE/DELETE policies (mig 108) and BEFORE-INSERT
+# autofill_org_id triggers, and the skill-files storage bucket is owner-path-scoped under
+# authenticated — so every handler here (incl. import_skill's file-upload BackgroundTask, which
+# writes skill_files + owner-path storage) works under the user-JWT client. The version-capture
+# trigger is SECURITY DEFINER, so version rows are still written on skill create/update. KEEP
+# .eq("user_id") (D-14) + run_in_threadpool (D-v2.5-01). The re-embed writer is out of scope (plan 09).
+from app.dependencies import get_current_user, get_user_supabase_client
 from app.models.skill import (
     PublishGate,
     SkillCreate,
@@ -188,7 +196,7 @@ def _sibling_descriptions(
 @router.get("", response_model=list[SkillResponse])
 async def list_skills(
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """List all skills visible to the current user (owned + global), deduplicated."""
     result = (
@@ -215,7 +223,7 @@ async def list_skills(
 async def create_skill(
     body: SkillCreate,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """Create a new skill owned by the current user."""
     # Phase 123 (WR-07): reject an empty/whitespace name. A blank name would render a
@@ -251,7 +259,7 @@ async def import_skill(
     file: UploadFile = File(...),
     background_tasks: BackgroundTasks = None,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """Import skill(s) from a ZIP file in agentskills.io format."""
     # 1. Read and validate size
@@ -417,7 +425,7 @@ async def update_skill(
     skill_id: str,
     body: SkillUpdate,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """Update name, description, or instructions of an owned skill."""
     update_data = body.model_dump(exclude_none=True)
@@ -457,7 +465,7 @@ async def update_skill(
 async def delete_skill(
     skill_id: str,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """Delete a skill and cascade-remove all associated storage files."""
     # Step 1: Fetch all file_paths for the skill
@@ -492,7 +500,7 @@ async def delete_skill(
 async def toggle_enabled(
     skill_id: str,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """Flip the is_enabled boolean on an owned skill."""
     # Step 1: Fetch current state
@@ -529,7 +537,7 @@ async def toggle_global(
     skill_id: str,
     body: TogglePublishBody | None = None,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """Flip the is_global boolean on an owned skill. Only the owner can toggle.
 
@@ -629,7 +637,7 @@ async def toggle_global(
 async def get_publish_gate(
     skill_id: str,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """Return the server-computed publish gate for an owned skill (D-05).
 
@@ -661,7 +669,7 @@ async def get_publish_gate(
 async def list_skill_files(
     skill_id: str,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """List files attached to a skill (owner or global skill only)."""
     # Verify skill is accessible (own or global)
@@ -692,7 +700,7 @@ async def upload_skill_file(
     skill_id: str,
     file: UploadFile = File(...),
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """Upload a file to a skill. Only the skill owner can upload."""
     # 1. Read file and enforce 10 MB limit (checked before DB access)
@@ -752,7 +760,7 @@ async def delete_skill_file(
     skill_id: str,
     file_id: str,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """Delete a file from a skill. Only the file owner can delete."""
     # 1. Fetch file row (owner only — enforces FILE-06)
@@ -782,7 +790,7 @@ async def delete_skill_file(
 async def export_skill(
     skill_id: str,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """Export a skill as a ZIP file in agentskills.io format."""
     # 1. Fetch skill (owner-only)
