@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v3.4
 milestone_name: Multi-Tenancy & Org Access
 status: executing
-last_updated: "2026-07-19T08:02:43.457Z"
+last_updated: "2026-07-19T09:27:33.000Z"
 last_activity: 2026-07-19
 progress:
   total_phases: 28
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 10
-  completed_plans: 9
-  percent: 11
+  completed_plans: 10
+  percent: 14
 ---
 
 # Project State
@@ -40,12 +40,13 @@ Items acknowledged and deferred at milestone close on 2026-07-18 (44 open `audit
 
 ## Current Position
 
-Phase: 162.5 (threads-py-producer-extraction) — EXECUTING
-Plan: 4 of 4
-Status: Ready to execute
+Phase: 162.5 (threads-py-producer-extraction) — ✅ COMPLETE (4/4 plans; operator-approved D-A6 Deep byte-identical gate 2026-07-19)
+Plan: 4 of 4 complete
+Status: Phase 162.5 done — the `threads.py` extraction landed byte-identical (2,444 → 1,214 LOC; agent_loop.py unchanged). **Phase 163 UNBLOCKED (D-A1 satisfied).**
+Next action: `/gsd:plan-phase 163` — RLS Rewrite + User-JWT Client Swap (THE ATOMIC CRUX; TEN-01/TEN-02/TEN-04; mig slots 107 RLS + 108 TEN-04)
 Last activity: 2026-07-19
 
-Progress: [█████████░] 90%
+Progress: [██████████] 100% (all authored plans through 162.5 complete; Phase 163 plans not yet authored — bar recomputes when 163 is planned)
 
 ### Quick Tasks Completed
 
@@ -63,6 +64,8 @@ Progress: [█████████░] 90%
 - **G-5 / Phase 163 (2026-07-18, roadmap-approval — v3.4 crux):** `backend/app/api/threads.py` is the most-fired G-5 hot file (ledger: "G-5 fires — extraction due") and Phase 163 (the atomic RLS + user-JWT-client crux) threads `org_id` through its ~1850-LOC `send_message`. G-5's letter wants a *dedicated* refactor phase before the feature; the roadmap instead sequences the extraction as **Wave 0 of 163** (operator-approved at roadmap sign-off) to keep the 160–168 numbering, with a HARD gate: **no `org_id` touches `send_message` until the extraction lands + proves Deep byte-identical.** The split-vs-bundle call (promote to a standalone phase 163.x if the extraction proves large) is **deliberately deferred to `/gsd:plan-phase 163`**, where the extraction's true size is measurable — the more rigorous point to decide it than blind at roadmap time. Safety property holds either way. Recommendation on record was the dedicated phase; operator chose bundle-now / decide-at-plan-time. Mirrors the 147/149 override shape; the extraction refactor is finally being done (not deferred again), just co-located with the crux.
 - **G-5 / Phase 149 (2026-07-12, plan-phase):** `backend/app/api/threads.py` (ledger: "G-5 fires — extraction due") is touched by plan 149-06 Task 3 with a minimal in-place fallback-notice guard at the single shared model-resolution point for the locked D-149-10 enabled-enforcement decision. Accepted at plan verification (operator-confirmed): guard only, no new endpoint, no file growth beyond the guard, no per-provider fork, shared SSE emitter untouched — all new operator endpoints live in `admin.py`. Mirrors the Phase-147 override shape. The threads.py extraction refactor remains due.
 - **G-5 / Phase 147 (2026-07-11, plan-phase):** `backend/app/api/threads.py` (ledger: "G-5 fires — extraction due") is touched by plan 147-04 Task 2 with a minimal in-place workflow-kickoff guard for the D-05 workflows kill-switch. Accepted at plan verification: conditional guard only, no new endpoint, no file growth beyond the guard — all new operator endpoints live in `admin.py`. The threads.py extraction refactor remains due.
+
+**Phase 162.5 — threads.py Producer Extraction (G-5 refactor) — COMPLETE (2026-07-19).** 4/4 plans, sequential on main tree (file-ownership on `threads.py` forced serialization: leaves → kickoff → producer-heart → `[BLOCKING]` gate). The overdue G-5 extraction is PAID DOWN: `threads.py` **2,444 → 1,214 LOC** across 4 cohesive service modules (`thread_title.py` / `run_model_resolution.py` / `workflow_kickoff.py` / `run_producer.py`), with `agent_runner` + `spawn_continuation_run` UNIFIED onto ONE shared `_finalize_producer_run` (8 finalize-ordering invariants preserved) and **`agent_loop.py::run_agent_loop` byte-unchanged** (Deep red line held, D-A7); zero org_id/RLS content. **Plan 04 = the `[BLOCKING]` D-A6 gate: OPERATOR-APPROVED 2026-07-19.** The definitive **old-vs-new differential** (phase-start `263d0b73` vs HEAD, same targeted producer/finalize/continue/provider set) = **19 failed / 55 passed IDENTICAL both sides — zero net-new** (the 19 = documented pre-existing `insert_run`/source-drift rot). Live SC#10 4-axis all PASS: cross-provider **full native-7** completed (OpenAI/Anthropic/Google + DeepSeek/Moonshot/MiniMax/Zhipu; OpenRouter external-404 = not-our-code + bonus failure-path proof) · multi-tool (`search_documents`→cited [1]-[5]→`execute_code`=4) · parallel-thread (no cross-leak) · long-message (10,479 input tok) · Continue covered (`test_continue.py` 8/8 + live Resume). Scoreboard: `162.5-VALIDATION.md`. **Enables TEN-02** — Phase 163 threads `org_id` through the clean `run_producer(...)` seam. **Next: `/gsd:plan-phase 163` (THE ATOMIC CRUX — UNBLOCKED, D-A1 satisfied; mig slots 107 RLS + 108 TEN-04).**
 
 **Phase 156 — Everyday UX Polish (STRETCH) (POLISH-01) — COMPLETE (2026-07-16).** 4/4 plans (Wave 0 shared `threadGroups` engine → Wave 1 permanent 58px icon rail + dedicated `ChatHistoryColumn` → Wave 2 hand-rolled ⌘K palette [no `cmdk`] → Wave 3 mobile drawer search + optional Date⇄Folder toggle) + an operator-requested **collapsible-layout refinement** (`8486e0c3`: pinned `☰` rail-expand 58⇄210 [NOT hover-driven] + fold-away history + `▷` reopen, both persisted). VERIFICATION `verified` (10/10 code truths + all 5 felt-experience items live). **verify-work 9/9 PASS** (`156-UAT.md` — operator batch-confirm of the live Chrome-DevTools UAT: 399 threads / 7 folders, both themes, zero h-overflow 390→3440px). **secure-phase `threats_open: 0` — 6/6 CLOSED** (`156-SECURITY.md`: 4 `mitigate` verified in code [T-156-01 XSS `dangerouslySetInnerHTML`=0 / T-156-03 Radix focus-trap / T-156-05 operator-shield outside `NAV_ITEMS` / T-156-SC no-`cmdk`] + 2 `accept` [T-156-02/04 client-not-a-trust-boundary]; short-circuit — register@plan-time, grep+lock-test verified; frontend-only, 11 files, no backend/py/auth). **POLISH-01 → complete; BUG-260711-01 `folded → closed`** (`verified_closed_by: 156` — the thin rail verifiably stops starving the history column at 399-thread scale). Frontend-only — NO backend/migration/cloud-parity. **Next: STRETCH 157 (Deployment Presets & Runbook, DEPLOY-01) / 158 (First-Run Install Wizard, DEPLOY-02) — gated behind CORE + budget; `/gsd:discuss-phase 157` when resumed.**
 

@@ -66,7 +66,7 @@ Ship only if CORE lands clean and budget remains. First-to-cut ordering: SSO/OID
 - [x] **Phase 160: Tenancy-Model ADR** — ratify D-PRD-02 co-tenant posture + lock `is_system`→`is_system_global` reuse + 104+ renumbering (ADR-01)
 - [x] **Phase 161: Org / Dept / Role Schema** — 8 org tables + `current_user_org_ids()` helper + non-recursive `org_members` policy + nullable `org_id` on the ~26 remaining tables, RLS from day one (ORG-01, ORG-02)
 - [x] **Phase 162: Personal-Org Backfill** — one personal org + default dept + org-admin membership per user; batched idempotent `org_id` backfill; org_id auto-fill net (mig 106) so nothing breaks; NOT-NULL only after zero-NULL (MIG-01)
-- [ ] **Phase 162.5: threads.py Producer Extraction (G-5 refactor)** — extract `agent_runner`+`_shielded_finalize`+`spawn_continuation_run` → `run_producer.py` (8 finalize invariants preserved) + `workflow_kickoff.py`/`thread_title.py`/`run_model_resolution.py`; Deep byte-identical + full suite green = the hard gate before 163 (enables TEN-02)
+- [x] **Phase 162.5: threads.py Producer Extraction (G-5 refactor)** — extract `agent_runner`+`_shielded_finalize`+`spawn_continuation_run` → `run_producer.py` (8 finalize invariants preserved) + `workflow_kickoff.py`/`thread_title.py`/`run_model_resolution.py`; Deep byte-identical + full suite green = the hard gate before 163 (enables TEN-02) — **operator-approved 2026-07-19 (D-A6 gate PASSED; Phase 163 unblocked)**
 - [ ] **Phase 163: RLS Rewrite + User-JWT Client Swap — THE ATOMIC CRUX** — (after Phase 162.5 extraction) membership RLS across 38 tables + user-JWT client on BOTH paths (supabase-py JWT-header + asyncpg `SET LOCAL ROLE authenticated`) + `document_chunks`/`skill_embeddings` `org_id` denormalize+index (TEN-01, TEN-02, TEN-04)
 - [ ] **Phase 164: SECDEF Audit + Cross-Org Isolation Suite** — 4 SECDEF functions org-scoped + `search_path` pinned + `_inject_user_id` deleted; `test_v3_4_org_isolation.py` two-org exit gate; folder-ACL retrieval isolation; SEED-091 closed (TEN-03, TEN-05, TEN-06, PRAG-01)
 - [ ] **Phase 165: `is_global` Retirement Cleanup** — `is_global`→`is_org_shared` rename across SQL / `folder_utils.py` / Storage policy + UI copy; migration-only `is_system_global` allow-list for the seeded skill-creator (MIG-02)
@@ -133,7 +133,7 @@ Ship only if CORE lands clean and budget remains. First-to-cut ordering: SSO/OID
 - [x] 162.5-01-PLAN.md — Leaf extractions: thread_title.py (title subsystem + auto-title emit) + run_model_resolution.py (disabled-model fallback + provider resolution)
 - [x] 162.5-02-PLAN.md — workflow_kickoff.py: _ensure_skill_snapshots + kickoff-preflight + harness run-context/scope build
 - [x] 162.5-03-PLAN.md — run_producer.py: agent_runner + _shielded_finalize UNIFIED with spawn_continuation_run over one shared finalizer (8 invariants preserved)
-- [ ] 162.5-04-PLAN.md — [BLOCKING] Deep byte-identical gate (Phase-089 harness + full live suite + native-provider 4-axis smoke; autonomous:false)
+- [x] 162.5-04-PLAN.md — [BLOCKING] Deep byte-identical gate (Phase-089 harness + full live suite + native-provider 4-axis smoke; autonomous:false)
 
 #### Phase 163: RLS Rewrite + Per-Request User-JWT Client Swap — THE ATOMIC CRUX
 **Goal**: Membership-based RLS and the per-request user-JWT DB context land TOGETHER across both data-access paths, so RLS becomes actually enforceable (not decorative) — the single load-bearing security transition of the milestone — with the `threads.py` producer extraction landed as **Phase 162.5** (proven Deep-byte-identical) FIRST and retrieval performance held under the CONCUR-01 gate.
@@ -263,7 +263,7 @@ Ship only if CORE lands clean and budget remains. First-to-cut ordering: SSO/OID
 | 160. Tenancy-Model ADR | 1/1 | Complete | 2026-07-18 |
 | 161. Org / Dept / Role Schema | 2/2 | Complete | 2026-07-18 |
 | 162. Personal-Org Backfill | 3/3 | Complete | 2026-07-18 |
-| 162.5. threads.py Producer Extraction (G-5) | 1/4 | In progress | - |
+| 162.5. threads.py Producer Extraction (G-5) | 4/4 | Complete | 2026-07-19 |
 | 163. RLS Rewrite + User-JWT Client Swap (CRUX) | 0/? | Not started | - |
 | 164. SECDEF Audit + Cross-Org Isolation Suite | 0/? | Not started | - |
 | 165. `is_global` Retirement Cleanup | 0/? | Not started | - |
