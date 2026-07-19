@@ -428,22 +428,24 @@ COMMIT;
 
 **If this table is short:** the load-bearing claims (auth.uid() body, the SECDEF bypass, the BEFORE-trigger/WITH-CHECK ordering, the 100 connectionless calls, the installed idioms) are all VERIFIED against authoritative sources or live code — only the environment-variant items above remain ASSUMED, and each is neutralized by a Wave-0 probe or the D-08 gate.
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+> All three closed at plan time (`/gsd:plan-phase 163`) — none block execution. Each is neutralised by an unconditional design choice, not left to be discovered mid-execution.
 
 1. **Exact GUC variant the LIVE local `auth.uid()` reads.**
    - What we know: canonical cloud reads both; the prototype's legacy form passes locally; issue #29332 says some local stacks read only legacy.
    - What's unclear: whether THIS local DB's `auth.uid()` also reads the JSON blob.
-   - Recommendation: Wave-0 probe `SELECT pg_get_functiondef('auth.uid()'::regprocedure)`; set BOTH forms regardless (variant-independent); D-08 is the arbiter.
+   - **RESOLVED:** made moot — D-02 ships BOTH GUC forms unconditionally (legacy `request.jwt.claim.sub` + JSON `request.jwt.claims`) in `get_user_pg_connection` (plan 163-01); the fail-loud `auth.uid()` preflight + the operator-run D-08 live test (plan 163-10) confirm/arbitrate on this DB. Variant-independent by construction.
 
 2. **Whether D-04's local JWKS works on the local stack (HS256 vs ES256).**
    - What we know: PyJWT 2.10.1 has `PyJWKClient`; asymmetric keys are opt-in.
    - What's unclear: whether the local project has signing keys enabled.
-   - Recommendation: probe `/.well-known/jwks.json`; keep GoTrue fallback; do not block the client swap on D-04.
+   - **RESOLVED:** decoupled — D-04's local JWKS is an OPTIONAL latency optimization, NOT wired in 163 and NOT a blocker; the SET-LOCAL claims come from the already-validated `current_user["id"]`, with the GoTrue round-trip retained as fallback (plan 163-01). JWKS availability gates nothing this phase.
 
 3. **Does any request-scoped path SELECT `document_chunks` directly (non-RPC)?**
    - What we know: retrieval is via SECDEF RPCs (RLS-bypassing); ingest INSERTs chunks.
    - What's unclear: whether counts/admin reads hit the table directly under the user-JWT path.
-   - Recommendation: the `org_id` btree covers both cases; benchmark direct-access if any are found at plan time.
+   - **RESOLVED:** covered regardless — TEN-04 adds an UNCONDITIONAL `org_id` btree on `document_chunks` (plan 163-02), so any direct-table SELECT under the user-JWT path is index-supported whether or not one exists today; the retrieval RPC path stays SECDEF (Phase 164). No plan-time enumeration needed.
 
 ## Environment Availability
 
