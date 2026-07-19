@@ -73,3 +73,32 @@ unrelated files during an additive plan).
   get_user_pg_connection) — is FIXED in this plan. `test_locked_thread_deep_send_refused_409`
   (the T-163-06c blocker-fix path) + all 67 `test_147_*` pass GREEN.
 - **Disposition:** out of scope for 163-06 (test-infra refresh — re-target the moved patch seams). Not a blocker.
+
+## Pre-existing test rot (NOT introduced by Plan 163-07)
+
+**`tests/integration/test_111_field_def_scoping.py::test_scoped_read_excludes_other_users_private_field` — 1 failing test (mig-105/106 org_id NOT-NULL vs NULL-user_id global row).**
+
+- Root symptom: `asyncpg.exceptions.NotNullViolationError: null value in column "org_id" of
+  relation "metadata_field_definitions" violates not-null constraint`, raised at the RAW asyncpg
+  INSERT of the seeded GLOBAL field (`user_id = NULL, is_global = true`) — BEFORE any assertion.
+  mig 105 made `org_id` NOT NULL and mig 106's `autofill_org_id_by_owner('user_id')` BEFORE-INSERT
+  trigger derives org_id from the OWNER's `user_id`; a global row with `user_id = NULL` yields a
+  NULL org_id → NOT-NULL violation.
+- **Proven independent of 163-07:** the test imports only `asyncio/json/os/uuid/asyncpg/pytest`
+  (never `app.api.metadata_fields`) and fails on a raw `pg_pool.execute(INSERT …)` — Plan 163-07
+  only swaps the metadata_fields API handler's `Depends(get_supabase)` → the user-JWT client, which
+  is not on this test's code path. It is a migration-state × test-seed mismatch surfaced by the
+  Wave-3 apply of migs 105/106/107/108, not by the client swap. (The real metadata_fields handler
+  suites — `test_111_metadata_fields_crud`, `test_111_audit_field_create` — pass GREEN with the swap.)
+- **Disposition:** out of scope for 163-07 (an additive client-swap plan). Candidate for Phase 165
+  (`is_global` retirement) or a test-seed refresh: a NULL-user_id global row needs an explicit
+  `org_id` (or a trigger branch that fills the system org for global rows). Not a blocker. Note: the
+  APP never creates global metadata fields via the API (the service hard-sets `is_global = false`),
+  so this raw-SQL scenario is a test-only construct.
+
+**`tests/test_knowledge_health.py::test_never_retrieved_excludes_retrieved_docs` — 1 failing test (pre-existing at the phase base).**
+
+- Present in the Plan 163-07 pre-change baseline run (zero source edits) alongside the 3
+  `test_119_leak` failures. `knowledge_health.py` is kept SERVICE-ROLE by 163-07 (classified
+  exception — it reads `audit_log`, which has no `authenticated` SELECT policy), so its behavior is
+  byte-unchanged by the swap. Out of scope; not a blocker.
