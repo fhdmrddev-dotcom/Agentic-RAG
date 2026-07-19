@@ -46,7 +46,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.concurrency import run_in_threadpool
 from supabase import Client
 
-from app.dependencies import get_current_user, get_supabase, require_visible
+from app.dependencies import get_current_user, get_supabase, get_user_supabase_client, require_visible
 from app.services.document_relationship_service import (
     _resolve_readable_latest,  # broken-edge classification: None == broken (D-119-3)
     _uid,                       # UUID-coerce-before-predicate (sole owner-scoping gate)
@@ -353,6 +353,13 @@ def _pagination_params(
 async def governance_broken_relationships(
     offset_limit: tuple[int, int] = Depends(_pagination_params),
     current_user: dict = Depends(get_current_user),
+    # SERVICE-ROLE (classified exception): _fetch_broken_relationships → _latest_exists_anywhere
+    # is a deliberate CROSS-USER existence probe (D-119-3 masking-vs-deletion) that must BYPASS
+    # RLS to distinguish "another user's doc is alive → MASKED, not broken" from "no latest row
+    # anywhere → BROKEN". Under a user-JWT client RLS would hide the alive-elsewhere doc and
+    # mis-report a masked edge as broken. This is the plan's "aggregate call that legitimately
+    # needs cross-user scope → keep service-role" carve-out; the owner-scoped edge read still
+    # carries .eq("user_id", caller) (D-14 belt-and-suspenders).
     supabase: Client = Depends(get_supabase),
 ):
     """Return the caller's broken/dangling relationships (target resolves to no readable
@@ -374,7 +381,7 @@ async def governance_broken_relationships(
 async def governance_unclassified(
     offset_limit: tuple[int, int] = Depends(_pagination_params),
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """Return the caller's docs with a pending classification suggestion (D-119-4)."""
     user_id = current_user["id"]
@@ -393,7 +400,7 @@ async def governance_unclassified(
 async def governance_low_confidence(
     offset_limit: tuple[int, int] = Depends(_pagination_params),
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """Return the caller's docs with any extracted field below the confidence cutoff
     (D-119-5)."""

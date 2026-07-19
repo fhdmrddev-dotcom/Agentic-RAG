@@ -3,7 +3,7 @@ import re
 from fastapi import APIRouter, Depends, HTTPException, Query
 from supabase import Client
 
-from app.dependencies import get_current_user, get_supabase
+from app.dependencies import get_current_user, get_user_supabase_client
 from app.models.kb import LsResponse, TreeResponse, GrepResponse, GlobResponse, ReadResponse
 from app.utils.folder_utils import fetch_visible_folders as _fetch_all_visible_folders, get_globally_visible_folder_ids
 
@@ -174,7 +174,7 @@ async def tree_path(path: str, depth: int | None, user_id: str, supabase: Client
 async def ls(
     path: str = Query(default="/", description="Folder path, e.g. /reports/q1"),
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     result = await ls_path(path, current_user["id"], supabase)
     if "error" in result:
@@ -222,7 +222,7 @@ async def tree(
     path: str = Query(default="/", description="Folder path, e.g. /reports"),
     depth: int | None = Query(default=None, ge=1, description="Max depth below target; omit for unlimited"),
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     result = await tree_path(path, depth, current_user["id"], supabase)
     if "error" in result:
@@ -274,7 +274,7 @@ async def grep(
     pattern: str = Query(description="Regex pattern to search in document content"),
     path: str | None = Query(default=None, description="Optional folder path to scope search, e.g. /reports"),
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     result = await grep_path(pattern, path, current_user["id"], supabase)
     if "error" in result:
@@ -376,7 +376,7 @@ async def glob_path(pattern: str, user_id: str, supabase: Client) -> dict:
 async def glob_search(
     pattern: str = Query(description="Glob pattern for filename matching, e.g. *.pdf or reports/**/*.pdf"),
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     result = await glob_path(pattern, current_user["id"], supabase)
     return GlobResponse(**result)
@@ -455,7 +455,7 @@ async def read(
     start_line: int | None = Query(default=None, ge=1, description="First line to return (1-based, inclusive)"),
     end_line: int | None = Query(default=None, ge=1, description="Last line to return (1-based, inclusive)"),
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     result = await read_path(document_id, current_user["id"], supabase, start_line, end_line)
     if "error" in result:

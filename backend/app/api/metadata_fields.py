@@ -16,7 +16,7 @@ service swallows errors, so the LIVE round-trip is the real verification
 from fastapi import APIRouter, Depends, HTTPException, status
 from supabase import Client
 
-from app.dependencies import get_current_user, get_supabase
+from app.dependencies import get_current_user, get_user_supabase_client
 from app.models.metadata_field import (
     MetadataFieldCreate,
     MetadataFieldResponse,
@@ -31,7 +31,7 @@ router = APIRouter(prefix="/metadata-fields", tags=["metadata-fields"])
 @router.get("", response_model=list[MetadataFieldResponse])
 async def list_metadata_fields(
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """List the caller's own field definitions plus global ones (deduped)."""
     return await metadata_field_service.list_field_definitions(
@@ -43,7 +43,7 @@ async def list_metadata_fields(
 async def create_metadata_field(
     body: MetadataFieldCreate,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """Define a custom metadata field owned by the caller (never global)."""
     # Own-scoped duplicate pre-check — migration 071 has no unique constraint on
@@ -83,7 +83,7 @@ async def update_metadata_field(
     field_id: str,
     body: MetadataFieldUpdate,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """Update an owned field definition (404 on a cross-user miss, not 403)."""
     data = body.model_dump(exclude_none=True)
@@ -101,7 +101,7 @@ async def update_metadata_field(
 async def delete_metadata_field(
     field_id: str,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """Delete an owned field definition (404 on a cross-user miss, not 403)."""
     removed = await metadata_field_service.delete_field_definition(

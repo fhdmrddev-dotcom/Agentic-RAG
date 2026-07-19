@@ -35,7 +35,7 @@ the same compiler, agrees with what these validators accept).
 from fastapi import APIRouter, Depends, HTTPException, status
 from supabase import Client
 
-from app.dependencies import get_current_user, get_supabase
+from app.dependencies import get_current_user, get_user_supabase_client
 from app.models.classification_rule import RuleCreate, RuleResponse, RuleUpdate
 from app.services import classification_rule_service, view_filter_compiler
 from app.services.audit_service import write_audit_entry
@@ -68,7 +68,7 @@ async def _validate_match_expr(match_expr, current_user: dict, supabase: Client)
 @router.get("", response_model=list[RuleResponse])
 async def list_rules(
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """List the caller's own rules plus global ones (deduped, ordered by name)."""
     rows = await classification_rule_service.list_rules(current_user["id"], supabase=supabase)
@@ -79,7 +79,7 @@ async def list_rules(
 async def create_rule(
     body: RuleCreate,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """Create an owner-private classification rule + write a classification.rule.create audit row.
 
@@ -118,7 +118,7 @@ async def update_rule(
     rule_id: str,
     body: RuleUpdate,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """Update an owned rule (404 on a cross-user miss, never the forbidden status).
 
@@ -162,7 +162,7 @@ async def update_rule(
 async def delete_rule(
     rule_id: str,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """Delete an owned rule (404 on a cross-user miss, never the forbidden status)."""
     removed = await classification_rule_service.delete_rule(

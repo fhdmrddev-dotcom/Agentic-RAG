@@ -13,6 +13,16 @@ request handlers here.
 Import discipline (breaks the ``dependencies`` <-> service cycle): ``get_pg_pool`` is imported
 lazily *inside each function* so importing this module never triggers a partial-import of
 ``app.dependencies``.
+
+Phase 163 (TEN-02) — SERVICE-ROLE, classified exception (the raw ``get_pg_pool()`` asyncpg pool is
+DELIBERATELY NOT converted to the per-request ``get_user_pg_connection``). Every ``pool.*`` call here
+is a CROSS-USER OPERATOR read behind the ``admin.py`` ``require_operator`` gate (no RLS backstop by
+design — the operator is org-agnostic): the audit browse/export reads ``audit_log`` with a NULL
+``user_id`` = the deliberate all-users scope, and the roster JOINs ``auth.users`` across every user.
+Routing these through ``get_user_pg_connection`` (``SET LOCAL ROLE authenticated``) would RLS-restrict
+them to the operator's own rows and break the platform feed. This is the plan's "aggregate call that
+legitimately needs cross-user scope → keep the hardened service-role" carve-out; safety stays the
+parameterized ``$N`` binds + the ``<= 100`` page clamp + the CSV cap, never an unbounded read.
 """
 import csv
 import io
@@ -100,7 +110,7 @@ async def query_platform_audit(
         "LIMIT $5 OFFSET $6"
     )
     try:
-        pool = await get_pg_pool()
+        pool = await get_pg_pool()  # SERVICE-ROLE (classified, Phase 163): cross-user operator audit browse — see module docstring
         rows = await pool.fetch(sql, user_id, action_types, since, until, limit, offset)
         return [dict(r) for r in rows]
     except Exception as exc:
@@ -128,7 +138,7 @@ async def export_platform_audit_csv(
     """
     from app.dependencies import get_pg_pool
 
-    pool = await get_pg_pool()
+    pool = await get_pg_pool()  # SERVICE-ROLE (classified, Phase 163): cross-user operator audit export — see module docstring
 
     # COUNT-first (same WHERE) — the cap gate before any streaming.
     count_sql = f"SELECT count(*) FROM audit_log {_AUDIT_WHERE}"
@@ -215,7 +225,7 @@ async def list_users_roster(page_size: int = 50, offset: int = 0) -> list[dict]:
         offset = 0
 
     try:
-        pool = await get_pg_pool()
+        pool = await get_pg_pool()  # SERVICE-ROLE (classified, Phase 163): all-users operator roster — see module docstring
         rows = await pool.fetch(_ROSTER_SQL, limit, offset)
         return [dict(r) for r in rows]
     except Exception as exc:
