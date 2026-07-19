@@ -700,7 +700,10 @@ async def continue_run(
     # ── Step 1: ownership SELECT → 404 (never leak existence; T-092-09) ──
     row_resp = await aexec(
         supabase.table("runs")
-        .select("run_id, status, thread_id, continues_used")
+        # Phase 163 (D-05): pull org_id off the RLS-verified run row so the Deep
+        # continuation's cap-paused read (load_cap_paused_tool_calls) can carry an
+        # org-scoping predicate on the service-role pool (belt-and-suspenders).
+        .select("run_id, status, thread_id, continues_used, org_id")
         .eq("run_id", str(run_id))
         .eq("user_id", current_user["id"])
         .maybe_single()
@@ -1075,7 +1078,15 @@ async def continue_run(
         # Deep continuation run-lifecycle/producer writers — raw service-role pool.
         pool = await get_pg_pool()
         thread_uuid = UUID(thread_id) if isinstance(thread_id, str) else thread_id
-        dropped = await load_cap_paused_tool_calls(pool, thread_uuid)
+        # Phase 163 (D-05): org-scope the service-role cap-paused read when the run row
+        # carried org_id (row.get is None-safe for mock/legacy rows → byte-identical).
+        _cont_org_id = row.get("org_id")
+        _cont_org_uuid = (
+            UUID(_cont_org_id) if isinstance(_cont_org_id, str) else _cont_org_id
+        )
+        dropped = await load_cap_paused_tool_calls(
+            pool, thread_uuid, org_id=_cont_org_uuid
+        )
         await spawn_continuation_run(
             run_id=run_id,
             thread_id=thread_id,

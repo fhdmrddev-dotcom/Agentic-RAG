@@ -8,7 +8,9 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
 from supabase import Client
 
-from app.dependencies import get_current_user, get_supabase
+# Phase 163 (D-03): both feedback handlers are request-scoped → the RLS-enforced
+# per-request user-JWT client. No producer/background path here, so no service-role seam.
+from app.dependencies import get_current_user, get_user_supabase_client
 from app.services.audit_service import write_audit_entry
 
 router = APIRouter(prefix="/feedback", tags=["feedback"])
@@ -37,7 +39,7 @@ async def submit_feedback(
     body: FeedbackRequest,
     background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """Submit a thumbs-up or thumbs-down on an assistant message (D-12).
 
@@ -82,7 +84,7 @@ async def submit_feedback(
 @router.get("/stats")
 async def get_feedback_stats(
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """Return overall positive rate (all-time, D-03) and top-5 most-downvoted documents (last 30 days, D-04).
 

@@ -14,12 +14,20 @@ import zipfile
 from datetime import datetime, timedelta, timezone
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, Response, UploadFile, status
 from starlette.concurrency import run_in_threadpool
 from supabase import Client
 
 from app.db.workspace import get_file_by_id
-from app.dependencies import get_current_user, get_pg_pool, get_supabase
+# Phase 163 (D-02/D-03): the workspace REST reads/writes are request-scoped → the
+# RLS-enforced per-request user-JWT client (supabase) + get_user_pg_connection for the
+# asyncpg-backed write/read (passed as the duck-typed `pool` into workspace_service /
+# db.workspace, which run under SET LOCAL ROLE authenticated). No producer path here.
+from app.dependencies import (
+    get_current_user,
+    get_user_pg_connection,
+    get_user_supabase_client,
+)
 from app.models.user_settings import load_app_settings_async
 from app.services.workspace_service import (
     MAX_FILE_SIZE,
@@ -221,9 +229,10 @@ validate_ooxml = validate_upload
 @router.post("/files")
 async def upload_template(
     thread_id: str,
+    request: Request,
     file: UploadFile = File(...),
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """Upload an ephemeral .docx/.pptx/.xlsx template (TMPL-01, D-12/D-05).
 
@@ -257,16 +266,21 @@ async def upload_template(
     safe_name = re.sub(r"\.{2,}", ".", safe_name).strip() or f"template{ext}"
     path = f"/{uuid4().hex[:8]}-{safe_name}"
     try:
-        result = await ws_write_file(
-            await get_pg_pool(),
-            supabase,
-            thread_id=UUID(thread_id),
-            user_id=UUID(current_user["id"]),
-            path=path,
-            content=raw,
-            kind="template_input",  # D-12
-            expires_at=expires_at,  # D-05
-        )
+        # Phase 163 (D-02): the template write runs under RLS on the per-request
+        # user-JWT connection (SET LOCAL ROLE authenticated). `conn` is passed as the
+        # duck-typed "pool" into ws_write_file — the whole upsert+version write is one
+        # RLS-scoped transaction. The AGENT workspace_write path keeps ctx.pool (D-05).
+        async with get_user_pg_connection(request, current_user) as conn:
+            result = await ws_write_file(
+                conn,
+                supabase,
+                thread_id=UUID(thread_id),
+                user_id=UUID(current_user["id"]),
+                path=path,
+                content=raw,
+                kind="template_input",  # D-12
+                expires_at=expires_at,  # D-05
+            )
     except FileTooLargeError as e:
         raise HTTPException(422, str(e))
     except WorkspaceError as e:
@@ -298,7 +312,7 @@ async def list_workspace_files(
     thread_id: str,
     prefix: str | None = Query(None, description="Path prefix filter"),
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """List workspace files for a thread (D-08, WS-03).
 
@@ -325,7 +339,7 @@ async def get_workspace_file_content(
     thread_id: str,
     file_id: str,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """Get workspace file content (D-08).
 
@@ -418,8 +432,9 @@ def _safe_download_filename(path: str) -> str:
 async def download_workspace_file_raw(
     thread_id: str,
     file_id: str,
+    request: Request,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """Stream the EXACT bytes of a workspace file as an attachment (101.1-09, gap 3).
 
@@ -438,7 +453,6 @@ async def download_workspace_file_raw(
     """
     await _verify_thread_ownership(thread_id, current_user, supabase)  # 404 on non-owner
 
-    pool = await get_pg_pool()
     # 101.1 review WR-06: a malformed file_id (typo / crafted URL) must 404 like
     # every sibling route (which passes the string to PostgREST and degrades to
     # 404/empty) — never 500 on an unhandled ValueError from UUID().
@@ -446,19 +460,23 @@ async def download_workspace_file_raw(
         fid = UUID(file_id)
     except ValueError:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
-    row = await get_file_by_id(pool, fid)
-    # Collapse missing / cross-thread / expired ALL to 404 (no existence leak).
-    if (
-        not row
-        or str(row.get("thread_id")) != thread_id
-        or row.get("is_expired")
-    ):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
 
-    try:
-        content_bytes = await _get_file_content(pool, supabase, row)
-    except WorkspaceError:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
+    # Phase 163 (D-02): the file-row read + content read run under RLS on the
+    # per-request user-JWT connection (conn passed as the duck-typed workspace "pool").
+    async with get_user_pg_connection(request, current_user) as conn:
+        row = await get_file_by_id(conn, fid)
+        # Collapse missing / cross-thread / expired ALL to 404 (no existence leak).
+        if (
+            not row
+            or str(row.get("thread_id")) != thread_id
+            or row.get("is_expired")
+        ):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
+
+        try:
+            content_bytes = await _get_file_content(conn, supabase, row)
+        except WorkspaceError:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
 
     filename = _safe_download_filename(row["path"])
     return Response(
@@ -473,7 +491,7 @@ async def list_workspace_file_versions(
     thread_id: str,
     file_id: str,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """List all versions of a workspace file (D-08, WS-04).
 
@@ -512,7 +530,7 @@ async def get_workspace_file_diff(
     from_version: int = Query(..., alias="from", description="Version to diff from"),
     to_version: int = Query(..., alias="to", description="Version to diff to"),
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """Get diff between two versions of a workspace file (D-08, WS-04).
 
