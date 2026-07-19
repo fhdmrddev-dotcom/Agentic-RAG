@@ -155,7 +155,7 @@ Ship only if CORE lands clean and budget remains. First-to-cut ordering: SSO/OID
 - [x] 163-07-PLAN.md — Documents/DM cluster client swap (retrieval RPCs left to Phase 164) (Wave 4)
 - [x] 163-08-PLAN.md — Skills + workflow-eval + identity/settings/audit router client swap (Wave 4)
 - [x] 163-09-PLAN.md — Widen eval-runner / harness / re-embed async writers to org-aware service-role (D-05) (Wave 4)
-- [ ] 163-10-PLAN.md — [BLOCKING] CONCUR-01 <1s benchmark + operator-run D-08 live two-user leak test + SC#10 4-axis UAT (Wave 5)
+- [x] 163-10-PLAN.md — [BLOCKING] CONCUR-01 <1s benchmark + operator-run D-08 live two-user leak test + SC#10 4-axis UAT (Wave 5)
 
 #### Phase 164: SECDEF Audit + Cross-Org Isolation Test Suite
 **Goal**: The four `SECURITY DEFINER` retrieval/sharing functions carry an in-body org predicate + pinned `search_path`, the fragile regex is deleted, and a two-org adversarial test suite proves zero cross-org leakage — the milestone's verifiable isolation gate.
