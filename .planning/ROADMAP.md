@@ -153,7 +153,7 @@ Ship only if CORE lands clean and budget remains. First-to-cut ordering: SSO/OID
 - [x] 163-05-PLAN.md — [BLOCKING] operator SQL-editor apply 107→108 + regenerate full-schema + live-DB assert + test_163_* suite GREEN (Wave 3)
 - [x] 163-06-PLAN.md — Chat/streaming client swap (threads.py-centric, both DB paths) + agent-loop writer widen (Wave 4)
 - [x] 163-07-PLAN.md — Documents/DM cluster client swap (retrieval RPCs left to Phase 164) (Wave 4)
-- [ ] 163-08-PLAN.md — Skills + workflow-eval + identity/settings/audit router client swap (Wave 4)
+- [x] 163-08-PLAN.md — Skills + workflow-eval + identity/settings/audit router client swap (Wave 4)
 - [ ] 163-09-PLAN.md — Widen eval-runner / harness / re-embed async writers to org-aware service-role (D-05) (Wave 4)
 - [ ] 163-10-PLAN.md — [BLOCKING] CONCUR-01 <1s benchmark + operator-run D-08 live two-user leak test + SC#10 4-axis UAT (Wave 5)
 
