@@ -395,4 +395,237 @@ CREATE POLICY workspace_versions_select_own ON public.workspace_file_versions FO
               FROM (public.threads t JOIN public.workspace_files wf ON ((wf.thread_id = t.id)))
              WHERE (wf.id = workspace_file_versions.workspace_file_id))));
 
--- (sections 4-6 + COMMIT are appended by Task 2)
+-- ================================================================================================
+-- §4 — SKILLS cluster (7 tables): skills, skill_files, skill_versions, skill_test_cases,
+--   skill_proposals, skill_publish_overrides, skill_embeddings
+--   Global branches preserved: is_global on skills ; EXISTS-on-skills(is_global) subquery on
+--   skill_files. skill_embeddings references the org_id added by migration 107. The eval/version/
+--   proposal/override tables are SELECT-only for authenticated callers (writes go via service-role).
+-- ================================================================================================
+
+-- skills (owner = user_id ; is_global branch on SELECT) ------------------------------------------
+DROP POLICY IF EXISTS "Users can delete own skills" ON public.skills;
+CREATE POLICY "Users can delete own skills" ON public.skills FOR DELETE TO authenticated
+  USING (org_id IN (SELECT public.current_user_org_ids()) AND (auth.uid() = user_id));
+
+DROP POLICY IF EXISTS "Users can insert own skills" ON public.skills;
+CREATE POLICY "Users can insert own skills" ON public.skills FOR INSERT TO authenticated
+  WITH CHECK (org_id IN (SELECT public.current_user_org_ids()) AND (auth.uid() = user_id));
+
+DROP POLICY IF EXISTS "Users can update own skills" ON public.skills;
+CREATE POLICY "Users can update own skills" ON public.skills FOR UPDATE TO authenticated
+  USING (org_id IN (SELECT public.current_user_org_ids()) AND (auth.uid() = user_id));
+
+DROP POLICY IF EXISTS "Users can view own and global skills" ON public.skills;
+CREATE POLICY "Users can view own and global skills" ON public.skills FOR SELECT TO authenticated
+  USING (org_id IN (SELECT public.current_user_org_ids()) AND ((auth.uid() = user_id) OR (is_global = true)));
+
+-- skill_files (owner = user_id ; EXISTS-on-skills global branch on SELECT ; DELETE+INSERT+SELECT) -
+DROP POLICY IF EXISTS "Users can delete own skill files" ON public.skill_files;
+CREATE POLICY "Users can delete own skill files" ON public.skill_files FOR DELETE TO authenticated
+  USING (org_id IN (SELECT public.current_user_org_ids()) AND (auth.uid() = user_id));
+
+DROP POLICY IF EXISTS "Users can insert own skill files" ON public.skill_files;
+CREATE POLICY "Users can insert own skill files" ON public.skill_files FOR INSERT TO authenticated
+  WITH CHECK (org_id IN (SELECT public.current_user_org_ids()) AND (auth.uid() = user_id));
+
+DROP POLICY IF EXISTS "Users can view files on own or global skills" ON public.skill_files;
+CREATE POLICY "Users can view files on own or global skills" ON public.skill_files FOR SELECT TO authenticated
+  USING (org_id IN (SELECT public.current_user_org_ids())
+         AND ((auth.uid() = user_id) OR (EXISTS ( SELECT 1
+             FROM public.skills
+            WHERE ((skills.id = skill_files.skill_id) AND (skills.is_global = true))))));
+
+-- skill_versions (owner = user_id ; SELECT-only) -------------------------------------------------
+DROP POLICY IF EXISTS "Users can view own skill versions" ON public.skill_versions;
+CREATE POLICY "Users can view own skill versions" ON public.skill_versions FOR SELECT TO authenticated
+  USING (org_id IN (SELECT public.current_user_org_ids()) AND (auth.uid() = user_id));
+
+-- skill_test_cases (owner = user_id) -------------------------------------------------------------
+DROP POLICY IF EXISTS "Users can delete own skill test cases" ON public.skill_test_cases;
+CREATE POLICY "Users can delete own skill test cases" ON public.skill_test_cases FOR DELETE TO authenticated
+  USING (org_id IN (SELECT public.current_user_org_ids()) AND (auth.uid() = user_id));
+
+DROP POLICY IF EXISTS "Users can insert own skill test cases" ON public.skill_test_cases;
+CREATE POLICY "Users can insert own skill test cases" ON public.skill_test_cases FOR INSERT TO authenticated
+  WITH CHECK (org_id IN (SELECT public.current_user_org_ids()) AND (auth.uid() = user_id));
+
+DROP POLICY IF EXISTS "Users can update own skill test cases" ON public.skill_test_cases;
+CREATE POLICY "Users can update own skill test cases" ON public.skill_test_cases FOR UPDATE TO authenticated
+  USING (org_id IN (SELECT public.current_user_org_ids()) AND (auth.uid() = user_id));
+
+DROP POLICY IF EXISTS "Users can view own skill test cases" ON public.skill_test_cases;
+CREATE POLICY "Users can view own skill test cases" ON public.skill_test_cases FOR SELECT TO authenticated
+  USING (org_id IN (SELECT public.current_user_org_ids()) AND (auth.uid() = user_id));
+
+-- skill_proposals (owner = user_id ; SELECT-only) ------------------------------------------------
+DROP POLICY IF EXISTS "Users can view own skill proposals" ON public.skill_proposals;
+CREATE POLICY "Users can view own skill proposals" ON public.skill_proposals FOR SELECT TO authenticated
+  USING (org_id IN (SELECT public.current_user_org_ids()) AND (auth.uid() = user_id));
+
+-- skill_publish_overrides (owner = user_id ; SELECT-only) ----------------------------------------
+DROP POLICY IF EXISTS "Users can view own publish overrides" ON public.skill_publish_overrides;
+CREATE POLICY "Users can view own publish overrides" ON public.skill_publish_overrides FOR SELECT TO authenticated
+  USING (org_id IN (SELECT public.current_user_org_ids()) AND (auth.uid() = user_id));
+
+-- skill_embeddings (owner = user_id ; org_id from migration 107 ; SELECT-only) -------------------
+DROP POLICY IF EXISTS "Users can view own skill embeddings" ON public.skill_embeddings;
+CREATE POLICY "Users can view own skill embeddings" ON public.skill_embeddings FOR SELECT TO authenticated
+  USING (org_id IN (SELECT public.current_user_org_ids()) AND (auth.uid() = user_id));
+
+-- ================================================================================================
+-- §5 — WORKFLOW-EVAL cluster (8 tables): workflow_definitions, workflow_phases, workflow_runs,
+--   eval_runs, eval_results, eval_ratings, tuner_runs, harness_audit
+--   Special: workflow_definitions owner column is created_by (NOT user_id) + is_global branch.
+--   workflow_phases/workflow_runs resolve ownership through the parent thread (subquery preserved).
+--   tuner_runs preserves the EXISTS-on-skills(is_global) global branch. eval_* are SELECT-only.
+-- ================================================================================================
+
+-- workflow_definitions (owner = created_by ; is_global branch ; INSERT/UPDATE keep is_global=false)
+DROP POLICY IF EXISTS "Users can delete own workflow definitions" ON public.workflow_definitions;
+CREATE POLICY "Users can delete own workflow definitions" ON public.workflow_definitions FOR DELETE TO authenticated
+  USING (org_id IN (SELECT public.current_user_org_ids()) AND (auth.uid() = created_by));
+
+DROP POLICY IF EXISTS "Users can insert own workflow definitions" ON public.workflow_definitions;
+CREATE POLICY "Users can insert own workflow definitions" ON public.workflow_definitions FOR INSERT TO authenticated
+  WITH CHECK (org_id IN (SELECT public.current_user_org_ids()) AND (auth.uid() = created_by) AND (is_global = false));
+
+DROP POLICY IF EXISTS "Users can update own workflow definitions" ON public.workflow_definitions;
+CREATE POLICY "Users can update own workflow definitions" ON public.workflow_definitions FOR UPDATE TO authenticated
+  USING (org_id IN (SELECT public.current_user_org_ids()) AND (auth.uid() = created_by))
+  WITH CHECK (org_id IN (SELECT public.current_user_org_ids()) AND (auth.uid() = created_by) AND (is_global = false));
+
+DROP POLICY IF EXISTS "Users can view own and global workflow definitions" ON public.workflow_definitions;
+CREATE POLICY "Users can view own and global workflow definitions" ON public.workflow_definitions FOR SELECT TO authenticated
+  USING (org_id IN (SELECT public.current_user_org_ids()) AND ((auth.uid() = created_by) OR (is_global = true)));
+
+-- workflow_phases (ownership via workflow_runs → threads — subquery preserved verbatim) -----------
+DROP POLICY IF EXISTS workflow_phases_delete_own ON public.workflow_phases;
+CREATE POLICY workflow_phases_delete_own ON public.workflow_phases FOR DELETE TO authenticated
+  USING (org_id IN (SELECT public.current_user_org_ids())
+         AND (auth.uid() = (SELECT t.user_id
+              FROM (public.threads t JOIN public.workflow_runs wr ON ((wr.thread_id = t.id)))
+             WHERE (wr.id = workflow_phases.workflow_run_id))));
+
+DROP POLICY IF EXISTS workflow_phases_insert_own ON public.workflow_phases;
+CREATE POLICY workflow_phases_insert_own ON public.workflow_phases FOR INSERT TO authenticated
+  WITH CHECK (org_id IN (SELECT public.current_user_org_ids())
+              AND (auth.uid() = (SELECT t.user_id
+                   FROM (public.threads t JOIN public.workflow_runs wr ON ((wr.thread_id = t.id)))
+                  WHERE (wr.id = workflow_phases.workflow_run_id))));
+
+DROP POLICY IF EXISTS workflow_phases_select_own ON public.workflow_phases;
+CREATE POLICY workflow_phases_select_own ON public.workflow_phases FOR SELECT TO authenticated
+  USING (org_id IN (SELECT public.current_user_org_ids())
+         AND (auth.uid() = (SELECT t.user_id
+              FROM (public.threads t JOIN public.workflow_runs wr ON ((wr.thread_id = t.id)))
+             WHERE (wr.id = workflow_phases.workflow_run_id))));
+
+DROP POLICY IF EXISTS workflow_phases_update_own ON public.workflow_phases;
+CREATE POLICY workflow_phases_update_own ON public.workflow_phases FOR UPDATE TO authenticated
+  USING (org_id IN (SELECT public.current_user_org_ids())
+         AND (auth.uid() = (SELECT t.user_id
+              FROM (public.threads t JOIN public.workflow_runs wr ON ((wr.thread_id = t.id)))
+             WHERE (wr.id = workflow_phases.workflow_run_id))))
+  WITH CHECK (org_id IN (SELECT public.current_user_org_ids())
+              AND (auth.uid() = (SELECT t.user_id
+                   FROM (public.threads t JOIN public.workflow_runs wr ON ((wr.thread_id = t.id)))
+                  WHERE (wr.id = workflow_phases.workflow_run_id))));
+
+-- workflow_runs (ownership via threads — subquery preserved verbatim) -----------------------------
+DROP POLICY IF EXISTS workflow_runs_delete_own ON public.workflow_runs;
+CREATE POLICY workflow_runs_delete_own ON public.workflow_runs FOR DELETE TO authenticated
+  USING (org_id IN (SELECT public.current_user_org_ids())
+         AND (auth.uid() = (SELECT threads.user_id FROM public.threads WHERE (threads.id = workflow_runs.thread_id))));
+
+DROP POLICY IF EXISTS workflow_runs_insert_own ON public.workflow_runs;
+CREATE POLICY workflow_runs_insert_own ON public.workflow_runs FOR INSERT TO authenticated
+  WITH CHECK (org_id IN (SELECT public.current_user_org_ids())
+              AND (auth.uid() = (SELECT threads.user_id FROM public.threads WHERE (threads.id = workflow_runs.thread_id))));
+
+DROP POLICY IF EXISTS workflow_runs_select_own ON public.workflow_runs;
+CREATE POLICY workflow_runs_select_own ON public.workflow_runs FOR SELECT TO authenticated
+  USING (org_id IN (SELECT public.current_user_org_ids())
+         AND (auth.uid() = (SELECT threads.user_id FROM public.threads WHERE (threads.id = workflow_runs.thread_id))));
+
+DROP POLICY IF EXISTS workflow_runs_update_own ON public.workflow_runs;
+CREATE POLICY workflow_runs_update_own ON public.workflow_runs FOR UPDATE TO authenticated
+  USING (org_id IN (SELECT public.current_user_org_ids())
+         AND (auth.uid() = (SELECT threads.user_id FROM public.threads WHERE (threads.id = workflow_runs.thread_id))))
+  WITH CHECK (org_id IN (SELECT public.current_user_org_ids())
+              AND (auth.uid() = (SELECT threads.user_id FROM public.threads WHERE (threads.id = workflow_runs.thread_id))));
+
+-- eval_runs (owner = user_id ; SELECT-only) ------------------------------------------------------
+DROP POLICY IF EXISTS "Users can view own eval runs" ON public.eval_runs;
+CREATE POLICY "Users can view own eval runs" ON public.eval_runs FOR SELECT TO authenticated
+  USING (org_id IN (SELECT public.current_user_org_ids()) AND (auth.uid() = user_id));
+
+-- eval_results (owner = user_id ; SELECT-only) ---------------------------------------------------
+DROP POLICY IF EXISTS "Users can view own eval results" ON public.eval_results;
+CREATE POLICY "Users can view own eval results" ON public.eval_results FOR SELECT TO authenticated
+  USING (org_id IN (SELECT public.current_user_org_ids()) AND (auth.uid() = user_id));
+
+-- eval_ratings (owner = user_id ; SELECT-only) ---------------------------------------------------
+DROP POLICY IF EXISTS "Users can view own eval ratings" ON public.eval_ratings;
+CREATE POLICY "Users can view own eval ratings" ON public.eval_ratings FOR SELECT TO authenticated
+  USING (org_id IN (SELECT public.current_user_org_ids()) AND (auth.uid() = user_id));
+
+-- tuner_runs (owner = user_id ; EXISTS-on-skills global branch on SELECT ; SELECT-only) ----------
+DROP POLICY IF EXISTS "Users can view tuner runs on own or global skills" ON public.tuner_runs;
+CREATE POLICY "Users can view tuner runs on own or global skills" ON public.tuner_runs FOR SELECT TO authenticated
+  USING (org_id IN (SELECT public.current_user_org_ids())
+         AND ((auth.uid() = user_id) OR (EXISTS ( SELECT 1
+             FROM public.skills
+            WHERE ((skills.id = tuner_runs.skill_id) AND (skills.is_global = true))))));
+
+-- harness_audit (owner = user_id ; INSERT + SELECT) ----------------------------------------------
+DROP POLICY IF EXISTS "Users can insert own harness audit" ON public.harness_audit;
+CREATE POLICY "Users can insert own harness audit" ON public.harness_audit FOR INSERT TO authenticated
+  WITH CHECK (org_id IN (SELECT public.current_user_org_ids()) AND (auth.uid() = user_id));
+
+DROP POLICY IF EXISTS "Users can view own harness audit" ON public.harness_audit;
+CREATE POLICY "Users can view own harness audit" ON public.harness_audit FOR SELECT TO authenticated
+  USING (org_id IN (SELECT public.current_user_org_ids()) AND (auth.uid() = user_id));
+
+-- ================================================================================================
+-- §6 — IDENTITY-AUDIT cluster (2 tables): profiles, audit_log
+--   profiles — DEVIATION (see header): NO org_id column (verified live at head 107), so its 3
+--     policies keep the OWNER branch ONLY (auth.uid() = id) — byte-identical self-only isolation,
+--     no membership macro. A membership prefix would reference a non-existent column and abort the
+--     whole rewrite at apply. Org-wide roster visibility is Phase 166 (adds profiles.org_id first).
+--   audit_log — D-10: insert-only for authenticated callers; its WITH CHECK carries an explicit
+--     org_id IS NULL branch so genuinely org-agnostic operator/system audit rows (reached via the
+--     operator/service-role path) are never rejected, in addition to the membership branch.
+-- ================================================================================================
+
+-- profiles (owner = id ; NO org_id column — owner-only, no membership macro by design) ------------
+DROP POLICY IF EXISTS "Users can insert their own profile" ON public.profiles;
+CREATE POLICY "Users can insert their own profile" ON public.profiles FOR INSERT TO authenticated
+  WITH CHECK (auth.uid() = id);
+
+DROP POLICY IF EXISTS "Users can update their own profile" ON public.profiles;
+CREATE POLICY "Users can update their own profile" ON public.profiles FOR UPDATE TO authenticated
+  USING (auth.uid() = id);
+
+DROP POLICY IF EXISTS "Users can view their own profile" ON public.profiles;
+CREATE POLICY "Users can view their own profile" ON public.profiles FOR SELECT TO authenticated
+  USING (auth.uid() = id);
+
+-- audit_log (owner = user_id ; INSERT-only ; explicit org_id IS NULL branch — D-10) --------------
+DROP POLICY IF EXISTS "Users can insert own audit entries" ON public.audit_log;
+CREATE POLICY "Users can insert own audit entries" ON public.audit_log FOR INSERT TO authenticated
+  WITH CHECK ((user_id = auth.uid())
+              AND ((org_id IS NULL) OR (org_id IN (SELECT public.current_user_org_ids()))));
+
+COMMIT;
+
+-- Closing note: 108 rewrites all 37 target user-facing tables (97 policies across the 6 sections) to
+-- the membership predicate org_id IN (SELECT public.current_user_org_ids()) AND (owner [OR preserved
+-- global branch]), TO authenticated, using the live departments_* template — every global OR-branch
+-- (folder_is_globally_visible / is_global / EXISTS-on-skills), the is_global=false WITH CHECKs, the
+-- created_by owner on workflow_definitions, and the parent-thread ownership subqueries preserved
+-- verbatim; profiles kept owner-only (no org_id column); audit_log carries the D-10 NULL branch. The
+-- migration is BEGIN/COMMIT-atomic + re-paste-safe, and INERT under the current BYPASSRLS connections
+-- — it changes zero behavior until the Wave-4 client swap. Apply AFTER 107; then regenerate
+-- full-schema (plan 163-05). The 8 org tables + operator/catalog tables are deliberately untouched.
+
