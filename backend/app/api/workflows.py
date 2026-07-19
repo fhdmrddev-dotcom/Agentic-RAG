@@ -43,6 +43,24 @@ from app.services.operator_service import write_operator_audit
 
 logger = logging.getLogger(__name__)
 
+# ── Phase 163 (TEN-02 / D-03 / D-05) — workflow-cluster client policy ─────────
+# The workflow cluster stays on the hardened service-role client (classified carve-out),
+# and its DB layer stays on the raw ``get_pg_pool()`` pool. Reasons (schema/architecture-driven,
+# per the plan-07 carve-out discipline — the workflow_* RLS is already LIVE + proven by
+# tests/integration/test_163_rls_workflow_eval.py, so DB-layer isolation is enforced regardless):
+#   * ``db/workflows.py`` is a service-role module BY DESIGN (its header), shared by BOTH the
+#     request routes AND the background harness engine on the SAME helpers — several of which own
+#     their own ``pool.acquire()`` transaction (create_workflow_run / delete_published_workflow_
+#     cascade / delete_workflow_cascade_preview / count_foreign_runs_on_global / finish_run) and so
+#     cannot accept a duck-typed request-scoped RLS Connection.
+#   * ``/published`` + ``/starters`` are the documented RUN CARVE-OUT picker feeds (see below): a
+#     GLOBAL workflow is now org-scoped (membership gates ``is_global`` — test_163_rls_workflow_eval),
+#     so a user-JWT read would HIDE cross-org starters — NOT behavior-preserving. is_system_global
+#     cross-org visibility is Phase 165.
+#   * ``delete_workflow_cascade`` is a destructive cross-user cascade that drives the shared
+#     service-role ``_cancel_run_internals`` writer + the operator audit ledger; ``generate_workflow``
+#     delegates to the out-of-scope ``workflow_authoring`` service. Both keep service-role
+#     (``# service-role:`` at their Depends). The harness/eval async writers are widened in plan 09.
 router = APIRouter(prefix="/workflows", tags=["workflows"])
 
 
@@ -482,6 +500,8 @@ async def get_delete_preview(
 async def delete_workflow_cascade(
     definition_id: UUID,
     current_user: dict = Depends(get_current_user),
+    # service-role: destructive cross-user cascade — drives the shared _cancel_run_internals
+    # writer + the operator audit ledger (write_operator_audit); not an RLS request path.
     supabase=Depends(get_supabase),
 ):
     """Hard-delete a workflow (definition + ALL versions + ALL runs) safely -> 204.
@@ -620,6 +640,8 @@ class GenerateRequest(BaseModel):
 async def generate_workflow(
     body: GenerateRequest,
     current_user: dict = Depends(get_current_user),
+    # service-role: delegates to the out-of-scope workflow_authoring service (grounding
+    # assembly reads spanning folders/templates/assets — not audited for RLS-readiness here).
     supabase=Depends(get_supabase),
 ):
     """Generate a grounded ``WorkflowDefinition`` DRAFT from an NL description (REQ-2).

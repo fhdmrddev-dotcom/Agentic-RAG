@@ -56,7 +56,14 @@ from supabase import Client
 
 from app.config import MODEL_CAPABILITIES, get_model_capability
 from app.db.runs import insert_run
-from app.dependencies import get_current_user, get_pg_pool, get_redis, get_supabase, require_visible
+from app.dependencies import (
+    get_current_user,
+    get_pg_pool,
+    get_redis,
+    get_supabase,
+    get_user_supabase_client,
+    require_visible,
+)
 from app.models.eval_run import (
     ForcePromoteBody,
     PromotionGate,
@@ -90,9 +97,22 @@ router_evals = APIRouter(
     dependencies=[Depends(require_visible("skill_studio"))],  # Phase 148 (VIS-01) — same Skill Studio gate
 )
 
-# TTL on the Redis in-flight claim — generously above the longest bounded run so a
-# crashed/killed worker that never reaches the job ``finally`` can't wedge a skill forever
-# (mirrors skill_tuner._INFLIGHT_TTL_S).
+# ── Phase 163 (TEN-02 / D-03 / D-05) — eval-domain client policy ──────────────────
+# The eval-cluster tables (``eval_runs`` / ``eval_results`` / ``eval_ratings`` /
+# ``skill_proposals``) have RLS enabled with ONLY an authenticated **SELECT own** policy (mig
+# 108) — there is NO authenticated INSERT/UPDATE/DELETE policy on any of them. So the eval domain
+# splits cleanly by the schema's own intent:
+#   * The 6 PURE-READ handlers (``get_eval_run`` / ``list_eval_runs`` / ``list_description_proposals``
+#     / ``get_eval_aggregate`` / ``get_engine_health`` / ``get_eval_run_by_id``) run on the
+#     per-request user-JWT client — RLS (SELECT own) is now the primary gate; ``.eq("user_id")``
+#     stays the D-14 second layer.
+#   * EVERY handler that WRITES an eval table — or reconciles-on-read (``list_skill_proposals`` /
+#     ``get_skill_proposal`` self-heal a proposal), or spawns the detached ``run_eval_job`` /
+#     ``_launch_reeval`` runner — KEEPS the hardened service-role client (marked
+#     ``# service-role:`` at each Depends). Under a user-JWT client those writes would be
+#     RLS-DENIED (no authenticated write policy). The eval RUNNER is a long-running detached async
+#     writer widened with org_id separately in plan 09 (D-05); owner-scoping stays the app
+#     ``.eq(user_id)`` gate (D-14). ``run_in_threadpool`` wraps every blocking supabase-py call.
 _INFLIGHT_TTL_S = 1800
 
 # CR-03 (135-08) — grace window before a wedged ``approved`` proposal (approve committed
@@ -161,7 +181,7 @@ async def start_eval_run(
     skill_id: str,
     body: StartEvalRunBody,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_supabase),  # service-role: eval write/reconcile/runner (no authenticated write policy) — plan 09
     redis: aioredis.Redis = Depends(get_redis),
     pool: asyncpg.Pool = Depends(get_pg_pool),
 ):
@@ -400,7 +420,7 @@ async def get_eval_run(
     skill_id: str,
     run_id: UUID,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),  # pure read — RLS SELECT own
 ):
     """Return the eval_run + its eval_results from the DB (owner-scoped).
 
@@ -477,7 +497,7 @@ async def get_eval_run(
 async def list_eval_runs(
     skill_id: str,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),  # pure read — RLS SELECT own
 ):
     """List a skill's eval runs (owner-scoped, newest-first).
 
@@ -508,7 +528,7 @@ async def rate_eval_result(
     result_id: UUID,
     body: RateResultBody,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_supabase),  # service-role: eval write/reconcile/runner (no authenticated write policy) — plan 09
 ):
     """Record (or clear) the caller's thumbs up/down on ONE eval_results answer (EVAL-04).
 
@@ -714,7 +734,7 @@ async def propose_skill_improvement(
     skill_id: str,
     body: ProposeBody,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_supabase),  # service-role: eval write/reconcile/runner (no authenticated write policy) — plan 09
 ):
     """Draft ONE improvement from a SOURCE eval run's evidence, on demand (D-01).
 
@@ -897,7 +917,7 @@ async def propose_skill_improvement(
 async def list_skill_proposals(
     skill_id: str,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_supabase),  # service-role: eval write/reconcile/runner (no authenticated write policy) — plan 09
     redis: aioredis.Redis = Depends(get_redis),
 ):
     """List a skill's proposals (owner-scoped, newest-first).
@@ -966,7 +986,7 @@ async def get_skill_proposal(
     skill_id: str,
     proposal_id: UUID,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_supabase),  # service-role: eval write/reconcile/runner (no authenticated write policy) — plan 09
     redis: aioredis.Redis = Depends(get_redis),
 ):
     """Return ONE proposal (owner-scoped).
@@ -1023,7 +1043,7 @@ async def reject_skill_proposal(
     skill_id: str,
     proposal_id: UUID,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_supabase),  # service-role: eval write/reconcile/runner (no authenticated write policy) — plan 09
 ):
     """Reject a proposal — a PURE AUDIT status flip (D-10).
 
@@ -1162,7 +1182,7 @@ async def propose_description_improvement(
     skill_id: str,
     body: ProposeDescriptionBody,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_supabase),  # service-role: eval write/reconcile/runner (no authenticated write policy) — plan 09
 ):
     """Draft ONE DESCRIPTION proposal from a completed Trigger Tuner run's held-out winner (D-01).
 
@@ -1327,7 +1347,7 @@ async def propose_description_improvement(
 async def list_description_proposals(
     skill_id: str,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),  # pure read — RLS SELECT own
 ):
     """List a skill's DESCRIPTION proposals (owner-scoped, newest-first) for rehydration-on-open.
 
@@ -1369,7 +1389,7 @@ async def reject_description_proposal(
     skill_id: str,
     proposal_id: UUID,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_supabase),  # service-role: eval write/reconcile/runner (no authenticated write policy) — plan 09
 ):
     """Reject a DESCRIPTION proposal — a PURE AUDIT status flip (D-05).
 
@@ -1440,7 +1460,7 @@ async def approve_description_proposal(
     skill_id: str,
     proposal_id: UUID,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_supabase),  # service-role: eval write/reconcile/runner (no authenticated write policy) — plan 09
 ):
     """Approve a DESCRIPTION proposal: write the LIVE description ONCE, let the 079/132 trigger
     version it, and promote — NO draft INSERT, NO re-eval, NO SSE (D-04/D-07 — the winner was
@@ -1998,7 +2018,7 @@ async def approve_skill_proposal(
     skill_id: str,
     proposal_id: UUID,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_supabase),  # service-role: eval write/reconcile/runner (no authenticated write policy) — plan 09
     redis: aioredis.Redis = Depends(get_redis),
     pool: asyncpg.Pool = Depends(get_pg_pool),
 ):
@@ -2223,7 +2243,7 @@ async def rerun_skill_proposal(
     skill_id: str,
     proposal_id: UUID,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_supabase),  # service-role: eval write/reconcile/runner (no authenticated write policy) — plan 09
     redis: aioredis.Redis = Depends(get_redis),
     pool: asyncpg.Pool = Depends(get_pg_pool),
 ):
@@ -2375,7 +2395,7 @@ async def force_promote_skill_proposal(
     proposal_id: UUID,
     body: ForcePromoteBody | None = None,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_supabase),  # service-role: eval write/reconcile/runner (no authenticated write policy) — plan 09
 ):
     """Force-promote a ``not_promoted`` proposal despite a non-improving gate (D-06 — human override).
 
@@ -2738,7 +2758,7 @@ async def start_matrix_run(
     skill_id: str,
     body: MatrixRunBody | None = None,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_supabase),  # service-role: eval write/reconcile/runner (no authenticated write policy) — plan 09
     redis: aioredis.Redis = Depends(get_redis),
     pool: asyncpg.Pool = Depends(get_pg_pool),
 ):
@@ -2883,7 +2903,7 @@ async def start_matrix_run(
 async def get_eval_aggregate(
     skill_id: str,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),  # pure read — RLS SELECT own
 ):
     """Return the per-config aggregation (mean±stddev/delta over accumulated run HISTORY) + the
     deterministic D-08 analyst notes for a skill (EVAL-05b / D-07 / D-08 — the Studio renders this
@@ -3042,7 +3062,7 @@ async def _build_engine_health_board(supabase: Client, user_id: str) -> dict:
 @router_evals.post("/engine-sweep")
 async def run_engine_sweep(
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_supabase),  # service-role: eval write/reconcile/runner (no authenticated write policy) — plan 09
     redis: aioredis.Redis = Depends(get_redis),
     pool: asyncpg.Pool = Depends(get_pg_pool),
 ):
@@ -3136,7 +3156,7 @@ async def run_engine_sweep(
 @router_evals.get("/engine-health")
 async def get_engine_health(
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),  # pure read — RLS SELECT own
 ):
     """Return the caller's LATEST smoke-sweep board (``EngineHealthBoard`` — the Settings card's data
     source, D-03). Owner-scoped (it reads only the caller's sweep groups); another user's sweep is
@@ -3152,7 +3172,7 @@ async def get_engine_health(
 async def get_eval_run_by_id(
     run_id: UUID,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),  # pure read — RLS SELECT own
 ):
     """Return the eval_run + its eval_results for ANY of the caller's runs BY ID — including NULL-skill
     sweep rows — with NO ``skill_id`` filter (D-03).

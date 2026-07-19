@@ -21,6 +21,17 @@ SECURITY (T-091-03 / V4 access control): the engine runs as service role
 owner-scoped through the workflow_runs -> threads.user_id FK chain); the engine
 never accepts a run_id it did not receive from the owning thread's producer spawn.
 
+PHASE 163 (TEN-02) — this module stays SERVICE-ROLE by design (no request-scoped
+get_user_pg_connection conversion). It is shared by BOTH the request routes AND the
+background harness engine on the SAME helpers, several of which own their own
+``pool.acquire()`` transaction (create_workflow_run / delete_published_workflow_cascade
+/ delete_workflow_cascade_preview / count_foreign_runs_on_global / finish_run) and so
+cannot accept a duck-typed request-scoped RLS Connection. The workflow_* membership-RLS
+policies are LIVE + proven at the DB layer (tests/integration/test_163_rls_workflow_eval.py:
+cross-org isolation + is_global-org-scoping + parent-thread + created_by preservation), so
+isolation is enforced regardless of the client; app-code ``created_by`` / ``workflow_run_id``
+scoping stays the D-14 in-code gate. Plan 09 widens the harness async writers with org_id.
+
 2-PHASE WRITE (HARNESS-03 / Pitfall 1): ``mark_phase_active`` makes the phase
 durably ``active`` BEFORE any work runs; ``complete_phase`` flips to ``completed``
 AND writes ``output`` in ONE atomic UPDATE, ONLY after the output is durable. A
