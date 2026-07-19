@@ -1045,7 +1045,9 @@ async def continue_run(
     else:
         # Deep: CONSUME the persisted dropped tool calls (SC#4).
         from app.db.runs import load_cap_paused_tool_calls  # noqa: PLC0415
-        from app.api.threads import spawn_continuation_run  # noqa: PLC0415
+        # Phase 162.5 Plan 03 (G-5 extraction): spawn_continuation_run moved to
+        # run_producer.py (folded onto the shared _finalize_producer_run).
+        from app.services.run_producer import spawn_continuation_run  # noqa: PLC0415
         from app.dependencies import get_pg_pool  # noqa: PLC0415
 
         pool = await get_pg_pool()

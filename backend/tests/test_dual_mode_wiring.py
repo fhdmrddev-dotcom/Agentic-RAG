@@ -1946,22 +1946,27 @@ async def test_harness_final_output_emits_delta_for_live_render(
 def test_deep_path_does_not_install_harness_persist_in_source():
     """F6/F7 single-persist-owner guard (D-11 / Pitfall 5): the surfacing + persist
     now live in ONE shared helper on the run_workflow terminal — NOT inline in the
-    threads.py harness branch. Assert:
+    producer's harness branch. Assert:
       * the shared helper exists in harness_engine and reads ctx.final_output;
-      * the threads.py harness branch NO LONGER persists inline (the inline
+      * the producer harness branch NO LONGER persists inline (the inline
         _persist_harness_message closure + its _result_sink install are GONE), so
         there is no double-persist / duplicate assistant message;
       * Deep stays byte-identical — run_agent_loop is still the sole Deep persist
         source via _result_sink.
+
+    Phase 162.5 Plan 03 (G-5 extraction): the producer shell (the harness branch +
+    the Deep run_agent_loop call) moved VERBATIM from threads.py::agent_runner into
+    run_producer.run_producer — so the harness-branch + Deep-persist assertions now
+    introspect run_producer.py (the runtime invariant is unchanged; only the home moved).
     """
     import inspect
-    from app.api import threads as threads_mod
+    from app.services import run_producer as producer_mod
     from app.services import harness_engine as engine_mod
 
-    threads_src = inspect.getsource(threads_mod)
+    producer_src = inspect.getsource(producer_mod)
     engine_src = inspect.getsource(engine_mod)
 
-    # The shared helper is THE surfacing/persist site, in the engine (not threads.py).
+    # The shared helper is THE surfacing/persist site, in the engine (not the producer).
     assert "_surface_final_answer" in engine_src, (
         "the shared surfacing helper must live in harness_engine"
     )
@@ -1971,15 +1976,15 @@ def test_deep_path_does_not_install_harness_persist_in_source():
     # run_workflow invokes the helper on its terminal (definition + call ≥ 2).
     assert engine_src.count("_surface_final_answer") >= 2
 
-    # The threads.py harness branch no longer persists inline — the inline closure +
+    # The producer harness branch no longer persists inline — the inline closure +
     # the harness _result_sink persist install are REMOVED (single persist owner).
-    assert "_persist_harness_message" not in threads_src, (
-        "the inline harness persist closure must be removed from threads.py"
+    assert "_persist_harness_message" not in producer_src, (
+        "the inline harness persist closure must be removed from run_producer.py"
     )
-    assert '_result_sink["persist"] = _persist_harness_message' not in threads_src
+    assert '_result_sink["persist"] = _persist_harness_message' not in producer_src
 
     # Deep stays byte-identical: run_agent_loop is still the sole Deep persist source.
-    assert "result_sink=_result_sink" in threads_src
+    assert "result_sink=_result_sink" in producer_src
 
 
 # ═════════════════════════════════════════════════════════════════════════════

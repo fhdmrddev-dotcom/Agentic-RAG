@@ -52,6 +52,10 @@ from datetime import datetime, timezone
 from uuid import UUID
 import uuid as _uuid_mod
 
+# Pure Pydantic model (cycle-safe — app.models.message imports only stdlib +
+# pydantic). The MessageCreate carrier the continuation hands the agent loop.
+from app.models.message import MessageCreate
+
 logger = logging.getLogger(__name__)
 
 
@@ -532,3 +536,127 @@ async def run_producer(
     # re-raise so the asyncio task transitions to CANCELLED state correctly (Pitfall 3).
     finally:
         pass  # outer try kept structurally; classification handled by inner except branches above.
+
+
+# ───────────────────────────────────────────────────────────────────────
+# Phase 092 (092-03 / CONT-01) — Deep-run continuation spawner.
+# POST /runs/{id}/continue (runs.py) calls this to re-drive the SAME run_id
+# within a FRESH bounded budget, CONSUMING the persisted dropped tool calls
+# (SC#4). NET-NEW (PATTERNS.md "No Analog Found"): the Deep-run continuation.
+# Phase 162.5 Plan 03 (D-A3 unification): its near-duplicate inner _finalize is
+# GONE — it now reuses the SAME _finalize_producer_run as the producer (persist →
+# sys-warnings → RUN-01b → finalize/keep-active → sentinel-or-skip → EXPIRE →
+# RUN_TASKS.pop). The only twist is the cap_paused disposition: if the
+# continuation hits the cap AGAIN it re-pauses (terminal_status="cap_paused" →
+# plain finalize_run keep-active, no terminal sentinel) so the next Continue can
+# resume, instead of finalizing terminal.
+# ───────────────────────────────────────────────────────────────────────
+async def spawn_continuation_run(
+    *,
+    run_id: _uuid_mod.UUID,
+    thread_id: str,
+    current_user: dict,
+    redis,
+    supabase,
+    dropped_tool_calls: list[dict],
+) -> None:
+    """Re-drive ``run_id`` consuming the persisted dropped tool calls (SC#4)."""
+    # Late import (D-A4): the shared RUN_TASKS registry FROM app.api.threads
+    # (_continuation closes over it; registration below is synchronous so the
+    # cancel verb can find the live task before /continue returns).
+    from app.api.threads import RUN_TASKS  # noqa: PLC0415
+
+    async def _continuation() -> None:
+        # Late imports (D-A4): resolve the SSE transport + test-patched
+        # run_agent_loop/RunContext/load_user_settings FROM app.api.threads (parity
+        # with the producer; keeps patch("app.api.threads.*") intercepting).
+        from app.api.threads import (  # noqa: PLC0415
+            _emit,
+            _emit_terminal,
+            _spawn,
+            run_agent_loop,
+            RunContext,
+            load_user_settings,
+        )
+
+        _terminal_status = "completed"
+        _terminal_error: str | None = None
+        _result_sink: dict = {}
+        # Hoisted for the shared finalizer's best-effort missing-usage warning — a
+        # continuation that fails before load_user_settings leaves these None (the
+        # warning then logs provider=None model=None; no functional change — the old
+        # inner _finalize simply omitted this best-effort log line entirely).
+        resolved_provider = None
+        resolved_model = None
+        try:
+            user_settings = load_user_settings(current_user["id"])
+            resolved_model = user_settings.llm_model
+            resolved_provider = user_settings.active_provider
+            # Minimal MessageCreate carrier — the loop reads body.model/.provider/
+            # .agent_mode/.content; a continuation carries no new user content.
+            body = MessageCreate(content="", model=resolved_model, provider=resolved_provider)
+            ctx = RunContext(
+                run_id=run_id,
+                thread_id=thread_id,
+                current_user=current_user,
+                user_settings=user_settings,
+                body=body,
+                redis=redis,
+                supabase=supabase,
+                resolved_model=resolved_model,
+                resolved_provider=resolved_provider,
+                resume_dropped_tool_calls=True,
+                dropped_tool_calls=tuple(dropped_tool_calls),
+            )
+            try:
+                await run_agent_loop(
+                    ctx,
+                    emit=_emit,
+                    emit_terminal=_emit_terminal,
+                    spawn=_spawn,
+                    result_sink=_result_sink,
+                )
+            except asyncio.CancelledError:
+                _terminal_status = "cancelled"
+                raise
+            except Exception as e:  # noqa: BLE001 — mirror the producer classifier
+                _terminal_status = "failed"
+                _terminal_error = f"failed: {type(e).__name__}: {(str(e) or '')[:200]}"
+                logger.exception("Continuation run %s failed", run_id)
+        finally:
+            # cap_disposition override — if the cap fired AGAIN, stay non-terminal.
+            _cap = _result_sink.get("cap_disposition")
+            if _cap == "cap_paused":
+                _terminal_status = "cap_paused"
+
+            # D-A3 unification: reuse the ONE shared finalizer. active_workflow_run_id
+            # is None (a Deep-only continuation → the step-7 harness F2 gate skips
+            # naturally); the cap_paused terminal_status routes step-4 to plain
+            # finalize_run (KEEPS runs:active — re-attachable) + skips the step-5
+            # terminal sentinel (cap_paused not in _RUN_STATUS_TO_TERMINAL_TYPE) —
+            # byte-identical to the deleted inner _finalize. RUN_TASKS.pop stays here
+            # in the outer finally (step 8).
+            try:
+                await asyncio.shield(_finalize_producer_run(
+                    run_id=run_id,
+                    thread_id=thread_id,
+                    redis=redis,
+                    result_sink=_result_sink,
+                    terminal_status=_terminal_status,
+                    terminal_error=_terminal_error,
+                    active_workflow_run_id=None,
+                    resolved_provider=resolved_provider,
+                    resolved_model=resolved_model,
+                ))
+            except asyncio.CancelledError:
+                raise
+            finally:
+                RUN_TASKS.pop(run_id, None)
+
+    task = asyncio.create_task(_continuation())
+    RUN_TASKS[run_id] = task
+
+    def _evict(_t, _rid=run_id):
+        RUN_TASKS.pop(_rid, None)
+    task.add_done_callback(_evict)
+
