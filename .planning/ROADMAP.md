@@ -130,7 +130,7 @@ Ship only if CORE lands clean and budget remains. First-to-cut ordering: SSO/OID
   3. **Deep-Mode byte-identical** on the native-7 (the Phase-089 harness + full integration suite green); no provider-path or SSE-vocabulary change.
   4. Zero `org_id` / RLS / client-swap content (pure refactor; no new threat surface).
 **Plans**: 4 plans (sequential — file-ownership on threads.py forces serialization; order = leaves → kickoff → producer → BLOCKING gate)
-- [ ] 162.5-01-PLAN.md — Leaf extractions: thread_title.py (title subsystem + auto-title emit) + run_model_resolution.py (disabled-model fallback + provider resolution)
+- [x] 162.5-01-PLAN.md — Leaf extractions: thread_title.py (title subsystem + auto-title emit) + run_model_resolution.py (disabled-model fallback + provider resolution)
 - [ ] 162.5-02-PLAN.md — workflow_kickoff.py: _ensure_skill_snapshots + kickoff-preflight + harness run-context/scope build
 - [ ] 162.5-03-PLAN.md — run_producer.py: agent_runner + _shielded_finalize UNIFIED with spawn_continuation_run over one shared finalizer (8 invariants preserved)
 - [ ] 162.5-04-PLAN.md — [BLOCKING] Deep byte-identical gate (Phase-089 harness + full live suite + native-provider 4-axis smoke; autonomous:false)
@@ -263,7 +263,7 @@ Ship only if CORE lands clean and budget remains. First-to-cut ordering: SSO/OID
 | 160. Tenancy-Model ADR | 1/1 | Complete | 2026-07-18 |
 | 161. Org / Dept / Role Schema | 2/2 | Complete | 2026-07-18 |
 | 162. Personal-Org Backfill | 3/3 | Complete | 2026-07-18 |
-| 162.5. threads.py Producer Extraction (G-5) | 0/4 | Planned | - |
+| 162.5. threads.py Producer Extraction (G-5) | 1/4 | In progress | - |
 | 163. RLS Rewrite + User-JWT Client Swap (CRUX) | 0/? | Not started | - |
 | 164. SECDEF Audit + Cross-Org Isolation Suite | 0/? | Not started | - |
 | 165. `is_global` Retirement Cleanup | 0/? | Not started | - |

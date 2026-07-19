@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.4
 milestone_name: Multi-Tenancy & Org Access
 status: executing
-last_updated: "2026-07-19T06:05:01.696Z"
-last_activity: 2026-07-19 -- Phase 162.5 planning complete
+last_updated: "2026-07-19T06:46:17.571Z"
+last_activity: 2026-07-19
 progress:
   total_phases: 28
   completed_phases: 3
   total_plans: 10
-  completed_plans: 6
+  completed_plans: 7
   percent: 11
 ---
 
@@ -22,7 +22,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-18 — v3.3 Operator UX SHIPPED + archived)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 163 — rls rewrite + per request user jwt client swap — the atomic crux
+**Current focus:** Phase 162.5 — threads-py-producer-extraction
 
 ## Deferred Items
 
@@ -40,12 +40,12 @@ Items acknowledged and deferred at milestone close on 2026-07-18 (44 open `audit
 
 ## Current Position
 
-Phase: 163
-Plan: Not started
+Phase: 162.5 (threads-py-producer-extraction) — EXECUTING
+Plan: 2 of 4
 Status: Ready to execute
-Last activity: 2026-07-19 -- Phase 162.5 planning complete
+Last activity: 2026-07-19 -- Phase 162.5 Plan 01 SHIPPED (thread_title.py + run_model_resolution.py extracted verbatim; threads.py 2444→2119 LOC; byte-identical, patch surface preserved, zero regressions vs baseline)
 
-Progress: [██████████] 100%
+Progress: [███████░░░] 70%
 
 ### Quick Tasks Completed
 
