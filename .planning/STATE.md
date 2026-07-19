@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.4
 milestone_name: Multi-Tenancy & Org Access
 status: executing
-last_updated: "2026-07-19T12:02:06.500Z"
-last_activity: 2026-07-19 -- Phase 163 Plan 01 complete (Front-B DB-context factories + RLS harness)
+last_updated: "2026-07-19T12:19:56.311Z"
+last_activity: 2026-07-19
 progress:
   total_phases: 28
   completed_phases: 4
   total_plans: 20
-  completed_plans: 11
+  completed_plans: 12
   percent: 14
 ---
 
@@ -41,12 +41,12 @@ Items acknowledged and deferred at milestone close on 2026-07-18 (44 open `audit
 ## Current Position
 
 Phase: 163 (rls-rewrite-per-request-user-jwt-client-swap-the-atomic-crux) — EXECUTING
-Plan: 2 of 10
-Status: Executing Phase 163 — Plan 01 complete (2/10)
-Next action: Continue Phase 163 execution — Plan 163-02 next; the three Front-B factories + `_rls_harness` + two-user/two-org fixtures from 163-01 are ready to consume (TEN-02 stays Pending until the Wave-4 hot-path swap)
-Last activity: 2026-07-19 -- Phase 163 Plan 01 complete (Front-B DB-context factories + two-user/two-org RLS harness)
+Plan: 3 of 10
+Status: Ready to execute
+Next action: Continue Phase 163 execution — Plan 163-03 next (RLS predicate rewrite, migration 108) — it references the `org_id` column that mig 107 (plan 02) just authored on document_chunks/skill_embeddings; 108 must apply AFTER 107. TEN-04 stays Pending until the plan-05 apply + plan-09/10 CONCUR-01 benchmark.
+Last activity: 2026-07-19 -- Phase 163 Plan 02 complete (mig 107 TEN-04 org_id substrate authored + RED test; not yet applied)
 
-Progress: [██████░░░░] 55%
+Progress: [██████░░░░] 60%
 
 ### Quick Tasks Completed
 
@@ -431,6 +431,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 162.5 P02 | 30 | 2 tasks | 3 files |
 | Phase 162.5 P03 | ~50min | 2 tasks | 5 files |
 | Phase 163 P01 | 25 | 2 tasks | 4 files |
+| Phase 163 P02 | 8min | 2 tasks | 2 files |
 
 ## Decisions
 
@@ -532,6 +533,8 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase 163]: 163-01: SET-LOCAL role-swap+both-GUC sequence extracted to _apply_rls_user_context, imported by both get_user_pg_connection and the test harness (zero drift).
 - [Phase 163]: 163-01: get_service_role_supabase raises ValueError on falsy org_id (refuse-without-scope); get_user_supabase builds a per-request ANON-key+Bearer client and never mutates the service-role singleton.
 - [Phase 163]: 163-01: live auth.uid() on :54322 reads legacy request.jwt.claim.sub first then JSON request.jwt.claims — both-GUC-forms is variant-independent (D-02).
+- [Phase 163]: 163-02: mig 107 slot inverted to 107=TEN-04 (before 108=RLS) — 108's document_chunks/skill_embeddings predicates reference the org_id column 107 adds; Postgres applies migrations in integer order so the column lands first
+- [Phase 163]: 163-02: TEN-04 kept Pending — plan 02 AUTHORS mig 107 + test_163_ten04_backfill (RED) only; applied plan 05, CONCUR-01-benchmarked plan 09/10. skill_embeddings backfill pages on skill_id (no id col); btree(org_id) default, HNSW/GIN untouched
 
 ## Operator Next Steps
 
