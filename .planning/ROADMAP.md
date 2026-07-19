@@ -150,7 +150,7 @@ Ship only if CORE lands clean and budget remains. First-to-cut ordering: SSO/OID
 - [x] 163-02-PLAN.md — TEN-04 migration 107: org_id denormalize + backfill + btree + autofill on document_chunks/skill_embeddings (Wave 2)
 - [x] 163-03-PLAN.md — TEN-01 migration 108: 37-table membership-RLS rewrite in 6 per-cluster bundles + 6 cluster tests (Wave 2)
 - [x] 163-04-PLAN.md — D-08 core leak (asyncpg + supabase-py) + role-swap-noop / spoof / fail-closed tests (Wave 2)
-- [ ] 163-05-PLAN.md — [BLOCKING] operator SQL-editor apply 107→108 + regenerate full-schema + live-DB assert + test_163_* suite GREEN (Wave 3)
+- [x] 163-05-PLAN.md — [BLOCKING] operator SQL-editor apply 107→108 + regenerate full-schema + live-DB assert + test_163_* suite GREEN (Wave 3)
 - [ ] 163-06-PLAN.md — Chat/streaming client swap (threads.py-centric, both DB paths) + agent-loop writer widen (Wave 4)
 - [ ] 163-07-PLAN.md — Documents/DM cluster client swap (retrieval RPCs left to Phase 164) (Wave 4)
 - [ ] 163-08-PLAN.md — Skills + workflow-eval + identity/settings/audit router client swap (Wave 4)

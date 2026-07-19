@@ -766,8 +766,16 @@ CREATE TABLE public.document_chunks (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     search_vector tsvector,
     embedding_model text,
-    embedding_dimensions integer
+    embedding_dimensions integer,
+    org_id uuid NOT NULL
 );
+
+
+--
+-- Name: COLUMN document_chunks.org_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.document_chunks.org_id IS 'TEN-04 (Phase 163): denormalized from documents.org_id via document_id. NOT NULL. RLS (mig 108) + Phase-164 SECDEF filter this directly — never a per-row join to documents (CONCUR-01).';
 
 
 --
@@ -1462,7 +1470,8 @@ CREATE TABLE public.skill_embeddings (
     embedding_model text,
     embedding_dimensions integer,
     source_text_hash text NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    org_id uuid NOT NULL
 );
 
 
@@ -1471,6 +1480,13 @@ CREATE TABLE public.skill_embeddings (
 --
 
 COMMENT ON TABLE public.skill_embeddings IS 'One embedding row per skill (TRIG-02, Phase 140). Sibling to skills, mirroring documents→document_chunks (mig 002) but with NO ANN index (skills are tens–hundreds of rows). Ships EMPTY (SQL cannot call the embedding API) — the skill_embedding_service backfill job (Plan 02) populates it; absence of a row == D-05 fail-open. Owner-only RLS (defense-in-depth); the service-role backfill writer bypasses RLS and hand-scopes .eq("user_id", …) (V4). embedding_model is the D-10 stale-model tag; source_text_hash is a non-crypto staleness fingerprint.';
+
+
+--
+-- Name: COLUMN skill_embeddings.org_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.skill_embeddings.org_id IS 'TEN-04 (Phase 163): denormalized from skills.org_id via skill_id. NOT NULL. RLS (mig 108) filters this directly.';
 
 
 --
@@ -2727,6 +2743,13 @@ CREATE INDEX idx_dept_members_user_id ON public.dept_members USING btree (user_i
 
 
 --
+-- Name: idx_document_chunks_org_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_document_chunks_org_id ON public.document_chunks USING btree (org_id);
+
+
+--
 -- Name: idx_document_images_org_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3004,6 +3027,13 @@ CREATE INDEX idx_runs_parent ON public.runs USING btree (parent_run_id) WHERE (p
 --
 
 CREATE INDEX idx_sandbox_files_org_id ON public.sandbox_files USING btree (org_id);
+
+
+--
+-- Name: idx_skill_embeddings_org_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_skill_embeddings_org_id ON public.skill_embeddings USING btree (org_id);
 
 
 --
@@ -3308,6 +3338,13 @@ CREATE TRIGGER code_executions_autofill_org_id BEFORE INSERT ON public.code_exec
 
 
 --
+-- Name: document_chunks document_chunks_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER document_chunks_autofill_org_id BEFORE INSERT ON public.document_chunks FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_from_parent('document_id', 'documents', 'id');
+
+
+--
 -- Name: document_images document_images_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -3452,6 +3489,13 @@ CREATE TRIGGER set_profiles_updated_at BEFORE UPDATE ON public.profiles FOR EACH
 --
 
 CREATE TRIGGER set_threads_updated_at BEFORE UPDATE ON public.threads FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: skill_embeddings skill_embeddings_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER skill_embeddings_autofill_org_id BEFORE INSERT ON public.skill_embeddings FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_from_parent('skill_id', 'skills', 'id');
 
 
 --
@@ -4357,592 +4401,543 @@ ALTER TABLE ONLY public.workspace_files
 -- Name: classification_rules Users can delete own classification_rules; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can delete own classification_rules" ON public.classification_rules FOR DELETE USING ((auth.uid() = user_id));
+CREATE POLICY "Users can delete own classification_rules" ON public.classification_rules FOR DELETE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: document_relationships Users can delete own document_relationships; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can delete own document_relationships" ON public.document_relationships FOR DELETE USING ((auth.uid() = user_id));
+CREATE POLICY "Users can delete own document_relationships" ON public.document_relationships FOR DELETE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: document_views Users can delete own document_views; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can delete own document_views" ON public.document_views FOR DELETE USING ((auth.uid() = user_id));
+CREATE POLICY "Users can delete own document_views" ON public.document_views FOR DELETE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: folders Users can delete own folders; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can delete own folders" ON public.folders FOR DELETE USING ((auth.uid() = user_id));
+CREATE POLICY "Users can delete own folders" ON public.folders FOR DELETE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: user_memory Users can delete own memory; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can delete own memory" ON public.user_memory FOR DELETE USING ((auth.uid() = user_id));
+CREATE POLICY "Users can delete own memory" ON public.user_memory FOR DELETE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: metadata_field_definitions Users can delete own metadata_field_definitions; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can delete own metadata_field_definitions" ON public.metadata_field_definitions FOR DELETE USING ((auth.uid() = user_id));
+CREATE POLICY "Users can delete own metadata_field_definitions" ON public.metadata_field_definitions FOR DELETE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: skill_files Users can delete own skill files; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can delete own skill files" ON public.skill_files FOR DELETE USING ((auth.uid() = user_id));
+CREATE POLICY "Users can delete own skill files" ON public.skill_files FOR DELETE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: skill_test_cases Users can delete own skill test cases; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can delete own skill test cases" ON public.skill_test_cases FOR DELETE USING ((auth.uid() = user_id));
+CREATE POLICY "Users can delete own skill test cases" ON public.skill_test_cases FOR DELETE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: skills Users can delete own skills; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can delete own skills" ON public.skills FOR DELETE USING ((auth.uid() = user_id));
+CREATE POLICY "Users can delete own skills" ON public.skills FOR DELETE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: workflow_definitions Users can delete own workflow definitions; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can delete own workflow definitions" ON public.workflow_definitions FOR DELETE USING ((auth.uid() = created_by));
+CREATE POLICY "Users can delete own workflow definitions" ON public.workflow_definitions FOR DELETE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = created_by)));
 
 
 --
 -- Name: document_chunks Users can delete their own chunks; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can delete their own chunks" ON public.document_chunks FOR DELETE USING ((auth.uid() = user_id));
+CREATE POLICY "Users can delete their own chunks" ON public.document_chunks FOR DELETE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: documents Users can delete their own documents; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can delete their own documents" ON public.documents FOR DELETE USING ((auth.uid() = user_id));
+CREATE POLICY "Users can delete their own documents" ON public.documents FOR DELETE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: messages Users can delete their own messages; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can delete their own messages" ON public.messages FOR DELETE USING ((auth.uid() = user_id));
+CREATE POLICY "Users can delete their own messages" ON public.messages FOR DELETE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: threads Users can delete their own threads; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can delete their own threads" ON public.threads FOR DELETE USING ((auth.uid() = user_id));
+CREATE POLICY "Users can delete their own threads" ON public.threads FOR DELETE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: audit_log Users can insert own audit entries; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can insert own audit entries" ON public.audit_log FOR INSERT WITH CHECK ((user_id = auth.uid()));
+CREATE POLICY "Users can insert own audit entries" ON public.audit_log FOR INSERT TO authenticated WITH CHECK (((user_id = auth.uid()) AND ((org_id IS NULL) OR (org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)))));
 
 
 --
 -- Name: classification_rules Users can insert own classification_rules; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can insert own classification_rules" ON public.classification_rules FOR INSERT WITH CHECK (((auth.uid() = user_id) AND (is_global = false)));
+CREATE POLICY "Users can insert own classification_rules" ON public.classification_rules FOR INSERT TO authenticated WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id) AND (is_global = false)));
 
 
 --
 -- Name: document_relationships Users can insert own document_relationships; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can insert own document_relationships" ON public.document_relationships FOR INSERT WITH CHECK ((auth.uid() = user_id));
+CREATE POLICY "Users can insert own document_relationships" ON public.document_relationships FOR INSERT TO authenticated WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: document_views Users can insert own document_views; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can insert own document_views" ON public.document_views FOR INSERT WITH CHECK (((auth.uid() = user_id) AND (is_global = false)));
+CREATE POLICY "Users can insert own document_views" ON public.document_views FOR INSERT TO authenticated WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id) AND (is_global = false)));
 
 
 --
 -- Name: code_executions Users can insert own executions; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can insert own executions" ON public.code_executions FOR INSERT WITH CHECK ((auth.uid() = user_id));
+CREATE POLICY "Users can insert own executions" ON public.code_executions FOR INSERT TO authenticated WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: message_feedback Users can insert own feedback; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can insert own feedback" ON public.message_feedback FOR INSERT WITH CHECK ((auth.uid() = user_id));
+CREATE POLICY "Users can insert own feedback" ON public.message_feedback FOR INSERT TO authenticated WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: folders Users can insert own folders; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can insert own folders" ON public.folders FOR INSERT WITH CHECK ((auth.uid() = user_id));
+CREATE POLICY "Users can insert own folders" ON public.folders FOR INSERT TO authenticated WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: harness_audit Users can insert own harness audit; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can insert own harness audit" ON public.harness_audit FOR INSERT WITH CHECK ((auth.uid() = user_id));
+CREATE POLICY "Users can insert own harness audit" ON public.harness_audit FOR INSERT TO authenticated WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: user_memory Users can insert own memory; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can insert own memory" ON public.user_memory FOR INSERT WITH CHECK ((auth.uid() = user_id));
+CREATE POLICY "Users can insert own memory" ON public.user_memory FOR INSERT TO authenticated WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: metadata_field_definitions Users can insert own metadata_field_definitions; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can insert own metadata_field_definitions" ON public.metadata_field_definitions FOR INSERT WITH CHECK (((auth.uid() = user_id) AND (is_global = false)));
+CREATE POLICY "Users can insert own metadata_field_definitions" ON public.metadata_field_definitions FOR INSERT TO authenticated WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id) AND (is_global = false)));
 
 
 --
 -- Name: sandbox_files Users can insert own sandbox files; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can insert own sandbox files" ON public.sandbox_files FOR INSERT WITH CHECK ((auth.uid() = user_id));
+CREATE POLICY "Users can insert own sandbox files" ON public.sandbox_files FOR INSERT TO authenticated WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: skill_files Users can insert own skill files; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can insert own skill files" ON public.skill_files FOR INSERT WITH CHECK ((auth.uid() = user_id));
+CREATE POLICY "Users can insert own skill files" ON public.skill_files FOR INSERT TO authenticated WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: skill_test_cases Users can insert own skill test cases; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can insert own skill test cases" ON public.skill_test_cases FOR INSERT WITH CHECK ((auth.uid() = user_id));
+CREATE POLICY "Users can insert own skill test cases" ON public.skill_test_cases FOR INSERT TO authenticated WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: skills Users can insert own skills; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can insert own skills" ON public.skills FOR INSERT WITH CHECK ((auth.uid() = user_id));
+CREATE POLICY "Users can insert own skills" ON public.skills FOR INSERT TO authenticated WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: workflow_definitions Users can insert own workflow definitions; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can insert own workflow definitions" ON public.workflow_definitions FOR INSERT WITH CHECK (((auth.uid() = created_by) AND (is_global = false)));
+CREATE POLICY "Users can insert own workflow definitions" ON public.workflow_definitions FOR INSERT TO authenticated WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = created_by) AND (is_global = false)));
 
 
 --
 -- Name: document_chunks Users can insert their own chunks; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can insert their own chunks" ON public.document_chunks FOR INSERT WITH CHECK ((auth.uid() = user_id));
+CREATE POLICY "Users can insert their own chunks" ON public.document_chunks FOR INSERT TO authenticated WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: documents Users can insert their own documents; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can insert their own documents" ON public.documents FOR INSERT WITH CHECK ((auth.uid() = user_id));
+CREATE POLICY "Users can insert their own documents" ON public.documents FOR INSERT TO authenticated WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: messages Users can insert their own messages; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can insert their own messages" ON public.messages FOR INSERT WITH CHECK ((auth.uid() = user_id));
+CREATE POLICY "Users can insert their own messages" ON public.messages FOR INSERT TO authenticated WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: profiles Users can insert their own profile; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can insert their own profile" ON public.profiles FOR INSERT WITH CHECK ((auth.uid() = id));
+CREATE POLICY "Users can insert their own profile" ON public.profiles FOR INSERT TO authenticated WITH CHECK ((auth.uid() = id));
 
 
 --
 -- Name: threads Users can insert their own threads; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can insert their own threads" ON public.threads FOR INSERT WITH CHECK ((auth.uid() = user_id));
+CREATE POLICY "Users can insert their own threads" ON public.threads FOR INSERT TO authenticated WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: document_images Users can manage own document images; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can manage own document images" ON public.document_images USING ((user_id = auth.uid())) WITH CHECK ((user_id = auth.uid()));
+CREATE POLICY "Users can manage own document images" ON public.document_images TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (user_id = auth.uid()))) WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (user_id = auth.uid())));
 
 
 --
 -- Name: document_tables Users can manage own document tables; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can manage own document tables" ON public.document_tables USING ((user_id = auth.uid())) WITH CHECK ((user_id = auth.uid()));
+CREATE POLICY "Users can manage own document tables" ON public.document_tables TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (user_id = auth.uid()))) WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (user_id = auth.uid())));
 
 
 --
 -- Name: message_feedback Users can select own feedback; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can select own feedback" ON public.message_feedback FOR SELECT USING ((auth.uid() = user_id));
+CREATE POLICY "Users can select own feedback" ON public.message_feedback FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: user_memory Users can select own memory; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can select own memory" ON public.user_memory FOR SELECT USING ((auth.uid() = user_id));
+CREATE POLICY "Users can select own memory" ON public.user_memory FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: classification_rules Users can update own classification_rules; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can update own classification_rules" ON public.classification_rules FOR UPDATE USING ((auth.uid() = user_id)) WITH CHECK (((auth.uid() = user_id) AND (is_global = false)));
+CREATE POLICY "Users can update own classification_rules" ON public.classification_rules FOR UPDATE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id))) WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id) AND (is_global = false)));
 
 
 --
 -- Name: document_relationships Users can update own document_relationships; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can update own document_relationships" ON public.document_relationships FOR UPDATE USING ((auth.uid() = user_id)) WITH CHECK ((auth.uid() = user_id));
+CREATE POLICY "Users can update own document_relationships" ON public.document_relationships FOR UPDATE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id))) WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: document_views Users can update own document_views; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can update own document_views" ON public.document_views FOR UPDATE USING ((auth.uid() = user_id)) WITH CHECK (((auth.uid() = user_id) AND (is_global = false)));
+CREATE POLICY "Users can update own document_views" ON public.document_views FOR UPDATE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id))) WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id) AND (is_global = false)));
 
 
 --
 -- Name: folders Users can update own folders; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can update own folders" ON public.folders FOR UPDATE USING ((auth.uid() = user_id));
+CREATE POLICY "Users can update own folders" ON public.folders FOR UPDATE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: user_memory Users can update own memory; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can update own memory" ON public.user_memory FOR UPDATE USING ((auth.uid() = user_id));
+CREATE POLICY "Users can update own memory" ON public.user_memory FOR UPDATE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: metadata_field_definitions Users can update own metadata_field_definitions; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can update own metadata_field_definitions" ON public.metadata_field_definitions FOR UPDATE USING ((auth.uid() = user_id)) WITH CHECK (((auth.uid() = user_id) AND (is_global = false)));
+CREATE POLICY "Users can update own metadata_field_definitions" ON public.metadata_field_definitions FOR UPDATE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id))) WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id) AND (is_global = false)));
 
 
 --
 -- Name: skill_test_cases Users can update own skill test cases; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can update own skill test cases" ON public.skill_test_cases FOR UPDATE USING ((auth.uid() = user_id));
+CREATE POLICY "Users can update own skill test cases" ON public.skill_test_cases FOR UPDATE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: skills Users can update own skills; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can update own skills" ON public.skills FOR UPDATE USING ((auth.uid() = user_id));
+CREATE POLICY "Users can update own skills" ON public.skills FOR UPDATE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: workflow_definitions Users can update own workflow definitions; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can update own workflow definitions" ON public.workflow_definitions FOR UPDATE USING ((auth.uid() = created_by)) WITH CHECK (((auth.uid() = created_by) AND (is_global = false)));
+CREATE POLICY "Users can update own workflow definitions" ON public.workflow_definitions FOR UPDATE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = created_by))) WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = created_by) AND (is_global = false)));
 
 
 --
 -- Name: document_chunks Users can update their own chunks; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can update their own chunks" ON public.document_chunks FOR UPDATE USING ((auth.uid() = user_id));
+CREATE POLICY "Users can update their own chunks" ON public.document_chunks FOR UPDATE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: documents Users can update their own documents; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can update their own documents" ON public.documents FOR UPDATE USING ((auth.uid() = user_id));
+CREATE POLICY "Users can update their own documents" ON public.documents FOR UPDATE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: messages Users can update their own messages; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can update their own messages" ON public.messages FOR UPDATE USING ((auth.uid() = user_id));
+CREATE POLICY "Users can update their own messages" ON public.messages FOR UPDATE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: profiles Users can update their own profile; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can update their own profile" ON public.profiles FOR UPDATE USING ((auth.uid() = id));
+CREATE POLICY "Users can update their own profile" ON public.profiles FOR UPDATE TO authenticated USING ((auth.uid() = id));
 
 
 --
 -- Name: threads Users can update their own threads; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can update their own threads" ON public.threads FOR UPDATE USING ((auth.uid() = user_id));
+CREATE POLICY "Users can update their own threads" ON public.threads FOR UPDATE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: skill_files Users can view files on own or global skills; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can view files on own or global skills" ON public.skill_files FOR SELECT USING (((auth.uid() = user_id) OR (EXISTS ( SELECT 1
+CREATE POLICY "Users can view files on own or global skills" ON public.skill_files FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND ((auth.uid() = user_id) OR (EXISTS ( SELECT 1
    FROM public.skills
-  WHERE ((skills.id = skill_files.skill_id) AND (skills.is_global = true))))));
+  WHERE ((skills.id = skill_files.skill_id) AND (skills.is_global = true)))))));
 
 
 --
 -- Name: classification_rules Users can view own and global classification_rules; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can view own and global classification_rules" ON public.classification_rules FOR SELECT USING (((auth.uid() = user_id) OR (is_global = true)));
+CREATE POLICY "Users can view own and global classification_rules" ON public.classification_rules FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND ((auth.uid() = user_id) OR (is_global = true))));
 
 
 --
 -- Name: document_views Users can view own and global document_views; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can view own and global document_views" ON public.document_views FOR SELECT USING (((auth.uid() = user_id) OR (is_global = true)));
+CREATE POLICY "Users can view own and global document_views" ON public.document_views FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND ((auth.uid() = user_id) OR (is_global = true))));
 
 
 --
 -- Name: folders Users can view own and global folders; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can view own and global folders" ON public.folders FOR SELECT USING (((auth.uid() = user_id) OR public.folder_is_globally_visible(id)));
+CREATE POLICY "Users can view own and global folders" ON public.folders FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND ((auth.uid() = user_id) OR public.folder_is_globally_visible(id))));
 
 
 --
 -- Name: metadata_field_definitions Users can view own and global metadata_field_definitions; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can view own and global metadata_field_definitions" ON public.metadata_field_definitions FOR SELECT USING (((auth.uid() = user_id) OR (is_global = true)));
+CREATE POLICY "Users can view own and global metadata_field_definitions" ON public.metadata_field_definitions FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND ((auth.uid() = user_id) OR (is_global = true))));
 
 
 --
 -- Name: skills Users can view own and global skills; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can view own and global skills" ON public.skills FOR SELECT USING (((auth.uid() = user_id) OR (is_global = true)));
+CREATE POLICY "Users can view own and global skills" ON public.skills FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND ((auth.uid() = user_id) OR (is_global = true))));
 
 
 --
 -- Name: workflow_definitions Users can view own and global workflow definitions; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can view own and global workflow definitions" ON public.workflow_definitions FOR SELECT USING (((auth.uid() = created_by) OR (is_global = true)));
+CREATE POLICY "Users can view own and global workflow definitions" ON public.workflow_definitions FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND ((auth.uid() = created_by) OR (is_global = true))));
 
 
 --
 -- Name: document_relationships Users can view own document_relationships; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can view own document_relationships" ON public.document_relationships FOR SELECT USING ((auth.uid() = user_id));
+CREATE POLICY "Users can view own document_relationships" ON public.document_relationships FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: eval_ratings Users can view own eval ratings; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can view own eval ratings" ON public.eval_ratings FOR SELECT USING ((auth.uid() = user_id));
-
-
---
--- Name: POLICY "Users can view own eval ratings" ON eval_ratings; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON POLICY "Users can view own eval ratings" ON public.eval_ratings IS 'Owner-only (D-08). Defense-in-depth: the service-role ratings endpoint bypasses RLS and the app-code .eq("user_id", …) filter is the real runtime gate (035/079/080 precedent, T-134-01).';
+CREATE POLICY "Users can view own eval ratings" ON public.eval_ratings FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: eval_results Users can view own eval results; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can view own eval results" ON public.eval_results FOR SELECT USING ((auth.uid() = user_id));
-
-
---
--- Name: POLICY "Users can view own eval results" ON eval_results; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON POLICY "Users can view own eval results" ON public.eval_results IS 'Owner-only (D-08). Defense-in-depth: the service-role eval task bypasses RLS and the app-code .eq("user_id", …) filter is the real runtime gate (035/079 precedent, T-133-01).';
+CREATE POLICY "Users can view own eval results" ON public.eval_results FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: eval_runs Users can view own eval runs; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can view own eval runs" ON public.eval_runs FOR SELECT USING ((auth.uid() = user_id));
-
-
---
--- Name: POLICY "Users can view own eval runs" ON eval_runs; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON POLICY "Users can view own eval runs" ON public.eval_runs IS 'Owner-only (D-08). Defense-in-depth: the service-role eval task bypasses RLS and the app-code .eq("user_id", …) filter is the real runtime gate (035/079 precedent, T-133-01).';
+CREATE POLICY "Users can view own eval runs" ON public.eval_runs FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: code_executions Users can view own executions; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can view own executions" ON public.code_executions FOR SELECT USING ((auth.uid() = user_id));
+CREATE POLICY "Users can view own executions" ON public.code_executions FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: harness_audit Users can view own harness audit; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can view own harness audit" ON public.harness_audit FOR SELECT USING ((auth.uid() = user_id));
+CREATE POLICY "Users can view own harness audit" ON public.harness_audit FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: documents Users can view own or global-folder documents; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can view own or global-folder documents" ON public.documents FOR SELECT USING (((auth.uid() = user_id) OR ((folder_id IS NOT NULL) AND public.folder_is_globally_visible(folder_id))));
+CREATE POLICY "Users can view own or global-folder documents" ON public.documents FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND ((auth.uid() = user_id) OR ((folder_id IS NOT NULL) AND public.folder_is_globally_visible(folder_id)))));
 
 
 --
 -- Name: skill_publish_overrides Users can view own publish overrides; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can view own publish overrides" ON public.skill_publish_overrides FOR SELECT USING ((auth.uid() = user_id));
-
-
---
--- Name: POLICY "Users can view own publish overrides" ON skill_publish_overrides; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON POLICY "Users can view own publish overrides" ON public.skill_publish_overrides IS 'Owner-only (D-02). Defense-in-depth: the service-role toggle handler bypasses RLS and the app-code .eq("user_id", …) filter is the real runtime gate (035/079/080/081/083 precedent, T-136-04).';
+CREATE POLICY "Users can view own publish overrides" ON public.skill_publish_overrides FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: sandbox_files Users can view own sandbox files; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can view own sandbox files" ON public.sandbox_files FOR SELECT USING ((auth.uid() = user_id));
+CREATE POLICY "Users can view own sandbox files" ON public.sandbox_files FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: skill_embeddings Users can view own skill embeddings; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can view own skill embeddings" ON public.skill_embeddings FOR SELECT USING ((auth.uid() = user_id));
-
-
---
--- Name: POLICY "Users can view own skill embeddings" ON skill_embeddings; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON POLICY "Users can view own skill embeddings" ON public.skill_embeddings IS 'Owner-only SELECT. Defense-in-depth: the backfill writer runs as service-role (bypasses RLS) and hand-scopes .eq("user_id", …); the match_skills RPC WHERE clause is the real cross-user gate (V4).';
+CREATE POLICY "Users can view own skill embeddings" ON public.skill_embeddings FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: skill_proposals Users can view own skill proposals; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can view own skill proposals" ON public.skill_proposals FOR SELECT USING ((auth.uid() = user_id));
-
-
---
--- Name: POLICY "Users can view own skill proposals" ON skill_proposals; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON POLICY "Users can view own skill proposals" ON public.skill_proposals IS 'Owner-only (D-07). Defense-in-depth: the service-role SI-01 router bypasses RLS and the app-code .eq("user_id", …) filter is the real runtime gate (035/079/080/081 precedent, T-135-07).';
+CREATE POLICY "Users can view own skill proposals" ON public.skill_proposals FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: skill_test_cases Users can view own skill test cases; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can view own skill test cases" ON public.skill_test_cases FOR SELECT USING ((auth.uid() = user_id));
+CREATE POLICY "Users can view own skill test cases" ON public.skill_test_cases FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: skill_versions Users can view own skill versions; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can view own skill versions" ON public.skill_versions FOR SELECT USING ((auth.uid() = user_id));
-
-
---
--- Name: POLICY "Users can view own skill versions" ON skill_versions; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON POLICY "Users can view own skill versions" ON public.skill_versions IS 'Owner-only (NO is_global branch, D-12). Defense-in-depth: the service-role writer bypasses RLS and the app-code .eq("user_id", …) filter is the real runtime gate (077 precedent, D-03-R3).';
+CREATE POLICY "Users can view own skill versions" ON public.skill_versions FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: document_chunks Users can view their own chunks; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can view their own chunks" ON public.document_chunks FOR SELECT USING ((auth.uid() = user_id));
+CREATE POLICY "Users can view their own chunks" ON public.document_chunks FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: messages Users can view their own messages; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can view their own messages" ON public.messages FOR SELECT USING ((auth.uid() = user_id));
+CREATE POLICY "Users can view their own messages" ON public.messages FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: profiles Users can view their own profile; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can view their own profile" ON public.profiles FOR SELECT USING ((auth.uid() = id));
+CREATE POLICY "Users can view their own profile" ON public.profiles FOR SELECT TO authenticated USING ((auth.uid() = id));
 
 
 --
 -- Name: threads Users can view their own threads; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can view their own threads" ON public.threads FOR SELECT USING ((auth.uid() = user_id));
+CREATE POLICY "Users can view their own threads" ON public.threads FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: tuner_runs Users can view tuner runs on own or global skills; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can view tuner runs on own or global skills" ON public.tuner_runs FOR SELECT USING (((auth.uid() = user_id) OR (EXISTS ( SELECT 1
+CREATE POLICY "Users can view tuner runs on own or global skills" ON public.tuner_runs FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND ((auth.uid() = user_id) OR (EXISTS ( SELECT 1
    FROM public.skills
-  WHERE ((skills.id = tuner_runs.skill_id) AND (skills.is_global = true))))));
+  WHERE ((skills.id = tuner_runs.skill_id) AND (skills.is_global = true)))))));
 
 
 --
@@ -5245,7 +5240,7 @@ ALTER TABLE public.pdf_extraction_runs ENABLE ROW LEVEL SECURITY;
 -- Name: pdf_extraction_runs pdf_extraction_runs_select_own; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY pdf_extraction_runs_select_own ON public.pdf_extraction_runs FOR SELECT USING ((auth.uid() = user_id));
+CREATE POLICY pdf_extraction_runs_select_own ON public.pdf_extraction_runs FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
@@ -5290,7 +5285,7 @@ ALTER TABLE public.runs ENABLE ROW LEVEL SECURITY;
 -- Name: runs runs_select_own; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY runs_select_own ON public.runs FOR SELECT USING ((auth.uid() = user_id));
+CREATE POLICY runs_select_own ON public.runs FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
@@ -5391,36 +5386,36 @@ ALTER TABLE public.todos ENABLE ROW LEVEL SECURITY;
 -- Name: todos todos_delete_own; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY todos_delete_own ON public.todos FOR DELETE TO authenticated USING ((auth.uid() = ( SELECT threads.user_id
+CREATE POLICY todos_delete_own ON public.todos FOR DELETE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = ( SELECT threads.user_id
    FROM public.threads
-  WHERE (threads.id = todos.thread_id))));
+  WHERE (threads.id = todos.thread_id)))));
 
 
 --
 -- Name: todos todos_insert_own; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY todos_insert_own ON public.todos FOR INSERT TO authenticated WITH CHECK ((auth.uid() = ( SELECT threads.user_id
+CREATE POLICY todos_insert_own ON public.todos FOR INSERT TO authenticated WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = ( SELECT threads.user_id
    FROM public.threads
-  WHERE (threads.id = todos.thread_id))));
+  WHERE (threads.id = todos.thread_id)))));
 
 
 --
 -- Name: todos todos_select_own; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY todos_select_own ON public.todos FOR SELECT TO authenticated USING ((auth.uid() = ( SELECT threads.user_id
+CREATE POLICY todos_select_own ON public.todos FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = ( SELECT threads.user_id
    FROM public.threads
-  WHERE (threads.id = todos.thread_id))));
+  WHERE (threads.id = todos.thread_id)))));
 
 
 --
 -- Name: todos todos_update_own; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY todos_update_own ON public.todos FOR UPDATE TO authenticated USING ((auth.uid() = ( SELECT threads.user_id
+CREATE POLICY todos_update_own ON public.todos FOR UPDATE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = ( SELECT threads.user_id
    FROM public.threads
-  WHERE (threads.id = todos.thread_id))));
+  WHERE (threads.id = todos.thread_id)))));
 
 
 --
@@ -5451,43 +5446,43 @@ ALTER TABLE public.workflow_phases ENABLE ROW LEVEL SECURITY;
 -- Name: workflow_phases workflow_phases_delete_own; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY workflow_phases_delete_own ON public.workflow_phases FOR DELETE TO authenticated USING ((auth.uid() = ( SELECT t.user_id
+CREATE POLICY workflow_phases_delete_own ON public.workflow_phases FOR DELETE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = ( SELECT t.user_id
    FROM (public.threads t
      JOIN public.workflow_runs wr ON ((wr.thread_id = t.id)))
-  WHERE (wr.id = workflow_phases.workflow_run_id))));
+  WHERE (wr.id = workflow_phases.workflow_run_id)))));
 
 
 --
 -- Name: workflow_phases workflow_phases_insert_own; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY workflow_phases_insert_own ON public.workflow_phases FOR INSERT TO authenticated WITH CHECK ((auth.uid() = ( SELECT t.user_id
+CREATE POLICY workflow_phases_insert_own ON public.workflow_phases FOR INSERT TO authenticated WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = ( SELECT t.user_id
    FROM (public.threads t
      JOIN public.workflow_runs wr ON ((wr.thread_id = t.id)))
-  WHERE (wr.id = workflow_phases.workflow_run_id))));
+  WHERE (wr.id = workflow_phases.workflow_run_id)))));
 
 
 --
 -- Name: workflow_phases workflow_phases_select_own; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY workflow_phases_select_own ON public.workflow_phases FOR SELECT TO authenticated USING ((auth.uid() = ( SELECT t.user_id
+CREATE POLICY workflow_phases_select_own ON public.workflow_phases FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = ( SELECT t.user_id
    FROM (public.threads t
      JOIN public.workflow_runs wr ON ((wr.thread_id = t.id)))
-  WHERE (wr.id = workflow_phases.workflow_run_id))));
+  WHERE (wr.id = workflow_phases.workflow_run_id)))));
 
 
 --
 -- Name: workflow_phases workflow_phases_update_own; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY workflow_phases_update_own ON public.workflow_phases FOR UPDATE TO authenticated USING ((auth.uid() = ( SELECT t.user_id
+CREATE POLICY workflow_phases_update_own ON public.workflow_phases FOR UPDATE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = ( SELECT t.user_id
    FROM (public.threads t
      JOIN public.workflow_runs wr ON ((wr.thread_id = t.id)))
-  WHERE (wr.id = workflow_phases.workflow_run_id)))) WITH CHECK ((auth.uid() = ( SELECT t.user_id
+  WHERE (wr.id = workflow_phases.workflow_run_id))))) WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = ( SELECT t.user_id
    FROM (public.threads t
      JOIN public.workflow_runs wr ON ((wr.thread_id = t.id)))
-  WHERE (wr.id = workflow_phases.workflow_run_id))));
+  WHERE (wr.id = workflow_phases.workflow_run_id)))));
 
 
 --
@@ -5500,38 +5495,38 @@ ALTER TABLE public.workflow_runs ENABLE ROW LEVEL SECURITY;
 -- Name: workflow_runs workflow_runs_delete_own; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY workflow_runs_delete_own ON public.workflow_runs FOR DELETE TO authenticated USING ((auth.uid() = ( SELECT threads.user_id
+CREATE POLICY workflow_runs_delete_own ON public.workflow_runs FOR DELETE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = ( SELECT threads.user_id
    FROM public.threads
-  WHERE (threads.id = workflow_runs.thread_id))));
+  WHERE (threads.id = workflow_runs.thread_id)))));
 
 
 --
 -- Name: workflow_runs workflow_runs_insert_own; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY workflow_runs_insert_own ON public.workflow_runs FOR INSERT TO authenticated WITH CHECK ((auth.uid() = ( SELECT threads.user_id
+CREATE POLICY workflow_runs_insert_own ON public.workflow_runs FOR INSERT TO authenticated WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = ( SELECT threads.user_id
    FROM public.threads
-  WHERE (threads.id = workflow_runs.thread_id))));
+  WHERE (threads.id = workflow_runs.thread_id)))));
 
 
 --
 -- Name: workflow_runs workflow_runs_select_own; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY workflow_runs_select_own ON public.workflow_runs FOR SELECT TO authenticated USING ((auth.uid() = ( SELECT threads.user_id
+CREATE POLICY workflow_runs_select_own ON public.workflow_runs FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = ( SELECT threads.user_id
    FROM public.threads
-  WHERE (threads.id = workflow_runs.thread_id))));
+  WHERE (threads.id = workflow_runs.thread_id)))));
 
 
 --
 -- Name: workflow_runs workflow_runs_update_own; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY workflow_runs_update_own ON public.workflow_runs FOR UPDATE TO authenticated USING ((auth.uid() = ( SELECT threads.user_id
+CREATE POLICY workflow_runs_update_own ON public.workflow_runs FOR UPDATE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = ( SELECT threads.user_id
    FROM public.threads
-  WHERE (threads.id = workflow_runs.thread_id)))) WITH CHECK ((auth.uid() = ( SELECT threads.user_id
+  WHERE (threads.id = workflow_runs.thread_id))))) WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = ( SELECT threads.user_id
    FROM public.threads
-  WHERE (threads.id = workflow_runs.thread_id))));
+  WHERE (threads.id = workflow_runs.thread_id)))));
 
 
 --
@@ -5550,56 +5545,56 @@ ALTER TABLE public.workspace_files ENABLE ROW LEVEL SECURITY;
 -- Name: workspace_files workspace_files_delete_own; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY workspace_files_delete_own ON public.workspace_files FOR DELETE TO authenticated USING ((auth.uid() = ( SELECT threads.user_id
+CREATE POLICY workspace_files_delete_own ON public.workspace_files FOR DELETE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = ( SELECT threads.user_id
    FROM public.threads
-  WHERE (threads.id = workspace_files.thread_id))));
+  WHERE (threads.id = workspace_files.thread_id)))));
 
 
 --
 -- Name: workspace_files workspace_files_insert_own; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY workspace_files_insert_own ON public.workspace_files FOR INSERT TO authenticated WITH CHECK ((auth.uid() = ( SELECT threads.user_id
+CREATE POLICY workspace_files_insert_own ON public.workspace_files FOR INSERT TO authenticated WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = ( SELECT threads.user_id
    FROM public.threads
-  WHERE (threads.id = workspace_files.thread_id))));
+  WHERE (threads.id = workspace_files.thread_id)))));
 
 
 --
 -- Name: workspace_files workspace_files_select_own; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY workspace_files_select_own ON public.workspace_files FOR SELECT TO authenticated USING ((auth.uid() = ( SELECT threads.user_id
+CREATE POLICY workspace_files_select_own ON public.workspace_files FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = ( SELECT threads.user_id
    FROM public.threads
-  WHERE (threads.id = workspace_files.thread_id))));
+  WHERE (threads.id = workspace_files.thread_id)))));
 
 
 --
 -- Name: workspace_files workspace_files_update_own; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY workspace_files_update_own ON public.workspace_files FOR UPDATE TO authenticated USING ((auth.uid() = ( SELECT threads.user_id
+CREATE POLICY workspace_files_update_own ON public.workspace_files FOR UPDATE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = ( SELECT threads.user_id
    FROM public.threads
-  WHERE (threads.id = workspace_files.thread_id))));
+  WHERE (threads.id = workspace_files.thread_id)))));
 
 
 --
 -- Name: workspace_file_versions workspace_versions_insert_own; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY workspace_versions_insert_own ON public.workspace_file_versions FOR INSERT TO authenticated WITH CHECK ((auth.uid() = ( SELECT t.user_id
+CREATE POLICY workspace_versions_insert_own ON public.workspace_file_versions FOR INSERT TO authenticated WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = ( SELECT t.user_id
    FROM (public.threads t
      JOIN public.workspace_files wf ON ((wf.thread_id = t.id)))
-  WHERE (wf.id = workspace_file_versions.workspace_file_id))));
+  WHERE (wf.id = workspace_file_versions.workspace_file_id)))));
 
 
 --
 -- Name: workspace_file_versions workspace_versions_select_own; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY workspace_versions_select_own ON public.workspace_file_versions FOR SELECT TO authenticated USING ((auth.uid() = ( SELECT t.user_id
+CREATE POLICY workspace_versions_select_own ON public.workspace_file_versions FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = ( SELECT t.user_id
    FROM (public.threads t
      JOIN public.workspace_files wf ON ((wf.thread_id = t.id)))
-  WHERE (wf.id = workspace_file_versions.workspace_file_id))));
+  WHERE (wf.id = workspace_file_versions.workspace_file_id)))));
 
 
 --
