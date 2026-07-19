@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.4
 milestone_name: Multi-Tenancy & Org Access
 status: executing
-last_updated: "2026-07-19T13:06:45.489Z"
+last_updated: "2026-07-19T16:45:59.548Z"
 last_activity: 2026-07-19
 progress:
   total_phases: 28
   completed_phases: 4
   total_plans: 20
-  completed_plans: 14
+  completed_plans: 16
   percent: 14
 ---
 
@@ -41,12 +41,12 @@ Items acknowledged and deferred at milestone close on 2026-07-18 (44 open `audit
 ## Current Position
 
 Phase: 163 (rls-rewrite-per-request-user-jwt-client-swap-the-atomic-crux) — EXECUTING
-Plan: 5 of 10
+Plan: 6 of 10
 Status: Ready to execute
 Next action: Continue Phase 163 execution — Plan 163-04 next. Migration 108 (the 37-table membership-RLS rewrite) is AUTHORED + INERT; the [BLOCKING] Wave-3 plan (163-05) applies 107 THEN 108 via the SQL editor. Do NOT apply 107/108 until plan 05. TEN-01/TEN-04 stay Pending until that apply + the Wave-4 client swap + plan-09/10 CONCUR-01 benchmark.
 Last activity: 2026-07-19
 
-Progress: [███████░░░] 70%
+Progress: [████████░░] 80%
 
 ### Quick Tasks Completed
 
@@ -434,6 +434,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 163 P02 | 8min | 2 tasks | 2 files |
 | Phase 163 P03 | 11m | 3 tasks | 7 files |
 | Phase 163 P04 | 9m | 2 tasks | 3 files |
+| Phase 163 P06 | 59min | 3 tasks | 17 files |
 
 ## Decisions
 
@@ -541,6 +542,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase ?]: 163-03 DEVIATION: profiles kept owner-only (auth.uid()=id, NO membership macro) — no org_id column live (mig 104 excluded it); a membership prefix would abort the migration at apply (Rule 1/3)
 - [Phase ?]: 163-03: global OR-branches (folder_is_globally_visible / is_global / EXISTS-on-skills) preserved verbatim but now membership-gated; audit_log carries explicit org_id IS NULL branch (D-10); 6 cluster tests RED until apply
 - [Phase ?]: 163-04: D-08 leak core authored (15 tests, RED until 163-05 apply) — fail-loud auth.uid() preflight FIRST guards against a wrong-GUC-variant false-pass at 0 rows; role-swap-noop 1->0 diff proves SET LOCAL ROLE (not claims) turns RLS on; GUC arbitration hard-asserts only the both-forms default
+- [Phase ?]: 163-06 THE FLIP: chat/streaming hot path swapped to per-request user-JWT clients (RLS is now the real gate); producer/agent-loop writer stays service-role (D-05, run_producer byte-unchanged); agent_loop.py+gateway byte-unchanged (D-09); blocker T-163-06c fixed (preflight workflow_runs read under RLS); TEN-02 ADVANCED (completes after 07/08 swaps + CONCUR-01 bench)
 
 ## Operator Next Steps
 
