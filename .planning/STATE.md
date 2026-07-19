@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v3.4
 milestone_name: Multi-Tenancy & Org Access
-status: executing
-last_updated: "2026-07-19T09:27:33.000Z"
+status: ready_to_plan
+last_updated: 2026-07-19T10:05:15.028Z
 last_activity: 2026-07-19
 progress:
   total_phases: 28
@@ -11,6 +11,7 @@ progress:
   total_plans: 10
   completed_plans: 10
   percent: 14
+stopped_at: Phase 162.5 complete (4/4) — ready to discuss Phase 163
 ---
 
 # Project State
@@ -22,7 +23,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-18 — v3.3 Operator UX SHIPPED + archived)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 162.5 — threads-py-producer-extraction
+**Current focus:** Phase 163 — rls rewrite per request user jwt client swap the atomic crux
 
 ## Deferred Items
 
@@ -40,9 +41,9 @@ Items acknowledged and deferred at milestone close on 2026-07-18 (44 open `audit
 
 ## Current Position
 
-Phase: 162.5 (threads-py-producer-extraction) — ✅ COMPLETE (4/4 plans; operator-approved D-A6 Deep byte-identical gate 2026-07-19)
-Plan: 4 of 4 complete
-Status: Phase 162.5 done — the `threads.py` extraction landed byte-identical (2,444 → 1,214 LOC; agent_loop.py unchanged). **Phase 163 UNBLOCKED (D-A1 satisfied).**
+Phase: 163
+Plan: Not started
+Status: Ready to plan
 Next action: `/gsd:plan-phase 163` — RLS Rewrite + User-JWT Client Swap (THE ATOMIC CRUX; TEN-01/TEN-02/TEN-04; mig slots 107 RLS + 108 TEN-04)
 Last activity: 2026-07-19
 
