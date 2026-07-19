@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.4
 milestone_name: Multi-Tenancy & Org Access
 status: executing
-last_updated: "2026-07-19T12:19:56.311Z"
-last_activity: 2026-07-19
+last_updated: "2026-07-19T12:52:44.095Z"
+last_activity: 2026-07-19 -- Phase 163 Plan 03 complete (mig 108 membership-RLS rewrite authored, inert until Wave-4 swap; 6 RED cluster tests; profiles owner-only deviation + audit_log D-10 documented)
 progress:
   total_phases: 28
   completed_phases: 4
   total_plans: 20
-  completed_plans: 12
+  completed_plans: 13
   percent: 14
 ---
 
@@ -41,12 +41,12 @@ Items acknowledged and deferred at milestone close on 2026-07-18 (44 open `audit
 ## Current Position
 
 Phase: 163 (rls-rewrite-per-request-user-jwt-client-swap-the-atomic-crux) — EXECUTING
-Plan: 3 of 10
+Plan: 4 of 10
 Status: Ready to execute
-Next action: Continue Phase 163 execution — Plan 163-03 next (RLS predicate rewrite, migration 108) — it references the `org_id` column that mig 107 (plan 02) just authored on document_chunks/skill_embeddings; 108 must apply AFTER 107. TEN-04 stays Pending until the plan-05 apply + plan-09/10 CONCUR-01 benchmark.
-Last activity: 2026-07-19 -- Phase 163 Plan 02 complete (mig 107 TEN-04 org_id substrate authored + RED test; not yet applied)
+Next action: Continue Phase 163 execution — Plan 163-04 next. Migration 108 (the 37-table membership-RLS rewrite) is AUTHORED + INERT; the [BLOCKING] Wave-3 plan (163-05) applies 107 THEN 108 via the SQL editor. Do NOT apply 107/108 until plan 05. TEN-01/TEN-04 stay Pending until that apply + the Wave-4 client swap + plan-09/10 CONCUR-01 benchmark.
+Last activity: 2026-07-19 -- Phase 163 Plan 03 complete (mig 108 membership-RLS rewrite authored, inert until Wave-4 swap; 6 RED cluster tests; profiles owner-only deviation + audit_log D-10 documented)
 
-Progress: [██████░░░░] 60%
+Progress: [███████░░░] 65%
 
 ### Quick Tasks Completed
 
@@ -432,6 +432,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 162.5 P03 | ~50min | 2 tasks | 5 files |
 | Phase 163 P01 | 25 | 2 tasks | 4 files |
 | Phase 163 P02 | 8min | 2 tasks | 2 files |
+| Phase 163 P03 | 11m | 3 tasks | 7 files |
 
 ## Decisions
 
@@ -535,6 +536,9 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase 163]: 163-01: live auth.uid() on :54322 reads legacy request.jwt.claim.sub first then JSON request.jwt.claims — both-GUC-forms is variant-independent (D-02).
 - [Phase 163]: 163-02: mig 107 slot inverted to 107=TEN-04 (before 108=RLS) — 108's document_chunks/skill_embeddings predicates reference the org_id column 107 adds; Postgres applies migrations in integer order so the column lands first
 - [Phase 163]: 163-02: TEN-04 kept Pending — plan 02 AUTHORS mig 107 + test_163_ten04_backfill (RED) only; applied plan 05, CONCUR-01-benchmarked plan 09/10. skill_embeddings backfill pages on skill_id (no id col); btree(org_id) default, HNSW/GIN untouched
+- [Phase ?]: 163-03: migration 108 rewrites all 37 user-facing tables (97 policies, 6 sectioned clusters) to org_id IN (SELECT public.current_user_org_ids()) AND (owner OR preserved-global) — INERT under BYPASSRLS, applies AFTER 107; TEN-01 enforced only after plan-05 apply + Wave-4 client swap
+- [Phase ?]: 163-03 DEVIATION: profiles kept owner-only (auth.uid()=id, NO membership macro) — no org_id column live (mig 104 excluded it); a membership prefix would abort the migration at apply (Rule 1/3)
+- [Phase ?]: 163-03: global OR-branches (folder_is_globally_visible / is_global / EXISTS-on-skills) preserved verbatim but now membership-gated; audit_log carries explicit org_id IS NULL branch (D-10); 6 cluster tests RED until apply
 
 ## Operator Next Steps
 
