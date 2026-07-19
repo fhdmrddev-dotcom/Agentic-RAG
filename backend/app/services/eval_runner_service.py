@@ -248,18 +248,29 @@ def _format_tool_evidence(tool_call_lists: list[list[dict]]) -> str:
     return "\n".join(lines)[:_EVIDENCE_BLOCK_CAP]
 
 
-async def _gather_tool_evidence(supabase, thread_id: str, user_id: str) -> str:
+async def _gather_tool_evidence(
+    supabase, thread_id: str, user_id: str, org_id: str | None = None
+) -> str:
     """Collect THIS arm's tool receipts from the eval thread. Each arm starts from a
     reset-to-prompt thread, so every assistant tool_calls row present belongs to the
     arm just completed. Owner-scoped; blocking supabase-py wrapped (D-v2.5-01).
-    Best-effort: any failure returns '' (judge falls back to answer-only grading)."""
+    Best-effort: any failure returns '' (judge falls back to answer-only grading).
+
+    Phase 163 (D-05/D-14): when the run's ``org_id`` is known (threaded from
+    ``run_eval_job``), the owner ``.eq("user_id")`` scope is WIDENED with an
+    ``.eq("org_id")`` predicate as belt-and-suspenders on the service-role
+    (BYPASSRLS) read. ``org_id=None`` keeps the read byte-identical."""
     def _q():
-        return (
+        q = (
             supabase.table("messages")
             .select("tool_calls")
             .eq("thread_id", thread_id)
             .eq("user_id", user_id)
-            .eq("role", "assistant")
+        )
+        if org_id:
+            q = q.eq("org_id", org_id)
+        return (
+            q.eq("role", "assistant")
             .order("created_at")
             .execute()
         )
@@ -476,6 +487,7 @@ async def _run_arm(
     current_user: dict,
     user_settings,
     skill_instructions_override: dict[str, str] | None = None,  # Phase 135 (SI-01) — Pitfall #1 carrier; None on 133/134 => unchanged
+    org_id: str | None = None,  # Phase 163 (D-05) — widens the tool-evidence read to org-aware; None => byte-identical
 ) -> tuple[str, str, bool | None]:
     """Drive ONE completion (WITH or WITHOUT arm) for one case, grade it, then persist its
     eval_results row (verdict in the SAME insert) + emit progress. A per-arm exception
@@ -504,6 +516,7 @@ async def _run_arm(
             provider=provider, model=model, current_user=current_user,
             user_settings=user_settings, user_id=user_id, test_case_id=test_case_id,
             skill_instructions_override=skill_instructions_override,
+            org_id=org_id,
         )
     finally:
         pulse.cancel()
@@ -525,6 +538,7 @@ async def _run_arm_body(
     user_id: str,
     test_case_id,
     skill_instructions_override: dict[str, str] | None = None,  # Phase 135 (SI-01) — Pitfall #1 carrier; None on 133/134 => unchanged
+    org_id: str | None = None,  # Phase 163 (D-05) — org-aware tool-evidence read; None => byte-identical
 ) -> tuple[str, str, bool | None]:
     """The original ``_run_arm`` body (loop → D-04 grading gate → persist → emits),
     extracted verbatim so the heartbeat pulse can wrap it with try/finally without
@@ -601,7 +615,7 @@ async def _run_arm_body(
         # (files produced, exit codes) so artifact-producing work is gradeable. The
         # persisted eval_results.output stays the PURE model answer — the evidence
         # augments only what the judge reads.
-        evidence = await _gather_tool_evidence(supabase, thread_id, user_id)
+        evidence = await _gather_tool_evidence(supabase, thread_id, user_id, org_id)
         answer_for_judge = (
             output
             + "\n\n--- TOOL EVIDENCE (runtime-captured execution receipts; ground truth, not model claims) ---\n"
@@ -673,10 +687,16 @@ async def _update_eval_run_status(
     passed_count: int | None = None,
     measured_count: int | None = None,
     verdict_summary: str | None = None,
+    org_id: str | None = None,  # Phase 163 (D-05) — org-aware ownership filter; None => byte-identical
 ) -> None:
     """Update the durable eval_runs row's terminal status + completed_at (owner-scoped).
     The Phase 134 rollup params are added to the payload ONLY when not None — a cancelled /
-    interrupted / crashed run leaves them untouched (NULL), never a misleading partial count."""
+    interrupted / crashed run leaves them untouched (NULL), never a misleading partial count.
+
+    Phase 163 (D-05/D-14): the ``.eq("user_id")`` ownership filter is WIDENED with an
+    ``.eq("org_id")`` predicate when the run's ``org_id`` is known (threaded from
+    ``run_eval_job``) — belt-and-suspenders on the service-role (BYPASSRLS) update.
+    ``org_id=None`` keeps the update byte-identical (the ``id`` filter is a unique key)."""
     payload = {
         "status": status,
         "completed_at": datetime.now(timezone.utc).isoformat(),
@@ -690,18 +710,48 @@ async def _update_eval_run_status(
         payload["verdict_summary"] = verdict_summary
 
     def _update():
-        return (
+        q = (
             supabase.table("eval_runs")
             .update(payload)
             .eq("id", str(run_id))
             .eq("user_id", user_id)
-            .execute()
         )
+        if org_id:
+            q = q.eq("org_id", org_id)
+        return q.execute()
 
     try:
         await run_in_threadpool(_update)
     except Exception:
         logger.exception("eval_runs status update failed for run %s", run_id)
+
+
+async def _resolve_eval_org_id(supabase, run_id: UUID) -> str | None:
+    """Resolve the org of the eval run this job is processing (Phase 163 / D-05).
+
+    Reads ``eval_runs.org_id`` (backfilled post-162) for ``run_id`` via the injected
+    service-role client so the detached writer can route through
+    ``get_service_role_supabase(org_id)`` and widen its ownership filters to org-aware.
+    Best-effort + type-guarded: any failure — or a fake/mock client with no ``eval_runs``
+    row (the unit-test seam) — returns None, and the writer stays byte-identical to
+    pre-163 (owner ``.eq("user_id")`` scope only). Blocking supabase-py wrapped (D-v2.5-01)."""
+    def _q():
+        return (
+            supabase.table("eval_runs")
+            .select("org_id")
+            .eq("id", str(run_id))
+            .limit(1)
+            .execute()
+        )
+
+    try:
+        resp = await run_in_threadpool(_q)
+        rows = resp.data or []
+        val = rows[0].get("org_id") if rows else None
+        return str(val) if isinstance(val, (str, UUID)) and val else None
+    except Exception:  # noqa: BLE001 — org resolution is best-effort; None => byte-identical
+        logger.debug("eval org_id resolve failed for run %s", run_id, exc_info=True)
+        return None
 
 
 async def run_eval_job(
@@ -722,6 +772,11 @@ async def run_eval_job(
     # every 133/134 caller => the WITH/WITHOUT/judge/heartbeat/terminal/rollup logic
     # is byte-identical; the re-eval passes the draft body for the WITH arm ONLY.
     skill_instructions_override: dict[str, str] | None = None,
+    # Phase 163 (D-05) — the eval run's org. Threaded from the eval_runs row this job
+    # processes (resolved below when the caller omits it). Routes the detached writer
+    # through get_service_role_supabase(org_id) + widens the ownership filters. None on a
+    # fake/mock client (unit tests) => the writer is byte-identical to pre-163.
+    org_id: str | None = None,
 ) -> None:
     """The bounded background eval job (EVAL-02).
 
@@ -736,6 +791,18 @@ async def run_eval_job(
     ``description``) — the WITH arm injects THAT, not the live skills row (D-03/D-10).
     """
     user_id = current_user["id"]
+    # Phase 163 (D-05): resolve the run's org and route this detached service-role writer
+    # through the org-requiring wrapper (get_service_role_supabase REFUSES a missing org).
+    # org_id comes from the eval_runs row this job processes (backfilled post-162); a caller
+    # may also pass it explicitly. When it cannot be resolved (a fake/mock client in unit
+    # tests), org_id stays None: the client + every ownership filter stay byte-identical to
+    # pre-163 (the .eq("user_id") owner scope is unchanged — D-14 belt-and-suspenders).
+    if org_id is None:
+        org_id = await _resolve_eval_org_id(supabase, run_id)
+    if org_id:
+        from app.dependencies import get_service_role_supabase  # function-local (avoid import cycle)
+
+        supabase = get_service_role_supabase(org_id)
     final_status = "completed"
     run_error: str | None = None
     try:
@@ -748,6 +815,7 @@ async def run_eval_job(
             await _emit_terminal(redis, run_id, TERMINAL_ERROR, error=run_error)
             await _update_eval_run_status(
                 supabase, run_id=run_id, user_id=user_id, status=final_status, error=run_error,
+                org_id=org_id,
             )
             return
 
@@ -787,6 +855,7 @@ async def run_eval_job(
                     # Phase 135 (SI-01) — WITH arm ONLY: the DRAFT re-eval measures the
                     # proposed instructions (Pitfall #1). None on 133/134 => unchanged.
                     skill_instructions_override=skill_instructions_override,
+                    org_id=org_id,  # Phase 163 (D-05) — org-aware tool-evidence read
                 )
             )
 
@@ -812,6 +881,7 @@ async def run_eval_job(
                 case=case, variant=VARIANT_WITHOUT, catalog_override=(),
                 provider=provider, model=model, current_user=current_user,
                 user_settings=user_settings,
+                org_id=org_id,  # Phase 163 (D-05) — org-aware tool-evidence read
             )
 
         # With-skill rollup (D-07 / OQ3), written ONLY on a clean completion. A cancelled /
@@ -831,6 +901,7 @@ async def run_eval_job(
         await _update_eval_run_status(
             supabase, run_id=run_id, user_id=user_id, status=final_status, error=run_error,
             passed_count=passed_count, measured_count=measured_count, verdict_summary=verdict_summary,
+            org_id=org_id,
         )
         await _emit_terminal(redis, run_id, TERMINAL_DONE, status=final_status)
     except Exception:
@@ -839,6 +910,7 @@ async def run_eval_job(
         run_error = "eval_job_failed"
         await _update_eval_run_status(
             supabase, run_id=run_id, user_id=user_id, status=final_status, error=run_error,
+            org_id=org_id,
         )
         await _emit_terminal(redis, run_id, TERMINAL_ERROR, error=run_error)
     finally:

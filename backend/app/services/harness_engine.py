@@ -176,7 +176,7 @@ def _persist_output(output: dict) -> dict:
     return output
 
 
-async def _expire_pending_ask_user(pool, thread_id, run_id) -> None:
+async def _expire_pending_ask_user(pool, thread_id, run_id, *, org_id=None) -> None:
     """D-06 (BUG-260605-01): resolve any outstanding ask_user prompt when a run
     reaches terminal status. INSERT-only (HARNESS-06 audit posture): writes a
     system message shaped as the matching ask_user_response with expired=true,
@@ -192,29 +192,59 @@ async def _expire_pending_ask_user(pool, thread_id, run_id) -> None:
     Never UPDATEs any existing row. No-op when nothing is pending. Callers wrap
     each call in try/except — cleanup must never convert a successful
     terminalization into a crash.
+
+    Phase 163 (D-05 / D-14): this runs on the raw service-role (BYPASSRLS) pool with
+    no auth.uid(). When the caller has org context (``org_id`` — the resume finalizer
+    threads it from the run's org), an ``AND m.org_id = $3`` predicate is added to the
+    SELECT as belt-and-suspenders org-scoping. ``org_id=None`` keeps the read
+    byte-identical (thread_id + the prompt's run_id already uniquely scope the row).
+    The INSERT omits org_id → the mig-106 autofill-from-parent-thread trigger stamps it.
     """
     if thread_id is None:
         return
     _tid = thread_id if isinstance(thread_id, UUID) else UUID(str(thread_id))
-    rows = await pool.fetch(
-        """
-        SELECT m.tool_calls->0->>'tool_call_id' AS tool_call_id, m.user_id
-        FROM messages m
-        WHERE m.thread_id = $1
-          AND m.role = 'system'
-          AND m.tool_calls @> '[{"kind": "ask_user_prompt"}]'::jsonb
-          AND m.tool_calls->0->>'run_id' = $2
-          AND NOT EXISTS (
-            SELECT 1 FROM messages r
-            WHERE r.thread_id = m.thread_id
-              AND r.role = 'system'
-              AND r.tool_calls @> '[{"kind": "ask_user_response"}]'::jsonb
-              AND r.tool_calls->0->>'tool_call_id' = m.tool_calls->0->>'tool_call_id'
-          )
-        """,
-        _tid,
-        str(run_id),
-    )
+    if org_id is not None:
+        rows = await pool.fetch(
+            """
+            SELECT m.tool_calls->0->>'tool_call_id' AS tool_call_id, m.user_id
+            FROM messages m
+            WHERE m.thread_id = $1
+              AND m.org_id = $3
+              AND m.role = 'system'
+              AND m.tool_calls @> '[{"kind": "ask_user_prompt"}]'::jsonb
+              AND m.tool_calls->0->>'run_id' = $2
+              AND NOT EXISTS (
+                SELECT 1 FROM messages r
+                WHERE r.thread_id = m.thread_id
+                  AND r.role = 'system'
+                  AND r.tool_calls @> '[{"kind": "ask_user_response"}]'::jsonb
+                  AND r.tool_calls->0->>'tool_call_id' = m.tool_calls->0->>'tool_call_id'
+              )
+            """,
+            _tid,
+            str(run_id),
+            org_id if isinstance(org_id, UUID) else UUID(str(org_id)),
+        )
+    else:
+        rows = await pool.fetch(
+            """
+            SELECT m.tool_calls->0->>'tool_call_id' AS tool_call_id, m.user_id
+            FROM messages m
+            WHERE m.thread_id = $1
+              AND m.role = 'system'
+              AND m.tool_calls @> '[{"kind": "ask_user_prompt"}]'::jsonb
+              AND m.tool_calls->0->>'run_id' = $2
+              AND NOT EXISTS (
+                SELECT 1 FROM messages r
+                WHERE r.thread_id = m.thread_id
+                  AND r.role = 'system'
+                  AND r.tool_calls @> '[{"kind": "ask_user_response"}]'::jsonb
+                  AND r.tool_calls->0->>'tool_call_id' = m.tool_calls->0->>'tool_call_id'
+              )
+            """,
+            _tid,
+            str(run_id),
+        )
     for r in rows:
         tcid = r["tool_call_id"]
         if not tcid:
@@ -1176,7 +1206,8 @@ async def run_workflow(
                 try:
                     await asyncio.shield(
                         _expire_pending_ask_user(
-                            pool, getattr(ctx, "thread_id", None), run_id
+                            pool, getattr(ctx, "thread_id", None), run_id,
+                            org_id=getattr(ctx, "org_id", None),
                         )
                     )
                 except BaseException:  # noqa: BLE001 — second cancel mid-cleanup
@@ -1204,7 +1235,8 @@ async def run_workflow(
             # outstanding ask_user prompt so /pending never serves a dead one.
             try:
                 await _expire_pending_ask_user(
-                    pool, getattr(ctx, "thread_id", None), run_id
+                    pool, getattr(ctx, "thread_id", None), run_id,
+                    org_id=getattr(ctx, "org_id", None),
                 )
             except Exception:  # noqa: BLE001 — cleanup never crashes a terminal
                 logger.exception(
@@ -1244,7 +1276,8 @@ async def run_workflow(
                 # D-06 (BUG-260605-01): second terminal site — same prompt expiry.
                 try:
                     await _expire_pending_ask_user(
-                        pool, getattr(ctx, "thread_id", None), run_id
+                        pool, getattr(ctx, "thread_id", None), run_id,
+                        org_id=getattr(ctx, "org_id", None),
                     )
                 except Exception:  # noqa: BLE001
                     logger.exception(
@@ -1469,16 +1502,34 @@ async def _build_resume_context(run, redis, pool):
     )
 
     # F5 (092-07): the startup sweep has NO request, so there is no request-scoped
-    # supabase to thread. Source the SERVICE-ROLE client from the existing
-    # dependencies factory (get_supabase — a module-level singleton building
-    # create_client(SUPABASE_URL, SERVICE_ROLE_KEY); dependencies.py:16-20). Without
+    # supabase to thread. Source the SERVICE-ROLE client for the resumed run. Without
     # ctx.supabase a resumed phase's search_documents hits ctx.supabase.rpc → None
     # AttributeError (the exact F5 crash). THREAT: the service-role client bypasses
     # RLS, so retrieval MUST stay owner-scoped — search_documents filters by
     # current_user["id"], which we set below from run["user_id"] (the durable
     # run-owner), so a resumed search can never read another user's documents.
-    from app.dependencies import get_supabase
-    _service_supabase = get_supabase()
+    #
+    # Phase 163 (D-05 / T-163-05b): the client is built via get_service_role_supabase(org_id)
+    # — the org-requiring wrapper that REFUSES to construct a BYPASSRLS client without an
+    # explicit org — instead of a bare, org-less service-role singleton, so no org-less
+    # service-role client survives on this async-writer path. The org is the resumed run's OWN org
+    # (workflow_runs.org_id, backfilled post-162): carried on the run dict when
+    # find_resumable_runs selected it, else read here by run id. The BYPASSRLS + owner-scope
+    # posture is otherwise unchanged.
+    from app.dependencies import get_service_role_supabase
+    _org_id = run.get("org_id")
+    if _org_id is None:
+        try:
+            _org_id = await pool.fetchval(
+                "SELECT org_id FROM workflow_runs WHERE id = $1",
+                run["run_id"] if isinstance(run["run_id"], UUID) else UUID(str(run["run_id"])),
+            )
+        except Exception:  # noqa: BLE001 — org resolution is best-effort
+            logger.debug(
+                "resume: org_id read failed for run %s", run.get("run_id"), exc_info=True
+            )
+            _org_id = None
+    _service_supabase = get_service_role_supabase(_org_id)
 
     # F8 (092-07) + 152 WFIN-02 (Pitfall 5): parse the durable workflow_runs.inputs jsonb
     # ONCE up front so both the folder-override scope resolution below AND the F8
@@ -1656,6 +1707,9 @@ async def _build_resume_context(run, redis, pool):
         # spawner so a resumed sub-agent's task() can fan out; per_run_task_semaphore =
         # a fresh per-run gate for this resumed run.
         supabase=_service_supabase,
+        # Phase 163 (D-05): the resumed run's org, so the terminal ask_user-expiry
+        # cleanup (and any org-aware helper reading off ctx) widens to org-scope.
+        org_id=_org_id,
         folder_subtree_ids=_resume_folder_subtree_ids,
         scoped_folder_path=None,
         spawn=_resume_spawn,
@@ -1796,7 +1850,8 @@ async def resume_stranded_workflows(*, pool, redis) -> int:
             # the stale one keeps /pending honest in the interim.
             try:
                 await _expire_pending_ask_user(
-                    pool, run.get("thread_id"), run_id
+                    pool, run.get("thread_id"), run_id,
+                    org_id=getattr(ctx, "org_id", None),
                 )
             except Exception:  # noqa: BLE001
                 logger.exception(

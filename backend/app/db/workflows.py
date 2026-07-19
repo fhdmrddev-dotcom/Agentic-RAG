@@ -633,7 +633,8 @@ async def find_resumable_runs(pool: asyncpg.Pool) -> list[dict]:
     """
     rows = await pool.fetch(
         """
-        SELECT wr.id AS run_id, wr.thread_id, wr.current_phase_id, wr.inputs, t.user_id
+        SELECT wr.id AS run_id, wr.thread_id, wr.current_phase_id, wr.inputs,
+               wr.org_id, t.user_id
         FROM workflow_runs wr
         JOIN threads t ON t.id = wr.thread_id
         WHERE wr.status IN ('active', 'paused')

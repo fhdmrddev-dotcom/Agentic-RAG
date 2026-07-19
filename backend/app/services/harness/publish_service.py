@@ -497,9 +497,18 @@ async def _drive_golden_run(
     from app.services.harness_engine import _emit, run_workflow
 
     if supabase is None:
-        from app.dependencies import get_supabase
+        # Phase 163 (D-05 / T-163-05b): NO bare, org-less service-role fallback survives on
+        # the publish / golden-run path. Build the service-role client via the org-requiring
+        # wrapper (get_service_role_supabase REFUSES to construct without an explicit org),
+        # scoped to the org of the workflow definition being published
+        # (workflow_definitions.org_id, backfilled post-162). The ephemeral validation
+        # thread INSERT below still relies on the mig-106 autofill for its own org_id.
+        from app.dependencies import get_service_role_supabase
 
-        supabase = get_supabase()
+        _org_id = await pool.fetchval(
+            "SELECT org_id FROM workflow_definitions WHERE id = $1", definition_id
+        )
+        supabase = get_service_role_supabase(_org_id)
 
     # ── 1. ephemeral validation thread (the golden run's anchor) ─────────────────
     from fastapi.concurrency import run_in_threadpool  # D-v2.5-01: wrap blocking supabase-py
