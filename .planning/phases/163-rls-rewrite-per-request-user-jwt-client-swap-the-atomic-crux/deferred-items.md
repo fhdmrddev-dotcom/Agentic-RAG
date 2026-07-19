@@ -24,3 +24,31 @@ unrelated files during an additive plan).
   for the Wave-4 leak-test wiring or a dedicated test-infra fix — the governance leak
   tests likely need the same TestClient-vs-asyncpg loop isolation the Phase-163 leak
   tests will establish. Not a blocker for this plan.
+
+## Pre-existing test rot (NOT introduced by Plan 163-06)
+
+**`tests/integration/test_threads.py` — 4 failing tests (162.5 extraction source-drift rot).**
+
+- Failing: `TestSendMessage::test_sse_stream_contains_delta_events`,
+  `TestSendMessage::test_sse_stream_delta_events_are_valid_json`,
+  `TestSendMessageDispatchAttribution::test_dispatch_response_carries_resolved_model_and_provider`,
+  `TestSendMessageDispatchAttribution::test_dispatch_response_model_provider_follow_explicit_body_override`.
+- Root symptom: `AttributeError: <module 'app.api.threads'> does not have the attribute
+  'create_streaming_chat'` / `'insert_run'`. The tests do
+  `with patch("app.api.threads.create_streaming_chat", ...)` / `patch("app.api.threads.insert_run", ...)`
+  — both symbols were REMOVED from `threads.py` by the Phase 162.5 producer extraction
+  (streaming → `run_producer`/`agent_loop`; `insert_run` is imported by `db/runs.py`/`run_lifecycle`,
+  never re-exported through `threads.py`). The failure is a `patch()` SETUP `AttributeError`
+  raised BEFORE the test body runs — no send_message logic is exercised.
+- **Proven pre-existing:** `git show HEAD:backend/app/api/threads.py` (base commit `99d6020a`)
+  imports only `from app.db.runs import finalize_run, insert_assistant_message` — neither
+  `create_streaming_chat` nor `insert_run` is a module attribute on the base, so the
+  `patch()` targets are absent identically on the base. These are the documented
+  "insert_run/source-drift rot" from the Phase 162.5 close-out (old-vs-new differential:
+  "19 failed / 55 passed IDENTICAL both sides — zero net-new").
+- **Independence from 163-06:** Plan 163-06 only swaps `Depends(get_supabase)` → the user-JWT
+  client + converts request-scoped pool reads. It never references `create_streaming_chat`
+  or `insert_run`. `test_058_concurrency.py` (CONCUR-01, 0.41s < 1.0s gate) + `test_continue.py`
+  + the other 21 `test_threads.py`/integration tests pass GREEN with the swap in place.
+- **Disposition:** out of scope for 163-06. Candidate for a test-infra refresh that re-targets
+  the moved patch seams (`run_producer` / `agent_loop` / `db.runs`). Not a blocker.

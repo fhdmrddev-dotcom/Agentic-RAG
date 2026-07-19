@@ -4,7 +4,7 @@ import logging
 import os
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 # WR-01 fix: removed dead imports `AsyncGenerator` and `EventSourceResponse`
@@ -23,7 +23,22 @@ except ImportError:
     AnthropicAPIError = Exception  # fallback if SDK not installed
 from supabase import Client
 
-from app.dependencies import get_current_user, get_supabase, get_redis
+# Phase 163 (TEN-02) — the Wave-4 request-seam swap:
+#   get_user_supabase_client : the FastAPI-injectable per-request user-JWT (anon+Bearer)
+#     client — RLS-ENFORCED — that the chat/streaming request handlers inject instead of
+#     the service-role get_supabase singleton (D-03).
+#   get_user_pg_connection   : the SET-LOCAL-ROLE-authenticated asyncpg CM the request-scoped
+#     connectionless pool reads convert to (D-02).
+#   get_supabase (kept)      : STILL injected on the send_message producer seam ONLY, as the
+#     service-role client handed to run_producer — the agent-loop async writer stays
+#     service-role (D-05/D-09); it must NEVER get the user-JWT client.
+from app.dependencies import (
+    get_current_user,
+    get_supabase,
+    get_redis,
+    get_user_pg_connection,
+    get_user_supabase_client,
+)
 import redis.asyncio as aioredis
 # Phase 075 D-075-04: RedisError for the /snapshot endpoint's xinfo_stream
 # probe → 503+Retry-After:10 fallback (mirrors runs.py:354-370 pattern).
@@ -245,7 +260,7 @@ async def _emit_terminal(redis, run_id: _uuid_mod.UUID, type: str, **fields) -> 
 @router.get("", response_model=list[ThreadResponse])
 async def list_threads(
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     # BUG-260702-01 / Phase 134.1 (mig 082): exclude eval-execution threads (is_eval=true).
     # They are pure agent-loop exhaust — the eval's user-visible outputs live in eval_results +
@@ -352,7 +367,7 @@ async def _enrich_messages_with_runs(
 async def list_active_runs(
     thread_id: UUID,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     # Ownership check — mirror runs.py stream_run / cancel_run pattern. 404
     # (NOT 403) per D-062-12 so we don't leak thread existence to other users
@@ -406,7 +421,7 @@ async def list_active_runs(
 async def get_snapshot(
     thread_id: UUID,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
     redis: aioredis.Redis = Depends(get_redis),
 ):
     """D-075-01: one-round-trip reconcile primitive.
@@ -541,7 +556,7 @@ async def create_thread(
     background_tasks: BackgroundTasks,
     body: ThreadCreate = ThreadCreate(),
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     insert_data: dict = {"user_id": current_user["id"], "title": body.title}
     if body.folder_id:
@@ -565,7 +580,7 @@ async def rename_thread(
     thread_id: str,
     body: ThreadUpdate,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     # BL-01 fix: wrap sync .execute() with aexec (D-v2.5-01).
     await aexec(
@@ -591,7 +606,7 @@ async def delete_thread(
     thread_id: str,
     background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     # Close sandbox session if sandbox is enabled (SAND-10).
     # sandbox_manager is imported unconditionally at module scope (WR-03);
@@ -658,7 +673,7 @@ async def delete_thread(
 async def get_messages(
     thread_id: str,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     # BL-01 fix: wrap sync .execute() with aexec (D-v2.5-01).
     thread = await aexec(
@@ -723,7 +738,15 @@ async def send_message(
     thread_id: str,
     body: MessageCreate,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
+    # Phase 163 (D-05/D-09): the service-role client handed to the PRODUCER only.
+    # send_message's own request-scoped reads/writes (the thread ownership SELECT,
+    # preflight_workflow_kickoff, the user-message INSERT, maybe_autotitle_thread)
+    # run on the RLS-enforced `supabase` above; the detached agent-loop producer task
+    # (run_producer, below) STAYS service-role — it has no auth.uid() and must never
+    # carry the request's user-JWT client (which would also expire mid-run). The
+    # org-aware widening of the producer's writes is db/runs.py (Task 2).
+    service_supabase: Client = Depends(get_supabase),
     redis: aioredis.Redis = Depends(get_redis),
 ):
     thread_resp = await aexec(
@@ -834,6 +857,13 @@ async def send_message(
         # started-at score (the ordering 062's active-runs endpoint ZRANGEBYSCOREs).
         # _resolved_provider is guaranteed non-None at this line by the if/else chain
         # above (Pitfall 6 — provider column is NOT NULL).
+        #
+        # Phase 163 (D-05): register_run_start / finalize_run_terminal / create_workflow_run
+        # are the run-LIFECYCLE writers on the raw asyncpg pool (get_pg_pool → postgres role).
+        # They are the agent-loop-writer substrate (the runs / workflow_runs rows the producer
+        # then finalizes), NOT request-scoped user reads — so they STAY on the service-role pool
+        # and are NOT converted to get_user_pg_connection. mig-106's runs_autofill_org_id /
+        # workflow-run autofill triggers stamp org_id on INSERT; the widening lives in db/runs.py.
         await register_run_start(
             pool=await get_pg_pool(),
             redis=redis,
@@ -936,7 +966,9 @@ async def send_message(
         run_id,
         thread_id=thread_id,
         current_user=current_user,
-        supabase=supabase,
+        # Phase 163 (D-05/D-09): service-role — the agent-loop async writer path
+        # keeps BYPASSRLS (no auth.uid() off-request); NOT the user-JWT `supabase`.
+        supabase=service_supabase,
         redis=redis,
         user_settings=_user_settings,
         body=body,
@@ -993,8 +1025,9 @@ _MAX_CONTINUES_PER_RUN = 3  # D-06 (mirror of config.max_continues_per_run; Plan
 @router.get("/{thread_id}/workflow", response_model=ThreadWorkflowState)
 async def get_thread_workflow(
     thread_id: str,
+    request: Request,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ) -> ThreadWorkflowState:
     """PURE READ — reconcile a thread's Deep/Harness mode + lock + phase + Continue.
 
@@ -1019,7 +1052,21 @@ async def get_thread_workflow(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Thread not found")
 
     active_workflow_run_id = row.get("active_workflow_run_id")
-    pool = await get_pg_pool()
+
+    # Phase 163 (TEN-02 / D-02): the reconcile reads that used a connectionless
+    # get_pg_pool() BYPASSRLS pool now run under RLS on the per-request user-JWT
+    # connection (SET LOCAL ROLE authenticated + both GUC forms). Each read opens its
+    # own short SET-LOCAL txn — byte-for-byte the SAME independent-read semantics the
+    # old pool.fetchrow/pool.fetch had (asyncpg Pool.* acquires+releases per call), so
+    # workflow_runs / runs / workflow_phases / workflow_definitions are all gated by the
+    # caller's org membership. Deep byte-identical: this is a pure-read reconcile endpoint.
+    async def _rls_fetchrow(sql, *args):
+        async with get_user_pg_connection(request, current_user) as _conn:
+            return await _conn.fetchrow(sql, *args)
+
+    async def _rls_fetch(sql, *args):
+        async with get_user_pg_connection(request, current_user) as _conn:
+            return await _conn.fetch(sql, *args)
 
     # 2. Workflow-run state (joined: run -> definition -> current phase + total).
     run_status = None
@@ -1031,7 +1078,7 @@ async def get_thread_workflow(
     wf_continues_used = 0
     phases_list: list[WorkflowPhaseState] | None = None
     if active_workflow_run_id is not None:
-        wf_row = await pool.fetchrow(
+        wf_row = await _rls_fetchrow(
             """
             SELECT wr.status,
                    wr.continues_used,
@@ -1083,7 +1130,7 @@ async def get_thread_workflow(
     # new query, no write — the 092-05 pure-read F2 invariant holds).
     latest_producer_run_id = None
     if active_workflow_run_id is not None and not lock_is_stale:
-        prod_row = await pool.fetchrow(
+        prod_row = await _rls_fetchrow(
             "SELECT run_id, status FROM runs WHERE thread_id = $1 "
             "ORDER BY started_at DESC LIMIT 1",
             UUID(thread_id) if isinstance(thread_id, str) else thread_id,
@@ -1104,7 +1151,7 @@ async def get_thread_workflow(
     continues_used = wf_continues_used
     if not cap_paused:
         # Look at the thread's latest cap_paused `runs` row (Deep-run Continue case).
-        deep_row = await pool.fetchrow(
+        deep_row = await _rls_fetchrow(
             """
             SELECT status, continues_used
             FROM runs
@@ -1129,7 +1176,7 @@ async def get_thread_workflow(
     # panel timeline; a pure-deep thread (no workflow_run ever) yields phases=None.
     phases_source_run_id = active_workflow_run_id
     if phases_source_run_id is None:
-        latest_wf = await pool.fetchrow(
+        latest_wf = await _rls_fetchrow(
             "SELECT id FROM workflow_runs WHERE thread_id = $1 "
             "ORDER BY created_at DESC LIMIT 1",
             UUID(thread_id) if isinstance(thread_id, str) else thread_id,
@@ -1137,7 +1184,7 @@ async def get_thread_workflow(
         if latest_wf is not None:
             phases_source_run_id = latest_wf["id"]
     if phases_source_run_id is not None:
-        phase_rows = await pool.fetch(
+        phase_rows = await _rls_fetch(
             "SELECT slug, phase_index, status FROM workflow_phases "
             "WHERE workflow_run_id = $1 ORDER BY phase_index",
             UUID(phases_source_run_id) if isinstance(phases_source_run_id, str) else phases_source_run_id,
@@ -1147,7 +1194,7 @@ async def get_thread_workflow(
             # timeline can render the correct 3D icon for completed/historical runs
             # (the workflow_phases table doesn't store phase_type).
             slug_to_type: dict[str, str] = {}
-            def_row = await pool.fetchrow(
+            def_row = await _rls_fetchrow(
                 "SELECT wd.definition FROM workflow_runs wr "
                 "JOIN workflow_definitions wd ON wd.id = wr.definition_id "
                 "WHERE wr.id = $1",

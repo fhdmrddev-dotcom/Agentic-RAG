@@ -274,6 +274,26 @@ async def get_current_user(
     return identity
 
 
+# ── Phase 163 (TEN-02) — the FastAPI-injectable user-JWT client seam ───────────
+# ``get_user_supabase`` (above) takes an EXPLICIT ``token`` arg (called directly by
+# the Phase-163 test harness with a literal token), so it is not itself
+# ``Depends()``-able — FastAPI cannot resolve a bare ``token: str``. This thin async
+# adapter IS the router ``Depends()`` seam the Wave-4 chat/workspace handlers swap
+# onto: it resolves the validated identity (``get_current_user``) + the raw bearer
+# token (``bearer_scheme`` — the SAME token ``get_current_user`` just validated) and
+# hands both to the factory. FastAPI caches ``get_current_user`` per-request, so a
+# handler declaring BOTH ``current_user`` and this client still resolves
+# ``get_current_user`` exactly once. run_in_threadpool still wraps the blocking
+# supabase-py calls at every call site (D-v2.5-01); the client returned here is
+# per-request + ANON-key+Bearer, so RLS is ENFORCED on the swapped read/write path.
+async def get_user_supabase_client(
+    request: Request,
+    current_user: dict = Depends(get_current_user),
+    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+) -> Client:
+    return get_user_supabase(request, current_user, credentials.credentials)
+
+
 # ── Phase 146 (ADMIN-01) — operator gate + append-only audit floor ────────────
 # Byte-identical to Starlette's unknown-route 404 (non-discoverable). Do NOT
 # customize the body — the whole point is that a non-operator cannot tell an
