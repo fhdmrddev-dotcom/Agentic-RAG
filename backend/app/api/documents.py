@@ -15,7 +15,7 @@ from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
 from supabase import Client
 
-from app.dependencies import get_current_user, get_supabase
+from app.dependencies import get_current_user, get_supabase, get_user_supabase_client
 from app.models.document import DocumentMetadata, DocumentMoveRequest, DocumentResponse
 from app.models.user_settings import load_app_settings
 from app.services.audit_service import write_audit_entry
@@ -366,7 +366,12 @@ async def upload_document(
         ),
     ),
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
+    # D-05 carve-out: the detached BackgroundTask writers below (`_upload_pipeline` +
+    # `write_audit_entry`) stay service-role — the ingest pipeline writes `pdf_extraction_runs`,
+    # which has RLS enabled but NO `authenticated` INSERT policy, so a user-JWT client would be
+    # silently denied. Request-scoped work above uses the RLS-enforced `supabase`.
+    service_supabase: Client = Depends(get_supabase),
 ):
     # Normalize mime type (strip charset suffix)
     mime_type = (file.content_type or "").split(";")[0].strip()
@@ -518,7 +523,7 @@ async def upload_document(
         file.filename,
         current_user["id"],
         storage_path,
-        supabase,
+        service_supabase,   # D-05: detached pipeline stays service-role (pdf_extraction_runs INSERT)
         engines_dict,
     )
     background_tasks.add_task(
@@ -526,7 +531,7 @@ async def upload_document(
         user_id=current_user["id"],
         action_type="document.upload",
         metadata={"document_id": doc["id"], "filename": doc["filename"], "folder_id": folder_id},
-        supabase=supabase,
+        supabase=service_supabase,   # D-05: detached audit writer stays service-role
     )
 
     return doc
@@ -535,7 +540,7 @@ async def upload_document(
 @router.get("", response_model=list[DocumentResponse])
 async def list_documents(
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     # Own documents — only show latest versions (VER-03)
     own_result = (
@@ -599,7 +604,7 @@ async def list_documents(
 async def list_document_versions(
     document_id: str,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """Return all versions of a document ordered by version_number descending."""
     # 1. Verify doc exists and user has access
@@ -629,7 +634,7 @@ async def list_document_versions(
 async def restore_document_version(
     document_id: str,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """Restore a historical document version, making it the current latest."""
     # 1. Validate ownership
@@ -674,7 +679,12 @@ async def reingest_document(
     document_id: str,
     background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
+    # D-05 carve-out: the detached `_upload_pipeline` BackgroundTask stays service-role — it
+    # writes `pdf_extraction_runs` (RLS-enabled, NO `authenticated` INSERT policy). The
+    # request-scoped owner SELECT / storage download / chunk-cascade delete / status UPDATE
+    # above run on the RLS-enforced `supabase`.
+    service_supabase: Client = Depends(get_supabase),
 ):
     """Re-queue a document for ingestion by fetching from storage and scheduling
     background extraction.
@@ -762,7 +772,7 @@ async def reingest_document(
         target["filename"],
         current_user["id"],
         "",                  # storage_path="" → skip storage upload (file already there)
-        supabase,
+        service_supabase,    # D-05: detached pipeline stays service-role (pdf_extraction_runs INSERT)
     )
     return result.data[0]
 
@@ -1010,7 +1020,13 @@ async def reextract_document(
         ),
     ),
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
+    # D-05 carve-out: the detached `ingest_document` BackgroundTask stays service-role — it
+    # writes `pdf_extraction_runs` (RLS-enabled, NO `authenticated` INSERT policy) + runs the
+    # global-rule classification splice. The request-scoped owner SELECT / storage download /
+    # delete-cascade / status UPDATE / the awaited `_reextract_refill_empty_descriptions` above
+    # run on the RLS-enforced `supabase`.
+    service_supabase: Client = Depends(get_supabase),
 ):
     """Re-extract a single document with an explicit engine override (Phase 071 D-071-09..12).
 
@@ -1196,7 +1212,7 @@ async def reextract_document(
         document_id,
         text,
         current_user["id"],
-        supabase,
+        service_supabase,    # D-05: detached ingest writer stays service-role (pdf_extraction_runs INSERT)
         raw,
         mime_type,
         target["filename"],
@@ -1213,7 +1229,12 @@ async def delete_document(
     background_tasks: BackgroundTasks,
     scope: str = Query(default="version", pattern="^(version|all)$"),
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
+    # D-05 carve-out: the detached `write_audit_entry` BackgroundTask stays service-role
+    # (uniform with the other BackgroundTask-spawning handlers). The request-scoped owner
+    # SELECT / storage remove / owner-scoped DELETE / sibling-promote above run on the
+    # RLS-enforced `supabase`.
+    service_supabase: Client = Depends(get_supabase),
 ):
     doc_resp = (
         supabase.table("documents")
@@ -1297,7 +1318,7 @@ async def delete_document(
             "filename": target.get("filename", ""),
             "scope": scope,
         },
-        supabase=supabase,
+        supabase=service_supabase,   # D-05: detached audit writer stays service-role
     )
 
 
@@ -1306,7 +1327,7 @@ async def move_document(
     document_id: str,
     body: DocumentMoveRequest,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """Move a document to a different folder. folder_id=null moves to root."""
     # 1. Verify document ownership
@@ -1360,7 +1381,7 @@ async def update_document_metadata(
     document_id: str,
     body: MetadataUpdateRequest,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """Phase 112 META-05 (D-03) — audited single-field metadata edit.
 
@@ -1456,7 +1477,7 @@ async def update_document_metadata(
 async def accept_classification(
     document_id: str,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """Phase 118 CLASS-03 — accept a classification suggestion (reversible move + audit).
 
@@ -1549,7 +1570,7 @@ async def accept_classification(
 async def dismiss_classification(
     document_id: str,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """Phase 118 CLASS-03 — dismiss a classification suggestion (clear, no move, no audit).
 

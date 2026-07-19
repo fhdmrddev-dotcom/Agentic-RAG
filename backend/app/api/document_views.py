@@ -47,7 +47,7 @@ deferred wholesale to Phase 119 (not shipped here).
 from fastapi import APIRouter, Depends, HTTPException, status
 from supabase import Client
 
-from app.dependencies import get_current_user, get_supabase
+from app.dependencies import get_current_user, get_user_supabase_client
 from app.models.document_view import (
     AdHocResolve,
     ViewCreate,
@@ -85,7 +85,7 @@ router = APIRouter(prefix="/document-views", tags=["document-views"])
 @router.get("", response_model=list[ViewResponse])
 async def list_views(
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """List the caller's own views plus global ones (deduped, ordered by name)."""
     return await document_view_service.list_views(current_user["id"], supabase=supabase)
@@ -95,7 +95,7 @@ async def list_views(
 async def create_view(
     body: ViewCreate,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """Create an owner-private saved view (never global) + write a view.create audit row.
 
@@ -140,7 +140,7 @@ async def update_view(
     view_id: str,
     body: ViewUpdate,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """Update an owned view (404 on a cross-user miss, never 403).
 
@@ -189,7 +189,7 @@ async def update_view(
 async def delete_view(
     view_id: str,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """Delete an owned view (404 on a cross-user miss, never 403)."""
     removed = await document_view_service.delete_view(
@@ -204,7 +204,7 @@ async def resolve_view(
     view_id: str,
     count_only: bool = False,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """Resolve a view to its complete listing of matching latest-version docs.
 
@@ -264,7 +264,7 @@ async def resolve_view(
 async def resolve_adhoc(
     body: AdHocResolve,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """STATELESS ad-hoc resolve/count for an UNSAVED filter (114 CR-01).
 
