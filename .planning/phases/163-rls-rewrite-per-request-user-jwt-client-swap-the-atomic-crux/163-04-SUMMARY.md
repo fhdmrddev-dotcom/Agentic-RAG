@@ -82,7 +82,13 @@ The three files ARE the mitigations in the plan's `<threat_model>`: T-163-01 (ro
 
 ## Deviations from Plan
 
-None — plan executed as written. Two in-spec design choices are recorded in the frontmatter `decisions` (two-tier representative table coverage; positive-control as the supabase-path fail-loud guard since the fluent adapter exposes no raw-SQL preflight). Neither changes behavior or scope.
+**1. [Rule 1 — inaccurate state write] TEN-02 kept Pending, not marked Complete.**
+- **Found during:** state updates (post-execution bookkeeping).
+- **Issue:** the workflow's `requirements mark-complete` (fed from the plan frontmatter `requirements: [TEN-02]`) flipped TEN-02 → Complete. But this is a Wave-2 plan that only AUTHORS the leak tests, which are RED by design until plan 163-05 applies migrations 107+108. TEN-02's own text says it "**Ships in the same phase as TEN-01** (RLS is inert without it)," and TEN-01 + TEN-04 remain Pending — so a lone TEN-02 Complete is cross-requirement-inconsistent and would risk a false phase-done signal (the exact stale-bookkeeping class the project repeatedly flags).
+- **Fix:** reverted `REQUIREMENTS.md` — TEN-02 checkbox `[x]→[ ]` and traceability row `Complete→Pending`. TEN-02 should be marked Complete when the plan-05 apply + Wave-4 hot-path swap land and its tests go GREEN.
+- **Files modified:** `.planning/REQUIREMENTS.md`.
+
+Otherwise the plan executed as written. Two in-spec design choices are recorded in the frontmatter `decisions` (two-tier representative table coverage; positive-control as the supabase-path fail-loud guard since the fluent adapter exposes no raw-SQL preflight). Neither changes behavior or scope.
 
 ## Known Stubs
 
