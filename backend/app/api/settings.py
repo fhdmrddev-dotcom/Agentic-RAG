@@ -18,6 +18,20 @@ from app.services.skill_tuner_service import resolve_skill_builder_model
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 
+# ── Phase 163 (TEN-02 / D-03 / D-05) — settings client policy ─────────────────
+# These handlers KEEP the hardened service-role client (classified carve-out, marked
+# ``# service-role:`` at each Depends) — this is APP-LEVEL / operator config, not per-user
+# request data:
+#   * ``app_settings`` has RLS DISABLED (a global singleton config table — verified live on
+#     :54322); the settings read/write flows through ``load_app_settings_async`` /
+#     ``save_app_settings`` (their own ``get_pg_pool()`` access), NOT the injected client.
+#   * The injected ``supabase`` here only drives (a) the ``write_audit_entry`` BackgroundTask
+#     (audit_log — INSERT-only authenticated policy, a detached writer) and (b) the RE-EMBED
+#     subsystem (``start_reembed`` / ``reembed_progress`` in reembed_service.py) — the re-embed
+#     ASYNC WRITER is explicitly widened with org_id in plan 09 (D-05), so its request surface
+#     stays service-role here to keep that boundary clean.
+# ``GET /settings/providers`` (the Run-carve-out chat-picker feed) injects no client at all.
+
 
 # ── Response models ───────────────────────────────────────────────────────────
 
@@ -322,7 +336,7 @@ async def update_settings(
     body: SettingsUpdate,
     background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_supabase),  # service-role: app-level settings (app_settings RLS-off) + audit/re-embed writers (plan 09)
 ):
     updates: dict = {}
 
@@ -524,7 +538,7 @@ class ReembedProgressResponse(BaseModel):
 )
 async def get_reembed_progress(
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_supabase),  # service-role: app-level settings (app_settings RLS-off) + audit/re-embed writers (plan 09)
 ):
     """Reconcile-on-fetch progress for the Settings re-embed status card (D-v2.5-03).
 
@@ -545,7 +559,7 @@ async def get_reembed_progress(
 async def rekick_reembed(
     background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_supabase),  # service-role: app-level settings (app_settings RLS-off) + audit/re-embed writers (plan 09)
 ):
     """Manual "Re-embed now" re-kick for a failed/partial run (D-05). Re-runs against the
     same stale predicate, so it resumes from wherever the last run stopped. dims_changed

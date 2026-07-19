@@ -4,6 +4,18 @@ Settings resolution: DB app_settings row > .env defaults.
 Phase 081.1 Plan 03: file-based settings_override.json eliminated.
 All settings reads go through a 30s TTL in-process DB cache (D-06).
 Writes go through save_app_settings() via asyncpg (D-20).
+
+Phase 163 (TEN-02): the ``get_pg_pool()`` raw-pool calls in this module
+(``_load_settings_from_db`` / ``save_app_settings`` / ``_load_model_overrides`` /
+``load_all_model_overrides`` / ``set_feature_visibility``) STAY service-role — they are
+NOT per-request user data and so are NOT converted to ``get_user_pg_connection``. They
+operate on GLOBAL / operator config: ``app_settings`` (a singleton config table with RLS
+DISABLED, verified live on :54322), ``model_capabilities_overrides`` (a global registry —
+authenticated SELECT-only, operator writes land in admin.py), and the feature-visibility
+map — none of which have a per-user ``org_id``/``user_id`` scope a ``SET LOCAL ROLE
+authenticated`` context would narrow. Forcing a per-user RLS connection here would be
+semantically wrong (there is no per-user row to scope) and these helpers are called from
+BOTH request handlers AND the agent loop / background paths.
 """
 
 from __future__ import annotations
