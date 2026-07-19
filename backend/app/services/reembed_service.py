@@ -68,6 +68,35 @@ def _current_model(app_settings) -> str:
     return (getattr(app_settings, "embedding_model", "") or DEFAULT_MODEL)
 
 
+async def _resolve_reembed_org_id(supabase, user_id: str):
+    """Resolve the org that owns this user's chunks (Phase 163 / D-05).
+
+    Reads one ``document_chunks.org_id`` (denormalized + backfilled by the TEN-04
+    migration) for ``user_id`` via the injected service-role client, so the batch
+    re-embed writer can route through ``get_service_role_supabase(org_id)`` and widen
+    every read + write to org-aware. Best-effort: any failure — or a corpus with no
+    chunks / a NULL org_id — returns None, and the job stays byte-identical to pre-163
+    (the ``.eq("user_id")`` owner scope is unchanged). The raw value is returned
+    unconverted so it binds correctly on BOTH client surfaces (a uuid object on the
+    asyncpg test adapter, a str via PostgREST). Blocking supabase-py wrapped (D-v2.5-01)."""
+    def _q():
+        return (
+            supabase.table("document_chunks")
+            .select("org_id")
+            .eq("user_id", user_id)
+            .limit(1)
+            .execute()
+        )
+
+    try:
+        resp = await run_in_threadpool(_q)
+        rows = resp.data or []
+        return rows[0].get("org_id") if rows else None
+    except Exception:  # noqa: BLE001 — org resolution is best-effort; None => byte-identical
+        logger.debug("reembed org_id resolve failed for user_id=%s", user_id, exc_info=True)
+        return None
+
+
 # ── the job ─────────────────────────────────────────────────────────────────────
 
 async def reembed_job(
@@ -77,6 +106,8 @@ async def reembed_job(
     dims_changed: bool,
     max_batches: int | None = None,
     batch_size: int | None = None,
+    *,
+    org_id=None,
 ) -> dict:
     """Re-embed this user's stale chunks from their preserved `content`.
 
@@ -86,10 +117,18 @@ async def reembed_job(
     `batch_size` overrides the per-pass slice size (defaults to BATCH); also used by the
     resumable test to force genuine multi-pass behavior on a small fixture.
     Returns a snapshot of the progress record.
+
+    Phase 163 (D-05/D-14): `org_id` is the org that owns this corpus (threaded from
+    `start_reembed`, else resolved here from the chunks being re-embedded). When known,
+    every read AND write is WIDENED with an `.eq("org_id")` predicate alongside the
+    retained `.eq("user_id")` scope — belt-and-suspenders on the service-role (BYPASSRLS)
+    batch path. `org_id=None` keeps the job byte-identical to pre-163.
     """
     limit = batch_size if batch_size is not None else BATCH
     current = _current_model(app_settings)
     dims = getattr(app_settings, "embedding_dimensions", None)
+    if org_id is None:
+        org_id = await _resolve_reembed_org_id(supabase, user_id)
     _set_status(user_id, "running", model=current, dims_changed=bool(dims_changed))
 
     try:
@@ -117,14 +156,21 @@ async def reembed_job(
             # (NULL != 'x' is NULL, not TRUE), so those chunks were counted as "remaining" by
             # reembed_progress yet never selectable here -> stranded forever. or_(is.null,neq)
             # restores the true IS DISTINCT FROM stale predicate (D-10). Threadpool-wrapped.
-            batch = await run_in_threadpool(
-                lambda: supabase.table("document_chunks")
-                .select("id, content")
-                .eq("user_id", user_id)
-                .or_(f'embedding_model.is.null,embedding_model.neq."{current}"')
-                .limit(limit)
-                .execute()
-            )
+            def _read_batch():
+                q = (
+                    supabase.table("document_chunks")
+                    .select("id, content")
+                    .eq("user_id", user_id)
+                )
+                if org_id is not None:
+                    q = q.eq("org_id", org_id)  # Phase 163 (D-05) — org-aware read scope
+                return (
+                    q.or_(f'embedding_model.is.null,embedding_model.neq."{current}"')
+                    .limit(limit)
+                    .execute()
+                )
+
+            batch = await run_in_threadpool(_read_batch)
             rows = batch.data or []
             if not rows:
                 break
@@ -141,25 +187,30 @@ async def reembed_job(
             # replacement — never NULLed first. An interruption between batches leaves the
             # unprocessed chunks with their original vector (the corpus stays "partial").
             for row, vec in zip(rows, vectors):
-                await run_in_threadpool(
-                    lambda row=row, vec=vec: supabase.table("document_chunks")
-                    .update(
-                        {
-                            "embedding": vec,
-                            "embedding_model": current,
-                            "embedding_dimensions": dims,
-                        }
+                def _write(row=row, vec=vec):
+                    q = (
+                        supabase.table("document_chunks")
+                        .update(
+                            {
+                                "embedding": vec,
+                                "embedding_model": current,
+                                "embedding_dimensions": dims,
+                            }
+                        )
+                        .eq("id", row["id"])
+                        .eq("user_id", user_id)  # RLS scope on the WRITE too (V4)
                     )
-                    .eq("id", row["id"])
-                    .eq("user_id", user_id)  # RLS scope on the WRITE too (V4)
-                    .execute()
-                )
+                    if org_id is not None:
+                        q = q.eq("org_id", org_id)  # Phase 163 (D-05) — org-aware write scope
+                    return q.execute()
+
+                await run_in_threadpool(_write)
                 processed += 1
 
             _set_status(user_id, "running", processed=processed)
 
         # Reconcile final status against the live counts (source of truth).
-        progress = await reembed_progress(supabase, user_id, app_settings)
+        progress = await reembed_progress(supabase, user_id, app_settings, org_id=org_id)
         final = "complete" if progress["remaining"] == 0 else "partial"
         _set_status(user_id, final, processed=processed)
         progress["status"] = final
@@ -169,7 +220,7 @@ async def reembed_job(
         logger.warning("reembed_job failed for user_id=%s; marking partial", user_id, exc_info=True)
         _set_status(user_id, "failed")
         try:
-            progress = await reembed_progress(supabase, user_id, app_settings)
+            progress = await reembed_progress(supabase, user_id, app_settings, org_id=org_id)
             progress["status"] = "failed"
             return progress
         except Exception:  # noqa: BLE001
@@ -180,6 +231,8 @@ async def reembed_progress(
     supabase,
     user_id: str,
     app_settings: "UserEffectiveSettings | None" = None,
+    *,
+    org_id=None,
 ) -> dict:
     """Reconcile-on-fetch progress for the Settings status card (D-v2.5-03).
 
@@ -187,32 +240,46 @@ async def reembed_progress(
     worker restart). `status` overlays the in-process hint, reconciled against the counts:
     if no stale chunks remain the status is `complete` regardless of a stale hint; if some
     remain and nothing is running, it degrades to `partial`. RLS-scoped eq(user_id).
+
+    Phase 163 (D-05/D-14): both COUNT reads WIDEN to org-aware (add `.eq("org_id")`) when
+    the corpus org is known (threaded from `reembed_job`, else resolved here). `org_id=None`
+    keeps the counts byte-identical (owner `.eq("user_id")` scope only).
     """
     current = _current_model(app_settings) if app_settings is not None else None
+    if org_id is None:
+        org_id = await _resolve_reembed_org_id(supabase, user_id)
 
     # COUNT via count="exact" (PostgREST Content-Range), NOT len(rows): a plain
     # .select().execute() returns at most the PostgREST default max-rows (1000),
     # so len() silently undercounts any corpus > 1000 chunks. Found live (G-4 UAT):
     # an 1839-chunk corpus reported total=1000, which also skewed the progress
     # denominator. limit(1) avoids transferring rows we don't need — only .count matters.
-    total_res = await run_in_threadpool(
-        lambda: supabase.table("document_chunks")
-        .select("id", count="exact")
-        .eq("user_id", user_id)
-        .limit(1)
-        .execute()
-    )
+    def _total_q():
+        q = (
+            supabase.table("document_chunks")
+            .select("id", count="exact")
+            .eq("user_id", user_id)
+        )
+        if org_id is not None:
+            q = q.eq("org_id", org_id)  # Phase 163 (D-05) — org-aware count scope
+        return q.limit(1).execute()
+
+    total_res = await run_in_threadpool(_total_q)
     total_n = total_res.count or 0
 
     if current is not None:
-        done_res = await run_in_threadpool(
-            lambda: supabase.table("document_chunks")
-            .select("id", count="exact")
-            .eq("user_id", user_id)
-            .eq("embedding_model", current)
-            .limit(1)
-            .execute()
-        )
+        def _done_q():
+            q = (
+                supabase.table("document_chunks")
+                .select("id", count="exact")
+                .eq("user_id", user_id)
+                .eq("embedding_model", current)
+            )
+            if org_id is not None:
+                q = q.eq("org_id", org_id)  # Phase 163 (D-05) — org-aware count scope
+            return q.limit(1).execute()
+
+        done_res = await run_in_threadpool(_done_q)
         re_embedded = done_res.count or 0
     else:
         re_embedded = None
@@ -246,5 +313,19 @@ async def start_reembed(
     dims_changed: bool,
 ) -> dict:
     """Entrypoint the settings kickoff (BackgroundTask) + the "Re-embed now" re-kick both
-    call. Thin wrapper over `reembed_job` (runs to completion — no batch cap)."""
-    return await reembed_job(supabase, user_id, app_settings, dims_changed=dims_changed)
+    call. Thin wrapper over `reembed_job` (runs to completion — no batch cap).
+
+    Phase 163 (D-05 / T-163-05b): route the detached batch writer through the org-requiring
+    service-role wrapper. Resolve the corpus org (from the user's own chunks) and, when
+    present, build the client via `get_service_role_supabase(org_id)` — which REFUSES to
+    construct a BYPASSRLS client without an explicit org — so no bare, org-less service-role
+    client survives on the re-embed path. A corpus with no chunks (org_id None) has nothing
+    to re-embed, so it falls through on the injected client unchanged."""
+    org_id = await _resolve_reembed_org_id(supabase, user_id)
+    if org_id:
+        from app.dependencies import get_service_role_supabase  # function-local (avoid import cycle)
+
+        supabase = get_service_role_supabase(org_id)
+    return await reembed_job(
+        supabase, user_id, app_settings, dims_changed=dims_changed, org_id=org_id
+    )

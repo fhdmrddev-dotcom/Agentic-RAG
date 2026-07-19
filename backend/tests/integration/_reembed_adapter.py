@@ -94,6 +94,7 @@ class _Query:
         self._update_values: dict = {}
         self._eq: list[tuple[str, object]] = []
         self._neq: list[tuple[str, object]] = []
+        self._or_groups: list[str] = []
         self._limit = None
 
     # -- builder verbs (chainable) --
@@ -115,6 +116,14 @@ class _Query:
         self._neq.append((col, val))
         return self
 
+    def or_(self, filter_str):
+        # PostgREST or() filter: comma-separated `col.op.val` conditions combined with OR.
+        # The re-embed job uses exactly `embedding_model.is.null,embedding_model.neq."<model>"`
+        # (its D-10 stale predicate) — supported here so the LIVE adapter exercises the real
+        # WHERE (a bare .neq drops NULL-model chunks). Rendered in _where alongside eq/neq.
+        self._or_groups.append(filter_str)
+        return self
+
     def limit(self, n):
         self._limit = n
         return self
@@ -134,6 +143,24 @@ class _Query:
             clauses.append(f"{col} IS DISTINCT FROM ${i}")
             params.append(val)
             i += 1
+        for group in self._or_groups:
+            or_parts: list[str] = []
+            for cond in group.split(","):
+                col, op, val = (cond.strip().split(".", 2) + ["", ""])[:3]
+                if op == "is" and val == "null":
+                    or_parts.append(f"{col} IS NULL")
+                elif op == "neq":
+                    or_parts.append(f"{col} IS DISTINCT FROM ${i}")
+                    params.append(val.strip().strip('"'))
+                    i += 1
+                elif op == "eq":
+                    or_parts.append(f"{col} = ${i}")
+                    params.append(val.strip().strip('"'))
+                    i += 1
+                else:
+                    raise ValueError(f"_reembed_adapter or_() unsupported op: {op!r}")
+            if or_parts:
+                clauses.append("(" + " OR ".join(or_parts) + ")")
         where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
         return where, params
 
