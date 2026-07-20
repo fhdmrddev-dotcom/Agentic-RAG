@@ -67,7 +67,7 @@ Ship only if CORE lands clean and budget remains. First-to-cut ordering: SSO/OID
 - [x] **Phase 161: Org / Dept / Role Schema** — 8 org tables + `current_user_org_ids()` helper + non-recursive `org_members` policy + nullable `org_id` on the ~26 remaining tables, RLS from day one (ORG-01, ORG-02)
 - [x] **Phase 162: Personal-Org Backfill** — one personal org + default dept + org-admin membership per user; batched idempotent `org_id` backfill; org_id auto-fill net (mig 106) so nothing breaks; NOT-NULL only after zero-NULL (MIG-01)
 - [x] **Phase 162.5: threads.py Producer Extraction (G-5 refactor)** — extract `agent_runner`+`_shielded_finalize`+`spawn_continuation_run` → `run_producer.py` (8 finalize invariants preserved) + `workflow_kickoff.py`/`thread_title.py`/`run_model_resolution.py`; Deep byte-identical + full suite green = the hard gate before 163 (enables TEN-02) — **operator-approved 2026-07-19 (D-A6 gate PASSED; Phase 163 unblocked)**
-- [ ] **Phase 163: RLS Rewrite + User-JWT Client Swap — THE ATOMIC CRUX** — (after Phase 162.5 extraction) membership RLS across 38 tables + user-JWT client on BOTH paths (supabase-py JWT-header + asyncpg `SET LOCAL ROLE authenticated`) + `document_chunks`/`skill_embeddings` `org_id` denormalize+index (TEN-01, TEN-02, TEN-04)
+- [x] **Phase 163: RLS Rewrite + User-JWT Client Swap — THE ATOMIC CRUX** — (after Phase 162.5 extraction) membership RLS across 38 tables + user-JWT client on BOTH paths (supabase-py JWT-header + asyncpg `SET LOCAL ROLE authenticated`) + `document_chunks`/`skill_embeddings` `org_id` denormalize+index (TEN-01, TEN-02, TEN-04) — **COMPLETE 2026-07-20**: 11/11 plans, migs 107+108 + FIX-A mig 109 (platform-universal RLS); UAT 8/8, secure-phase 28/28 STRIDE (threats_open:0); membership RLS now the ENFORCED gate on every request path
 - [ ] **Phase 164: SECDEF Audit + Cross-Org Isolation Suite** — 4 SECDEF functions org-scoped + `search_path` pinned + `_inject_user_id` deleted; `test_v3_4_org_isolation.py` two-org exit gate; folder-ACL retrieval isolation; SEED-091 closed (TEN-03, TEN-05, TEN-06, PRAG-01)
 - [ ] **Phase 165: `is_global` Retirement Cleanup** — `is_global`→`is_org_shared` rename across SQL / `folder_utils.py` / Storage policy + UI copy; migration-only `is_system_global` allow-list for the seeded skill-creator (MIG-02)
 - [ ] **Phase 166: Org-Admin Shell + Switcher + Profile + Audit + Settings Split** — profile identity anchor + org switcher (`<OrgContext>` outside StreamsProvider) + 7-tab org-admin shell + org-scoped audit + SEED-116 Settings IA split (ADMIN-01, ADMIN-02, ADMIN-03, ADMIN-04, ADMIN-05)
@@ -274,7 +274,7 @@ Ship only if CORE lands clean and budget remains. First-to-cut ordering: SSO/OID
 | 161. Org / Dept / Role Schema | 2/2 | Complete | 2026-07-18 |
 | 162. Personal-Org Backfill | 3/3 | Complete | 2026-07-18 |
 | 162.5. threads.py Producer Extraction (G-5) | 4/4 | Complete | 2026-07-19 |
-| 163. RLS Rewrite + User-JWT Client Swap (CRUX) | 0/10 | Not started | - |
+| 163. RLS Rewrite + User-JWT Client Swap (CRUX) | 11/11 | Complete | 2026-07-20 |
 | 164. SECDEF Audit + Cross-Org Isolation Suite | 0/? | Not started | - |
 | 165. `is_global` Retirement Cleanup | 0/? | Not started | - |
 | 166. Org-Admin Shell + Switcher + Profile + Audit + Settings Split | 0/? | Not started | - |
