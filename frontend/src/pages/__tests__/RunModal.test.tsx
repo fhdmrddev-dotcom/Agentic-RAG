@@ -61,8 +61,8 @@ import type { Folder } from "@/types"
 
 /** The author default (folder-aaa) + a distinct override target (folder-bbb). */
 const folders: Folder[] = [
-  { id: "folder-aaa", user_id: "u1", name: "DBA Chapters", parent_id: null, is_global: false, created_at: "", updated_at: "" },
-  { id: "folder-bbb", user_id: "u1", name: "Contracts", parent_id: null, is_global: false, created_at: "", updated_at: "" },
+  { id: "folder-aaa", user_id: "u1", name: "DBA Chapters", parent_id: null, is_org_shared: false, created_at: "", updated_at: "" },
+  { id: "folder-bbb", user_id: "u1", name: "Contracts", parent_id: null, is_org_shared: false, created_at: "", updated_at: "" },
 ]
 
 /** A published workflow BOUND to folder-aaa, with NO per-phase folder_scope (so every
@@ -97,9 +97,9 @@ const unboundPublished = {
 
 /** Project P with children A and B (the backend 152-06 P/A/B shape). */
 const phaseScopedFolders: Folder[] = [
-  { id: "folder-p", user_id: "u1", name: "Project P", parent_id: null, is_global: false, created_at: "", updated_at: "" },
-  { id: "folder-a", user_id: "u1", name: "Team A", parent_id: "folder-p", is_global: false, created_at: "", updated_at: "" },
-  { id: "folder-b", user_id: "u1", name: "Team B", parent_id: "folder-p", is_global: false, created_at: "", updated_at: "" },
+  { id: "folder-p", user_id: "u1", name: "Project P", parent_id: null, is_org_shared: false, created_at: "", updated_at: "" },
+  { id: "folder-a", user_id: "u1", name: "Team A", parent_id: "folder-p", is_org_shared: false, created_at: "", updated_at: "" },
+  { id: "folder-b", user_id: "u1", name: "Team B", parent_id: "folder-p", is_org_shared: false, created_at: "", updated_at: "" },
 ]
 
 /** A workflow declaring two per-phase folder_scopes [A] and [B]. An override of A would
@@ -125,10 +125,10 @@ const phaseScopedPublished = {
  *  subtree(P)={P,A1}; subtree(R)={R,P,A1,P2} — so R (a strict ancestor of the bound project)
  *  trivially satisfies the per-phase folder_scope=[A1] yet WIDENS retrieval to the sibling P2. */
 const ancestorFolders: Folder[] = [
-  { id: "folder-r", user_id: "u1", name: "Workspace root", parent_id: null, is_global: false, created_at: "", updated_at: "" },
-  { id: "folder-p", user_id: "u1", name: "Project P", parent_id: "folder-r", is_global: false, created_at: "", updated_at: "" },
-  { id: "folder-a1", user_id: "u1", name: "Team A1", parent_id: "folder-p", is_global: false, created_at: "", updated_at: "" },
-  { id: "folder-p2", user_id: "u1", name: "Project P2", parent_id: "folder-r", is_global: false, created_at: "", updated_at: "" },
+  { id: "folder-r", user_id: "u1", name: "Workspace root", parent_id: null, is_org_shared: false, created_at: "", updated_at: "" },
+  { id: "folder-p", user_id: "u1", name: "Project P", parent_id: "folder-r", is_org_shared: false, created_at: "", updated_at: "" },
+  { id: "folder-a1", user_id: "u1", name: "Team A1", parent_id: "folder-p", is_org_shared: false, created_at: "", updated_at: "" },
+  { id: "folder-p2", user_id: "u1", name: "Project P2", parent_id: "folder-r", is_org_shared: false, created_at: "", updated_at: "" },
 ]
 
 /** A workflow BOUND to P (project_folder_id: "folder-p") declaring phase folder_scope=[A1].

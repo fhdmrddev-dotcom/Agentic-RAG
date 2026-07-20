@@ -67,7 +67,7 @@ import { WorkflowsPage } from "../WorkflowsPage"
 import type { Folder } from "@/types"
 
 const folders: Folder[] = [
-  { id: "folder-aaa", user_id: "u1", name: "DBA Chapters", parent_id: null, is_global: false, created_at: "", updated_at: "" },
+  { id: "folder-aaa", user_id: "u1", name: "DBA Chapters", parent_id: null, is_org_shared: false, created_at: "", updated_at: "" },
 ]
 
 /** One published workflow — its `id` (pub-1) is the definition id the preview + cascade

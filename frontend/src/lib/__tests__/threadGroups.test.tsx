@@ -116,7 +116,7 @@ describe("folderLabel — name / Unfiled / Folder (D-04)", () => {
       user_id: "u-1",
       name: "Finance",
       parent_id: null,
-      is_global: false,
+      is_org_shared: false,
       created_at: daysAgoISO(0),
       updated_at: daysAgoISO(0),
     },
@@ -137,9 +137,9 @@ describe("folderLabel — name / Unfiled / Folder (D-04)", () => {
 
 describe("groupByFolder — folder groups, Unfiled last, empty-fold, within-group DESC (Task 2 / D-04)", () => {
   const folders: Folder[] = [
-    { id: "f-fin", user_id: "u-1", name: "Finance", parent_id: null, is_global: false, created_at: daysAgoISO(0), updated_at: daysAgoISO(0) },
-    { id: "f-eng", user_id: "u-1", name: "Engineering", parent_id: null, is_global: false, created_at: daysAgoISO(0), updated_at: daysAgoISO(0) },
-    { id: "f-empty", user_id: "u-1", name: "Empty", parent_id: null, is_global: false, created_at: daysAgoISO(0), updated_at: daysAgoISO(0) },
+    { id: "f-fin", user_id: "u-1", name: "Finance", parent_id: null, is_org_shared: false, created_at: daysAgoISO(0), updated_at: daysAgoISO(0) },
+    { id: "f-eng", user_id: "u-1", name: "Engineering", parent_id: null, is_org_shared: false, created_at: daysAgoISO(0), updated_at: daysAgoISO(0) },
+    { id: "f-empty", user_id: "u-1", name: "Empty", parent_id: null, is_org_shared: false, created_at: daysAgoISO(0), updated_at: daysAgoISO(0) },
   ]
 
   it("groups by folder name in the folders-array order, with Unfiled LAST and empty folders dropped", () => {
@@ -186,7 +186,7 @@ describe("groupByFolder — folder groups, Unfiled last, empty-fold, within-grou
 
   it('HI-01: a folder literally named "Unfiled" does NOT merge with or double the null-folder group', () => {
     const withUnfiledFolder: Folder[] = [
-      { id: "f-unf", user_id: "u-1", name: "Unfiled", parent_id: null, is_global: false, created_at: daysAgoISO(0), updated_at: daysAgoISO(0) },
+      { id: "f-unf", user_id: "u-1", name: "Unfiled", parent_id: null, is_org_shared: false, created_at: daysAgoISO(0), updated_at: daysAgoISO(0) },
     ]
     const groups = groupByFolder(
       [
@@ -204,8 +204,8 @@ describe("groupByFolder — folder groups, Unfiled last, empty-fold, within-grou
 
   it("HI-01: two distinct folders sharing a name stay separate (keyed by id, not name)", () => {
     const dupName: Folder[] = [
-      { id: "f-a", user_id: "u-1", name: "Projects", parent_id: null, is_global: false, created_at: daysAgoISO(0), updated_at: daysAgoISO(0) },
-      { id: "f-b", user_id: "u-1", name: "Projects", parent_id: "f-a", is_global: false, created_at: daysAgoISO(0), updated_at: daysAgoISO(0) },
+      { id: "f-a", user_id: "u-1", name: "Projects", parent_id: null, is_org_shared: false, created_at: daysAgoISO(0), updated_at: daysAgoISO(0) },
+      { id: "f-b", user_id: "u-1", name: "Projects", parent_id: "f-a", is_org_shared: false, created_at: daysAgoISO(0), updated_at: daysAgoISO(0) },
     ]
     const groups = groupByFolder(
       [

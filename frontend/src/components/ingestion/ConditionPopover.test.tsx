@@ -128,7 +128,7 @@ describe("ConditionPopover", () => {
             field_key: "amount",
             field_type: "number",
             enabled: true,
-            is_global: false,
+            is_system_global: false,
           },
         ]}
       />,

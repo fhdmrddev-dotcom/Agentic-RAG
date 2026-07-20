@@ -80,7 +80,7 @@ describe("WorkflowBuilderPage — describe-first empty Builder", () => {
 
   it("shows ONE calm project-folder picker once folders load (the only added control)", async () => {
     mockListFolders.mockResolvedValue([
-      { id: "f1", user_id: "u", name: "Project Meridian", parent_id: null, is_global: false, created_at: "", updated_at: "" },
+      { id: "f1", user_id: "u", name: "Project Meridian", parent_id: null, is_org_shared: false, created_at: "", updated_at: "" },
     ])
     render(<WorkflowBuilderPage />)
     const picker = await screen.findByTestId("project-folder-picker")
@@ -145,7 +145,7 @@ describe("WorkflowBuilderPage — single state transition + honest failure", () 
 
   it("forwards the chosen project_folder_id to generate + shows the bound NAME in the header", async () => {
     mockListFolders.mockResolvedValue([
-      { id: "f1", user_id: "u", name: "Project Meridian", parent_id: null, is_global: false, created_at: "", updated_at: "" },
+      { id: "f1", user_id: "u", name: "Project Meridian", parent_id: null, is_org_shared: false, created_at: "", updated_at: "" },
     ])
     mockGenerate.mockResolvedValue({ ok: true, definition: draft3 })
     const { default: userEvent } = await import("@testing-library/user-event")
@@ -207,7 +207,7 @@ describe("WorkflowBuilderPage — OPEN existing (initial) boots into the editing
 
   it("seeds the bound-folder NAME in the header from the loaded definition", async () => {
     mockListFolders.mockResolvedValue([
-      { id: "f9", user_id: "u", name: "Risk KB", parent_id: null, is_global: false, created_at: "", updated_at: "" },
+      { id: "f9", user_id: "u", name: "Risk KB", parent_id: null, is_org_shared: false, created_at: "", updated_at: "" },
     ])
     const bound = { ...draft3, project_folder_id: "f9" }
     render(<WorkflowBuilderPage initial={{ definition: bound, draftId: "draft-77" }} />)

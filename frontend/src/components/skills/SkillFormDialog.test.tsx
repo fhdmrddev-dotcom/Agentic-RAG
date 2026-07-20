@@ -72,7 +72,7 @@ function mkSkill(overrides: Partial<Skill> = {}): Skill {
     description: "Risk register.",
     instructions: "Build a spreadsheet…",
     is_enabled: true,
-    is_global: false,
+    is_org_shared: false,
     is_system: false,
     created_at: "2026-06-23T00:00:00Z",
     updated_at: "2026-06-23T00:00:00Z",
