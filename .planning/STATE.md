@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v3.4
 milestone_name: Multi-Tenancy & Org Access
-status: planning
-last_updated: "2026-07-20T19:07:51.073Z"
-last_activity: 2026-07-20
+status: executing
+last_updated: "2026-07-20T20:37:24.713Z"
+last_activity: 2026-07-20 -- Phase 165 planning complete
 progress:
   total_phases: 28
   completed_phases: 6
-  total_plans: 26
+  total_plans: 37
   completed_plans: 26
   percent: 21
 ---
@@ -42,9 +42,9 @@ Items acknowledged and deferred at milestone close on 2026-07-18 (44 open `audit
 
 Phase: 165
 Plan: Not started
-Status: Ready to plan
+Status: Ready to execute
 Next action: **Phase 165 context gathered 2026-07-20** (`165-CONTEXT.md`, commit `ceee3f0d`) — 4 gray areas resolved. **D-165-01 semantic-split RENAME** (folders/skills `is_global`→`is_org_shared` = genuine user org-share toggles; workflow_definitions/document_views/classification_rules/metadata_field_definitions `is_global`→`is_system_global` — those are write-locked platform-seed-only, so this keeps the **15 seeded workflows** cross-org by construction, zero data movement). **D-165-02** keep the physical `skills.is_system` column name (documented as the skills allow-list); both D-165-01/02 are **operator-ratified deviations** from 160-ADR §1/§2 literal wording. **D-165-04/05 = SC#4 / [[SEED-124]] fix:** org-aware `folder_utils.py` helpers on the **service-role** browse path (`ls`/`tree`/`read_document` run on BYPASSRLS `get_supabase()`, RLS can't reach them) + WR-01 null owner `user_id` on ANY non-owned visible folder (shared rows + descendants-via-ancestry); close by flipping `test_browse_tools_cross_org_leak_KNOWN_OPEN_seed124` `xfail(strict)`→XPASS→remove. **D-165-06** full end-to-end rename (DB + API + frontend + `folder_is_globally_visible`→`folder_is_org_shared`) in ONE operator-applied migration + ONE commit. **D-165-07** keep the share toggle functional, relabel 'Global'→'Shared with org' (mig 108/109 already org-scoped user is_global rows in 163 → rename is cosmetic on visibility, no silent un-share). **Next: `/gsd:plan-phase 165`** (mechanical rename + the folded security fix; skip-research OK per roadmap; next free migration slot = **111**). **Cloud parity owed:** migs 099→110 + the new 165 migration + `SECRETS_ENCRYPTION_KEY`, in order, at next operator-gated push.
-Last activity: 2026-07-20
+Last activity: 2026-07-20 -- Phase 165 planning complete
 
 Progress: [██████████] 100%
 
