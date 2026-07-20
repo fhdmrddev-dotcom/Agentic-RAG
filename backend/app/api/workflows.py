@@ -5,7 +5,7 @@ ran workflows, no live HTTP surface). This adds the single read the Harness-mode
 picker needs: the list of published workflow definitions a user may kick off.
 
 The endpoint is owner-scoped through ``list_published_workflows``' RLS-mirroring
-WHERE clause (``status='published' AND (is_global OR created_by=user)``) — a user
+WHERE clause (``status='published' AND (is_system_global OR created_by=user)``) — a user
 never sees another user's unpublished or private definitions (T-092-07). The GET
 itself is a pure read (no writes).
 """
@@ -54,7 +54,7 @@ logger = logging.getLogger(__name__)
 #     cascade / delete_workflow_cascade_preview / count_foreign_runs_on_global / finish_run) and so
 #     cannot accept a duck-typed request-scoped RLS Connection.
 #   * ``/published`` + ``/starters`` are the documented RUN CARVE-OUT picker feeds (see below): a
-#     GLOBAL workflow is now org-scoped (membership gates ``is_global`` — test_163_rls_workflow_eval),
+#     GLOBAL workflow is now org-scoped (membership gates ``is_system_global`` — test_163_rls_workflow_eval),
 #     so a user-JWT read would HIDE cross-org starters — NOT behavior-preserving. is_system_global
 #     cross-org visibility is Phase 165.
 #   * ``delete_workflow_cascade`` is a destructive cross-user cascade that drives the shared
@@ -183,10 +183,10 @@ async def get_starter_workflows(
 ) -> list[PublishedWorkflow]:
     """List the curated global starters — the Starters shelf feed (Phase 143 / WF-01).
 
-    Delegates to ``list_starter_workflows`` (``status='published' AND is_global=true
+    Delegates to ``list_starter_workflows`` (``status='published' AND is_system_global=true
     AND definition->>'category'='starter'``) and maps each row through the existing
     ``PublishedWorkflow`` + ``_coerce_definition`` shape the Published shelf uses. The
-    rows are UNSCOPED curated globals — ``is_global`` published rows are world-readable
+    rows are UNSCOPED curated globals — ``is_system_global`` published rows are world-readable
     (T-143-01, mig-056 SELECT policy), so no per-user filter is needed; ``category=
     'starter'`` narrows to curated (the 5 mig-061 dev scaffolds lack the marker and are
     excluded — D-143-2a).
@@ -307,7 +307,7 @@ async def create_draft(
     """Persist a NEW draft (REQ-1 create) — returns ``{id, version}``.
 
     Server-forced invariants (T-103-01-03): ``status='draft'`` is forced on the body
-    server-side (never trusted from the client); the DB fn binds ``is_global=false`` +
+    server-side (never trusted from the client); the DB fn binds ``is_system_global=false`` +
     ``created_by=user_id`` literally/by the trusted owner. A hallucinated/extra key in
     the body is already a 422 (``WorkflowDefinition`` is ``extra='forbid'``).
     """
@@ -528,7 +528,7 @@ async def delete_workflow_cascade(
     user_id = _coerce_user_id(current_user)
     slug = await _owned_slug_or_404(pool, definition_id, user_id)
 
-    # WR-01 fail-closed guard: an ``is_global`` definition's runs are owned by RUNNERS,
+    # WR-01 fail-closed guard: an ``is_system_global`` definition's runs are owned by RUNNERS,
     # not the definition owner. The ON DELETE RESTRICT FK forces the cascade to sweep
     # every runner's rows, so deleting a shared workflow here would cancel + destroy
     # OTHER users' run history. Refuse with 409 (before any cancel/delete side effect)

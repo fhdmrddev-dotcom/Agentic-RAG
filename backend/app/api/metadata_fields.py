@@ -3,7 +3,7 @@
 Mirrors the skills router (own + global CRUD, get_current_user, RLS) with two
 deliberate deviations driven by the threat register:
 
-  - create HARD-SETS is_global=False (T-111-03-01) — a user can never author a
+  - create HARD-SETS is_system_global=False (T-111-03-01) — a user can never author a
     global field def; the RLS WITH CHECK at migration 071:168 forces it too.
   - update/delete are own-scoped and collapse a cross-user miss to 404-not-403
     (T-111-03-03, D-v2.6-04 — the safer non-leaking pattern).
@@ -64,7 +64,7 @@ async def create_metadata_field(
         options=body.options,
         enabled=body.enabled,
         supabase=supabase,
-        # is_global intentionally NOT passed — the service hard-sets it False.
+        # is_system_global intentionally NOT passed — the service hard-sets it False.
     )
 
     # Fire the audit row. write_audit_entry is async and SWALLOWS errors, so it

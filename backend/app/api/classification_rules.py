@@ -7,7 +7,7 @@ is evaluated on upload by the ingest splice, Plan 03, not resolved on demand):
 
   - CRUD (`GET/POST/PATCH/DELETE`): create validates the `match_expr` AST fields +
     operands against the live whitelist (→ 422 on an unknown/`_`-prefixed field or a
-    malformed operand), the service hard-sets `is_global=False` + `enabled=True`
+    malformed operand), the service hard-sets `is_system_global=False` + `enabled=True`
     (T-118-02-01), and a fire-and-forget `classification.rule.create` audit row is
     written (the enum is LIVE in VALID_ACTION_TYPES). Every cross-user/unseeable miss
     collapses to a generic 404, NEVER the forbidden status — no existence leak.
@@ -19,7 +19,7 @@ is evaluated on upload by the ingest splice, Plan 03, not resolved on demand):
     updatable). The `enabled` toggle rides this UPDATE path (no dedicated endpoint).
 
 The route functions return `RuleResponse` instances (not plain dicts) so the live
-integration tests can call the coroutines directly and read `.is_global` / `.id` /
+integration tests can call the coroutines directly and read `.is_system_global` / `.id` /
 `.enabled`; FastAPI's `response_model` still serializes them identically at the HTTP
 boundary.
 
@@ -85,13 +85,13 @@ async def create_rule(
 
     Validates every `match_expr` AST field + operand against the live whitelist BEFORE
     the write (→ 422 on an unknown/`_`-prefixed field). The service hard-sets
-    `is_global=False` + `enabled=True` (T-118-02-01); the body never supplies them.
+    `is_system_global=False` + `enabled=True` (T-118-02-01); the body never supplies them.
     """
     # 1. Field-whitelist + operand validation at SAVE → 422 on a bad/`_`-field or a
     #    malformed operand.
     await _validate_match_expr(body.match_expr, current_user, supabase)
 
-    # 2. Persist (service hard-sets is_global=False + enabled=True; match_expr stored
+    # 2. Persist (service hard-sets is_system_global=False + enabled=True; match_expr stored
     #    as the validated AST dict via model_dump()).
     created = await classification_rule_service.create_rule(
         user_id=current_user["id"],

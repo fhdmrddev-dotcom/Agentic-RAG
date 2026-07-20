@@ -71,7 +71,7 @@ async def create_folder(
             "user_id": current_user["id"],
             "name": body.name.strip(),
             "parent_id": str(body.parent_id) if body.parent_id else None,
-            "is_global": body.is_global,
+            "is_org_shared": body.is_org_shared,
         })
         .execute()
     )
@@ -175,7 +175,7 @@ async def toggle_global(
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_user_supabase_client),
 ):
-    """Toggle is_global on a folder. Only the folder owner can toggle."""
+    """Toggle is_org_shared on a folder. Only the folder owner can toggle."""
     # 1. Fetch current folder (owner-only)
     current = (
         supabase.table("folders")
@@ -191,11 +191,11 @@ async def toggle_global(
             detail="Folder not found or you are not the owner",
         )
 
-    new_value = not current.data["is_global"]
+    new_value = not current.data["is_org_shared"]
 
     result = (
         supabase.table("folders")
-        .update({"is_global": new_value})
+        .update({"is_org_shared": new_value})
         .eq("id", folder_id)
         .eq("user_id", current_user["id"])
         .execute()

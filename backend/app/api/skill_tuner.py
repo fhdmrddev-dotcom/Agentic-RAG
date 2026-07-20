@@ -201,7 +201,7 @@ class StartTunerRunBody(BaseModel):
 async def _fetch_owned_or_global_skill(supabase: Client, skill_id: str, user_id: str) -> dict:
     """Return the skill row IFF the caller owns it OR it is global; else raise 404.
 
-    ``get_supabase()`` is SERVICE-ROLE — this ``.or_(user_id.eq, is_global.eq.true)`` scoping
+    ``get_supabase()`` is SERVICE-ROLE — this ``.or_(user_id.eq, is_org_shared.eq.true)`` scoping
     (mirrors skills.py owner-scoping) is the only thing preventing a cross-user leak. 404 (never
     403) on a miss so resource existence is not leaked to other users. Wrapped in
     ``run_in_threadpool`` because supabase-py is blocking (D-v2.5-01).
@@ -210,9 +210,9 @@ async def _fetch_owned_or_global_skill(supabase: Client, skill_id: str, user_id:
     def _read():
         return (
             supabase.table("skills")
-            .select("id, name, description, user_id, is_global")
+            .select("id, name, description, user_id, is_org_shared")
             .eq("id", skill_id)
-            .or_(f"user_id.eq.{user_id},is_global.eq.true")
+            .or_(f"user_id.eq.{user_id},is_org_shared.eq.true")
             .limit(1)
             .execute()
         )
@@ -980,7 +980,7 @@ async def get_seeded_cases(
     """Return the already-computed seeded benchmark cases WITH provenance (D-05).
 
     Owner-verify first (404 on cross-user — T-123.1-02). Then fetch the owner-scoped siblings
-    (the SOLE false-fire-rail leak gate — ``.or_(user_id.eq, is_global.eq.true)`` inside
+    (the SOLE false-fire-rail leak gate — ``.or_(user_id.eq, is_org_shared.eq.true)`` inside
     ``fetch_owner_scoped_siblings``) and return the provenance-carrying seed so the editor can
     SHOW + edit the cases before a run (fixes WR-05 / HIGH #2 — the editor previously showed
     "0 cases"). Another user's private skill never reaches the seed.

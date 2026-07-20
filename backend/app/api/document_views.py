@@ -5,7 +5,7 @@ service into a live, leak-safe API surface (VIEW-01/02/04/05/06):
 
   - CRUD (`POST/GET/PATCH/DELETE`) cloned from `api/metadata_fields.py`: create
     validates the AST fields against the live whitelist (D-113-10 → 422 on an
-    unknown/`_`-prefixed field), the service hard-sets `is_global=False`
+    unknown/`_`-prefixed field), the service hard-sets `is_system_global=False`
     (D-113-3), and a fire-and-forget `view.create` audit row is written (DMF-01).
     Every cross-user/unseeable miss collapses to a generic 404, NEVER 403 — no
     existence leak (D-113-4 / T-113-10).
@@ -101,7 +101,7 @@ async def create_view(
 
     Validates every AST field against the live whitelist BEFORE the write
     (D-113-10): an unknown or `_`-prefixed field → 422. The service hard-sets
-    `is_global=False` (D-113-3); the body never supplies it.
+    `is_system_global=False` (D-113-3); the body never supplies it.
     """
     # 1. Field-whitelist + operand validation at SAVE (D-113-10 / WR-01 / WR-02) —
     #    unknown/`_`-field, a range op on a custom number field, or a malformed
@@ -113,7 +113,7 @@ async def create_view(
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
 
-    # 2. Persist (service hard-sets is_global=False; filter_expr stored as the
+    # 2. Persist (service hard-sets is_system_global=False; filter_expr stored as the
     #    validated AST dict via model_dump()).
     created = await document_view_service.create_view(
         user_id=current_user["id"],

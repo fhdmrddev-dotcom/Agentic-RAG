@@ -171,7 +171,7 @@ def _sibling_descriptions(
 ) -> list[str]:
     """Owner-scoped (own + global) sibling descriptions for the lint duplicate check.
 
-    Uses the SAME owner-scoped ``.or_(user_id.eq, is_global.eq.true)`` filter as
+    Uses the SAME owner-scoped ``.or_(user_id.eq, is_org_shared.eq.true)`` filter as
     ``list_skills`` — never another user's private skills (T-123-01-02). On PATCH the
     edited skill is excluded so a skill never flags itself as a duplicate. Never raises:
     a read failure degrades to an empty sibling list (the lint stays advisory).
@@ -180,7 +180,7 @@ def _sibling_descriptions(
         result = (
             supabase.table("skills")
             .select("id, description")
-            .or_(f"user_id.eq.{user_id},is_global.eq.true")
+            .or_(f"user_id.eq.{user_id},is_org_shared.eq.true")
             .execute()
         )
         rows = result.data or []
@@ -202,7 +202,7 @@ async def list_skills(
     result = (
         supabase.table("skills")
         .select("*")
-        .or_(f"user_id.eq.{current_user['id']},is_global.eq.true")
+        .or_(f"user_id.eq.{current_user['id']},is_org_shared.eq.true")
         # CREATE-01 (D-05): is_system rows FIRST, then alphabetical — the built-in
         # skill-creator pins to the top of the Skills list. PostgREST emits
         # order=is_system.desc,name.asc. Chained multi-column order is an established
@@ -218,7 +218,7 @@ async def list_skills(
             # SEED-091 / D-164-05 (TEN-06): hide the seeding owner's identity from non-owner
             # readers of a global/system skill (the built-in is_system skill-creator is the
             # cross-org-visible surface today). RLS gates the row, not the column — null here.
-            if (row.get("is_global") or row.get("is_system")) and str(row.get("user_id")) != str(current_user["id"]):
+            if (row.get("is_org_shared") or row.get("is_system")) and str(row.get("user_id")) != str(current_user["id"]):
                 row["user_id"] = None
             skills.append(row)
     return skills
@@ -250,7 +250,7 @@ async def create_skill(
             "name": body.name.strip(),
             "description": body.description,
             "instructions": body.instructions,
-            "is_global": False,  # HARD-SET — never from the caller (D-08 / T-118-02-01)
+            "is_org_shared": False,  # HARD-SET — never from the caller (D-08 / T-118-02-01)
         })
         .execute()
     )
@@ -323,7 +323,7 @@ async def import_skill(
                     "name": fm["name"],
                     "description": fm.get("description", ""),
                     "instructions": instructions,
-                    "is_global": False,
+                    "is_org_shared": False,
                 })
                 .execute()
             ).data[0]
@@ -544,7 +544,7 @@ async def toggle_global(
     current_user: dict = Depends(get_current_user),
     supabase: Client = Depends(get_user_supabase_client),
 ):
-    """Flip the is_global boolean on an owned skill. Only the owner can toggle.
+    """Flip the is_org_shared boolean on an owned skill. Only the owner can toggle.
 
     GATE-01 (D-07): the private→global direction is GATED. The server recomputes the publish
     gate from ``eval_runs`` (never trusting any client-supplied gate data) and REFUSES the flip
@@ -572,7 +572,7 @@ async def toggle_global(
     # Step 2: Compute new value
     # current.data is a list (select returns list); maybe_single behaviour varies by client version
     skill_row = current.data[0] if isinstance(current.data, list) else current.data
-    new_value = not skill_row["is_global"]
+    new_value = not skill_row["is_org_shared"]
 
     # Step 3 (GATE-01 / D-07): gate the private→global direction ONLY. Unshare (new_value is
     # False) falls straight through to the UPDATE — never gated, and the NEXT re-share re-gates
@@ -627,10 +627,10 @@ async def toggle_global(
             await run_in_threadpool(_insert_override)
         # gate.met is True → a straight publish, no override row.
 
-    # Step 4: Apply the is_global UPDATE (owner-scoped).
+    # Step 4: Apply the is_org_shared UPDATE (owner-scoped).
     result = (
         supabase.table("skills")
-        .update({"is_global": new_value})
+        .update({"is_org_shared": new_value})
         .eq("id", skill_id)
         .eq("user_id", current_user["id"])
         .execute()
@@ -680,9 +680,9 @@ async def list_skill_files(
     # Verify skill is accessible (own or global)
     skill = (
         supabase.table("skills")
-        .select("id, user_id, is_global")
+        .select("id, user_id, is_org_shared")
         .eq("id", skill_id)
-        .or_(f"user_id.eq.{current_user['id']},is_global.eq.true")
+        .or_(f"user_id.eq.{current_user['id']},is_org_shared.eq.true")
         .maybe_single()
         .execute()
     )
@@ -697,9 +697,9 @@ async def list_skill_files(
         .execute()
     )
     rows = result.data or []
-    # SEED-091 / D-164-05 (TEN-06, A3): skill_files rows carry no is_global column, so key on
+    # SEED-091 / D-164-05 (TEN-06, A3): skill_files rows carry no is_org_shared column, so key on
     # the PARENT skill's ownership (fetched above). A non-owner only reaches here via the
-    # is_global branch, so a mismatch means the seeding owner's identity would leak on every
+    # is_org_shared branch, so a mismatch means the seeding owner's identity would leak on every
     # file row — null it. The owner reading their own skill keeps their user_id.
     if str(skill.data.get("user_id")) != str(current_user["id"]):
         for r in rows:

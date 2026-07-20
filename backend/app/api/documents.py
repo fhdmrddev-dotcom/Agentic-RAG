@@ -1348,7 +1348,7 @@ async def move_document(
             supabase.table("folders")
             .select("id")
             .eq("id", str(body.folder_id))
-            .or_(f"user_id.eq.{current_user['id']},is_global.eq.true")
+            .or_(f"user_id.eq.{current_user['id']},is_org_shared.eq.true")
             .maybe_single()
             .execute()
         )
@@ -1525,7 +1525,7 @@ async def accept_classification(
             lambda: supabase.table("folders")
             .select("id")
             .eq("id", str(target))
-            .or_(f"user_id.eq.{caller_uid},is_global.eq.true")
+            .or_(f"user_id.eq.{caller_uid},is_org_shared.eq.true")
             .maybe_single()
             .execute()
         )
@@ -1908,7 +1908,7 @@ def ingest_document(
         #
         # This is a sync def inside a BackgroundTask (NO request JWT — auth.uid() is NULL and
         # the service-role client BYPASSES RLS). The SOLE owner-scoping gate is the in-app
-        # `.or_(user_id.eq.{uploader},is_global.eq.true)` predicate (Pitfall 3, D-118-8): an
+        # `.or_(user_id.eq.{uploader},is_system_global.eq.true)` predicate (Pitfall 3, D-118-8): an
         # unscoped select would return ALL users' rules. A global rule is evaluated against
         # the uploader's OWN metadata_dict only. sync .execute() — D-v2.5-01 does NOT fire.
         if metadata_dict:  # no metadata → nothing to match (never blocks ingest)
@@ -1919,9 +1919,9 @@ def ingest_document(
                     supabase.table("classification_rules").select("*")
                     # AR-118-01: coerce the interpolated uploader id (service-role read,
                     # RLS bypassed — this app-code predicate is the SOLE owner gate).
-                    .or_(f"user_id.eq.{coerce_uid(user_id)},is_global.eq.true")  # D-118-8 own + global
+                    .or_(f"user_id.eq.{coerce_uid(user_id)},is_system_global.eq.true")  # D-118-8 own + global
                     .eq("enabled", True)
-                    .order("is_global").order("created_at")  # owner(false) before global(true); oldest first (D-118-4)
+                    .order("is_system_global").order("created_at")  # owner(false) before global(true); oldest first (D-118-4)
                     .execute()
                 ).data or []
                 # AR-118-02: fail-closed Python re-filter — the same defense-in-depth the
@@ -1929,7 +1929,7 @@ def ingest_document(
                 # list_rules). `(A OR B) AND enabled` is correct today, but this guarantees
                 # a malformed/over-broad result can NEVER evaluate another user's rule
                 # against this uploader's metadata (the phase's highest-stakes leak site).
-                rules = [r for r in rules if r.get("is_global") or str(r.get("user_id")) == str(user_id)]
+                rules = [r for r in rules if r.get("is_system_global") or str(r.get("user_id")) == str(user_id)]
                 whitelist = _METADATA_BUILTINS | {
                     d["field_key"] for d in read_enabled_field_defs(supabase, user_id)  # SYNC reader
                 }
