@@ -715,3 +715,78 @@ async def test_badge_spoof_blocked(pg_pool, two_orgs_two_users):
             )
         finally:
             await tx.rollback()
+
+
+# ══════════════════════════════════════════════════════════════════════════════════
+# 164-05 Task 1 — WR-02: `_inject_folder_scope` must splice the folder filter into the
+#          WHERE BEFORE any trailing ORDER BY / GROUP BY / HAVING / LIMIT / OFFSET
+#          (a valid-SQL regression after 164-04 deleted `_inject_user_id`'s WHERE
+#          normalization). Pure-string unit legs — matched by `-k folder_scope`.
+# ══════════════════════════════════════════════════════════════════════════════════
+
+# A single deterministic folder id — the exact value the helper interpolates (no uppercase,
+# so `.lower()` comparisons in the asserts stay faithful to the emitted SQL).
+_FOLDER_SCOPE_IDS = ["11111111-1111-1111-1111-111111111111"]
+
+
+def test_folder_scope_condition_precedes_order_by_and_limit():
+    """WR-02: a no-WHERE query with a trailing ORDER BY / LIMIT gets a fresh
+    ``WHERE documents.folder_id IN (...)`` inserted BEFORE the ORDER BY — pre-164-05 it was
+    appended after LIMIT (``... ORDER BY x LIMIT n WHERE ...`` → invalid SQL)."""
+    from app.services.sql_service import _inject_folder_scope
+
+    out = _inject_folder_scope(
+        "SELECT * FROM documents ORDER BY created_at LIMIT 5", _FOLDER_SCOPE_IDS
+    )
+    low = out.lower()
+    assert "documents.folder_id in (" in low, f"folder filter missing entirely: {out!r}"
+    # the folder condition must sit BEFORE the ORDER BY (valid WHERE placement)
+    assert low.index("folder_id in (") < low.index("order by"), (
+        f"WR-02 regression: folder filter landed AFTER ORDER BY → invalid SQL: {out!r}"
+    )
+    # trailing clauses keep their original order and no WHERE appears after ORDER BY
+    assert low.index("order by") < low.index("limit"), f"trailing clauses reordered: {out!r}"
+    assert "order by created_at where" not in low, f"WHERE after ORDER BY (invalid): {out!r}"
+
+
+def test_folder_scope_where_and_precedes_limit():
+    """WR-02: an existing WHERE + trailing LIMIT gets ``AND documents.folder_id IN (...)``
+    spliced into the WHERE (before LIMIT), not appended after LIMIT."""
+    from app.services.sql_service import _inject_folder_scope
+
+    out = _inject_folder_scope(
+        "SELECT * FROM documents WHERE title = 'x' LIMIT 3", _FOLDER_SCOPE_IDS
+    )
+    low = out.lower()
+    assert " and documents.folder_id in (" in low, f"expected AND-splice onto WHERE, got {out!r}"
+    assert low.index("folder_id in (") < low.index("limit"), (
+        f"WR-02 regression: folder filter landed AFTER LIMIT → invalid SQL: {out!r}"
+    )
+    # the LLM's own predicate survives verbatim
+    assert "title = 'x'" in out, f"original WHERE predicate dropped: {out!r}"
+
+
+def test_folder_scope_no_tail_appends_where():
+    """No-tail regression guard: a bare SELECT with no trailing clause still gets a trailing
+    `` WHERE documents.folder_id IN (...)`` (the pre-existing happy path is unchanged)."""
+    from app.services.sql_service import _inject_folder_scope
+
+    out = _inject_folder_scope("SELECT * FROM documents", _FOLDER_SCOPE_IDS)
+    expected_tail = f"WHERE documents.folder_id IN ('{_FOLDER_SCOPE_IDS[0]}')"
+    assert out.rstrip().endswith(expected_tail), f"expected trailing {expected_tail!r}, got {out!r}"
+
+
+def test_folder_scope_group_by_having_placement():
+    """WR-02: with a GROUP BY (+ HAVING) tail, the condition splices before the FIRST trailing
+    clause (GROUP BY) — GROUP BY / HAVING keep their order and stay valid SQL."""
+    from app.services.sql_service import _inject_folder_scope
+
+    out = _inject_folder_scope(
+        "SELECT folder_id, count(*) FROM documents GROUP BY folder_id HAVING count(*) > 1",
+        _FOLDER_SCOPE_IDS,
+    )
+    low = out.lower()
+    assert low.index("documents.folder_id in (") < low.index("group by"), (
+        f"WR-02 regression: folder filter landed at/after GROUP BY: {out!r}"
+    )
+    assert low.index("group by") < low.index("having"), f"GROUP BY / HAVING reordered: {out!r}"

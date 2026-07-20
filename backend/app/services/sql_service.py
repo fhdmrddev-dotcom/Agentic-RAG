@@ -28,7 +28,18 @@ def _detect_alias(sql: str, table: str) -> str:
 
 
 def _inject_folder_scope(sql: str, folder_ids: list[str]) -> str:
-    """Inject folder_id IN (...) filter to restrict to a folder subtree."""
+    """Inject folder_id IN (...) filter to restrict to a folder subtree.
+
+    WR-02 (164-05): the folder condition is spliced into the WHERE *before* any trailing
+    ``ORDER BY`` / ``GROUP BY`` / ``HAVING`` / ``LIMIT`` / ``OFFSET`` clause — never appended
+    at the very end. Pre-164 ``_inject_user_id`` ran first and normalized WHERE placement, so
+    this helper could safely ``AND``/``WHERE`` onto the tail; 164-04 deleted ``_inject_user_id``,
+    so ``_inject_folder_scope`` must own clause placement itself. Blindly appending
+    ``WHERE``/``AND`` after a trailing clause yields invalid SQL (``... ORDER BY x WHERE ...``)
+    or binds the filter to the ORDER BY expression — either way folder-scoped ``query_documents``
+    breaks (the Phase-098 GOV-01 containment). RLS via the user-context connection still owns
+    cross-org isolation; this is purely a valid-SQL placement fix.
+    """
     if not folder_ids:
         return sql
     ids_list = ", ".join(f"'{fid}'" for fid in folder_ids)
@@ -40,10 +51,17 @@ def _inject_folder_scope(sql: str, folder_ids: list[str]) -> str:
     else:
         doc_ref = _detect_alias(sql, "documents")
         condition = f"{doc_ref}.folder_id IN ({ids_list})"
-    # Already has a WHERE clause — append AND
-    if re.search(r"\bwhere\b", sql, re.IGNORECASE):
-        return sql.rstrip() + f" AND {condition}"
-    return sql + f" WHERE {condition}"
+    # ``AND`` onto an existing WHERE, else open a fresh ``WHERE``.
+    connector = "AND" if re.search(r"\bwhere\b", sql, re.IGNORECASE) else "WHERE"
+    # Splice the condition BEFORE the first trailing clause (leftmost keyword boundary) so it
+    # always lands inside the WHERE. A simple keyword regex is sufficient for the LLM-generated
+    # single-SELECT shape (string-literal-aware parsing is out of scope — D-164-05 / 164-05).
+    tail = re.search(r"\b(?:order\s+by|group\s+by|having|limit|offset)\b", sql, re.IGNORECASE)
+    if tail:
+        pos = tail.start()
+        head = sql[:pos].rstrip()
+        return f"{head} {connector} {condition} {sql[pos:]}"
+    return sql.rstrip() + f" {connector} {condition}"
 
 
 async def query_documents(sql_query: str, user_id: str, supabase: Client, folder_ids: list[str] | None = None) -> str:
