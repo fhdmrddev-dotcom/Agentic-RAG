@@ -40,13 +40,13 @@ DOC_ROOT = str(uuid4())        # doc at root (folder_id=None)
 DOC_IN_REPORTS = str(uuid4())  # doc in reports folder
 
 
-def _folder_row(folder_id, name, parent_id=None, is_global=False, user_id=USER_ID):
+def _folder_row(folder_id, name, parent_id=None, is_org_shared=False, user_id=USER_ID):
     return {
         "id": folder_id,
         "user_id": user_id,
         "name": name,
         "parent_id": parent_id,
-        "is_global": is_global,
+        "is_org_shared": is_org_shared,
         "created_at": NOW,
         "updated_at": NOW,
     }

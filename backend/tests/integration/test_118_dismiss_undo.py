@@ -133,7 +133,7 @@ async def doc_with_suggestion(pg_pool):
     )
     for fid, name in ((folder_id, "Inbox"), (target_folder, "Invoices")):
         await pg_pool.execute(
-            "INSERT INTO public.folders (id, user_id, name, is_global) VALUES ($1, $2, $3, false)",
+            "INSERT INTO public.folders (id, user_id, name, is_org_shared) VALUES ($1, $2, $3, false)",
             fid, user_id, name,
         )
     await pg_pool.execute(

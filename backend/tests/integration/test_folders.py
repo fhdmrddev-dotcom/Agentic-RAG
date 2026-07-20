@@ -16,13 +16,13 @@ CHILD_FOLDER_ID = str(uuid4())
 NOW = datetime.now(timezone.utc).isoformat()
 
 
-def _folder_row(folder_id=None, name="Reports", parent_id=None, is_global=False):
+def _folder_row(folder_id=None, name="Reports", parent_id=None, is_org_shared=False):
     return {
         "id": folder_id or FOLDER_ID,
         "user_id": USER_ID,
         "name": name,
         "parent_id": parent_id,
-        "is_global": is_global,
+        "is_org_shared": is_org_shared,
         "created_at": NOW,
         "updated_at": NOW,
     }
@@ -50,7 +50,7 @@ class TestCreateFolder:
         assert data["name"] == "Reports"
         assert data["user_id"] == USER_ID
         assert data["parent_id"] is None
-        assert data["is_global"] is False
+        assert data["is_org_shared"] is False
         # Verify supabase.table("folders") was called
         table_calls = [str(c) for c in _supabase.table.call_args_list]
         assert any("folders" in c for c in table_calls)
@@ -64,7 +64,7 @@ class TestCreateFolder:
         ]
         response = client.post("/folders", headers=auth_headers, json={"name": "Reports"})
         data = response.json()
-        for key in ("id", "user_id", "name", "parent_id", "is_global", "created_at", "updated_at"):
+        for key in ("id", "user_id", "name", "parent_id", "is_org_shared", "created_at", "updated_at"):
             assert key in data, f"Missing field: {key}"
 
     def test_create_folder_strips_whitespace(self, client, auth_headers, mock_builder):
@@ -116,25 +116,25 @@ class TestCreateFolder:
         assert response.status_code == 404
 
     def test_create_global_folder(self, client, auth_headers, mock_builder):
-        """POST /folders with is_global=true returns 201, insert called with is_global=True."""
+        """POST /folders with is_org_shared=true returns 201, insert called with is_org_shared=True."""
         # Root folder: no parent_id → fetch_visible_folders is skipped
         mock_builder.execute.side_effect = [
             _make_result(None),                                 # name check (no duplicate)
-            _make_result([_folder_row(name="Shared", is_global=True)]),  # insert
+            _make_result([_folder_row(name="Shared", is_org_shared=True)]),  # insert
         ]
         response = client.post(
             "/folders",
             headers=auth_headers,
-            json={"name": "Shared", "is_global": True},
+            json={"name": "Shared", "is_org_shared": True},
         )
         assert response.status_code == 201
         data = response.json()
-        assert data["is_global"] is True
-        # Verify .insert() was called with is_global=True
+        assert data["is_org_shared"] is True
+        # Verify .insert() was called with is_org_shared=True
         insert_call_args = _supabase.table.return_value.insert.call_args
         assert insert_call_args is not None
         inserted_data = insert_call_args[0][0]
-        assert inserted_data["is_global"] is True
+        assert inserted_data["is_org_shared"] is True
 
     def test_create_folder_sets_user_id(self, client, auth_headers, mock_builder):
         """POST /folders — insert is called with the authenticated user's id."""
@@ -188,7 +188,7 @@ class TestListFolders:
     def test_list_folders_deduplicates_owned_global(self, client, auth_headers, mock_execute_result):
         """GET /folders returns each folder once via fetch_visible_folders."""
         # Same folder ID returned twice by the mock DB query
-        row = _folder_row(is_global=True)
+        row = _folder_row(is_org_shared=True)
         mock_execute_result.data = [row, row]
         response = client.get("/folders", headers=auth_headers)
         data = response.json()
