@@ -1,16 +1,17 @@
 """SEED-102 regression — a same-named owned skill row must NOT shadow an is_system built-in.
 
 ``_handle_load_skill`` resolves a name collision by ordering the candidate rows and
-taking ``row[0]``. Before the fix it ordered ``.order("is_global")`` ASCENDING, so an
-owned row (is_global False) sorted ahead of the same-named global/system built-in and the
-agent executed the user's UNVETTED body. The fix reverses the tie-break to
-``.order("is_system", desc=True).order("is_global", desc=True)`` — precedence
-**system > global > owned** — so the protected built-in always wins.
+taking ``row[0]``. Before the fix it ordered ``.order("is_org_shared")`` ASCENDING, so an
+owned row (is_org_shared False) sorted ahead of the same-named org-shared/system built-in
+and the agent executed the user's UNVETTED body. The fix reverses the tie-break to
+``.order("is_system", desc=True).order("is_org_shared", desc=True)`` — precedence
+**system > org-shared > owned** — so the protected built-in always wins.
+(Phase 165 / D-165-01: skills.is_global RENAMED -> is_org_shared; is_system unchanged.)
 
 RED/GREEN CONTRACT — this test goes RED against the pre-fix tie-break and GREEN after it:
-  * Against the OLD ``.order("is_global")`` (ascending) the sort returns the owned row
+  * Against the OLD ``.order("is_org_shared")`` (ascending) the sort returns the owned row
     first, so ``payload["instructions"]`` would be ``"OWNED BODY"`` -> assertion FAILS.
-  * Against the NEW two-key ``is_system DESC, is_global DESC`` the built-in sorts first,
+  * Against the NEW two-key ``is_system DESC, is_org_shared DESC`` the built-in sorts first,
     so ``payload["instructions"]`` is ``"SYSTEM BODY"`` -> assertion PASSES.
 
 WHY A NEW FAKE (not the passthrough in test_load_skill_override.py): that fake makes
@@ -128,7 +129,7 @@ async def test_collision_resolves_to_is_system_builtin():
         "instructions": "OWNED BODY",
         "user_id": TEST_USER_ID,
         "is_system": False,
-        "is_global": False,
+        "is_org_shared": False,
         "is_enabled": True,
     }
     builtin = {
@@ -138,7 +139,7 @@ async def test_collision_resolves_to_is_system_builtin():
         "instructions": "SYSTEM BODY",
         "user_id": SYSTEM_USER_ID,
         "is_system": True,
-        "is_global": True,
+        "is_org_shared": True,
         "is_enabled": True,
     }
     # Adversarial seed order: OWNED first. A passthrough fake would return row[0] = owned;
