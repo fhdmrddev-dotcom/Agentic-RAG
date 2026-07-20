@@ -1,8 +1,8 @@
 ---
 phase: 164
 slug: secdef-audit-cross-org-isolation-test-suite
-status: draft
-nyquist_compliant: false
+status: ready
+nyquist_compliant: true
 wave_0_complete: false
 created: 2026-07-20
 ---
