@@ -113,6 +113,12 @@ This plan's gate is grep + `--collect-only` only. Migration 111 is NOT yet appli
 - The skills/folders test surface now references `is_org_shared`, aligned with mig-111's renamed columns — ready for the post-migration assertion-green sweep in plan 165-11.
 - No blockers. No migration/DB action taken by this plan.
 
+## Self-Check: PASSED
+
+- `165-06-SUMMARY.md` exists on disk. ✓
+- Commits verified present in `git log`: `5686db61` (Task 1), `105daf77` (Task 2), `603d3e4c` (SUMMARY). ✓
+- Committed state: 0 bare `is_global` across all 19 plan files; `is_system` preserved; 0 `is_system_global`. ✓
+
 ---
 *Phase: 165-is-global-retirement-cleanup*
 *Completed: 2026-07-20*
