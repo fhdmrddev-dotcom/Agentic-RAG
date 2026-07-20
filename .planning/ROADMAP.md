@@ -180,6 +180,7 @@ Ship only if CORE lands clean and budget remains. First-to-cut ordering: SSO/OID
   1. `is_global` is value-preservingly RENAMEd to `is_org_shared` (never drop+add) everywhere it lives — SQL columns, the `folder_utils.py` recursive-visibility mirror, and the Storage `skill-files` bucket policy branch.
   2. User-facing copy reads "Shared with org" (not "Global"), and no previously-shared folder / skill / view silently un-shares.
   3. An `is_system_global` allow-list — reusing the write-locked `skills.is_system` marker — keeps the seeded `skill-creator` visible across every org, and no route can set `is_system_global` (migration-only, never route-settable).
+  4. **(Folded from Phase 164 CR-01 / [[SEED-124]] — MUST close here)** The `folder_utils.py` visibility helpers (`is_in_global_subtree` / `fetch_visible_folders` / `get_globally_visible_folder_ids`) are **org-scoped** so the agent's service-role KB browse/read tools (`ls`/`tree`/`read_document`/`fetch_document_file`) can no longer enumerate or read documents in another org's `is_org_shared` (formerly `is_global`) folders. Verified by flipping the `xfail(strict=True)` marker `test_browse_tools_cross_org_leak_KNOWN_OPEN_seed124` in `test_v3_4_org_isolation.py` to XPASS → then removing it. Also close WR-01 (null the seeder's `user_id` on non-`is_org_shared` **descendants** of shared folders in the folders list/serialize path).
 **Plans**: TBD
 
 #### Phase 166: Org-Admin Shell + Org Switcher + Profile-Menu Anchor
