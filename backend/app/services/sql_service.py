@@ -6,8 +6,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from supabase import Client
 
-from app.utils.db import aexec
-from app.utils.folder_utils import get_globally_visible_folder_ids
+from app.dependencies import get_user_pg_connection
 
 import re
 
@@ -28,46 +27,6 @@ def _detect_alias(sql: str, table: str) -> str:
     return table
 
 
-def _inject_user_id(sql: str, user_id: str, global_folder_ids: list[str] | None = None) -> str:
-    """
-    Inject a user_id WHERE clause into the query.
-    The service role client bypasses RLS, so we must scope manually.
-
-    Rules:
-    - documents-only query  → documents.user_id = '{user_id}'
-    - folders-only query    → (folders.user_id = '{user_id}' OR folders.is_global = true)
-    - JOIN (both tables)    → documents.user_id = '{user_id}'  (documents already scopes the user)
-    """
-    has_documents = bool(re.search(r"\bdocuments\b", sql, re.IGNORECASE))
-    has_folders = bool(re.search(r"\bfolders\b", sql, re.IGNORECASE))
-
-    if has_folders and not has_documents:
-        folder_ref = _detect_alias(sql, "folders")
-        if global_folder_ids:
-            ids_list = ", ".join(f"'{fid}'" for fid in global_folder_ids)
-            condition = f"({folder_ref}.user_id = '{user_id}' OR {folder_ref}.id IN ({ids_list}))"
-        else:
-            condition = f"{folder_ref}.user_id = '{user_id}'"
-    else:
-        doc_ref = _detect_alias(sql, "documents")
-        condition = f"{doc_ref}.user_id = '{user_id}'"
-
-    # Already has a WHERE clause — append AND
-    if re.search(r"\bwhere\b", sql, re.IGNORECASE):
-        return re.sub(
-            r"\b(where)\b",
-            f"WHERE {condition} AND",
-            sql, count=1, flags=re.IGNORECASE,
-        )
-    # Has ORDER BY / GROUP BY / LIMIT / HAVING — insert WHERE before them
-    match = re.search(r"\b(order\s+by|group\s+by|limit|having)\b", sql, re.IGNORECASE)
-    if match:
-        pos = match.start()
-        return sql[:pos] + f"WHERE {condition} " + sql[pos:]
-    # Plain query — append at end
-    return sql + f" WHERE {condition}"
-
-
 def _inject_folder_scope(sql: str, folder_ids: list[str]) -> str:
     """Inject folder_id IN (...) filter to restrict to a folder subtree."""
     if not folder_ids:
@@ -81,7 +40,7 @@ def _inject_folder_scope(sql: str, folder_ids: list[str]) -> str:
     else:
         doc_ref = _detect_alias(sql, "documents")
         condition = f"{doc_ref}.folder_id IN ({ids_list})"
-    # Already has WHERE (from _inject_user_id) — append AND
+    # Already has a WHERE clause — append AND
     if re.search(r"\bwhere\b", sql, re.IGNORECASE):
         return sql.rstrip() + f" AND {condition}"
     return sql + f" WHERE {condition}"
@@ -89,32 +48,39 @@ def _inject_folder_scope(sql: str, folder_ids: list[str]) -> str:
 
 async def query_documents(sql_query: str, user_id: str, supabase: Client, folder_ids: list[str] | None = None) -> str:
     """
-    Execute a SELECT query against the user's documents table via the
-    query_user_documents RPC. Injects user_id filter since the service role
-    client bypasses RLS.
+    Execute a SELECT query against the user's documents via the query_user_documents RPC,
+    run over the Phase-163 asyncpg user-context (D-164-02/04).
+
+    query_user_documents is INVOKER (no SECURITY clause) — its dynamic EXECUTE runs as the
+    caller's role, so once the RPC is invoked on the user-context connection (SET LOCAL ROLE
+    authenticated + uid-synthesized claims) RLS scopes every base-table read to the caller's
+    org. That RLS gate is what replaced the deleted per-user WHERE-injection regex (RESEARCH
+    Pitfall 4 — deleting the regex is safe ONLY because the connection is now user-context). The
+    ``supabase`` param is retained for call-site signature stability but is no longer used.
     """
     clean = sql_query.strip()
 
-    # Client-side validation — defence-in-depth before the DB call
+    # Client-side validation — defence-in-depth before the DB call (query_user_documents
+    # re-checks SELECT-only + single-statement server-side too). RETAINED per D-164-04.
     if not clean.lower().startswith("select"):
         raise ValueError("Only SELECT queries are permitted.")
     if ";" in clean:
         raise ValueError("Query must be a single statement (no semicolons).")
 
-    # Scope to current user (service role bypasses RLS)
-    global_folder_ids = await get_globally_visible_folder_ids(supabase, user_id)
-    scoped = _inject_user_id(clean, user_id, global_folder_ids)
-
-    # Scope to folder subtree if provided
+    # Feature-narrowing to a chosen folder subtree — relevance, NOT a cross-user gate (RLS
+    # via the user-context owns cross-user/cross-org isolation now). KEPT per D-164-04 / A4.
+    scoped = clean
     if folder_ids:
         scoped = _inject_folder_scope(scoped, folder_ids)
 
+    # Route the INVOKER RPC over the asyncpg user-context so RLS scopes the arbitrary SELECT.
     try:
-        result = await aexec(supabase.rpc("query_user_documents", {"sql_query": scoped}))
+        async with get_user_pg_connection(None, {"id": user_id}) as conn:
+            data = await conn.fetchval("SELECT public.query_user_documents($1)", scoped)
     except Exception as e:
         raise RuntimeError(f"Database query failed: {e}") from e
 
-    rows: list[dict] = result.data or []
+    rows: list[dict] = data or []
 
     if not rows:
         return "No results."

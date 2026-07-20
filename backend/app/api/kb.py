@@ -3,7 +3,7 @@ import re
 from fastapi import APIRouter, Depends, HTTPException, Query
 from supabase import Client
 
-from app.dependencies import get_current_user, get_user_supabase_client
+from app.dependencies import get_current_user, get_user_supabase_client, get_user_pg_connection
 from app.models.kb import LsResponse, TreeResponse, GrepResponse, GlobResponse, ReadResponse
 from app.utils.folder_utils import (
     fetch_visible_folders as _fetch_all_visible_folders,
@@ -239,18 +239,15 @@ async def tree(
     return TreeResponse(**result)
 
 
-def _inject_user_id_for_grep(sql: str, user_id: str) -> str:
-    """Inject user_id filter into grep SQL. Always targets documents table."""
-    condition = f"documents.user_id = '{user_id}'"
-    if re.search(r"\bwhere\b", sql, re.IGNORECASE):
-        return re.sub(r"\b(where)\b", f"WHERE {condition} AND", sql, count=1, flags=re.IGNORECASE)
-    return sql + f" WHERE {condition}"
-
-
 async def grep_path(pattern: str, path: str | None, user_id: str, supabase: Client) -> dict:
-    """Search document full_markdown for regex pattern, optionally scoped to a folder subtree."""
-    from app.utils.db import aexec  # noqa: PLC0415
+    """Search document full_markdown for regex pattern, optionally scoped to a folder subtree.
 
+    Phase 164 (D-164-04): the cross-user WHERE-injection grep regex is DELETED — the
+    query_user_documents INVOKER RPC now runs over the asyncpg user-context (get_user_pg_connection),
+    so RLS scopes the arbitrary SELECT to the caller's org (RESEARCH Pitfall 4). The passed-in
+    ``supabase`` client is still used for folder-tree resolution below; the folder-subtree
+    narrowing + pattern-escaping (relevance, not a cross-user gate) are retained.
+    """
     # Determine folder scoping
     folder_ids: list[str] | None = None
     if path and path.strip("/") != "":
@@ -269,11 +266,12 @@ async def grep_path(pattern: str, path: str | None, user_id: str, supabase: Clie
         sql += f" AND folder_id IN ({ids_list})"
 
     try:
-        result = await aexec(supabase.rpc("query_user_documents", {"sql_query": _inject_user_id_for_grep(sql, user_id)}))
+        async with get_user_pg_connection(None, {"id": user_id}) as conn:
+            data = await conn.fetchval("SELECT public.query_user_documents($1)", sql)
     except Exception as e:
         return {"error": f"Grep failed: {e}"}
 
-    rows = result.data or []
+    rows = data or []
     matches = [{"document_id": r["id"], "filename": r["filename"], "folder_id": r.get("folder_id")} for r in rows]
     return {"pattern": pattern, "path": path, "matches": matches, "total": len(matches)}
 
