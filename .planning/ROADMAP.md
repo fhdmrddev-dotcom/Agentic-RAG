@@ -167,7 +167,7 @@ Ship only if CORE lands clean and budget remains. First-to-cut ordering: SSO/OID
   3. Hybrid search returns only rows the asking user may access — org- AND folder-ACL-isolated (`document_chunks` RLS mirrors the full folder-visibility predicate authored in 163) — proven with a live two-user retrieval test (PRAG-01).
   4. Global / org-shared resources (folders / skills / views) null the seeding owner's `user_id` (+ scope UUIDs) for non-owner readers in every list/serialize path (SEED-091 / TEN-06 closed).
 **Plans**: 4 plans (3 waves)
-- [ ] 164-01-PLAN.md — Author the two-org exit-gate suite test_v3_4_org_isolation.py (pg_proc audit helper + red-anchor RED vs pre-164 + table matrix both paths + 4 DEFINER legs + X-Org-Id spoof + PRAG-01 leg) (Wave 1)
+- [x] 164-01-PLAN.md — Author the two-org exit-gate suite test_v3_4_org_isolation.py (pg_proc audit helper + red-anchor RED vs pre-164 + table matrix both paths + 4 DEFINER legs + X-Org-Id spoof + PRAG-01 leg) (Wave 1)
 - [ ] 164-02-PLAN.md — SEED-091 owner-identity nulling across folders/skills/views serialize paths + model loosens + unit test (TEN-06) (Wave 1)
 - [ ] 164-03-PLAN.md — Author + [BLOCKING] apply migration 110 (4 DEFINER org predicate + pinned search_path + document_chunks PRAG-01 RLS widening) + regenerate full-schema + CONCUR-01 <1s gate (Wave 2)
 - [ ] 164-04-PLAN.md — Producer client-swap: retrieval RPCs + text-to-SQL/grep onto the asyncpg user-context; delete _inject_user_id/_inject_user_id_for_grep; whole suite GREEN (Wave 3)

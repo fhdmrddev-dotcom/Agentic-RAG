@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v3.4
 milestone_name: Multi-Tenancy & Org Access
 status: executing
-last_updated: "2026-07-20T15:14:27.799Z"
-last_activity: 2026-07-20 -- Phase 164 planning complete
+last_updated: "2026-07-20T15:16:23.867Z"
+last_activity: 2026-07-20 -- Phase 164 Plan 01 complete (cross-org isolation exit gate authored, RED-anchor proven)
 progress:
   total_phases: 28
   completed_phases: 5
@@ -22,7 +22,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-20 — Phase 163 THE ATOMIC CRUX complete; membership RLS enforced)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 164 — secdef audit + cross org isolation test suite
+**Current focus:** Phase 164 — secdef-audit-cross-org-isolation-test-suite
 
 ## Deferred Items
 
@@ -40,13 +40,13 @@ Items acknowledged and deferred at milestone close on 2026-07-18 (44 open `audit
 
 ## Current Position
 
-Phase: 164
-Plan: Not started (context gathered → planning next)
-Status: Ready to execute
-Next action: `/gsd:plan-phase 164 --auto` — CONTEXT.md committed (`de5baac1`, 8 decisions locked via `--auto`). SECDEF Audit + Cross-Org Isolation Test Suite (TEN-03, TEN-05, TEN-06, PRAG-01). Locked: **D-164-01** in-body `current_user_org_ids()` org predicate (no `match_org_id` param) + **D-164-02** route the 3 retrieval RPCs through the user-JWT client (163-07 deferred these here); **D-164-03** keep DEFINER + pinned `search_path` (audit = per-fn justification); **D-164-04** DELETE `_inject_user_id`/`_inject_user_id_for_grep`, rely on RLS via INVOKER `query_user_documents`; **D-164-05** null owner `user_id`+scope UUIDs on non-owned global rows across folders/skills/views (SEED-091/TEN-06); **D-164-06** exhaustive `test_v3_4_org_isolation.py` exit gate (red-then-green) extending `test_163_factories.py`; **D-164-07** widen `document_chunks` SELECT to mirror folder-visibility for PRAG-01, re-bench CONCUR-01 <1s; **D-164-08** new migration slot 110 via SQL editor (never reset/push). Flags: SC#10, threat model (security core), research-phase (pgvector+RLS). Reported-bugs cross-check done — no Agentic-RAG bug overlaps 164; SEED-091 is the only fold.
-Last activity: 2026-07-20 -- Phase 164 planning complete
+Phase: 164 (secdef-audit-cross-org-isolation-test-suite) — EXECUTING
+Plan: 1 of 4 — 164-01 COMPLETE (exit-gate suite authored, RED-anchor proven)
+Status: Executing Phase 164
+Next action: execute **Plan 164-02** (migration 110 authoring — 4× DEFINER re-CREATE w/ in-body `current_user_org_ids()` org predicate + pinned `search_path`; `is_system` OUTSIDE the gate for `match_skills` per mig-109 FIX-A; `document_chunks` SELECT RLS widening for PRAG-01). `test_v3_4_org_isolation.py` is now the arbiter: turning its 8 RED tests GREEN (without regressing the 10 GREEN) is the acceptance signal. Plan 164-01 shipped `backend/tests/integration/test_v3_4_org_isolation.py` (18 tests) — the milestone exit gate: pg_proc DEFINER audit, the spoofed-`match_user_id` red-anchor (proven RED — B retrieves A's real chunk), the information_schema-driven every-table matrix (both DB paths), the four-DEFINER 0-cross-org legs, X-Org-Id spoof rejection, the D-164-04 text-to-SQL/grep `query_user_documents` user-context-vs-leak-conn arbitration (proves the CONNECTION is the gate, not the deleted regex), the PRAG-01 private-vs-shared retrieval leg, and the platform-universal / over-widening / badge-spoof guards. Requirements TEN-05/TEN-03/PRAG-01 advanced (gate authored) but NOT marked complete — they go GREEN after Plans 03 (mig 110) + 04 (producer client-swap). DEFINER coverage is asyncpg (SupabaseTxnAdapter.rpc is a record-only stub → supabase path proven by the table matrix).
+Last activity: 2026-07-20 -- Phase 164 Plan 01 complete — cross-org isolation exit gate authored (RED-anchor proven; 10 GREEN invariants / 8 RED leak-states migration 110 + Plan 04 close)
 
-Progress: [████████████████████] 21/21 plans (100%) — Phase 163 done; Phase 164 context gathered → planning
+Progress: [████████████████████] 21/21 plans (100%) — Phase 163 done; Phase 164 EXECUTING — Plan 01/4 complete (exit-gate suite authored, RED-anchor proven)
 
 ### Quick Tasks Completed
 
