@@ -42,8 +42,8 @@ Items acknowledged and deferred at milestone close on 2026-07-18 (44 open `audit
 
 Phase: 163 (rls-rewrite-per-request-user-jwt-client-swap-the-atomic-crux) — ALL 11 PLANS COMPLETE
 Plan: 11 of 11
-Status: Phase 163 code complete — bookkeeping close-out remaining (secure + verify)
-Next action: (1) `/gsd:secure-phase 163` — re-run to register T-163-11 (the is_system badge-spoof WITH-CHECK added by mig 109 AFTER the prior SECURED run at `ae25a358`); (2) `/gsd:verify-work 163` — re-confirm Test 7 now passes and flip `163-UAT.md` (status: diagnosed → pass). THEN Phase 163 is closeable and Phase 164 (SECDEF Audit + Cross-Org Isolation Suite) is unblocked. 163-11 FIX-A (mig 109 platform-universal RLS fix + T-163-11 badge-spoof hardening) closed out 2026-07-20: all 9 policies verified live @ :54322, test_163_rls_platform_universal 8/8 GREEN, full test_163_* + CONCUR-01 35/35 GREEN, Deep red-line HELD (empty diff on agent_loop/run_producer/provider_gateway).
+Status: Phase 163 code complete + SECURED — one bookkeeping gate remaining (verify-work)
+Next action: `/gsd:verify-work 163` — re-confirm UAT Test 7 (global/system visibility) now passes under mig 109 and flip `163-UAT.md` (status: diagnosed → pass). THEN Phase 163 is closeable and Phase 164 (SECDEF Audit + Cross-Org Isolation Suite) is unblocked. DONE 2026-07-20: (a) 163-11 FIX-A closed out — mig 109 platform-universal RLS fix + T-163-11 badge-spoof hardening; all 9 policies verified live @ :54322, test_163_rls_platform_universal 8/8, full test_163_* + CONCUR-01 35/35 GREEN, Deep red-line HELD; (b) `/gsd:secure-phase 163` mig-109 delta re-audit — **28/28 STRIDE CLOSED, threats_open:0** (`2ed3a21f`; added T-163-11 + T-163-11b, re-verified T-163-08b/07b under Fix-A policies).
 Last activity: 2026-07-20 -- Phase 163 all 11 plans complete (163-11 FIX-A closed out)
 
 Progress: [██████████] 100% (11/11 plans; phase close-out pending secure + verify)
