@@ -74,13 +74,218 @@ ALTER TABLE public.classification_rules       RENAME COLUMN is_global TO is_syst
 ALTER TABLE public.metadata_field_definitions RENAME COLUMN is_global TO is_system_global;
 
 -- ================================================================================================
--- §2 — Function / trigger bodies (TEXT — do NOT auto-follow the rename) — AUTHORED IN TASK 2
---   pg_proc.prosrc is TEXT parsed at runtime, so it does NOT follow RENAME COLUMN. The DEFINER
---   retrieval/visibility fns + the two trigger fns naming the old column must be explicitly
---   CREATE OR REPLACE'd, and folder_is_globally_visible OID-preservingly ALTER FUNCTION … RENAME'd
---   (so its dependent SELECT policies auto-follow by OID). Ordering: renames (§1) → functions (§2) →
---   storage policy (§3), with the folder fn renamed BEFORE its text-bodied callers reference the new name.
---   >>> Task 2 inserts §2 here. <<<
+-- §2 — Function / trigger bodies (TEXT — do NOT auto-follow the rename)
+--   pg_proc.prosrc is TEXT parsed at runtime, so it does NOT follow RENAME COLUMN. The four DEFINER
+--   retrieval/visibility fns + the two trigger fns naming the old column are explicitly CREATE OR
+--   REPLACE'd here, and folder_is_globally_visible is OID-preservingly ALTER FUNCTION … RENAME'd (so its
+--   dependent documents/folders/document_chunks SELECT policies — which reference it by OID in their
+--   node-trees — auto-follow to the new name; NO policy re-create needed). Ordering is load-bearing:
+--   (a) fix the folder fn body → (b) rename the folder fn → (c)/(d) rewrite its text-bodied callers to
+--   the new name → (e)/(f)/(g) the remaining bodies. Every DEFINER fn copies the mig-110 SECURITY DEFINER
+--   + SET search_path (='' for the audit-pinned four; ='public','pg_temp' for capture_skill_version as
+--   it stands today) + OPERATOR(public.<=>) + schema-qualified objects VERBATIM — the search-path safety
+--   (CVE-2018-1058) is NOT weakened by this rename (T-165-04).
+--   Catch-all (Task 2g): a grep of the migrations + full-schema for trigger/function bodies naming the old
+--   column found ONLY (f) workflow_definitions_block_published_update (a real column ref) and
+--   (g) capture_skill_version (a comment-only ref, the toggle-flip guard) — no additional trigger fns.
+--   (The COMMENT ON TABLE public.skill_versions doc-string also names the old flag but is a table comment,
+--   not a function body — out of this migration's DDL scope; regenerated full-schema will reflect the rest.)
+-- ================================================================================================
+
+-- (a) folder_is_globally_visible — fix the body against the renamed folders column FIRST (OID kept). ---
+--     Copies the mig-110 §4 body verbatim; only the three folder-column tokens become is_org_shared.
+CREATE OR REPLACE FUNCTION public.folder_is_globally_visible(p_folder_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+  WITH RECURSIVE ancestors AS (
+    SELECT id, parent_id, is_org_shared
+    FROM public.folders
+    WHERE id = p_folder_id
+
+    UNION ALL
+
+    SELECT f.id, f.parent_id, f.is_org_shared
+    FROM public.folders f
+    INNER JOIN ancestors a ON f.id = a.parent_id
+  )
+  SELECT COALESCE(bool_or(is_org_shared), false) FROM ancestors;
+$$;
+
+-- (b) OID-preserving rename → folder_is_org_shared. The documents/folders/document_chunks SELECT policies
+--     reference this fn by OID in their node-trees, so they auto-follow; do NOT re-create those policies.
+ALTER FUNCTION public.folder_is_globally_visible(uuid) RENAME TO folder_is_org_shared;
+
+-- (c) match_document_chunks — mig-110 §1 verbatim; ONLY the visibility call is renamed to the new fn. ---
+CREATE OR REPLACE FUNCTION public.match_document_chunks(
+  query_embedding public.vector,
+  match_user_id uuid,
+  match_count integer DEFAULT 5,
+  match_threshold double precision DEFAULT 0.3,
+  metadata_filter jsonb DEFAULT NULL::jsonb,
+  p_folder_ids uuid[] DEFAULT NULL::uuid[],
+  p_embedding_model text DEFAULT NULL
+) RETURNS TABLE(id uuid, document_id uuid, content text, chunk_index integer, similarity double precision)
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path = ''
+    AS $$
+BEGIN
+  RETURN QUERY
+  SELECT dc.id, dc.document_id, dc.content, dc.chunk_index,
+         1 - (dc.embedding OPERATOR(public.<=>) query_embedding) AS similarity
+  FROM public.document_chunks dc
+  JOIN public.documents d ON d.id = dc.document_id
+  WHERE dc.org_id = ANY (SELECT public.current_user_org_ids())          -- D-164-01 org gate (indexed, mig 107)
+    AND (                                                               -- PRAG-01 within-org visibility
+      dc.user_id = auth.uid()                                          --   owner (session-derived, NOT match_user_id)
+      OR (d.folder_id IS NOT NULL AND public.folder_is_org_shared(d.folder_id))
+    )
+    AND 1 - (dc.embedding OPERATOR(public.<=>) query_embedding) > match_threshold
+    AND d.is_latest = true
+    AND (metadata_filter IS NULL OR d.metadata @> metadata_filter)
+    AND (p_folder_ids IS NULL OR d.folder_id = ANY(p_folder_ids))
+    AND (p_embedding_model IS NULL OR dc.embedding_model = p_embedding_model)  -- D-10 stale-model filter
+  ORDER BY dc.embedding OPERATOR(public.<=>) query_embedding
+  LIMIT match_count;
+END;
+$$;
+
+-- (d) keyword_search_chunks — mig-110 §2 verbatim; ONLY the visibility call is renamed to the new fn. ---
+CREATE OR REPLACE FUNCTION public.keyword_search_chunks(
+  search_query text,
+  match_user_id uuid,
+  match_count integer DEFAULT 20,
+  metadata_filter jsonb DEFAULT NULL::jsonb,
+  p_folder_ids uuid[] DEFAULT NULL::uuid[]
+) RETURNS TABLE(id uuid, document_id uuid, content text, chunk_index integer, rank double precision)
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path = ''
+    AS $$
+DECLARE
+  tsq tsquery;
+BEGIN
+  tsq := plainto_tsquery('english', search_query);
+  RETURN QUERY
+  SELECT dc.id, dc.document_id, dc.content, dc.chunk_index,
+         ts_rank_cd(dc.search_vector, tsq)::float AS rank
+  FROM public.document_chunks dc
+  JOIN public.documents d ON d.id = dc.document_id
+  WHERE dc.org_id = ANY (SELECT public.current_user_org_ids())          -- D-164-01 org gate (indexed, mig 107)
+    AND (                                                               -- PRAG-01 within-org visibility
+      dc.user_id = auth.uid()                                          --   owner (session-derived, NOT match_user_id)
+      OR (d.folder_id IS NOT NULL AND public.folder_is_org_shared(d.folder_id))
+    )
+    AND dc.search_vector @@ tsq
+    AND d.is_latest = true
+    AND (metadata_filter IS NULL OR d.metadata @> metadata_filter)
+    AND (p_folder_ids IS NULL OR d.folder_id = ANY(p_folder_ids))
+  ORDER BY rank DESC
+  LIMIT match_count;
+END;
+$$;
+
+-- (e) match_skills — mig-110 §3 verbatim; is_system stays the UNIVERSAL escape (D-165-02), the org-gated
+--     owner branch's user toggle becomes is_org_shared. FIX-A shape (is_system OUTSIDE the org gate) kept.
+CREATE OR REPLACE FUNCTION public.match_skills(
+  query_embedding public.vector,
+  match_user_id uuid,
+  p_embedding_model text DEFAULT NULL
+) RETURNS TABLE(id uuid, name text, description text, similarity double precision)
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path = ''
+    AS $$
+BEGIN
+  RETURN QUERY
+  SELECT s.id, s.name, s.description,
+         CASE WHEN se.embedding IS NULL THEN NULL
+              ELSE 1 - (se.embedding OPERATOR(public.<=>) query_embedding) END AS similarity
+  FROM public.skills s
+  LEFT JOIN public.skill_embeddings se
+         ON se.skill_id = s.id
+        AND (p_embedding_model IS NULL OR se.embedding_model = p_embedding_model)  -- D-10 stale-model filter
+  -- FIX-A (mig 109): is_system = true is a UNIVERSAL escape OUTSIDE the org gate; the
+  -- owner OR user-is_org_shared branch stays INSIDE the org gate (owner keys on auth.uid()).
+  WHERE ( (s.is_system = true)
+          OR (s.org_id = ANY (SELECT public.current_user_org_ids())
+              AND (s.user_id = auth.uid() OR s.is_org_shared = true)) )
+    AND s.is_enabled = true
+  ORDER BY similarity DESC NULLS LAST, s.name;   -- NULL sim (no vector) = fail-open, ranked last-but-kept
+END;
+$$;
+
+-- (f) workflow_definitions_block_published_update — trigger fn (INVOKER, no search_path) verbatim from
+--     full-schema; the published-immutability guard column becomes is_system_global (write-locked table).
+CREATE OR REPLACE FUNCTION public.workflow_definitions_block_published_update() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+  IF OLD.status = 'published' AND (
+        NEW.slug             IS DISTINCT FROM OLD.slug
+     OR NEW.version          IS DISTINCT FROM OLD.version
+     OR NEW.name             IS DISTINCT FROM OLD.name
+     OR NEW.description       IS DISTINCT FROM OLD.description
+     OR NEW.status           IS DISTINCT FROM OLD.status
+     OR NEW.definition       IS DISTINCT FROM OLD.definition
+     OR NEW.created_by       IS DISTINCT FROM OLD.created_by
+     OR NEW.is_system_global IS DISTINCT FROM OLD.is_system_global
+     OR NEW.org_id           IS DISTINCT FROM OLD.org_id
+  ) THEN
+    RAISE EXCEPTION
+      'workflow_definitions row % is published and immutable; create a new version instead',
+      OLD.id
+      USING ERRCODE = 'check_violation';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+-- (g) capture_skill_version — trigger fn (DEFINER, search_path 'public','pg_temp' — preserved verbatim);
+--     body is byte-identical to full-schema, ONLY the toggle-flip comment names the renamed skills column.
+CREATE OR REPLACE FUNCTION public.capture_skill_version() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public', 'pg_temp'
+    AS $$
+DECLARE
+  next_num integer;
+BEGIN
+  -- D-02: on UPDATE, capture a version ONLY when the content trifecta changes. A
+  -- toggle-only flip (is_enabled / is_org_shared) MUST NOT version.
+  IF TG_OP = 'UPDATE' THEN
+    IF NOT (
+         NEW.name         IS DISTINCT FROM OLD.name
+      OR NEW.description  IS DISTINCT FROM OLD.description
+      OR NEW.instructions IS DISTINCT FROM OLD.instructions
+    ) THEN
+      RETURN NEW;  -- toggle-only / no content change → no version
+    END IF;
+  END IF;
+
+  -- COALESCE(MAX)+1 per skill; the UNIQUE(skill_id, version_number) constraint turns any
+  -- concurrent collision into a benign retryable 23505 (D-03-R3 / T-132-04).
+  SELECT COALESCE(MAX(version_number), 0) + 1
+    INTO next_num
+    FROM public.skill_versions
+   WHERE skill_id = NEW.id;
+
+  INSERT INTO public.skill_versions
+    (skill_id, user_id, version_number, name, description, instructions, source)
+  VALUES
+    (NEW.id, NEW.user_id, next_num, NEW.name, NEW.description, NEW.instructions, 'manual');
+    -- user_id = NEW.user_id (NOT auth.uid() — NULL under service-role, D-03-R3 / T-132-03).
+    -- source 'manual': the trigger cannot distinguish write paths (D-03-R1); the 5-value enum
+    -- stays for forward-compat (import/tuner/self_improve/backfill set by other paths).
+
+  RETURN NEW;
+END;
+$$;
+
+-- Closing §2 note: the RLS SELECT/WITH-CHECK policies + the mfd_reachable CHECK + all indexes are
+-- intentionally NOT re-created in this migration — RENAME COLUMN (§1) auto-propagated them verbatim, and
+-- the folder-fn dependents auto-follow the OID-preserving ALTER FUNCTION RENAME (b). Every DEFINER
+-- search_path pin + OPERATOR(public.<=>) + is_system universal escape is preserved exactly as mig-110/109.
 -- ================================================================================================
 
 -- ================================================================================================
