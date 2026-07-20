@@ -2,16 +2,15 @@
 gsd_state_version: 1.0
 milestone: v3.4
 milestone_name: Multi-Tenancy & Org Access
-status: ready_to_plan
-last_updated: 2026-07-20T13:52:58.455Z
-last_activity: 2026-07-20 -- Phase 163 all 11 plans complete (163-11 FIX-A closed out); secure/verify next
+status: planning
+last_updated: "2026-07-20T14:08:26.395Z"
+last_activity: "2026-07-20 -- Phase 163 CLOSED (atomic crux complete: 11/11 + UAT 8/8 + 28/28 secured)"
 progress:
   total_phases: 28
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 21
   completed_plans: 21
-  percent: 14
-stopped_at: Phase 163 complete (11/11) — ready to discuss Phase 164
+  percent: 18
 ---
 
 # Project State
@@ -42,12 +41,12 @@ Items acknowledged and deferred at milestone close on 2026-07-18 (44 open `audit
 ## Current Position
 
 Phase: 164
-Plan: Not started
-Status: Ready to plan
-Next action: `/gsd:discuss-phase 164` — SECDEF Audit + Cross-Org Isolation Test Suite (TEN-03, TEN-05, TEN-06, PRAG-01). The 4 SECURITY DEFINER retrieval/sharing fns get an in-body org predicate + pinned search_path, the fragile regex is deleted, and the two-org adversarial `test_v3_4_org_isolation.py` suite (the milestone exit gate) is built. Flags: SC#10, threat model (security core), research-phase (pgvector+RLS), folds SEED-091. **Phase 163 CLOSED 2026-07-20** — THE ATOMIC CRUX complete: 11/11 plans, UAT 8/8, secure-phase 28/28 STRIDE (threats_open:0), TEN-01/TEN-02/TEN-04 Validated. Membership-based RLS is now the enforced gate on every request path.
-Last activity: 2026-07-20 -- Phase 163 CLOSED (atomic crux complete: 11/11 + UAT 8/8 + 28/28 secured)
+Plan: Not started (context gathered → planning next)
+Status: Planning
+Next action: `/gsd:plan-phase 164 --auto` — CONTEXT.md committed (`de5baac1`, 8 decisions locked via `--auto`). SECDEF Audit + Cross-Org Isolation Test Suite (TEN-03, TEN-05, TEN-06, PRAG-01). Locked: **D-164-01** in-body `current_user_org_ids()` org predicate (no `match_org_id` param) + **D-164-02** route the 3 retrieval RPCs through the user-JWT client (163-07 deferred these here); **D-164-03** keep DEFINER + pinned `search_path` (audit = per-fn justification); **D-164-04** DELETE `_inject_user_id`/`_inject_user_id_for_grep`, rely on RLS via INVOKER `query_user_documents`; **D-164-05** null owner `user_id`+scope UUIDs on non-owned global rows across folders/skills/views (SEED-091/TEN-06); **D-164-06** exhaustive `test_v3_4_org_isolation.py` exit gate (red-then-green) extending `test_163_factories.py`; **D-164-07** widen `document_chunks` SELECT to mirror folder-visibility for PRAG-01, re-bench CONCUR-01 <1s; **D-164-08** new migration slot 110 via SQL editor (never reset/push). Flags: SC#10, threat model (security core), research-phase (pgvector+RLS). Reported-bugs cross-check done — no Agentic-RAG bug overlaps 164; SEED-091 is the only fold.
+Last activity: 2026-07-20 -- Phase 164 context gathered (--auto); auto-advancing to plan-phase
 
-Progress: [████████████████████] 21/21 plans (100%) — Phase 163 done; Phase 164 ready to plan
+Progress: [████████████████████] 21/21 plans (100%) — Phase 163 done; Phase 164 context gathered → planning
 
 ### Quick Tasks Completed
 
