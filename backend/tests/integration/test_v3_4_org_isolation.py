@@ -153,10 +153,50 @@ async def two_orgs_chunks_and_shared_folder(pg_pool, two_orgs_two_users):
         u["private_chunk_id"] = str(cid)
         created_chunk_ids.append(cid)
 
-    # A single teardown ledger children-first; Task 3 appends (table, id) rows here.
+    # Teardown ledger, children-first: private chunks first, then the shared-folder rows
+    # (shared_chunk → shared_doc → shared_folder) so FK order holds on cleanup.
     teardown: list[tuple[str, object]] = [
         ("document_chunks", cid) for cid in created_chunk_ids
     ]
+
+    # ── SHARED-FOLDER scenario for user A (PRAG-01): an is_global folder owned by A + a
+    #    document inside it + one document_chunk — so the PRAG-01 leg can distinguish A's
+    #    PRIVATE chunk from A's SHARED-folder chunk. (folder_is_globally_visible walks
+    #    ancestors on is_global, so a top-level is_global folder resolves True.)
+    a = base["a"]
+    shared_folder_id = uuid4()
+    shared_doc_id = uuid4()
+    shared_chunk_id = uuid4()
+    await pg_pool.execute(
+        "INSERT INTO public.folders (id, user_id, org_id, name, is_global) "
+        "VALUES ($1, $2, $3, $4, true)",
+        shared_folder_id, a["uid"], a["org_id"], f"164-a-shared-folder-{shared_folder_id}",
+    )
+    await pg_pool.execute(
+        "INSERT INTO public.documents "
+        "(id, user_id, org_id, folder_id, filename, file_path, file_size, mime_type, "
+        " status, is_latest, version_number) "
+        "VALUES ($1, $2, $3, $4, $5, $6, 100, 'text/plain', 'completed', true, 1)",
+        shared_doc_id, a["uid"], a["org_id"], shared_folder_id,
+        f"164-a-shared-{shared_doc_id}.txt", f"{a['uid']}/{shared_doc_id}.txt",
+    )
+    await pg_pool.execute(
+        "INSERT INTO public.document_chunks "
+        "(id, document_id, user_id, org_id, content, chunk_index, embedding, "
+        " embedding_model, embedding_dimensions) "
+        "VALUES ($1, $2, $3, $4, $5, 0, $6::vector, 'text-embedding-3-small', $7)",
+        shared_chunk_id, shared_doc_id, a["uid"], a["org_id"], "164-a-shared-chunk",
+        _unit_vec_literal(), EMBED_DIM,
+    )
+    a["shared_folder_id"] = str(shared_folder_id)
+    a["shared_doc_id"] = str(shared_doc_id)
+    a["shared_chunk_id"] = str(shared_chunk_id)
+    teardown += [
+        ("document_chunks", shared_chunk_id),
+        ("documents", shared_doc_id),
+        ("folders", shared_folder_id),
+    ]
+
     base["_teardown"] = teardown
 
     try:
@@ -411,3 +451,257 @@ async def test_org_header_spoof_does_not_widen(pg_pool, two_orgs_two_users):
             "cannot widen access because the DB derives org from current_user_org_ids(), never "
             "the header."
         )
+
+
+# ══════════════════════════════════════════════════════════════════════════════════
+# Task 3 — text-to-SQL / grep cross-org leg (query_user_documents, D-164-04) + PRAG-01
+#          live-retrieval isolation + platform-universal / over-widening guards.
+# ══════════════════════════════════════════════════════════════════════════════════
+
+
+def _extract_a_rows(data, a_uid: str) -> list:
+    """Filter a ``query_user_documents`` jsonb result (a list of row dicts) to rows OWNED by
+    user A. The pg_pool jsonb codec decodes the result to Python objects, so ``user_id`` is a
+    string; compare against A's uid."""
+    return [r for r in (data or []) if str(r.get("user_id")) == str(a_uid)]
+
+
+@pytest.mark.asyncio
+async def test_text_to_sql_query_user_documents_isolation(pg_pool, two_orgs_chunks_and_shared_folder):
+    """D-164-04 / RESEARCH Pitfall 4 — the single highest-risk regression this phase carries.
+
+    ``public.query_user_documents(sql_query)`` is INVOKER (no SECURITY clause) — it EXECUTEs
+    the arbitrary text-to-SQL under the CALLER'S role. Plan 04 DELETES the ``_inject_user_id``
+    regex, leaving the user-context CONNECTION as the ONLY scope. This leg arbitrates that the
+    CONNECTION identity — not the deleted regex, not the param — is the gate:
+
+      * USER-CONTEXT (``open_user_conn`` as B, role authenticated, RLS enforced): a crafted
+        cross-org SELECT that WOULD surface A's rows returns 0 A-owned rows. GREEN (documents
+        RLS shipped in 163; the connection identity scopes the arbitrary query).
+      * LEAK-CONN (a plain ``pg_pool.acquire()`` — role postgres / BYPASSRLS, NO
+        ``_apply_rls_user_context``): the SAME crafted SELECT DOES return A's rows (> 0). This
+        is the "regex deleted BUT connection not user-context" leak state (Pitfall 4) — the
+        checkout Plan 04 must NOT ship. It proves the connection is the arbiter.
+    """
+    ctx = two_orgs_chunks_and_shared_folder
+    a, b = ctx["a"], ctx["b"]
+    # A crafted cross-org SELECT (SELECT-only, no semicolon — passes query_user_documents' guard).
+    crafted = f"select id, user_id from documents where user_id = '{a['uid']}'"
+
+    async with open_user_conn(pg_pool, b["uid"]) as conn:
+        await assert_auth_uid(conn, b["uid"])  # fail-loud FIRST
+        data = await conn.fetchval("SELECT public.query_user_documents($1)", crafted)
+        a_rows = _extract_a_rows(data, a["uid"])
+        assert len(a_rows) == 0, (
+            "cross-org leak (text-to-SQL, user-context): B's crafted query_user_documents SELECT "
+            f"surfaced {len(a_rows)} of user A's documents — RLS under the authenticated role "
+            "must scope the arbitrary query to B's org."
+        )
+
+    # LEAK-CONN RED-demonstration — a NON-user-context connection (role postgres, BYPASSRLS)
+    # runs the identical crafted SELECT and LEAKS A's rows. NOT a user conn → no assert_auth_uid.
+    async with pg_pool.acquire() as leak_conn:
+        data = await leak_conn.fetchval("SELECT public.query_user_documents($1)", crafted)
+        a_rows = _extract_a_rows(data, a["uid"])
+        assert len(a_rows) > 0, (
+            "leak-conn demonstration is VACUOUS: query_user_documents over a NON-user-context "
+            "connection did NOT surface user A's rows. The connection identity (not the deleted "
+            "regex) is the gate (Pitfall 4) — if this fails, A owns no documents or the pool "
+            "connection unexpectedly enforced RLS."
+        )
+
+
+@pytest.mark.asyncio
+async def test_text_to_sql_grep_path_isolation(pg_pool, two_orgs_chunks_and_shared_folder):
+    """The grep SUCCESSOR path (``kb.grep_path`` → ``_inject_user_id_for_grep``, DELETED in
+    Plan 04) — the SAME ``public.query_user_documents`` INVOKER RPC with a pattern-match SELECT
+    (the shape grep builds). Identical arbitration to the text-to-SQL leg: user-context → 0
+    A-rows; leak-conn → A's rows leak. Both matched by ``-k text_to_sql``; Plan 04 Task 3's
+    ``-k "text_to_sql" -x`` verify runs both."""
+    ctx = two_orgs_chunks_and_shared_folder
+    a, b = ctx["a"], ctx["b"]
+    # A grep-shaped content pattern-match over A's chunks (private "164-a-secret-chunk" +
+    # shared "164-a-shared-chunk" both match '%164-a-%').
+    grep_sql = "select user_id, content from document_chunks where content ilike '%164-a-%'"
+
+    async with open_user_conn(pg_pool, b["uid"]) as conn:
+        await assert_auth_uid(conn, b["uid"])  # fail-loud FIRST
+        data = await conn.fetchval("SELECT public.query_user_documents($1)", grep_sql)
+        a_rows = _extract_a_rows(data, a["uid"])
+        assert len(a_rows) == 0, (
+            "cross-org leak (grep path, user-context): B's crafted grep-shaped SELECT surfaced "
+            f"{len(a_rows)} of user A's chunks — RLS under the authenticated role must scope it."
+        )
+
+    async with pg_pool.acquire() as leak_conn:
+        data = await leak_conn.fetchval("SELECT public.query_user_documents($1)", grep_sql)
+        a_rows = _extract_a_rows(data, a["uid"])
+        assert len(a_rows) > 0, (
+            "leak-conn demonstration is VACUOUS: the grep-shaped query_user_documents over a "
+            "NON-user-context connection did NOT surface user A's chunks — the connection "
+            "identity is the gate (Pitfall 4)."
+        )
+
+
+@pytest.mark.asyncio
+async def test_prag01_retrieval_isolation(pg_pool, two_orgs_chunks_and_shared_folder):
+    """PRAG-01 live retrieval isolation (``-k prag01_retrieval``) — org- AND folder-ACL scoping.
+
+    As user B over the asyncpg user-context, retrieval via ``match_document_chunks`` must:
+      * POSITIVE CONTROL — return B's OWN chunk (the query works; not 0-for-everyone).
+      * NEVER return A's PRIVATE chunk (org isolation — GREEN pre + post).
+      * NEVER return A's SHARED-folder chunk cross-org either. The folder-ACL branch
+        (``folder_is_globally_visible``) lives INSIDE the org gate, so a DISJOINT-org reader
+        gets 0 — user is_global folder content stays org-scoped until orgs gain members
+        (163-UAT Test-7 symptom two; the co-member POSITIVE folder-ACL proof is a Phase
+        166/167 forward gate, where the shared fixture's two-DISJOINT-org topology is replaced
+        by a co-member).
+
+    RED pre-164 / GREEN post-110 via the SPOOFED ``match_user_id = A``: pre-164 the SECDEF body
+    filters ``dc.user_id = match_user_id`` and returns BOTH of A's chunks (leak); post-110 the
+    in-body org gate keys on ``auth.uid() = B`` → 0. The positive control is GREEN in both."""
+    ctx = two_orgs_chunks_and_shared_folder
+    a, b = ctx["a"], ctx["b"]
+    async with open_user_conn(pg_pool, b["uid"]) as conn:
+        await assert_auth_uid(conn, b["uid"])  # fail-loud FIRST
+        # positive control — B retrieves its OWN chunk (non-vacuity; the query is live).
+        own = await conn.fetch(
+            "SELECT id FROM public.match_document_chunks($1::public.vector, $2, 100, 0.0)",
+            _unit_vec_literal(), b["uid"],
+        )
+        own_ids = {str(r["id"]) for r in own}
+        assert b["private_chunk_id"] in own_ids, (
+            "positive-control failure: user B cannot retrieve its OWN chunk — retrieval is "
+            "0-for-everyone, which would false-green the isolation assertions below."
+        )
+        # adversarial — spoof match_user_id = A. B must receive NEITHER A's PRIVATE nor A's
+        # SHARED-folder chunk (org gate blocks both cross-org; folder-ACL does not widen).
+        leaked = await conn.fetch(
+            "SELECT id FROM public.match_document_chunks($1::public.vector, $2, 100, 0.0)",
+            _unit_vec_literal(), a["uid"],
+        )
+        leaked_ids = {str(r["id"]) for r in leaked}
+        assert a["private_chunk_id"] not in leaked_ids, (
+            "PRAG-01 leak: user B retrieved user A's PRIVATE chunk (cross-org)."
+        )
+        assert a["shared_chunk_id"] not in leaked_ids, (
+            "PRAG-01 leak: user B retrieved user A's SHARED-folder chunk cross-org — user "
+            "is_global folder content stays org-scoped (the folder-ACL branch lives INSIDE the "
+            "org gate); a disjoint-org reader must get 0. RED pre-164, GREEN post-110."
+        )
+
+
+# ── platform-universal + over-widening guards (clone test_163_rls_platform_universal) ──
+
+async def _ensure_system_seed_user(pool) -> None:
+    """Ensure the system seed user exists so an is_system seed satisfies skills.user_id FK.
+    Idempotent; normally already present from migration 087. NEVER torn down (shared principal)."""
+    await pool.execute(
+        "INSERT INTO auth.users (id, email) VALUES ($1, $2) ON CONFLICT (id) DO NOTHING",
+        SYSTEM_SEED_UID, "seed@system.local",
+    )
+
+
+async def _seed_system_skill(pool, org_id: str) -> str:
+    """Seed an is_system=true skill owned by the system seed in ``org_id`` (mirrors the real
+    skill-creator: is_system=true + is_global=true). org_id explicit → mig-106 autofill no-ops."""
+    sid = uuid4()
+    await pool.execute(
+        "INSERT INTO public.skills (id, user_id, org_id, name, is_system, is_global) "
+        "VALUES ($1, $2, $3, $4, true, true)",
+        sid, SYSTEM_SEED_UID, org_id, f"164-systemskill-{sid}",
+    )
+    return str(sid)
+
+
+async def _cleanup(pool, sql: str, arg) -> None:
+    try:
+        await pool.execute(sql, arg)
+    except Exception:  # best-effort teardown — never fail a test on cleanup
+        pass
+
+
+@pytest.mark.asyncio
+async def test_is_system_stays_universal(pg_pool, two_orgs_two_users):
+    """Platform-universal READ via ``match_skills`` — a non-co-member (disjoint org) SEES an
+    ``is_system=true`` built-in skill. Guards the mig-109 FIX-A / 163-UAT Test-7 regression:
+    is_system platform content must stay OUTSIDE the org gate (universal), else the built-in
+    skill-creator vanishes for everyone but the seed org."""
+    a, b = two_orgs_two_users["a"], two_orgs_two_users["b"]
+    await _ensure_system_seed_user(pg_pool)
+    sys_skill = await _seed_system_skill(pg_pool, a["org_id"])  # in org X; B is a non-co-member
+    try:
+        async with open_user_conn(pg_pool, b["uid"]) as conn:
+            await assert_auth_uid(conn, b["uid"])  # fail-loud FIRST
+            rows = await conn.fetch(
+                "SELECT id FROM public.match_skills($1::public.vector, $2, NULL)",
+                _unit_vec_literal(), b["uid"],
+            )
+        ids = {str(r["id"]) for r in rows}
+        assert sys_skill in ids, (
+            "FIX-A regression (163-UAT Test 7): the is_system built-in skill-creator is invisible "
+            "to a non-co-member via match_skills — is_system must stay OUTSIDE the org gate "
+            "(universal). Migration 110 must preserve the mig-109 is_system escape."
+        )
+    finally:
+        await _cleanup(pg_pool, "DELETE FROM public.skills WHERE id = $1", sys_skill)
+
+
+@pytest.mark.asyncio
+async def test_user_is_global_stays_org_scoped(pg_pool, two_orgs_two_users):
+    """Over-widening guard via ``match_skills`` — a user's OWN is_global skill (owner-toggled,
+    org-shared) must NOT leak to a non-co-member. Only is_system (platform) escapes the org
+    gate; user-self-served is_global stays org-scoped until orgs gain members (166/167).
+
+    RED pre-164 (match_skills has no org gate → the ``s.is_global = true`` branch leaks A's
+    skill cross-org) / GREEN post-110 (org gate → A's skill excluded for a disjoint-org B)."""
+    a, b = two_orgs_two_users["a"], two_orgs_two_users["b"]
+    own_global = uuid4()
+    await pg_pool.execute(
+        "INSERT INTO public.skills (id, user_id, org_id, name, is_global) "
+        "VALUES ($1, $2, $3, $4, true)",
+        own_global, a["uid"], a["org_id"], f"164-ownglobal-{own_global}",
+    )
+    try:
+        async with open_user_conn(pg_pool, b["uid"]) as conn:
+            await assert_auth_uid(conn, b["uid"])  # fail-loud FIRST
+            rows = await conn.fetch(
+                "SELECT id FROM public.match_skills($1::public.vector, $2, NULL)",
+                _unit_vec_literal(), b["uid"],
+            )
+        ids = {str(r["id"]) for r in rows}
+        assert str(own_global) not in ids, (
+            "over-widening: user A's ORG-scoped is_global skill leaked to a non-co-member via "
+            "match_skills — only is_system (platform) escapes the org gate; user is_global stays "
+            "org-scoped until orgs gain members (166/167). RED pre-164, GREEN post-110."
+        )
+    finally:
+        await _cleanup(pg_pool, "DELETE FROM public.skills WHERE id = $1", str(own_global))
+
+
+@pytest.mark.asyncio
+async def test_badge_spoof_blocked(pg_pool, two_orgs_two_users):
+    """Badge-spoof (T-163-11, mig 109 WITH-CHECK) — an authenticated user self-setting
+    ``is_system=true`` on INSERT is REJECTED (SQLSTATE 42501). GREEN (109 applied); the audit
+    re-asserts the write check survives the 110 re-CREATE surface. Rolled back regardless."""
+    a = two_orgs_two_users["a"]
+    spoof = uuid4()
+    async with pg_pool.acquire() as conn:
+        tx = conn.transaction()
+        await tx.start()
+        try:
+            await _apply_rls_user_context(conn, a["uid"])
+            await assert_auth_uid(conn, a["uid"])  # fail-loud FIRST
+            with pytest.raises(asyncpg.PostgresError) as exc:
+                await conn.execute(
+                    "INSERT INTO public.skills (id, user_id, org_id, name, is_system) "
+                    "VALUES ($1, $2, $3, $4, true)",
+                    spoof, a["uid"], a["org_id"], f"164-spoof-{spoof}",
+                )
+            assert exc.value.sqlstate == _RLS_VIOLATION_SQLSTATE, (
+                f"expected an RLS write-check violation ({_RLS_VIOLATION_SQLSTATE}), got "
+                f"{exc.value.sqlstate!r}. An authenticated user self-setting is_system=true must "
+                "be REJECTED (T-163-11 badge-spoof; mig-109 WITH-CHECK)."
+            )
+        finally:
+            await tx.rollback()
