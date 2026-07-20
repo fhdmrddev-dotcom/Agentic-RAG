@@ -24,14 +24,14 @@ Requirements for the v3.4 release. Each maps to exactly one roadmap phase.
 
 - [x] **TEN-01**: Every RLS predicate on all 38 user-facing tables is rewritten from `user_id = auth.uid()` to membership-based (`org_id = ANY(current_user_org_ids()) AND (owner-within-org OR is_org_shared OR dept-scoped OR is_system_global)`), shipped atomically across reviewable per-cluster bundles.
 - [x] **TEN-02**: The service-role Supabase singleton is replaced on hot paths by a per-request user-JWT DB context across **both** data-access paths — supabase-py (JWT-header swap) and the raw asyncpg pool (`SET LOCAL request.jwt.claims` + the mandatory `SET LOCAL ROLE authenticated`) — with a hardened `get_service_role_supabase(org_id)` wrapper (refuses to construct without an explicit org) retained only for legitimate cross-tenant ops. **Ships in the same phase as TEN-01** (RLS is inert without it).
-- [ ] **TEN-03**: All four `SECURITY DEFINER` retrieval/sharing functions (`match_document_chunks`, `keyword_search_chunks`, `match_skills`, `folder_is_globally_visible`→`folder_is_org_shared`) carry an explicit org predicate in-body + a pinned `search_path`; the fragile `_inject_user_id` regex is **deleted** (not extended) and `query_user_documents` is called through the user-JWT client.
+- [x] **TEN-03**: All four `SECURITY DEFINER` retrieval/sharing functions (`match_document_chunks`, `keyword_search_chunks`, `match_skills`, `folder_is_globally_visible`→`folder_is_org_shared`) carry an explicit org predicate in-body + a pinned `search_path`; the fragile `_inject_user_id` regex is **deleted** (not extended) and `query_user_documents` is called through the user-JWT client.
 - [x] **TEN-04**: `org_id` is denormalized onto `document_chunks` and `skill_embeddings` (the pgvector hot paths) with a partial/composite index alongside the existing vector index, benchmarked so membership-RLS does not regress the CONCUR-01 <1s cross-tab-GET-during-streaming binding gate.
-- [ ] **TEN-05**: A cross-org isolation test suite (`test_v3_4_org_isolation.py`) — two seeded orgs × every user-facing table × all four `SECURITY DEFINER` functions (0 cross-org rows) × both DB access paths × `X-Org-Id` header-spoof rejection — passes, and is the milestone exit gate.
+- [x] **TEN-05**: A cross-org isolation test suite (`test_v3_4_org_isolation.py`) — two seeded orgs × every user-facing table × all four `SECURITY DEFINER` functions (0 cross-org rows) × both DB access paths × `X-Org-Id` header-spoof rejection — passes, and is the milestone exit gate.
 - [x] **TEN-06**: SEED-091 closed — global/org-shared resources (folders / skills / views) null the seeding owner's `user_id` (+ scope UUIDs) for non-owner readers in every list/serialize path.
 
 ### Permission-Aware Retrieval
 
-- [ ] **PRAG-01**: Retrieval is org- and folder-ACL-isolated — `document_chunks` RLS mirrors the full folder-visibility predicate so hybrid search returns only rows the asking user may access (a near-free byproduct of authoring TEN-01/TEN-03 correctly; a latent cross-org leak if omitted).
+- [x] **PRAG-01**: Retrieval is org- and folder-ACL-isolated — `document_chunks` RLS mirrors the full folder-visibility predicate so hybrid search returns only rows the asking user may access (a near-free byproduct of authoring TEN-01/TEN-03 correctly; a latent cross-org leak if omitted).
 
 ### Data Migration — "nothing breaks"
 
@@ -119,10 +119,10 @@ Populated during roadmap creation (each requirement maps to exactly one phase; n
 | TEN-01 | 163 | Complete |
 | TEN-02 | 163 | Complete |
 | TEN-04 | 163 | Complete |
-| TEN-03 | 164 | Pending |
-| TEN-05 | 164 | Pending |
+| TEN-03 | 164 | Complete |
+| TEN-05 | 164 | Complete |
 | TEN-06 | 164 | Complete |
-| PRAG-01 | 164 | Pending |
+| PRAG-01 | 164 | Complete |
 | MIG-02 | 165 | Pending |
 | ADMIN-01 | 166 | Pending |
 | ADMIN-02 | 166 | Pending |

@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v3.4
 milestone_name: Multi-Tenancy & Org Access
-status: executing
-last_updated: "2026-07-20T16:20:30.432Z"
-last_activity: 2026-07-20
+status: verifying
+last_updated: "2026-07-20T16:46:26.609Z"
+last_activity: 2026-07-20 -- Phase 164 Plan 04 complete (producer user-context client-swap; TEN-03/TEN-05/PRAG-01 complete; 18/18 exit-gate GREEN)
 progress:
   total_phases: 28
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 25
-  completed_plans: 24
-  percent: 18
+  completed_plans: 25
+  percent: 21
 ---
 
 # Project State
@@ -40,13 +40,13 @@ Items acknowledged and deferred at milestone close on 2026-07-18 (44 open `audit
 
 ## Current Position
 
-Phase: 164 (secdef-audit-cross-org-isolation-test-suite) — EXECUTING
-Plan: 3 of 4 — 164-03 COMPLETE (migration 110 SECDEF org-scope audit — the SQL half of TEN-03/PRAG-01)
-Status: Ready to execute
-Next action: execute **Plan 164-04** (producer asyncpg client-swap onto `get_user_pg_connection` for the retrieval + text-to-SQL/grep DB calls + delete `_inject_user_id`/`_inject_user_id_for_grep`) — the app-code half that resolves `auth.uid()` in the producer (retrieval currently returns 0 rows on the service-role producer: the DESIGNED two-halves transient). **TEN-03 + PRAG-01 mark complete at 164-04** (164-03 landed only the SQL half — inert on the service-role producer until the swap). **Plan 164-03 shipped:** `110_secdef_org_scope_audit.sql` applied live to :54322 via psycopg2 (operator-authorized this session; NEVER db push/reset) — 4× `CREATE OR REPLACE` DEFINER (byte-identical sigs) with in-body `org_id = ANY(SELECT current_user_org_ids())` + pinned `SET search_path = ''` + `OPERATOR(public.<=>)`; `match_skills` keeps `is_system` OUTSIDE the org gate (mig 109 FIX-A); `document_chunks` SELECT RLS widened for PRAG-01. pg_proc verified (all 4 prosecdef=true + search_path pinned); `full-schema.sql` regenerated no-reset (same-commit `e14c146b`). **All 18 `test_v3_4_org_isolation.py` legs GREEN** (red-anchor `test_definer_ignores_spoofed_match_user_id` passes); CONCUR-01 15.0ms (<1s). **Rule 1 fix** `c8a67e86`: 3 assertions (red-anchor + zero-cross-org chunk legs) changed from `len(rows)==0` to A-chunk-absence — B legitimately sees its OWN matching chunk post-164 (matches the fixture's positive-control design). 2 pre-existing 163 RLS-DM/workflow failures remain out-of-scope (D-164-02-A). **Cloud parity owed:** migs 099→110 + `SECRETS_ENCRYPTION_KEY` at next operator-gated push.
-Last activity: 2026-07-20 -- Phase 164 Plan 03 complete (migration 110 SECDEF org-scope audit; 18/18 exit-gate legs GREEN)
+Phase: 164 (secdef-audit-cross-org-isolation-test-suite) — COMPLETE (4/4 plans)
+Plan: 4 of 4 — 164-04 COMPLETE (producer asyncpg client-swap — the app-code half of the two-halves crux)
+Status: Phase 164 complete — ready for **/gsd:verify-work 164**
+Next action: run **/gsd:verify-work 164** (then the SC#10 4-axis live operator UAT per `164-VALIDATION.md` before phase close). **Plan 164-04 shipped:** the producer's three retrieval RPCs (`match_document_chunks`/`keyword_search_chunks` via `retrieval_service`; `match_skills` via `agent_loop`) + the text-to-SQL/grep `query_user_documents` path now run over the Phase-163 asyncpg `get_user_pg_connection` user-context (shared `retrieval_service._call_as_user` seam; embeddings as `'[...]'::public.vector`, id `::text` for str-key parity) — `auth.uid()` now resolves the caller in the producer, so migration 110's in-body org gate is LIVE and retrieval returns the caller's rows again (not the 0-for-everyone service-role transient). `_inject_user_id` (sql_service) + `_inject_user_id_for_grep` (kb.py) DELETED; `_inject_folder_scope` + SELECT-only/no-`;` guards RETAINED; `query_user_documents` stays INVOKER (RLS is the gate). `tool_dispatcher` unchanged (the RPC leg self-acquires the user-context; `ctx.supabase` kept only for enrich/audit). **TEN-03 / TEN-05 / PRAG-01 → Complete** (TEN-06 already complete at 164-02). Full exit-gate `test_v3_4_org_isolation.py` **18/18 GREEN**; 163 crux not regressed (2 known pre-existing co-member failures, D-164-02-A); `test_kb.py` 24/24 (grep tests re-pointed at the user-context seam); CONCUR-01 <1s. Deep Mode byte-identical (DB-connection-seam swap, no provider fork, D-14). **Out-of-scope logged (`deferred-items.md`):** D-164-04-A (27 pre-existing async-not-awaited rot tests in `test_retrieval_service`/`test_sql_service` — coroutine-never-awaited, predates 164) + D-164-04-B (`test_stale_model_chunks_excluded` broke at 164-03/mig-110 — needs a user-context-connection update). **Cloud parity owed:** migs 099→110 + `SECRETS_ENCRYPTION_KEY` at next operator-gated push.
+Last activity: 2026-07-20 -- Phase 164 Plan 04 complete (producer user-context client-swap; TEN-03/TEN-05/PRAG-01 complete; 18/18 exit-gate GREEN)
 
-Progress: [██████████] 96%
+Progress: [██████████] 100%
 
 ### Quick Tasks Completed
 
@@ -441,6 +441,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 164 P02 | 30 | 2 tasks | 8 files |
 | Phase 164 P02 | 30 | 2 tasks | 8 files |
 | Phase 164 P164-03 | 42min | 2 tasks | 3 files |
+| Phase 164 P164-04 | 35min | 3 tasks | 5 files |
 
 ## Decisions
 
@@ -554,6 +555,9 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase ?]: 163-09: D-05 CLOSED — eval-runner/harness-resume/golden-run-publish/re-embed/skill-backfill route through get_service_role_supabase(org_id) + widen .eq(user_id) org-aware; org_id resolved self-contained from the entity each writer processes; org_id=None => byte-identical (D-14 filters kept); _reembed_adapter.or_() fixed to unblock the two-user isolation proof
 - [Phase ?]: Phase 164-02 (TEN-06/SEED-091): one shared _null_foreign_global_owner rule ((is_global OR is_system) AND not-owner -> user_id=None) across folders/skills/views serialize paths; +folder_scope=None on global views; +skill_files A3 loosen/null; FolderResponse/SkillResponse/SkillFileResponse.user_id -> UUID|None. Frontend Folder/Skill.user_id stays hard-required string -> flagged follow-up.
 - [Phase ?]: 164-03: migration 110 applied live to :54322 — 4 SECDEF fns org-scoped in-body (current_user_org_ids/auth.uid, never match_user_id) + search_path='' + OPERATOR(public.<=>); match_skills is_system OUTSIDE the gate; document_chunks SELECT RLS widened (PRAG-01). All 18 exit-gate legs GREEN; CONCUR-01 15ms. TEN-03/PRAG-01 = SQL half only, complete at 164-04.
+- [Phase ?]: Phase 164-04 (D-164-02): producer retrieval RPCs + text-to-SQL/grep query_user_documents run over the Phase-163 asyncpg get_user_pg_connection user-context via a shared retrieval_service._call_as_user seam — never the request JWT (expires mid-run) nor service-role (auth.uid()=NULL → 0 rows).
+- [Phase ?]: Phase 164-04 (D-164-04): _inject_user_id + _inject_user_id_for_grep DELETED — RLS on the INVOKER query_user_documents over the user-context is the cross-user gate; _inject_folder_scope + SELECT-only/no-semicolon guards RETAINED; query_user_documents NOT made DEFINER.
+- [Phase ?]: Phase 164-04: asyncpg has no pgvector codec — embeddings formatted as '[...]'::public.vector (_vector_literal); id/document_id cast ::text for str-key parity with the old PostgREST JSON. Deep Mode byte-identical (DB-connection-seam swap only, no provider fork, D-14).
 
 ## Operator Next Steps
 
