@@ -367,22 +367,25 @@ async def test_definer_ignores_spoofed_match_user_id(pg_pool, two_orgs_two_users
 
 **If a claim above needs confirmation before it becomes a locked decision, surface it in plan-phase / discuss-phase.**
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Does `_inject_folder_scope` (sql_service.py:71) survive the D-164-04 deletion?**
    - What we know: D-164-04 names only the two SECURITY-injection helpers (`_inject_user_id`, `_inject_user_id_for_grep`). `_inject_folder_scope` narrows a query to a user-chosen folder subtree — a relevance feature, not a cross-user gate.
    - What's unclear: whether keeping it is desired, or whether folder-scoping should also move to a param/RLS-friendly form.
    - Recommendation: KEEP `_inject_folder_scope` (feature), delete only the two security injections; note in the plan that RLS now owns cross-user isolation and folder-scope owns relevance.
+   - **RESOLVED:** KEEP `_inject_folder_scope`; delete only the two security injectors. Implemented in Plan 164-04 (explicit "KEEP `_inject_folder_scope`"). Also captured under CONTEXT.md §Claude's Discretion.
 
 2. **Seam for the producer retrieval client-swap (D-164-02 discretion).**
    - What we know: three RPC sites (`retrieval_service._vector_search`, `._keyword_search`, `agent_loop` match_skills) + the tool DB path all need the asyncpg user-context.
    - What's unclear: one shared `_call_as_user(pool, uid, ...)` helper vs. per-site.
    - Recommendation: one shared helper in `retrieval_service` (or a small `db/user_rpc.py`); `match_skills` can ride it or its own seam — planner's call.
+   - **RESOLVED:** one shared `_call_as_user` seam. Implemented in Plan 164-04 (single shared helper routes all producer RPCs onto the asyncpg user-context). CONTEXT.md §Claude's Discretion pre-authorized the planner's call.
 
 3. **`X-Org-Id` spoof test scope.**
    - What we know: 164 only *asserts* a spoofed header cannot widen (org derives from membership; the header is not consulted until 166).
    - What's unclear: whether any code path already reads `X-Org-Id`.
    - Recommendation: grep for `X-Org-Id`/`x_org_id` at plan-time; if unread, the test asserts "header present ≠ access change" (the header is inert in 164).
+   - **RESOLVED:** grep-at-author-time then assert "header present ≠ access change." Implemented in Plan 164-01 Task 2 (X-Org-Id spoof leg greps for readers, then proves the header is inert in 164; validated narrowing lands in 166).
 
 ## Environment Availability
 
