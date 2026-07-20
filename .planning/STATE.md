@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.4
 milestone_name: Multi-Tenancy & Org Access
 status: executing
-last_updated: "2026-07-20T15:56:55.497Z"
+last_updated: "2026-07-20T16:20:30.432Z"
 last_activity: 2026-07-20
 progress:
   total_phases: 28
   completed_phases: 5
   total_plans: 25
-  completed_plans: 23
+  completed_plans: 24
   percent: 18
 ---
 
@@ -41,12 +41,12 @@ Items acknowledged and deferred at milestone close on 2026-07-18 (44 open `audit
 ## Current Position
 
 Phase: 164 (secdef-audit-cross-org-isolation-test-suite) — EXECUTING
-Plan: 2 of 4 — 164-02 COMPLETE (SEED-091 owner-nulling, TEN-06 → complete)
+Plan: 3 of 4 — 164-03 COMPLETE (migration 110 SECDEF org-scope audit — the SQL half of TEN-03/PRAG-01)
 Status: Ready to execute
-Next action: execute **Plan 164-03** (migration 110 `110_secdef_org_scope_audit.sql` — 4× DEFINER re-CREATE w/ in-body `current_user_org_ids()` org predicate + pinned `search_path`; `is_system` OUTSIDE the gate for `match_skills` per mig-109 FIX-A; `document_chunks` SELECT RLS widening for PRAG-01), then **Plan 164-04** (producer asyncpg client-swap + delete `_inject_user_id`/`_inject_user_id_for_grep`). `test_v3_4_org_isolation.py` (Plan 164-01, 18 tests) is the arbiter: its 8 RED legs turn GREEN after 164-03+04 (TEN-03/TEN-05/PRAG-01 mark complete then). **Plan 164-02 shipped (TEN-06/SEED-091):** one shared `_null_foreign_global_owner` rule ((is_global OR is_system) AND not-owner → user_id=None) across folders/skills/views serialize paths (+folder_scope=None on global views; +skill_files A3 loosen/null); `FolderResponse`/`SkillResponse`/`SkillFileResponse.user_id → UUID|None`; DB-independent unit gate `tests/test_seed091_owner_nulling.py` 6/6 green. Commits `07840986` (feat) + `2acf3934` (test). Frontend `Folder`/`Skill.user_id` stay hard-required `string` → flagged follow-up (loosen to `string | null`; no UI build this plan). 2 pre-existing 163 RLS-DM/workflow failures (classification_rules/workflow_definitions cross-org visibility) logged out-of-scope → `164/deferred-items.md` (D-164-02-A).
-Last activity: 2026-07-20 -- Phase 164 Plan 02 complete (SEED-091 owner-nulling, TEN-06)
+Next action: execute **Plan 164-04** (producer asyncpg client-swap onto `get_user_pg_connection` for the retrieval + text-to-SQL/grep DB calls + delete `_inject_user_id`/`_inject_user_id_for_grep`) — the app-code half that resolves `auth.uid()` in the producer (retrieval currently returns 0 rows on the service-role producer: the DESIGNED two-halves transient). **TEN-03 + PRAG-01 mark complete at 164-04** (164-03 landed only the SQL half — inert on the service-role producer until the swap). **Plan 164-03 shipped:** `110_secdef_org_scope_audit.sql` applied live to :54322 via psycopg2 (operator-authorized this session; NEVER db push/reset) — 4× `CREATE OR REPLACE` DEFINER (byte-identical sigs) with in-body `org_id = ANY(SELECT current_user_org_ids())` + pinned `SET search_path = ''` + `OPERATOR(public.<=>)`; `match_skills` keeps `is_system` OUTSIDE the org gate (mig 109 FIX-A); `document_chunks` SELECT RLS widened for PRAG-01. pg_proc verified (all 4 prosecdef=true + search_path pinned); `full-schema.sql` regenerated no-reset (same-commit `e14c146b`). **All 18 `test_v3_4_org_isolation.py` legs GREEN** (red-anchor `test_definer_ignores_spoofed_match_user_id` passes); CONCUR-01 15.0ms (<1s). **Rule 1 fix** `c8a67e86`: 3 assertions (red-anchor + zero-cross-org chunk legs) changed from `len(rows)==0` to A-chunk-absence — B legitimately sees its OWN matching chunk post-164 (matches the fixture's positive-control design). 2 pre-existing 163 RLS-DM/workflow failures remain out-of-scope (D-164-02-A). **Cloud parity owed:** migs 099→110 + `SECRETS_ENCRYPTION_KEY` at next operator-gated push.
+Last activity: 2026-07-20 -- Phase 164 Plan 03 complete (migration 110 SECDEF org-scope audit; 18/18 exit-gate legs GREEN)
 
-Progress: [█████████░] 92%
+Progress: [██████████] 96%
 
 ### Quick Tasks Completed
 
@@ -440,6 +440,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 163 P09 | 125 | 2 tasks | 10 files |
 | Phase 164 P02 | 30 | 2 tasks | 8 files |
 | Phase 164 P02 | 30 | 2 tasks | 8 files |
+| Phase 164 P164-03 | 42min | 2 tasks | 3 files |
 
 ## Decisions
 
@@ -552,6 +553,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase ?]: 163-08: skills cluster (23 handlers) -> user-JWT (RLS gate; is_global/is_system preserved via test_163_rls_skills); eval PURE READS (6) swapped, eval writes/reconcile/runner + workflow cluster + audit_log reads + app-level settings kept classified service-role (no authenticated write/SELECT policy / Run-carve-out / shared harness module / RLS-off); plan-09 async writers untouched
 - [Phase ?]: 163-09: D-05 CLOSED — eval-runner/harness-resume/golden-run-publish/re-embed/skill-backfill route through get_service_role_supabase(org_id) + widen .eq(user_id) org-aware; org_id resolved self-contained from the entity each writer processes; org_id=None => byte-identical (D-14 filters kept); _reembed_adapter.or_() fixed to unblock the two-user isolation proof
 - [Phase ?]: Phase 164-02 (TEN-06/SEED-091): one shared _null_foreign_global_owner rule ((is_global OR is_system) AND not-owner -> user_id=None) across folders/skills/views serialize paths; +folder_scope=None on global views; +skill_files A3 loosen/null; FolderResponse/SkillResponse/SkillFileResponse.user_id -> UUID|None. Frontend Folder/Skill.user_id stays hard-required string -> flagged follow-up.
+- [Phase ?]: 164-03: migration 110 applied live to :54322 — 4 SECDEF fns org-scoped in-body (current_user_org_ids/auth.uid, never match_user_id) + search_path='' + OPERATOR(public.<=>); match_skills is_system OUTSIDE the gate; document_chunks SELECT RLS widened (PRAG-01). All 18 exit-gate legs GREEN; CONCUR-01 15ms. TEN-03/PRAG-01 = SQL half only, complete at 164-04.
 
 ## Operator Next Steps
 
