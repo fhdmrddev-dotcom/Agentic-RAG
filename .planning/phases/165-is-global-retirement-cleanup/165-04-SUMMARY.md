@@ -152,6 +152,13 @@ None - no external service configuration required.
 - Backend service/db/app layer is fully off `is_global` — Plans 05/06/07 (test renames) and Plan 10 (migration 111 apply) can proceed.
 - Runtime/assertion-level green is deferred to Plan 165-11 (post-migration), which is the SC#4 isolation-suite arbiter.
 
+## Self-Check: PASSED
+
+- `165-04-SUMMARY.md` exists at `.planning/phases/165-is-global-retirement-cleanup/`
+- Task 1 commit `f795cefc` present
+- Task 2 commit `e39fe0f8` present
+- SUMMARY commit `47de6553` present
+
 ---
 *Phase: 165-is-global-retirement-cleanup*
 *Completed: 2026-07-20*
