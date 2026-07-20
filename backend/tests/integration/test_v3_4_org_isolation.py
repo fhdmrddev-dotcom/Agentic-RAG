@@ -790,3 +790,113 @@ def test_folder_scope_group_by_having_placement():
         f"WR-02 regression: folder filter landed at/after GROUP BY: {out!r}"
     )
     assert low.index("group by") < low.index("having"), f"GROUP BY / HAVING reordered: {out!r}"
+
+
+# ══════════════════════════════════════════════════════════════════════════════════
+# 164-05 Task 2 — CR-01 / SEED-124 KNOWN-OPEN marker (folded to Phase 165 per operator).
+#          The agent's KB browse/read tools (ls / tree / glob / read_document) run on the
+#          service-role BYPASSRLS client and resolve folder visibility through the
+#          org-BLIND helpers in `folder_utils.py` — so a disjoint-org user's agent can see
+#          another org's `is_global` folders + documents cross-org, the exact property this
+#          exit gate claims to eliminate. Migration 108 (RLS) + migration 110 (DEFINER)
+#          org-scope every OTHER path; these service-role Python helpers are the outlier.
+#
+#          This xfail(strict) marker makes the exit gate COVER the browse-tool surface AND
+#          honestly document the known-open state: the suite stays green while the leak is
+#          tracked, and when Phase 165 org-scopes the folder helpers the test XPASSes →
+#          strict xfail FAILS → forcing this marker's removal (+ closing SEED-124). Do NOT
+#          fix the leak here — the fix is Phase 165 (SEED-124 / is_global retirement).
+# ══════════════════════════════════════════════════════════════════════════════════
+
+
+def _read_local_supabase_env():
+    """Parse ``SUPABASE_URL`` + ``SUPABASE_SERVICE_ROLE_KEY`` straight from ``backend/.env``.
+
+    The root ``conftest.py`` sets ``os.environ.setdefault("SUPABASE_URL",
+    "https://test.supabase.co")`` at import time, so ``settings.supabase_url`` /
+    ``get_supabase()`` point at an unreachable MOCK host under pytest. Reading the real local
+    URL from the ``.env`` file (mirrors ``test_115_tool_global_leak._read_local_supabase_env``)
+    gives the genuine ``http://127.0.0.1:54321`` service-role gate the agent tool path uses."""
+    import os  # noqa: PLC0415
+
+    env_path = os.path.join(os.path.dirname(__file__), "..", "..", ".env")
+    if not os.path.exists(env_path):
+        return None
+    url = key = None
+    try:
+        with open(env_path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                k, v = line.split("=", 1)
+                k, v = k.strip(), v.strip().strip('"').strip("'")
+                if k == "SUPABASE_URL":
+                    url = v
+                elif k == "SUPABASE_SERVICE_ROLE_KEY":
+                    key = v
+    except OSError:
+        return None
+    if not url or not key:
+        return None
+    return url, key
+
+
+def _service_role_supabase_or_skip():
+    """The REAL service-role (BYPASSRLS) client the agent producer injects into the KB tool
+    path (``ctx.supabase = get_supabase()`` on the ``send_message`` seam) — built against the
+    LOCAL Supabase from ``backend/.env`` (see ``_read_local_supabase_env``, since the root
+    conftest pollutes ``SUPABASE_URL`` with a mock host). Probe the REST gate; skip cleanly if
+    it is unreachable so this leg is XFAIL when the leak is exercisable and SKIP when the stack
+    is down — never a spurious ERROR."""
+    creds = _read_local_supabase_env()
+    if creds is None:
+        pytest.skip("local SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY not found in backend/.env")
+    url, key = creds
+    try:
+        from supabase import create_client  # noqa: PLC0415
+
+        client = create_client(url, key)
+        client.table("folders").select("id").limit(1).execute()  # probe the gate the helper hits
+    except Exception as e:  # noqa: BLE001
+        pytest.skip(f"service-role Supabase REST gate unreachable: {type(e).__name__}: {e}")
+    return client
+
+
+@pytest.mark.asyncio
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "SEED-124 / CR-01: KB browse-tool service-role folder helpers are org-blind; "
+        "closed by Phase 165 is_global retirement"
+    ),
+)
+async def test_browse_tools_cross_org_leak_KNOWN_OPEN_seed124(
+    pg_pool, two_orgs_chunks_and_shared_folder
+):
+    """KNOWN-OPEN (SEED-124 / CR-01) — the agent's KB browse/read tools leak cross-org.
+
+    The fixture seeds an ``is_global`` folder + document owned by user A (org X). This leg
+    drives the REAL service-role folder-visibility helper
+    (``folder_utils.get_globally_visible_folder_ids`` — the exact function ``read_path`` /
+    ``ls_path`` / ``tree_path`` call on the BYPASSRLS client) as user B (org Y, disjoint) and
+    asserts B does NOT see A's ``is_global`` folder. The helper has NO org predicate, so B
+    DOES see A's folder cross-org → the assertion FAILS → ``xfail(strict)`` (expected). When
+    Phase 165 org-scopes the helpers (SEED-124), B stops seeing A's folder → the test
+    XPASSes → strict xfail FAILS → forcing this marker's removal. The leak is NOT fixed here
+    (folder_utils.py is untouched by 164-05); this marker only tracks it."""
+    from app.utils.folder_utils import get_globally_visible_folder_ids
+
+    ctx = two_orgs_chunks_and_shared_folder
+    a, b = ctx["a"], ctx["b"]
+    sb = _service_role_supabase_or_skip()
+
+    # Service-role browse path exactly as the KB read/ls/tree tools invoke it (org-blind).
+    visible_ids = {str(fid) for fid in await get_globally_visible_folder_ids(sb, b["uid"])}
+
+    assert a["shared_folder_id"] not in visible_ids, (
+        "CR-01 cross-org leak: user B (org Y) sees user A's (org X) is_global folder "
+        f"{a['shared_folder_id']} via the service-role folder-visibility helper — the KB "
+        "browse/read tools bypass the membership org gate that RLS/DEFINER enforce everywhere "
+        "else. Closed by Phase 165 (SEED-124); this xfail marker tracks the known-open state."
+    )
