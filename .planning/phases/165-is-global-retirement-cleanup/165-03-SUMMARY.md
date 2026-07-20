@@ -134,6 +134,12 @@ None - no external service configuration required.
 - Plan 165-04 (backend service/db/main rename) is the direct downstream: it owns the actual `"is_global": False` service-layer write-lock literals + the DB helper `folder_is_globally_visible` -> `folder_is_org_shared` rename.
 - Runtime (wire-level green) verification lands in plan 165-11 AFTER migration 111 is applied — this plan is static-import + grep-guard verified only.
 
+## Self-Check: PASSED
+
+- SUMMARY.md exists at `.planning/phases/165-is-global-retirement-cleanup/165-03-SUMMARY.md`.
+- Commits verified present: `2f916351` (Task 1 models), `72dca493` (Task 2 api), `3bcf5b2d` (SUMMARY).
+- All 14 modified files present on disk and imported clean via the backend venv.
+
 ---
 *Phase: 165-is-global-retirement-cleanup*
 *Completed: 2026-07-20*
