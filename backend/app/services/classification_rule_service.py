@@ -13,11 +13,11 @@ survives its folder's deletion). The rule NEVER moves a document at create — t
 move happens only when the user accepts the suggestion (the accept endpoint, Plan 03).
 
 Security invariants (T-118-02-01 / T-118-02-02 / T-118-02-03):
-  - create_rule HARD-SETS is_global=False and enabled=True (never trusts a caller
-    arg; the RLS WITH CHECK at migration 071 forces is_global on INSERT/UPDATE too —
+  - create_rule HARD-SETS is_system_global=False and enabled=True (never trusts a caller
+    arg; the RLS WITH CHECK at migration 071 forces is_system_global on INSERT/UPDATE too —
     this hard-set is defense-in-depth). Globals are service-role / migration-seeded
     only, exactly like global folders, skills and views.
-  - get_rule gates reads to own-OR-global (`.or_(...is_global.eq.true)`); a not-
+  - get_rule gates reads to own-OR-global (`.or_(...is_system_global.eq.true)`); a not-
     readable id collapses to None so the router returns 404-not-403 (no existence
     leak).
   - update_rule / delete_rule are own-scoped (`.eq("user_id", caller)`) and collapse
@@ -65,8 +65,8 @@ async def create_rule(
 
     ``match_expr`` arrives as an already-validated AST dict (the router runs
     ``view_filter_compiler.validate_fields`` + ``model_dump()`` before calling this).
-    ``is_global=False`` and ``enabled=True`` are HARD-SET in the inserted payload and
-    NEVER read from any caller field (T-118-02-01; RLS WITH CHECK forces is_global too
+    ``is_system_global=False`` and ``enabled=True`` are HARD-SET in the inserted payload and
+    NEVER read from any caller field (T-118-02-01; RLS WITH CHECK forces is_system_global too
     — defense-in-depth). ``suggest_folder_id`` is stored as ``str(...)`` (a UUID) or
     None.
     """
@@ -76,7 +76,7 @@ async def create_rule(
         "name": name,
         "match_expr": match_expr,  # validated AST jsonb (already passed validate_fields)
         "suggest_folder_id": str(suggest_folder_id) if suggest_folder_id else None,
-        "is_global": False,  # HARD-SET — never from the caller (T-118-02-01)
+        "is_system_global": False,  # HARD-SET — never from the caller (T-118-02-01)
         "enabled": True,  # HARD-SET — a new rule is on; the toggle rides update_rule
     }
     result = await aexec(client.table(_TABLE).insert(payload))
@@ -92,7 +92,7 @@ async def list_rules(user_id, supabase: Client | None = None) -> list[dict]:
     result = await aexec(
         client.table(_TABLE)
         .select("*")
-        .or_(f"user_id.eq.{_uid(user_id)},is_global.eq.true")
+        .or_(f"user_id.eq.{_uid(user_id)},is_system_global.eq.true")
         .order("name")
     )
     seen: set = set()
@@ -115,7 +115,7 @@ async def get_rule(rule_id, user_id, supabase: Client | None = None) -> dict | N
         client.table(_TABLE)
         .select("*")
         .eq("id", rule_id)
-        .or_(f"user_id.eq.{_uid(user_id)},is_global.eq.true")  # own OR global; not-readable → empty
+        .or_(f"user_id.eq.{_uid(user_id)},is_system_global.eq.true")  # own OR global; not-readable → empty
     )
     return (result.data or [None])[0]
 

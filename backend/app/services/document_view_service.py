@@ -10,11 +10,11 @@ A view is a metadata-driven *query, not a copy* (D-113-1): `name` + the validate
 many views with zero duplication.
 
 Security invariants (T-113-06 / T-113-07 / T-113-08):
-  - create_view HARD-SETS is_global=False (never trusts a caller arg; D-113-3) —
+  - create_view HARD-SETS is_system_global=False (never trusts a caller arg; D-113-3) —
     globals are service-role / migration-seeded only, exactly like global folders
     and global skills. The RLS WITH CHECK at migration 071 forces the same on
     INSERT/UPDATE; this hard-set is defense-in-depth.
-  - get_view gates reads to own-OR-global (`.or_(...is_global.eq.true)`); a not-
+  - get_view gates reads to own-OR-global (`.or_(...is_system_global.eq.true)`); a not-
     readable id collapses to None so the router returns 404-not-403 (no existence
     leak; the readability check the resolve route's leak-safety depends on,
     D-113-4).
@@ -73,7 +73,7 @@ async def create_view(
 
     ``filter_expr`` arrives as an already-validated AST dict (the router runs
     ``view_filter_compiler.validate_fields`` + ``model_dump()`` before calling
-    this). ``is_global=False`` is HARD-SET in the inserted payload and NEVER read
+    this). ``is_system_global=False`` is HARD-SET in the inserted payload and NEVER read
     from any caller field (D-113-3; RLS WITH CHECK forces it too — defense-in-
     depth). ``folder_scope`` is stored as ``str(folder_scope)`` (a UUID) or None.
     """
@@ -83,7 +83,7 @@ async def create_view(
         "name": name,
         "filter_expr": filter_expr,  # validated AST jsonb (already passed validate_fields)
         "folder_scope": str(folder_scope) if folder_scope else None,
-        "is_global": False,  # HARD-SET — never from the caller (T-113-06)
+        "is_system_global": False,  # HARD-SET — never from the caller (T-113-06)
     }
     result = await aexec(client.table(_TABLE).insert(payload))
     return result.data[0]
@@ -98,7 +98,7 @@ async def list_views(user_id, supabase: Client | None = None) -> list[dict]:
     result = await aexec(
         client.table(_TABLE)
         .select("*")
-        .or_(f"user_id.eq.{_uid(user_id)},is_global.eq.true")
+        .or_(f"user_id.eq.{_uid(user_id)},is_system_global.eq.true")
         .order("name")
     )
     seen: set = set()
@@ -109,7 +109,7 @@ async def list_views(user_id, supabase: Client | None = None) -> list[dict]:
             # SEED-091 / D-164-05 (TEN-06): a non-owner reader of a global view must not learn
             # the seeding owner's identity — null user_id AND the folder_scope UUID (views-only
             # scope UUID). RLS gates the row, not these columns, so null at serialize time.
-            if row.get("is_global") and str(row.get("user_id")) != str(_uid(user_id)):
+            if row.get("is_system_global") and str(row.get("user_id")) != str(_uid(user_id)):
                 row["user_id"] = None
                 row["folder_scope"] = None
             out.append(row)
@@ -128,7 +128,7 @@ async def get_view(view_id, user_id, supabase: Client | None = None) -> dict | N
         client.table(_TABLE)
         .select("*")
         .eq("id", view_id)
-        .or_(f"user_id.eq.{_uid(user_id)},is_global.eq.true")  # own OR global; not-readable → empty
+        .or_(f"user_id.eq.{_uid(user_id)},is_system_global.eq.true")  # own OR global; not-readable → empty
     )
     return (result.data or [None])[0]
 
@@ -150,7 +150,7 @@ async def get_view_by_name(
 
     WR-02 hardening: the ``name`` is NEVER interpolated into a PostgREST ``.or_()`` /
     ``.eq()`` filter grammar. We reuse the already-owner-scoped ``list_views`` (which
-    runs the safe ``user_id.eq.<uuid>,is_global.eq.true`` predicate with the ``_uid``
+    runs the safe ``user_id.eq.<uuid>,is_system_global.eq.true`` predicate with the ``_uid``
     UUID-coercion guard) and filter the returned rows in Python — so there is no new
     runtime-value-into-DSL surface for a view name to break out of.
     """

@@ -208,9 +208,9 @@ async def preflight_workflow_kickoff(*, request, body, thread_id, thread_row, su
         # existence) — a user cannot start another user's private workflow.
         _def_resp = await aexec(
             supabase.table("workflow_definitions")
-            .select("id, definition, status, is_global, created_by, skill_snapshots")
+            .select("id, definition, status, is_system_global, created_by, skill_snapshots")
             .eq("id", str(body.workflow_definition_id))
-            .or_(f"is_global.eq.true,created_by.eq.{current_user['id']}")
+            .or_(f"is_system_global.eq.true,created_by.eq.{current_user['id']}")
             .maybe_single()
         )
         _def_row = _def_resp.data if _def_resp is not None else None

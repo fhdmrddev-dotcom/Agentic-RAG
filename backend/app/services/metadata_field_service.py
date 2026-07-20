@@ -5,7 +5,7 @@ module (not inline in the router) so the live-DB integration tests can drive the
 create/list logic directly against :54322 without a FastAPI TestClient + JWT.
 
 Security invariants (T-111-03-01 / -03):
-  - create() HARD-SETS user_id=caller + is_global=false (never trusts a caller
+  - create() HARD-SETS user_id=caller + is_system_global=false (never trusts a caller
     arg); the RLS WITH CHECK at migration 071:168 forces the same on INSERT.
   - update()/delete() are own-scoped (.eq("user_id", caller)) and collapse a
     cross-user miss to None/False the router maps to 404-not-403.
@@ -40,7 +40,7 @@ async def list_field_definitions(user_id, supabase: Client | None = None) -> lis
     result = await aexec(
         client.table(_TABLE)
         .select("*")
-        .or_(f"user_id.eq.{user_id},is_global.eq.true")
+        .or_(f"user_id.eq.{user_id},is_system_global.eq.true")
         .order("field_key")
     )
     seen: set = set()
@@ -59,13 +59,13 @@ async def create_field_definition(
     description: str | None = None,
     options: list[str] | None = None,
     enabled: bool = True,
-    is_global: bool = False,  # accepted for signature symmetry; ALWAYS forced False below
+    is_system_global: bool = False,  # accepted for signature symmetry; ALWAYS forced False below
     supabase: Client | None = None,
 ) -> dict:
     """Insert a custom field def owned by ``user_id`` — never global.
 
-    ``is_global`` in the signature is intentionally ignored: a caller cannot
-    escalate to a global field. ``user_id`` and ``is_global=False`` are
+    ``is_system_global`` in the signature is intentionally ignored: a caller cannot
+    escalate to a global field. ``user_id`` and ``is_system_global=False`` are
     hard-set in the inserted payload (RLS WITH CHECK forces it too).
     """
     client = _client(supabase)
@@ -74,7 +74,7 @@ async def create_field_definition(
         "field_key": field_key,
         "field_type": field_type,
         "description": description,
-        "is_global": False,  # HARD-SET — never from the caller (T-111-03-01)
+        "is_system_global": False,  # HARD-SET — never from the caller (T-111-03-01)
         "enabled": enabled,
     }
     # `options` only exists after migration 072 (Plan 05). Include it only when

@@ -28,7 +28,7 @@ background harness engine on the SAME helpers, several of which own their own
 / delete_workflow_cascade_preview / count_foreign_runs_on_global / finish_run) and so
 cannot accept a duck-typed request-scoped RLS Connection. The workflow_* membership-RLS
 policies are LIVE + proven at the DB layer (tests/integration/test_163_rls_workflow_eval.py:
-cross-org isolation + is_global-org-scoping + parent-thread + created_by preservation), so
+cross-org isolation + is_system_global-org-scoping + parent-thread + created_by preservation), so
 isolation is enforced regardless of the client; app-code ``created_by`` / ``workflow_run_id``
 scoping stays the D-14 in-code gate. Plan 09 widens the harness async writers with org_id.
 
@@ -177,7 +177,7 @@ async def list_published_workflows(
     """Published workflow definitions visible to a user (the picker feed).
 
     Mirrors the RESEARCH Q5 RLS-mirroring predicate: ``status='published'`` AND
-    (``is_global`` OR ``created_by = $1``) — a user never sees another user's
+    (``is_system_global`` OR ``created_by = $1``) — a user never sees another user's
     unpublished or private definitions (T-092-07). Returns the id/slug/name the
     picker needs. ``$N`` placeholders only.
 
@@ -199,18 +199,18 @@ async def list_published_workflows(
 
     SCOPED NARROWING (Phase 143 / WF-01, D-143-2b): the additive keyword-only
     ``owned_only`` flag (default ``False``) narrows the predicate to the caller's
-    OWN published rows (``created_by = $1``, dropping the bare ``is_global``) so
+    OWN published rows (``created_by = $1``, dropping the bare ``is_system_global``) so
     the Workflows-page Published shelf stops double-rendering the curated globals
     that now live in their own Starters shelf (D-143-2a end state). This is a
     SCOPED narrowing, NOT a blanket change: the DEFAULT ``owned_only=False`` keeps
-    the exact ``(is_global = true OR created_by = $1)`` predicate every OTHER caller
+    the exact ``(is_system_global = true OR created_by = $1)`` predicate every OTHER caller
     relies on — the composer Harness picker, ``WorkspacePanel`` run-soul, and
     ``threads.py`` kickoff all NEED the global rows (Pitfall 3). Mirrors the
     ``is_golden_run=False`` keyword-only precedent: default OFF = byte-identical.
     """
     if owned_only:
         # D-143-2b — the Workflows-page Published shelf only; drop the bare
-        # is_global so curated globals live solely in the Starters shelf.
+        # is_system_global so curated globals live solely in the Starters shelf.
         sql = (
             "SELECT id, slug, name, definition FROM workflow_definitions "
             "WHERE status = 'published' AND created_by = $1"
@@ -224,7 +224,7 @@ async def list_published_workflows(
             # picker callers ignore the extra column (asyncpg's pool codec decodes
             # the JSONB to a dict).
             "SELECT id, slug, name, definition FROM workflow_definitions "
-            "WHERE status = 'published' AND (is_global = true OR created_by = $1)"
+            "WHERE status = 'published' AND (is_system_global = true OR created_by = $1)"
         )
     params: list = [user_id]
     if project_folder_id is not None:
@@ -238,14 +238,14 @@ async def list_published_workflows(
 async def list_starter_workflows(pool: asyncpg.Pool) -> list[dict]:
     """Curated global starters — the Starters shelf feed (Phase 143 / WF-01, D-143-2).
 
-    Returns the ``status='published' AND is_global=true`` definitions carrying the
+    Returns the ``status='published' AND is_system_global=true`` definitions carrying the
     JSONB curation marker ``definition->>'category' = 'starter'`` — the 3 seeded
     starters (Plan 03), NOT the 5 mig-061 dev scaffolds (which lack the marker so
     they are excluded from this shelf, D-143-2a). Mirrors the
     ``definition->>'project_folder_id'`` JSONB-path precedent in
     ``list_published_workflows``.
 
-    NO user scope: ``is_global`` published rows are world-readable by the mig-056
+    NO user scope: ``is_system_global`` published rows are world-readable by the mig-056
     SELECT policy (T-143-01 — no private row can appear); ``category='starter'``
     narrows to curated. The ``'starter'`` literal is a CONSTANT predicate, not user
     input, so it is a ``$``-free literal — the ``$N``-only binding rule (T-073-02 /
@@ -255,7 +255,7 @@ async def list_starter_workflows(pool: asyncpg.Pool) -> list[dict]:
     """
     rows = await pool.fetch(
         "SELECT id, slug, name, definition FROM workflow_definitions "
-        "WHERE status = 'published' AND is_global = true "
+        "WHERE status = 'published' AND is_system_global = true "
         "AND definition->>'category' = 'starter' "
         "ORDER BY name"
     )
@@ -274,8 +274,8 @@ async def get_definition(
 
     OWNER-SCOPED for DRAFTS (V4 / T-102-05-01 + WR-02 / T-102-09-01): a row is
     readable only when ``created_by = $2`` (the true owner — drafts included) OR
-    it is a GLOBAL PUBLISHED row (``is_global = true AND status = 'published'``).
-    The bare ``OR is_global = true`` is GONE: a non-owner can NO LONGER load (and
+    it is a GLOBAL PUBLISHED row (``is_system_global = true AND status = 'published'``).
+    The bare ``OR is_system_global = true`` is GONE: a non-owner can NO LONGER load (and
     therefore can NOT golden-run / publish-flip) another user's GLOBAL DRAFT — that
     was a real elevation-of-privilege (a privileged state change by a non-owner). A
     non-owner now gets ``None`` for ANY draft (including a global draft); the publish
@@ -290,7 +290,7 @@ async def get_definition(
     row = await pool.fetchrow(
         "SELECT id, slug, version, name, status, definition, created_by "
         "FROM workflow_definitions "
-        "WHERE id = $1 AND (created_by = $2 OR (is_global = true AND status = 'published'))",
+        "WHERE id = $1 AND (created_by = $2 OR (is_system_global = true AND status = 'published'))",
         definition_id,
         user_id,
     )
@@ -333,7 +333,7 @@ async def create_workflow_definition(
 ) -> dict:
     """INSERT a new DRAFT definition, RETURNING ``{id, version}`` (REQ-1 create).
 
-    Server-enforced invariants (T-103-01-03): ``status='draft'``, ``is_global=false``,
+    Server-enforced invariants (T-103-01-03): ``status='draft'``, ``is_system_global=false``,
     ``created_by=user_id`` are bound LITERALLY/by the trusted owner id — never from the
     client body (the route forces ``body.status='draft'`` too; this is the second
     backstop). The ``definition`` JSONB is ``json.dumps(definition.model_dump(mode="json"))``
@@ -347,7 +347,7 @@ async def create_workflow_definition(
     Returns ``{id, version}``.
     """
     row = await pool.fetchrow(
-        "INSERT INTO workflow_definitions (slug, version, name, status, definition, created_by, is_global) "
+        "INSERT INTO workflow_definitions (slug, version, name, status, definition, created_by, is_system_global) "
         "VALUES ($1, $2, $3, 'draft', $4::jsonb, $5, false) "
         "RETURNING id, version",
         definition.slug,
@@ -506,7 +506,7 @@ async def delete_workflow_cascade_preview(
     Owner-scoping applies to the DEFINITIONS only (``created_by = $2`` resolves the
     caller's own version_ids for ``slug``). The ``runs`` / ``threads`` / ``in_flight``
     counts are then computed over those definitions' workflow_runs — which, for an
-    ``is_global`` definition, AGGREGATE across ALL runners (``workflow_runs.user_id`` is
+    ``is_system_global`` definition, AGGREGATE across ALL runners (``workflow_runs.user_id`` is
     the runner, not the definition owner), NOT just the caller's own runs (WR-01). These
     read counts are owner-definition-scoped and low-sensitivity; the DESTRUCTIVE path is
     fail-closed separately by the ``count_foreign_runs_on_global`` 409 guard in the
@@ -562,13 +562,13 @@ async def delete_workflow_cascade_preview(
 async def count_foreign_runs_on_global(
     pool: asyncpg.Pool, *, slug: str, user_id: UUID
 ) -> int:
-    """Count OTHER users' runs on the caller's ``is_global`` definitions for ``slug`` (WR-01).
+    """Count OTHER users' runs on the caller's ``is_system_global`` definitions for ``slug`` (WR-01).
 
     The delete cascade's owner gate is on the DEFINITION (``created_by``), but the
     ``ON DELETE RESTRICT`` FK forces ``DELETE workflow_runs`` to sweep EVERY runner's
-    rows on an ``is_global`` definition (any user may run a global published workflow;
+    rows on an ``is_system_global`` definition (any user may run a global published workflow;
     ``workflow_runs.user_id`` is the runner). This helper is the fail-closed guard: it
-    resolves the caller's OWN global version_ids (``created_by = $2 AND is_global = true``)
+    resolves the caller's OWN global version_ids (``created_by = $2 AND is_system_global = true``)
     then returns ``COUNT(*)`` of workflow_runs on those versions owned by anyone else
     (``user_id <> $2``). The cascade route refuses (409) when this is > 0, so a global
     starter's owner can no longer silently cancel + delete every user's run history.
@@ -580,7 +580,7 @@ async def count_foreign_runs_on_global(
     async with pool.acquire() as con:
         rows = await con.fetch(
             "SELECT id FROM workflow_definitions "
-            "WHERE slug = $1 AND created_by = $2 AND is_global = true",
+            "WHERE slug = $1 AND created_by = $2 AND is_system_global = true",
             slug,
             user_id,
         )

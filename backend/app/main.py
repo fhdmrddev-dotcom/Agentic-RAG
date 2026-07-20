@@ -674,7 +674,7 @@ app.include_router(workflows.router)  # Phase 092 MODE-01 — published-workflow
 app.include_router(metadata_fields.router)  # Phase 111 META-01 — custom metadata field-definition CRUD
 app.include_router(document_views.router)  # Phase 113 VIEW-01/02 — virtual-folder views CRUD + per-viewer resolve
 app.include_router(document_relationships.router)  # Phase 116 REL-01/03 — typed document-relationship CRUD (visible-both gate + audit)
-app.include_router(classification_rules.router)  # Phase 118 CLASS-01 — classification-rule CRUD (leak-safe own+global, is_global hard-false, match_expr validation + audit)
+app.include_router(classification_rules.router)  # Phase 118 CLASS-01 — classification-rule CRUD (leak-safe own+global, is_system_global hard-false, match_expr validation + audit)
 app.include_router(document_governance.router)  # Phase 119 DGOV-01/02 — read-only governance aggregation (broken-rel / unclassified / low-conf; owner-scoped reads, no write path)
 app.include_router(skill_tuner.router)  # Phase 123 TRIG-01 — owner-scoped Skill Trigger Tuner (bounded background run over the run-buffer + tuner_* SSE + held-out scoreboard)
 app.include_router(skill_test_cases.router)  # Phase 132 EVAL-01/VER-01 — owner-scoped eval test-case CRUD + read-only skill version history
