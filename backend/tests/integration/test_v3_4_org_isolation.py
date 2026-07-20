@@ -9,7 +9,7 @@ into an exhaustive gate over:
   * every user-facing table (driven from ``information_schema``) — B reads 0 of A's rows,
     over BOTH DB paths (asyncpg ``open_user_conn`` + supabase-py ``as_user_supabase_txn``);
   * all four ``SECURITY DEFINER`` functions (``match_document_chunks`` /
-    ``keyword_search_chunks`` / ``match_skills`` / ``folder_is_globally_visible``) —
+    ``keyword_search_chunks`` / ``match_skills`` / ``folder_is_org_shared``) —
     0 cross-org rows when called with a spoofed ``match_user_id``, + a pg_proc audit
     that each is DEFINER with a pinned ``search_path``;
   * an ``X-Org-Id`` header spoof that does NOT widen access (org derives from
@@ -68,12 +68,13 @@ EMBED_DIM = 1536
 # The four SECURITY DEFINER functions the phase audits (live signatures probed at author
 # time). Pre-164 proconfig: match_document_chunks=NULL, keyword_search_chunks=NULL (both
 # UN-pinned → RED for the search_path audit); match_skills='public, pg_temp',
-# folder_is_globally_visible='public' (pinned → GREEN). Migration 110 pins all four.
+# folder_is_org_shared='public' (pinned → GREEN). Migration 110 pins all four.
+# (the folder DEFINER fn was OID-preservingly renamed → folder_is_org_shared by mig 111.)
 _DEFINER_FUNCTIONS = (
     "match_document_chunks",
     "keyword_search_chunks",
     "match_skills",
-    "folder_is_globally_visible",
+    "folder_is_org_shared",
 )
 
 # The built-in skill-creator's owner (migration 087 / 018) — the system principal that owns
@@ -159,16 +160,16 @@ async def two_orgs_chunks_and_shared_folder(pg_pool, two_orgs_two_users):
         ("document_chunks", cid) for cid in created_chunk_ids
     ]
 
-    # ── SHARED-FOLDER scenario for user A (PRAG-01): an is_global folder owned by A + a
+    # ── SHARED-FOLDER scenario for user A (PRAG-01): an is_org_shared folder owned by A + a
     #    document inside it + one document_chunk — so the PRAG-01 leg can distinguish A's
-    #    PRIVATE chunk from A's SHARED-folder chunk. (folder_is_globally_visible walks
-    #    ancestors on is_global, so a top-level is_global folder resolves True.)
+    #    PRIVATE chunk from A's SHARED-folder chunk. (folder_is_org_shared walks
+    #    ancestors on is_org_shared, so a top-level is_org_shared folder resolves True.)
     a = base["a"]
     shared_folder_id = uuid4()
     shared_doc_id = uuid4()
     shared_chunk_id = uuid4()
     await pg_pool.execute(
-        "INSERT INTO public.folders (id, user_id, org_id, name, is_global) "
+        "INSERT INTO public.folders (id, user_id, org_id, name, is_org_shared) "
         "VALUES ($1, $2, $3, $4, true)",
         shared_folder_id, a["uid"], a["org_id"], f"164-a-shared-folder-{shared_folder_id}",
     )
@@ -413,16 +414,16 @@ async def test_definer_zero_cross_org(pg_pool, two_orgs_chunks_and_shared_folder
             ids = {str(r["id"]) for r in rows}
             assert a["skill_id"] not in ids, (
                 f"cross-org leak via {fn_name}: user B retrieved user A's PRIVATE skill "
-                f"{a['skill_id']} via a spoofed match_user_id (is_system/is_global platform "
+                f"{a['skill_id']} via a spoofed match_user_id (is_system/is_org_shared platform "
                 "content may legitimately appear; A's private skill must NOT)."
             )
-        elif fn_name == "folder_is_globally_visible":
+        elif fn_name == "folder_is_org_shared":
             visible = await conn.fetchval(
-                "SELECT public.folder_is_globally_visible($1)", a["folder_id"]
+                "SELECT public.folder_is_org_shared($1)", a["folder_id"]
             )
             assert visible is not True, (
                 f"leak via {fn_name}: user A's PRIVATE folder {a['folder_id']} is reported "
-                "globally visible — a non-global folder must resolve False (no cross-org widening)."
+                "org-shared — a non-shared folder must resolve False (no cross-org widening)."
             )
 
 
@@ -561,8 +562,8 @@ async def test_prag01_retrieval_isolation(pg_pool, two_orgs_chunks_and_shared_fo
       * POSITIVE CONTROL — return B's OWN chunk (the query works; not 0-for-everyone).
       * NEVER return A's PRIVATE chunk (org isolation — GREEN pre + post).
       * NEVER return A's SHARED-folder chunk cross-org either. The folder-ACL branch
-        (``folder_is_globally_visible``) lives INSIDE the org gate, so a DISJOINT-org reader
-        gets 0 — user is_global folder content stays org-scoped until orgs gain members
+        (``folder_is_org_shared``) lives INSIDE the org gate, so a DISJOINT-org reader
+        gets 0 — user is_org_shared folder content stays org-scoped until orgs gain members
         (163-UAT Test-7 symptom two; the co-member POSITIVE folder-ACL proof is a Phase
         166/167 forward gate, where the shared fixture's two-DISJOINT-org topology is replaced
         by a co-member).
@@ -596,7 +597,7 @@ async def test_prag01_retrieval_isolation(pg_pool, two_orgs_chunks_and_shared_fo
         )
         assert a["shared_chunk_id"] not in leaked_ids, (
             "PRAG-01 leak: user B retrieved user A's SHARED-folder chunk cross-org — user "
-            "is_global folder content stays org-scoped (the folder-ACL branch lives INSIDE the "
+            "is_org_shared folder content stays org-scoped (the folder-ACL branch lives INSIDE the "
             "org gate); a disjoint-org reader must get 0. RED pre-164, GREEN post-110."
         )
 
@@ -614,10 +615,10 @@ async def _ensure_system_seed_user(pool) -> None:
 
 async def _seed_system_skill(pool, org_id: str) -> str:
     """Seed an is_system=true skill owned by the system seed in ``org_id`` (mirrors the real
-    skill-creator: is_system=true + is_global=true). org_id explicit → mig-106 autofill no-ops."""
+    skill-creator: is_system=true + is_org_shared=true). org_id explicit → mig-106 autofill no-ops."""
     sid = uuid4()
     await pool.execute(
-        "INSERT INTO public.skills (id, user_id, org_id, name, is_system, is_global) "
+        "INSERT INTO public.skills (id, user_id, org_id, name, is_system, is_org_shared) "
         "VALUES ($1, $2, $3, $4, true, true)",
         sid, SYSTEM_SEED_UID, org_id, f"164-systemskill-{sid}",
     )
@@ -658,17 +659,17 @@ async def test_is_system_stays_universal(pg_pool, two_orgs_two_users):
 
 
 @pytest.mark.asyncio
-async def test_user_is_global_stays_org_scoped(pg_pool, two_orgs_two_users):
-    """Over-widening guard via ``match_skills`` — a user's OWN is_global skill (owner-toggled,
+async def test_user_is_org_shared_stays_org_scoped(pg_pool, two_orgs_two_users):
+    """Over-widening guard via ``match_skills`` — a user's OWN is_org_shared skill (owner-toggled,
     org-shared) must NOT leak to a non-co-member. Only is_system (platform) escapes the org
-    gate; user-self-served is_global stays org-scoped until orgs gain members (166/167).
+    gate; user-self-served is_org_shared stays org-scoped until orgs gain members (166/167).
 
-    RED pre-164 (match_skills has no org gate → the ``s.is_global = true`` branch leaks A's
+    RED pre-164 (match_skills has no org gate → the ``s.is_org_shared = true`` branch leaks A's
     skill cross-org) / GREEN post-110 (org gate → A's skill excluded for a disjoint-org B)."""
     a, b = two_orgs_two_users["a"], two_orgs_two_users["b"]
     own_global = uuid4()
     await pg_pool.execute(
-        "INSERT INTO public.skills (id, user_id, org_id, name, is_global) "
+        "INSERT INTO public.skills (id, user_id, org_id, name, is_org_shared) "
         "VALUES ($1, $2, $3, $4, true)",
         own_global, a["uid"], a["org_id"], f"164-ownglobal-{own_global}",
     )
@@ -681,8 +682,8 @@ async def test_user_is_global_stays_org_scoped(pg_pool, two_orgs_two_users):
             )
         ids = {str(r["id"]) for r in rows}
         assert str(own_global) not in ids, (
-            "over-widening: user A's ORG-scoped is_global skill leaked to a non-co-member via "
-            "match_skills — only is_system (platform) escapes the org gate; user is_global stays "
+            "over-widening: user A's ORG-scoped is_org_shared skill leaked to a non-co-member via "
+            "match_skills — only is_system (platform) escapes the org gate; user is_org_shared stays "
             "org-scoped until orgs gain members (166/167). RED pre-164, GREEN post-110."
         )
     finally:
