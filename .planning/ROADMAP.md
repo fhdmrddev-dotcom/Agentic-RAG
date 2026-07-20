@@ -191,8 +191,8 @@ Ship only if CORE lands clean and budget remains. First-to-cut ordering: SSO/OID
 - [x] 165-07-PLAN.md — Backend tests: platform tables workflows/views/rules/metadata (25 files -> `is_system_global`; folders exceptions flagged)
 - [x] 165-08-PLAN.md — Frontend components + contract + UI copy ("Global"->"Shared with org", D-165-07); functional isOrgShared vs display isSystemGlobal per file; tsc clean
 - [x] 165-09-PLAN.md — Frontend test rename (unrelated isGlobal in ChatHistoryColumn/threadGroups left intact); vitest clean vs rot baseline
-- [ ] 165-10-PLAN.md — [BLOCKING] Operator applies migration 111 via SQL editor (dev-server stop window) + regenerate full-schema (no-reset) + same-commit + post-apply over-widening check
-- [ ] 165-11-PLAN.md — Exit-gate re-green + SC#4 arbitration: flip SEED-124 leak test xfail->XPASS->remove marker; two-org suite green (23 passed); backend rename-regression sweep
+- [x] 165-10-PLAN.md — [BLOCKING] Operator applies migration 111 via SQL editor (dev-server stop window) + regenerate full-schema (no-reset) + same-commit + post-apply over-widening check
+- [x] 165-11-PLAN.md — Exit-gate re-green + SC#4 arbitration: flip SEED-124 leak test xfail->XPASS->remove marker; two-org suite green (23 passed); backend rename-regression sweep
 
 #### Phase 166: Org-Admin Shell + Org Switcher + Profile-Menu Anchor
 **Goal**: A multi-org user gets a real identity anchor, an org switcher that safely swaps active-org context, and an org-admin shell with org-scoped audit + a resolved Settings IA — the human-facing surface of the now-real tenancy model, reusing the shipped v3.3 Control-Room shell as composition.
