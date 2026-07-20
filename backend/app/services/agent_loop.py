@@ -66,6 +66,10 @@ from app.services.citation_markers import (
     normalize_citation_markers,
 )
 from app.services.tool_dispatcher import ToolContext, ToolResult, dispatch_tool
+# Phase 164 (D-164-02): reuse the shared retrieval user-context seam for the match_skills
+# DEFINER RPC (retrieval_service is already in the import graph via tool_dispatcher above —
+# no new cycle; it never imports agent_loop).
+from app.services.retrieval_service import _call_as_user, _vector_literal
 # Phase 095.1-04 (D-095.1-03 / PROVIDER-ERR): the per-provider gateway-boundary
 # error classifier — replaces the billing-first keyword if-ladder in the outer
 # APIError catch so a 429 (incl. Google RESOURCE_EXHAUSTED) reads as rate_limit,
@@ -1303,21 +1307,24 @@ async def run_agent_loop(
                         # WHERE clause is the byte-exact clone of today's catalog scope
                         # (V4 — no cross-user leak) and filters the CURRENT embedding model
                         # (D-10 stale guard); a vector-less skill returns similarity NULL.
-                        _ranked = await aexec(
-                            supabase.rpc(
-                                "match_skills",
-                                {
-                                    "query_embedding": q_vec,
-                                    "match_user_id": current_user["id"],
-                                    "p_embedding_model": getattr(
-                                        user_settings, "embedding_model", ""
-                                    )
-                                    or "text-embedding-3-small",
-                                },
-                            )
+                        # Phase 164 (D-164-02): match_skills is DEFINER — its in-body org gate
+                        # (is_system UNIVERSAL escape OUTSIDE the gate, owner/is_global INSIDE —
+                        # mig 109 FIX-A) resolves the caller only when auth.uid() is set, so run
+                        # it over the asyncpg user-context, NOT the service-role producer supabase.
+                        # Same vector-literal wrinkle (Pitfall 3); id cast ::text so keys match the
+                        # str skill ids from the catalog SELECT. No request JWT captured (163 red
+                        # line); uid comes from the already-carried current_user (no new ctx field).
+                        _ranked_rows = await _call_as_user(
+                            current_user["id"],
+                            "SELECT id::text AS id, name, description, similarity "
+                            "FROM public.match_skills($1::public.vector, $2, $3)",
+                            _vector_literal(q_vec),
+                            current_user["id"],
+                            getattr(user_settings, "embedding_model", "")
+                            or "text-embedding-3-small",
                         )
                         sim_by_id = {
-                            r["id"]: r["similarity"] for r in (_ranked.data or [])
+                            r["id"]: r["similarity"] for r in _ranked_rows
                         }
                         # Blocker-1 self-heal: any in-scope skill the RPC returned with a
                         # missing/NULL similarity has a stale/absent vector — fire the
