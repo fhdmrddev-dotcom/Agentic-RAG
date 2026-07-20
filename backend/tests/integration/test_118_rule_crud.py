@@ -4,7 +4,7 @@ Drives the REAL router coroutines (``app.api.classification_rules``, Plan 02) ag
 service-role Supabase client on :54322 — NOT a mock. The security-load-bearing behaviors
 proven here (flipped GREEN in Plan 02):
 
-  * ``is_global`` is HARD-SET False on create (never trusts a caller arg — T-118-02-02).
+  * ``is_system_global`` is HARD-SET False on create (never trusts a caller arg — T-118-02-02).
   * own-OR-global reads → a not-readable id collapses to 404, NEVER 403 (no existence leak).
   * ``match_expr`` validation (``validate_fields``/``validate_operands``) → 422 on a
     ``_``-prefixed/unknown field or a bad operand.
@@ -153,7 +153,7 @@ def _good_expr() -> dict:
 
 
 @pytest.mark.asyncio
-async def test_create_hard_sets_is_global_false(pg_pool, two_users):
+async def test_create_hard_sets_is_system_global_false(pg_pool, two_users):
     if not await _table_exists(pg_pool, "classification_rules"):
         pytest.skip("classification_rules table absent")
     from app.api import classification_rules as router_mod
@@ -162,7 +162,7 @@ async def test_create_hard_sets_is_global_false(pg_pool, two_users):
     caller = {"id": str(two_users["user_a"])}
     body = router_mod.RuleCreate(name="Invoices", match_expr=_good_expr())
     created = await router_mod.create_rule(body, current_user=caller, supabase=sb)
-    assert created.is_global is False
+    assert created.is_system_global is False
 
 
 @pytest.mark.asyncio

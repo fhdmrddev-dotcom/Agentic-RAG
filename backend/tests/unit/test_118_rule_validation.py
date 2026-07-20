@@ -10,7 +10,7 @@ no eval). This file proves the model trio:
   * An unknown op (``op:"xor"``) in ``match_expr`` raises a Pydantic ``ValidationError``.
   * ``RuleUpdate`` fields are ALL Optional (name/match_expr/suggest_folder_id/enabled) —
     the enable/disable toggle rides UPDATE.
-  * ``RuleResponse`` carries id/user_id/name/match_expr(dict)/suggest_folder_id/is_global/enabled.
+  * ``RuleResponse`` carries id/user_id/name/match_expr(dict)/suggest_folder_id/is_system_global/enabled.
 
 GREEN in THIS plan (Task 3 lands the models). The ``validate_fields`` /
 ``validate_operands`` reject-path is exercised in Plan 02's router (live integration); here
@@ -116,14 +116,14 @@ def test_rule_response_shape():
         name="Invoices",
         match_expr=_good_expr(),
         suggest_folder_id=uuid4(),
-        is_global=False,
+        is_system_global=False,
         enabled=True,
     )
     assert rr.id == "rule-1"
     assert rr.user_id == "user-1"
     assert rr.name == "Invoices"
     assert isinstance(rr.match_expr, dict)   # response carries the raw jsonb dict
-    assert rr.is_global is False
+    assert rr.is_system_global is False
     assert rr.enabled is True
 
 
@@ -131,6 +131,6 @@ def test_rule_response_defaults():
     from app.models.classification_rule import RuleResponse
 
     rr = RuleResponse(id="r", name="n", match_expr=_good_expr())
-    assert rr.is_global is False
+    assert rr.is_system_global is False
     assert rr.enabled is True
     assert rr.suggest_folder_id is None
