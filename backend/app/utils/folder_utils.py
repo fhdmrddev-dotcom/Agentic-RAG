@@ -34,6 +34,24 @@ def is_in_global_subtree(folder_id: str, folder_map: dict, cache: dict | None = 
     return result
 
 
+def _null_foreign_global_owner(rows: list[dict], caller_id) -> list[dict]:
+    """SEED-091 / D-164-05 (TEN-06): hide the seeding owner's identity from non-owner readers.
+
+    For every row that is globally/system shared (``is_global`` OR ``is_system``) and NOT owned
+    by ``caller_id``, null the owner ``user_id`` IN PLACE — RLS gates rows, not columns, so this
+    serialize-time projection is what stops a non-owner from learning who seeded a shared
+    resource. THE single uniform rule across folders / skills / views (skills add the
+    ``is_system`` OR-branch — the built-in skill-creator; folders/views carry no ``is_system``
+    column so ``.get`` yields None and the branch is inert there). Callers that also expose a
+    scope UUID (views' ``folder_scope``) null that separately. Returns ``rows`` for chaining.
+    """
+    cid = str(caller_id)
+    for row in rows:
+        if (row.get("is_global") or row.get("is_system")) and str(row.get("user_id")) != cid:
+            row["user_id"] = None
+    return rows
+
+
 async def fetch_visible_folders(supabase: "Client", user_id: str) -> list[dict]:
     """Fetch all folders visible to user: owned by user OR in any global folder's subtree."""
     all_folders = await fetch_all_folders(supabase, fields="*")

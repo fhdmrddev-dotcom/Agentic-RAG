@@ -19,7 +19,10 @@ class SkillUpdate(BaseModel):
 
 class SkillResponse(BaseModel):
     id: UUID
-    user_id: UUID
+    # SEED-091 / D-164-05 (TEN-06): nullable owner. A non-owner reader of an is_global OR
+    # is_system skill gets user_id=None at serialize time (the seeding owner — e.g. the
+    # built-in skill-creator's admin — is not disclosed). Mirrors ViewResponse.user_id.
+    user_id: UUID | None
     name: str
     description: str
     instructions: str
@@ -41,7 +44,10 @@ class SkillResponse(BaseModel):
 class SkillFileResponse(BaseModel):
     id: UUID
     skill_id: UUID
-    user_id: UUID
+    # SEED-091 / D-164-05 (TEN-06, A3-confirmed): nullable owner. list_skill_files surfaces
+    # the seeding owner's user_id on a non-owner's read of a global skill's files (the parent
+    # skill is reachable via the is_global branch), so the foreign owner is nulled there.
+    user_id: UUID | None
     filename: str
     file_path: str
     file_size: int

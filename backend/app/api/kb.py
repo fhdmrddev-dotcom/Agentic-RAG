@@ -5,7 +5,11 @@ from supabase import Client
 
 from app.dependencies import get_current_user, get_user_supabase_client
 from app.models.kb import LsResponse, TreeResponse, GrepResponse, GlobResponse, ReadResponse
-from app.utils.folder_utils import fetch_visible_folders as _fetch_all_visible_folders, get_globally_visible_folder_ids
+from app.utils.folder_utils import (
+    fetch_visible_folders as _fetch_all_visible_folders,
+    get_globally_visible_folder_ids,
+    _null_foreign_global_owner,
+)
 
 router = APIRouter(prefix="/kb", tags=["kb"])
 
@@ -107,6 +111,11 @@ async def tree_path(path: str, depth: int | None, user_id: str, supabase: Client
     from app.utils.db import aexec  # noqa: PLC0415
 
     all_folders = await _fetch_visible_folders(supabase, user_id)
+    # SEED-091 / D-164-05 (TEN-06): null the seeding owner on non-owned global folders BEFORE
+    # they are copied into tree nodes — the shared uniform rule (folders/skills/views cannot
+    # diverge). The current /tree serialize output omits user_id, so this is defense-in-depth +
+    # contract uniformity: any node that later exposes user_id is already nulled for non-owners.
+    _null_foreign_global_owner(all_folders, user_id)
     nodes, roots = _build_tree_map(all_folders)
 
     if path.strip("/") == "":

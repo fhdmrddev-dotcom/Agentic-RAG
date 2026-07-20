@@ -106,6 +106,12 @@ async def list_views(user_id, supabase: Client | None = None) -> list[dict]:
     for row in result.data or []:
         if row["id"] not in seen:
             seen.add(row["id"])
+            # SEED-091 / D-164-05 (TEN-06): a non-owner reader of a global view must not learn
+            # the seeding owner's identity — null user_id AND the folder_scope UUID (views-only
+            # scope UUID). RLS gates the row, not these columns, so null at serialize time.
+            if row.get("is_global") and str(row.get("user_id")) != str(_uid(user_id)):
+                row["user_id"] = None
+                row["folder_scope"] = None
             out.append(row)
     return out
 

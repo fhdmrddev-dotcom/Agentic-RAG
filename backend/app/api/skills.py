@@ -215,6 +215,11 @@ async def list_skills(
     for row in result.data:
         if row["id"] not in seen:
             seen.add(row["id"])
+            # SEED-091 / D-164-05 (TEN-06): hide the seeding owner's identity from non-owner
+            # readers of a global/system skill (the built-in is_system skill-creator is the
+            # cross-org-visible surface today). RLS gates the row, not the column — null here.
+            if (row.get("is_global") or row.get("is_system")) and str(row.get("user_id")) != str(current_user["id"]):
+                row["user_id"] = None
             skills.append(row)
     return skills
 
@@ -691,7 +696,15 @@ async def list_skill_files(
         .order("filename")
         .execute()
     )
-    return result.data
+    rows = result.data or []
+    # SEED-091 / D-164-05 (TEN-06, A3): skill_files rows carry no is_global column, so key on
+    # the PARENT skill's ownership (fetched above). A non-owner only reaches here via the
+    # is_global branch, so a mismatch means the seeding owner's identity would leak on every
+    # file row — null it. The owner reading their own skill keeps their user_id.
+    if str(skill.data.get("user_id")) != str(current_user["id"]):
+        for r in rows:
+            r["user_id"] = None
+    return rows
 
 
 @router.post("/{skill_id}/files", response_model=SkillFileResponse,

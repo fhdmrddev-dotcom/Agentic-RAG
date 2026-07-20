@@ -3,7 +3,7 @@ from supabase import Client
 
 from app.dependencies import get_current_user, get_user_supabase_client
 from app.models.folder import FolderCreate, FolderMoveRequest, FolderUpdate, FolderResponse
-from app.utils.folder_utils import fetch_visible_folders
+from app.utils.folder_utils import fetch_visible_folders, _null_foreign_global_owner
 
 router = APIRouter(prefix="/folders", tags=["folders"])
 
@@ -16,7 +16,8 @@ async def list_folders(
     """List all folders visible to the current user (owned + global subtree)."""
     folders = await fetch_visible_folders(supabase, current_user["id"])
     folders.sort(key=lambda f: f["name"])
-    return folders
+    # SEED-091 / D-164-05 (TEN-06): null the seeding owner on non-owned global folders.
+    return _null_foreign_global_owner(folders, current_user["id"])
 
 
 @router.get("/{folder_id}/children", response_model=list[FolderResponse])
@@ -29,7 +30,8 @@ async def list_children(
     visible = await fetch_visible_folders(supabase, current_user["id"])
     children = [f for f in visible if f["parent_id"] == folder_id]
     children.sort(key=lambda f: f["name"])
-    return children
+    # SEED-091 / D-164-05 (TEN-06): null the seeding owner on non-owned global folders.
+    return _null_foreign_global_owner(children, current_user["id"])
 
 
 @router.post("", response_model=FolderResponse, status_code=status.HTTP_201_CREATED)
