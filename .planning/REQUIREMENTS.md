@@ -27,7 +27,7 @@ Requirements for the v3.4 release. Each maps to exactly one roadmap phase.
 - [ ] **TEN-03**: All four `SECURITY DEFINER` retrieval/sharing functions (`match_document_chunks`, `keyword_search_chunks`, `match_skills`, `folder_is_globally_visible`→`folder_is_org_shared`) carry an explicit org predicate in-body + a pinned `search_path`; the fragile `_inject_user_id` regex is **deleted** (not extended) and `query_user_documents` is called through the user-JWT client.
 - [x] **TEN-04**: `org_id` is denormalized onto `document_chunks` and `skill_embeddings` (the pgvector hot paths) with a partial/composite index alongside the existing vector index, benchmarked so membership-RLS does not regress the CONCUR-01 <1s cross-tab-GET-during-streaming binding gate.
 - [ ] **TEN-05**: A cross-org isolation test suite (`test_v3_4_org_isolation.py`) — two seeded orgs × every user-facing table × all four `SECURITY DEFINER` functions (0 cross-org rows) × both DB access paths × `X-Org-Id` header-spoof rejection — passes, and is the milestone exit gate.
-- [ ] **TEN-06**: SEED-091 closed — global/org-shared resources (folders / skills / views) null the seeding owner's `user_id` (+ scope UUIDs) for non-owner readers in every list/serialize path.
+- [x] **TEN-06**: SEED-091 closed — global/org-shared resources (folders / skills / views) null the seeding owner's `user_id` (+ scope UUIDs) for non-owner readers in every list/serialize path.
 
 ### Permission-Aware Retrieval
 
@@ -121,7 +121,7 @@ Populated during roadmap creation (each requirement maps to exactly one phase; n
 | TEN-04 | 163 | Complete |
 | TEN-03 | 164 | Pending |
 | TEN-05 | 164 | Pending |
-| TEN-06 | 164 | Pending |
+| TEN-06 | 164 | Complete |
 | PRAG-01 | 164 | Pending |
 | MIG-02 | 165 | Pending |
 | ADMIN-01 | 166 | Pending |
