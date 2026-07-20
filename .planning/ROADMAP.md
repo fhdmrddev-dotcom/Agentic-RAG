@@ -181,7 +181,15 @@ Ship only if CORE lands clean and budget remains. First-to-cut ordering: SSO/OID
   2. User-facing copy reads "Shared with org" (not "Global"), and no previously-shared folder / skill / view silently un-shares.
   3. An `is_system_global` allow-list — reusing the write-locked `skills.is_system` marker — keeps the seeded `skill-creator` visible across every org, and no route can set `is_system_global` (migration-only, never route-settable).
   4. **(Folded from Phase 164 CR-01 / [[SEED-124]] — MUST close here)** The `folder_utils.py` visibility helpers (`is_in_global_subtree` / `fetch_visible_folders` / `get_globally_visible_folder_ids`) are **org-scoped** so the agent's service-role KB browse/read tools (`ls`/`tree`/`read_document`/`fetch_document_file`) can no longer enumerate or read documents in another org's `is_org_shared` (formerly `is_global`) folders. Verified by flipping the `xfail(strict=True)` marker `test_browse_tools_cross_org_leak_KNOWN_OPEN_seed124` in `test_v3_4_org_isolation.py` to XPASS → then removing it. Also close WR-01 (null the seeder's `user_id` on non-`is_org_shared` **descendants** of shared folders in the folders list/serialize path).
-**Plans**: TBD
+**Plans**: 8 plans
+- [ ] 165-01-PLAN.md — Migration 111: value-preserving `is_global` rename (D-165-01 split) + RLS auto-propagation + DEFINER/trigger rewrites + `folder_is_globally_visible`->`folder_is_org_shared` + storage skill-files policy reconciliation
+- [ ] 165-02-PLAN.md — Folded SEED-124 security fix: org-scope the service-role folder-visibility helpers (CR-01, fail-closed) + subtree-descendant owner-nulling (WR-01) + `is_org_shared` rename in `folder_utils.py`/`kb.py`/`tool_dispatcher.py`
+- [ ] 165-03-PLAN.md — Backend model + API-layer rename (6 models + 8 routes; platform write-lock preserved)
+- [ ] 165-04-PLAN.md — Backend service + db + main seed-path rename (15 files; 15 workflows stay `is_system_global=true`; Deep byte-identical)
+- [ ] 165-05-PLAN.md — Backend test rename (~55 files, except the exit gate) — rename-regression coverage
+- [ ] 165-06-PLAN.md — Frontend rename (types/api/hooks/components/tests) + "Global"->"Shared with org" toggle copy (D-165-07)
+- [ ] 165-07-PLAN.md — [BLOCKING] Operator applies migration 111 via SQL editor + regenerate full-schema (no-reset) + same-commit landing + post-apply over-widening check
+- [ ] 165-08-PLAN.md — Exit-gate re-green + SC#4 arbitration: flip SEED-124 leak test xfail->XPASS->remove marker; two-org suite green (23 passed); backend rename-regression sweep
 
 #### Phase 166: Org-Admin Shell + Org Switcher + Profile-Menu Anchor
 **Goal**: A multi-org user gets a real identity anchor, an org switcher that safely swaps active-org context, and an org-admin shell with org-scoped audit + a resolved Settings IA — the human-facing surface of the now-real tenancy model, reusing the shipped v3.3 Control-Room shell as composition.
@@ -281,7 +289,7 @@ Ship only if CORE lands clean and budget remains. First-to-cut ordering: SSO/OID
 | 162.5. threads.py Producer Extraction (G-5) | 4/4 | Complete | 2026-07-19 |
 | 163. RLS Rewrite + User-JWT Client Swap (CRUX) | 11/11 | Complete | 2026-07-20 |
 | 164. SECDEF Audit + Cross-Org Isolation Suite | 5/5 | Complete | 2026-07-20 |
-| 165. `is_global` Retirement Cleanup | 0/? | Not started | - |
+| 165. `is_global` Retirement Cleanup | 0/8 | Planned | - |
 | 166. Org-Admin Shell + Switcher + Profile + Audit + Settings Split | 0/? | Not started | - |
 | 167. Invitations + Roles + Greenlists + JIT + Per-User Prefs | 0/? | Not started | - |
 | 168. SSO — SAML 2.0 (CORE) | 0/? | Not started | - |
