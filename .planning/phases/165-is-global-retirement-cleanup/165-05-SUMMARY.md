@@ -122,3 +122,8 @@ None - no external service configuration required. (DB migration 111 is applied 
 ---
 *Phase: 165-is-global-retirement-cleanup*
 *Completed: 2026-07-20*
+
+## Self-Check: PASSED
+- All 15 modified test files verified (0 bare is_global, 0 folder_is_globally_visible; genuine is_system preserved).
+- Commits verified in history: e6f4fd7d (Task 1), 63d2abbd (Task 2), 1abbfba4 (SUMMARY).
+- SUMMARY.md present at .planning/phases/165-is-global-retirement-cleanup/165-05-SUMMARY.md.
