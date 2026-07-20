@@ -73,11 +73,13 @@ class _FakeSupabase:
 
 # ── FOLDERS (the shared helper IS the folder serialize seam) ─────────────────────
 def test_folders_null_foreign_global_owner():
+    # Phase 165 (D-165-01): folders.is_global RENAMED -> is_org_shared; _null_foreign_global_owner's
+    # predicate now reads is_org_shared (is_system branch unchanged). Rows updated in-place to match.
     rows = [
-        {"id": "f-foreign-global", "user_id": OWNER, "is_global": True},   # (a) shared, not owned
-        {"id": "f-foreign-private", "user_id": OWNER, "is_global": False}, # (c) non-global -> untouched
-        {"id": "f-own-global", "user_id": CALLER, "is_global": True},      # (b) owner of a global row
-        {"id": "f-own-private", "user_id": CALLER, "is_global": False},    # owner private -> untouched
+        {"id": "f-foreign-global", "user_id": OWNER, "is_org_shared": True},   # (a) shared, not owned
+        {"id": "f-foreign-private", "user_id": OWNER, "is_org_shared": False}, # (c) non-shared -> untouched
+        {"id": "f-own-global", "user_id": CALLER, "is_org_shared": True},      # (b) owner of a shared row
+        {"id": "f-own-private", "user_id": CALLER, "is_org_shared": False},    # owner private -> untouched
     ]
     out = _null_foreign_global_owner(rows, CALLER)
     by_id = {r["id"]: r for r in out}

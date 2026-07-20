@@ -142,3 +142,32 @@ def test_is_in_global_subtree_honors_org_membership():
 @pytest.mark.asyncio
 async def test_resolve_caller_org_ids_returns_membership_set():
     assert await _resolve_caller_org_ids(_sb(), USER_A) == {ORG_X}
+
+
+# ── (WR-01, D-165-05) — owner-nulling broadens to non-shared subtree descendants ──
+def test_null_foreign_owner_broadens_to_subtree_descendants():
+    """A non-owner reader of a shared subtree sees user_id == null on the shared row AND on its
+    non-shared descendant (the id set from get_globally_visible_folder_ids carries descendants)."""
+    rows = copy.deepcopy(FOLDERS)
+    non_owned_visible = {"f1", "f2"}  # what get_globally_visible_folder_ids returns for USER_C
+    out = _null_foreign_global_owner(rows, USER_C, non_owned_visible)
+    by_id = {r["id"]: r for r in out}
+    assert by_id["f1"]["user_id"] is None    # org-shared row, non-owned -> nulled
+    assert by_id["f2"]["user_id"] is None    # NON-shared descendant, non-owned -> nulled (WR-01)
+    assert by_id["f3"]["user_id"] == USER_B  # B's private, not in the visible set -> untouched
+
+    hidden = {r["id"] for r in out if r["user_id"] is None}
+    visible = {r["id"] for r in out if r["user_id"] is not None}
+    assert hidden == {"f1", "f2"}
+    assert hidden.isdisjoint(visible)
+
+
+def test_null_foreign_owner_without_set_keeps_shared_row_only_rule():
+    """Skills / views callers pass NO visible set: only is_org_shared/is_system rows get nulled —
+    the original (pre-WR-01) behavior is preserved for the no-subtree callers."""
+    rows = copy.deepcopy(FOLDERS)
+    out = _null_foreign_global_owner(rows, USER_C)  # no visible_non_owned_ids
+    by_id = {r["id"]: r for r in out}
+    assert by_id["f1"]["user_id"] is None     # is_org_shared, non-owner -> nulled
+    assert by_id["f2"]["user_id"] == USER_A   # non-shared descendant NOT nulled without the set
+    assert by_id["f3"]["user_id"] == USER_B   # untouched

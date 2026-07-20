@@ -553,7 +553,7 @@ async def _handle_attach_skill_file(args: dict, ctx: ToolContext) -> ToolResult:
     untouched, no ``provider ==`` fork. self_improve-gated (D-11) in ``get_tools()`` AND
     refused in-flight via ``_CAPABILITY_FLAG_TOOLS``. Owner-only WRITE gate (D-06/T-04):
     the target skill is resolved by name under ``.eq("user_id")`` — NEVER the
-    ``.or_(is_global.eq.true)`` READ filter — and ``is_system`` skills are also rejected;
+    ``.or_(is_org_shared.eq.true)`` READ filter — and ``is_system`` skills are also rejected;
     service-role has no RLS backstop so this app gate is load-bearing. A colliding filename
     overwrites in place via a race-immune upsert (D-07, Plan 02 unique index). Reuses the
     existing ``skill_files`` table + ``skill-files`` bucket (D-08) — no new table/bucket.
@@ -579,9 +579,9 @@ async def _handle_attach_skill_file(args: dict, ctx: ToolContext) -> ToolResult:
     filename = _re_local.sub(r"\.{2,}", ".", filename).strip() or "attachment"
 
     # ── D-06 / T-04 / SC#4 — resolve the target skill OWNER-ONLY. Empty .data (not owned
-    #    / not found) OR is_system → refuse. NEVER the .or_(is_global.eq.true) READ filter.
-    #    WR-04: the gate intentionally does NOT reject is_global — a global skill the caller
-    #    OWNS is writable BY DESIGN (T-03: attach-to-owned-skill then owner later toggles it
+    #    / not found) OR is_system → refuse. NEVER the .or_(is_org_shared.eq.true) READ filter.
+    #    WR-04: the gate intentionally does NOT reject is_org_shared — an org-shared skill the
+    #    caller OWNS is writable BY DESIGN (T-03: attach-to-owned-skill then owner later toggles it
     #    global is a documented, owner-driven data-movement path, not blocked). The refusal
     #    copy below is therefore scoped to built-in (is_system) skills only, so it never
     #    overstates the enforcement (auditors: owner-scope on user_id is the load-bearing gate). ──
@@ -1142,14 +1142,14 @@ async def _handle_load_skill(args: dict, ctx: ToolContext) -> ToolResult:
     await ctx.emit(ctx.redis, ctx.run_id, 'skill_activated', skill_name=skill_name)
     # Resolve skill -- on a name collision the most-authoritative row wins:
     # system > global > owned (SEED-102). is_system DESC pins a protected built-in
-    # above any same-named owned row; is_global DESC is the secondary tie-break.
+    # above any same-named owned row; is_org_shared DESC is the secondary tie-break.
     _skill_resp = await aexec(
         ctx.supabase.table("skills")
         .select("id, name, description, instructions, user_id")
-        .or_(f"user_id.eq.{ctx.current_user['id']},is_global.eq.true")
+        .or_(f"user_id.eq.{ctx.current_user['id']},is_org_shared.eq.true")
         .eq("name", skill_name)
         .eq("is_enabled", True)
-        .order("is_system", desc=True).order("is_global", desc=True)
+        .order("is_system", desc=True).order("is_org_shared", desc=True)
     )
     skill_row = _skill_resp.data
     if not skill_row:
@@ -1233,7 +1233,7 @@ async def _handle_save_skill(args: dict, ctx: ToolContext) -> ToolResult:
         siblings_resp = await aexec(
             ctx.supabase.table("skills")
             .select("id, description")
-            .or_(f"user_id.eq.{ctx.current_user['id']},is_global.eq.true")
+            .or_(f"user_id.eq.{ctx.current_user['id']},is_org_shared.eq.true")
         )
         siblings = [
             r.get("description", "")
@@ -1361,7 +1361,7 @@ async def _handle_read_skill_file(args: dict, ctx: ToolContext) -> ToolResult:
     _sr_resp = await aexec(
         ctx.supabase.table("skills")
         .select("id, user_id")
-        .or_(f"user_id.eq.{ctx.current_user['id']},is_global.eq.true")
+        .or_(f"user_id.eq.{ctx.current_user['id']},is_org_shared.eq.true")
         .eq("name", skill_name)
         .maybe_single()
     )
@@ -1373,7 +1373,7 @@ async def _handle_read_skill_file(args: dict, ctx: ToolContext) -> ToolResult:
             _sr_resp2 = await aexec(
                 ctx.supabase.table("skills")
                 .select("id, user_id")
-                .or_(f"user_id.eq.{ctx.current_user['id']},is_global.eq.true")
+                .or_(f"user_id.eq.{ctx.current_user['id']},is_org_shared.eq.true")
                 .eq("name", _sr_norm)
                 .maybe_single()
             )
@@ -1516,7 +1516,7 @@ async def _handle_execute_code(args: dict, ctx: ToolContext) -> ToolResult:
             _sf_resp = await aexec(
                 ctx.supabase.table("skills")
                 .select("id, user_id")
-                .or_(f"user_id.eq.{ctx.current_user['id']},is_global.eq.true")
+                .or_(f"user_id.eq.{ctx.current_user['id']},is_org_shared.eq.true")
                 .eq("name", sf_skill_name)
                 .maybe_single()
             )
@@ -1528,7 +1528,7 @@ async def _handle_execute_code(args: dict, ctx: ToolContext) -> ToolResult:
                     _sf_resp2 = await aexec(
                         ctx.supabase.table("skills")
                         .select("id, user_id")
-                        .or_(f"user_id.eq.{ctx.current_user['id']},is_global.eq.true")
+                        .or_(f"user_id.eq.{ctx.current_user['id']},is_org_shared.eq.true")
                         .eq("name", _sf_norm)
                         .maybe_single()
                     )

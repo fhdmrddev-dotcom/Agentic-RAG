@@ -60,7 +60,7 @@ async def ls_path(path: str, user_id: str, supabase: Client) -> dict:
 
     if path.strip("/") == "":
         folder_entries = [
-            {"id": r["id"], "name": r["name"], "is_global": r["is_global"]}
+            {"id": r["id"], "name": r["name"], "is_org_shared": r["is_org_shared"]}
             for r in roots
         ]
         doc_result = await aexec(
@@ -76,7 +76,7 @@ async def ls_path(path: str, user_id: str, supabase: Client) -> dict:
         return {"error": f"Path '{path}' not found"}
 
     folder_entries = [
-        {"id": c["id"], "name": c["name"], "is_global": c["is_global"]}
+        {"id": c["id"], "name": c["name"], "is_org_shared": c["is_org_shared"]}
         for c in target["children"]
     ]
     # Docs in the target folder visible to this user
@@ -111,11 +111,16 @@ async def tree_path(path: str, depth: int | None, user_id: str, supabase: Client
     from app.utils.db import aexec  # noqa: PLC0415
 
     all_folders = await _fetch_visible_folders(supabase, user_id)
-    # SEED-091 / D-164-05 (TEN-06): null the seeding owner on non-owned global folders BEFORE
-    # they are copied into tree nodes — the shared uniform rule (folders/skills/views cannot
-    # diverge). The current /tree serialize output omits user_id, so this is defense-in-depth +
-    # contract uniformity: any node that later exposes user_id is already nulled for non-owners.
-    _null_foreign_global_owner(all_folders, user_id)
+    # D-165-05 (WR-01): the caller's non-owned-visible folder id set — the org-shared rows AND any
+    # NON-shared descendants visible via a shared ancestor (get_globally_visible_folder_ids already
+    # walks the shared subtree, org-scoped per D-165-04). Resolved once here, reused for doc scoping.
+    non_owned_visible_ids = set(await get_globally_visible_folder_ids(supabase, user_id))
+    # SEED-091 / D-164-05 (TEN-06) + D-165-05 (WR-01): null the seeding owner on EVERY non-owned
+    # visible folder — the shared row AND its non-shared subtree descendants — BEFORE they are copied
+    # into tree nodes (the shared uniform rule; folders/skills/views cannot diverge). The current
+    # /tree serialize output omits user_id, so this is defense-in-depth + contract uniformity: any
+    # node that later exposes user_id is already nulled for non-owners.
+    _null_foreign_global_owner(all_folders, user_id, non_owned_visible_ids)
     nodes, roots = _build_tree_map(all_folders)
 
     if path.strip("/") == "":
@@ -131,7 +136,7 @@ async def tree_path(path: str, depth: int | None, user_id: str, supabase: Client
         all_ids.extend(_collect_folder_ids(tn))
 
     if all_ids:
-        global_folder_ids_set = set(await get_globally_visible_folder_ids(supabase, user_id))
+        global_folder_ids_set = non_owned_visible_ids  # reuse the D-165-05 set (no duplicate fetch)
         # Fetch own docs in subtree
         _own_resp = await aexec(
             supabase.table("documents")
@@ -210,7 +215,7 @@ def _serialize_tree(node: dict, current_depth: int, max_depth: int | None) -> di
             "id": node["id"],
             "name": node["name"],
             "type": "folder",
-            "is_global": node["is_global"],
+            "is_org_shared": node["is_org_shared"],
             "truncated": has_content,
             "children": [],
             "documents": [],
@@ -219,7 +224,7 @@ def _serialize_tree(node: dict, current_depth: int, max_depth: int | None) -> di
         "id": node["id"],
         "name": node["name"],
         "type": "folder",
-        "is_global": node["is_global"],
+        "is_org_shared": node["is_org_shared"],
         "truncated": False,
         "children": [_serialize_tree(c, current_depth + 1, max_depth) for c in node["children"]],
         "documents": node["documents"],
