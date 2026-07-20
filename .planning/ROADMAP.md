@@ -280,7 +280,7 @@ Ship only if CORE lands clean and budget remains. First-to-cut ordering: SSO/OID
 | 162. Personal-Org Backfill | 3/3 | Complete | 2026-07-18 |
 | 162.5. threads.py Producer Extraction (G-5) | 4/4 | Complete | 2026-07-19 |
 | 163. RLS Rewrite + User-JWT Client Swap (CRUX) | 11/11 | Complete | 2026-07-20 |
-| 164. SECDEF Audit + Cross-Org Isolation Suite | 0/4 | Planning | - |
+| 164. SECDEF Audit + Cross-Org Isolation Suite | 5/5 | Complete | 2026-07-20 |
 | 165. `is_global` Retirement Cleanup | 0/? | Not started | - |
 | 166. Org-Admin Shell + Switcher + Profile + Audit + Settings Split | 0/? | Not started | - |
 | 167. Invitations + Roles + Greenlists + JIT + Per-User Prefs | 0/? | Not started | - |
