@@ -223,7 +223,7 @@ $$;
 
 CREATE FUNCTION public.folder_is_globally_visible(p_folder_id uuid) RETURNS boolean
     LANGUAGE sql STABLE SECURITY DEFINER
-    SET search_path TO 'public'
+    SET search_path TO ''
     AS $$
   WITH RECURSIVE ancestors AS (
     SELECT id, parent_id, is_global
@@ -282,6 +282,7 @@ $$;
 
 CREATE FUNCTION public.keyword_search_chunks(search_query text, match_user_id uuid, match_count integer DEFAULT 20, metadata_filter jsonb DEFAULT NULL::jsonb, p_folder_ids uuid[] DEFAULT NULL::uuid[]) RETURNS TABLE(id uuid, document_id uuid, content text, chunk_index integer, rank double precision)
     LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO ''
     AS $$
 DECLARE
   tsq tsquery;
@@ -292,7 +293,11 @@ BEGIN
          ts_rank_cd(dc.search_vector, tsq)::float AS rank
   FROM public.document_chunks dc
   JOIN public.documents d ON d.id = dc.document_id
-  WHERE dc.user_id = match_user_id
+  WHERE dc.org_id = ANY (SELECT public.current_user_org_ids())          -- D-164-01 org gate (indexed, mig 107)
+    AND (                                                               -- PRAG-01 within-org visibility
+      dc.user_id = auth.uid()                                          --   owner (session-derived, NOT match_user_id)
+      OR (d.folder_id IS NOT NULL AND public.folder_is_globally_visible(d.folder_id))
+    )
     AND dc.search_vector @@ tsq
     AND d.is_latest = true
     AND (metadata_filter IS NULL OR d.metadata @> metadata_filter)
@@ -309,20 +314,25 @@ $$;
 
 CREATE FUNCTION public.match_document_chunks(query_embedding public.vector, match_user_id uuid, match_count integer DEFAULT 5, match_threshold double precision DEFAULT 0.3, metadata_filter jsonb DEFAULT NULL::jsonb, p_folder_ids uuid[] DEFAULT NULL::uuid[], p_embedding_model text DEFAULT NULL::text) RETURNS TABLE(id uuid, document_id uuid, content text, chunk_index integer, similarity double precision)
     LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO ''
     AS $$
 BEGIN
   RETURN QUERY
   SELECT dc.id, dc.document_id, dc.content, dc.chunk_index,
-         1 - (dc.embedding <=> query_embedding) AS similarity
+         1 - (dc.embedding OPERATOR(public.<=>) query_embedding) AS similarity
   FROM public.document_chunks dc
   JOIN public.documents d ON d.id = dc.document_id
-  WHERE dc.user_id = match_user_id          -- RLS scope (V4 — keep)
-    AND 1 - (dc.embedding <=> query_embedding) > match_threshold
+  WHERE dc.org_id = ANY (SELECT public.current_user_org_ids())          -- D-164-01 org gate (indexed, mig 107)
+    AND (                                                               -- PRAG-01 within-org visibility
+      dc.user_id = auth.uid()                                          --   owner (session-derived, NOT match_user_id)
+      OR (d.folder_id IS NOT NULL AND public.folder_is_globally_visible(d.folder_id))
+    )
+    AND 1 - (dc.embedding OPERATOR(public.<=>) query_embedding) > match_threshold
     AND d.is_latest = true
     AND (metadata_filter IS NULL OR d.metadata @> metadata_filter)
     AND (p_folder_ids IS NULL OR d.folder_id = ANY(p_folder_ids))
     AND (p_embedding_model IS NULL OR dc.embedding_model = p_embedding_model)  -- D-10 stale-model filter
-  ORDER BY dc.embedding <=> query_embedding
+  ORDER BY dc.embedding OPERATOR(public.<=>) query_embedding
   LIMIT match_count;
 END;
 $$;
@@ -334,18 +344,22 @@ $$;
 
 CREATE FUNCTION public.match_skills(query_embedding public.vector, match_user_id uuid, p_embedding_model text DEFAULT NULL::text) RETURNS TABLE(id uuid, name text, description text, similarity double precision)
     LANGUAGE plpgsql SECURITY DEFINER
-    SET search_path TO 'public', 'pg_temp'
+    SET search_path TO ''
     AS $$
 BEGIN
   RETURN QUERY
   SELECT s.id, s.name, s.description,
          CASE WHEN se.embedding IS NULL THEN NULL
-              ELSE 1 - (se.embedding <=> query_embedding) END AS similarity
+              ELSE 1 - (se.embedding OPERATOR(public.<=>) query_embedding) END AS similarity
   FROM public.skills s
   LEFT JOIN public.skill_embeddings se
          ON se.skill_id = s.id
         AND (p_embedding_model IS NULL OR se.embedding_model = p_embedding_model)  -- D-10 stale-model filter
-  WHERE (s.user_id = match_user_id OR s.is_global = true)   -- BYTE-EXACT clone of today's catalog scope (V4)
+  -- FIX-A (mig 109:70-73): is_system = true is a UNIVERSAL escape OUTSIDE the org gate; the
+  -- owner OR user-is_global branch stays INSIDE the org gate (owner keys on auth.uid()).
+  WHERE ( (s.is_system = true)
+          OR (s.org_id = ANY (SELECT public.current_user_org_ids())
+              AND (s.user_id = auth.uid() OR s.is_global = true)) )
     AND s.is_enabled = true
   ORDER BY similarity DESC NULLS LAST, s.name;   -- NULL sim (no vector) = fail-open, ranked last-but-kept
 END;
@@ -4909,7 +4923,9 @@ CREATE POLICY "Users can view own skill versions" ON public.skill_versions FOR S
 -- Name: document_chunks Users can view their own chunks; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can view their own chunks" ON public.document_chunks FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
+CREATE POLICY "Users can view their own chunks" ON public.document_chunks FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND ((auth.uid() = user_id) OR (EXISTS ( SELECT 1
+   FROM public.documents d
+  WHERE ((d.id = document_chunks.document_id) AND (d.folder_id IS NOT NULL) AND public.folder_is_globally_visible(d.folder_id)))))));
 
 
 --
