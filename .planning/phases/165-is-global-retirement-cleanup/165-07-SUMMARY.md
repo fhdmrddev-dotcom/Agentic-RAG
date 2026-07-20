@@ -146,6 +146,13 @@ None - no external service configuration required. NOTE: migration 111 (the live
 - Plan 10 must apply migration 111 (RENAME COLUMN x6 + policy/DEFINER-fn rewrite) and regenerate full-schema before these tests can run assertion-green.
 - Plan 11 re-greens `test_v3_4_org_isolation.py` (the last file still holding live `is_global` literals — intentionally out of scope here).
 
+## Self-Check: PASSED
+
+- SUMMARY.md present at `.planning/phases/165-is-global-retirement-cleanup/165-07-SUMMARY.md`.
+- All task commits verified in git log: `304e267a` (Task 1), `67a66982` (Task 2), `c0159d6d` (Task 3), `5ea47a7c` (plan metadata).
+- All 25 plan files: 0 bare `is_global` (case-sensitive); `is_system_global` applied, folders exceptions -> `is_org_shared`.
+- `--collect-only` clean on all three sampled subsets + the full 25-file set (194 tests, exit 0).
+
 ---
 *Phase: 165-is-global-retirement-cleanup*
 *Completed: 2026-07-21*
