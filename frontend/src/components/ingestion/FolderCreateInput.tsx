@@ -3,7 +3,7 @@ import { Globe } from "lucide-react"
 
 interface FolderCreateInputProps {
   depth: number
-  onCommit: (name: string, isGlobal: boolean) => void
+  onCommit: (name: string, isOrgShared: boolean) => void
   onCancel: () => void
 }
 
@@ -13,7 +13,7 @@ export function FolderCreateInput({
   onCancel,
 }: FolderCreateInputProps) {
   const [value, setValue] = useState("")
-  const [isGlobal, setIsGlobal] = useState(false)
+  const [isOrgShared, setIsOrgShared] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const committedRef = useRef(false)
 
@@ -35,7 +35,7 @@ export function FolderCreateInput({
             committedRef.current = true
             onCancel()
           }
-          // Non-empty on blur → keep input visible (user may be clicking the Global checkbox)
+          // Non-empty on blur → keep input visible (user may be clicking the share checkbox)
         }}
         onKeyDown={(e) => {
           if (e.key === "Enter") {
@@ -44,7 +44,7 @@ export function FolderCreateInput({
             const trimmed = value.trim()
             if (trimmed) {
               committedRef.current = true
-              onCommit(trimmed, isGlobal)
+              onCommit(trimmed, isOrgShared)
             }
           }
           if (e.key === "Escape") {
@@ -61,12 +61,12 @@ export function FolderCreateInput({
       <label className="flex items-center gap-1.5 mt-1 text-xs text-muted-foreground cursor-pointer">
         <input
           type="checkbox"
-          checked={isGlobal}
-          onChange={(e) => setIsGlobal(e.target.checked)}
+          checked={isOrgShared}
+          onChange={(e) => setIsOrgShared(e.target.checked)}
           className="rounded"
         />
         <Globe className="h-3 w-3" />
-        Global folder
+        Shared with org
       </label>
     </div>
   )

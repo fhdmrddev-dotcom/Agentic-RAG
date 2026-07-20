@@ -13,15 +13,15 @@
  *     ConditionPopover/ViewCondition grammar the 029/114 FilterBar uses)
  *   → action = 📁 folder ONLY (the 🏷 tag radio is DROPPED per D-118-1 — the app has
  *     no document-tags concept; folder is the only action target)
- *   → scope segmented (👤 Only me / 🌐 Global G; default Only me)
+ *   → scope segmented (👤 Only me / 🌐 Built-in G; default Only me)
  *   → live "would match N of M" preview via the EXISTING resolveAdHoc({count_only:true})
  *     (a rule's match_expr is the SAME ViewFilter AST — NO new client fn, NO new endpoint)
  *     + the forward-only honesty line: "existing docs aren't moved — rules suggest on
  *     new uploads only." (D-118-2).
  *
- * Save → createRule(name, match_expr, suggest_folder_id) — the body OMITS is_global
+ * Save → createRule(name, match_expr, suggest_folder_id) — the body OMITS is_system_global
  * (the server hard-sets it false; the scope toggle is an authoring affordance the
- * server honors only on an admin-gated global path, NEVER a create-body flag, T-118-06-01)
+ * server honors only on an admin-gated built-in path, NEVER a create-body flag, T-118-06-01)
  * — or updateRule(id, {...}) when editing an existing rule.
  *
  * UX-01: Deep Midnight / Aether tokens, mobile-responsive, WCAG 2.1 AA (every control
@@ -111,7 +111,7 @@ export function RuleBuilderPanel({
   const [folderId, setFolderId] = useState<string>(rule?.suggest_folder_id ?? "")
 
   // ── scope segmented (default Only me) ────────────────────────────────────────
-  const [scope, setScope] = useState<Scope>(rule?.is_global ? "global" : "private")
+  const [scope, setScope] = useState<Scope>(rule?.is_system_global ? "global" : "private")
 
   // ── live debounced "would match N" preview (reuses resolveAdHoc count_only) ──
   const [count, setCount] = useState<number | null>(null)
@@ -198,8 +198,8 @@ export function RuleBuilderPanel({
         })
       } else {
         // CREATE mode: the body is (name, match_expr, suggest_folder_id) ONLY — it
-        // NEVER carries is_global (the server hard-sets it false; the scope toggle
-        // is an authoring affordance, not a create-body flag — T-118-06-01).
+        // NEVER carries is_system_global (the server hard-sets it false; the scope
+        // toggle is an authoring affordance, not a create-body flag — T-118-06-01).
         saved = await createRule(name.trim(), matchExpr, suggestFolder)
       }
       onSaved(saved)
@@ -315,13 +315,13 @@ export function RuleBuilderPanel({
           {folders.map((f) => (
             <option key={f.id} value={f.id}>
               {f.name}
-              {f.is_global ? " (global)" : ""}
+              {f.is_org_shared ? " (shared)" : ""}
             </option>
           ))}
         </select>
       </label>
 
-      {/* scope segmented — 👤 Only me / 🌐 Global (default Only me). Native radios
+      {/* scope segmented — 👤 Only me / 🌐 Built-in (default Only me). Native radios
           so it is keyboard-operable + screen-reader legible (UX-01 / AA). */}
       <fieldset className="space-y-1.5">
         <legend className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
@@ -346,13 +346,13 @@ export function RuleBuilderPanel({
             />
             <span aria-hidden="true">👤</span> Only me
           </label>
-          {/* AR-118-04: "Global" is disabled — there is no client path to create a
-              global rule (the server hard-sets is_global=false on create; globals are
-              admin/service-role-seeded). Showing it live but non-functional was a
-              "never silent" honesty defect, so it's disabled with an explanation
-              rather than silently ignored. */}
+          {/* AR-118-04: "Built-in" is disabled — there is no client path to create a
+              built-in rule (the server hard-sets is_system_global=false on create;
+              built-ins are admin/service-role-seeded). Showing it live but
+              non-functional was a "never silent" honesty defect, so it's disabled
+              with an explanation rather than silently ignored. */}
           <label
-            title="Global rules are seeded by an administrator"
+            title="Built-in rules are seeded by an administrator"
             className={cn(
               "inline-flex cursor-not-allowed items-center gap-1.5 rounded-md px-3 py-1.5 text-sm transition-colors",
               scope === "global"
@@ -363,20 +363,20 @@ export function RuleBuilderPanel({
             <input
               type="radio"
               name="rule-scope"
-              aria-label="Global"
+              aria-label="Built-in"
               className="sr-only"
               checked={scope === "global"}
               disabled
               onChange={() => setScope("global")}
             />
-            <span aria-hidden="true">🌐</span> Global
+            <span aria-hidden="true">🌐</span> Built-in
             <span className="text-[9px] font-medium uppercase tracking-wider text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">
               G
             </span>
           </label>
         </div>
         <p className="text-[11px] text-muted-foreground">
-          Global rules are seeded by an administrator.
+          Built-in rules are seeded by an administrator.
         </p>
       </fieldset>
 

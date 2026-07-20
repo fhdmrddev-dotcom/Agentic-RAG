@@ -15,7 +15,7 @@ interface Props {
   onToggleEnabled: (id: string) => Promise<void>
   // Phase 136 (GATE-01): the share direction rides an optional `override` through
   // the publish gate; the unshare direction passes nothing (never gated — D-07).
-  onToggleGlobal: (id: string, override?: boolean) => Promise<void>
+  onToggleOrgShared: (id: string, override?: boolean) => Promise<void>
   onTryInChat: (skillName: string) => void
   onExport: (id: string, name: string) => Promise<void>
   // Phase 137-07 (PANEL-01 / sketch 057 MAP / D-06): passed through to the publish
@@ -31,7 +31,7 @@ export function SkillCard({
   onSelect,
   onDelete,
   onToggleEnabled,
-  onToggleGlobal,
+  onToggleOrgShared,
   onTryInChat,
   onExport,
   onReviewEvals,
@@ -40,7 +40,7 @@ export function SkillCard({
   const [toggleError, setToggleError] = useState<string | null>(null)
   const [localEnabled, setLocalEnabled] = useState(skill.is_enabled)
   const [exporting, setExporting] = useState(false)
-  // Phase 136 (GATE-01 / D-05): the private→global share opens the gate dialog.
+  // Phase 136 (GATE-01 / D-05): the private→org-shared share opens the gate dialog.
   const [showPublishDialog, setShowPublishDialog] = useState(false)
 
   const isOwner = skill.user_id === currentUserId
@@ -65,9 +65,9 @@ export function SkillCard({
     }
   }
 
-  const handleToggleGlobal = async () => {
+  const handleToggleOrgShared = async () => {
     try {
-      await onToggleGlobal(skill.id)
+      await onToggleOrgShared(skill.id)
     } catch {
       setToggleError("Failed to update skill.")
       setTimeout(() => setToggleError(null), 3000)
@@ -116,16 +116,17 @@ export function SkillCard({
         <span className="font-semibold text-sm text-foreground truncate flex-1 min-w-0">{skill.name}</span>
         {/* Phase 137.2 / CREATE-01 (D-01) — ONE pill via a ternary: "Built-in"
             (trust-badge tint) for a system-owned platform built-in, else the
-            existing muted "Global" pill. A built-in is inherently global, so
-            two pills would be redundant. Reflects the backend value; never set
-            here (badge-spoofing mitigation, T-137.2-02). */}
+            existing muted "Shared with org" pill. A built-in is inherently shared,
+            so two pills would be redundant. Reflects the backend value; never set
+            here (badge-spoofing mitigation, T-137.2-02). Phase 165 (MIG-02):
+            is_system stays the physical marker (D-165-02); is_global→is_org_shared. */}
         {skill.is_system ? (
           <span className="text-[10px] text-primary bg-primary/10 px-2 py-1 rounded-full shrink-0">
             Built-in
           </span>
-        ) : skill.is_global && (
+        ) : skill.is_org_shared && (
           <span className="text-[10px] text-muted-foreground bg-muted px-2 py-1 rounded-full shrink-0">
-            Global
+            Shared with org
           </span>
         )}
       </div>
@@ -178,8 +179,8 @@ export function SkillCard({
 
           {/* Action buttons */}
           <div className="flex items-center gap-0.5">
-            {/* Toggle enabled — hidden for global skills the user doesn't own */}
-            {!(skill.user_id !== currentUserId && skill.is_global) && (
+            {/* Toggle enabled — hidden for org-shared skills the user doesn't own */}
+            {!(skill.user_id !== currentUserId && skill.is_org_shared) && (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
@@ -255,21 +256,21 @@ export function SkillCard({
                       size="icon"
                       className="h-8 w-8"
                       onClick={() => {
-                        // D-07: unshare (global→private) is a direct, never-gated
-                        // toggle; share (private→global) opens the publish gate.
-                        if (skill.is_global) {
-                          handleToggleGlobal()
+                        // D-07: unshare (shared→private) is a direct, never-gated
+                        // toggle; share (private→org-shared) opens the publish gate.
+                        if (skill.is_org_shared) {
+                          handleToggleOrgShared()
                         } else {
                           setShowPublishDialog(true)
                         }
                       }}
-                      aria-label={skill.is_global ? "Unshare skill" : "Share skill globally"}
+                      aria-label={skill.is_org_shared ? "Unshare skill" : "Share skill with org"}
                     >
                       <Globe className="h-3.5 w-3.5" aria-hidden="true" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
-                    {skill.is_global ? "Unshare" : "Share globally"}
+                    {skill.is_org_shared ? "Unshare" : "Share with org"}
                   </TooltipContent>
                 </Tooltip>
 
@@ -305,7 +306,7 @@ export function SkillCard({
         open={showPublishDialog}
         onOpenChange={setShowPublishDialog}
         onConfirm={async (override) => {
-          await onToggleGlobal(skill.id, override)
+          await onToggleOrgShared(skill.id, override)
         }}
         onReviewEvals={onReviewEvals}
       />

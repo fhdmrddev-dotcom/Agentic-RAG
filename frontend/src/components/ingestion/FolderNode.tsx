@@ -44,9 +44,9 @@ interface FolderNodeProps {
   onConfirmDelete: (id: string) => void
   onCancelDelete: () => void
   onCreateSubfolder: (parentId: string) => void
-  onCreateCommit: (name: string, isGlobal: boolean) => void
+  onCreateCommit: (name: string, isOrgShared: boolean) => void
   onCreateCancel: () => void
-  onToggleGlobal: (id: string) => void
+  onToggleOrgShared: (id: string) => void
 }
 
 export function FolderNode({
@@ -70,7 +70,7 @@ export function FolderNode({
   onCreateSubfolder,
   onCreateCommit,
   onCreateCancel,
-  onToggleGlobal,
+  onToggleOrgShared,
 }: FolderNodeProps) {
   const isSelected = node.id === selectedFolderId
   const isExpanded = expandedIds.has(node.id)
@@ -92,7 +92,8 @@ export function FolderNode({
         count={count}
         depth={depth}
         isSelected={isSelected}
-        isGlobal={node.is_global}
+        isShared={node.is_org_shared}
+        sharedLabel="Shared with org"
         onSelect={() => onSelect(node.id)}
         isEditing={isEditing}
         onCommitRename={(newName) => onCommitRename(node.id, newName)}
@@ -164,11 +165,11 @@ export function FolderNode({
                   <DropdownMenuItem
                     onClick={(e) => {
                       e.stopPropagation()
-                      onToggleGlobal(node.id)
+                      onToggleOrgShared(node.id)
                     }}
                   >
                     <Globe className="h-3.5 w-3.5 mr-2" />
-                    {node.is_global ? "Make private" : "Make global"}
+                    {node.is_org_shared ? "Make private" : "Share with org"}
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuSeparator />
@@ -250,7 +251,7 @@ export function FolderNode({
             onCreateSubfolder={onCreateSubfolder}
             onCreateCommit={onCreateCommit}
             onCreateCancel={onCreateCancel}
-            onToggleGlobal={onToggleGlobal}
+            onToggleOrgShared={onToggleOrgShared}
           />
         ))}
     </div>

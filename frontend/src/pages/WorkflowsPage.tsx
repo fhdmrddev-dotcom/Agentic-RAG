@@ -110,7 +110,7 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
   // null = "All projects"; "__unbound__" = unbound; else a folder id.
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
   const [published, setPublished] = useState<PublishedWorkflow[]>([])
-  // Phase 143 (WF-01): the curated Starters shelf (is_global + category='starter').
+  // Phase 143 (WF-01): the curated Starters shelf (is_system_global + category='starter').
   const [starters, setStarters] = useState<PublishedWorkflow[]>([])
   const [drafts, setDrafts] = useState<WorkflowDraftRow[]>([])
   const [runFor, setRunFor] = useState<PublishedWorkflow | null>(null)
@@ -146,7 +146,7 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
     const projectArg = selectedProjectId && selectedProjectId !== UNBOUND ? selectedProjectId : null
     const seq = ++publishedSeqRef.current
     // Phase 143 (D-143-2a): the Workflows-page Published shelf is MINE-only — pass
-    // scope:"mine" so the curated Starters + the mig-061 dev scaffolds (both is_global)
+    // scope:"mine" so the curated Starters + the mig-061 dev scaffolds (both is_system_global)
     // stop double-rendering here; they live in the Starters shelf. Only THIS call site
     // opts in — the composer picker + WorkspacePanel keep the default global feed.
     const rows = await listPublishedWorkflows(projectArg, undefined, { scope: "mine" })
@@ -233,7 +233,7 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
   //    same-slug Tweak's v(N+1)) — required because UNIQUE(slug, version) is GLOBAL
   //    across all users, so two forkers of ONE shared starter can't both mint
   //    <slug> v(N+1). The server (createWorkflowDraft → POST /workflows) forces
-  //    is_global=false / status=draft / created_by=caller; the published starter row
+  //    is_system_global=false / status=draft / created_by=caller; the published starter row
   //    stays frozen. On a 409 slug/version collision (astronomically unlikely hash
   //    clash) retry once with a fresh hash (Pitfall 5). Lands in the Builder (D-143-1a). ──
   const onUseStarter = useCallback(

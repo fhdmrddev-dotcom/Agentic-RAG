@@ -77,7 +77,7 @@ function stageMessage(
     case "passed":
       return `Publish ready — eval passed ${passed}/${measured} on the current version (v${skillVersion}). Publishing is unlocked.`
     case "latest_failed":
-      return `The gate is holding — the latest eval on v${skillVersion} passed ${passed}/${measured}. All measured cases must pass before this skill can go global.`
+      return `The gate is holding — the latest eval on v${skillVersion} passed ${passed}/${measured}. All measured cases must pass before this skill can be shared with your org.`
     case "passed_on_older_version":
       // The subtlest state: a passing eval exists, but on OLDER instructions. Name the
       // stale version vs the live version so "re-run on the current version" is instant.

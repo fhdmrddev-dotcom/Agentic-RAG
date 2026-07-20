@@ -13,8 +13,9 @@ import { cn } from "@/lib/utils"
  *
  * The verified folder-tree debt is fixed HERE, while extracting:
  *  - a count slot renders on EVERY row (today only Root showed one) — D-114-8/13;
- *  - the bare uppercase `G` pill is wrapped in a tooltip ("Global — shared with
- *    everyone") so it is no longer opaque;
+ *  - the bare uppercase `G` pill is wrapped in a tooltip (the exact wording is
+ *    caller-supplied via `sharedLabel` — "Shared with org" for folders, built-in
+ *    wording for platform-seeded views/rules) so it is no longer opaque;
  *  - the action menu is keyboard/touch-reachable — faintly visible at rest
  *    (opacity-25) and fully revealed on hover OR focus-within, never `opacity-0`
  *    hover-only (which was invisible on touch);
@@ -40,8 +41,13 @@ export interface NavRowProps {
   count?: number
   /** Selected/active styling (bg-primary/10 vs hover:bg-accent/60). */
   isSelected?: boolean
-  /** Shows the tooltip-labeled global "G" pill. */
-  isGlobal?: boolean
+  /** Shows the tooltip-labeled shared "G" pill. Phase 165 (MIG-02): the row is
+   *  generic — the caller decides the semantic (an org-shared folder or a
+   *  platform-seeded view/rule) and supplies the pill's tooltip via `sharedLabel`. */
+  isShared?: boolean
+  /** Tooltip text for the "G" pill (D-165-07). Folders pass "Shared with org";
+   *  platform-seeded views/rules pass built-in wording. Defaults to "Shared". */
+  sharedLabel?: string
   /** Nesting depth (0 = top level). Drives the single soft indent guide + the
    *  ~3-level indent cap. */
   depth?: number
@@ -65,7 +71,8 @@ export function NavRow({
   name,
   count,
   isSelected = false,
-  isGlobal = false,
+  isShared = false,
+  sharedLabel = "Shared",
   depth = 0,
   leading,
   actions,
@@ -203,15 +210,16 @@ export function NavRow({
           </Tooltip>
         )}
 
-        {/* Global "G" pill — tooltip-labeled (no longer an opaque single letter) */}
-        {isGlobal && !isEditing && (
+        {/* Shared "G" pill — tooltip-labeled (no longer an opaque single letter).
+            Phase 165 (MIG-02): the tooltip wording is caller-supplied (sharedLabel). */}
+        {isShared && !isEditing && (
           <Tooltip>
             <TooltipTrigger asChild>
               <span className="shrink-0 text-[9px] font-medium uppercase tracking-wider text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full cursor-help">
                 G
               </span>
             </TooltipTrigger>
-            <TooltipContent>Global — shared with everyone</TooltipContent>
+            <TooltipContent>{sharedLabel}</TooltipContent>
           </Tooltip>
         )}
 
