@@ -119,6 +119,15 @@ None in this plan. **Migration application is deferred to the Wave-2 [BLOCKING] 
 - **Cloud parity owed** at the next operator-gated push: migrations 099→110 + this new 111 + `SECRETS_ENCRYPTION_KEY`, in order.
 - No blockers. Migration is atomic, re-paste-safe, and not yet applied (by design).
 
+## Self-Check: PASSED
+
+- `supabase/migrations/111_is_global_retirement_rename.sql` — FOUND
+- `.planning/phases/165-is-global-retirement-cleanup/165-01-SUMMARY.md` — FOUND
+- Commit `ba09c653` (Task 1) — FOUND
+- Commit `3737f603` (Task 2) — FOUND
+- Commit `0cd2886b` (metadata) — FOUND
+- STATE.md / ROADMAP.md — NOT modified by this executor (orchestrator owns those writes)
+
 ---
 *Phase: 165-is-global-retirement-cleanup*
 *Completed: 2026-07-21*
