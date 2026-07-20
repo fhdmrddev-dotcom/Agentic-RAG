@@ -13,7 +13,7 @@ Behaviors proven:
     base_url-less provider NEVER appears; OpenRouter and native deepseek/zhipu/
     moonshot/minimax are DISTINCT; N=1 is a valid clean result.
   - auto_seed_cases / fetch_owner_scoped_siblings: the owner-scoped
-    .or_(user_id.eq.{id}, is_global.eq.true) query is used and never returns a
+    .or_(user_id.eq.{id}, is_org_shared.eq.true) query is used and never returns a
     sibling outside that scope.
   - the Pydantic schemas are FLAT + single-typed (no Union/anyOf/oneOf).
 
@@ -455,8 +455,8 @@ def test_fetch_siblings_uses_owner_scoped_query():
     supa = _FakeSupabase(rows)
     out = fetch_owner_scoped_siblings(supa, user_id="user-123")
     # The query carried the EXACT owner-scoped .or_() filter + is_enabled gate.
-    assert supa.query.or_arg == "user_id.eq.user-123,is_global.eq.true", (
-        "siblings MUST be fetched with the owner-scoped .or_(user_id.eq.{id}, is_global.eq.true) query"
+    assert supa.query.or_arg == "user_id.eq.user-123,is_org_shared.eq.true", (
+        "siblings MUST be fetched with the owner-scoped .or_(user_id.eq.{id}, is_org_shared.eq.true) query"
     )
     assert supa.query.is_enabled_filter is True
     assert {r["id"] for r in out} == {"s1", "g1"}

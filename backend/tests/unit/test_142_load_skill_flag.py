@@ -87,7 +87,7 @@ def _skill_row(instructions="Build the deck."):
         "instructions": instructions,
         "user_id": TEST_USER_ID,
         "is_system": False,
-        "is_global": False,
+        "is_org_shared": False,
         "is_enabled": True,
     }
 

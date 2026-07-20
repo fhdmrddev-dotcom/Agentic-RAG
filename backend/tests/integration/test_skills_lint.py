@@ -35,7 +35,7 @@ def _skill_row(name="Helper", description=WEAK_DESC, skill_id=None):
         "description": description,
         "instructions": "do the thing",
         "is_enabled": True,
-        "is_global": False,
+        "is_org_shared": False,
         "created_at": NOW,
         "updated_at": NOW,
     }

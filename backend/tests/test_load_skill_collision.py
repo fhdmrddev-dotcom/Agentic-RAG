@@ -6,7 +6,7 @@ owned row (is_org_shared False) sorted ahead of the same-named org-shared/system
 and the agent executed the user's UNVETTED body. The fix reverses the tie-break to
 ``.order("is_system", desc=True).order("is_org_shared", desc=True)`` — precedence
 **system > org-shared > owned** — so the protected built-in always wins.
-(Phase 165 / D-165-01: skills.is_global RENAMED -> is_org_shared; is_system unchanged.)
+(Phase 165 / D-165-01: the skills share-flag column is now is_org_shared; is_system unchanged.)
 
 RED/GREEN CONTRACT — this test goes RED against the pre-fix tie-break and GREEN after it:
   * Against the OLD ``.order("is_org_shared")`` (ascending) the sort returns the owned row

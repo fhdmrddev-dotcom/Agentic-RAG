@@ -87,7 +87,7 @@ _SKIP_UNAPPLIED = (
 
 
 async def _seed_skill(conn, *, name="probe", description="d", instructions="i",
-                      is_global=False):
+                      is_org_shared=False):
     """Seed an auth.users + public.skills FK chain inside the caller's rolled-back tx.
 
     Returns (user_id, skill_id). The skill INSERT fires the capture trigger → a v1 row.
@@ -99,9 +99,9 @@ async def _seed_skill(conn, *, name="probe", description="d", instructions="i",
         uid, f"phase-132-{uid}@test.local",
     )
     await conn.execute(
-        "INSERT INTO public.skills (id, user_id, name, description, instructions, is_global) "
+        "INSERT INTO public.skills (id, user_id, name, description, instructions, is_org_shared) "
         "VALUES ($1, $2, $3, $4, $5, $6)",
-        sid, uid, name, description, instructions, is_global,
+        sid, uid, name, description, instructions, is_org_shared,
     )
     return uid, sid
 
@@ -160,7 +160,7 @@ async def test_content_change_captures_new_version(pg_pool):
 
 @pytest.mark.asyncio
 async def test_toggle_does_not_version(pg_pool):
-    """UPDATE only is_enabled (then is_global) → version count unchanged (D-02)."""
+    """UPDATE only is_enabled (then is_org_shared) → version count unchanged (D-02)."""
     async with pg_pool.acquire() as conn:
         if not await _skill_versions_applied(conn):
             pytest.skip(_SKIP_UNAPPLIED)
@@ -180,9 +180,9 @@ async def test_toggle_does_not_version(pg_pool):
             )
             assert await _count() == 1, "is_enabled toggle must NOT capture a version"
             await conn.execute(
-                "UPDATE public.skills SET is_global = NOT is_global WHERE id = $1", sid,
+                "UPDATE public.skills SET is_org_shared = NOT is_org_shared WHERE id = $1", sid,
             )
-            assert await _count() == 1, "is_global toggle must NOT capture a version"
+            assert await _count() == 1, "is_org_shared toggle must NOT capture a version"
         finally:
             await tx.rollback()
 
