@@ -311,6 +311,22 @@ CREATE POLICY "Users can read own skill files" ON storage.objects FOR SELECT TO 
     )
   );
 
+-- ================================================================================================
+-- §4 — Doc-string reconciliation (COMMENT ON TABLE — no functional/RLS effect)
+--   pg_dump emits the live table comment verbatim into full-schema.sql; the skill_versions comment
+--   still named the retired toggle column (is_global). RENAME COLUMN does NOT touch comment TEXT
+--   (like function bodies, §2), so it is reconciled explicitly here to is_org_shared so the
+--   regenerated full-schema carries zero bare is_global. Idempotent; value-equivalent doc-only edit.
+-- ================================================================================================
+COMMENT ON TABLE public.skill_versions IS
+  'Per-skill APPEND-ONLY version history (VER-01, D-01/D-03). One row captured per skill content save '
+  '(name/description/instructions) by the AFTER INSERT OR UPDATE trigger on public.skills; toggles '
+  '(is_enabled/is_org_shared) capture NO version (D-02). Immutable (BEFORE UPDATE block trigger, 23514) '
+  'but cascades on skill delete (D-03-R2). user_id sourced from NEW.user_id, NEVER auth.uid() (NULL '
+  'under service-role, T-132-03). RLS is owner-only defense-in-depth (D-12); the app-code owner filter '
+  'is the real runtime gate (service-role bypasses RLS). Distinct from the workflow-scoped '
+  'skill_snapshots table (D-04). Stable id is the Phase 133 FK target (D-10).';
+
 COMMIT;
 
 -- Closing note: 111 value-preservingly renames the six legacy global columns per the D-165-01 split

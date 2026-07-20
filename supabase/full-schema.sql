@@ -132,7 +132,7 @@ DECLARE
   next_num integer;
 BEGIN
   -- D-02: on UPDATE, capture a version ONLY when the content trifecta changes. A
-  -- toggle-only flip (is_enabled / is_global) MUST NOT version.
+  -- toggle-only flip (is_enabled / is_org_shared) MUST NOT version.
   IF TG_OP = 'UPDATE' THEN
     IF NOT (
          NEW.name         IS DISTINCT FROM OLD.name
@@ -218,25 +218,25 @@ $$;
 
 
 --
--- Name: folder_is_globally_visible(uuid); Type: FUNCTION; Schema: public; Owner: -
+-- Name: folder_is_org_shared(uuid); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.folder_is_globally_visible(p_folder_id uuid) RETURNS boolean
+CREATE FUNCTION public.folder_is_org_shared(p_folder_id uuid) RETURNS boolean
     LANGUAGE sql STABLE SECURITY DEFINER
     SET search_path TO ''
     AS $$
   WITH RECURSIVE ancestors AS (
-    SELECT id, parent_id, is_global
+    SELECT id, parent_id, is_org_shared
     FROM public.folders
     WHERE id = p_folder_id
 
     UNION ALL
 
-    SELECT f.id, f.parent_id, f.is_global
+    SELECT f.id, f.parent_id, f.is_org_shared
     FROM public.folders f
     INNER JOIN ancestors a ON f.id = a.parent_id
   )
-  SELECT COALESCE(bool_or(is_global), false) FROM ancestors;
+  SELECT COALESCE(bool_or(is_org_shared), false) FROM ancestors;
 $$;
 
 
@@ -296,7 +296,7 @@ BEGIN
   WHERE dc.org_id = ANY (SELECT public.current_user_org_ids())          -- D-164-01 org gate (indexed, mig 107)
     AND (                                                               -- PRAG-01 within-org visibility
       dc.user_id = auth.uid()                                          --   owner (session-derived, NOT match_user_id)
-      OR (d.folder_id IS NOT NULL AND public.folder_is_globally_visible(d.folder_id))
+      OR (d.folder_id IS NOT NULL AND public.folder_is_org_shared(d.folder_id))
     )
     AND dc.search_vector @@ tsq
     AND d.is_latest = true
@@ -325,7 +325,7 @@ BEGIN
   WHERE dc.org_id = ANY (SELECT public.current_user_org_ids())          -- D-164-01 org gate (indexed, mig 107)
     AND (                                                               -- PRAG-01 within-org visibility
       dc.user_id = auth.uid()                                          --   owner (session-derived, NOT match_user_id)
-      OR (d.folder_id IS NOT NULL AND public.folder_is_globally_visible(d.folder_id))
+      OR (d.folder_id IS NOT NULL AND public.folder_is_org_shared(d.folder_id))
     )
     AND 1 - (dc.embedding OPERATOR(public.<=>) query_embedding) > match_threshold
     AND d.is_latest = true
@@ -355,11 +355,11 @@ BEGIN
   LEFT JOIN public.skill_embeddings se
          ON se.skill_id = s.id
         AND (p_embedding_model IS NULL OR se.embedding_model = p_embedding_model)  -- D-10 stale-model filter
-  -- FIX-A (mig 109:70-73): is_system = true is a UNIVERSAL escape OUTSIDE the org gate; the
-  -- owner OR user-is_global branch stays INSIDE the org gate (owner keys on auth.uid()).
+  -- FIX-A (mig 109): is_system = true is a UNIVERSAL escape OUTSIDE the org gate; the
+  -- owner OR user-is_org_shared branch stays INSIDE the org gate (owner keys on auth.uid()).
   WHERE ( (s.is_system = true)
           OR (s.org_id = ANY (SELECT public.current_user_org_ids())
-              AND (s.user_id = auth.uid() OR s.is_global = true)) )
+              AND (s.user_id = auth.uid() OR s.is_org_shared = true)) )
     AND s.is_enabled = true
   ORDER BY similarity DESC NULLS LAST, s.name;   -- NULL sim (no vector) = fail-open, ranked last-but-kept
 END;
@@ -538,15 +538,15 @@ CREATE FUNCTION public.workflow_definitions_block_published_update() RETURNS tri
     AS $$
 BEGIN
   IF OLD.status = 'published' AND (
-        NEW.slug        IS DISTINCT FROM OLD.slug
-     OR NEW.version     IS DISTINCT FROM OLD.version
-     OR NEW.name        IS DISTINCT FROM OLD.name
-     OR NEW.description  IS DISTINCT FROM OLD.description
-     OR NEW.status      IS DISTINCT FROM OLD.status
-     OR NEW.definition  IS DISTINCT FROM OLD.definition
-     OR NEW.created_by  IS DISTINCT FROM OLD.created_by
-     OR NEW.is_global   IS DISTINCT FROM OLD.is_global
-     OR NEW.org_id      IS DISTINCT FROM OLD.org_id
+        NEW.slug             IS DISTINCT FROM OLD.slug
+     OR NEW.version          IS DISTINCT FROM OLD.version
+     OR NEW.name             IS DISTINCT FROM OLD.name
+     OR NEW.description       IS DISTINCT FROM OLD.description
+     OR NEW.status           IS DISTINCT FROM OLD.status
+     OR NEW.definition       IS DISTINCT FROM OLD.definition
+     OR NEW.created_by       IS DISTINCT FROM OLD.created_by
+     OR NEW.is_system_global IS DISTINCT FROM OLD.is_system_global
+     OR NEW.org_id           IS DISTINCT FROM OLD.org_id
   ) THEN
     RAISE EXCEPTION
       'workflow_definitions row % is published and immutable; create a new version instead',
@@ -698,7 +698,7 @@ CREATE TABLE public.classification_rules (
     name text NOT NULL,
     match_expr jsonb NOT NULL,
     suggest_folder_id uuid,
-    is_global boolean DEFAULT false NOT NULL,
+    is_system_global boolean DEFAULT false NOT NULL,
     enabled boolean DEFAULT true NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL
 );
@@ -877,7 +877,7 @@ CREATE TABLE public.document_views (
     name text NOT NULL,
     filter_expr jsonb DEFAULT '{}'::jsonb NOT NULL,
     folder_scope uuid,
-    is_global boolean DEFAULT false NOT NULL,
+    is_system_global boolean DEFAULT false NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
@@ -1094,7 +1094,7 @@ CREATE TABLE public.folders (
     user_id uuid NOT NULL,
     name text NOT NULL,
     parent_id uuid,
-    is_global boolean DEFAULT false NOT NULL,
+    is_org_shared boolean DEFAULT false NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     org_id uuid NOT NULL
@@ -1207,11 +1207,11 @@ CREATE TABLE public.metadata_field_definitions (
     field_key text NOT NULL,
     field_type text DEFAULT 'string'::text NOT NULL,
     description text,
-    is_global boolean DEFAULT false NOT NULL,
+    is_system_global boolean DEFAULT false NOT NULL,
     enabled boolean DEFAULT true NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     options jsonb,
-    CONSTRAINT mfd_reachable CHECK (((user_id IS NOT NULL) OR (is_global = true)))
+    CONSTRAINT mfd_reachable CHECK (((user_id IS NOT NULL) OR (is_system_global = true)))
 );
 
 
@@ -1691,7 +1691,7 @@ CREATE TABLE public.skill_versions (
 -- Name: TABLE skill_versions; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON TABLE public.skill_versions IS 'Per-skill APPEND-ONLY version history (VER-01, D-01/D-03). One row captured per skill content save (name/description/instructions) by the AFTER INSERT OR UPDATE trigger on public.skills — toggles (is_enabled/is_global) capture NO version (D-02). Immutable (BEFORE UPDATE block trigger, 23514) but cascades on skill delete (D-03-R2). user_id sourced from NEW.user_id, NEVER auth.uid() (NULL under service-role, T-132-03). RLS is owner-only defense-in-depth (D-12); the app-code owner filter is the real runtime gate (service-role bypasses RLS). Distinct from the workflow-scoped skill_snapshots table (D-04). Stable id is the Phase 133 FK target (D-10).';
+COMMENT ON TABLE public.skill_versions IS 'Per-skill APPEND-ONLY version history (VER-01, D-01/D-03). One row captured per skill content save (name/description/instructions) by the AFTER INSERT OR UPDATE trigger on public.skills; toggles (is_enabled/is_org_shared) capture NO version (D-02). Immutable (BEFORE UPDATE block trigger, 23514) but cascades on skill delete (D-03-R2). user_id sourced from NEW.user_id, NEVER auth.uid() (NULL under service-role, T-132-03). RLS is owner-only defense-in-depth (D-12); the app-code owner filter is the real runtime gate (service-role bypasses RLS). Distinct from the workflow-scoped skill_snapshots table (D-04). Stable id is the Phase 133 FK target (D-10).';
 
 
 --
@@ -1712,7 +1712,7 @@ CREATE TABLE public.skills (
     description text DEFAULT ''::text NOT NULL,
     instructions text DEFAULT ''::text NOT NULL,
     is_enabled boolean DEFAULT true NOT NULL,
-    is_global boolean DEFAULT false NOT NULL,
+    is_org_shared boolean DEFAULT false NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     is_system boolean DEFAULT false NOT NULL,
@@ -1887,7 +1887,7 @@ CREATE TABLE public.workflow_definitions (
     status text DEFAULT 'draft'::text NOT NULL,
     definition jsonb DEFAULT '{}'::jsonb NOT NULL,
     created_by uuid NOT NULL,
-    is_global boolean DEFAULT false NOT NULL,
+    is_system_global boolean DEFAULT false NOT NULL,
     org_id uuid NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
@@ -4520,7 +4520,7 @@ CREATE POLICY "Users can insert own audit entries" ON public.audit_log FOR INSER
 -- Name: classification_rules Users can insert own classification_rules; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can insert own classification_rules" ON public.classification_rules FOR INSERT TO authenticated WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id) AND (is_global = false)));
+CREATE POLICY "Users can insert own classification_rules" ON public.classification_rules FOR INSERT TO authenticated WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id) AND (is_system_global = false)));
 
 
 --
@@ -4534,7 +4534,7 @@ CREATE POLICY "Users can insert own document_relationships" ON public.document_r
 -- Name: document_views Users can insert own document_views; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can insert own document_views" ON public.document_views FOR INSERT TO authenticated WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id) AND (is_global = false)));
+CREATE POLICY "Users can insert own document_views" ON public.document_views FOR INSERT TO authenticated WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id) AND (is_system_global = false)));
 
 
 --
@@ -4576,7 +4576,7 @@ CREATE POLICY "Users can insert own memory" ON public.user_memory FOR INSERT TO 
 -- Name: metadata_field_definitions Users can insert own metadata_field_definitions; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can insert own metadata_field_definitions" ON public.metadata_field_definitions FOR INSERT TO authenticated WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id) AND (is_global = false)));
+CREATE POLICY "Users can insert own metadata_field_definitions" ON public.metadata_field_definitions FOR INSERT TO authenticated WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id) AND (is_system_global = false)));
 
 
 --
@@ -4611,7 +4611,7 @@ CREATE POLICY "Users can insert own skills" ON public.skills FOR INSERT TO authe
 -- Name: workflow_definitions Users can insert own workflow definitions; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can insert own workflow definitions" ON public.workflow_definitions FOR INSERT TO authenticated WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = created_by) AND (is_global = false)));
+CREATE POLICY "Users can insert own workflow definitions" ON public.workflow_definitions FOR INSERT TO authenticated WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = created_by) AND (is_system_global = false)));
 
 
 --
@@ -4681,7 +4681,7 @@ CREATE POLICY "Users can select own memory" ON public.user_memory FOR SELECT TO 
 -- Name: classification_rules Users can update own classification_rules; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can update own classification_rules" ON public.classification_rules FOR UPDATE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id))) WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id) AND (is_global = false)));
+CREATE POLICY "Users can update own classification_rules" ON public.classification_rules FOR UPDATE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id))) WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id) AND (is_system_global = false)));
 
 
 --
@@ -4695,7 +4695,7 @@ CREATE POLICY "Users can update own document_relationships" ON public.document_r
 -- Name: document_views Users can update own document_views; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can update own document_views" ON public.document_views FOR UPDATE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id))) WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id) AND (is_global = false)));
+CREATE POLICY "Users can update own document_views" ON public.document_views FOR UPDATE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id))) WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id) AND (is_system_global = false)));
 
 
 --
@@ -4716,7 +4716,7 @@ CREATE POLICY "Users can update own memory" ON public.user_memory FOR UPDATE TO 
 -- Name: metadata_field_definitions Users can update own metadata_field_definitions; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can update own metadata_field_definitions" ON public.metadata_field_definitions FOR UPDATE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id))) WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id) AND (is_global = false)));
+CREATE POLICY "Users can update own metadata_field_definitions" ON public.metadata_field_definitions FOR UPDATE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id))) WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id) AND (is_system_global = false)));
 
 
 --
@@ -4737,7 +4737,7 @@ CREATE POLICY "Users can update own skills" ON public.skills FOR UPDATE TO authe
 -- Name: workflow_definitions Users can update own workflow definitions; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can update own workflow definitions" ON public.workflow_definitions FOR UPDATE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = created_by))) WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = created_by) AND (is_global = false)));
+CREATE POLICY "Users can update own workflow definitions" ON public.workflow_definitions FOR UPDATE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = created_by))) WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = created_by) AND (is_system_global = false)));
 
 
 --
@@ -4783,49 +4783,49 @@ CREATE POLICY "Users can view files on own or global skills" ON public.skill_fil
    FROM public.skills
   WHERE ((skills.id = skill_files.skill_id) AND (skills.is_system = true)))) OR ((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND ((auth.uid() = user_id) OR (EXISTS ( SELECT 1
    FROM public.skills
-  WHERE ((skills.id = skill_files.skill_id) AND (skills.is_global = true))))))));
+  WHERE ((skills.id = skill_files.skill_id) AND (skills.is_org_shared = true))))))));
 
 
 --
 -- Name: classification_rules Users can view own and global classification_rules; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can view own and global classification_rules" ON public.classification_rules FOR SELECT TO authenticated USING (((is_global = true) OR ((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id))));
+CREATE POLICY "Users can view own and global classification_rules" ON public.classification_rules FOR SELECT TO authenticated USING (((is_system_global = true) OR ((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id))));
 
 
 --
 -- Name: document_views Users can view own and global document_views; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can view own and global document_views" ON public.document_views FOR SELECT TO authenticated USING (((is_global = true) OR ((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id))));
+CREATE POLICY "Users can view own and global document_views" ON public.document_views FOR SELECT TO authenticated USING (((is_system_global = true) OR ((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id))));
 
 
 --
 -- Name: folders Users can view own and global folders; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can view own and global folders" ON public.folders FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND ((auth.uid() = user_id) OR public.folder_is_globally_visible(id))));
+CREATE POLICY "Users can view own and global folders" ON public.folders FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND ((auth.uid() = user_id) OR public.folder_is_org_shared(id))));
 
 
 --
 -- Name: metadata_field_definitions Users can view own and global metadata_field_definitions; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can view own and global metadata_field_definitions" ON public.metadata_field_definitions FOR SELECT TO authenticated USING (((is_global = true) OR ((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id))));
+CREATE POLICY "Users can view own and global metadata_field_definitions" ON public.metadata_field_definitions FOR SELECT TO authenticated USING (((is_system_global = true) OR ((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id))));
 
 
 --
 -- Name: skills Users can view own and global skills; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can view own and global skills" ON public.skills FOR SELECT TO authenticated USING (((is_system = true) OR ((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND ((auth.uid() = user_id) OR (is_global = true)))));
+CREATE POLICY "Users can view own and global skills" ON public.skills FOR SELECT TO authenticated USING (((is_system = true) OR ((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND ((auth.uid() = user_id) OR (is_org_shared = true)))));
 
 
 --
 -- Name: workflow_definitions Users can view own and global workflow definitions; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can view own and global workflow definitions" ON public.workflow_definitions FOR SELECT TO authenticated USING (((is_global = true) OR ((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = created_by))));
+CREATE POLICY "Users can view own and global workflow definitions" ON public.workflow_definitions FOR SELECT TO authenticated USING (((is_system_global = true) OR ((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = created_by))));
 
 
 --
@@ -4874,7 +4874,7 @@ CREATE POLICY "Users can view own harness audit" ON public.harness_audit FOR SEL
 -- Name: documents Users can view own or global-folder documents; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can view own or global-folder documents" ON public.documents FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND ((auth.uid() = user_id) OR ((folder_id IS NOT NULL) AND public.folder_is_globally_visible(folder_id)))));
+CREATE POLICY "Users can view own or global-folder documents" ON public.documents FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND ((auth.uid() = user_id) OR ((folder_id IS NOT NULL) AND public.folder_is_org_shared(folder_id)))));
 
 
 --
@@ -4925,7 +4925,7 @@ CREATE POLICY "Users can view own skill versions" ON public.skill_versions FOR S
 
 CREATE POLICY "Users can view their own chunks" ON public.document_chunks FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND ((auth.uid() = user_id) OR (EXISTS ( SELECT 1
    FROM public.documents d
-  WHERE ((d.id = document_chunks.document_id) AND (d.folder_id IS NOT NULL) AND public.folder_is_globally_visible(d.folder_id)))))));
+  WHERE ((d.id = document_chunks.document_id) AND (d.folder_id IS NOT NULL) AND public.folder_is_org_shared(d.folder_id)))))));
 
 
 --
@@ -4957,7 +4957,7 @@ CREATE POLICY "Users can view tuner runs on own or global skills" ON public.tune
    FROM public.skills
   WHERE ((skills.id = tuner_runs.skill_id) AND (skills.is_system = true)))) OR ((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND ((auth.uid() = user_id) OR (EXISTS ( SELECT 1
    FROM public.skills
-  WHERE ((skills.id = tuner_runs.skill_id) AND (skills.is_global = true))))))));
+  WHERE ((skills.id = tuner_runs.skill_id) AND (skills.is_org_shared = true))))))));
 
 
 --
@@ -5651,7 +5651,8 @@ CREATE POLICY workspace_versions_select_own ON public.workspace_file_versions FO
 -- MAINTENANCE: when a NEW migration adds a storage bucket, an auth.users
 -- trigger, or a realtime table, mirror it here (idempotently). Sources:
 --   storage  -> migrations 017 (skill-files), 029 (documents, sandbox-outputs),
---               054 (workspace-files)
+--               054 (workspace-files), 111 (skill-files read policy: legacy
+--               global flag retired -> s.is_system OR s.is_org_shared, D-165-01)
 --   auth     -> migration 001 (on_auth_user_created)
 --   realtime -> migrations 002 (documents), 014 (folders), 032 (messages)
 -- ============================================================
@@ -5707,7 +5708,9 @@ DROP POLICY IF EXISTS "Users can delete own sandbox outputs" ON storage.objects;
 CREATE POLICY "Users can delete own sandbox outputs" ON storage.objects FOR DELETE TO authenticated
   USING (bucket_id = 'sandbox-outputs' AND (storage.foldername(name))[1] = (select auth.uid()::text));
 
--- skill-files policies (read allows owner OR files belonging to a global skill)
+-- skill-files policies (read allows owner OR files belonging to a system built-in
+-- or an org-shared skill — mig 111 D-165-01 semantic split: legacy global flag retired,
+-- reconciled to the mig-109 skill_files table-RLS shape s.is_system OR s.is_org_shared)
 DROP POLICY IF EXISTS "Users can read own skill files" ON storage.objects;
 CREATE POLICY "Users can read own skill files" ON storage.objects FOR SELECT TO authenticated
   USING (
@@ -5717,7 +5720,7 @@ CREATE POLICY "Users can read own skill files" ON storage.objects FOR SELECT TO 
       OR EXISTS (
         SELECT 1 FROM public.skill_files sf
         JOIN public.skills s ON s.id = sf.skill_id
-        WHERE sf.file_path = name AND s.is_global = true
+        WHERE sf.file_path = name AND (s.is_system = true OR s.is_org_shared = true)
       )
     )
   );
