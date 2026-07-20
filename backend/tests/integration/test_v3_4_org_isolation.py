@@ -262,9 +262,14 @@ async def test_definer_ignores_spoofed_match_user_id(pg_pool, two_orgs_chunks_an
             "SELECT id FROM public.match_document_chunks($1::public.vector, $2, 50, 0.0)",
             _unit_vec_literal(), a["uid"],  # spoofed match_user_id = A
         )
-        assert len(rows) == 0, (
+        # The property is "0 of A's cross-org chunks" — NOT "0 rows total": post-164 B
+        # legitimately retrieves its OWN matching chunk (same unit embedding), because the
+        # in-body gate keys on auth.uid()=B (mirrors the test_prag01_retrieval_isolation +
+        # match_skills assertion style — a specific-A-chunk-absence check, not a raw count).
+        leaked = {str(r["id"]) for r in rows} & {a["private_chunk_id"], a["shared_chunk_id"]}
+        assert not leaked, (
             "cross-org leak: DEFINER trusted the spoofed match_user_id — user B retrieved "
-            f"user A's chunk(s) {[str(r['id']) for r in rows]} (their orgs are disjoint). "
+            f"user A's chunk(s) {leaked} (their orgs are disjoint). "
             "RED pre-164; migration 110's in-body org gate (keyed on auth.uid()=B) turns it GREEN."
         )
 
@@ -381,19 +386,24 @@ async def test_definer_zero_cross_org(pg_pool, two_orgs_chunks_and_shared_folder
                 "SELECT id FROM public.match_document_chunks($1::public.vector, $2, 50, 0.0)",
                 _unit_vec_literal(), a["uid"],
             )
-            assert len(rows) == 0, (
-                f"cross-org leak via {fn_name}: user B retrieved {len(rows)} of user A's chunks "
-                "with a spoofed match_user_id."
+            # A's-chunk-absence, NOT a raw count: post-164 B's OWN matching chunk may
+            # legitimately appear (org gate keys on auth.uid()=B). Only A's disjoint-org
+            # chunks must be absent (same style as the match_skills leg below).
+            leaked = {str(r["id"]) for r in rows} & {a["private_chunk_id"], a["shared_chunk_id"]}
+            assert not leaked, (
+                f"cross-org leak via {fn_name}: user B retrieved user A's chunk(s) {leaked} "
+                "with a spoofed match_user_id (B's OWN matching chunk may legitimately appear)."
             )
         elif fn_name == "keyword_search_chunks":
             rows = await conn.fetch(
                 "SELECT id FROM public.keyword_search_chunks($1, $2, 50, NULL, NULL)",
                 "secret", a["uid"],
             )
-            assert len(rows) == 0, (
-                f"cross-org leak via {fn_name}: user B got {len(rows)} of user A's keyword hits "
-                "with a spoofed match_user_id (pre-164 the body returns only rows where "
-                "user_id = the param)."
+            leaked = {str(r["id"]) for r in rows} & {a["private_chunk_id"], a["shared_chunk_id"]}
+            assert not leaked, (
+                f"cross-org leak via {fn_name}: user B got user A's keyword hit(s) {leaked} "
+                "with a spoofed match_user_id (B's OWN 'secret' chunk may legitimately appear; "
+                "pre-164 the body returned only rows where user_id = the param)."
             )
         elif fn_name == "match_skills":
             rows = await conn.fetch(
