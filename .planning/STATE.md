@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.4
 milestone_name: Multi-Tenancy & Org Access
 status: executing
-last_updated: "2026-07-19T19:03:01.389Z"
-last_activity: 2026-07-19
+last_updated: "2026-07-20T00:00:00.000Z"
+last_activity: 2026-07-20 -- Phase 163 all 11 plans complete (163-11 FIX-A closed out); secure/verify next
 progress:
   total_phases: 28
   completed_phases: 4
-  total_plans: 20
-  completed_plans: 19
+  total_plans: 21
+  completed_plans: 21
   percent: 14
 ---
 
@@ -40,13 +40,13 @@ Items acknowledged and deferred at milestone close on 2026-07-18 (44 open `audit
 
 ## Current Position
 
-Phase: 163 (rls-rewrite-per-request-user-jwt-client-swap-the-atomic-crux) — EXECUTING
-Plan: 9 of 10
-Status: Ready to execute
-Next action: Continue Phase 163 execution — Plan 163-09 next (widen the eval-runner / harness / re-embed ASYNC WRITERS to org-aware service-role via get_service_role_supabase(org_id), D-05). Migrations 107+108 applied + inert (163-05); the Wave-4 request-scoped client swap is done across chat/docs (06/07) + skills/eval-reads (08); the schema-forced service-role carve-outs (eval writes, workflow cluster, audit_log reads, app-level settings) are classified. TEN-01/TEN-02/TEN-04 stay Pending until 163-09 (async writers) + the [BLOCKING] 163-10 CONCUR-01 <1s benchmark + operator-run D-08 live two-user leak + SC#10 4-axis UAT.
-Last activity: 2026-07-19
+Phase: 163 (rls-rewrite-per-request-user-jwt-client-swap-the-atomic-crux) — ALL 11 PLANS COMPLETE
+Plan: 11 of 11
+Status: Phase 163 code complete — bookkeeping close-out remaining (secure + verify)
+Next action: (1) `/gsd:secure-phase 163` — re-run to register T-163-11 (the is_system badge-spoof WITH-CHECK added by mig 109 AFTER the prior SECURED run at `ae25a358`); (2) `/gsd:verify-work 163` — re-confirm Test 7 now passes and flip `163-UAT.md` (status: diagnosed → pass). THEN Phase 163 is closeable and Phase 164 (SECDEF Audit + Cross-Org Isolation Suite) is unblocked. 163-11 FIX-A (mig 109 platform-universal RLS fix + T-163-11 badge-spoof hardening) closed out 2026-07-20: all 9 policies verified live @ :54322, test_163_rls_platform_universal 8/8 GREEN, full test_163_* + CONCUR-01 35/35 GREEN, Deep red-line HELD (empty diff on agent_loop/run_producer/provider_gateway).
+Last activity: 2026-07-20 -- Phase 163 all 11 plans complete (163-11 FIX-A closed out)
 
-Progress: [██████████] 95%
+Progress: [██████████] 100% (11/11 plans; phase close-out pending secure + verify)
 
 ### Quick Tasks Completed
 
