@@ -126,6 +126,12 @@ None — no external service configuration. NOTE (from the plan's W1 dev-server 
 - **Plan 165-10 (migration 111):** applies the DB rename so the live wire matches this frontend contract; until then dev-server reads are expected to break (W1).
 - **Plan 165-11 (SC#4):** unaffected by this plan.
 
+## Self-Check: PASSED
+
+- Files: `165-08-SUMMARY.md` FOUND, `deferred-items.md` FOUND
+- Commits: `7dea74fa` FOUND, `82d7e77e` FOUND, `527598cb` FOUND
+- Static gate: all 22 edited app files type-clean (`tsc -b`); 0 non-test errors reference the rename
+
 ---
 *Phase: 165-is-global-retirement-cleanup*
 *Completed: 2026-07-20*
