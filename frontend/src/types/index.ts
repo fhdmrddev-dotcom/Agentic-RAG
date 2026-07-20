@@ -245,7 +245,9 @@ export interface MetadataFieldDef {
   field_type: "string" | "date" | "number" | "boolean" | "enum"
   description?: string | null
   options?: string[] | null
-  is_global: boolean
+  /** Phase 165 (MIG-02): is_global→is_system_global — DISPLAY-ONLY platform-seed
+   *  badge (write-locked server-side; users cannot set it). */
+  is_system_global: boolean
   enabled: boolean
 }
 
@@ -308,15 +310,17 @@ export interface ViewFilter {
 export const EMPTY_FILTER: ViewFilter = { op: "and", conditions: [] }
 
 /** A saved view (mirrors the backend `ViewResponse`). Selecting one loads its
- *  `filter_expr` back into the same filter bar (D-114-1); seeded global views
- *  carry `is_global` (the tooltip-labeled `G` pill in the Views sidebar). */
+ *  `filter_expr` back into the same filter bar (D-114-1); seeded platform views
+ *  carry `is_system_global` (the tooltip-labeled `G` pill in the Views sidebar). */
 export interface SavedView {
   id: string
   user_id?: string | null
   name: string
   filter_expr: ViewFilter
   folder_scope?: string | null
-  is_global: boolean
+  /** Phase 165 (MIG-02): is_global→is_system_global — DISPLAY-ONLY platform-seed
+   *  badge (write-locked server-side; the create body never supplies it). */
+  is_system_global: boolean
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -396,8 +400,8 @@ export interface Relationship {
 //   - `ClassificationRule` mirrors the rule CRUD response (`RuleResponse`,
 //     models/classification_rule.py) — a `SavedView` clone with `filter_expr`
 //     renamed to `match_expr` plus `suggest_folder_id`/`enabled`. The backend
-//     OWNS the `is_global` scope (hard-set false on create); the create body
-//     NEVER supplies it (mirrors `createView`).
+//     OWNS the `is_system_global` scope (hard-set false on create); the create
+//     body NEVER supplies it (mirrors `createView`).
 //   - `ClassificationSuggestion` mirrors the on-upload `_classification` object
 //     the ingest rule-eval pass stamps onto a doc's metadata (D-118-5) — the
 //     matched rule's provenance, the suggested folder (resolved fresh; nullable
@@ -415,15 +419,17 @@ export interface Relationship {
  *  `match_expr` (the SAME `ViewFilter` AST, evaluated in-Python at upload by the
  *  net-new matcher), plus `suggest_folder_id` (the folder a match suggests; the
  *  FK is `ON DELETE SET NULL` so it may be null) and `enabled` (the toggle rides
- *  the UPDATE path — no separate endpoint). `is_global` is server-owned; the
- *  create body never supplies it (the server hard-sets it false). */
+ *  the UPDATE path — no separate endpoint). `is_system_global` is server-owned;
+ *  the create body never supplies it (the server hard-sets it false). */
 export interface ClassificationRule {
   id: string
   user_id?: string | null
   name: string
   match_expr: ViewFilter
   suggest_folder_id: string | null
-  is_global: boolean
+  /** Phase 165 (MIG-02): is_global→is_system_global — DISPLAY-ONLY platform-seed
+   *  badge (write-locked server-side; the create body never supplies it). */
+  is_system_global: boolean
   enabled: boolean
 }
 
@@ -451,7 +457,9 @@ export interface Folder {
   user_id: string
   name: string
   parent_id: string | null
-  is_global: boolean
+  /** Phase 165 (MIG-02): is_global→is_org_shared — FUNCTIONAL org-share toggle
+   *  (the "Shared with org" control; D-165-07 relabel-not-unshare). */
+  is_org_shared: boolean
   created_at: string
   updated_at: string
 }
@@ -497,8 +505,10 @@ export interface Skill {
   description: string
   instructions: string
   is_enabled: boolean
-  is_global: boolean
-  is_system: boolean // Phase 137.2 / CREATE-01 — "Built-in" pill (output-only; the client reads it, never sends it)
+  /** Phase 165 (MIG-02): is_global→is_org_shared — FUNCTIONAL org-share toggle
+   *  (the "Shared with org" control; D-165-07 relabel-not-unshare). */
+  is_org_shared: boolean
+  is_system: boolean // Phase 137.2 / CREATE-01 — "Built-in" pill (output-only; the client reads it, never sends it). D-165-02: NOT renamed — is_system stays the physical allow-list marker.
   created_at: string
   updated_at: string
   /** Phase 123-06 (TRIG-03) — the optional save-time lint warnings the
@@ -515,7 +525,8 @@ export interface SkillCreate {
   name: string
   description?: string
   instructions?: string
-  is_global?: boolean
+  /** Phase 165 (MIG-02): is_global→is_org_shared — FUNCTIONAL org-share toggle. */
+  is_org_shared?: boolean
 }
 
 export interface SkillUpdate {

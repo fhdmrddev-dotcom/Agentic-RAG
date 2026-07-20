@@ -5,16 +5,16 @@ import {
   createFolder as apiCreateFolder,
   renameFolder as apiRenameFolder,
   deleteFolder as apiDeleteFolder,
-  toggleFolderGlobal as apiToggleFolderGlobal,
+  toggleFolderOrgShared as apiToggleFolderOrgShared,
 } from "@/lib/api"
 import type { Folder } from "@/types"
 
 interface UseFolders {
   folders: Folder[]
-  createFolder: (name: string, parentId: string | null, isGlobal?: boolean) => Promise<Folder>
+  createFolder: (name: string, parentId: string | null, isOrgShared?: boolean) => Promise<Folder>
   renameFolder: (id: string, name: string) => Promise<void>
   deleteFolder: (id: string) => Promise<void>
-  toggleGlobal: (id: string) => Promise<void>
+  toggleOrgShared: (id: string) => Promise<void>
 }
 
 export function useFolders(): UseFolders {
@@ -80,8 +80,8 @@ export function useFolders(): UseFolders {
   }, [loadFolders])
 
   const createFolder = useCallback(
-    async (name: string, parentId: string | null, isGlobal = false): Promise<Folder> => {
-      const folder = await apiCreateFolder(name, parentId, isGlobal)
+    async (name: string, parentId: string | null, isOrgShared = false): Promise<Folder> => {
+      const folder = await apiCreateFolder(name, parentId, isOrgShared)
       // Optimistic add; Realtime INSERT will reconcile
       setFolders((prev) => {
         if (prev.some((f) => f.id === folder.id)) return prev
@@ -104,10 +104,12 @@ export function useFolders(): UseFolders {
     setFolders((prev) => prev.filter((f) => f.id !== id))
   }, [])
 
-  const toggleGlobal = useCallback(async (id: string): Promise<void> => {
-    const updated = await apiToggleFolderGlobal(id)
-    setFolders((prev) => prev.map((f) => (f.id === id ? { ...f, is_global: updated.is_global } : f)))
+  const toggleOrgShared = useCallback(async (id: string): Promise<void> => {
+    const updated = await apiToggleFolderOrgShared(id)
+    setFolders((prev) =>
+      prev.map((f) => (f.id === id ? { ...f, is_org_shared: updated.is_org_shared } : f)),
+    )
   }, [])
 
-  return { folders, createFolder, renameFolder, deleteFolder, toggleGlobal }
+  return { folders, createFolder, renameFolder, deleteFolder, toggleOrgShared }
 }

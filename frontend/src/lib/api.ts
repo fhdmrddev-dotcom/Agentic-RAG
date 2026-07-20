@@ -1282,7 +1282,7 @@ export async function listPublishedWorkflows(
   signal?: AbortSignal,
   /** Phase 143 (WF-01 / D-143-2b): the Workflows-page Published shelf opts into
    *  `scope: "mine"` so the backend AND-narrows to `created_by = me` (dropping the
-   *  bare `is_global`), de-duping the curated Starters + the mig-061 dev scaffolds
+   *  bare `is_system_global`), de-duping the curated Starters + the mig-061 dev scaffolds
    *  that now render in their own Starters shelf. EVERY other caller (the composer
    *  Harness picker, the WorkspacePanel run-soul recovery) OMITS it and keeps the
    *  byte-identical global-OR-mine feed those surfaces depend on (Pitfall 3). */
@@ -1303,7 +1303,7 @@ export async function listPublishedWorkflows(
 }
 
 /** Phase 143 (WF-01 / D-143-2) — GET /workflows/starters. The curated Starters-shelf
- *  feed: `is_global` published definitions carrying `definition.category = 'starter'`
+ *  feed: `is_system_global` published definitions carrying `definition.category = 'starter'`
  *  (a server-side JSONB-path predicate, `list_starter_workflows`). No project/user
  *  scope — curated globals are world-readable by the mig-056 SELECT policy, so this
  *  is a clone of listPublishedWorkflows with NO query params. The Workflows page
@@ -1576,12 +1576,13 @@ export async function listFolders(): Promise<Folder[]> {
   return res.json() as Promise<Folder[]>
 }
 
-export async function createFolder(name: string, parentId: string | null, isGlobal = false): Promise<Folder> {
+export async function createFolder(name: string, parentId: string | null, isOrgShared = false): Promise<Folder> {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_BASE}/folders`, {
     method: "POST",
     headers,
-    body: JSON.stringify({ name, parent_id: parentId, is_global: isGlobal }),
+    // Phase 165 (MIG-02): the wire field is is_org_shared (folders = FUNCTIONAL org-share).
+    body: JSON.stringify({ name, parent_id: parentId, is_org_shared: isOrgShared }),
   })
   if (!res.ok) throw new Error("Failed to create folder")
   return res.json() as Promise<Folder>
@@ -1607,15 +1608,15 @@ export async function deleteFolder(id: string): Promise<void> {
   if (!res.ok) throw new Error("Failed to delete folder")
 }
 
-export async function toggleFolderGlobal(id: string): Promise<Folder> {
+export async function toggleFolderOrgShared(id: string): Promise<Folder> {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_BASE}/folders/${id}/toggle-global`, {
     method: "PATCH",
     headers,
   })
   if (!res.ok) {
-    if (res.status === 403) throw new Error("Only the folder owner can toggle global status")
-    throw new Error("Failed to toggle folder global status")
+    if (res.status === 403) throw new Error("Only the folder owner can change org sharing")
+    throw new Error("Failed to update folder sharing")
   }
   return res.json() as Promise<Folder>
 }
@@ -1681,17 +1682,17 @@ export class PublishGateError extends Error {
   }
 }
 
-export async function toggleSkillGlobal(id: string, override?: boolean): Promise<Skill> {
+export async function toggleSkillOrgShared(id: string, override?: boolean): Promise<Skill> {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_BASE}/skills/${id}/toggle-global`, {
     method: "PATCH",
     headers,
-    // Only the private→global publish direction sends a body ({ override }); the
-    // ungated global→private unshare direction (no arg) sends none — unchanged.
+    // Only the private→org-shared publish direction sends a body ({ override }); the
+    // ungated shared→private unshare direction (no arg) sends none — unchanged.
     ...(override !== undefined ? { body: JSON.stringify({ override }) } : {}),
   })
   if (!res.ok) {
-    if (res.status === 403) throw new Error("Only the skill owner can toggle global status")
+    if (res.status === 403) throw new Error("Only the skill owner can change org sharing")
     if (res.status === 409) {
       // Structured publish-gate refusal — detail is an OBJECT { error, gate }, NOT
       // a string (do NOT route through proposalError's string path). Surface the
@@ -2787,7 +2788,7 @@ export async function listMetadataFields(): Promise<MetadataFieldDef[]> {
 
 /** POST /document-views — persist the current filter as a named saved view
  *  (D-114-1: Save-as-view just persists what you're looking at). The server
- *  hard-sets `is_global=false` (the body never supplies it). Returns the new
+ *  hard-sets `is_system_global=false` (the body never supplies it). Returns the new
  *  `SavedView`. */
 export async function createView(
   name: string,
@@ -2980,14 +2981,14 @@ export async function deleteRelationship(id: string): Promise<void> {
 //
 // Thin consumers of the leak-safe classification-rules router (Plans 02/03):
 //   GET    /classification-rules                          list own + global rules
-//   POST   /classification-rules                          create a rule (is_global server-owned)
+//   POST   /classification-rules                          create a rule (is_system_global server-owned)
 //   PATCH  /classification-rules/{id}                      update an owned rule (incl. the enabled toggle)
 //   DELETE /classification-rules/{id}                      delete an owned rule (204; 404-tolerant)
 //   PATCH  /documents/{id}/classification/accept           accept the suggestion (moves + stamps prior_folder_id)
 //   PATCH  /documents/{id}/classification/dismiss          dismiss the suggestion (clears _classification; no move)
 //
 // The client is NOT a trust boundary — the `match_expr` whitelist validation, the
-// `is_global` hard-set, the own+global leak-safe reads, and the accept-move folder
+// `is_system_global` hard-set, the own+global leak-safe reads, and the accept-move folder
 // re-check are all enforced server-side. The builder's "would match N" live count
 // REUSES the existing `resolveAdHoc`/`resolveFilterCount` (a rule's `match_expr` is
 // the SAME `ViewFilter` AST) — NO new count fn, NO new backend endpoint. Undo reuses
@@ -3007,7 +3008,7 @@ export async function listRules(): Promise<ClassificationRule[]> {
 }
 
 /** POST /classification-rules — create a named rule. The body is
- *  `{ name, match_expr, suggest_folder_id }` ONLY — it NEVER supplies `is_global`
+ *  `{ name, match_expr, suggest_folder_id }` ONLY — it NEVER supplies `is_system_global`
  *  (the server hard-sets it false; mirrors `createView`, T-118-04-01). The server
  *  re-runs the `match_expr` whitelist + operand validation (the client is not a
  *  trust boundary). Returns the new `ClassificationRule`. */
