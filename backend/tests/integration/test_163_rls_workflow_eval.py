@@ -2,14 +2,14 @@
 
 Cluster tables (8): workflow_definitions, workflow_phases, workflow_runs, eval_runs, eval_results,
 eval_ratings, tuner_runs, harness_audit. Special cases exercised here:
-  * workflow_definitions owner column is ``created_by`` (NOT user_id) + ``is_global`` global branch;
+  * workflow_definitions owner column is ``created_by`` (NOT user_id) + ``is_system_global`` global branch;
   * workflow_phases / workflow_runs resolve ownership through the parent thread (subquery preserved);
-  * tuner_runs preserves the EXISTS-on-skills(is_global) global branch.
+  * tuner_runs preserves the EXISTS-on-skills(is_org_shared) global branch.
 
   (a) CROSS-ORG ISOLATION (behavioral) — a workflow_definition created_by user A (Org X) is invisible /
       unwritable to user B (Org Y), under the real SET-LOCAL-as-user path + fail-loud auth.uid() preflight.
   (b) MEMBERSHIP PROOF (structural) — every rewritten policy references ``current_user_org_ids``.
-  (c) PRESERVATION (structural) — workflow_definitions SELECT keeps ``is_global`` + resolves the
+  (c) PRESERVATION (structural) — workflow_definitions SELECT keeps ``is_system_global`` + resolves the
       ``created_by`` owner; tuner_runs keeps the EXISTS-on-skills subquery; workflow_runs/workflow_phases
       keep the parent-thread subquery — all alongside the membership macro (T-163-02 / T-163-02b).
   (c) BEHAVIORAL — a GLOBAL workflow_definition renders for a same-org co-member but NOT cross-org.
@@ -75,12 +75,12 @@ async def _drop_user(pool, uid: str) -> None:
             pass
 
 
-async def _seed_workflow_def(pool, created_by: str, org_id: str, is_global: bool):
+async def _seed_workflow_def(pool, created_by: str, org_id: str, is_system_global: bool):
     wf_id = uuid4()
     await pool.execute(
-        "INSERT INTO public.workflow_definitions (id, slug, name, created_by, org_id, is_global) "
+        "INSERT INTO public.workflow_definitions (id, slug, name, created_by, org_id, is_system_global) "
         "VALUES ($1, $2, $3, $4, $5, $6)",
-        wf_id, f"163-wf-{wf_id}", f"163-wf-{wf_id}", created_by, org_id, is_global,
+        wf_id, f"163-wf-{wf_id}", f"163-wf-{wf_id}", created_by, org_id, is_system_global,
     )
     return wf_id
 
@@ -90,7 +90,7 @@ async def _seed_workflow_def(pool, created_by: str, org_id: str, is_global: bool
 @pytest.mark.asyncio
 async def test_cross_org_cannot_read_or_write_workflow_definitions(pg_pool, two_orgs_two_users):
     a, b = two_orgs_two_users["a"], two_orgs_two_users["b"]
-    wf_id = await _seed_workflow_def(pg_pool, a["uid"], a["org_id"], is_global=False)
+    wf_id = await _seed_workflow_def(pg_pool, a["uid"], a["org_id"], is_system_global=False)
     try:
         async with pg_pool.acquire() as conn:
             tx = conn.transaction()
@@ -124,21 +124,21 @@ async def test_policy_enforces_membership(pg_pool, table):
     )
 
 
-# ── (c) preservation: created_by owner + is_global, EXISTS-on-skills, parent-thread (structural) ──
+# ── (c) preservation: created_by owner + is_system_global, EXISTS-on-skills, parent-thread (structural) ──
 
 @pytest.mark.asyncio
-async def test_workflow_definitions_created_by_and_is_global_preserved(pg_pool):
+async def test_workflow_definitions_created_by_and_is_system_global_preserved(pg_pool):
     text = await _policy_text(pg_pool, "workflow_definitions")
     assert "created_by" in text, "workflow_definitions must key ownership off created_by (T-163-02b)"
-    assert "is_global" in text, "workflow_definitions lost its is_global global branch (T-163-02)"
+    assert "is_system_global" in text, "workflow_definitions lost its is_system_global global branch (T-163-02)"
     assert "current_user_org_ids" in text, "workflow_definitions missing the membership predicate"
 
 
 @pytest.mark.asyncio
 async def test_tuner_runs_exists_on_skills_preserved(pg_pool):
     text = await _policy_text(pg_pool, "tuner_runs")
-    assert "skills" in text and "is_global" in text, (
-        "tuner_runs lost its EXISTS-on-skills(is_global) global branch in the rewrite (T-163-02)"
+    assert "skills" in text and "is_org_shared" in text, (
+        "tuner_runs lost its EXISTS-on-skills(is_org_shared) global branch in the rewrite (T-163-02)"
     )
     assert "current_user_org_ids" in text, "tuner_runs missing the membership predicate"
 
@@ -157,7 +157,7 @@ async def test_parent_thread_ownership_preserved(pg_pool, table):
 async def test_global_workflow_def_renders_for_comember_not_cross_org(pg_pool, two_orgs_two_users):
     a, b = two_orgs_two_users["a"], two_orgs_two_users["b"]
     c_uid = await _add_comember(pg_pool, a["org_id"])
-    wf_id = await _seed_workflow_def(pg_pool, a["uid"], a["org_id"], is_global=True)
+    wf_id = await _seed_workflow_def(pg_pool, a["uid"], a["org_id"], is_system_global=True)
     try:
         async with open_user_conn(pg_pool, c_uid) as conn:
             await assert_auth_uid(conn, c_uid)
@@ -174,7 +174,7 @@ async def test_global_workflow_def_renders_for_comember_not_cross_org(pg_pool, t
             )
         assert crossorg_sees == 0, (
             "cross-org leak: a global workflow_definition is visible across orgs (membership must gate "
-            "the is_global branch post-163)"
+            "the is_system_global branch post-163)"
         )
     finally:
         await pg_pool.execute("DELETE FROM public.workflow_definitions WHERE id = $1", wf_id)

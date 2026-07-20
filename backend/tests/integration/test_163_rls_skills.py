@@ -1,8 +1,8 @@
 """Phase 163 (TEN-01) — SKILLS-cluster membership-RLS contract (RED until plan 163-05 applies 108).
 
 Cluster tables (7): skills, skill_files, skill_versions, skill_test_cases, skill_proposals,
-skill_publish_overrides, skill_embeddings. Global branches: ``is_global`` on skills; the
-EXISTS-on-skills(is_global) subquery on skill_files. skill_embeddings references the org_id column
+skill_publish_overrides, skill_embeddings. Global branches: ``is_org_shared`` on skills; the
+EXISTS-on-skills(is_org_shared) subquery on skill_files. skill_embeddings references the org_id column
 added by migration 107.
 
   (a) CROSS-ORG ISOLATION (behavioral) — user B (Org Y) reads / updates / deletes ZERO of user A's
@@ -10,7 +10,7 @@ added by migration 107.
   (b) MEMBERSHIP PROOF (structural) — every rewritten skills-cluster policy references
       ``current_user_org_ids`` (RED→GREEN; the OLD policies are auth.uid()-only).
   (c) GLOBAL-BRANCH PRESERVATION (structural + behavioral) — the skills SELECT predicate STILL carries
-      ``is_global`` and skill_files STILL carries the EXISTS-on-skills subquery (T-163-02); AND a GLOBAL
+      ``is_org_shared`` and skill_files STILL carries the EXISTS-on-skills subquery (T-163-02); AND a GLOBAL
       skill renders for a same-org co-member (never the owner's PRIVATE skill) but NOT for a cross-org
       user — global is now membership-scoped.
 
@@ -124,14 +124,14 @@ async def test_policy_enforces_membership(pg_pool, table):
 # ── (c) global-branch preservation (structural) ──
 
 @pytest.mark.asyncio
-async def test_is_global_branch_preserved(pg_pool):
+async def test_is_org_shared_branch_preserved(pg_pool):
     skills_text = await _policy_text(pg_pool, "skills")
-    assert "is_global" in skills_text, "skills lost its is_global global branch in the rewrite (T-163-02)"
+    assert "is_org_shared" in skills_text, "skills lost its is_org_shared global branch in the rewrite (T-163-02)"
     assert "current_user_org_ids" in skills_text, "skills missing the membership predicate"
     files_text = await _policy_text(pg_pool, "skill_files")
-    # The EXISTS-on-skills subquery references the skills table + is_global.
-    assert "skills" in files_text and "is_global" in files_text, (
-        "skill_files lost its EXISTS-on-skills(is_global) global branch in the rewrite (T-163-02)"
+    # The EXISTS-on-skills subquery references the skills table + is_org_shared.
+    assert "skills" in files_text and "is_org_shared" in files_text, (
+        "skill_files lost its EXISTS-on-skills(is_org_shared) global branch in the rewrite (T-163-02)"
     )
 
 
@@ -144,7 +144,7 @@ async def test_global_skill_renders_for_comember_not_cross_org(pg_pool, two_orgs
     global_skill = uuid4()
     try:
         await pg_pool.execute(
-            "INSERT INTO public.skills (id, user_id, org_id, name, is_global) "
+            "INSERT INTO public.skills (id, user_id, org_id, name, is_org_shared) "
             "VALUES ($1, $2, $3, $4, true)",
             global_skill, a["uid"], a["org_id"], f"163-globalskill-{global_skill}",
         )
@@ -170,7 +170,7 @@ async def test_global_skill_renders_for_comember_not_cross_org(pg_pool, two_orgs
                 "SELECT count(*) FROM public.skills WHERE id = $1", global_skill
             )
         assert crossorg_sees_global == 0, (
-            "cross-org leak: a global skill is visible across orgs (membership must gate the is_global "
+            "cross-org leak: a global skill is visible across orgs (membership must gate the is_org_shared "
             "branch post-163)"
         )
     finally:

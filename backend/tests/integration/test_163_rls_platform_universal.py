@@ -3,17 +3,17 @@
 The cross-org COMPLEMENT to ``test_163_rls_skills.py`` — the same-org test that MISSED the 163-UAT
 Test-7 regression. Migration 108 org-gated the preserved global / ``is_system`` OR-branch, so in the
 post-162 solo-org topology the built-in ``skill-creator`` (``is_system=true``, owned by seed …0001)
-and the seeded ``is_global`` starter workflows lost cross-user visibility. ``test_163_rls_skills.py``
+and the seeded ``is_system_global`` starter workflows lost cross-user visibility. ``test_163_rls_skills.py``
 only ever probes a SAME-ORG co-member, so it never observed the platform-content drop. This file
 probes a genuine NON-CO-MEMBER (a member of a DIFFERENT org), which is where FIX-A must hold.
 
 Assertions (RED until plan 163-11 Task 2 applies migration 109):
   (1) PLATFORM-UNIVERSAL READ — a non-co-member SEES an ``is_system=true`` skill (RED pre-109: the
       org-gate hides it → 0 rows; GREEN post-109: the is_system universal escape → 1).
-  (2) PLATFORM WORKFLOW — a non-co-member SEES a seed-owned ``is_global=true`` workflow_definition.
-  (3) USER is_global STAYS ORG-SCOPED (invariant guard — GREEN in BOTH states) — a non-co-member does
-      NOT see user A's OWN is_global skill, A's is_global FOLDER, or a DOCUMENT inside that global
-      folder (the composed folder_is_globally_visible path — 163-UAT Test-7 symptom two).
+  (2) PLATFORM WORKFLOW — a non-co-member SEES a seed-owned ``is_system_global=true`` workflow_definition.
+  (3) USER is_org_shared STAYS ORG-SCOPED (invariant guard — GREEN in BOTH states) — a non-co-member does
+      NOT see user A's OWN is_org_shared skill, A's is_org_shared FOLDER, or a DOCUMENT inside that global
+      folder (the composed folder_is_org_shared path — 163-UAT Test-7 symptom two).
   (4) BADGE-SPOOF BLOCKED (T-163-11) — as user A (role authenticated, A's claims) an INSERT / UPDATE
       self-setting ``is_system=true`` is REJECTED by the write check (RED pre-109: the 108 checks omit
       is_system so the write succeeds; GREEN post-109: 42501). A plain ``is_system=false`` insert /
@@ -64,12 +64,12 @@ async def _ensure_system_seed_user(pool) -> None:
 async def _seed_system_skill(pool, org_id: str) -> str:
     """Seed an ``is_system=true`` skill owned by the system seed, in org ``org_id`` (org X).
 
-    Mirrors the real skill-creator (is_system=true + is_global=true). org_id is provided explicitly so
+    Mirrors the real skill-creator (is_system=true + is_org_shared=true). org_id is provided explicitly so
     the mig-106 autofill trigger no-ops (the system seed has no org membership to resolve).
     """
     sid = uuid4()
     await pool.execute(
-        "INSERT INTO public.skills (id, user_id, org_id, name, is_system, is_global) "
+        "INSERT INTO public.skills (id, user_id, org_id, name, is_system, is_org_shared) "
         "VALUES ($1, $2, $3, $4, true, true)",
         sid, SYSTEM_SEED_UID, org_id, f"163-systemskill-{sid}",
     )
@@ -77,14 +77,14 @@ async def _seed_system_skill(pool, org_id: str) -> str:
 
 
 async def _seed_platform_workflow(pool, org_id: str) -> str:
-    """Seed a seed-owned ``is_global=true`` published workflow_definition in org ``org_id`` (org X).
+    """Seed a seed-owned ``is_system_global=true`` published workflow_definition in org ``org_id`` (org X).
 
     Owner column is ``created_by`` (workflow_definitions special case). org_id explicit -> trigger no-op.
     """
     wid = uuid4()
     await pool.execute(
         "INSERT INTO public.workflow_definitions "
-        "(id, slug, name, created_by, org_id, is_global, status) "
+        "(id, slug, name, created_by, org_id, is_system_global, status) "
         "VALUES ($1, $2, $3, $4, $5, true, 'published')",
         wid, f"163-plat-{wid}", f"163-platform-workflow-{wid}", SYSTEM_SEED_UID, org_id,
     )
@@ -120,7 +120,7 @@ async def test_platform_is_system_skill_visible_to_non_comember(pg_pool, two_org
         await _cleanup(pg_pool, "DELETE FROM public.skills WHERE id = $1", sys_skill)
 
 
-# ── (2) platform workflow — a non-co-member sees a seed-owned is_global workflow_definition ──
+# ── (2) platform workflow — a non-co-member sees a seed-owned is_system_global workflow_definition ──
 
 @pytest.mark.asyncio
 async def test_platform_global_workflow_visible_to_non_comember(pg_pool, two_orgs_two_users):
@@ -134,27 +134,27 @@ async def test_platform_global_workflow_visible_to_non_comember(pg_pool, two_org
                 "SELECT count(*) FROM public.workflow_definitions WHERE id = $1", wid
             )
         assert seen == 1, (
-            "FIX-A regression: a seeded is_global platform workflow is invisible cross-org. is_global "
-            "on workflow_definitions is hard-set-false-for-users, so is_global=true is platform-only "
+            "FIX-A regression: a seeded is_system_global platform workflow is invisible cross-org. is_system_global "
+            "on workflow_definitions is hard-set-false-for-users, so is_system_global=true is platform-only "
             "and must escape the org-gate (RED until migration 109)."
         )
     finally:
         await _cleanup(pg_pool, "DELETE FROM public.workflow_definitions WHERE id = $1", wid)
 
 
-# ── (3) USER-self-served is_global STAYS org-scoped (invariant guard — GREEN in BOTH states) ──
+# ── (3) USER-self-served is_org_shared STAYS org-scoped (invariant guard — GREEN in BOTH states) ──
 
 @pytest.mark.asyncio
-async def test_user_is_global_skill_stays_org_scoped(pg_pool, two_orgs_two_users):
-    """A user's OWN is_global skill (owner-toggled, org-shared) must NOT leak to a non-co-member.
+async def test_user_is_org_shared_skill_stays_org_scoped(pg_pool, two_orgs_two_users):
+    """A user's OWN is_org_shared skill (owner-toggled, org-shared) must NOT leak to a non-co-member.
 
-    Fix A deliberately keeps skills.is_global INSIDE the org-gate — it becomes cross-user-visible only
+    Fix A deliberately keeps skills.is_org_shared INSIDE the org-gate — it becomes cross-user-visible only
     when orgs gain members (Phases 166/167). Holds pre AND post-109 (this is the over-widening guard).
     """
     a, b = two_orgs_two_users["a"], two_orgs_two_users["b"]
     own_global_skill = uuid4()
     await pg_pool.execute(
-        "INSERT INTO public.skills (id, user_id, org_id, name, is_global) VALUES ($1, $2, $3, $4, true)",
+        "INSERT INTO public.skills (id, user_id, org_id, name, is_org_shared) VALUES ($1, $2, $3, $4, true)",
         own_global_skill, a["uid"], a["org_id"], f"163-ownglobal-{own_global_skill}",
     )
     try:
@@ -164,8 +164,8 @@ async def test_user_is_global_skill_stays_org_scoped(pg_pool, two_orgs_two_users
                 "SELECT count(*) FROM public.skills WHERE id = $1", str(own_global_skill)
             )
         assert seen == 0, (
-            "over-widening: Fix A leaked user A's ORG-scoped is_global skill to a non-co-member. Only "
-            "is_system (platform) escapes the gate; user-self-served skills.is_global stays org-scoped."
+            "over-widening: Fix A leaked user A's ORG-scoped is_org_shared skill to a non-co-member. Only "
+            "is_system (platform) escapes the gate; user-self-served skills.is_org_shared stays org-scoped."
         )
     finally:
         await _cleanup(pg_pool, "DELETE FROM public.skills WHERE id = $1", str(own_global_skill))
@@ -173,9 +173,9 @@ async def test_user_is_global_skill_stays_org_scoped(pg_pool, two_orgs_two_users
 
 @pytest.mark.asyncio
 async def test_user_global_folder_and_its_document_stay_org_scoped(pg_pool, two_orgs_two_users):
-    """A user's is_global FOLDER — and a DOCUMENT inside it — must NOT leak to a non-co-member.
+    """A user's is_org_shared FOLDER — and a DOCUMENT inside it — must NOT leak to a non-co-member.
 
-    The composed ``folder_is_globally_visible`` path on documents is 163-UAT Test-7 symptom two. Fix A
+    The composed ``folder_is_org_shared`` path on documents is 163-UAT Test-7 symptom two. Fix A
     leaves the documents + folders read policies UNCHANGED (user-self-served, org-scoped), so this holds
     pre AND post-109. Guards against Fix A accidentally widening the folder-derived document branch.
     """
@@ -183,7 +183,7 @@ async def test_user_global_folder_and_its_document_stay_org_scoped(pg_pool, two_
     global_folder = uuid4()
     doc_in_folder = uuid4()
     await pg_pool.execute(
-        "INSERT INTO public.folders (id, user_id, org_id, name, is_global) VALUES ($1, $2, $3, $4, true)",
+        "INSERT INTO public.folders (id, user_id, org_id, name, is_org_shared) VALUES ($1, $2, $3, $4, true)",
         global_folder, a["uid"], a["org_id"], f"163-globalfolder-{global_folder}",
     )
     await pg_pool.execute(
@@ -203,12 +203,12 @@ async def test_user_global_folder_and_its_document_stay_org_scoped(pg_pool, two_
                 "SELECT count(*) FROM public.documents WHERE id = $1", str(doc_in_folder)
             )
         assert sees_folder == 0, (
-            "over-widening: user A's is_global FOLDER leaked to a non-co-member (folders.is_global is "
+            "over-widening: user A's is_org_shared FOLDER leaked to a non-co-member (folders.is_org_shared is "
             "user-self-served and must stay org-scoped under Fix A)."
         )
         assert sees_doc == 0, (
             "over-widening: a document inside user A's global folder leaked cross-org via the composed "
-            "folder_is_globally_visible path (163-UAT Test-7 symptom two — must stay org-scoped)."
+            "folder_is_org_shared path (163-UAT Test-7 symptom two — must stay org-scoped)."
         )
     finally:
         # children before parent (documents FK folders); best-effort.

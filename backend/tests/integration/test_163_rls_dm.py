@@ -9,7 +9,7 @@ metadata_field_definitions, pdf_extraction_runs. Encodes what migration 108 must
       (RED→GREEN: the OLD policies are auth.uid()-only). Includes the document_images/document_tables
       single FOR-ALL policies and the SELECT-only pdf_extraction_runs.
   (c) GLOBAL-BRANCH PRESERVATION (structural + behavioral) — classification_rules /
-      metadata_field_definitions SELECT predicates STILL carry ``is_global`` (T-163-02), AND a global
+      metadata_field_definitions SELECT predicates STILL carry ``is_system_global`` (T-163-02), AND a global
       classification_rule renders for a same-org co-member but NOT for a cross-org user.
 
 STATE: RED now, GREEN after plan 163-05 applies 107→108. THIS plan only needs ``--collect-only``.
@@ -73,12 +73,12 @@ async def _drop_user(pool, uid: str) -> None:
             pass
 
 
-async def _seed_rule(pool, user_id: str, org_id: str, is_global: bool):
+async def _seed_rule(pool, user_id: str, org_id: str, is_system_global: bool):
     rule_id = uuid4()
     await pool.execute(
-        "INSERT INTO public.classification_rules (id, user_id, org_id, name, match_expr, is_global) "
+        "INSERT INTO public.classification_rules (id, user_id, org_id, name, match_expr, is_system_global) "
         "VALUES ($1, $2, $3, $4, $5, $6)",
-        rule_id, user_id, org_id, f"163-rule-{rule_id}", {"kind": "all", "conditions": []}, is_global,
+        rule_id, user_id, org_id, f"163-rule-{rule_id}", {"kind": "all", "conditions": []}, is_system_global,
     )
     return rule_id
 
@@ -88,7 +88,7 @@ async def _seed_rule(pool, user_id: str, org_id: str, is_global: bool):
 @pytest.mark.asyncio
 async def test_cross_org_cannot_read_or_write_classification_rules(pg_pool, two_orgs_two_users):
     a, b = two_orgs_two_users["a"], two_orgs_two_users["b"]
-    rule_id = await _seed_rule(pg_pool, a["uid"], a["org_id"], is_global=False)
+    rule_id = await _seed_rule(pg_pool, a["uid"], a["org_id"], is_system_global=False)
     try:
         async with pg_pool.acquire() as conn:
             tx = conn.transaction()
@@ -126,9 +126,9 @@ async def test_policy_enforces_membership(pg_pool, table):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("table", ["classification_rules", "metadata_field_definitions"])
-async def test_is_global_branch_preserved(pg_pool, table):
+async def test_is_system_global_branch_preserved(pg_pool, table):
     text = await _policy_text(pg_pool, table)
-    assert "is_global" in text, f"{table} lost its is_global global branch in the rewrite (T-163-02)"
+    assert "is_system_global" in text, f"{table} lost its is_system_global global branch in the rewrite (T-163-02)"
     assert "current_user_org_ids" in text, f"{table} missing the membership predicate"
 
 
@@ -138,7 +138,7 @@ async def test_is_global_branch_preserved(pg_pool, table):
 async def test_global_rule_renders_for_comember_not_cross_org(pg_pool, two_orgs_two_users):
     a, b = two_orgs_two_users["a"], two_orgs_two_users["b"]
     c_uid = await _add_comember(pg_pool, a["org_id"])
-    rule_id = await _seed_rule(pg_pool, a["uid"], a["org_id"], is_global=True)
+    rule_id = await _seed_rule(pg_pool, a["uid"], a["org_id"], is_system_global=True)
     try:
         async with open_user_conn(pg_pool, c_uid) as conn:
             await assert_auth_uid(conn, c_uid)
@@ -155,7 +155,7 @@ async def test_global_rule_renders_for_comember_not_cross_org(pg_pool, two_orgs_
             )
         assert crossorg_sees == 0, (
             "cross-org leak: a global classification_rule is visible across orgs (membership must gate "
-            "the is_global branch post-163)"
+            "the is_system_global branch post-163)"
         )
     finally:
         await pg_pool.execute("DELETE FROM public.classification_rules WHERE id = $1", rule_id)

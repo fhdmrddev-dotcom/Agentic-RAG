@@ -11,12 +11,12 @@ connection to role ``authenticated``:
       ``current_user_org_ids`` (the RED→GREEN signal: the OLD policy is auth.uid()-only). Proves the
       rewrite LANDED, not the pre-163 policy.
   (c) GLOBAL-BRANCH PRESERVATION (structural + behavioral) — the documents/folders SELECT predicate
-      STILL contains ``folder_is_globally_visible`` (T-163-02: a dropped global branch is data-loss),
+      STILL contains ``folder_is_org_shared`` (T-163-02: a dropped global branch is data-loss),
       AND a global-folder document renders for a same-org NON-OWNER (co-member) while a cross-org user
       no longer sees it (global is now org-scoped — the semantic the crux introduces).
 
 STATE CONTRACT: RED *now* — the membership structural assert + the cross-org global-visibility assert
-fail against the live auth.uid()-only / is_global-for-everyone policies. GREEN after plan 163-05 applies
+fail against the live auth.uid()-only / is_org_shared-for-everyone policies. GREEN after plan 163-05 applies
 107 then 108. For THIS plan the bar is ``pytest ... --collect-only`` (imports resolve) — do NOT try to
 make it pass here (108 is deliberately not applied yet). Skip-guarded on local Postgres :54322.
 """
@@ -132,8 +132,8 @@ async def test_policy_enforces_membership(pg_pool, table):
 async def test_global_folder_branch_preserved(pg_pool):
     for table in ("documents", "folders"):
         text = await _policy_text(pg_pool, table)
-        assert "folder_is_globally_visible" in text, (
-            f"{table} lost its folder_is_globally_visible global branch in the rewrite (T-163-02)"
+        assert "folder_is_org_shared" in text, (
+            f"{table} lost its folder_is_org_shared global branch in the rewrite (T-163-02)"
         )
         assert "current_user_org_ids" in text, f"{table} missing the membership predicate"
 
@@ -148,7 +148,7 @@ async def test_global_folder_doc_renders_for_comember_not_cross_org(pg_pool, two
     try:
         # A owns a GLOBAL folder + a document inside it (explicit org_id so we never rely on autofill).
         await pg_pool.execute(
-            "INSERT INTO public.folders (id, user_id, org_id, name, is_global) "
+            "INSERT INTO public.folders (id, user_id, org_id, name, is_org_shared) "
             "VALUES ($1, $2, $3, $4, true)",
             folder_id, a["uid"], a["org_id"], f"163-globalfolder-{folder_id}",
         )
