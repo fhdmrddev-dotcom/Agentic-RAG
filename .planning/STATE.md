@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v3.4
 milestone_name: Multi-Tenancy & Org Access
 status: executing
-last_updated: "2026-07-20T20:37:24.713Z"
-last_activity: 2026-07-20 -- Phase 165 planning complete
+last_updated: "2026-07-20T20:44:06.389Z"
+last_activity: 2026-07-20 -- Phase 165 execution started
 progress:
   total_phases: 28
   completed_phases: 6
@@ -22,7 +22,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-20 — Phase 163 THE ATOMIC CRUX complete; membership RLS enforced)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 165 — `is_global` retirement cleanup
+**Current focus:** Phase 165 — is-global-retirement-cleanup
 
 ## Deferred Items
 
@@ -40,11 +40,11 @@ Items acknowledged and deferred at milestone close on 2026-07-18 (44 open `audit
 
 ## Current Position
 
-Phase: 165
-Plan: Planned — 11 plans / 3 waves (commit `bb2f043c`)
-Status: Ready to execute
+Phase: 165 (is-global-retirement-cleanup) — EXECUTING
+Plan: 1 of 11
+Status: Executing Phase 165
 Next action: **Phase 165 PLANNED 2026-07-21** — 11 plans in 3 waves (verification PASSED after 3 checker iterations; research + UI-SPEC skipped per operator/roadmap). **Wave 1 (01-09, parallel, autonomous):** 01 = migration 111 (value-preserving `RENAME COLUMN` ×6 semantic split + RLS auto-propagation + `folder_is_globally_visible`→`folder_is_org_shared` OID-preserving `ALTER FUNCTION` + trigger/storage-policy rewrite); 02 = **SEED-124 fix** (org-scope `folder_utils.py` service-role helpers CR-01 fail-closed + WR-01 subtree owner-null); 03/04 = backend model/API + service/db/main rename (per-file table→target map, `documents.py` MIXED); 05/06/07 = backend tests split by owning-table domain; 08/09 = frontend components/copy ("Global"→"Shared with org") + `toggle*Global`→`OrgShared` identifier retirement + tests. **Wave 2:** 10 = **`[BLOCKING]` operator checkpoint (autonomous:false)** — stop dev servers, paste migration 111 into Supabase SQL editor, `regenerate-full-schema.sh` no-reset, same-commit. **Wave 3:** 11 = **SC#4 arbiter** — flip `test_browse_tools_cross_org_leak_KNOWN_OPEN_seed124` `xfail(strict)`→XPASS→remove; `test_v3_4_org_isolation.py` green (23 passed). **LESSON (this planning):** plan-checker's *live-source* pass caught 4 real production-code semantic-split misclassifications in 03/04 that plan-text review missed (`classification_matcher`/`workflow_authoring`→`is_org_shared`, `embedding_service`→`is_system_global`, `documents.py` MIXED) — for a same-token→different-name-by-table rename, map each file's target against its actual `supabase.table()` context; the "0 bare is_global" grep does NOT catch wrong-but-present renames. **Next: `/gsd:execute-phase 165`** (`/clear` first; Plan 10 pauses for the operator). Locked decisions unchanged: D-165-01 split (skills.is_system name KEPT, D-165-02), D-165-04/05 SC#4, D-165-06 one-migration/one-commit, D-165-07 relabel-not-unshare. **Cloud parity owed:** migs 099→110 + the new 165 migration (111) + `SECRETS_ENCRYPTION_KEY`, in order, at next operator-gated push.
-Last activity: 2026-07-21 -- Phase 165 planning complete (11 plans, verification passed)
+Last activity: 2026-07-20 -- Phase 165 execution started
 
 Progress: [██████████] 100%
 

@@ -182,15 +182,15 @@ Ship only if CORE lands clean and budget remains. First-to-cut ordering: SSO/OID
   3. An `is_system_global` allow-list — reusing the write-locked `skills.is_system` marker — keeps the seeded `skill-creator` visible across every org, and no route can set `is_system_global` (migration-only, never route-settable).
   4. **(Folded from Phase 164 CR-01 / [[SEED-124]] — MUST close here)** The `folder_utils.py` visibility helpers (`is_in_global_subtree` / `fetch_visible_folders` / `get_globally_visible_folder_ids`) are **org-scoped** so the agent's service-role KB browse/read tools (`ls`/`tree`/`read_document`/`fetch_document_file`) can no longer enumerate or read documents in another org's `is_org_shared` (formerly `is_global`) folders. Verified by flipping the `xfail(strict=True)` marker `test_browse_tools_cross_org_leak_KNOWN_OPEN_seed124` in `test_v3_4_org_isolation.py` to XPASS → then removing it. Also close WR-01 (null the seeder's `user_id` on non-`is_org_shared` **descendants** of shared folders in the folders list/serialize path).
 **Plans**: 11 plans (Wave 1: 01-09 parallel authoring · Wave 2: 10 operator apply · Wave 3: 11 exit-gate)
-- [ ] 165-01-PLAN.md — Migration 111: value-preserving `is_global` rename (D-165-01 split) + RLS auto-propagation + DEFINER/trigger rewrites + `folder_is_globally_visible`->`folder_is_org_shared` + storage skill-files policy reconciliation
-- [ ] 165-02-PLAN.md — Folded SEED-124 fix: org-scope the service-role folder-visibility helpers (CR-01, fail-closed) + subtree-descendant owner-nulling (WR-01) + `is_org_shared` rename in `folder_utils.py`/`kb.py`/`tool_dispatcher.py`
-- [ ] 165-03-PLAN.md — Backend model + API-layer rename (6 models + 8 routes; platform write-lock preserved)
-- [ ] 165-04-PLAN.md — Backend service + db rename + isolated `main.py` seed task (15 workflows stay `is_system_global=true`) + D-14 token-only check on agent_loop/openai_service
-- [ ] 165-05-PLAN.md — Backend tests: RLS/isolation/leak/owner-nulling (15 files, explicit per-table mapping — the mig-109 Test-7 regression-class guard)
-- [ ] 165-06-PLAN.md — Backend tests: skills/folders domain (19 files -> `is_org_shared`, single-target)
-- [ ] 165-07-PLAN.md — Backend tests: platform tables workflows/views/rules/metadata (25 files -> `is_system_global`; folders exceptions flagged)
-- [ ] 165-08-PLAN.md — Frontend components + contract + UI copy ("Global"->"Shared with org", D-165-07); functional isOrgShared vs display isSystemGlobal per file; tsc clean
-- [ ] 165-09-PLAN.md — Frontend test rename (unrelated isGlobal in ChatHistoryColumn/threadGroups left intact); vitest clean vs rot baseline
+- [x] 165-01-PLAN.md — Migration 111: value-preserving `is_global` rename (D-165-01 split) + RLS auto-propagation + DEFINER/trigger rewrites + `folder_is_globally_visible`->`folder_is_org_shared` + storage skill-files policy reconciliation
+- [x] 165-02-PLAN.md — Folded SEED-124 fix: org-scope the service-role folder-visibility helpers (CR-01, fail-closed) + subtree-descendant owner-nulling (WR-01) + `is_org_shared` rename in `folder_utils.py`/`kb.py`/`tool_dispatcher.py`
+- [x] 165-03-PLAN.md — Backend model + API-layer rename (6 models + 8 routes; platform write-lock preserved)
+- [x] 165-04-PLAN.md — Backend service + db rename + isolated `main.py` seed task (15 workflows stay `is_system_global=true`) + D-14 token-only check on agent_loop/openai_service
+- [x] 165-05-PLAN.md — Backend tests: RLS/isolation/leak/owner-nulling (15 files, explicit per-table mapping — the mig-109 Test-7 regression-class guard)
+- [x] 165-06-PLAN.md — Backend tests: skills/folders domain (19 files -> `is_org_shared`, single-target)
+- [x] 165-07-PLAN.md — Backend tests: platform tables workflows/views/rules/metadata (25 files -> `is_system_global`; folders exceptions flagged)
+- [x] 165-08-PLAN.md — Frontend components + contract + UI copy ("Global"->"Shared with org", D-165-07); functional isOrgShared vs display isSystemGlobal per file; tsc clean
+- [x] 165-09-PLAN.md — Frontend test rename (unrelated isGlobal in ChatHistoryColumn/threadGroups left intact); vitest clean vs rot baseline
 - [ ] 165-10-PLAN.md — [BLOCKING] Operator applies migration 111 via SQL editor (dev-server stop window) + regenerate full-schema (no-reset) + same-commit + post-apply over-widening check
 - [ ] 165-11-PLAN.md — Exit-gate re-green + SC#4 arbitration: flip SEED-124 leak test xfail->XPASS->remove marker; two-org suite green (23 passed); backend rename-regression sweep
 
