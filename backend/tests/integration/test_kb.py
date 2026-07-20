@@ -1,11 +1,28 @@
 """Integration tests for /kb endpoints."""
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
 
 from tests.conftest import _supabase
+
+
+def _patch_grep_rpc(rows):
+    """Patch kb.get_user_pg_connection so grep_path's query_user_documents returns ``rows``.
+
+    Phase 164 (D-164-04): grep_path deletes the _inject_user_id_for_grep regex and runs the
+    INVOKER query_user_documents RPC over the asyncpg user-context (RLS scopes it), NOT over
+    the mocked service-role supabase client. This stubs that user-context connection so the
+    endpoint returns canned rows without hitting the live DB. Cross-org isolation itself is
+    proven live in tests/integration/test_v3_4_org_isolation.py (text_to_sql/grep legs)."""
+    @asynccontextmanager
+    async def _cm(request, current_user):
+        conn = MagicMock()
+        conn.fetchval = AsyncMock(return_value=rows)
+        yield conn
+    return patch("app.api.kb.get_user_pg_connection", _cm)
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -234,12 +251,11 @@ class TestTree:
 class TestGrep:
     def test_grep_no_path(self, client, auth_headers, mock_builder):
         """GET /kb/grep?pattern=budget returns 200 with matching documents."""
-        mock_builder.execute.side_effect = [
-            _make_result([
-                {"id": DOC_IN_REPORTS, "filename": "report.pdf", "folder_id": FOLDER_ROOT_A},
-            ]),
-        ]
-        response = client.get("/kb/grep?pattern=budget", headers=auth_headers)
+        # Phase 164: the query_user_documents RPC runs over the user-context, not mock_builder.
+        with _patch_grep_rpc([
+            {"id": DOC_IN_REPORTS, "filename": "report.pdf", "folder_id": FOLDER_ROOT_A},
+        ]):
+            response = client.get("/kb/grep?pattern=budget", headers=auth_headers)
         assert response.status_code == 200
         data = response.json()
         assert data["pattern"] == "budget"
@@ -249,13 +265,14 @@ class TestGrep:
 
     def test_grep_with_path(self, client, auth_headers, mock_builder):
         """GET /kb/grep?pattern=revenue&path=/reports scopes to reports subtree."""
+        # Folder resolution still uses the mocked supabase; the RPC uses the user-context (164).
         mock_builder.execute.side_effect = [
             _make_result(_standard_folders()),  # _fetch_visible_folders
-            _make_result([
-                {"id": DOC_IN_REPORTS, "filename": "report.pdf", "folder_id": FOLDER_ROOT_A},
-            ]),  # RPC result
         ]
-        response = client.get("/kb/grep?pattern=revenue&path=/reports", headers=auth_headers)
+        with _patch_grep_rpc([
+            {"id": DOC_IN_REPORTS, "filename": "report.pdf", "folder_id": FOLDER_ROOT_A},
+        ]):
+            response = client.get("/kb/grep?pattern=revenue&path=/reports", headers=auth_headers)
         assert response.status_code == 200
         data = response.json()
         assert data["pattern"] == "revenue"
@@ -282,19 +299,21 @@ class TestGrep:
         assert data["matches"] == []
 
     def test_grep_rls(self, client, auth_headers, mock_builder):
-        """grep results are scoped to the user via query_user_documents RPC user_id injection."""
-        # The RPC call includes user_id in the SQL WHERE clause
-        # Mock returns only the user's documents (RLS simulation)
-        mock_builder.execute.side_effect = [
-            _make_result([
-                {"id": DOC_ROOT, "filename": "readme.pdf", "folder_id": None},
-            ]),
-        ]
-        response = client.get("/kb/grep?pattern=hello", headers=auth_headers)
+        """grep results are scoped to the caller via RLS on the user-context connection.
+
+        Phase 164 (D-164-04): the _inject_user_id_for_grep regex is DELETED — cross-user/
+        cross-org scoping is now enforced by RLS when the INVOKER query_user_documents RPC
+        runs over the asyncpg user-context (the actual isolation is proven live in
+        test_v3_4_org_isolation.py::test_text_to_sql_grep_path_isolation). Here the
+        user-context returns only the caller's document, and the endpoint surfaces it."""
+        with _patch_grep_rpc([
+            {"id": DOC_ROOT, "filename": "readme.pdf", "folder_id": None},
+        ]):
+            response = client.get("/kb/grep?pattern=hello", headers=auth_headers)
         assert response.status_code == 200
         data = response.json()
         assert data["total"] == 1
-        # Verify only the user's document was returned
+        # Only the caller's document is returned (RLS-scoped via the user-context).
         assert data["matches"][0]["document_id"] == DOC_ROOT
 
 
