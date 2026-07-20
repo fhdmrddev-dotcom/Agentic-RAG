@@ -166,7 +166,11 @@ Ship only if CORE lands clean and budget remains. First-to-cut ordering: SSO/OID
   2. `test_v3_4_org_isolation.py` passes and is the milestone exit gate: two seeded orgs × every user-facing table × all four DEFINER functions (0 cross-org rows) × both DB access paths × `X-Org-Id` header-spoof rejection.
   3. Hybrid search returns only rows the asking user may access — org- AND folder-ACL-isolated (`document_chunks` RLS mirrors the full folder-visibility predicate authored in 163) — proven with a live two-user retrieval test (PRAG-01).
   4. Global / org-shared resources (folders / skills / views) null the seeding owner's `user_id` (+ scope UUIDs) for non-owner readers in every list/serialize path (SEED-091 / TEN-06 closed).
-**Plans**: TBD
+**Plans**: 4 plans (3 waves)
+- [ ] 164-01-PLAN.md — Author the two-org exit-gate suite test_v3_4_org_isolation.py (pg_proc audit helper + red-anchor RED vs pre-164 + table matrix both paths + 4 DEFINER legs + X-Org-Id spoof + PRAG-01 leg) (Wave 1)
+- [ ] 164-02-PLAN.md — SEED-091 owner-identity nulling across folders/skills/views serialize paths + model loosens + unit test (TEN-06) (Wave 1)
+- [ ] 164-03-PLAN.md — Author + [BLOCKING] apply migration 110 (4 DEFINER org predicate + pinned search_path + document_chunks PRAG-01 RLS widening) + regenerate full-schema + CONCUR-01 <1s gate (Wave 2)
+- [ ] 164-04-PLAN.md — Producer client-swap: retrieval RPCs + text-to-SQL/grep onto the asyncpg user-context; delete _inject_user_id/_inject_user_id_for_grep; whole suite GREEN (Wave 3)
 
 #### Phase 165: `is_global` Retirement Cleanup
 **Goal**: The `is_global` mechanism is fully retired to `is_org_shared` across code, UI copy, and storage policies, with a migration-only `is_system_global` allow-list keeping the seeded skill-creator cross-org visible — no cross-org leak, no per-org skill-creator copies.
@@ -275,7 +279,7 @@ Ship only if CORE lands clean and budget remains. First-to-cut ordering: SSO/OID
 | 162. Personal-Org Backfill | 3/3 | Complete | 2026-07-18 |
 | 162.5. threads.py Producer Extraction (G-5) | 4/4 | Complete | 2026-07-19 |
 | 163. RLS Rewrite + User-JWT Client Swap (CRUX) | 11/11 | Complete | 2026-07-20 |
-| 164. SECDEF Audit + Cross-Org Isolation Suite | 0/? | Not started | - |
+| 164. SECDEF Audit + Cross-Org Isolation Suite | 0/4 | Planning | - |
 | 165. `is_global` Retirement Cleanup | 0/? | Not started | - |
 | 166. Org-Admin Shell + Switcher + Profile + Audit + Settings Split | 0/? | Not started | - |
 | 167. Invitations + Roles + Greenlists + JIT + Per-User Prefs | 0/? | Not started | - |
