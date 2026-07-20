@@ -2,15 +2,16 @@
 gsd_state_version: 1.0
 milestone: v3.4
 milestone_name: Multi-Tenancy & Org Access
-status: verifying
-last_updated: "2026-07-20T17:40:27.338Z"
-last_activity: 2026-07-20 -- Phase 164 Plan 05 complete (gap closure — WR-02 folder-scope SQL fix + CR-01/SEED-124 xfail marker; exit gate 22 passed / 1 xfailed)
+status: ready_to_plan
+last_updated: 2026-07-20T18:38:35.597Z
+last_activity: 2026-07-20 -- Phase 164 COMPLETE (SECDEF exit gate: secure-phase SECURED threats_open:0; verify-work 2/2 PASS; VERIFICATION passed 8/8; TEN-03/05/06 + PRAG-01 Validated). Advanced to Phase 165 (is_global retirement — MUST close CR-01/WR-01).
 progress:
   total_phases: 28
   completed_phases: 6
   total_plans: 26
   completed_plans: 26
   percent: 21
+stopped_at: Phase 164 complete (5/5) — ready to discuss Phase 165
 ---
 
 # Project State
@@ -22,7 +23,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-20 — Phase 163 THE ATOMIC CRUX complete; membership RLS enforced)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 164 — secdef-audit-cross-org-isolation-test-suite
+**Current focus:** Phase 165 — `is_global` retirement cleanup
 
 ## Deferred Items
 
@@ -40,11 +41,11 @@ Items acknowledged and deferred at milestone close on 2026-07-18 (44 open `audit
 
 ## Current Position
 
-Phase: 164 (secdef-audit-cross-org-isolation-test-suite) — EXECUTED 5/5 plans; automated verification 7/8 (`human_needed`) — NOT yet phase-closed
-Plan: 5 of 5 — 164-05 COMPLETE (code-review gap closure — WR-02 folder-scope SQL fix + CR-01/SEED-124 known-open xfail marker)
-Status: Execution + deep code review + automated verification COMPLETE (`164-VERIFICATION.md` status:human_needed, 7/8; no blockers). Two OPERATOR-run gates remain before phase close: (1) **SC#10 4-axis live cross-provider UAT** + frontend null-owner UI check (`164-HUMAN-UAT.md`, 2 pending); (2) **`/gsd:secure-phase 164`** — SECURITY.md not yet written (security-core phase, threat model in RESEARCH §Security Domain). `phase.complete` NOT run (verification is human_needed).
-Next action: operator runs the SC#10 live UAT (backend must be running with post-164 code; mig 110 already applied local) → then **`/gsd:verify-work 164`** to flip `164-HUMAN-UAT.md`/VERIFICATION to passed, and **`/gsd:secure-phase 164`** for the STRIDE mitigation audit. THEN phase-close + advance to Phase 165 (`is_global` retirement — MUST close CR-01/WR-01 per [[SEED-124]]). **Plan 164-05 shipped (gap closure from `164-REVIEW.md`):** WR-02 fixed — `_inject_folder_scope` (`sql_service.py`) now splices the `folder_id IN (...)` condition into the WHERE **before** any trailing `ORDER BY`/`GROUP BY`/`HAVING`/`LIMIT`/`OFFSET` (the 164-04 `_inject_user_id`-deletion regression that broke folder-scoped `query_documents`); `_detect_alias` + documents-vs-folders ref + SELECT-only/no-`;` guards preserved verbatim; +4 `folder_scope` unit legs. CR-01 (service-role KB browse/read tools leak cross-org via the org-blind `folder_utils.py` helpers) is **NOT fixed here — folded to Phase 165 per operator (SEED-124)**; the exit gate gains `test_browse_tools_cross_org_leak_KNOWN_OPEN_seed124` (`xfail(strict)`) that drives the real service-role `get_globally_visible_folder_ids` as user B against A's `is_global` folder — the leak is live so it XFAILs; when 165 org-scopes the helpers it flips to XPASS-strict → forces marker removal + SEED-124 close. `folder_utils.py` UNTOUCHED. Exit-gate suite `test_v3_4_org_isolation.py` now **22 passed / 1 xfailed (exit 0)**. **Plan 164-04 (prior):** the producer's three retrieval RPCs (`match_document_chunks`/`keyword_search_chunks` via `retrieval_service`; `match_skills` via `agent_loop`) + the text-to-SQL/grep `query_user_documents` path now run over the Phase-163 asyncpg `get_user_pg_connection` user-context (shared `retrieval_service._call_as_user` seam; embeddings as `'[...]'::public.vector`, id `::text` for str-key parity) — `auth.uid()` now resolves the caller in the producer, so migration 110's in-body org gate is LIVE and retrieval returns the caller's rows again (not the 0-for-everyone service-role transient). `_inject_user_id` (sql_service) + `_inject_user_id_for_grep` (kb.py) DELETED; `_inject_folder_scope` + SELECT-only/no-`;` guards RETAINED; `query_user_documents` stays INVOKER (RLS is the gate). `tool_dispatcher` unchanged (the RPC leg self-acquires the user-context; `ctx.supabase` kept only for enrich/audit). **TEN-03 / TEN-05 / PRAG-01 → Complete** (TEN-06 already complete at 164-02). Full exit-gate `test_v3_4_org_isolation.py` **18/18 GREEN**; 163 crux not regressed (2 known pre-existing co-member failures, D-164-02-A); `test_kb.py` 24/24 (grep tests re-pointed at the user-context seam); CONCUR-01 <1s. Deep Mode byte-identical (DB-connection-seam swap, no provider fork, D-14). **Out-of-scope logged (`deferred-items.md`):** D-164-04-A (27 pre-existing async-not-awaited rot tests in `test_retrieval_service`/`test_sql_service` — coroutine-never-awaited, predates 164) + D-164-04-B (`test_stale_model_chunks_excluded` broke at 164-03/mig-110 — needs a user-context-connection update). **Cloud parity owed:** migs 099→110 + `SECRETS_ENCRYPTION_KEY` at next operator-gated push.
-Last activity: 2026-07-20 -- Phase 164 Plan 05 complete (gap closure — WR-02 folder-scope SQL fix + CR-01/SEED-124 xfail marker; exit gate 22 passed / 1 xfailed)
+Phase: 165
+Plan: Not started
+Status: Ready to plan
+Next action: **Phase 164 CLOSED 2026-07-20** — secure-phase SECURED (threats_open:0, ASVS L2, `164-SECURITY.md`); verify-work **2/2 PASS** (Test 1 SC#10 4-axis cross-provider: operator live + DB double-confirm — 7 recent threads single-org, every `search_documents` returned citations = no empty-retrieval regression; Test 2 null-owner UI: Chrome-verified skill-creator hides Edit/Delete); VERIFICATION reconciled to **passed 8/8**; ROADMAP checkbox `[x]` + Progress table flipped; PROJECT.md/REQUIREMENTS.md evolved (TEN-03/05/06 + PRAG-01 Validated). **Next: `/gsd:discuss-phase 165`** (`is_global`→`is_org_shared` retirement — MUST close CR-01/WR-01 per [[SEED-124]]; the live `xfail(strict)` marker flips to XPASS when done). **Plan 164-05 shipped (gap closure from `164-REVIEW.md`):** WR-02 fixed — `_inject_folder_scope` (`sql_service.py`) now splices the `folder_id IN (...)` condition into the WHERE **before** any trailing `ORDER BY`/`GROUP BY`/`HAVING`/`LIMIT`/`OFFSET` (the 164-04 `_inject_user_id`-deletion regression that broke folder-scoped `query_documents`); `_detect_alias` + documents-vs-folders ref + SELECT-only/no-`;` guards preserved verbatim; +4 `folder_scope` unit legs. CR-01 (service-role KB browse/read tools leak cross-org via the org-blind `folder_utils.py` helpers) is **NOT fixed here — folded to Phase 165 per operator (SEED-124)**; the exit gate gains `test_browse_tools_cross_org_leak_KNOWN_OPEN_seed124` (`xfail(strict)`) that drives the real service-role `get_globally_visible_folder_ids` as user B against A's `is_global` folder — the leak is live so it XFAILs; when 165 org-scopes the helpers it flips to XPASS-strict → forces marker removal + SEED-124 close. `folder_utils.py` UNTOUCHED. Exit-gate suite `test_v3_4_org_isolation.py` now **22 passed / 1 xfailed (exit 0)**. **Plan 164-04 (prior):** the producer's three retrieval RPCs (`match_document_chunks`/`keyword_search_chunks` via `retrieval_service`; `match_skills` via `agent_loop`) + the text-to-SQL/grep `query_user_documents` path now run over the Phase-163 asyncpg `get_user_pg_connection` user-context (shared `retrieval_service._call_as_user` seam; embeddings as `'[...]'::public.vector`, id `::text` for str-key parity) — `auth.uid()` now resolves the caller in the producer, so migration 110's in-body org gate is LIVE and retrieval returns the caller's rows again (not the 0-for-everyone service-role transient). `_inject_user_id` (sql_service) + `_inject_user_id_for_grep` (kb.py) DELETED; `_inject_folder_scope` + SELECT-only/no-`;` guards RETAINED; `query_user_documents` stays INVOKER (RLS is the gate). `tool_dispatcher` unchanged (the RPC leg self-acquires the user-context; `ctx.supabase` kept only for enrich/audit). **TEN-03 / TEN-05 / PRAG-01 → Complete** (TEN-06 already complete at 164-02). Full exit-gate `test_v3_4_org_isolation.py` **18/18 GREEN**; 163 crux not regressed (2 known pre-existing co-member failures, D-164-02-A); `test_kb.py` 24/24 (grep tests re-pointed at the user-context seam); CONCUR-01 <1s. Deep Mode byte-identical (DB-connection-seam swap, no provider fork, D-14). **Out-of-scope logged (`deferred-items.md`):** D-164-04-A (27 pre-existing async-not-awaited rot tests in `test_retrieval_service`/`test_sql_service` — coroutine-never-awaited, predates 164) + D-164-04-B (`test_stale_model_chunks_excluded` broke at 164-03/mig-110 — needs a user-context-connection update). **Cloud parity owed:** migs 099→110 + `SECRETS_ENCRYPTION_KEY` at next operator-gated push.
+Last activity: 2026-07-20
 
 Progress: [██████████] 100%
 
