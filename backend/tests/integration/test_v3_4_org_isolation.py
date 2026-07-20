@@ -794,19 +794,20 @@ def test_folder_scope_group_by_having_placement():
 
 
 # ══════════════════════════════════════════════════════════════════════════════════
-# 164-05 Task 2 — CR-01 / SEED-124 KNOWN-OPEN marker (folded to Phase 165 per operator).
+# CLOSED by Phase 165 (SEED-124 / CR-01) — the cross-org KB browse-tool leak is fixed.
 #          The agent's KB browse/read tools (ls / tree / glob / read_document) run on the
-#          service-role BYPASSRLS client and resolve folder visibility through the
-#          org-BLIND helpers in `folder_utils.py` — so a disjoint-org user's agent can see
-#          another org's `is_global` folders + documents cross-org, the exact property this
-#          exit gate claims to eliminate. Migration 108 (RLS) + migration 110 (DEFINER)
-#          org-scope every OTHER path; these service-role Python helpers are the outlier.
+#          service-role BYPASSRLS client and resolve folder visibility through
+#          `folder_utils.py`. Plan 165-02 org-scoped those helpers (fail-closed caller-org
+#          resolution from `org_members`), so a disjoint-org user's agent no longer sees
+#          another org's org-shared folders + documents cross-org. Migration 108 (RLS) +
+#          migration 110 (DEFINER) org-scope every OTHER path; migration 111's semantic-split
+#          rename (-> is_org_shared / is_system_global) + 165-02 closed this last
+#          service-role Python outlier.
 #
-#          This xfail(strict) marker makes the exit gate COVER the browse-tool surface AND
-#          honestly document the known-open state: the suite stays green while the leak is
-#          tracked, and when Phase 165 org-scopes the folder helpers the test XPASSes →
-#          strict xfail FAILS → forcing this marker's removal (+ closing SEED-124). Do NOT
-#          fix the leak here — the fix is Phase 165 (SEED-124 / is_global retirement).
+#          The former strict expected-failure marker (which tracked the known-open state) is
+#          REMOVED: the two-org live drive below now stands as a normal passing regression
+#          assertion — the SC#4 arbiter that the leak is closed (proven live against the real
+#          service-role client via the XPASS→removal flip).
 # ══════════════════════════════════════════════════════════════════════════════════
 
 
@@ -865,39 +866,35 @@ def _service_role_supabase_or_skip():
 
 
 @pytest.mark.asyncio
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "SEED-124 / CR-01: KB browse-tool service-role folder helpers are org-blind; "
-        "closed by Phase 165 is_global retirement"
-    ),
-)
-async def test_browse_tools_cross_org_leak_KNOWN_OPEN_seed124(
+async def test_browse_tools_cross_org_isolation_seed124_closed(
     pg_pool, two_orgs_chunks_and_shared_folder
 ):
-    """KNOWN-OPEN (SEED-124 / CR-01) — the agent's KB browse/read tools leak cross-org.
+    """CLOSED by Phase 165 (SEED-124 / CR-01) — the agent's KB browse/read tools no longer
+    leak cross-org. This is the SC#4 arbiter: a normal passing assertion driven LIVE against
+    the real service-role client (not code inspection).
 
-    The fixture seeds an ``is_global`` folder + document owned by user A (org X). This leg
+    The fixture seeds an ``is_org_shared`` folder + document owned by user A (org X). This leg
     drives the REAL service-role folder-visibility helper
     (``folder_utils.get_globally_visible_folder_ids`` — the exact function ``read_path`` /
     ``ls_path`` / ``tree_path`` call on the BYPASSRLS client) as user B (org Y, disjoint) and
-    asserts B does NOT see A's ``is_global`` folder. The helper has NO org predicate, so B
-    DOES see A's folder cross-org → the assertion FAILS → ``xfail(strict)`` (expected). When
-    Phase 165 org-scopes the helpers (SEED-124), B stops seeing A's folder → the test
-    XPASSes → strict xfail FAILS → forcing this marker's removal. The leak is NOT fixed here
-    (folder_utils.py is untouched by 164-05); this marker only tracks it."""
+    asserts B does NOT see A's ``is_org_shared`` folder. Plan 165-02 org-scoped the helper
+    (fail-closed caller-org resolution from ``org_members``), so B — a disjoint-org caller —
+    resolves 0 of A's shared folders and the assertion PASSES. Formerly a strict
+    expected-failure marker while the leak was open; the marker was removed once 165-02 closed
+    the leak (the test XPASSed → the strict expected-failure FAILed → forcing the flip to this
+    normal passing regression test)."""
     from app.utils.folder_utils import get_globally_visible_folder_ids
 
     ctx = two_orgs_chunks_and_shared_folder
     a, b = ctx["a"], ctx["b"]
     sb = _service_role_supabase_or_skip()
 
-    # Service-role browse path exactly as the KB read/ls/tree tools invoke it (org-blind).
+    # Service-role browse path exactly as the KB read/ls/tree tools invoke it (now org-scoped).
     visible_ids = {str(fid) for fid in await get_globally_visible_folder_ids(sb, b["uid"])}
 
     assert a["shared_folder_id"] not in visible_ids, (
-        "CR-01 cross-org leak: user B (org Y) sees user A's (org X) is_global folder "
+        "CR-01 cross-org leak: user B (org Y) sees user A's (org X) org-shared folder "
         f"{a['shared_folder_id']} via the service-role folder-visibility helper — the KB "
         "browse/read tools bypass the membership org gate that RLS/DEFINER enforce everywhere "
-        "else. Closed by Phase 165 (SEED-124); this xfail marker tracks the known-open state."
+        "else. Closed by Phase 165 (SEED-124 / 165-02 org-scoped folder_utils.py)."
     )
