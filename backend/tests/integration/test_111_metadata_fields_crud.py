@@ -1,6 +1,6 @@
 """Phase 111 Wave-0 (RED) — metadata_field_definitions CRUD + RLS forcing (META-01).
 
-The CRUD create endpoint forces `user_id=caller` and `is_global=false` (no
+The CRUD create endpoint forces `user_id=caller` and `is_system_global=false` (no
 client-supplied ownership escalation); list returns own + global enabled rows.
 
 RED convention: the CRUD endpoint lands in Plan 03. Until then the create call
@@ -153,7 +153,7 @@ async def test_user(pg_pool):
 
 @pytest.mark.asyncio
 async def test_crud_create_forces_owner_and_not_global(pg_pool, test_user):
-    """The CRUD create path forces user_id=caller and is_global=false."""
+    """The CRUD create path forces user_id=caller and is_system_global=false."""
     if not await _table_exists(pg_pool, "metadata_field_definitions"):
         pytest.skip("migration 071 not applied (metadata_field_definitions absent)")
 
@@ -165,16 +165,16 @@ async def test_crud_create_forces_owner_and_not_global(pg_pool, test_user):
         field_key="contract_value",
         field_type="number",
         # A client trying to escalate to global must be ignored.
-        is_global=True,
+        is_system_global=True,
         supabase=sb,
     )
     row = await pg_pool.fetchrow(
-        "SELECT user_id, is_global FROM public.metadata_field_definitions WHERE id = $1",
+        "SELECT user_id, is_system_global FROM public.metadata_field_definitions WHERE id = $1",
         created["id"],
     )
     assert row is not None, "created field row must exist"
     assert row["user_id"] == test_user, "create must force user_id=caller"
-    assert row["is_global"] is False, "create must force is_global=false (no escalation)"
+    assert row["is_system_global"] is False, "create must force is_system_global=false (no escalation)"
 
 
 @pytest.mark.asyncio
@@ -198,7 +198,7 @@ async def test_list_returns_own_plus_global_enabled(pg_pool, test_user):
     assert "own_field" in keys, "list must return the caller's own field def"
     # Every returned row is either the caller's own or a global row.
     for f in fields:
-        assert str(f["user_id"]) == str(test_user) or f["is_global"] is True
+        assert str(f["user_id"]) == str(test_user) or f["is_system_global"] is True
 
 
 @pytest.mark.asyncio

@@ -133,7 +133,7 @@ async def _seed_view(pool, owner_id, *, name, field, value):
     view_id = uuid4()
     filter_expr = {"op": "and", "conditions": [{"field": field, "op": "eq", "value": value}]}
     await pool.execute(
-        "INSERT INTO public.document_views (id, user_id, name, filter_expr, is_global) "
+        "INSERT INTO public.document_views (id, user_id, name, filter_expr, is_system_global) "
         "VALUES ($1, $2, $3, $4, false)",
         view_id, owner_id, name, filter_expr,
     )

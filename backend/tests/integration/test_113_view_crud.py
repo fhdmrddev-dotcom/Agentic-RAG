@@ -184,7 +184,7 @@ async def test_create_writes_audit(pg_pool, test_user):
         body=body, current_user={"id": str(test_user)}, supabase=sb
     )
     assert created["name"] == "Invoices"
-    assert created["is_global"] is False, "create must hard-set is_global=false"
+    assert created["is_system_global"] is False, "create must hard-set is_system_global=false"
 
     # The audit write SWALLOWS errors — the LIVE round-trip is the real proof.
     row = await pg_pool.fetchrow(

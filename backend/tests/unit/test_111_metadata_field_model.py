@@ -104,5 +104,5 @@ def test_response_model_constructs():
         field_type="number",
     )
     assert resp.field_key == "contract_value"
-    assert resp.is_global is False
+    assert resp.is_system_global is False
     assert resp.enabled is True
