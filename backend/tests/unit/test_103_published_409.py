@@ -96,7 +96,7 @@ async def test_patch_published_row_is_immutable_via_route_404_and_no_mutation():
         body = _published_definition(slug)
         async with pool.acquire() as con:
             def_id = await con.fetchval(
-                "INSERT INTO workflow_definitions (slug, version, name, status, definition, created_by, is_global) "
+                "INSERT INTO workflow_definitions (slug, version, name, status, definition, created_by, is_system_global) "
                 "VALUES ($1, 1, $2, 'published', $3::jsonb, $4, false) RETURNING id",
                 slug, body["name"], __import__("json").dumps(body), owner,
             )
@@ -140,7 +140,7 @@ async def test_delete_published_row_is_immutable_via_route_404_and_row_survives(
         body = _published_definition(slug)
         async with pool.acquire() as con:
             def_id = await con.fetchval(
-                "INSERT INTO workflow_definitions (slug, version, name, status, definition, created_by, is_global) "
+                "INSERT INTO workflow_definitions (slug, version, name, status, definition, created_by, is_system_global) "
                 "VALUES ($1, 1, $2, 'published', $3::jsonb, $4, false) RETURNING id",
                 slug, body["name"], __import__("json").dumps(body), owner,
             )

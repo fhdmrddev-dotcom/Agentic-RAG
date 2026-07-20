@@ -234,7 +234,7 @@ async def test_write_audit_rejects_unknown_event_type_before_insert(mock_asyncpg
 async def test_list_published_workflows_scopes_to_published_owned_or_global(
     mock_asyncpg_pool
 ):
-    """The picker feed: only status='published' rows, scoped to (is_global OR
+    """The picker feed: only status='published' rows, scoped to (is_system_global OR
     created_by=user). The WHERE clause enforces the RLS-mirroring predicate
     (T-092-07) and the result carries id/slug/name.
     """
@@ -253,7 +253,7 @@ async def test_list_published_workflows_scopes_to_published_owned_or_global(
     ]
     sql, args = mock_asyncpg_pool.calls[-1]
     assert "status = 'published'" in sql
-    assert "is_global = true OR created_by = $1" in sql
+    assert "is_system_global = true OR created_by = $1" in sql
     assert args == (user_id,)
 
 
@@ -368,7 +368,7 @@ async def test_producer_branches_harness_when_anchor_set(
     def_row = {
         "id": str(def_id),
         "status": "published",
-        "is_global": True,
+        "is_system_global": True,
         "created_by": str(uuid.uuid4()),
         "definition": {
             "slug": "wf", "version": 1, "name": "WF", "status": "published",
@@ -454,7 +454,7 @@ async def test_harness_failure_terminalizes_and_clears_anchor(
     def_row = {
         "id": str(def_id),
         "status": "published",
-        "is_global": True,
+        "is_system_global": True,
         "created_by": str(uuid.uuid4()),
         "definition": {
             "slug": "wf", "version": 1, "name": "WF", "status": "published",
@@ -544,7 +544,7 @@ async def test_user_cancel_terminalizes_workflow_as_cancelled(
     def_row = {
         "id": str(def_id),
         "status": "published",
-        "is_global": True,
+        "is_system_global": True,
         "created_by": str(uuid.uuid4()),
         "definition": {
             "slug": "wf", "version": 1, "name": "WF", "status": "published",
@@ -1785,7 +1785,7 @@ async def test_harness_final_output_persisted_as_assistant_message(
     def_row = {
         "id": str(def_id),
         "status": "published",
-        "is_global": True,
+        "is_system_global": True,
         "created_by": str(uuid.uuid4()),
         "definition": {
             "slug": "wf", "version": 1, "name": "WF", "status": "published",
@@ -1891,7 +1891,7 @@ async def test_harness_final_output_emits_delta_for_live_render(
     def_row = {
         "id": str(def_id),
         "status": "published",
-        "is_global": True,
+        "is_system_global": True,
         "created_by": str(uuid.uuid4()),
         "definition": {
             "slug": "wf", "version": 1, "name": "WF", "status": "published",
@@ -2069,7 +2069,7 @@ async def test_harness_final_grounding_persisted_with_deep_param_shape(
     def_row = {
         "id": str(def_id),
         "status": "published",
-        "is_global": True,
+        "is_system_global": True,
         "created_by": str(uuid.uuid4()),
         "definition": {
             "slug": "wf", "version": 1, "name": "WF", "status": "published",
@@ -2174,7 +2174,7 @@ async def test_harness_final_grounding_emits_sources_citations_confidence_live(
     def_row = {
         "id": str(def_id),
         "status": "published",
-        "is_global": True,
+        "is_system_global": True,
         "created_by": str(uuid.uuid4()),
         "definition": {
             "slug": "wf", "version": 1, "name": "WF", "status": "published",

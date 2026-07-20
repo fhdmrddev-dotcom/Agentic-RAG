@@ -144,14 +144,14 @@ async def two_users(pg_pool):
 # Seed helpers
 # ----------------------------------------------------------------------------
 
-async def _seed_definition(pg_pool, *, slug, version, name, created_by, status="published", is_global=False):
+async def _seed_definition(pg_pool, *, slug, version, name, created_by, status="published", is_system_global=False):
     """Insert one workflow_definitions row (minimal valid definition JSONB)."""
     return await pg_pool.fetchval(
-        "INSERT INTO workflow_definitions (slug, version, name, status, definition, created_by, is_global) "
+        "INSERT INTO workflow_definitions (slug, version, name, status, definition, created_by, is_system_global) "
         "VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7) RETURNING id",
         slug, version, name, status,
         json.dumps({"slug": slug, "version": version, "phases": []}),
-        created_by, is_global,
+        created_by, is_system_global,
     )
 
 
@@ -478,7 +478,7 @@ async def test_route_preview_reports_in_flight(pg_pool, route_owner):
 
 @pytest.mark.asyncio
 async def test_route_wr01_refuse_global_cross_user(pg_pool, route_owner):
-    """WR-01: an is_global definition with ANOTHER user's run → cascade DELETE 409, and
+    """WR-01: an is_system_global definition with ANOTHER user's run → cascade DELETE 409, and
     BOTH the definition and the other user's run are UNTOUCHED (nothing cross-user deleted)."""
     import contextlib
 
@@ -490,7 +490,7 @@ async def test_route_wr01_refuse_global_cross_user(pg_pool, route_owner):
     owner, other = route_owner
     slug = f"wf-route-wr01-{uuid4().hex[:8]}"
     d1 = await _seed_definition(
-        pg_pool, slug=slug, version=1, name="Global WF", created_by=owner, is_global=True
+        pg_pool, slug=slug, version=1, name="Global WF", created_by=owner, is_system_global=True
     )
     other_thread = await _seed_thread(pg_pool, user_id=other)
     other_run = await _seed_run(

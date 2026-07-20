@@ -77,8 +77,8 @@ def test_migration_061_exists_and_is_idempotent_global_published():
     # 4 seed INSERTs into workflow_definitions, each idempotent (ON CONFLICT).
     assert sql.count("INSERT INTO public.workflow_definitions") == 4
     assert sql.count("ON CONFLICT (id) DO NOTHING") >= 4
-    # is_global true on each seed (the 4 trailing `true` + the seed-user row uses
-    # ON CONFLICT, not is_global) — assert at least 4 `true` flags.
+    # is_system_global true on each seed (the 4 trailing `true` + the seed-user row uses
+    # ON CONFLICT, not is_system_global) — assert at least 4 `true` flags.
     assert sql.count("\n  true\n") >= 4
     # Seed system user present (created_by FK).
     assert "00000000-0000-0000-0000-000000000001" in sql

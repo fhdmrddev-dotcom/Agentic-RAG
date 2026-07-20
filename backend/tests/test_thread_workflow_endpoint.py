@@ -243,8 +243,8 @@ async def test_list_published_workflows_project_filter(mock_asyncpg_pool):
     sql, args = mock_asyncpg_pool.calls[-1]
     # JSONB-path predicate present, user-scope preserved and evaluated first.
     assert "definition->>'project_folder_id'" in sql
-    assert "is_global = true OR created_by = $1" in sql
-    assert sql.index("is_global = true OR created_by = $1") < sql.index(
+    assert "is_system_global = true OR created_by = $1" in sql
+    assert sql.index("is_system_global = true OR created_by = $1") < sql.index(
         "definition->>'project_folder_id'"
     )
     # Exactly two bound params: user_id ($1), then the project folder as TEXT ($2).

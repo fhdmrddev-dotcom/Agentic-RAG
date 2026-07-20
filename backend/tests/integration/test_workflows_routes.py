@@ -90,20 +90,20 @@ def _draft_definition(slug: str) -> dict:
     }
 
 
-async def _insert_published(con, *, slug: str, definition: dict, created_by, is_global: bool):
+async def _insert_published(con, *, slug: str, definition: dict, created_by, is_system_global: bool):
     import json
     import uuid
 
     await con.execute(
         "INSERT INTO workflow_definitions "
-        "(id, slug, version, name, status, definition, created_by, is_global) "
+        "(id, slug, version, name, status, definition, created_by, is_system_global) "
         "VALUES ($1, $2, 1, $3, 'published', $4::jsonb, $5, $6)",
         uuid.uuid4(),
         slug,
         definition["name"],
         json.dumps(definition),
         created_by,
-        is_global,
+        is_system_global,
     )
 
 
@@ -126,7 +126,7 @@ async def test_get_starter_workflows_returns_seeded_starters():
                 slug=starter_slug,
                 definition=_starter_definition(starter_slug),
                 created_by=owner,
-                is_global=True,
+                is_system_global=True,
             )
         current_user = {"id": str(owner)}
         try:
@@ -171,14 +171,14 @@ async def test_published_scope_mine_narrows():
                     slug=own_slug,
                     definition=_published_definition(own_slug),
                     created_by=owner,
-                    is_global=False,
+                    is_system_global=False,
                 )
                 await _insert_published(
                     con,
                     slug=global_slug,
                     definition=_published_definition(global_slug),
                     created_by=other,
-                    is_global=True,
+                    is_system_global=True,
                 )
             with patch("app.api.workflows.get_pg_pool", AsyncMock(return_value=pool)):
                 # RED: the scope param does not exist until Plan 02 → TypeError.

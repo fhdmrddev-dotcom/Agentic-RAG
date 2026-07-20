@@ -4,7 +4,7 @@ These pin the two DB-layer acceptance behaviors BEFORE Plan 02 implements them, 
 each has a failing target to turn green:
 
   • SC-a — ``list_starter_workflows(pool)`` returns ONLY curated globals
-    (``is_global=true AND definition->>'category'='starter'``) and EXCLUDES the 5
+    (``is_system_global=true AND definition->>'category'='starter'``) and EXCLUDES the 5
     mig-061 dev scaffolds (they lack the ``category`` marker). D-143-2 / D-143-2a.
   • SC-b — ``list_published_workflows(..., owned_only=True)`` narrows to
     ``created_by=me`` (no global double-render); ``owned_only=False`` (the DEFAULT
@@ -32,7 +32,7 @@ _DSN = os.environ.get(
     "postgresql://postgres:postgres@127.0.0.1:54322/postgres",
 )
 
-# The 5 mig-061 dev scaffolds — is_global published, but WITHOUT the category marker,
+# The 5 mig-061 dev scaffolds — is_system_global published, but WITHOUT the category marker,
 # so they must NOT appear in the Starters shelf (D-143-2a).
 _SCAFFOLD_SLUGS = (
     "research_summarize",
@@ -90,23 +90,23 @@ def _published_definition(slug: str, *, category: str | None = None) -> dict:
 
 
 async def _insert_definition(
-    con, *, slug: str, name: str, definition: dict, created_by, is_global: bool
+    con, *, slug: str, name: str, definition: dict, created_by, is_system_global: bool
 ):
-    """Direct is_global-capable INSERT (service role bypasses RLS). Returns the new id."""
+    """Direct is_system_global-capable INSERT (service role bypasses RLS). Returns the new id."""
     import json
     import uuid
 
     new_id = uuid.uuid4()
     await con.execute(
         "INSERT INTO workflow_definitions "
-        "(id, slug, version, name, status, definition, created_by, is_global) "
+        "(id, slug, version, name, status, definition, created_by, is_system_global) "
         "VALUES ($1, $2, 1, $3, 'published', $4::jsonb, $5, $6)",
         new_id,
         slug,
         name,
         json.dumps(definition),
         created_by,
-        is_global,
+        is_system_global,
     )
     return new_id
 
@@ -132,7 +132,7 @@ async def test_starters_query_excludes_scaffolds():
                 name="RED Starter Test",
                 definition=_starter_definition(starter_slug),
                 created_by=owner,
-                is_global=True,
+                is_system_global=True,
             )
         try:
             rows = await list_starter_workflows(pool)
@@ -177,7 +177,7 @@ async def test_published_owned_only_and_default():
                     name="RED Owned Test",
                     definition=_published_definition(own_slug),
                     created_by=owner,
-                    is_global=False,
+                    is_system_global=False,
                 )
                 await _insert_definition(
                     con,
@@ -185,7 +185,7 @@ async def test_published_owned_only_and_default():
                     name="RED Global Test",
                     definition=_published_definition(global_slug),
                     created_by=other,
-                    is_global=True,
+                    is_system_global=True,
                 )
 
             # RED: the owned_only kwarg does NOT exist until Plan 02 → TypeError.

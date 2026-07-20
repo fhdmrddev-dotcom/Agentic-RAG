@@ -264,7 +264,7 @@ def test_harness_publish_max_seconds_config_present():
 @pytest.mark.asyncio
 async def test_get_definition_publish_read_is_owner_only_for_drafts():
     """WR-02 / T-102-09-01: ``get_definition``'s publish read restricts drafts to true
-    ownership — the bare ``OR is_global = true`` is GONE; a global row is readable only
+    ownership — the bare ``OR is_system_global = true`` is GONE; a global row is readable only
     when PUBLISHED. The SQL predicate is the security boundary (a non-owner can no longer
     load a global DRAFT → no golden run / no flip on another user's draft)."""
     from unittest.mock import AsyncMock as _AsyncMock
@@ -287,9 +287,9 @@ async def test_get_definition_publish_read_is_owner_only_for_drafts():
     assert result is None  # a non-owner gets None for a global draft
     q = captured["query"]
     # The corrected, owner-only-for-drafts predicate:
-    assert "(is_global = true AND status = 'published')" in q
+    assert "(is_system_global = true AND status = 'published')" in q
     # The over-wide bare global predicate is GONE (no global-DRAFT exposure):
-    assert "OR is_global = true)" not in q
+    assert "OR is_system_global = true)" not in q
     # $N placeholders only — the owner id is bound as $2 (no f-string SQL):
     assert "created_by = $2" in q
     assert captured["args"] == (_DEF_ID, other_user)

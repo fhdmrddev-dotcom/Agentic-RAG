@@ -76,7 +76,7 @@ def _two_owners(cur):
 # ── Plan 01 Task 2 fills these (DB-fn level) — GREEN against :54322 ────────────
 @pytest.mark.asyncio
 async def test_create_persists_draft_and_returns_id_version():
-    """create_workflow_definition INSERTs status='draft', is_global=false and
+    """create_workflow_definition INSERTs status='draft', is_system_global=false and
     RETURNs {id, version}; a re-read shows the row owned by the caller."""
     import asyncpg
 
