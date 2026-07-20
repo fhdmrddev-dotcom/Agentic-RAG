@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v3.4
 milestone_name: Multi-Tenancy & Org Access
-status: executing
-last_updated: "2026-07-20T00:00:00.000Z"
+status: ready_to_plan
+last_updated: 2026-07-20T13:52:58.455Z
 last_activity: 2026-07-20 -- Phase 163 all 11 plans complete (163-11 FIX-A closed out); secure/verify next
 progress:
   total_phases: 28
@@ -11,6 +11,7 @@ progress:
   total_plans: 21
   completed_plans: 21
   percent: 14
+stopped_at: Phase 163 complete (11/11) — ready to discuss Phase 164
 ---
 
 # Project State
@@ -19,10 +20,10 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-07-18 — v3.3 Operator UX SHIPPED + archived)
+See: .planning/PROJECT.md (updated 2026-07-20 — Phase 163 THE ATOMIC CRUX complete; membership RLS enforced)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 163 — rls-rewrite-per-request-user-jwt-client-swap-the-atomic-crux
+**Current focus:** Phase 164 — secdef audit + cross org isolation test suite
 
 ## Deferred Items
 
@@ -40,13 +41,13 @@ Items acknowledged and deferred at milestone close on 2026-07-18 (44 open `audit
 
 ## Current Position
 
-Phase: 163 (rls-rewrite-per-request-user-jwt-client-swap-the-atomic-crux) — ALL 11 PLANS COMPLETE
-Plan: 11 of 11
-Status: Phase 163 code complete + SECURED — one bookkeeping gate remaining (verify-work)
-Next action: `/gsd:verify-work 163` — re-confirm UAT Test 7 (global/system visibility) now passes under mig 109 and flip `163-UAT.md` (status: diagnosed → pass). THEN Phase 163 is closeable and Phase 164 (SECDEF Audit + Cross-Org Isolation Suite) is unblocked. DONE 2026-07-20: (a) 163-11 FIX-A closed out — mig 109 platform-universal RLS fix + T-163-11 badge-spoof hardening; all 9 policies verified live @ :54322, test_163_rls_platform_universal 8/8, full test_163_* + CONCUR-01 35/35 GREEN, Deep red-line HELD; (b) `/gsd:secure-phase 163` mig-109 delta re-audit — **28/28 STRIDE CLOSED, threats_open:0** (`2ed3a21f`; added T-163-11 + T-163-11b, re-verified T-163-08b/07b under Fix-A policies).
-Last activity: 2026-07-20 -- Phase 163 all 11 plans complete (163-11 FIX-A closed out)
+Phase: 164
+Plan: Not started
+Status: Ready to plan
+Next action: `/gsd:discuss-phase 164` — SECDEF Audit + Cross-Org Isolation Test Suite (TEN-03, TEN-05, TEN-06, PRAG-01). The 4 SECURITY DEFINER retrieval/sharing fns get an in-body org predicate + pinned search_path, the fragile regex is deleted, and the two-org adversarial `test_v3_4_org_isolation.py` suite (the milestone exit gate) is built. Flags: SC#10, threat model (security core), research-phase (pgvector+RLS), folds SEED-091. **Phase 163 CLOSED 2026-07-20** — THE ATOMIC CRUX complete: 11/11 plans, UAT 8/8, secure-phase 28/28 STRIDE (threats_open:0), TEN-01/TEN-02/TEN-04 Validated. Membership-based RLS is now the enforced gate on every request path.
+Last activity: 2026-07-20 -- Phase 163 CLOSED (atomic crux complete: 11/11 + UAT 8/8 + 28/28 secured)
 
-Progress: [██████████] 100% (11/11 plans; phase close-out pending secure + verify)
+Progress: [████████████████████] 21/21 plans (100%) — Phase 163 done; Phase 164 ready to plan
 
 ### Quick Tasks Completed
 
