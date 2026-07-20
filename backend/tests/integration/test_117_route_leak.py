@@ -164,11 +164,11 @@ async def _seed_user(pool, label):
 
 
 async def _seed_global_folder(pool, owner_id, *, name):
-    """A folder owned by `owner_id` with is_global=true → its docs are visible to EVERYONE.
+    """A folder owned by `owner_id` with is_org_shared=true → its docs are visible to EVERYONE.
     The SUBJECT lives here so user B can read it even though A owns it."""
     folder_id = uuid4()
     await pool.execute(
-        "INSERT INTO public.folders (id, user_id, name, is_global) VALUES ($1, $2, $3, true)",
+        "INSERT INTO public.folders (id, user_id, name, is_org_shared) VALUES ($1, $2, $3, true)",
         folder_id, owner_id, name,
     )
     return folder_id

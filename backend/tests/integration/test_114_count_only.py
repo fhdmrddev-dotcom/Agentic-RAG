@@ -202,10 +202,10 @@ async def _seed_doc(pool, user_id, *, metadata, created_at, folder_id=None, is_l
 
 
 async def _seed_global_folder(pool, owner_id):
-    """A folder owned by `owner_id` with is_global=true (globally visible to others)."""
+    """A folder owned by `owner_id` with is_org_shared=true (globally visible to others)."""
     folder_id = uuid4()
     await pool.execute(
-        "INSERT INTO folders (id, user_id, name, parent_id, is_global) "
+        "INSERT INTO folders (id, user_id, name, parent_id, is_org_shared) "
         "VALUES ($1, $2, $3, NULL, true)",
         folder_id, owner_id, f"global-{folder_id}",
     )

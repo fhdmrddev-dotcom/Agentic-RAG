@@ -73,8 +73,9 @@ class _FakeSupabase:
 
 # ── FOLDERS (the shared helper IS the folder serialize seam) ─────────────────────
 def test_folders_null_foreign_global_owner():
-    # Phase 165 (D-165-01): folders.is_global RENAMED -> is_org_shared; _null_foreign_global_owner's
-    # predicate now reads is_org_shared (is_system branch unchanged). Rows updated in-place to match.
+    # Phase 165 (D-165-01): folders' legacy global flag was RENAMED -> is_org_shared;
+    # _null_foreign_global_owner's predicate now reads is_org_shared (is_system branch unchanged).
+    # Rows updated in-place to match.
     rows = [
         {"id": "f-foreign-global", "user_id": OWNER, "is_org_shared": True},   # (a) shared, not owned
         {"id": "f-foreign-private", "user_id": OWNER, "is_org_shared": False}, # (c) non-shared -> untouched
@@ -99,15 +100,15 @@ def test_folders_null_foreign_global_owner():
 @pytest.mark.asyncio
 async def test_skills_list_nulls_foreign_global_and_system_owner():
     rows = [
-        {"id": "s-foreign-global", "user_id": OWNER, "name": "g", "is_global": True, "is_system": False},
-        {"id": "s-foreign-system", "user_id": OWNER, "name": "sys", "is_global": False, "is_system": True},
-        {"id": "s-own-global", "user_id": CALLER, "name": "og", "is_global": True, "is_system": False},
-        {"id": "s-own-private", "user_id": CALLER, "name": "op", "is_global": False, "is_system": False},
+        {"id": "s-foreign-global", "user_id": OWNER, "name": "g", "is_org_shared": True, "is_system": False},
+        {"id": "s-foreign-system", "user_id": OWNER, "name": "sys", "is_org_shared": False, "is_system": True},
+        {"id": "s-own-global", "user_id": CALLER, "name": "og", "is_org_shared": True, "is_system": False},
+        {"id": "s-own-private", "user_id": CALLER, "name": "op", "is_org_shared": False, "is_system": False},
     ]
     out = await list_skills(current_user={"id": CALLER}, supabase=_FakeSupabase(rows))
     by_id = {r["id"]: r for r in out}
 
-    assert by_id["s-foreign-global"]["user_id"] is None          # (a) is_global, non-owner
+    assert by_id["s-foreign-global"]["user_id"] is None          # (a) is_org_shared, non-owner
     assert by_id["s-foreign-system"]["user_id"] is None          # is_system, non-owner (mig-109 surface)
     assert by_id["s-own-global"]["user_id"] == CALLER            # (b) owner of a global row
     assert by_id["s-own-private"]["user_id"] == CALLER           # (c) non-global -> untouched
@@ -122,8 +123,8 @@ async def test_skills_list_nulls_foreign_global_and_system_owner():
 async def test_skills_owner_keeps_own_identity_on_global_and_system():
     """The seeding OWNER reading their OWN global/system skills still sees their user_id."""
     rows = [
-        {"id": "s-global", "user_id": OWNER, "name": "g", "is_global": True, "is_system": False},
-        {"id": "s-system", "user_id": OWNER, "name": "sys", "is_global": False, "is_system": True},
+        {"id": "s-global", "user_id": OWNER, "name": "g", "is_org_shared": True, "is_system": False},
+        {"id": "s-system", "user_id": OWNER, "name": "sys", "is_org_shared": False, "is_system": True},
     ]
     out = await list_skills(current_user={"id": OWNER}, supabase=_FakeSupabase(rows))
     by_id = {r["id"]: r for r in out}
@@ -141,11 +142,11 @@ async def test_views_list_nulls_user_id_and_folder_scope_for_non_owner():
     scope_owng = "cccccccc-cccc-cccc-cccc-cccccccccccc"
     rows = [
         {"id": "v-foreign-global", "user_id": OWNER, "name": "fg",
-         "filter_expr": {}, "folder_scope": scope_foreign, "is_global": True},
+         "filter_expr": {}, "folder_scope": scope_foreign, "is_system_global": True},
         {"id": "v-own-private", "user_id": CALLER, "name": "op",
-         "filter_expr": {}, "folder_scope": scope_own, "is_global": False},
+         "filter_expr": {}, "folder_scope": scope_own, "is_system_global": False},
         {"id": "v-own-global", "user_id": CALLER, "name": "og",
-         "filter_expr": {}, "folder_scope": scope_owng, "is_global": True},
+         "filter_expr": {}, "folder_scope": scope_owng, "is_system_global": True},
     ]
     out = await list_views(CALLER, supabase=_FakeSupabase(rows))
     by_id = {r["id"]: r for r in out}
@@ -171,7 +172,7 @@ async def test_views_owner_read_keeps_scope():
     """OWNER reading their OWN global view keeps both user_id and folder_scope."""
     scope = "dddddddd-dddd-dddd-dddd-dddddddddddd"
     rows = [{"id": "v-own", "user_id": OWNER, "name": "og",
-             "filter_expr": {}, "folder_scope": scope, "is_global": True}]
+             "filter_expr": {}, "folder_scope": scope, "is_system_global": True}]
     out = await list_views(OWNER, supabase=_FakeSupabase(rows))
     assert out[0]["user_id"] == OWNER
     assert out[0]["folder_scope"] == scope
