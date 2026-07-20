@@ -140,7 +140,7 @@ EMIT_TOOL: dict = {
 def _skill_registry(supabase, user_id: str) -> list[dict]:
     """Owner + global ENABLED skills (service-role bypasses RLS — scope by hand).
 
-    Reproduces the spike's query shape (RESEARCH A3) — ``user_id.eq OR is_global`` +
+    Reproduces the spike's query shape (RESEARCH A3) — ``user_id.eq OR is_org_shared`` +
     an ``is_enabled`` filter. ``skill_ref`` in a PhaseConfig is the skill ``id`` (a UUID),
     so the caller builds the membership set from ``s["id"]``.
 
@@ -151,8 +151,8 @@ def _skill_registry(supabase, user_id: str) -> list[dict]:
     try:
         rows = (
             supabase.table("skills")
-            .select("id,name,is_global,user_id,is_enabled")
-            .or_(f"user_id.eq.{user_id},is_global.eq.true")
+            .select("id,name,is_org_shared,user_id,is_enabled")
+            .or_(f"user_id.eq.{user_id},is_org_shared.eq.true")
             .execute()
             .data
         ) or []
@@ -166,8 +166,8 @@ def _skill_registry(supabase, user_id: str) -> list[dict]:
         try:
             rows = (
                 supabase.table("skills")
-                .select("id,name,is_global,user_id,is_enabled")
-                .or_(f"user_id.eq.{user_id},is_global.eq.true")
+                .select("id,name,is_org_shared,user_id,is_enabled")
+                .or_(f"user_id.eq.{user_id},is_org_shared.eq.true")
                 .execute()
                 .data
             ) or []
@@ -177,7 +177,7 @@ def _skill_registry(supabase, user_id: str) -> list[dict]:
     return [
         r
         for r in rows
-        if r.get("is_enabled") and (str(r.get("user_id")) == str(user_id) or r.get("is_global"))
+        if r.get("is_enabled") and (str(r.get("user_id")) == str(user_id) or r.get("is_org_shared"))
     ]
 
 

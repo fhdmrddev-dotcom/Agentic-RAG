@@ -1270,7 +1270,7 @@ async def run_agent_loop(
             _skills_resp = await aexec(
                 supabase.table("skills")
                 .select("id, name, description")
-                .or_(f"user_id.eq.{current_user['id']},is_global.eq.true")
+                .or_(f"user_id.eq.{current_user['id']},is_org_shared.eq.true")
                 .eq("is_enabled", True)
                 .order("name")
             )
@@ -1308,7 +1308,7 @@ async def run_agent_loop(
                         # (V4 — no cross-user leak) and filters the CURRENT embedding model
                         # (D-10 stale guard); a vector-less skill returns similarity NULL.
                         # Phase 164 (D-164-02): match_skills is DEFINER — its in-body org gate
-                        # (is_system UNIVERSAL escape OUTSIDE the gate, owner/is_global INSIDE —
+                        # (is_system UNIVERSAL escape OUTSIDE the gate, owner/is_org_shared INSIDE —
                         # mig 109 FIX-A) resolves the caller only when auth.uid() is set, so run
                         # it over the asyncpg user-context, NOT the service-role producer supabase.
                         # Same vector-literal wrinkle (Pitfall 3); id cast ::text so keys match the

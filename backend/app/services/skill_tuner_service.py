@@ -23,7 +23,7 @@ THIN orchestration over the SHIPPED ``forced_emit`` substrate — exactly like
     OpenRouter distinct from native deepseek/zhipu/moonshot/minimax, N=1 the clean
     single-provider baseline (NOT degraded).
   - ``auto_seed_cases`` seeds should-fire + should-NOT cases; siblings come from the
-    owner-scoped ``.or_(user_id.eq.{id}, is_global.eq.true)`` catalog query ONLY (D-04 /
+    owner-scoped ``.or_(user_id.eq.{id}, is_org_shared.eq.true)`` catalog query ONLY (D-04 /
     V4 — never leaks another user's private skills).
 
 RED LINE (D-14 / G-5): this REUSES ``forced_emit`` -> the Phase 092.5 provider gateway.
@@ -367,7 +367,7 @@ def auto_seed_cases(skill: dict, sibling_skills: list[dict]) -> dict[str, list[s
       (the false-fire rail) + the fixed generic off-topic set.
 
     ``sibling_skills`` MUST come from the owner-scoped
-    ``.or_(user_id.eq.{id}, is_global.eq.true).eq(is_enabled, True)`` query
+    ``.or_(user_id.eq.{id}, is_org_shared.eq.true).eq(is_enabled, True)`` query
     (see ``fetch_owner_scoped_siblings``) — this function NEVER reads the DB itself, so a
     caller cannot accidentally widen the scope here. A sibling's own name/description is the
     only thing seeded; another user's private skill never reaches this list.
@@ -479,7 +479,7 @@ def seed_cases_with_provenance(
 def fetch_owner_scoped_siblings(supabase, user_id: str, exclude_skill_id: str | None = None) -> list[dict]:
     """Fetch the requesting owner's + global skills via the EXACT owner-scoped catalog
     query (D-04 / V4 / T-123-03-01). ``get_supabase()`` is the SERVICE-ROLE client (RLS
-    bypassed) — this app-code ``.or_(user_id.eq.{id}, is_global.eq.true)`` scoping is the
+    bypassed) — this app-code ``.or_(user_id.eq.{id}, is_org_shared.eq.true)`` scoping is the
     SOLE leak gate. A user must NEVER see another user's private skill as bait.
 
     Degrades to ``[]`` on read failure (the auto-seed stays advisory; never crashes).
@@ -488,7 +488,7 @@ def fetch_owner_scoped_siblings(supabase, user_id: str, exclude_skill_id: str | 
         resp = (
             supabase.table("skills")
             .select("id, name, description")
-            .or_(f"user_id.eq.{user_id},is_global.eq.true")
+            .or_(f"user_id.eq.{user_id},is_org_shared.eq.true")
             .eq("is_enabled", True)
             .execute()
         )

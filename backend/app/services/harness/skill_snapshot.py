@@ -22,7 +22,7 @@ load-bearing decision (D-01/D-02/D-03a): determinism beats freshness.
      DB JSONB + Storage (shared across workers), never an in-process cache.
 
 THREAT (T-099-02 / Elevation / IDOR): the resolve query is OWNED-OR-GLOBAL
-(``.or_(user_id.eq…,is_global.eq.true)``); a non-visible id resolves to no row and
+(``.or_(user_id.eq…,is_org_shared.eq.true)``); a non-visible id resolves to no row and
 the ``ValueError`` message is GENERIC — it never confirms another user's skill
 exists (no existence leak). Both functions are OWNER-scoped via ``user_id``; the
 harness runs as service role (bypasses RLS), so the caller MUST pass the durable
@@ -61,7 +61,7 @@ if TYPE_CHECKING:  # pragma: no cover — typing only
 # fetched SEPARATELY from the ``skill_files`` table inside materialize_skill_snapshots
 # (D-06 — names, not contents), exactly as _handle_load_skill does. Do NOT add a
 # ``files`` token here.
-_SKILL_SELECT = "id, name, description, instructions, user_id, is_enabled, is_global"
+_SKILL_SELECT = "id, name, description, instructions, user_id, is_enabled, is_org_shared"
 
 
 def _resolve_skill_query(supabase, *, skill_ref, user_id):
@@ -69,7 +69,7 @@ def _resolve_skill_query(supabase, *, skill_ref, user_id):
     return (
         supabase.table("skills")
         .select(_SKILL_SELECT)
-        .or_(f"user_id.eq.{user_id},is_global.eq.true")   # D-10 owned-or-global (T-099-02 IDOR)
+        .or_(f"user_id.eq.{user_id},is_org_shared.eq.true")   # D-10 owned-or-global (T-099-02 IDOR)
         .eq("id", str(skill_ref))                          # D-09 by UUID, not name
         .eq("is_enabled", True)                            # D-10 enabled gate (T-099-01)
         .maybe_single()

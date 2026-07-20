@@ -75,7 +75,7 @@ QUERY_DOCUMENTS_TOOL = {
             "d.metadata->>'author' AS author FROM documents d "
             "WHERE d.metadata->>'title' ILIKE '%search_term%'. "
             "Table: folders. Columns: id (uuid), name (text), parent_id (uuid, nullable), "
-            "user_id (uuid), is_global (boolean). "
+            "user_id (uuid), is_org_shared (boolean). "
             "JOIN example: SELECT d.filename, f.name AS folder FROM documents d "
             "LEFT JOIN folders f ON d.folder_id = f.id. "
             "The query is automatically scoped to the current user — do NOT add a "
