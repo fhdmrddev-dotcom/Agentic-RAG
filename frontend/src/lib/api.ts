@@ -2378,6 +2378,66 @@ export async function setJudgeModel(model: string): Promise<FullAppSettings> {
   return updateSettings({ harness_judge_model: model })
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 167 VIS-02 (D-167-04) — the per-user default-model preference client.
+//
+// The FIRST concrete SEED-116 two-layer preference: the operator/org governs the
+// ENABLED allowed-set + the lock; the user picks a default WITHIN it. Both fns hit
+// the RLS-scoped /me/preferences route (Plan 04) — getAuthHeaders() auto-carries the
+// caller's JWT (the write is keyed on auth.uid() server-side). The server is the
+// source of truth: PUT re-validates the model ∈ the allowed-set (400 otherwise) and
+// re-derives the effective pair, so the picker stays server-derived (never optimistic).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** The two-layer model-default view (`GET/PUT /me/preferences`, Plan 04). `default_model`
+ *  is the caller's own raw preference (null = unset → the operator default flows);
+ *  `effective_model` is what a new chat actually defaults to under the SEED-116 compose
+ *  (surfaced in the footer, never blank — falls back to the org default); `locked` surfaces
+ *  the operator lock (disable the picker + name the governed default); `allowed_models` is
+ *  the operator/org ENABLED set the picker offers (the user can never pick outside it). */
+export interface ModelDefault {
+  default_model: string | null
+  effective_model: string | null
+  locked: boolean
+  allowed_models: string[]
+}
+
+/** Read the caller's per-user default model + the two-layer context (`GET /me/preferences`).
+ *  A defensive `?? fallback` unwrap keeps the picker honest if the server omits a field. */
+export async function getModelDefault(): Promise<ModelDefault> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/me/preferences`, { headers, cache: "no-store" })
+  if (!res.ok) throw new ApiError("Failed to load your default model.", res.status)
+  const body = (await res.json()) as Partial<ModelDefault>
+  return {
+    default_model: body.default_model ?? null,
+    effective_model: body.effective_model ?? null,
+    locked: body.locked ?? false,
+    allowed_models: body.allowed_models ?? [],
+  }
+}
+
+/** Set (or clear) the caller's own default model (`PUT /me/preferences`). Pass `null` to
+ *  clear the override (the operator default flows). The server validates the model ∈ the
+ *  enabled allowed-set (400 otherwise — T-167-13) and honors the lock, then returns the
+ *  fresh two-layer view so the picker re-reads server-derived state (never optimistic). */
+export async function setModelDefault(model: string | null): Promise<ModelDefault> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/me/preferences`, {
+    method: "PUT",
+    headers,
+    body: JSON.stringify({ default_model: model }),
+  })
+  if (!res.ok) throw new ApiError("Failed to save your default model.", res.status)
+  const body = (await res.json()) as Partial<ModelDefault>
+  return {
+    default_model: body.default_model ?? null,
+    effective_model: body.effective_model ?? null,
+    locked: body.locked ?? false,
+    allowed_models: body.allowed_models ?? [],
+  }
+}
+
 // Phase 111.1 EMBED-05 — re-embed lifecycle (Plan 05 backend). Counts are derived
 // live from document_chunks on every fetch (the source of truth — reconcile-on-fetch,
 // D-v2.5-03); `status` is a cosmetic hint reconciled against the counts (counts win).
@@ -4059,6 +4119,31 @@ export async function setFeatureVisibility(
     method: "PUT",
     headers,
     body: JSON.stringify({ feature, audience }),
+  })
+  if (!res.ok) throw new ApiError("Failed to update feature visibility.", res.status)
+}
+
+/** Phase 167 (VIS-01 / D-167-06) — the 4-tier org roles a `role` greenlist can name.
+ *  The server allowlist-validates every role ⊆ this set (400 on a bad role); the client
+ *  control is render-only (never the boundary — T-167-10b). */
+export type GreenlistRole = "super-admin" | "org-admin" | "dept-admin" | "member"
+
+/** Set a governed feature's audience to a ROLE greenlist (`PUT /admin/visibility`, Phase
+ *  167 / VIS-01 / D-167-06). Extends setFeatureVisibility's binary audience to the `role`
+ *  audience: the SAME allowlist-validated PUT, plus a `roles[]` greenlist the server checks
+ *  ⊆ the 4-tier set BEFORE any write (400 otherwise — SQLi-safe). The greenlist resolver
+ *  makes hide == refuse (the UI hide and the API 403 can never disagree). Pass `roles=[]`
+ *  for the everyone/operators audiences — they ignore it. */
+export async function setFeatureAudience(
+  feature: GovernedFeature,
+  audience: string,
+  roles: string[] = [],
+): Promise<void> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/admin/visibility`, {
+    method: "PUT",
+    headers,
+    body: JSON.stringify({ feature, audience, roles }),
   })
   if (!res.ok) throw new ApiError("Failed to update feature visibility.", res.status)
 }
