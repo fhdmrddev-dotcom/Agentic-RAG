@@ -18,6 +18,7 @@ unknown value falls back to the safe default provider.
 """
 from __future__ import annotations
 
+import html
 import logging
 from typing import Protocol
 
@@ -60,14 +61,21 @@ class ResendProvider:
         import resend
 
         resend.api_key = settings.resend_api_key
+        # WR-02: org_name is tenant-controlled (organizations.name) and link is composed
+        # server-side — HTML-escape BOTH before interpolating into the email body, or an org
+        # named `</a><script>…` (or containing "/</>) breaks out of the markup (HTML/content
+        # injection at the outbound-email trust boundary). The `subject` is a plain-text field,
+        # not HTML, so it is left un-escaped (escaping it would surface literal entities).
+        safe_org = html.escape(org_name)
+        safe_link = html.escape(link, quote=True)
         resend.Emails.send(
             {
                 "from": settings.invite_from_email,
                 "to": to,
                 "subject": f"You're invited to {org_name}",
                 "html": (
-                    f'<p>You have been invited to join <strong>{org_name}</strong>.</p>'
-                    f'<p><a href="{link}">Accept your invitation</a></p>'
+                    f'<p>You have been invited to join <strong>{safe_org}</strong>.</p>'
+                    f'<p><a href="{safe_link}">Accept your invitation</a></p>'
                 ),
             }
         )
