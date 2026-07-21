@@ -21,6 +21,11 @@ import { ReembedConfirmModal } from "@/components/settings/ReembedConfirmModal"
 import { ReembedStatusCard } from "@/components/settings/ReembedStatusCard"
 import { EngineHealthCard } from "@/components/settings/EngineHealthCard"
 import { JudgeModelPicker } from "@/components/settings/JudgeModelPicker"
+// Phase 167 (VIS-02 / D-167-04 / SEED-116) — the per-user default-model picker. Lives
+// in the personal-preferences home (this Settings surface, NOT the operator Control Room):
+// the user picks a default WITHIN the operator/org-allowed set; the always-on 🔒 footer
+// surfaces the operator lock. Self-fetching (getModelDefault), so it needs no page state.
+import { ModelDefaultPreference } from "@/components/settings/ModelDefaultPreference"
 // Phase 154 (LANG-01) — the app-wide plain-language reveal spine (Wave 1). The
 // Settings page HOSTS the "Show technical names" toggle (D-01/SC#3) wired to the
 // shared context, and routes bounded user-facing labels through the term-map (D-04).
@@ -895,6 +900,14 @@ export function SettingsPage() {
                 </div>
                 <TechnicalNamesToggle enabled={showTechnical} onToggle={toggleTechnical} />
               </div>
+
+              {/* Phase 167 (VIS-02 / D-167-04 / SEED-116) — the per-user default chat
+                  model. A PERSONAL preference (this Settings home, not the operator
+                  Control Room): the user picks WITHIN the operator/org-allowed set, and
+                  the always-on 🔒 footer surfaces the operator lock. Self-contained
+                  (self-fetches + self-persists via /me/preferences), outside the AI Model
+                  save cycle — mirrors the EngineHealthCard/JudgeModelPicker infra cards. */}
+              <ModelDefaultPreference />
 
               {/* LLM Providers SectionCard */}
               <SectionCard
