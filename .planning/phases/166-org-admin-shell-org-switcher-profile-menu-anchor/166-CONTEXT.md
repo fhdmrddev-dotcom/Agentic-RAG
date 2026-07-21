@@ -1,7 +1,7 @@
 # Phase 166: Org-Admin Shell + Org Switcher + Profile-Menu Anchor - Context
 
 **Gathered:** 2026-07-21
-**Status:** Ready for planning — **sketch-gated (G-2): `/gsd:sketch 166` before spec/plan**
+**Status:** Ready for planning — **G-2 sketch gate SATISFIED** (sketches [079-C](../../sketches/079-identity-anchor-and-org-switcher/README.md) + [080-A](../../sketches/080-org-admin-shell/README.md), operator-approved 2026-07-21)
 
 <domain>
 ## Phase Boundary
@@ -30,11 +30,13 @@ Ship the **human-facing surface** of the now-real tenancy model (163 crux + 164 
 ### Org-scoped Audit — source + depth (ADMIN-04)
 - **D-166-04:** Back the member-facing Audit tab with **`public.audit_log` ONLY** (the general per-user action log, now `org_id`-carrying via the 161/162 backfill). Access model: **`org:audit_view` unlocks the cross-member org read** (all rows within the org); a member without it **sees only their own rows** (RLS already enforces the member-sees-own half). **Reuse the operator `AuditTab` component shape but a lighter first cut** — list + chip filters; **CSV export deferred**. **Exclude** `harness_audit` (workflow-internal, noisy) and `operator_audit_log` (Control-Room-only).
 
-### Sketch-gated visual decisions (G-2 — deferred to `/gsd:sketch 166`)
-- **D-166-05:** The following are **NOT decided here** — they are the sketch's job, and the operator-approved mockup is the acceptance bar before spec/plan:
-  - Profile menu ↔ org switcher **composition** (one merged top-right anchor vs two separate elements).
-  - Role-badge placement + copy (org-scoped role: Org-admin / Member).
-  - The org-admin shell **entry point** (a nav entry mirroring the Phase-146 operator amber-shield rendered outside `NAV_ITEMS`, vs an item inside the profile menu). Likely mirrors the operator shield pattern, but the sketch confirms it.
+### Sketch-resolved visual decisions (G-2 — RESOLVED by sketches 079-C + 080-A, 2026-07-21)
+- **D-166-05:** The visual composition is now **operator-approved** (mockups were the acceptance bar). LOCKED:
+  - **Profile ↔ org switcher composition → 079-C (Hybrid).** Identity + org-scoped **role badge** + the **org switcher** (renders only at 2+ orgs; solo = a quiet name button, no switcher chrome per D-166-02) live in **ONE merged rail-footer profile-menu popover** (the footer where "Sign out" lives today in `NavPanel.tsx`; there is no top bar — SEED-113's "top-right anchor" lands as a rail-footer element). The org switch preserves the D-166-08 teardown (subscriptions → thread-bucket clear → refetch).
+  - **Role-badge placement + copy → in the profile-menu header AND the shell band; copy = `◆ Org-admin` / `Member`** (indigo `admin` chip / muted `member` chip).
+  - **Org-admin shell entry point → 079-C: a rail Shield-mirror** rendered OUTSIDE `NAV_ITEMS`, sitting **directly parallel to the Phase-146 operator amber shield**, in **indigo** (distinct from operator amber) — the SEED-113 "user-side mirror" made spatial. Shown only when the caller holds `org:manage`; honestly absent (never disabled) for a Member.
+  - **Shell composition → 080-A (Org-indigo band).** The 7-tab shell reuses the 061-B Control-Room band+tabs, tinted **org-indigo** (amber stays reserved for the operator zone); band carries org name + `ORG ADMIN` chip + role badge + the 062-A "every action recorded" marker + plain-first **⌥ Technical-names** (146 LANG-01). **3 live tabs** (Members read-only 068-A roster · Audit lighter-067-A list+chips, no CSV · Settings light org-config home) **+ 4 locked** "coming soon" `LockedTab` placeholders (Invitations & Roles · SSO · Subscription · Retention) with **no roadmap numbers in copy** (061-B). The `org:audit_view` degrade is **RLS-honest** — an explicit "you see only your own" banner + row filtering, never a silent empty list.
+  - **Sketch findings (build spec):** [`079-identity-anchor-and-org-switcher/README.md`](../../sketches/079-identity-anchor-and-org-switcher/README.md) + [`080-org-admin-shell/README.md`](../../sketches/080-org-admin-shell/README.md); shared theme tokens mirror `frontend/src/index.css :.dark`.
 
 ### Locked upstream — carried forward, do NOT re-decide (landmines for the planner)
 - **D-166-06:** Org-switch mechanism is **hybrid**: membership set baked into the JWT for RLS **+ a server-validated `X-Org-Id` header** for the active org. The `X-Org-Id` header **MUST be server-validated against the caller's membership** (threat-model item — never trust the client's claimed active org).
