@@ -19,7 +19,7 @@
  * useAuth + useOrgOptional are mocked (the menu is a presentational leaf over context).
  */
 import { describe, it, expect, beforeEach, vi } from "vitest"
-import { render, screen, cleanup } from "@testing-library/react"
+import { render, screen, cleanup, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 
 import { ProfileMenu } from "./ProfileMenu"
@@ -88,10 +88,13 @@ describe("ProfileMenu — identity header + role badge (ADMIN-03 / D-166-05)", (
     const { user } = setup()
     await user.click(screen.getByRole("button", { name: /account menu/i }))
 
-    expect(await screen.findByText("Alice Doe")).toBeInTheDocument()
-    expect(screen.getAllByText("alice@example.com").length).toBeGreaterThan(0)
-    expect(screen.getByText("Org-admin")).toBeInTheDocument()
-    expect(screen.queryByText("Member")).toBeNull()
+    // Scope to the opened menu — the expanded anchor ALSO paints the name, so the
+    // header assertion targets the popover (role="menu") to avoid the anchor duplicate.
+    const menu = await screen.findByRole("menu")
+    expect(within(menu).getByText("Alice Doe")).toBeInTheDocument()
+    expect(within(menu).getByText("alice@example.com")).toBeInTheDocument()
+    expect(within(menu).getByText("Org-admin")).toBeInTheDocument()
+    expect(within(menu).queryByText("Member")).toBeNull()
   })
 
   it("shows the muted Member badge for a plain member", async () => {
@@ -138,8 +141,9 @@ describe("ProfileMenu — org switcher (ADMIN-02 / D-166-02 / D-166-08)", () => 
     const { user } = setup()
     await user.click(screen.getByRole("button", { name: /account menu/i }))
 
-    await screen.findByText("Alice Doe")
-    expect(screen.queryByText("Switch organization")).toBeNull()
+    const menu = await screen.findByRole("menu")
+    expect(within(menu).getByText("Alice Doe")).toBeInTheDocument()
+    expect(within(menu).queryByText("Switch organization")).toBeNull()
   })
 })
 
