@@ -4128,6 +4128,28 @@ export async function setFeatureVisibility(
  *  control is render-only (never the boundary — T-167-10b). */
 export type GreenlistRole = "super-admin" | "org-admin" | "dept-admin" | "member"
 
+/** One governed feature's persisted visibility record (`GET /admin/visibility`, Phase 167
+ *  WR-05). `audience` is the ENUM value (cold-default aware); `roles` is the greenlist,
+ *  meaningful only when `audience === "role"`. */
+export interface FeatureVisibilityRecord {
+  audience: FeatureAudience | "role"
+  roles: GreenlistRole[]
+}
+
+/** Read the persisted per-feature audience + greenlist map (`GET /admin/visibility`, Phase 167
+ *  WR-05). Seeds the Control Room's visibility/greenlist UI from SERVER truth on mount so an
+ *  operator never sees a stale default audience after a reload. Operator-gated (404 to
+ *  non-operators); floor-EXEMPT config read. Returns a `{feature: {audience, roles}}` map. */
+export async function getFeatureVisibility(): Promise<
+  Record<GovernedFeature, FeatureVisibilityRecord>
+> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/admin/visibility`, { headers, cache: "no-store" })
+  if (!res.ok) throw new ApiError("Failed to load feature visibility.", res.status)
+  const body = (await res.json()) as { features?: Record<GovernedFeature, FeatureVisibilityRecord> }
+  return body.features ?? ({} as Record<GovernedFeature, FeatureVisibilityRecord>)
+}
+
 /** Set a governed feature's audience to a ROLE greenlist (`PUT /admin/visibility`, Phase
  *  167 / VIS-01 / D-167-06). Extends setFeatureVisibility's binary audience to the `role`
  *  audience: the SAME allowlist-validated PUT, plus a `roles[]` greenlist the server checks

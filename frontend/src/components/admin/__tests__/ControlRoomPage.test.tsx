@@ -24,6 +24,8 @@ vi.mock("@/lib/api", () => ({
   getAdminActiveRuns: vi.fn(),
   getSettings: vi.fn(),
   getOperatorAudit: vi.fn(),
+  // WR-05: the shell seeds the visibility/greenlist maps from server truth on mount.
+  getFeatureVisibility: vi.fn(),
   recordControlPlaneEvent: vi.fn(),
   killRun: vi.fn(),
   setFlag: vi.fn(),
@@ -43,6 +45,7 @@ import {
   getSettings,
   getOperatorAudit,
   getModelRegistry,
+  getFeatureVisibility,
   recordControlPlaneEvent,
 } from "@/lib/api"
 
@@ -82,6 +85,12 @@ beforeEach(() => {
   vi.mocked(getOperatorAudit).mockResolvedValue([])
   vi.mocked(recordControlPlaneEvent).mockResolvedValue(undefined)
   vi.mocked(getModelRegistry).mockResolvedValue([])
+  vi.mocked(getFeatureVisibility).mockResolvedValue({
+    skill_studio: { audience: "operators", roles: [] },
+    model_management: { audience: "operators", roles: [] },
+    workflow_authoring: { audience: "everyone", roles: [] },
+    governance_health: { audience: "everyone", roles: [] },
+  })
 })
 
 afterEach(() => {

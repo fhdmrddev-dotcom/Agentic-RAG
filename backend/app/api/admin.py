@@ -946,6 +946,31 @@ async def revoke_operator_access(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
+@router.get("/visibility")
+async def get_visibility():
+    """Read the persisted per-feature audience + greenlist map (WR-05 — server truth).
+
+    The Control Room previously seeded its visibility/greenlist UI from client defaults, so an
+    operator saw the DEFAULT audience (not the persisted one) after any reload — display
+    dishonesty on a security-governance surface. This returns the CURRENT audience (cold-default
+    aware, via ``feature_audience``) + greenlisted ``roles`` for every governed feature, so the
+    shell seeds from the DB on mount. Floor-EXEMPT (a config read seeded on every Control Room
+    mount — logging it would spam the ledger; the write PUT /admin/visibility is what's recorded).
+    Inherits the router-level ``require_operator`` gate (404 to non-operators).
+    """
+    from app.models.user_settings import (
+        _GOVERNED_FEATURES,
+        _feature_record,
+        feature_audience,
+    )
+    features = {}
+    for f in _GOVERNED_FEATURES:
+        rec = _feature_record(f)
+        roles = [r for r in (rec.get("roles") or []) if isinstance(r, str) and r in _VISIBILITY_ROLES]
+        features[f] = {"audience": feature_audience(f), "roles": roles}
+    return {"features": features}
+
+
 class VisibilityUpdate(BaseModel):
     """Body for PUT /admin/visibility. ``feature`` + ``audience`` + ``roles`` are validated
     against code allowlists in the handler (T-148-03 / T-167-12) — never free text.

@@ -43,6 +43,7 @@ import {
   disableUser,
   enableUser,
   exportPlatformAudit,
+  getFeatureVisibility,
   getModelRegistry,
   getOperatorAudit,
   getPlatformAudit,
@@ -302,6 +303,33 @@ export function ControlRoomPage({ identity, onBack }: ControlRoomPageProps) {
       /* keep the last-known registry (honest degrade, never a crash) */
     }
   }, [])
+  // WR-05: seed the visibility + greenlist maps from SERVER truth (GET /admin/visibility) on
+  // mount, so the operator never sees a stale DEFAULT audience after a reload. Defensive
+  // per-key merge (an absent/partial record keeps the day-one default); a read blip keeps the
+  // seeded defaults (honest degrade). The subsequent per-flip writes still update the maps live.
+  const fetchVisibility = useCallback(async () => {
+    try {
+      const map = await getFeatureVisibility()
+      if (!alive.current || !map) return
+      setVisibility((prev) => {
+        const next = { ...prev }
+        for (const key of Object.keys(next) as GovernedFeature[]) {
+          const aud = map[key]?.audience
+          if (aud) next[key] = aud
+        }
+        return next
+      })
+      setGreenlist((prev) => {
+        const next = { ...prev }
+        for (const key of Object.keys(next) as GovernedFeature[]) {
+          next[key] = map[key]?.roles ?? next[key] ?? []
+        }
+        return next
+      })
+    } catch {
+      /* keep the seeded day-one defaults (honest degrade, never a crash) */
+    }
+  }, [])
 
   // ── Platform-activity browse (067-A source #2). AuditTab owns the filter state and
   //    calls this with the resolved filters + page whenever they change; the shell owns
@@ -343,6 +371,8 @@ export function ControlRoomPage({ identity, onBack }: ControlRoomPageProps) {
     fetchSignals()
     fetchRuns()
     fetchSettings()
+    // WR-05: seed the feature-visibility/greenlist maps from server truth once on mount.
+    void fetchVisibility()
 
     // Record ONE deliberate visit row, THEN read the ledger so the operator sees
     // their "Opened the Control Plane" row land (the D-07 honesty beat). If the
@@ -393,7 +423,7 @@ export function ControlRoomPage({ identity, onBack }: ControlRoomPageProps) {
       stopPolling()
       document.removeEventListener("visibilitychange", handleVisibility)
     }
-  }, [fetchSignals, fetchRuns, fetchSettings, fetchAudit])
+  }, [fetchSignals, fetchRuns, fetchSettings, fetchAudit, fetchVisibility])
 
   // ── Lazy roster load (068-A): fetch the users roster the first time the operator
   //    opens the Users & Access tab, and refresh it on every re-open. This keeps the
