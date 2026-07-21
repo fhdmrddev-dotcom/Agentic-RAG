@@ -261,8 +261,15 @@ async def resolve_run_model(*, body, user_settings):
         # garbage model_id (which falls into the ollama fallback bucket)
         # shouldn't yank routing to Ollama when the user has an explicit
         # active_provider set.
+        # WR-04 (167 review): accept db_override alongside registry — a discovery-confirmed
+        # DB-only model is operator-VERIFIED (mirrors _reresolve_fallback_provider:114), so its
+        # provider must be re-resolved from the capability. VIS-02 newly makes this reachable
+        # WITHOUT an explicit body.provider (a per-user default overlays user_settings.llm_model),
+        # so a cross-provider DB-override default now routes to the correct provider SDK instead
+        # of the org's active_provider (the D-167-09 "cross-provider by construction" promise).
+        # inferred/unknown still fall through to active_provider (unchanged).
         capability_source = capability.get("capability_source", "registry")
-        if capability_provider != "unknown" and capability_source == "registry":
+        if capability_provider != "unknown" and capability_source in ("registry", "db_override"):
             resolved_provider = capability_provider
             # Align user_settings so downstream agent_runner reads see the
             # resolved provider for SDK selection (D-067.3-N01-04). The
