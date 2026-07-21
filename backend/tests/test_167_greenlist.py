@@ -97,6 +97,82 @@ def test_resolve_unknown_and_malformed_safe_deny(monkeypatch):
     assert us.resolve_feature_access("missing", "super-admin", set()) is False
 
 
+# ── resolve_caller_role — the REAL resolver (NOT monkeypatched) — CR-01 regression ─────
+# The greenlist unit tests above/below all monkeypatch resolve_caller_role, so the real
+# active-org resolution was never exercised. These drive the ACTUAL resolver to prove the
+# CR-01 fix: a user who is org-admin of their personal org but `member` of the ACTIVE shared
+# org resolves to `member` (never the personal-org org-admin), and a caller with no valid
+# X-Org-Id fails closed to `member` (never a highest-role-across-memberships scan).
+
+async def test_resolve_caller_role_uses_active_org_not_highest(monkeypatch):
+    """CR-01: with no request.state.org_role, the role is resolved for the VALIDATED
+    X-Org-Id active org — the caller's `member` role there, NOT the org-admin they hold
+    in their personal org (which _highest_role would have returned for everyone)."""
+    from contextlib import asynccontextmanager
+    from app import dependencies as deps
+
+    class _Conn:
+        async def fetchrow(self, _sql, _org_uuid):
+            # The caller's membership row IN THE ACTIVE (shared) org — role = member.
+            return {"role": "member"}
+
+    @asynccontextmanager
+    async def _fake_conn(_request, _current_user):
+        yield _Conn()
+
+    monkeypatch.setattr(deps, "get_user_pg_connection", _fake_conn)
+
+    req = SimpleNamespace(
+        state=SimpleNamespace(),  # org_role UNSET — endpoint skipped get_active_org_id
+        headers={"X-Org-Id": "11111111-1111-1111-1111-111111111111"},
+    )
+    role, groups = await deps.resolve_caller_role(req, {"id": "u1"})
+    assert role == "member"  # NOT "org-admin" — the personal-org role must never leak in
+    assert groups == set()
+
+
+async def test_resolve_caller_role_no_active_org_fail_closed_member():
+    """CR-01: a caller with no valid X-Org-Id resolves fail-closed to `member` — never a
+    highest-role scan (which would return the personal-org org-admin for everyone)."""
+    from app import dependencies as deps
+
+    # Absent header → no active org can be validated → fail-closed member (no DB read).
+    req = SimpleNamespace(state=SimpleNamespace(), headers={})
+    role, groups = await deps.resolve_caller_role(req, {"id": "u1"})
+    assert role == "member"
+    assert groups == set()
+
+    # A None request likewise fails closed to member.
+    role2, groups2 = await deps.resolve_caller_role(None, {"id": "u1"})
+    assert role2 == "member"
+    assert groups2 == set()
+
+
+async def test_resolve_caller_role_non_member_org_fail_closed_member(monkeypatch):
+    """CR-01: a present-but-non-member X-Org-Id matches no row under RLS → fail-closed
+    `member` (never org-admin, never a raise)."""
+    from contextlib import asynccontextmanager
+    from app import dependencies as deps
+
+    class _Conn:
+        async def fetchrow(self, _sql, _org_uuid):
+            return None  # RLS: the caller is not a member of the supplied org
+
+    @asynccontextmanager
+    async def _fake_conn(_request, _current_user):
+        yield _Conn()
+
+    monkeypatch.setattr(deps, "get_user_pg_connection", _fake_conn)
+
+    req = SimpleNamespace(
+        state=SimpleNamespace(),
+        headers={"X-Org-Id": "22222222-2222-2222-2222-222222222222"},
+    )
+    role, groups = await deps.resolve_caller_role(req, {"id": "u1"})
+    assert role == "member"
+    assert groups == set()
+
+
 # ── require_visible — the extended gate (operator/everyone no-op preserved) ─────
 
 async def test_require_visible_operator_noop(monkeypatch):

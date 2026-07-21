@@ -464,27 +464,54 @@ async def resolve_caller_role(
 ) -> tuple[str | None, set[str]]:
     """Resolve the caller's effective org role + group set for the greenlist gate (D-167-06).
 
-    Prefers ``request.state.org_role`` — already resolved + validated AS THE CALLER by
-    ``get_active_org_id`` (D-166-06), so no extra query when the request went through it.
-    Otherwise falls back to the caller's HIGHEST role across their memberships via a
-    user-JWT/RLS read (``auth.uid()`` resolves to the caller — never the BYPASSRLS pool).
+    CR-01 (review): the role is resolved AGAINST THE CALLER'S ACTIVE ORG — NEVER
+    ``_highest_role`` across ALL memberships. Every user is provisioned as ``org-admin`` of
+    their OWN personal org (mig 105 §A backfill + the ``handle_new_user`` signup trigger),
+    so a highest-role-across-memberships scan returns ``org-admin`` for EVERY authenticated
+    user — which grants any ``role:["org-admin"]``-greenlisted feature to everyone AND denies
+    every ``role:["member"]`` feature to everyone (the exact broken-access-control inversion
+    the greenlist exists to prevent). Resolution order:
+
+    1. ``request.state.org_role`` — already resolved + validated AS THE CALLER by
+       ``get_active_org_id`` (D-166-06); no extra query when the request went through it.
+    2. Otherwise (endpoints that attach ``require_visible`` WITHOUT ``get_active_org_id``, and
+       ``GET /features``) resolve the caller's role for the VALIDATED ``X-Org-Id`` active org —
+       the header the 166 client injects on every request. The lookup runs AS THE CALLER on a
+       user-JWT/RLS connection (``auth.uid()`` resolves to the caller — never the BYPASSRLS
+       pool), so a spoofed / non-member org returns no row.
+    3. FAIL-CLOSED to ``member`` (the least-privileged real role) when no active org can be
+       validated — an absent/malformed ``X-Org-Id``, a non-member org, or any read failure.
+       ``member`` (never the personal-org ``org-admin``, never a highest-role scan) means a
+       plain member of a shared org resolves to ``member``: ``role:["org-admin"]`` no longer
+       leaks to everyone, and ``role:["member"]`` no longer denies everyone.
+
     ``caller_groups`` is an empty (extensible) set this phase — the groups table is deferred
-    (RESEARCH OQ2); the resolver already unions against it. ANY resolution failure -> a
-    ``(None, set())`` deny signal (fail-closed) — NEVER raises.
+    (RESEARCH OQ2); the resolver already unions against it. NEVER raises.
     """
     role = getattr(getattr(request, "state", None), "org_role", None)
     if role:
         return role, set()
     if request is None:
-        return None, set()
+        return "member", set()  # no request context -> fail-closed to the least-privileged role
+    # Resolve the caller's role in their VALIDATED active org (the X-Org-Id header). NEVER a
+    # highest-role scan across memberships (CR-01: personal-org org-admin defeats the greenlist).
+    try:
+        header_org = request.headers.get("X-Org-Id")
+    except Exception:  # noqa: BLE001 — a malformed request object -> fail-closed member
+        return "member", set()
+    org_uuid = _to_uuid(header_org) if header_org else None
+    if org_uuid is None:
+        return "member", set()  # no valid active org -> fail-closed member
     try:
         async with get_user_pg_connection(request, current_user) as conn:
-            rows = await conn.fetch(
-                "SELECT role FROM public.org_members WHERE user_id = auth.uid()"
+            row = await conn.fetchrow(
+                "SELECT role FROM public.org_members WHERE org_id = $1 AND user_id = auth.uid()",
+                org_uuid,
             )
-        return _highest_role([r["role"] for r in rows]), set()
-    except Exception:  # noqa: BLE001 — any read failure -> fail-closed deny
-        return None, set()
+        # A non-member (or spoofed) X-Org-Id matches no row under RLS -> fail-closed member.
+        return (row["role"] if row is not None else "member"), set()
+    except Exception:  # noqa: BLE001 — any read failure -> fail-closed member (never highest-role)
+        return "member", set()
 
 
 def require_visible(feature: str):
