@@ -84,6 +84,11 @@ import {
   type ThreadSnapshot,
 } from "@/lib/api"
 import { usePanelReconcile } from "@/hooks/usePanelReconcile"
+// Phase 166 (D-166-07/08): the org-context bridge. OrgProvider mounts ABOVE this
+// provider (App.tsx), so an org switch is observable here via the non-throwing
+// useOrgOptional — StreamsProvider stays renderable outside an OrgProvider (tests,
+// storybook) where it returns null and the teardown effect is inert.
+import { useOrgOptional } from "@/providers/OrgProvider"
 import {
   useStreamsStore,
   type SurfaceId,
@@ -2875,6 +2880,40 @@ export function StreamsProvider({ children }: PropsWithChildren) {
       throttledWriteRef.current = null
     }
   }, [])
+
+  // ---- useEffect #5 (Phase 166 D-166-08): org-switch stream teardown ----
+  // OrgProvider mounts ABOVE this provider (App.tsx / D-166-07), so an org switch is
+  // observable here via useOrgOptional (null outside an OrgProvider → this effect is inert,
+  // so the standalone StreamsProvider tests are byte-unchanged). On a REAL org change (not
+  // the initial mount), tear down every in-flight subscription so no stale old-org SSE frame
+  // repopulates a bucket, then clear the viewed thread's bucket in each active surface
+  // THROUGH the existing 067.5-guarded `clearThreadBucket` action (its mid-stream-send
+  // predicate at :1340 is preserved verbatim — a thread with a send in flight is NEVER
+  // wiped). This is the SAME guarded action looped across surfaces; it is NOT a
+  // new bucket-wipe path (G-5: minimal surface-area change in this hot file). The new org's
+  // thread LIST is refetched by ChatLayout (Plan 05, keyed on the same activeOrgId); the
+  // `X-Org-Id` header is already the new org synchronously (OrgProvider → setActiveOrgId), so
+  // the isolation boundary is the server-validated fetch (D-v2.5-03: Realtime is best-effort,
+  // never the boundary). We deliberately do NOT re-reconcile the stale viewed thread here — a
+  // fetch of the OLD thread under the NEW header could re-populate old-org data; the user
+  // reconciles to the new org by navigating the refetched list.
+  const activeOrgId = useOrgOptional()?.activeOrgId ?? null
+  const prevOrgRef = useRef<string | null | undefined>(undefined)
+  useEffect(() => {
+    const prev = prevOrgRef.current
+    prevOrgRef.current = activeOrgId
+    // Skip the initial mount (undefined → first value) and any no-op re-render: only an
+    // actual SWITCH tears down.
+    if (prev === undefined || prev === activeOrgId) return
+    // 1) Tear down in-flight subscriptions (mirrors the unmount-cleanup shape at useEffect #3).
+    for (const ctrl of subscriptionsRef.current.values()) ctrl.abort()
+    subscriptionsRef.current.clear()
+    // 2) Clear each active surface's viewed-thread bucket THROUGH the existing guarded action.
+    const actions = useStreamsStore.getState().actions
+    for (const surface of useStreamsStore.getState().bucketsBySurface.keys()) {
+      actions.clearThreadBucket(surface)
+    }
+  }, [activeOrgId])
 
   return <>{children}</>
 }

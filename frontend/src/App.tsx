@@ -7,6 +7,10 @@ import { ChatLayout } from "./components/layout/ChatLayout"
 import type { StudioTab } from "./pages/SkillStudioPage"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { StreamsProvider } from "@/providers/StreamsProvider"
+// Phase 166 (D-166-07): the org-context spine mounts OUTSIDE StreamsProvider so an
+// org switch can reach the streams teardown from above. Exposes active org +
+// memberships + role + can_manage/can_audit_view + switchOrg via useOrg/useOrgOptional.
+import { OrgProvider } from "@/providers/OrgProvider"
 import { CitationNavProvider } from "@/lib/citationNav"
 import { TechnicalNamesProvider } from "@/providers/TechnicalNamesProvider"
 import { getMaintenanceStatus, getSetupStatus, FEATURE_FORBIDDEN_EVENT, VISIBILITY_REFUSAL, type SetupStatus } from "@/lib/api"
@@ -79,7 +83,7 @@ import { useOperatorProbe } from "@/hooks/useOperatorProbe"
 import { useEffectiveFeatures } from "@/hooks/useEffectiveFeatures"
 import { visibleNavItems } from "@/lib/nav-items"
 
-export type ActiveView = "chat" | "documents" | "skills" | "settings" | "library-health" | "workflows" | "classification-rules" | "governance" | "skill-studio" | "control-room"
+export type ActiveView = "chat" | "documents" | "skills" | "settings" | "library-health" | "workflows" | "classification-rules" | "governance" | "skill-studio" | "control-room" | "org-admin"
 
 function App() {
   const { user, loading, signIn, signUp, signOut } = useAuth()
@@ -206,8 +210,9 @@ function App() {
   }
 
   return (
-    <StreamsProvider>
-      <TooltipProvider>
+    <OrgProvider userId={user?.id ?? null}>
+      <StreamsProvider>
+        <TooltipProvider>
         {/* Phase 147 (D-06): app-wide end-user maintenance banner — sits above
             ChatLayout, outside the /admin surface, reading the public /health flag. */}
         <MaintenanceBanner />
@@ -255,8 +260,9 @@ function App() {
             />
           </CitationNavProvider>
         </TechnicalNamesProvider>
-      </TooltipProvider>
-    </StreamsProvider>
+        </TooltipProvider>
+      </StreamsProvider>
+    </OrgProvider>
   )
 }
 
