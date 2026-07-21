@@ -1,5 +1,6 @@
 import json
 import logging
+import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from typing import AsyncIterator
@@ -473,3 +474,124 @@ def require_visible(feature: str):
             detail="This feature is available to administrators only.",
         )
     return _dep
+
+
+# ── Phase 166 (ADMIN-01/02/04) — org authz: active-org resolution + org:manage gate ──
+# The user-side mirror of require_operator, but gated on org PERMISSIONS (mig 104's
+# current_user_has_permission SECDEF helper) instead of operator membership. D-166-09: no
+# route called that helper before Phase 166 — this is the net-new enforcement layer.
+#
+# THE load-bearing security beat (D-166-06 / T-166-01): the X-Org-Id header is NEVER
+# trusted. get_active_org_id validates it against the caller's org_members on a user-JWT/RLS
+# connection (auth.uid() resolves to the caller) — a non-member org is a 403.
+# current_user_has_permission likewise MUST run AS THE CALLER (its body reads auth.uid(),
+# mig 104:197) — always on get_user_pg_connection, never the BYPASSRLS pool (T-166-04).
+
+
+def _to_uuid(value: str) -> uuid.UUID | None:
+    """Parse a client-supplied org id into a ``uuid.UUID`` (asyncpg-native), or None if malformed.
+
+    asyncpg binds a ``uuid.UUID`` natively to a uuid column; a malformed string would raise a
+    22P02 at the DB. Parsing here turns an invalid/untrusted X-Org-Id into a clean non-member
+    403 (never a 500) — the header is untrusted input (D-166-06).
+    """
+    try:
+        return uuid.UUID(str(value))
+    except (ValueError, AttributeError, TypeError):
+        return None
+
+
+async def _has_org_permission(
+    request: Request, current_user: dict, org_id: str, permission_key: str
+) -> bool:
+    """The single org-permission seam (mirrors is_operator as the one swappable boundary).
+
+    Runs mig 104's ``current_user_has_permission(p_org_id, p_permission_key)`` SECDEF helper
+    AS THE CALLER on a user-JWT connection — the helper body reads ``auth.uid()`` (mig
+    104:197), so a BYPASSRLS/service-role connection (no ``auth.uid()``) would evaluate
+    postgres's permissions, not the caller's (T-166-04). Parameterized ``$1/$2`` binds — never
+    f-string SQL. Used by ``require_org_manage`` AND the ``/org/audit`` org:audit_view branch
+    (D-166-09, ADMIN-04).
+    """
+    async with get_user_pg_connection(request, current_user) as conn:
+        allowed = await conn.fetchval(
+            "SELECT public.current_user_has_permission($1, $2)",
+            _to_uuid(org_id),
+            permission_key,
+        )
+    return bool(allowed)
+
+
+async def get_active_org_id(
+    request: Request, current_user: dict = Depends(get_current_user)
+) -> str:
+    """Resolve + validate the caller's active org (D-166-06 / T-166-01).
+
+    Reads the ``X-Org-Id`` request header and VALIDATES it against the caller's
+    ``org_members`` on a user-JWT/RLS connection (``auth.uid()`` resolves to the caller,
+    never the service-role/BYPASSRLS pool) — a spoofed/non-member org is a 403, NEVER
+    trusted. Header absent: resolve the caller's default org — exactly one membership uses it;
+    zero → 403; 2+ → 400 (the frontend always sends the header once the switcher exists).
+    Stashes ``request.state.active_org`` + ``request.state.org_role`` for the endpoints/band;
+    returns the validated org_id string. Every query is a ``$1`` bind (never f-string SQL).
+    """
+    header_org = request.headers.get("X-Org-Id")
+    async with get_user_pg_connection(request, current_user) as conn:
+        if header_org:
+            org_uuid = _to_uuid(header_org)
+            if org_uuid is None:
+                # A malformed header can never match a real membership — treat as non-member.
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="You are not a member of this organization.",
+                )
+            row = await conn.fetchrow(
+                "SELECT role FROM public.org_members WHERE org_id = $1 AND user_id = auth.uid()",
+                org_uuid,
+            )
+            if row is None:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="You are not a member of this organization.",
+                )
+            request.state.active_org = str(header_org)
+            request.state.org_role = row["role"]
+            return str(header_org)
+        rows = await conn.fetch(
+            "SELECT org_id, role FROM public.org_members "
+            "WHERE user_id = auth.uid() ORDER BY created_at"
+        )
+    if not rows:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not belong to any organization.",
+        )
+    if len(rows) > 1:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="X-Org-Id header required.",
+        )
+    active = str(rows[0]["org_id"])
+    request.state.active_org = active
+    request.state.org_role = rows[0]["role"]
+    return active
+
+
+async def require_org_manage(
+    request: Request,
+    current_user: dict = Depends(get_current_user),
+    active_org: str = Depends(get_active_org_id),
+) -> dict:
+    """org:manage gate for the manager-only /org reads (ADMIN-01 default-deny).
+
+    Calls ``_has_org_permission(active_org, 'org:manage')`` AS THE CALLER (D-166-09). On
+    False → 403 (a legitimate product feature, NOT the /admin byte-identical 404 — mirrors
+    require_visible:471-474). FastAPI dedupes the shared ``get_active_org_id`` resolution, so
+    an endpoint declaring both resolves + validates the active org exactly once.
+    """
+    if not await _has_org_permission(request, current_user, active_org, "org:manage"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to manage this organization.",
+        )
+    return current_user
