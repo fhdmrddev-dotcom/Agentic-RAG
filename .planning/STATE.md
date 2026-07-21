@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v3.4
 milestone_name: Multi-Tenancy & Org Access
-status: executing
-last_updated: "2026-07-21T15:14:11.250Z"
-last_activity: 2026-07-21 -- Phase 166 execution started
+status: "**Phase 166 EXECUTED 2026-07-21** (5/5 plans, ~31 commits, sequential main-tree). **NO MIGRATION** — the authz substrate (mig 104 seeds org-admin→`org:manage`/`org:audit_view`; mig 105 makes every user org-admin of their personal org; `audit_log.org_id` populated) already shipped; 166 is FE UI + a net-new backend authz router that CALLS `current_user_has_permission()` (D-166-09). Deploy-artifact drift check PASS (no env/migration/service/sandbox change)."
+last_updated: "2026-07-21T18:14:39.467Z"
+last_activity: 2026-07-21 -- Phase 166 executed, code-verified, secured; live UAT pending
 progress:
   total_phases: 28
-  completed_phases: 7
+  completed_phases: 8
   total_plans: 43
-  completed_plans: 38
-  percent: 25
+  completed_plans: 43
+  percent: 29
 ---
 
 # Project State
