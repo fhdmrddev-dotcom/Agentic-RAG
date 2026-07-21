@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { NavPanel } from "./NavPanel"
 import { ChatHistoryColumn } from "./ChatHistoryColumn"
 import { ThreadCommandPalette } from "./ThreadCommandPalette"
@@ -16,6 +16,12 @@ import { SkillStudioPage, type StudioTab } from "@/pages/SkillStudioPage"
 // Phase 146 (ADMIN-01): the Control Room mounts here as a full-surface branch
 // (governance/skill-studio precedent), reachable only via the probe-gated shield.
 import { ControlRoomPage } from "@/components/admin/ControlRoomPage"
+// Phase 166 Plan 05 (ADMIN-01): the org-admin shell mounts here as a full-surface
+// branch (the ControlRoomPage precedent), reachable via the indigo canManage-gated
+// Shield-mirror. useOrgOptional supplies canManage (the mobile-drawer shield gate) +
+// activeOrgId (the D-166-08 thread-list refetch key).
+import { OrgAdminShell } from "@/components/org/OrgAdminShell"
+import { useOrgOptional } from "@/providers/OrgProvider"
 import { useThreads } from "@/hooks/useThreads"
 import { useFolders } from "@/hooks/useFolders"
 import { useTheme } from "@/hooks/useTheme"
@@ -96,6 +102,12 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
   const { folders } = useFolders()
   const { theme, toggleTheme } = useTheme()
 
+  // Phase 166 Plan 05 (ADMIN-01 / D-166-08): the org context (render-only). canManage
+  // gates the mobile-drawer indigo shield; activeOrgId keys the thread-list refetch.
+  const org = useOrgOptional()
+  const canManage = org?.canManage ?? false
+  const activeOrgId = org?.activeOrgId ?? null
+
   // Phase 156 (POLISH-01, Wave 1 / RESEARCH Pitfall 1): the single app-wide thread
   // bootstrap. Lifted UP from the old NavPanel (which only mounted on the chat view)
   // so the whole app shares one loaded thread list — the Wave-2 global ⌘K palette is
@@ -106,6 +118,21 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
       setTimeout(() => loadThreads().catch(console.error), 2000)
     })
   }, [loadThreads])
+
+  // Phase 166 Plan 05 (ADMIN-02 / D-166-08 second half): reconcile the sidebar thread
+  // list to the newly-active org after a switchOrg(). OrgProvider.switchOrg syncs the
+  // X-Org-Id header SYNCHRONOUSLY (Plan 02) BEFORE this effect runs, so loadThreads()
+  // fetches the NEW org's threads. This is ORTHOGONAL to the StreamsProvider bucket
+  // teardown (also Plan 02) — the two are independent 067.5 state, so no cross-effect
+  // ordering coupling is needed (reconcile-via-fetch, D-v2.5-03). A ref-guard skips the
+  // initial mount (the one-shot effect above already loaded the current org) so this
+  // fires ONLY on an actual org change — never a duplicate mount fetch.
+  const lastOrgRef = useRef(activeOrgId)
+  useEffect(() => {
+    if (lastOrgRef.current === activeOrgId) return
+    lastOrgRef.current = activeOrgId
+    loadThreads().catch(console.error)
+  }, [activeOrgId, loadThreads])
 
   // Title cross-wiring fix (parallel chats): apply a generated title to the run's
   // OWNING threadId (threaded through from StreamsProvider via makeStreamCallbacks)
@@ -464,6 +491,26 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
                 </button>
               )
             })}
+            {/* Phase 166 Plan 05 (ADMIN-01 / D-166-05): the indigo org-admin Shield-mirror
+                on mobile — parallel to the amber operator shield, gated on canManage,
+                honestly ABSENT for a member, so the org-admin shell is reachable on mobile
+                too (the reachability triad reaches the drawer). Indigo, never amber. */}
+            {canManage && (
+              <button
+                aria-label="Organization admin"
+                aria-current={activeView === "org-admin" ? "page" : undefined}
+                onClick={() => { onNavigate("org-admin"); setDrawerOpen(false) }}
+                className={cn(
+                  "flex items-center justify-center w-10 h-10 rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30",
+                  activeView === "org-admin"
+                    ? "bg-indigo-500/15 text-indigo-400"
+                    : "text-indigo-400/80 hover:text-indigo-400 hover:bg-indigo-500/10",
+                )}
+              >
+                <Shield className="w-4 h-4" />
+              </button>
+            )}
+
             {/* Phase 146 (ADMIN-01 / D-07): the probe-gated operator shield —
                 rendered OUTSIDE NAV_ITEMS (a SEPARATE element, never in the shared
                 array) so a non-operator's drawer is byte-identical. Amber Shield,
@@ -581,6 +628,15 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
             // + this mount + the shield action) is owned in-phase (the built-but-
             // unreachable lesson).
             <ControlRoomPage identity={operatorIdentity} onBack={() => onNavigate("chat")} />
+          ) : activeView === "org-admin" ? (
+            // Phase 166 Plan 05 (ADMIN-01 / D-166-05): the org-admin shell full-surface
+            // mounts here (additive branch BEFORE the trailing KnowledgeHealthPage else —
+            // the ControlRoomPage precedent). Reached ONLY via the indigo canManage-gated
+            // Shield-mirror (NavPanel footer + the mobile drawer); the shell self-sources
+            // everything from useOrg()/useTechnicalNames() — its only prop is onBack. This
+            // closes the reachability triad (App union [Plan 02] + this mount + the NavPanel
+            // entry — all owned in-phase; the Phase-118 built-but-unreachable lesson).
+            <OrgAdminShell onBack={() => onNavigate("chat")} />
           ) : (
             <KnowledgeHealthPage />
           )}
