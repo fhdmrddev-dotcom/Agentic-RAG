@@ -34,6 +34,39 @@ def _make_result(data):
     return r
 
 
+# ── Phase 165 (MIG-02) org-membership mock routing ────────────────────────────
+# Plan 165-02 added `_resolve_caller_org_ids` -> a leading
+# `supabase.table("org_members").select("org_id").eq("user_id", ...)` query at the FRONT of
+# fetch_visible_folders (folder_utils.py — create/move parent validation calls it). Route THAT
+# one query to a canned caller-org result (table-name-keyed dispatch) so it never consumes an
+# entry from the ordered `execute.side_effect` lists below — the existing positional folder
+# sequences stay aligned, and future leading-query insertions won't re-break them.
+CALLER_ORG_ID = "00000000-0000-0000-0000-0000000000a1"
+
+
+@pytest.fixture(autouse=True)
+def _route_org_members(mock_builder):
+    """Dispatch `table("org_members")` to a canned org-membership result; everything else
+    keeps returning the shared side_effect-driven builder (so positional lists stay intact)."""
+    from tests.conftest import _supabase  # noqa: PLC0415
+
+    org_result = MagicMock()
+    org_result.data = [{"org_id": CALLER_ORG_ID}]
+    org_builder = MagicMock()
+    org_builder.select.return_value = org_builder
+    org_builder.eq.return_value = org_builder
+    org_builder.execute.return_value = org_result
+
+    def _dispatch(name, *args, **kwargs):
+        return org_builder if name == "org_members" else mock_builder
+
+    _supabase.table.side_effect = _dispatch
+    try:
+        yield
+    finally:
+        _supabase.table.side_effect = None
+
+
 # ── POST /folders ──────────────────────────────────────────────────────────────
 
 class TestCreateFolder:
