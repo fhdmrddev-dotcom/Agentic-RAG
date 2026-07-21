@@ -72,13 +72,47 @@ export type GovernedFeature =
  *  fallback (hook error / pre-resolve) type-checks — an absent key reads as hidden. */
 export type EffectiveFeatures = Partial<Record<GovernedFeature, boolean>>
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 166 (D-166-06) — the active-org id injected as an `X-Org-Id` header on
+// EVERY authed request. This is a per-device UI HINT, never trusted: the server
+// re-validates it against the caller's membership (Plan 01 `get_active_org_id`,
+// on a user-JWT/RLS connection) and a forged/stale value reaches no data (403).
+//
+// Read module-level here — exactly like the access token is read from
+// `supabase.auth.getSession()` — so every existing authed call auto-carries the
+// header with ZERO call-site churn. `OrgProvider` is the sole WRITER (it calls
+// `setActiveOrgId` synchronously on every switch, D-166-08, so any effect keyed on
+// the active org sees the new header before it runs). We seed the module var from
+// localStorage at load so the very first authed call after a page reload already
+// carries the rehydrated org, before OrgProvider's mount effect re-syncs it.
+// ─────────────────────────────────────────────────────────────────────────────
+export const ACTIVE_ORG_STORAGE_KEY = "active-org-id"
+
+let _activeOrgId: string | null =
+  typeof window !== "undefined" ? window.localStorage.getItem(ACTIVE_ORG_STORAGE_KEY) : null
+
+/** The active org id injected as `X-Org-Id` (a hint — the server re-validates it). */
+export function getActiveOrgId(): string | null {
+  return _activeOrgId
+}
+
+/** Set the active org id for the header seam. Called by OrgProvider on every
+ *  switch (synchronously, D-166-08) + on mount (rehydrate). Persisting to
+ *  localStorage is OrgProvider's job (the `ACTIVE_ORG_STORAGE_KEY` single source). */
+export function setActiveOrgId(orgId: string | null): void {
+  _activeOrgId = orgId
+}
+
 async function getAuthHeaders(): Promise<HeadersInit> {
   const { data } = await supabase.auth.getSession()
   const token = data.session?.access_token
   if (!token) throw new Error("Not authenticated")
+  const orgId = getActiveOrgId()
   return {
     "Content-Type": "application/json",
     Authorization: `Bearer ${token}`,
+    // Phase 166 (D-166-06): server RE-VALIDATES this against membership — never trusted.
+    ...(orgId ? { "X-Org-Id": orgId } : {}),
   }
 }
 
@@ -4431,5 +4465,162 @@ export async function getPublicConfig(): Promise<PublicConfig | null> {
     return { supabase_url: body.supabase_url, supabase_anon_key: body.supabase_anon_key }
   } catch {
     return null
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 166 (ADMIN-01..05) — the org-admin surface client (the user-side mirror
+// of the /admin operator client above). Backs `useOrgPermissionsProbe`, the org
+// switcher, the read-only Members tab, and the lighter org-scoped Audit tab.
+//
+// SECURITY NOTE (mirror of the /admin note): these functions decide RENDERING
+// ONLY. The backend `require_org_manage` router gate (Plan 01) over mig 104's
+// `current_user_has_permission` SECDEF helper is the sole authority — a forged
+// `can_manage`/`can_audit_view` in the browser reaches no data (a non-manager's
+// `/org/members` + `/org/audit` return 403). `X-Org-Id` is a hint the server
+// re-validates against membership; a spoofed active org is a 403, never trusted.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** One membership row from `GET /org/me` `memberships[]` (org_members JOIN
+ *  organizations). Feeds the org switcher — which renders only at 2+ (D-166-02). */
+export interface OrgMembership {
+  org_id: string
+  name: string
+  role: string
+}
+
+/** The org-permissions probe payload from `GET /org/me` (Plan 01). `can_manage`
+ *  gates the shell/rail shield; `can_audit_view` unlocks the cross-member audit
+ *  read; `memberships` feeds the switcher. RENDER-ONLY (the backend gate is the wall). */
+export interface OrgPermissions {
+  /** The server-validated active org (null only on the fail-closed default). */
+  org_id: string | null
+  role: string
+  can_manage: boolean
+  can_audit_view: boolean
+  memberships: OrgMembership[]
+}
+
+/** One roster row from `GET /org/members` (org_members JOIN auth.users). Read-only
+ *  this phase — invite/role editing is Phase 167. `email` is null if unresolved. */
+export interface OrgMember {
+  user_id: string
+  email: string | null
+  role: string
+  joined_at: string | null
+}
+
+/** One server page of the org members roster. 1-based; the server clamps
+ *  `page_size` <= 100. `total` is the org's member count (COUNT behind the manage gate). */
+export interface OrgMembersPage {
+  members: OrgMember[]
+  page: number
+  page_size: number
+  total: number
+}
+
+/** One org-scoped `audit_log` row from `GET /org/audit`. Same RAW platform
+ *  vocabulary as the operator platform-audit (`action_type` is a code the UI maps
+ *  to a plain-first label); `org_id` is always the active org (never cross-org). */
+export interface OrgAuditRow {
+  id: string
+  user_id: string | null
+  action_type: string
+  metadata: Record<string, unknown> | null
+  created_at: string
+  org_id: string
+}
+
+/** The filter shape for the org audit browse (the lighter cut — single source,
+ *  no CSV, no user filter). `since` is a chip preset (7d/30d/90d); `actionType`
+ *  maps to the single `action_type` query param. */
+export interface OrgAuditFilters {
+  since?: string | null
+  actionType?: string | null
+}
+
+/** One server page of the org audit browse. `scope` is the load-bearing honesty
+ *  flag: `"all"` = the caller holds `org:audit_view` (all org rows); `"own"` = the
+ *  RLS-honest degrade (own rows only) the UI banners — NEVER a silent empty list
+ *  (D-166-04). `total` is the COUNT of the (scoped) filtered set for the pager. */
+export interface OrgAuditPage {
+  entries: OrgAuditRow[]
+  total: number
+  page: number
+  page_size: number
+  scope: "all" | "own"
+}
+
+/** The org-permissions probe. Calls `GET /org/me` (floor-exempt) and returns the
+ *  caller's org identity + permissions + memberships. Mirrors `getOperatorProbe`
+ *  (typed GET, `ApiError` on non-OK) but has NO 404→null idiom — every member
+ *  reaches their own org's probe (200). The active org is carried by the `X-Org-Id`
+ *  header (server-validated), so no arg is needed. RENDER-ONLY (backend gate is the wall). */
+export async function getOrgPermissions(): Promise<OrgPermissions> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/org/me`, { headers })
+  if (!res.ok) throw new ApiError("Failed to load the org permissions.", res.status)
+  const body = (await res.json()) as Partial<OrgPermissions>
+  return {
+    org_id: body.org_id ?? null,
+    role: body.role ?? "member",
+    can_manage: body.can_manage ?? false,
+    can_audit_view: body.can_audit_view ?? false,
+    memberships: body.memberships ?? [],
+  }
+}
+
+/** Read the read-only org members roster (`GET /org/members`, Plan 01 — manager-only).
+ *  Mirrors `getUsersRoster`: 1-based pagination, `pageSize` clamped server-side, an
+ *  envelope `{members, page, page_size, total}` unwrapped defensively (CR-01 precedent). */
+export async function getOrgMembers(page = 1, pageSize = 50): Promise<OrgMembersPage> {
+  const headers = await getAuthHeaders()
+  const params = new URLSearchParams({
+    page: String(Math.max(1, page)),
+    page_size: String(pageSize),
+  })
+  const res = await fetch(`${API_BASE}/org/members?${params}`, { headers })
+  if (!res.ok) throw new ApiError("Failed to load the org members.", res.status)
+  const body = (await res.json()) as Partial<OrgMembersPage>
+  return {
+    members: body.members ?? [],
+    page: body.page ?? page,
+    page_size: body.page_size ?? pageSize,
+    total: body.total ?? 0,
+  }
+}
+
+/** Shared query-string builder for the org audit browse (the lighter single-source
+ *  cut of `platformAuditParams`). */
+function orgAuditParams(filters: OrgAuditFilters): URLSearchParams {
+  const params = new URLSearchParams()
+  if (filters.since) params.set("since", filters.since)
+  if (filters.actionType) params.set("action_type", filters.actionType)
+  return params
+}
+
+/** Browse the org-scoped `audit_log` (`GET /org/audit`, Plan 01 — manager-only).
+ *  Mirrors `getPlatformAudit` (params builder + defensive envelope unwrap) but keeps
+ *  the single-source `scope` flag: on the own-only degrade the UI banners "you see
+ *  only your own activity" instead of a silent empty list (D-166-04). 1-based
+ *  pagination; the server clamps `pageSize` <= 100. */
+export async function getOrgAudit(
+  filters: OrgAuditFilters,
+  page = 1,
+  pageSize = 50,
+): Promise<OrgAuditPage> {
+  const headers = await getAuthHeaders()
+  const params = orgAuditParams(filters)
+  params.set("page", String(Math.max(1, page)))
+  params.set("page_size", String(pageSize))
+  const res = await fetch(`${API_BASE}/org/audit?${params}`, { headers })
+  if (!res.ok) throw new ApiError("Failed to load the org audit activity.", res.status)
+  const body = (await res.json()) as Partial<OrgAuditPage>
+  return {
+    entries: body.entries ?? [],
+    total: body.total ?? 0,
+    page: body.page ?? page,
+    page_size: body.page_size ?? pageSize,
+    scope: body.scope === "all" ? "all" : "own",
   }
 }
