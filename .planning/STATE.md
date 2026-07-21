@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v3.4
 milestone_name: Multi-Tenancy & Org Access
 status: executing
-last_updated: "2026-07-21T19:09:41.782Z"
-last_activity: 2026-07-21 -- Phase 167 planning complete
+last_updated: "2026-07-21T19:10:02.479Z"
+last_activity: 2026-07-21 -- Phase 167 execution started
 progress:
   total_phases: 28
   completed_phases: 8
@@ -22,7 +22,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-20 — Phase 163 THE ATOMIC CRUX complete; membership RLS enforced)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 166 — org-admin-shell-org-switcher-profile-menu-anchor
+**Current focus:** Phase 167 — invitations-roles-greenlists-jit-per-user-prefs
 
 ## Deferred Items
 
@@ -40,11 +40,11 @@ Items acknowledged and deferred at milestone close on 2026-07-18 (44 open `audit
 
 ## Current Position
 
-Phase: 166 (org-admin-shell-org-switcher-profile-menu-anchor) — EXECUTED; code-verified + SECURED; **live UAT (human_needed) pending**
-Plan: 5 of 5 complete
-Status: Ready to execute
+Phase: 167 (invitations-roles-greenlists-jit-per-user-prefs) — EXECUTING
+Plan: 1 of 7
+Status: Executing Phase 167
 Next action: **Operator live UAT** (`166-VERIFICATION.md` = `human_needed`, 6 items in `166-HUMAN-UAT.md`): the SC#10 4-axis (cross-provider × multi-tool × parallel-thread × long-message, incl. the **org-switch-mid-stream** hard bar for D-166-08) + G-4 Chrome lived-experience — need a running uvicorn + browser + provider keys. Then flip VERIFICATION `human_needed`→`passed` + `/gsd:complete-milestone`-track. **Delivered:** profile ProfileMenu anchor (079-C) · indigo org rail Shield-mirror (gated `org:manage`, absent for member) · OrgProvider outside StreamsProvider · server-validated `X-Org-Id` (spoof→403) · 7-tab OrgAdminShell (3 live Members/Audit/Settings + 4 LockedTab) · RLS-honest org audit degrade · light Settings IA split. **Gates:** frontend `tsc` exit 0 · backend org-gate 7/7 · org-isolation exit-gate 23/23 (no regression) · secure-phase **19/19 threats CLOSED (0 open, ASVS L2)** · code-review 0 blockers → **WR-01/02/03 + IN-01 FIXED** (WR-01 = `/org/me` bootstrap deadlock at 2+ orgs; WR-02 = G-5 stale-subscription teardown, 067.5 guard byte-unchanged; WR-03 = active-org cleared on sign-out). SEED-056 vitest rot pre-existing (baseline=HEAD). **Cloud parity owed (unchanged by 166 — no new DB work):** migs 099→111 + `SECRETS_ENCRYPTION_KEY`, in order, at next operator-gated push. **Next phase: `/gsd:discuss-phase 167`** (Invitations + Roles + Greenlists + JIT — builds on 166's bootstrap seam).
-Last activity: 2026-07-21 -- Phase 167 planning complete
+Last activity: 2026-07-21 -- Phase 167 execution started
 
 Progress: [██████████] 100%
 
