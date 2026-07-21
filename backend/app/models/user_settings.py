@@ -862,6 +862,98 @@ def load_user_settings(user_id: str, supabase=None) -> UserEffectiveSettings:
     return load_app_settings()
 
 
+# ── Phase 167 VIS-02 (D-167-04) — the SEED-116 two-layer per-user model default ──
+# The FIRST concrete per-user preference: a user picks a default AI model WITHIN the
+# operator/org-allowed ENABLED set, honoring an operator LOCK. This REVIVES the dead
+# ``user_settings.preferences`` column (mig 011) — ZERO migration.
+#
+# INVERSE of this module's service-role header rule (:8-18): ``load_user_model_default``
+# reads PER-USER data, explicitly scoped to the passed ``user_id`` (the belt-and-suspenders
+# ``WHERE user_id = $1`` filter the v3.4 milestone keeps), NOT the global app_settings path.
+# Every helper here FAILS SAFE so the chat send path stays byte-identical when unset (D-14):
+# a read blip / cold cache / unset preference all resolve to "no overlay".
+
+async def load_user_model_default(user_id: str) -> str | None:
+    """Return the caller's own ``user_settings.preferences->>'default_model'`` (VIS-02).
+
+    Reads the singleton asyncpg pool with an EXPLICIT ``WHERE user_id = $1`` per-user
+    filter. Returns ``None`` when unset / no row / any read error — FAIL-OPEN so an absent
+    or unreadable preference produces NO overlay and the send path stays byte-identical
+    (D-14). asyncpg is already async (D-v2.5-01 — no blocking supabase-py call). Never raises.
+    """
+    if not user_id:
+        return None
+    try:
+        from app.dependencies import get_pg_pool
+        pool = await get_pg_pool()
+        val = await pool.fetchval(
+            "SELECT preferences->>'default_model' FROM public.user_settings WHERE user_id = $1",
+            user_id,
+        )
+        return val or None
+    except Exception:  # noqa: BLE001 — a per-user read blip must never break a send (T-167-16)
+        logger.warning("load_user_model_default: read failed; no overlay", exc_info=True)
+        return None
+
+
+async def enabled_model_allowed_set() -> set[str]:
+    """The operator/org ENABLED allowed-set a per-user default may pick from (VIS-02).
+
+    A model is offerable iff its ``model_capabilities_overrides`` row is enabled (the Phase
+    149 registry ``enabled`` flag = shows-in-picker = offerable). A row with ``enabled=False``
+    is EXCLUDED (defense-in-depth: a later-disabled model falls back to the operator default,
+    T-167-13). Cross-provider by construction (the registry spans providers — D-167-09), so
+    the composed default routes through the SAME resolve_run_model provider resolution with no
+    per-provider fork. ``load_all_model_overrides`` swallows a DB blip -> empty set -> no valid
+    preference -> byte-identical. Never raises.
+    """
+    overrides = await load_all_model_overrides()
+    return {mid for mid, row in overrides.items() if (row or {}).get("enabled") is not False}
+
+
+async def operator_model_default_locked() -> bool:
+    """Is the operator/org default model LOCKED? (VIS-02 SEED-116 lock, honored SERVER-SIDE).
+
+    Reads the EXISTING ``app_settings.llm_model_locked`` flag (Phase 149 MODEL-02 — the single
+    org-default lock; ZERO migration). When True, a per-user default is IGNORED and the operator
+    default wins (T-167-14). FAIL-CLOSED to True on any read error: a lock-read blip is treated
+    as locked so a governance lock can never be bypassed by a transient failure — and because a
+    locked compose returns the operator default, ``apply_user_model_default`` then returns the
+    settings object UNCHANGED (still byte-identical, D-14). Never raises.
+    """
+    try:
+        row = await _load_settings_from_db()
+        return bool(row.get("llm_model_locked"))
+    except Exception:  # noqa: BLE001 — fail CLOSED (locked) so a blip can't bypass the lock
+        logger.warning(
+            "operator_model_default_locked: read failed; treating as LOCKED (fail-closed)",
+            exc_info=True,
+        )
+        return True
+
+
+def compose_effective_model_default(
+    user_pref: str | None,
+    effective: UserEffectiveSettings,
+    enabled_models: set[str],
+    locked: bool,
+) -> str:
+    """The SEED-116 two-layer compose (VIS-02 / D-167-04) — the pure decision.
+
+    Returns the operator/org default (``effective.llm_model``) UNLESS the user set a
+    preference that is (a) non-empty, (b) in the operator/org ENABLED allowed-set, AND
+    (c) NOT operator-locked — in which case returns the user's preference. The lock +
+    allowed-set are re-checked SERVER-SIDE here (defense-in-depth, T-167-13/14): a user
+    can never pick outside the enabled set, and a locked org default always wins. Pure;
+    never raises.
+    """
+    if locked:
+        return effective.llm_model
+    if user_pref and user_pref in enabled_models:
+        return user_pref
+    return effective.llm_model
+
+
 # ── Phase 075.10 -- tool_args_progress boundary helper ─────────────────────────
 
 # Hardcoded pre-075.10 fallback. Used by `tool_args_progress_emit_boundary_bytes()`
