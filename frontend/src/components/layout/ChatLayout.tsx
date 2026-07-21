@@ -131,8 +131,12 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
   useEffect(() => {
     if (lastOrgRef.current === activeOrgId) return
     lastOrgRef.current = activeOrgId
+    // IN-01: drop the old-org selected thread before the refetch so the chat view doesn't
+    // briefly show a stale thread (and reconcile it via a cross-org getSnapshot 404) that is
+    // absent from the new org's list. The user re-picks from the refetched new-org threads.
+    selectThread(null)
     loadThreads().catch(console.error)
-  }, [activeOrgId, loadThreads])
+  }, [activeOrgId, loadThreads, selectThread])
 
   // Title cross-wiring fix (parallel chats): apply a generated title to the run's
   // OWNING threadId (threaded through from StreamsProvider via makeStreamCallbacks)
