@@ -157,6 +157,33 @@ describe("Phase 166-02 — OrgProvider switchOrg teardown (composed tree, D-166-
     expect(cleared.length).toBe(0)
   })
 
+  it("finalizes stale streamingThreads + subscriptionsByThread in lockstep on switch (WR-02)", async () => {
+    renderComposed("user-1")
+    // Let the probe + StreamsProvider mount effects settle (incl. the WR-01 default-org adopt).
+    await act(async () => {})
+
+    const OLD_THREAD = "old-org-thread"
+    // Seed the store as if an OLD-org run were mid-stream: streamingThreads holds the thread
+    // AND the per-thread subscription mirror holds its run id — WITHOUT a send in flight
+    // (sendingThreadsRef is empty), so the switch is allowed to finalize it.
+    act(() => {
+      useStreamsStore.setState({
+        streamingThreads: new Set<string>([OLD_THREAD]),
+        subscriptionsByThread: new Map<string, Set<string>>([[OLD_THREAD, new Set(["run-old"])]]),
+      })
+    })
+
+    await act(async () => {
+      orgHandle!.switchOrg("org-2")
+    })
+
+    // A caller-initiated abort fires NO onTerminal (api.ts silent AbortError), so the
+    // teardown MUST clean both store mirrors itself — otherwise the inactivity watchdog
+    // keeps 404-probing getSnapshot(OLD_THREAD) under the new X-Org-Id, forever.
+    expect(useStreamsStore.getState().streamingThreads.has(OLD_THREAD)).toBe(false)
+    expect(useStreamsStore.getState().subscriptionsByThread.has(OLD_THREAD)).toBe(false)
+  })
+
   it("persists activeOrgId to localStorage on change and rehydrates it on mount", async () => {
     const first = renderComposed("user-1")
     await act(async () => {})

@@ -2905,9 +2905,44 @@ export function StreamsProvider({ children }: PropsWithChildren) {
     // Skip the initial mount (undefined → first value) and any no-op re-render: only an
     // actual SWITCH tears down.
     if (prev === undefined || prev === activeOrgId) return
-    // 1) Tear down in-flight subscriptions (mirrors the unmount-cleanup shape at useEffect #3).
+    // 1) Tear down in-flight subscriptions AND their store mirrors IN LOCKSTEP (WR-02). A
+    //    caller-initiated abort is a SILENT return in subscribeToRun (api.ts — an AbortError
+    //    fires NO onTerminal), so the store mirrors that onTerminal would clean are never
+    //    cleaned by the abort alone. Exactly like the enforceStreamPool evictor (:1204-1208),
+    //    we must replicate the onTerminal remove pair ourselves: subscriptionsRef.delete +
+    //    _removeRunFromThread. The pre-WR-02 teardown copied the UNMOUNT-cleanup shape
+    //    (abort-all + subscriptionsRef.clear only) — fine on unmount (the whole store is
+    //    discarded) but on a LIVE switch it left subscriptionsByThread holding stale old-org
+    //    run ids AND streamingThreads holding the old-org thread, so the inactivity watchdog
+    //    kept probing getSnapshot(oldThread) under the NEW X-Org-Id — a permanent phantom
+    //    "streaming" state plus a wasted cross-org 404 every ~20s, forever.
+    const byThread = useStreamsStore.getState().subscriptionsByThread
+    for (const [ownerThreadId, runIds] of byThread) {
+      for (const runId of runIds) {
+        subscriptionsRef.current.get(runId)?.abort()
+        subscriptionsRef.current.delete(runId)
+        useStreamsStore.setState((s) => ({
+          subscriptionsByThread: _removeRunFromThread(
+            s.subscriptionsByThread,
+            ownerThreadId,
+            runId,
+          ),
+        }))
+      }
+    }
+    // Belt-and-suspenders: abort + drop any controller NOT tracked in the per-thread mirror
+    // so no in-flight subscription survives the switch (the unmount-cleanup guarantee).
     for (const ctrl of subscriptionsRef.current.values()) ctrl.abort()
     subscriptionsRef.current.clear()
+    // Clear streamingThreads for the torn-down threads so the watchdog stops probing the old
+    // org's threads. Guarded by sendingThreadsRef so a thread with a send IN FLIGHT is never
+    // finalized here — the send-path finally owns its own streamingThreads.delete (the 067.5
+    // per-thread contract; same guard predicate as clearThreadBucket at :1340).
+    useStreamsStore.setState((s) => {
+      const next = new Set(s.streamingThreads)
+      for (const t of s.streamingThreads) if (!sendingThreadsRef.current.has(t)) next.delete(t)
+      return { streamingThreads: next }
+    })
     // 2) Clear each active surface's viewed-thread bucket THROUGH the existing guarded action.
     const actions = useStreamsStore.getState().actions
     for (const surface of useStreamsStore.getState().bucketsBySurface.keys()) {
