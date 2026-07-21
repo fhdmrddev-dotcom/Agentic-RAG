@@ -22,7 +22,10 @@ Endpoints:
 import logging
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, Query, Request
+import re
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from pydantic import BaseModel, field_validator
 from starlette.concurrency import run_in_threadpool
 from supabase import Client
 
@@ -32,11 +35,58 @@ from app.dependencies import (
     get_current_user,
     get_service_role_supabase,
     get_user_pg_connection,
+    get_user_supabase_client,
+    require_org_invite,
     require_org_manage,
     resolve_active_org_soft,
 )
+from app.services import invitation_service
+from app.services.audit_service import write_audit_entry
+from app.services.email_provider import compose_invite_link, get_email_provider
 
 logger = logging.getLogger(__name__)
+
+# ── invitation surface (Phase 167 INV-01/INV-02) ───────────────────────────────
+# Roles an invite may grant this phase: member (default) + org-admin. dept-admin is
+# schema-valid (mig 104 CHECK) but greyed until Phase 169; super-admin is refused
+# server-side (D-167-03). Validated BEFORE any mint/insert.
+_INVITE_ROLES = frozenset({"member", "org-admin"})
+
+# Every invitation lifecycle event records an audit row that must land on the org's
+# /org/audit tab. It REUSES the existing valid 'settings.update' action_type (org
+# administration) rather than a new 'invitation.*' type: the audit_log action_type CHECK
+# (mig 071) admits only 19 values and this phase authors NO migration (167-CONTEXT: "NO
+# migration is expected"); an unlisted type would silently drop (23514 is swallowed by
+# write_audit_entry). The specific event lives in metadata.event. T-167-23: every row
+# carries an EXPLICIT org_id (never the ORDER-BY-less mig-106 autofill guess).
+_INVITE_AUDIT_ACTION = "settings.update"
+
+# Lightweight email shape check. Deliberately NOT pydantic ``EmailStr`` — that pulls the
+# ``email-validator`` package, and this phase adds NO new dependency (threat T-167-SC / the
+# offline-safe default). A single-@ / dotted-domain check is sufficient at this trust boundary;
+# the invite is a bearer capability, not an identity assertion.
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+class SendInvitationBody(BaseModel):
+    """POST /org/invitations body — a validated email + the invited role."""
+
+    email: str
+    role: str = "member"
+
+    @field_validator("email")
+    @classmethod
+    def _validate_email(cls, v: str) -> str:
+        v = (v or "").strip()
+        if not _EMAIL_RE.match(v):
+            raise ValueError("A valid email address is required.")
+        return v
+
+
+class AcceptInvitationBody(BaseModel):
+    """POST /org/invitations/accept body — the raw invite token from the link."""
+
+    token: str
 
 # Default-deny is enforced PER GUARDED ROUTE, not at the router level (WR-01). The
 # manager-only reads (/org/members, /org/audit) each declare require_org_manage, which
@@ -241,4 +291,124 @@ async def get_org_audit(
         "page": max(1, page),
         "page_size": page_size,
         "scope": scope,
+    }
+
+
+# ── invitations (INV-01) — send + list, org:invite-gated on the user-JWT connection ─────
+@router.post("/invitations")
+async def send_org_invitation(
+    request: Request,
+    body: SendInvitationBody,
+    current_user: dict = Depends(require_org_invite),
+    audit_supabase: Client = Depends(get_user_supabase_client),
+):
+    """Send an org invitation (INV-01; org:invite-gated, default-deny 403).
+
+    Mints a one-way-hashed token (invitation_service), INSERTs the pending invite on the
+    CALLER'S user-JWT/RLS connection so the mig-104 ``org_invitations_insert WITH CHECK
+    (org:invite AND org_id ∈ current_user_org_ids)`` policy is the real wall (Pitfall 6) —
+    org_id is server-pinned to ``request.state.active_org``, NEVER client-supplied. Returns
+    the copy/share LINK (the raw token lives ONLY there, T-161-04); token_hash is never
+    selected or returned. Delivery is link-first: the env-switched provider (default none-log)
+    best-effort emails the link, but a delivery failure never fails the invite. The audit row
+    carries an EXPLICIT org_id=active_org (T-167-23 — never the mig-106 autofill guess).
+    """
+    active_org = deps._to_uuid(request.state.active_org)
+    email = str(body.email)
+    role = body.role
+    if role not in _INVITE_ROLES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invitations may grant only the member or org-admin role.",
+        )
+
+    raw, token_hash = invitation_service.mint_invite_token()
+    expires_at = datetime.now(timezone.utc) + timedelta(days=7)  # A1 default — 7d
+
+    async with get_user_pg_connection(request, current_user) as conn:
+        inv_row = await conn.fetchrow(
+            "INSERT INTO public.org_invitations "
+            "(org_id, email, role, token_hash, status, expires_at, invited_by) "
+            "VALUES ($1, $2, $3, $4, 'pending', $5, auth.uid()) "
+            "RETURNING id, email, role, status, expires_at",
+            active_org, email, role, token_hash, expires_at,
+        )
+        org_row = await conn.fetchrow(
+            "SELECT name FROM public.organizations WHERE id = $1", active_org
+        )
+
+    org_name = org_row["name"] if org_row else "your organization"
+    link = compose_invite_link(raw)
+    try:
+        get_email_provider().send_invite(email, link, org_name)
+    except Exception as exc:  # link-first: delivery never fails the invite
+        logger.error("invite email delivery failed for %s: %s", email, exc)
+
+    await write_audit_entry(
+        user_id=current_user["id"],
+        action_type=_INVITE_AUDIT_ACTION,
+        metadata={
+            "event": "invitation.send",
+            "invitation_id": str(inv_row["id"]),
+            "email": email,
+            "role": role,
+        },
+        supabase=audit_supabase,
+        org_id=str(request.state.active_org),  # EXPLICIT active_org (T-167-23)
+    )
+
+    return {
+        "link": link,
+        "invitation": {
+            "id": str(inv_row["id"]),
+            "email": inv_row["email"],
+            "role": inv_row["role"],
+            "status": inv_row["status"],
+            "expires_at": (
+                inv_row["expires_at"].isoformat() if inv_row["expires_at"] else None
+            ),
+        },
+    }
+
+
+@router.get("/invitations")
+async def list_org_invitations(
+    request: Request,
+    status_filter: str | None = Query(None, alias="status"),
+    current_user: dict = Depends(require_org_invite),
+):
+    """List the active org's invitations (INV-01; org:invite-gated).
+
+    Reads ``org_invitations`` for the server-validated active org on the user-JWT connection
+    (the mig-104 ``org_invitations_select`` RLS admits members). token_hash is NEVER in the
+    select list (T-161-04) — only id/email/role/status/expires_at/invited_by/created_at. An
+    optional ``?status=`` chip filters by lifecycle state.
+    """
+    active_org = deps._to_uuid(request.state.active_org)
+    cols = (
+        "SELECT id, email, role, status, expires_at, invited_by, created_at "
+        "FROM public.org_invitations WHERE org_id = $1"
+    )
+    async with get_user_pg_connection(request, current_user) as conn:
+        if status_filter:
+            rows = await conn.fetch(
+                cols + " AND status = $2 ORDER BY created_at DESC",
+                active_org, status_filter,
+            )
+        else:
+            rows = await conn.fetch(cols + " ORDER BY created_at DESC", active_org)
+
+    return {
+        "invitations": [
+            {
+                "id": str(r["id"]),
+                "email": r["email"],
+                "role": r["role"],
+                "status": r["status"],
+                "expires_at": r["expires_at"].isoformat() if r["expires_at"] else None,
+                "invited_by": str(r["invited_by"]) if r["invited_by"] else None,
+                "created_at": r["created_at"].isoformat() if r["created_at"] else None,
+            }
+            for r in rows
+        ]
     }

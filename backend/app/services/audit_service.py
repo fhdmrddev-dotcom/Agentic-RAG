@@ -59,16 +59,29 @@ async def write_audit_entry(
     action_type: str,
     metadata: dict,
     supabase: Client,
+    org_id: str | None = None,
 ) -> None:
     """Write a single audit log entry.
 
     Exceptions are caught, logged to stderr, and swallowed (D-05).
+
+    ``org_id`` is OPTIONAL and defaults to ``None`` → the insert dict is byte-identical
+    to the historical 3-column write, so every existing caller is unchanged (the mig-106
+    ``autofill_org_id_by_owner`` BEFORE-INSERT trigger still fills org_id for them). When a
+    caller passes an EXPLICIT ``org_id`` (Phase 167, T-167-23), it is added to the insert dict
+    and — because the trigger's first statement is ``IF NEW.org_id IS NOT NULL THEN RETURN
+    NEW`` — the trigger becomes a no-op and the provided value is written verbatim. This is the
+    only way a 2+-org caller's row lands on the CORRECT org's /org/audit tab (the trigger's
+    ORDER-BY-less ``org_members … LIMIT 1`` lookup would otherwise misattribute it).
     """
     try:
-        await aexec(supabase.table("audit_log").insert({
+        entry = {
             "user_id": user_id,
             "action_type": action_type,
             "metadata": metadata,
-        }))
+        }
+        if org_id is not None:
+            entry["org_id"] = org_id
+        await aexec(supabase.table("audit_log").insert(entry))
     except Exception as exc:
         logger.error("audit write failed [action=%s user=%s]: %s", action_type, user_id, exc)
