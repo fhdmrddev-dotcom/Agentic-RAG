@@ -661,3 +661,30 @@ async def require_org_manage(
             detail="You do not have permission to manage this organization.",
         )
     return current_user
+
+
+async def require_org_invite(
+    request: Request,
+    current_user: dict = Depends(get_current_user),
+    active_org: str = Depends(get_active_org_id),
+) -> dict:
+    """org:invite gate for the invitation write/list routes (Phase 167, INV-01 / D-167-08).
+
+    A verbatim mirror of ``require_org_manage`` with the permission key swapped to
+    ``org:invite``: ``_has_org_permission(active_org, 'org:invite')`` runs mig-104's
+    ``current_user_has_permission`` SECDEF helper AS THE CALLER (org-admin + super-admin hold
+    ``org:invite``; ``member`` does not — role_permissions seed, mig 104:416-425). On False →
+    403 (a legitimate product feature an end user can understand, NOT the /admin byte-identical
+    404 — mirrors require_org_manage / require_visible:472-474).
+
+    Inherits the STRICT ``get_active_org_id`` (spoofed/non-member ``X-Org-Id`` → 403;
+    absent-header-with-2+-memberships → 400), so every invitation write is pinned to the
+    server-validated active org (Pitfall 6) — never ``resolve_active_org_soft``. FastAPI dedupes
+    the shared ``get_active_org_id`` resolution across the endpoint's dependencies.
+    """
+    if not await _has_org_permission(request, current_user, active_org, "org:invite"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to invite members.",
+        )
+    return current_user

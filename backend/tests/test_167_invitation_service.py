@@ -170,3 +170,41 @@ def test_derive_adoption_state():
     assert inv.derive_adoption_state("pending", has_membership=False) == "pending"
     assert inv.derive_adoption_state(None, has_membership=False) == "not-yet-invited"
     assert inv.derive_adoption_state("revoked", has_membership=False) == "not-yet-invited"
+
+
+# ── require_org_invite gate (D-167-08 / Task 3) ───────────────────────────────
+
+import pytest  # noqa: E402
+from fastapi import HTTPException  # noqa: E402
+
+import app.dependencies as deps  # noqa: E402
+
+
+async def test_require_org_invite_denies_without_permission(monkeypatch):
+    """Default-deny: a caller lacking org:invite → 403 (a legitimate feature, NOT a 404)."""
+    async def _fake(request, current_user, org_id, permission_key):
+        assert permission_key == "org:invite"  # the gate mirrors org:manage on the invite key
+        return False
+
+    monkeypatch.setattr("app.dependencies._has_org_permission", _fake)
+
+    with pytest.raises(HTTPException) as exc:
+        await deps.require_org_invite(
+            request=None, current_user={"id": USER_ID}, active_org=ORG_ID
+        )
+    assert exc.value.status_code == 403
+
+
+async def test_require_org_invite_allows_with_permission(monkeypatch):
+    """A caller holding org:invite passes and gets the current_user back unchanged."""
+    async def _fake(request, current_user, org_id, permission_key):
+        assert permission_key == "org:invite"
+        return True
+
+    monkeypatch.setattr("app.dependencies._has_org_permission", _fake)
+
+    user = {"id": USER_ID}
+    result = await deps.require_org_invite(
+        request=None, current_user=user, active_org=ORG_ID
+    )
+    assert result == user
