@@ -994,45 +994,96 @@ _GOVERNED_FEATURES: dict[str, str] = {
 }
 
 
-def feature_audience(feature: str) -> str:
-    """Resolve a feature's audience -> 'everyone' | 'operators' (VIS-01).
+def _feature_record(feature: str) -> dict:
+    """The ONE dict-or-str-guarded read of a feature's stored visibility record (Pitfall 5).
 
-    Reads the stored enum record from the per-worker 30s TTL settings cache
-    (load_app_settings().feature_visibility). Returns the stored ``audience`` ONLY
-    when it is a recognized enum value; a cold cache / DB blip / missing key /
-    malformed record / unknown feature falls back to the per-feature hardcoded
-    default (_GOVERNED_FEATURES; unknown -> safe-deny "operators"). NEVER reads or
-    returns a boolean, and NEVER raises (mirrors maintenance_mode's no-raise posture).
+    Shared by ``feature_audience`` AND ``resolve_feature_access`` so there is exactly ONE
+    parse path (no second serialization branch — D-167-06 "extend, never fork"). Reads the
+    per-worker 30s TTL settings cache (load_app_settings().feature_visibility). Returns the
+    stored ``{"audience": ..., "roles": [...], "groups": [...]}`` dict when present + well-
+    formed; a cold cache / DB blip / missing key / non-dict record yields ``{}``. NEVER
+    raises (mirrors maintenance_mode's no-raise posture).
     """
     try:
         fv = load_app_settings().feature_visibility or {}
-        rec = fv.get(feature) or {}
-        aud = rec.get("audience") if isinstance(rec, dict) else None
-        if aud in ("everyone", "operators"):
-            return aud
-    except Exception:  # noqa: BLE001 — defensive: fall back to the hardcoded default
+        rec = fv.get(feature)
+        if isinstance(rec, dict):
+            return rec
+    except Exception:  # noqa: BLE001 — defensive: cold cache / DB blip -> empty record
         pass
+    return {}
+
+
+def feature_audience(feature: str) -> str:
+    """Resolve a feature's audience -> 'everyone' | 'operators' | 'role' (VIS-01, D-167-06).
+
+    Returns the stored ``audience`` ONLY when it is a recognized enum value — now including
+    ``"role"`` (the v3.4 greenlist shape; the ``roles``/``groups`` lists are read by
+    ``resolve_feature_access``, NOT here — this returns only the enum). A cold cache / DB
+    blip / missing key / malformed record / unknown feature falls back to the per-feature
+    hardcoded default (_GOVERNED_FEATURES; unknown -> safe-deny "operators"). NEVER reads or
+    returns a boolean, and NEVER raises. Extended in place (D-167-06) — not forked.
+    """
+    aud = _feature_record(feature).get("audience")
+    if aud in ("everyone", "operators", "role"):
+        return aud
     return _GOVERNED_FEATURES.get(feature, "operators")
 
 
-async def set_feature_visibility(feature: str, audience: str) -> bool:
-    """Atomically set ONE feature's audience via a JSONB ``||`` merge (VIS-01).
+def resolve_feature_access(feature: str, caller_role: str, caller_groups: set[str]) -> bool:
+    """Glean precedence-merge — the pure in-memory greenlist decision (VIS-01, D-167-06).
 
-    Merges only ``{feature: {"audience": audience}}`` into app_settings.feature_visibility
-    so a concurrent toggle of a DIFFERENT feature can't be clobbered (Pitfall 4 — the
-    lost-update a whole-column ``SET`` would cause). Deliberately does NOT route through
-    save_app_settings (which does a whole-column ``SET``). The caller validates
-    feature/audience against code allowlists before calling — this function still only
-    ever serializes the single validated record (SQLi-safe: asyncpg ``$1`` + JSONB codec).
-    Invalidates the settings cache so the next read reflects the change within the TTL.
+    The ONE swappable audience boundary, extended (never forked) to role greenlists:
+      - ``everyone`` -> True;
+      - ``operators`` -> False (the operator carve-out is handled UPSTREAM by is_operator —
+        this function is only reached for a non-operator);
+      - ``role`` -> True iff the caller's (highest) role is in the greenlisted ``roles``
+        (highest-role-wins for the primary tier) OR any of the caller's groups intersects
+        the greenlisted ``groups`` (UNION for the secondary grants);
+      - anything else (unknown/malformed/missing record) -> safe-deny False (matches the
+        cold default). FAIL-CLOSED — a user must NEVER see a feature they aren't greenlisted
+        for. NEVER raises.
+    """
+    rec = _feature_record(feature)
+    aud = rec.get("audience")
+    if aud == "everyone":
+        return True
+    if aud == "operators":
+        return False
+    if aud == "role":
+        try:
+            roles = set(rec.get("roles") or [])
+            groups = set(rec.get("groups") or [])
+            return caller_role in roles or bool(set(caller_groups or set()) & groups)
+        except Exception:  # noqa: BLE001 — any malformed list -> fail-closed deny
+            return False
+    return False
+
+
+async def set_feature_visibility(
+    feature: str, audience: str, roles: list[str] | None = None, groups: list[str] | None = None
+) -> bool:
+    """Atomically set ONE feature's audience via a JSONB ``||`` merge (VIS-01, D-167-06).
+
+    Merges only ``{feature: {"audience": audience, "roles": [...], "groups": [...]}}`` into
+    app_settings.feature_visibility so a concurrent toggle of a DIFFERENT feature can't be
+    clobbered (Pitfall 4 — the lost-update a whole-column ``SET`` would cause). Extended in
+    place to carry the ``role`` greenlist lists (empty for the everyone/operators shapes).
+    Deliberately does NOT route through save_app_settings (which does a whole-column
+    ``SET``). The caller (admin.py) validates feature/audience/roles against code allowlists
+    BEFORE calling — this function still only ever serializes the single validated record
+    (SQLi-safe: asyncpg ``$1`` + JSONB codec). This is a GLOBAL feature-visibility writer
+    (no per-user scope) so it STAYS on the service-role pool (user_settings.py header rule;
+    contrast the VIS-02 per-user writer). Invalidates the cache so the next read reflects it.
     """
     from app.dependencies import get_pg_pool
     pool = await get_pg_pool()
+    record = {"audience": audience, "roles": roles or [], "groups": groups or []}
     await pool.execute(
         "UPDATE app_settings SET feature_visibility = "
         "coalesce(feature_visibility, '{}'::jsonb) || $1::jsonb, updated_at = now() "
         "WHERE id = 'global'",
-        {feature: {"audience": audience}},  # JSONB codec serializes the dict
+        {feature: record},  # JSONB codec serializes the validated dict
     )
     invalidate_settings_cache()
     return True
