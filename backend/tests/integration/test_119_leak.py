@@ -78,6 +78,28 @@ pytestmark = pytest.mark.skipif(
 )
 
 
+@pytest.fixture(autouse=True)
+def _bypass_operator_pool_check():
+    """Phase 148's ``require_visible("governance_health")`` gate (the whole /document-governance
+    router) calls ``is_operator()`` on the app's SINGLETON asyncpg pool. Under the bare
+    ``TestClient`` these tests drive, that pool binds to a portal event loop that CLOSES across
+    the sequential ``client.get()`` calls (``_fetch_all_three`` / the two-viewer probes), so the
+    SECOND request raises ``RuntimeError: Event loop is closed`` / asyncpg ``another operation is
+    in progress`` BEFORE the route body ever runs. That is a pre-existing Phase-148 harness
+    interaction (the app-pool operator gate + a bare TestClient) — NOT a Phase-165 concern; the
+    org-scoping rename touches none of it.
+
+    ``governance_health`` is an Everyone-audience feature (the gate is a production no-op for
+    regular users), so patch ``is_operator`` -> True (the gate short-circuits to its operator
+    no-op) — test-only, never touches the pool. This removes ONLY the event-loop crash so the
+    governance routes actually execute; the routes' OWN owner-scoping (``.eq("user_id", caller)``)
+    and the D-119-3 masking logic — the actual leak assertions — run entirely unchanged."""
+    from unittest.mock import AsyncMock, patch  # noqa: PLC0415
+
+    with patch("app.dependencies.is_operator", new=AsyncMock(return_value=True)):
+        yield
+
+
 async def _table_exists(pool, table: str) -> bool:
     return bool(await pool.fetchval(
         "SELECT EXISTS (SELECT 1 FROM information_schema.tables "
