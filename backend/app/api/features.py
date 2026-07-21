@@ -22,27 +22,49 @@ hide and the API refusal can never disagree:
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 
-from app.dependencies import get_current_user
-from app.models.user_settings import _GOVERNED_FEATURES, feature_audience
+from app.dependencies import get_current_user, resolve_caller_role
+from app.models.user_settings import (
+    _GOVERNED_FEATURES,
+    feature_audience,
+    resolve_feature_access,
+)
 from app.services.operator_service import is_operator
 
 router = APIRouter(tags=["features"])
 
 
 @router.get("/features")
-async def get_effective_features(current_user: dict = Depends(get_current_user)) -> dict:
+async def get_effective_features(
+    request: Request, current_user: dict = Depends(get_current_user)
+) -> dict:
     """Return the caller's effective feature→bool map (authed, per-user — Pattern 5).
 
-    ``{"features": {feature: (operator OR audience=="everyone")}}`` over the four governed
-    features. Operator → all True; end user → True only for the Everyone-audience features.
+    ``{"features": {feature: (operator OR audience=="everyone" OR greenlisted role)}}`` over
+    the four governed features. Operator → all True; end user → True for Everyone-audience
+    features PLUS any ``role``-audience feature their org role/group is greenlisted for. The
+    bool is derived from the SAME two seams the ``require_visible`` gate uses
+    (``feature_audience`` + ``resolve_feature_access``), so hide == refuse (VIS-01 / D-167-06).
     Never operator-gated: a non-operator reaches it (200) to learn their own map.
     """
     op = await is_operator(current_user["id"])
+    # Resolve the caller's role only when some governed feature is role-audience (avoid a
+    # query for the common operator/everyone-only case). Fail-closed via resolve_caller_role.
+    caller_role: str | None = None
+    caller_groups: set[str] = set()
+    if not op and any(feature_audience(f) == "role" for f in _GOVERNED_FEATURES):
+        caller_role, caller_groups = await resolve_caller_role(request, current_user)
     return {
         "features": {
-            f: (op or feature_audience(f) == "everyone")
+            f: (
+                op
+                or feature_audience(f) == "everyone"
+                or (
+                    feature_audience(f) == "role"
+                    and resolve_feature_access(f, caller_role, caller_groups)
+                )
+            )
             for f in _GOVERNED_FEATURES
         }
     }

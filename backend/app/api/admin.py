@@ -100,7 +100,12 @@ _VISIBILITY_FEATURES = {
     "workflow_authoring",
     "governance_health",
 }
-_VISIBILITY_AUDIENCES = {"everyone", "operators"}
+# Phase 167 (VIS-01 / D-167-06): the audience enum extends to "role" (zero migration — the
+# mig-098 JSONB shape). A "role" write also carries a roles[] greenlist validated against the
+# 4-tier set (mig 104 CHECK) BEFORE the write — a free-text role must NEVER reach the JSONB
+# codec (SQLi-safe, mirrors the feature allowlist above).
+_VISIBILITY_AUDIENCES = {"everyone", "operators", "role"}
+_VISIBILITY_ROLES = {"super-admin", "org-admin", "dept-admin", "member"}
 
 # Phase 149 (MODEL-01 / T-149-11): the ONLY columns a capability PATCH may write — the
 # seven editable columns of model_capabilities_overrides. A client-supplied field name
@@ -942,12 +947,14 @@ async def revoke_operator_access(
 
 
 class VisibilityUpdate(BaseModel):
-    """Body for PUT /admin/visibility. ``feature`` + ``audience`` are validated against
-    code allowlists in the handler (T-148-03) — never free text. ``audience`` is an enum
-    VALUE, never a boolean (SEED-115 forward-compat)."""
+    """Body for PUT /admin/visibility. ``feature`` + ``audience`` + ``roles`` are validated
+    against code allowlists in the handler (T-148-03 / T-167-12) — never free text.
+    ``audience`` is an enum VALUE, never a boolean (SEED-115 forward-compat). ``roles`` is the
+    greenlist for the ``role`` audience (D-167-06) — empty for everyone/operators."""
 
     feature: str
     audience: str
+    roles: list[str] = []
 
 
 @router.put("/visibility", status_code=status.HTTP_204_NO_CONTENT)
@@ -974,10 +981,23 @@ async def set_visibility(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Unknown audience: {body.audience}",
         )
+    # T-167-12: every greenlist role must be in the 4-tier set BEFORE the JSONB write —
+    # a free-text role must never reach set_feature_visibility's codec (SQLi-safe).
+    bad = [r for r in body.roles if r not in _VISIBILITY_ROLES]
+    if bad:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unknown role(s): {', '.join(bad)}",
+        )
 
-    await set_feature_visibility(body.feature, body.audience)
+    await set_feature_visibility(body.feature, body.audience, roles=body.roles)
 
-    request.state.audit_label = f"Made {body.feature} visible to {body.audience}"
+    if body.audience == "role":
+        request.state.audit_label = (
+            f"Made {body.feature} visible to role(s): {', '.join(body.roles) or 'none'}"
+        )
+    else:
+        request.state.audit_label = f"Made {body.feature} visible to {body.audience}"
     request.state.audit_action = "visibility.set"
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 

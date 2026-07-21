@@ -446,29 +446,81 @@ async def operator_audit_floor(
         logger.error("operator audit floor failed: %s", exc)  # swallow (D-05 precedent)
 
 
-# ── Phase 148 (VIS-01) — per-endpoint feature-visibility gate ──────────────────
+# ── Phase 148 (VIS-01) / Phase 167 (D-167-06) — per-endpoint feature-visibility gate ──
+# The 4 org role tiers (mig 104 CHECK), ranked so a caller with 2+ memberships resolves to
+# their HIGHEST role (the Glean "highest-role-wins" primary tier). Unknown role -> -1 (never
+# the highest) so a malformed membership can only ever fail-closed.
+_ROLE_RANK: dict[str, int] = {"member": 0, "dept-admin": 1, "org-admin": 2, "super-admin": 3}
+
+
+def _highest_role(roles: list[str]) -> str | None:
+    """Reduce a caller's memberships to their single highest role (fail-closed)."""
+    ranked = [(_ROLE_RANK.get(r, -1), r) for r in roles if r]
+    return max(ranked)[1] if ranked else None
+
+
+async def resolve_caller_role(
+    request: Request | None, current_user: dict
+) -> tuple[str | None, set[str]]:
+    """Resolve the caller's effective org role + group set for the greenlist gate (D-167-06).
+
+    Prefers ``request.state.org_role`` — already resolved + validated AS THE CALLER by
+    ``get_active_org_id`` (D-166-06), so no extra query when the request went through it.
+    Otherwise falls back to the caller's HIGHEST role across their memberships via a
+    user-JWT/RLS read (``auth.uid()`` resolves to the caller — never the BYPASSRLS pool).
+    ``caller_groups`` is an empty (extensible) set this phase — the groups table is deferred
+    (RESEARCH OQ2); the resolver already unions against it. ANY resolution failure -> a
+    ``(None, set())`` deny signal (fail-closed) — NEVER raises.
+    """
+    role = getattr(getattr(request, "state", None), "org_role", None)
+    if role:
+        return role, set()
+    if request is None:
+        return None, set()
+    try:
+        async with get_user_pg_connection(request, current_user) as conn:
+            rows = await conn.fetch(
+                "SELECT role FROM public.org_members WHERE user_id = auth.uid()"
+            )
+        return _highest_role([r["role"] for r in rows]), set()
+    except Exception:  # noqa: BLE001 — any read failure -> fail-closed deny
+        return None, set()
+
+
 def require_visible(feature: str):
-    """VIS-01 API-layer visibility gate (D-03). A dependency FACTORY.
+    """VIS-01 API-layer visibility gate (D-03 / D-167-06). A dependency FACTORY.
 
     Returns an async dependency that is a literal NO-OP for operators AND for
     Everyone-audience features (Deep Mode / the Run + chat-model-picker carve-outs stay
-    byte-identical), and raises **403 — NOT 404** for a non-operator hitting an
-    Operators-only feature. The /admin surface keeps its byte-identical 404; a governed
-    product feature is a deliberate 403 an end user can understand (these are features
-    they may legitimately have seen before a flip). ``is_operator`` is the ONE swappable
-    boundary — SEED-115 later flips it to "is in group X" with zero change here.
+    byte-identical), and raises **403 — NOT 404** for a non-operator who is not greenlisted.
+    The /admin surface keeps its byte-identical 404; a governed product feature is a
+    deliberate 403 an end user can understand (these are features they may legitimately have
+    seen before a flip). ``is_operator`` is the ONE swappable boundary.
+
+    D-167-06 — EXTENDED IN PLACE, never forked: after the operator + everyone no-ops, a
+    ``role``-audience feature resolves the caller's org role (``resolve_caller_role``) and
+    runs the Glean precedence-merge (``resolve_feature_access``). A caller whose role/group
+    isn't greenlisted — or whose role can't be resolved — falls through to the existing 403
+    (fail-closed). ``request`` carries a default so the operator/everyone unit tests keep
+    calling ``_dep(current_user=...)``; FastAPI still injects it by annotation at runtime.
 
     Attach PER-ENDPOINT on the governed authoring/management endpoints ONLY — never at a
     router level that would gate a Run/chat carve-out (``GET /settings/providers``,
-    ``GET /workflows/published|starters``, the workflow launch). ``feature_audience`` is
-    lazy-imported inside the closure to avoid an import cycle (user_settings -> deps).
+    ``GET /workflows/published|starters``, the workflow launch). ``feature_audience`` +
+    ``resolve_feature_access`` are lazy-imported inside the closure to avoid an import cycle
+    (user_settings -> deps).
     """
-    async def _dep(current_user: dict = Depends(get_current_user)):
+    async def _dep(current_user: dict = Depends(get_current_user), request: Request = None):
         if await is_operator(current_user["id"]):
             return  # operator -> no-op
-        from app.models.user_settings import feature_audience
-        if feature_audience(feature) == "everyone":
+        from app.models.user_settings import feature_audience, resolve_feature_access
+        audience = feature_audience(feature)
+        if audience == "everyone":
             return  # Everyone-audience feature -> no-op (carve-out byte-identical)
+        if audience == "role":
+            caller_role, caller_groups = await resolve_caller_role(request, current_user)
+            if resolve_feature_access(feature, caller_role, caller_groups):
+                return  # greenlisted role/group -> pass
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="This feature is available to administrators only.",
