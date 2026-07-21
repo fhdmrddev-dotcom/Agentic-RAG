@@ -898,3 +898,244 @@ async def test_browse_tools_cross_org_isolation_seed124_closed(
         "browse/read tools bypass the membership org gate that RLS/DEFINER enforce everywhere "
         "else. Closed by Phase 165 (SEED-124 / 165-02 org-scoped folder_utils.py)."
     )
+
+
+# ══════════════════════════════════════════════════════════════════════════════════
+# SEED-125 (CR-01 / CR-02) — the SKILLS-domain sibling of the SEED-124 folder leak.
+#   The agent's load_skill / read_skill_file / execute_code(skill-file injection) /
+#   save_skill(sibling-lint) tools resolve skills on the BYPASSRLS service-role producer
+#   client, so the membership org gate never applied — a disjoint-org caller could load
+#   another org's is_org_shared skill instructions + pull its bundled file bytes. The fix
+#   org-gates all six resolution sites via one shared
+#   ``tool_dispatcher._resolve_skill_visibility_or`` (is_system universal escape PRESERVED,
+#   fail-closed on an empty org set). These legs drive the REAL handlers against the REAL
+#   service-role client (not code inspection — the D-102/D-110-5 "static would false-green"
+#   lesson), mirroring the SEED-124 SC#4 arbiter + the test_115_tool_global_leak two-caller
+#   pattern. CR-02 (the storage-read sibling) is a separate xfail-until-mig-112 leg below.
+# ══════════════════════════════════════════════════════════════════════════════════
+
+
+def _make_seed125_tool_ctx(sb, caller_uid: str):
+    """Minimal REAL ToolContext that drives the skill handlers as ``caller_uid`` on the REAL
+    service-role client ``sb`` (the exact ``ctx.supabase = get_supabase()`` producer seam).
+    ``emit`` is a no-op AsyncMock; ``spawn`` closes the write_audit_entry coroutine so it is
+    never left un-awaited and never writes (mirrors test_load_skill_collision._make_ctx)."""
+    from unittest.mock import AsyncMock  # noqa: PLC0415
+
+    from app.services.tool_dispatcher import ToolContext  # noqa: PLC0415
+
+    return ToolContext(
+        redis=None,
+        run_id=uuid4(),
+        thread_id="seed125-thread",
+        supabase=sb,
+        pool=None,
+        user_settings=None,
+        current_user={"id": caller_uid},
+        folder_subtree_ids=None,
+        scoped_folder_path=None,
+        emit=AsyncMock(return_value=None),
+        spawn=lambda c: c.close(),
+    )
+
+
+async def _seed_org_shared_skill(pool, owner_uid: str, org_id: str) -> tuple[str, str, str]:
+    """Seed an is_org_shared (owner-toggled, NOT is_system) skill owned by ``owner_uid`` in
+    ``org_id`` + one bundled skill_files row. Returns (skill_id, skill_name, instructions_body).
+    org_id explicit → the mig-106 autofill trigger no-ops; the skill_files row cascade-deletes
+    with the skill (ON DELETE CASCADE), so the two_orgs fixture's DELETE-by-user_id teardown
+    (owner == user A) cleans everything up."""
+    sid = uuid4()
+    name = f"seed125-shared-{sid}"
+    body = f"SEED-125 org-A PRIVATE instructions {sid}"
+    await pool.execute(
+        "INSERT INTO public.skills "
+        "(id, user_id, org_id, name, description, instructions, is_org_shared, is_enabled) "
+        "VALUES ($1, $2, $3, $4, $5, $6, true, true)",
+        sid, owner_uid, org_id, name, "org A shared skill", body,
+    )
+    await pool.execute(
+        "INSERT INTO public.skill_files "
+        "(id, skill_id, user_id, org_id, filename, file_path, file_size, mime_type) "
+        "VALUES ($1, $2, $3, $4, 'notes.txt', $5, 10, 'text/plain')",
+        uuid4(), sid, owner_uid, org_id, f"{owner_uid}/{sid}/notes.txt",
+    )
+    return str(sid), name, body
+
+
+@pytest.mark.asyncio
+async def test_load_skill_cross_org_refused_seed125(pg_pool, two_orgs_two_users):
+    """CR-01 load_skill — a disjoint-org caller (B) MUST NOT resolve org A's is_org_shared
+    skill; the owner (A) still does. Drives the REAL ``_handle_load_skill`` on the REAL
+    service-role client. RED pre-fix (the .or_(is_org_shared.eq.true) filter had no org gate
+    → B loaded A's instructions cross-org); GREEN post-fix (the org-gated filter)."""
+    from app.services.tool_dispatcher import _handle_load_skill  # noqa: PLC0415
+
+    a, b = two_orgs_two_users["a"], two_orgs_two_users["b"]
+    sb = _service_role_supabase_or_skip()
+    _sid, name, body = await _seed_org_shared_skill(pg_pool, a["uid"], a["org_id"])
+
+    # Owner A resolves the skill (positive control — the skill exists + is loadable).
+    out_a = json.loads((await _handle_load_skill(
+        {"skill_name": name}, _make_seed125_tool_ctx(sb, a["uid"]))).result)
+    assert out_a.get("instructions") == body, (
+        f"positive-control failure: owner A cannot load its OWN skill (got {out_a!r}) — the "
+        "org gate must not over-restrict the owner, or the isolation assert below false-greens."
+    )
+
+    # Disjoint-org B must be REFUSED at resolution — no instructions, the not-found error.
+    out_b = json.loads((await _handle_load_skill(
+        {"skill_name": name}, _make_seed125_tool_ctx(sb, b["uid"]))).result)
+    assert "instructions" not in out_b, (
+        "CR-01 cross-org leak: user B (disjoint org) loaded user A's is_org_shared skill "
+        f"instructions via the service-role load_skill tool — got {out_b!r}. The org gate "
+        "(org_id ∈ caller_org_ids) must exclude another org's shared skill."
+    )
+    assert out_b.get("error") == f"Skill '{name}' not found or not enabled.", (
+        f"expected the honest not-found refusal for cross-org B, got {out_b!r}"
+    )
+
+
+@pytest.mark.asyncio
+async def test_read_skill_file_cross_org_refused_seed125(pg_pool, two_orgs_two_users):
+    """CR-01 read_skill_file — cross-org B is refused at SKILL RESOLUTION (before any storage
+    download), so it never learns the file exists or reads its bytes; owner A passes the gate.
+    The distinct error strings arbitrate: B gets the skill-not-found refusal, A gets past it."""
+    from app.services.tool_dispatcher import _handle_read_skill_file  # noqa: PLC0415
+
+    a, b = two_orgs_two_users["a"], two_orgs_two_users["b"]
+    sb = _service_role_supabase_or_skip()
+    _sid, name, _body = await _seed_org_shared_skill(pg_pool, a["uid"], a["org_id"])
+
+    # B — resolution refused (org gate) → the SKILL-level not-found error, NOT a file-level one.
+    out_b = json.loads((await _handle_read_skill_file(
+        {"skill_name": name, "filename": "notes.txt"},
+        _make_seed125_tool_ctx(sb, b["uid"]))).result)
+    assert out_b.get("error") == f"Skill '{name}' not found.", (
+        "CR-01 cross-org leak: user B resolved user A's is_org_shared skill on read_skill_file "
+        f"(expected the skill-level refusal, got {out_b!r}) — the org gate must refuse B before "
+        "the storage path is ever built."
+    )
+
+    # A — passes skill resolution (owner). With no storage bytes seeded it returns a FILE-level
+    # error, proving A was NOT refused at the skill gate (the arbiter vs B's skill-level refusal).
+    out_a = json.loads((await _handle_read_skill_file(
+        {"skill_name": name, "filename": "notes.txt"},
+        _make_seed125_tool_ctx(sb, a["uid"]))).result)
+    assert not str(out_a.get("error", "")).startswith("Skill '"), (
+        f"positive-control failure: owner A was refused at skill resolution (got {out_a!r}) — "
+        "the org gate over-restricted the owner."
+    )
+
+
+@pytest.mark.asyncio
+async def test_is_system_skill_stays_cross_org_seed125(pg_pool, two_orgs_two_users):
+    """The is_system UNIVERSAL escape is PRESERVED by the org gate (mig-109 FIX-A / D-165-02):
+    a built-in (is_system=true) skill owned by the system seed in org A still loads for a
+    disjoint-org caller B. Guards against the fix over-restricting platform content — the exact
+    163-UAT Test-7 regression the match_skills RLS also guards (test_is_system_stays_universal)."""
+    from app.services.tool_dispatcher import _handle_load_skill  # noqa: PLC0415
+
+    a, b = two_orgs_two_users["a"], two_orgs_two_users["b"]
+    sb = _service_role_supabase_or_skip()
+    await _ensure_system_seed_user(pg_pool)
+
+    sid = uuid4()
+    name = f"seed125-system-{sid}"
+    body = f"SEED-125 system built-in instructions {sid}"
+    await pg_pool.execute(
+        "INSERT INTO public.skills "
+        "(id, user_id, org_id, name, description, instructions, is_system, is_org_shared, is_enabled) "
+        "VALUES ($1, $2, $3, $4, $5, $6, true, true, true)",
+        sid, SYSTEM_SEED_UID, a["org_id"], name, "built-in", body,
+    )
+    try:
+        out_b = json.loads((await _handle_load_skill(
+            {"skill_name": name}, _make_seed125_tool_ctx(sb, b["uid"]))).result)
+        assert out_b.get("instructions") == body, (
+            "FIX-A regression: the is_system built-in is invisible to a disjoint-org caller via "
+            f"load_skill (got {out_b!r}) — is_system must stay OUTSIDE the org gate (universal), "
+            "else the org-gate over-restricts platform content (163-UAT Test-7)."
+        )
+    finally:
+        await _cleanup(pg_pool, "DELETE FROM public.skills WHERE id = $1", str(sid))
+
+
+@pytest.mark.asyncio
+async def test_skill_file_storage_read_cross_org_refused_seed125(pg_pool, two_orgs_two_users):
+    """CR-02 storage-read sibling — under a user's JWT (storage RLS applies), the OWNER (A) reads
+    A's skill-file storage row, a DISJOINT-org caller (B) reads 0. Two-caller regression, GREEN
+    now AND post-mig-112.
+
+    NUANCE (measured, not assumed): the ``skill-files`` storage read policy's shared branch is an
+    ``EXISTS`` subquery that JOINs ``public.skills`` — and ``public.skills`` already carries
+    org-gated RLS (mig 108/109), which is enforced INSIDE the subquery under B's authenticated
+    role. So the storage read is ALREADY transitively org-gated at runtime (B's skills-RLS hides
+    A's org-shared skill from the JOIN → the EXISTS is false → B sees 0). mig 112 is therefore
+    NOT closing a live exploitable leak here; it hardens the storage POLICY EXPRESSION itself to
+    be EXPLICITLY org-gated (``s.org_id IN current_user_org_ids()``) — defense-in-depth that no
+    longer RELIES on the implicit transitive skills-RLS — and corrects mig-111's false
+    "reconciled to mig-109" comment. The two-caller result (A=1, B=0) is identical pre/post 112,
+    so this stands as a normal passing regression (no xfail). The A positive control proves the
+    B=0 is a genuine per-viewer denial, not a blanket storage.objects RLS block."""
+    a, b = two_orgs_two_users["a"], two_orgs_two_users["b"]
+    if not await _table_exists(pg_pool, "skill_files"):
+        pytest.skip("skill_files table absent")
+
+    sid = uuid4()
+    storage_name = f"{a['uid']}/{sid}/notes.txt"
+    try:
+        await pg_pool.execute(
+            "INSERT INTO public.skills (id, user_id, org_id, name, is_org_shared, is_enabled) "
+            "VALUES ($1, $2, $3, $4, true, true)",
+            sid, a["uid"], a["org_id"], f"seed125-storage-{sid}",
+        )
+        await pg_pool.execute(
+            "INSERT INTO public.skill_files "
+            "(id, skill_id, user_id, org_id, filename, file_path, file_size, mime_type) "
+            "VALUES ($1, $2, $3, $4, 'notes.txt', $5, 10, 'text/plain')",
+            uuid4(), sid, a["uid"], a["org_id"], storage_name,
+        )
+        await pg_pool.execute(
+            "INSERT INTO storage.objects (bucket_id, name) VALUES ('skill-files', $1)",
+            storage_name,
+        )
+    except Exception as e:  # storage schema / bucket differences → skip, never hard-error
+        await _cleanup(pg_pool, "DELETE FROM public.skills WHERE id = $1", str(sid))
+        pytest.skip(f"could not seed storage.objects skill-file row: {type(e).__name__}: {e}")
+
+    try:
+        # Positive control — the OWNER (A) reads the row (via the owner-prefix leg), so a B=0
+        # below is a genuine per-viewer denial, not storage.objects RLS blanket-blocking B.
+        async with open_user_conn(pg_pool, a["uid"]) as conn_a:
+            await assert_auth_uid(conn_a, a["uid"])  # fail-loud FIRST
+            owner_sees = await conn_a.fetchval(
+                "SELECT count(*) FROM storage.objects "
+                "WHERE bucket_id = 'skill-files' AND name = $1",
+                storage_name,
+            )
+        assert owner_sees == 1, (
+            "positive-control failure: owner A cannot read its OWN skill-file storage row — the "
+            "storage policy over-restricts (a 0-for-everyone bug would false-green the B leg)."
+        )
+
+        # Isolation — a disjoint-org caller (B) reads 0 of A's is_org_shared skill file.
+        async with open_user_conn(pg_pool, b["uid"]) as conn_b:
+            await assert_auth_uid(conn_b, b["uid"])  # fail-loud FIRST
+            leaked = await conn_b.fetchval(
+                "SELECT count(*) FROM storage.objects "
+                "WHERE bucket_id = 'skill-files' AND name = $1",
+                storage_name,
+            )
+        assert leaked == 0, (
+            "CR-02 storage leak: user B (disjoint org) reads the storage row of user A's "
+            "is_org_shared skill file — the shared branch must be org-gated (transitively via the "
+            "skills-table RLS today; explicitly via mig 112's current_user_org_ids() predicate)."
+        )
+    finally:
+        await _cleanup(
+            pg_pool,
+            "DELETE FROM storage.objects WHERE bucket_id = 'skill-files' AND name = $1",
+            storage_name,
+        )
+        await _cleanup(pg_pool, "DELETE FROM public.skills WHERE id = $1", str(sid))
