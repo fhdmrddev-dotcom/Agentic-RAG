@@ -76,6 +76,10 @@ from app.services.run_model_resolution import (
     _apply_fallback_to_request,
     resolve_run_model,
 )
+# Phase 167 VIS-02 — module handle so the send-path per-user model-default overlay is a
+# SINGLE call line (the 149-shaped named-import block above is untouched; the guard is
+# module-qualified → the G-5 threads.py surface grows by exactly the one guard line).
+from app.services import run_model_resolution as _run_model_resolution
 # Phase 162.5 Plan 02 (D-A2 / D-A4) — the workflow-kickoff machinery extracted to a
 # service module. Re-imported at module scope so `from app.api.threads import
 # _ensure_skill_snapshots` (test_099) still resolves + send_message calls the seam.
@@ -835,6 +839,11 @@ async def send_message(
     # the producer's closure-captured user_settings is independent (cheap
     # second call; load_user_settings is a settings-file read).
     _user_settings = load_user_settings(current_user["id"])
+    # Phase 167 VIS-02 (D-167-04) — the ONE-line two-layer per-user model-default overlay
+    # (SEED-116: operator allowed-set + lock; user picks within it). STRICT no-op when unset →
+    # the shared Deep/workflow send path stays byte-identical (D-14); the minimal G-5 in-place
+    # guard (no new endpoint here, no per-provider fork) mirroring the 147/149 in-place overrides.
+    _user_settings = await _run_model_resolution.apply_user_model_default(request, current_user, _user_settings)
     if body.provider and body.provider != _user_settings.active_provider:
         _user_settings = override_provider(_user_settings, body.provider)
 

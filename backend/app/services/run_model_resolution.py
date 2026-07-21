@@ -164,6 +164,56 @@ async def _apply_fallback_to_request(
     return body, resolved_provider, user_settings
 
 
+async def apply_user_model_default(request, current_user, user_settings):
+    """Phase 167 VIS-02 (D-167-04) — overlay the caller's per-user default model onto the
+    effective settings at the ONE chat send seam, as a STRICT no-op when unset.
+
+    D-14 RED LINE: when the user has NO preference (or it is locked / out of the enabled
+    allowed-set / composes to the current default), returns the SAME ``user_settings`` object
+    (identity) so the shared Deep / workflow send path is byte-identical to today. Only when a
+    valid, unlocked, in-allowed-set preference DIFFERS from the current ``llm_model`` does it
+    return a ``model_copy`` with the overlaid ``llm_model`` — ``resolve_run_model`` then
+    re-derives the provider from the model id (cross-provider, D-167-09; no per-provider fork;
+    an explicit in-composer ``body.model`` still wins because this only touches the FALLBACK
+    ``user_settings.llm_model``).
+
+    FAIL-OPEN: any error returns ``user_settings`` unchanged (T-167-16 — a preference blip must
+    never break or block a send). D-v2.5-01: the per-user read + the allowed-set / lock reads all
+    use async seams (asyncpg pool / the cached settings read) — no blocking supabase-py call.
+
+    ``request`` is accepted for the send-seam call signature; the caller is identified solely by
+    ``current_user["id"]`` (already validated by ``get_current_user``).
+    """
+    from app.models.user_settings import (  # noqa: PLC0415 — leaf-module seam, avoid import cycle
+        compose_effective_model_default,
+        enabled_model_allowed_set,
+        load_user_model_default,
+        operator_model_default_locked,
+    )
+    try:
+        user_id = (current_user or {}).get("id")
+        if not user_id:
+            return user_settings
+        user_pref = await load_user_model_default(user_id)
+        if not user_pref:
+            # Unset -> strict no-op BEFORE any further read: byte-identical (D-14).
+            return user_settings
+        enabled_models = await enabled_model_allowed_set()
+        locked = await operator_model_default_locked()
+        composed = compose_effective_model_default(
+            user_pref, user_settings, enabled_models, locked
+        )
+        if composed and composed != user_settings.llm_model:
+            return user_settings.model_copy(update={"llm_model": composed})
+        # Composed == current default (locked / out-of-set / same pick) -> identity (D-14).
+        return user_settings
+    except Exception:  # noqa: BLE001 — fail-open: a preference blip never breaks a send
+        logger.warning(
+            "apply_user_model_default: overlay failed; using settings unchanged", exc_info=True
+        )
+        return user_settings
+
+
 async def resolve_run_model(*, body, user_settings):
     """The send_message inline model/provider resolution transform, extracted VERBATIM
     (threads.py ~:1085-1143). Behavior byte-identical.
@@ -246,5 +296,6 @@ __all__ = [
     "_resolve_enabled_model",
     "_reresolve_fallback_provider",
     "_apply_fallback_to_request",
+    "apply_user_model_default",
     "resolve_run_model",
 ]
