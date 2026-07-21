@@ -23,7 +23,7 @@
 import { useMemo, useState } from "react"
 import { Eye, X } from "lucide-react"
 
-import type { OrgAuditFilters, OrgAuditPage } from "@/lib/api"
+import type { OrgAuditFilters, OrgAuditPage, OrgAuditRow } from "@/lib/api"
 import { cn } from "@/lib/utils"
 import { TechnicalNamesToggle } from "@/components/admin/TechnicalNamesToggle"
 
@@ -59,6 +59,29 @@ const ACTION_META: Record<string, { label: string; group: ActionGroup }> = {
  *  code (honest — never invents a label for a code we do not know). */
 function actionLabel(code: string): string {
   return ACTION_META[code]?.label ?? code
+}
+
+// Phase 167-02: invitation lifecycle rows reuse action_type='settings.update' + a
+// metadata.event discriminator (the audit_log CHECK enum has no invitation type, and
+// 167-CONTEXT forbids a migration). Render the honest event label so the org Audit tab
+// is truthful — NEVER a bare "Changed settings" for an invitation write.
+const INVITE_EVENT_LABEL: Record<string, string> = {
+  "invitation.send": "Invitation sent",
+  "invitation.resend": "Invitation resent",
+  "invitation.revoke": "Invitation revoked",
+  "invitation.accept": "Invitation accepted",
+}
+
+/** The row's plain label — an invitation metadata.event wins over the generic
+ *  settings.update action label so invitation writes read honestly (Phase 167). */
+function rowLabel(row: OrgAuditRow): string {
+  const meta = row.metadata
+  const event =
+    meta && typeof meta === "object" ? (meta as Record<string, unknown>).event : undefined
+  if (typeof event === "string" && event in INVITE_EVENT_LABEL) {
+    return INVITE_EVENT_LABEL[event]
+  }
+  return actionLabel(row.action_type)
 }
 
 /** The `since` chip presets the backend understands (`_since_to_dt`: 7d/30d/90d). */
@@ -342,7 +365,7 @@ export function OrgAuditTab({
                 <span className="flex-none font-mono text-xs text-muted-foreground">
                   {shortUser(row.user_id)}
                 </span>
-                <span className="text-foreground">{actionLabel(row.action_type)}</span>
+                <span className="text-foreground">{rowLabel(row)}</span>
                 {showTechnical && (
                   <code className="flex-none rounded bg-muted/60 px-1 py-0.5 font-mono text-[10px] text-muted-foreground">
                     {row.action_type}

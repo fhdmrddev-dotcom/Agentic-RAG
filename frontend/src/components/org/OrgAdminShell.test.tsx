@@ -125,12 +125,13 @@ beforeEach(() => {
 })
 
 describe("OrgAdminShell — live tabs mount their leaves (ADMIN-01 / D-166-01)", () => {
-  it("Members (default) mounts OrgMembersTab with the fetched roster rows", async () => {
+  it("Members (default) mounts OrgMembersTab with the fetched roster rows + adoption chips", async () => {
     renderShell()
     // The email row is rendered only by OrgMembersTab, never the shell skeleton.
     expect(await screen.findByText("alice@example.com")).toBeInTheDocument()
-    // The read-only leaf shows its honest banner (no invite/role write affordances).
-    expect(screen.getByText(/this roster is read-only/i)).toBeInTheDocument()
+    expect(screen.getByText("bob@example.com")).toBeInTheDocument()
+    // Phase 167: the roster leaf shows server-derived adoption chips (members read Active).
+    expect(screen.getAllByText("Active").length).toBeGreaterThan(0)
   })
 
   it("Audit mounts OrgAuditTab with the fetched audit page", async () => {

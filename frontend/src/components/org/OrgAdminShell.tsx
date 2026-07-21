@@ -31,9 +31,14 @@ import { Lock } from "lucide-react"
 import {
   getOrgAudit,
   getOrgMembers,
+  listInvitations,
+  resendInvitation,
+  revokeInvitation,
+  type Invitation,
   type OrgAuditFilters,
   type OrgAuditPage,
   type OrgMember,
+  type PendingInvitation,
 } from "@/lib/api"
 import { cn } from "@/lib/utils"
 import { useOrg } from "@/providers/OrgProvider"
@@ -43,6 +48,7 @@ import { OrgBand } from "./OrgBand"
 import { OrgMembersTab } from "./OrgMembersTab"
 import { OrgAuditTab } from "./OrgAuditTab"
 import { OrgSettingsTab } from "./OrgSettingsTab"
+import { InvitationsTab } from "./InvitationsTab"
 
 interface OrgAdminShellProps {
   /** Return to the ordinary app surface (navigates to "chat"). */
@@ -74,12 +80,9 @@ const TABS: readonly TabDef[] = [
   { id: "members", label: "Members", locked: false },
   { id: "audit", label: "Audit", locked: false },
   { id: "settings", label: "Settings", locked: false },
-  {
-    id: "invitations",
-    label: "Invitations & Roles",
-    locked: true,
-    lockedDescription: "Inviting people and managing roles is coming soon.",
-  },
+  // Phase 167 (D-167-07): the invitations home is LIVE — the org shell owns the
+  // invitation fetch + mutations; the leaf is InvitationsTab.
+  { id: "invitations", label: "Invitations & Roles", locked: false },
   {
     id: "sso",
     label: "SSO",
@@ -121,6 +124,12 @@ export function OrgAdminShell({ onBack }: OrgAdminShellProps) {
   // a pure leaf. Search filters the LOADED page client-side (never an unbounded fetch).
   const [members, setMembers] = useState<OrgMember[] | null>(null)
   const [memberQuery, setMemberQuery] = useState("")
+  // Phase 167 (INV-01): the roster's still-pending invitees ride ON the /org/members
+  // response — captured here so OrgMembersTab renders the Pending adoption rows.
+  const [memberPending, setMemberPending] = useState<PendingInvitation[]>([])
+  // Phase 167 (INV-01): the Invitations & Roles tab list; `null` until first opened (lazy —
+  // no invitation read on a Members-only visit). The shell owns the fetch; the leaf is pure.
+  const [invitations, setInvitations] = useState<Invitation[] | null>(null)
   // 067-A audit: the current server page + its in-flight flag; `null` until the Audit
   // tab is first opened. The load-bearing `scope` flag rides ON this page (server truth).
   // The shell owns the filter + 1-based page state; OrgAuditTab reports intent via callbacks.
@@ -138,9 +147,24 @@ export function OrgAdminShell({ onBack }: OrgAdminShellProps) {
   const fetchMembers = useCallback(async () => {
     try {
       const page = await getOrgMembers(1, MEMBERS_PAGE_SIZE)
-      if (alive.current) setMembers(page.members)
+      if (alive.current) {
+        setMembers(page.members)
+        // The still-pending invitees ride on the roster response (INV-01 adoption chips).
+        setMemberPending(page.pending_invitations ?? [])
+      }
     } catch {
       /* keep the last-known roster */
+    }
+  }, [])
+
+  // The Invitations & Roles list fetch — guarded, honest-degrade (keeps the last-known list
+  // on a blip), mirroring fetchMembers. The shell owns it; InvitationsTab is a pure leaf.
+  const fetchInvitations = useCallback(async () => {
+    try {
+      const list = await listInvitations()
+      if (alive.current) setInvitations(list)
+    } catch {
+      /* keep the last-known invitation list */
     }
   }, [])
 
@@ -175,7 +199,43 @@ export function OrgAdminShell({ onBack }: OrgAdminShellProps) {
     if (!canManage) return
     if (activeTab === "members") void fetchMembers()
     if (activeTab === "audit") void fetchAudit(auditFilters, auditPage)
-  }, [activeTab, canManage, fetchMembers, fetchAudit, auditFilters, auditPage])
+    if (activeTab === "invitations") void fetchInvitations()
+  }, [activeTab, canManage, fetchMembers, fetchAudit, fetchInvitations, auditFilters, auditPage])
+
+  // ── Invitation mutations (INV-01): the shell performs the write on the caller's org
+  //    (X-Org-Id + the org:invite server gate is the real wall — T-167-17) and re-fetches.
+  //    A successful send re-fetches BOTH the list and the roster (the new pending invitee
+  //    surfaces as a Pending adoption row). Resend returns the FRESH link-first URL so the
+  //    leaf can surface it to copy (D-167-02). ──
+  const handleInviteSent = useCallback(() => {
+    void fetchInvitations()
+    void fetchMembers()
+  }, [fetchInvitations, fetchMembers])
+
+  const handleResend = useCallback(
+    async (id: string): Promise<string | null> => {
+      try {
+        const { link } = await resendInvitation(id)
+        await fetchInvitations()
+        return link || null
+      } catch {
+        return null
+      }
+    },
+    [fetchInvitations],
+  )
+
+  const handleRevoke = useCallback(
+    async (id: string): Promise<void> => {
+      try {
+        await revokeInvitation(id)
+      } finally {
+        await fetchInvitations()
+        void fetchMembers()
+      }
+    },
+    [fetchInvitations, fetchMembers],
+  )
 
   // ── Audit filter/page intent from OrgAuditTab. A filter change resets to page 1 (the
   //    scoped total shifts); a page change walks the server pages. Both re-run the fetch
@@ -267,7 +327,23 @@ export function OrgAdminShell({ onBack }: OrgAdminShellProps) {
             then the FINAL LockedTab fallthrough that serves all 4 locked tabs from their
             phase-number-free `lockedDescription` (T-146-10 / T-166-13). */}
         {activeTab === "members" ? (
-          <OrgMembersTab members={members} query={memberQuery} onQueryChange={setMemberQuery} />
+          <OrgMembersTab
+            members={members}
+            pendingInvitations={memberPending}
+            query={memberQuery}
+            onQueryChange={setMemberQuery}
+          />
+        ) : activeTab === "invitations" ? (
+          // Phase 167 (D-167-07): the live invitations home. The shell owns the fetch +
+          // mutations; InvitationsTab is a pure leaf. canManage is the render-only invite
+          // gate (org:invite is the server wall — T-167-17).
+          <InvitationsTab
+            invitations={invitations}
+            canInvite={canManage}
+            onSent={handleInviteSent}
+            onResend={handleResend}
+            onRevoke={handleRevoke}
+          />
         ) : activeTab === "audit" ? (
           // Thread the audit page straight through: the load-bearing `scope` flag rides ON
           // `result`, so the RLS-honest degrade renders from server truth (T-166-11).
