@@ -373,7 +373,9 @@ async def send_org_invitation(
     org_name = org_row["name"] if org_row else "your organization"
     link = compose_invite_link(raw)
     try:
-        get_email_provider().send_invite(email, link, org_name)
+        # WR-01 (D-v2.5-01): send_invite is a BLOCKING HTTP call on the resend path — never
+        # run it directly on the event loop. run_in_threadpool keeps the async handler free.
+        await run_in_threadpool(get_email_provider().send_invite, email, link, org_name)
     except Exception as exc:  # link-first: delivery never fails the invite
         logger.error("invite email delivery failed for %s: %s", email, exc)
 
@@ -492,7 +494,9 @@ async def resend_org_invitation(
     org_name = org_row["name"] if org_row else "your organization"
     link = compose_invite_link(raw)
     try:
-        get_email_provider().send_invite(row["email"], link, org_name)
+        # WR-01 (D-v2.5-01): blocking HTTP on the resend path — wrap so the async handler
+        # never stalls the event loop while Resend responds.
+        await run_in_threadpool(get_email_provider().send_invite, row["email"], link, org_name)
     except Exception as exc:  # link-first: delivery never fails the resend
         logger.error("invite email re-delivery failed for %s: %s", row["email"], exc)
 
