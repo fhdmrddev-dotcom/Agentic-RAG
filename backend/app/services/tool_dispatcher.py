@@ -25,12 +25,14 @@ from uuid import UUID
 
 from starlette.concurrency import run_in_threadpool
 
-from app.utils.db import aexec
+from app.utils.db import aexec, coerce_uid
 from app.api.kb import ls_path, tree_path, grep_path, glob_path, read_path
 # Phase 151 (FILE-02) — owner→global doc-scope fallback (mirrors read_path). Module-level
 # (patch-where-used friendly) and cycle-safe: folder_utils imports only dependencies/db,
 # never tool_dispatcher.
-from app.utils.folder_utils import get_globally_visible_folder_ids
+# SEED-125 (CR-01) — the same fail-closed caller-org resolver the SEED-124 folder fix uses,
+# reused here to org-gate service-role skill resolution (see _resolve_skill_visibility_or).
+from app.utils.folder_utils import get_globally_visible_folder_ids, _resolve_caller_org_ids
 from app.services.retrieval_service import search_documents, resolve_document_id, fetch_full_document
 from app.services.web_search_service import web_search
 from app.services.sub_agent_service import run_sub_agent
@@ -1136,6 +1138,60 @@ def _skill_runtime_note(file_names: list[str]) -> str | None:
     return _SKILL_RUNTIME_NOTE.format(names=", ".join(offending))
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# SEED-125 (CR-01) — org-gated skill resolution on the service-role client.
+#
+# The agent's skill tools (load_skill / read_skill_file / save_skill sibling-lint /
+# execute_code skill-file injection) resolve skills on the BYPASSRLS service-role
+# producer client (``ctx.supabase``), so the membership org gate that RLS + the mig-110
+# DEFINER fns enforce on EVERY request path never applies here. Without an org predicate
+# the legacy ``.or_(user_id.eq.<caller>,is_org_shared.eq.true)`` filter matched ANY org's
+# ``is_org_shared`` skill → a disjoint-org caller's agent could load another org's skill
+# instructions + pull its bundled file bytes. This is the SKILLS analog of the SEED-124
+# folder leak Phase 165 closed on the same service-role seam.
+#
+# The single source of the corrected predicate — mirrors the mig-109 skill_files
+# table-RLS shape (FIX-A / D-165-02):
+#     visible  iff  is_system = true
+#                   OR (org_id ∈ caller_org_ids AND (user_id = caller OR is_org_shared = true))
+# ``is_system`` stays a platform-universal escape OUTSIDE the org gate (the built-in
+# skill-creator is legitimately cross-org). Fail-closed: an EMPTY caller org set → ONLY
+# ``is_system`` skills resolve (0 shared cross-org — over-restrict, never over-share).
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _build_skill_visibility_or(user_id: str, org_ids: set[str]) -> str:
+    """Build the PostgREST ``.or_()`` predicate string that org-gates skill resolution.
+
+    Pure + unit-testable. ``coerce_uid`` UUID-validates every runtime value spliced into
+    the ``.or_()`` grammar (a malformed id raises rather than breaking out of the DSL —
+    the service-role client has no RLS backstop). Empty ``org_ids`` returns the bare
+    ``is_system.eq.true`` term: no empty ``in.()`` (a PostgREST syntax error) AND
+    fail-closed (0 shared cross-org). Applied identically at all six resolution sites.
+    """
+    caller = coerce_uid(user_id)
+    if not org_ids:
+        return "is_system.eq.true"
+    org_list = ",".join(coerce_uid(o) for o in sorted(org_ids))
+    return (
+        f"is_system.eq.true,"
+        f"and(org_id.in.({org_list}),or(user_id.eq.{caller},is_org_shared.eq.true))"
+    )
+
+
+async def _resolve_skill_visibility_or(ctx: ToolContext) -> str:
+    """Resolve the caller's org set + build the org-gated skill-visibility ``.or_()``.
+
+    The service-role client bypasses RLS so ``auth.uid()`` / ``current_user_org_ids()``
+    never resolve here — the org set MUST be resolved from the threaded ``user_id`` via
+    ``org_members`` (fail-closed on an empty membership), exactly as ``folder_utils`` does
+    for the folder analog (SEED-124). One await per handler; handlers with two resolution
+    sites (read_skill_file / execute_code) resolve ONCE and reuse the returned string so
+    the injection loop never fires N membership round-trips.
+    """
+    org_ids = await _resolve_caller_org_ids(ctx.supabase, ctx.current_user["id"])
+    return _build_skill_visibility_or(ctx.current_user["id"], org_ids)
+
+
 async def _handle_load_skill(args: dict, ctx: ToolContext) -> ToolResult:
     skill_name = args.get("skill_name", "")
     # Emit skill_activated SSE event immediately (SKIL-12)
@@ -1143,10 +1199,14 @@ async def _handle_load_skill(args: dict, ctx: ToolContext) -> ToolResult:
     # Resolve skill -- on a name collision the most-authoritative row wins:
     # system > global > owned (SEED-102). is_system DESC pins a protected built-in
     # above any same-named owned row; is_org_shared DESC is the secondary tie-break.
+    # SEED-125 (CR-01): the visibility filter is org-gated (is_system universal escape
+    # OR org_id ∈ caller_org_ids AND (owner OR is_org_shared)) — a disjoint-org caller no
+    # longer resolves another org's is_org_shared skill on the BYPASSRLS service client.
+    _skill_filter = await _resolve_skill_visibility_or(ctx)
     _skill_resp = await aexec(
         ctx.supabase.table("skills")
         .select("id, name, description, instructions, user_id")
-        .or_(f"user_id.eq.{ctx.current_user['id']},is_org_shared.eq.true")
+        .or_(_skill_filter)
         .eq("name", skill_name)
         .eq("is_enabled", True)
         .order("is_system", desc=True).order("is_org_shared", desc=True)
@@ -1230,10 +1290,13 @@ async def _handle_save_skill(args: dict, ctx: ToolContext) -> ToolResult:
     # can mention them. A read failure degrades to an empty sibling list.
     lint_warnings: list[dict] = []
     try:
+        # SEED-125 (CR-01): org-gate the sibling set so the lint never reads (or echoes
+        # the description of) another org's is_org_shared skill on the service client.
+        _sibling_filter = await _resolve_skill_visibility_or(ctx)
         siblings_resp = await aexec(
             ctx.supabase.table("skills")
             .select("id, description")
-            .or_(f"user_id.eq.{ctx.current_user['id']},is_org_shared.eq.true")
+            .or_(_sibling_filter)
         )
         siblings = [
             r.get("description", "")
@@ -1355,13 +1418,16 @@ async def _handle_read_skill_file(args: dict, ctx: ToolContext) -> ToolResult:
             tool_result = json.dumps({"error": f"File '{filename}' not found in snapshot: {e}"})
         return ToolResult(result=tool_result)
 
-    # ── live-skill resolution below — UNCHANGED (the SC#3 red line; Pitfall 4) ──
+    # ── live-skill resolution below — SC#3 red line preserved (Pitfall 4); only the
+    #    visibility filter is org-gated per SEED-125 (CR-01). Resolve the caller's org
+    #    set ONCE and reuse it for the normalized-name retry (no double round-trip). ──
     skill_name = args.get("skill_name", "")
+    _skill_filter = await _resolve_skill_visibility_or(ctx)
     # Resolve skill to get owner's user_id for storage path
     _sr_resp = await aexec(
         ctx.supabase.table("skills")
         .select("id, user_id")
-        .or_(f"user_id.eq.{ctx.current_user['id']},is_org_shared.eq.true")
+        .or_(_skill_filter)
         .eq("name", skill_name)
         .maybe_single()
     )
@@ -1373,7 +1439,7 @@ async def _handle_read_skill_file(args: dict, ctx: ToolContext) -> ToolResult:
             _sr_resp2 = await aexec(
                 ctx.supabase.table("skills")
                 .select("id, user_id")
-                .or_(f"user_id.eq.{ctx.current_user['id']},is_org_shared.eq.true")
+                .or_(_skill_filter)
                 .eq("name", _sr_norm)
                 .maybe_single()
             )
@@ -1508,6 +1574,10 @@ async def _handle_execute_code(args: dict, ctx: ToolContext) -> ToolResult:
         # Inject skill files into sandbox
         skill_files_req = args.get("skill_files") or []
         file_preamble = ""
+        # SEED-125 (CR-01): resolve the caller's org-gated skill-visibility filter ONCE
+        # before the injection loop (not per file) so a disjoint-org caller cannot pull
+        # another org's is_org_shared skill files into the sandbox on the service client.
+        _sf_filter = await _resolve_skill_visibility_or(ctx) if skill_files_req else None
         for sf in skill_files_req:
             sf_skill_name = sf.get("skill_name", "")
             sf_filename = sf.get("filename", "")
@@ -1516,7 +1586,7 @@ async def _handle_execute_code(args: dict, ctx: ToolContext) -> ToolResult:
             _sf_resp = await aexec(
                 ctx.supabase.table("skills")
                 .select("id, user_id")
-                .or_(f"user_id.eq.{ctx.current_user['id']},is_org_shared.eq.true")
+                .or_(_sf_filter)
                 .eq("name", sf_skill_name)
                 .maybe_single()
             )
@@ -1528,7 +1598,7 @@ async def _handle_execute_code(args: dict, ctx: ToolContext) -> ToolResult:
                     _sf_resp2 = await aexec(
                         ctx.supabase.table("skills")
                         .select("id, user_id")
-                        .or_(f"user_id.eq.{ctx.current_user['id']},is_org_shared.eq.true")
+                        .or_(_sf_filter)
                         .eq("name", _sf_norm)
                         .maybe_single()
                     )

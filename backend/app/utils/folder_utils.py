@@ -39,7 +39,15 @@ async def _resolve_caller_org_ids(supabase: "Client", user_id: str) -> set[str]:
     resp = await aexec(
         supabase.table("org_members").select("org_id").eq("user_id", user_id)
     )
-    return {str(r["org_id"]) for r in (resp.data or []) if r.get("org_id") is not None}
+    # ``.select().eq()`` (no ``.maybe_single()``) always yields a LIST of rows; the
+    # isinstance coercion is defensive belt-and-suspenders (SEED-125 reuse) so a stray
+    # dict-shaped response — an accidental ``.maybe_single()`` or a duck-typed test stub —
+    # can never crash the org-resolution walk. It degrades to the fail-closed empty set.
+    rows = resp.data if isinstance(resp.data, list) else ([resp.data] if resp.data else [])
+    return {
+        str(r["org_id"]) for r in rows
+        if isinstance(r, dict) and r.get("org_id") is not None
+    }
 
 
 def is_in_global_subtree(
