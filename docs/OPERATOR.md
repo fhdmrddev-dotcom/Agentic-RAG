@@ -252,6 +252,19 @@ which models they can serve. Pin the model IDs you know your key serves (e.g.
 `OPENAI_MODELS=...`) rather than relying on a default that may not exist for this account. A
 stale default silently degraded metadata extraction to NULL in production once.
 
+### Invitation email — optional; the default just logs the link (Phase 167)
+
+Org-admins invite teammates by a secure link. Delivery is env-switched and **off by default** —
+no email account needed to run:
+
+- **`EMAIL_PROVIDER=none`** (default) — the app **logs the invite link** (visible in
+  `docker compose logs backend`) and the org-admin copies + shares it. Works fully offline.
+- **`EMAIL_PROVIDER=resend`** — sends real email. Opt-in: `pip install resend` into the backend
+  venv (it is **not** a default requirement), then set `RESEND_API_KEY` (secret — env only) and
+  `INVITE_FROM_EMAIL` (your verified from-address).
+
+The invite-link base reuses `FRONTEND_URL` (above) — there is **no** separate base-URL var.
+
 ## Security
 
 The instructions above **are** the security posture of a self-hosted box. Three things matter

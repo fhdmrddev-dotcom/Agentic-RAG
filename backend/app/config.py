@@ -1178,6 +1178,16 @@ class Settings(BaseSettings):
 
     frontend_url: str = "http://localhost:5173"
 
+    # Phase 167 (INV-01, D-167-02) — env-switched invitation email delivery. The DEFAULT is
+    # ``none``: the app just LOGS the invite link (offline/self-hosted safe — no email service
+    # or API key required). Set ``EMAIL_PROVIDER=resend`` + ``RESEND_API_KEY`` +
+    # ``INVITE_FROM_EMAIL`` to send real email (the ``resend`` package is an opt-in lazy import,
+    # NOT a default requirement). The link base reuses ``frontend_url`` above — no new
+    # APP_BASE_URL env var. RESEND_API_KEY is a secret → env only (never app_settings).
+    email_provider: str = "none"  # none | resend
+    resend_api_key: str = ""
+    invite_from_email: str = ""
+
 
 settings = Settings()
 
