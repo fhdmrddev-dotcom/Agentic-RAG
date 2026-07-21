@@ -3,6 +3,7 @@ import { AlertTriangle, Lock } from "lucide-react"
 import "./index.css"
 import { useAuth } from "./hooks/useAuth"
 import { AuthPage } from "./pages/AuthPage"
+import { AcceptInvitePage } from "./pages/AcceptInvitePage"
 import { ChatLayout } from "./components/layout/ChatLayout"
 import type { StudioTab } from "./pages/SkillStudioPage"
 import { TooltipProvider } from "@/components/ui/tooltip"
@@ -203,6 +204,20 @@ function App() {
   }
   if (atSetupPath && setupStatus.finalized) {
     return <FinalizedLockout onGoToApp={() => window.location.assign("/")} />
+  }
+
+  // Phase 167 (INV-01 / INV-02 / D-167-01): the pre-auth /invite accept-invite branch,
+  // mirroring the /setup precedent above — a guarded window.location.pathname check (no url
+  // router). Placed BEFORE the !user AuthPage return so an unauthenticated invitee gets the
+  // invite-branded auth (sign in → additive 2nd org, or sign up → fresh join) and an already-
+  // authenticated visitor on /invite still lands on the accept flow (NOT straight into
+  // ChatLayout). AcceptInvitePage reads the raw token from the URL and, on the first authed
+  // session, idempotently calls acceptInvitation(token); on success it redirects to "/" so
+  // OrgProvider re-probes and the 166 switcher shows both orgs. A non-/invite visit is
+  // byte-identical to today — this branch only fires on the literal /invite path.
+  const atInvitePath = window.location.pathname === "/invite"
+  if (atInvitePath) {
+    return <AcceptInvitePage user={user} onSignIn={signIn} onSignUp={signUp} />
   }
 
   if (!user) {
