@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v3.4
 milestone_name: Multi-Tenancy & Org Access
-status: "**Phase 166 EXECUTED 2026-07-21** (5/5 plans, ~31 commits, sequential main-tree). **NO MIGRATION** — the authz substrate (mig 104 seeds org-admin→`org:manage`/`org:audit_view`; mig 105 makes every user org-admin of their personal org; `audit_log.org_id` populated) already shipped; 166 is FE UI + a net-new backend authz router that CALLS `current_user_has_permission()` (D-166-09). Deploy-artifact drift check PASS (no env/migration/service/sandbox change)."
-last_updated: "2026-07-21T18:14:39.467Z"
-last_activity: 2026-07-21 -- Phase 166 executed, code-verified, secured; live UAT pending
+status: executing
+last_updated: "2026-07-21T19:09:41.782Z"
+last_activity: 2026-07-21 -- Phase 167 planning complete
 progress:
   total_phases: 28
   completed_phases: 8
-  total_plans: 43
+  total_plans: 50
   completed_plans: 43
   percent: 29
 ---
@@ -42,9 +42,9 @@ Items acknowledged and deferred at milestone close on 2026-07-18 (44 open `audit
 
 Phase: 166 (org-admin-shell-org-switcher-profile-menu-anchor) — EXECUTED; code-verified + SECURED; **live UAT (human_needed) pending**
 Plan: 5 of 5 complete
-Status: **Phase 166 EXECUTED 2026-07-21** (5/5 plans, ~31 commits, sequential main-tree). **NO MIGRATION** — the authz substrate (mig 104 seeds org-admin→`org:manage`/`org:audit_view`; mig 105 makes every user org-admin of their personal org; `audit_log.org_id` populated) already shipped; 166 is FE UI + a net-new backend authz router that CALLS `current_user_has_permission()` (D-166-09). Deploy-artifact drift check PASS (no env/migration/service/sandbox change).
+Status: Ready to execute
 Next action: **Operator live UAT** (`166-VERIFICATION.md` = `human_needed`, 6 items in `166-HUMAN-UAT.md`): the SC#10 4-axis (cross-provider × multi-tool × parallel-thread × long-message, incl. the **org-switch-mid-stream** hard bar for D-166-08) + G-4 Chrome lived-experience — need a running uvicorn + browser + provider keys. Then flip VERIFICATION `human_needed`→`passed` + `/gsd:complete-milestone`-track. **Delivered:** profile ProfileMenu anchor (079-C) · indigo org rail Shield-mirror (gated `org:manage`, absent for member) · OrgProvider outside StreamsProvider · server-validated `X-Org-Id` (spoof→403) · 7-tab OrgAdminShell (3 live Members/Audit/Settings + 4 LockedTab) · RLS-honest org audit degrade · light Settings IA split. **Gates:** frontend `tsc` exit 0 · backend org-gate 7/7 · org-isolation exit-gate 23/23 (no regression) · secure-phase **19/19 threats CLOSED (0 open, ASVS L2)** · code-review 0 blockers → **WR-01/02/03 + IN-01 FIXED** (WR-01 = `/org/me` bootstrap deadlock at 2+ orgs; WR-02 = G-5 stale-subscription teardown, 067.5 guard byte-unchanged; WR-03 = active-org cleared on sign-out). SEED-056 vitest rot pre-existing (baseline=HEAD). **Cloud parity owed (unchanged by 166 — no new DB work):** migs 099→111 + `SECRETS_ENCRYPTION_KEY`, in order, at next operator-gated push. **Next phase: `/gsd:discuss-phase 167`** (Invitations + Roles + Greenlists + JIT — builds on 166's bootstrap seam).
-Last activity: 2026-07-21 -- Phase 166 executed, code-verified, secured; live UAT pending
+Last activity: 2026-07-21 -- Phase 167 planning complete
 
 Progress: [██████████] 100%
 
@@ -61,6 +61,7 @@ Progress: [██████████] 100%
 
 **Guardrail overrides:**
 
+- **G-5 / Phase 167 (2026-07-21, plan-phase):** `backend/app/api/threads.py` (ledger: "G-5 fires — extraction due") is touched by plan 167-04 with a single additive line — the VIS-02 per-user model-default overlay guard at the send-path model-resolution call site. Accepted at plan verification: the plan-checker traced every smaller-footprint alternative (baking the overlay into `load_user_settings` leaks the chat user's personal default into 7 unrelated harness/workflow/publish call sites — a real regression; extending `resolve_run_model`'s signature or making `load_user_settings` async still needs a threads.py call-site edit) and confirmed the one-line guard is the minimal correct placement. Guard only — no new endpoint, no file growth beyond the guard, no per-provider fork, Deep byte-identical when unset (D-14). Mirrors the operator-approved 147/149 override shape. The threads.py extraction refactor remains due.
 - **G-5 / Phase 163 (2026-07-18, roadmap-approval — v3.4 crux):** `backend/app/api/threads.py` is the most-fired G-5 hot file (ledger: "G-5 fires — extraction due") and Phase 163 (the atomic RLS + user-JWT-client crux) threads `org_id` through its ~1850-LOC `send_message`. G-5's letter wants a *dedicated* refactor phase before the feature; the roadmap instead sequences the extraction as **Wave 0 of 163** (operator-approved at roadmap sign-off) to keep the 160–168 numbering, with a HARD gate: **no `org_id` touches `send_message` until the extraction lands + proves Deep byte-identical.** The split-vs-bundle call (promote to a standalone phase 163.x if the extraction proves large) is **deliberately deferred to `/gsd:plan-phase 163`**, where the extraction's true size is measurable — the more rigorous point to decide it than blind at roadmap time. Safety property holds either way. Recommendation on record was the dedicated phase; operator chose bundle-now / decide-at-plan-time. Mirrors the 147/149 override shape; the extraction refactor is finally being done (not deferred again), just co-located with the crux.
 - **G-5 / Phase 149 (2026-07-12, plan-phase):** `backend/app/api/threads.py` (ledger: "G-5 fires — extraction due") is touched by plan 149-06 Task 3 with a minimal in-place fallback-notice guard at the single shared model-resolution point for the locked D-149-10 enabled-enforcement decision. Accepted at plan verification (operator-confirmed): guard only, no new endpoint, no file growth beyond the guard, no per-provider fork, shared SSE emitter untouched — all new operator endpoints live in `admin.py`. Mirrors the Phase-147 override shape. The threads.py extraction refactor remains due.
 - **G-5 / Phase 147 (2026-07-11, plan-phase):** `backend/app/api/threads.py` (ledger: "G-5 fires — extraction due") is touched by plan 147-04 Task 2 with a minimal in-place workflow-kickoff guard for the D-05 workflows kill-switch. Accepted at plan verification: conditional guard only, no new endpoint, no file growth beyond the guard — all new operator endpoints live in `admin.py`. The threads.py extraction refactor remains due.

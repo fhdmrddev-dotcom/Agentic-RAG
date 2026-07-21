@@ -394,21 +394,24 @@ await pool.execute(
 
 **If this table is empty:** it is not — A1/A2/A4 in particular should be confirmed at discuss/plan time.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Email-confirmation on signup (A2)?**
    - What we know: signup is pure client→GoTrue; mig-105 trigger provisions the personal org on `auth.users` INSERT regardless of confirmation.
    - What's unclear: whether local/cloud GoTrue requires email confirmation before the session is live (affects WHEN the accept endpoint can run for a brand-new user).
    - Recommendation: design the accept to be idempotent + re-runnable and have the `/invite?token=…` landing page persist the token and call accept on the FIRST authenticated session (works whether confirmation is on or off). Verify the live GoTrue setting at plan time.
+   - **RESOLVED:** Plan 06 (167-06) — the `/invite?token=…` landing persists the token and calls the idempotent, re-runnable accept on the FIRST authenticated session, so it works whether GoTrue email-confirmation is on or off.
 
 2. **Group source for greenlists (A4)?**
    - What we know: the resolver must handle `roles:[...]` and "group grants" with union precedence; full group CRUD is deferred.
    - What's unclear: whether "groups" this phase = the 4 role tiers only, or a thin group concept.
    - Recommendation: ship the resolver against role tiers (+ an empty/extensible groups set) and a minimal admin surface that sets role audiences; leave the groups table for a later phase (matches CONTEXT deferral).
+   - **RESOLVED:** Plan 03 (167-03) — the greenlist resolver ships against the 4 role tiers only (+ an empty/extensible groups set); the groups table stays deferred.
 
 3. **Invite link base URL source?**
    - What we know: `/public-config` already serves runtime config to the SPA; the SPA has no dedicated `/invite` route yet.
    - Recommendation: add an `APP_BASE_URL` env (or reuse the public-config origin) to compose the link server-side; add a lightweight `/invite?token=…` landing route in the SPA.
+   - **RESOLVED:** Plan 01 (167-01) reuses the EXISTING `frontend_url` config as the invite-link base (NO new APP_BASE_URL env var); Plan 06 (167-06) adds the `/invite?token=…` SPA landing route.
 
 ## Environment Availability
 
