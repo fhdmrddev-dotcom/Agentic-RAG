@@ -654,7 +654,7 @@ async def list_models():
     return {"models": models, "default": settings.llm_model}
 
 
-from app.api import threads, runs, documents, settings as settings_api, folders, kb, skills, audit, knowledge_health, feedback, sandbox_outputs, workspace, admin, panel, workflows, metadata_fields, document_views, document_relationships, classification_rules, document_governance, skill_tuner, skill_test_cases, evals, features, setup as setup_api  # noqa: E402
+from app.api import threads, runs, documents, settings as settings_api, folders, kb, skills, audit, knowledge_health, feedback, sandbox_outputs, workspace, admin, panel, workflows, metadata_fields, document_views, document_relationships, classification_rules, document_governance, skill_tuner, skill_test_cases, evals, features, setup as setup_api, org  # noqa: E402
 
 app.include_router(threads.router)
 app.include_router(runs.router)
@@ -683,6 +683,7 @@ app.include_router(evals.router_evals)  # Phase 137.1 EVAL-05 — skill-LESS eva
 app.include_router(features.router)  # Phase 148 VIS-01 — authenticated per-user GET /features effective-map (NOT operator-gated; top-level, not under /admin — non-operators must reach it to learn their own map)
 app.include_router(setup_api.router)  # Phase 158 DEPLOY-02 — pre-auth token-gated /setup/* wizard API + open GET /setup/status (SetupMiddleware-allowlisted)
 app.include_router(setup_api.public_router)  # Phase 158 D-07 — open top-level GET /public-config (browser Supabase creds so login works without a frontend rebuild)
+app.include_router(org.router)  # Phase 166 ADMIN-01/02/04 — org-admin surface (server-validated X-Org-Id + org:manage gate; /org/me probe, read-only members roster, org-scoped audit degrade)
 
 
 # Phase 063 Plan 05 — test-only fixture endpoints (e2e harness support).
