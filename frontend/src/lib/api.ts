@@ -4501,19 +4501,43 @@ export interface OrgPermissions {
   memberships: OrgMembership[]
 }
 
-/** One roster row from `GET /org/members` (org_members JOIN auth.users). Read-only
- *  this phase — invite/role editing is Phase 167. `email` is null if unresolved. */
+/** The server-derived adoption projection (Phase 167 / INV-01): `active` (a membership
+ *  row exists), `pending` (a still-pending invite, no membership yet), `not-yet-invited`
+ *  (neither). Computed server-side via `derive_adoption_state` — NEVER a client flag. */
+export type AdoptionState = "not-yet-invited" | "pending" | "active"
+
+/** One roster row from `GET /org/members` (org_members JOIN auth.users). `email` is null
+ *  if unresolved. Phase 167 adds the server-derived adoption `state` (members are always
+ *  `active`) for the roster's adoption chip (INV-01). */
 export interface OrgMember {
   user_id: string
   email: string | null
   role: string
   joined_at: string | null
+  /** Server-derived adoption state (INV-01). A membership row is always `active`. */
+  state?: AdoptionState
+}
+
+/** A still-PENDING invitee surfaced on `GET /org/members` `pending_invitations[]` (Phase
+ *  167 / INV-01). It is NOT yet an `org_members` row — it carries the invite `id` (for
+ *  resend/revoke) + the `pending` adoption state so the roster renders it as a pending chip. */
+export interface PendingInvitation {
+  id: string
+  email: string | null
+  role: string
+  status: string
+  state: AdoptionState
+  invited_at: string | null
+  expires_at: string | null
 }
 
 /** One server page of the org members roster. 1-based; the server clamps
- *  `page_size` <= 100. `total` is the org's member count (COUNT behind the manage gate). */
+ *  `page_size` <= 100. `total` is the org's member count (COUNT behind the manage gate).
+ *  Phase 167 adds `pending_invitations` — the org's still-pending invitees for the roster
+ *  adoption chips (INV-01); optional so pre-167 callers/fixtures still typecheck. */
 export interface OrgMembersPage {
   members: OrgMember[]
+  pending_invitations?: PendingInvitation[]
   page: number
   page_size: number
   total: number
@@ -4584,6 +4608,8 @@ export async function getOrgMembers(page = 1, pageSize = 50): Promise<OrgMembers
   const body = (await res.json()) as Partial<OrgMembersPage>
   return {
     members: body.members ?? [],
+    // Phase 167 (INV-01): the still-pending invitees for the roster's adoption chips.
+    pending_invitations: body.pending_invitations ?? [],
     page: body.page ?? page,
     page_size: body.page_size ?? pageSize,
     total: body.total ?? 0,
@@ -4622,5 +4648,127 @@ export async function getOrgAudit(
     page: body.page ?? page,
     page_size: body.page_size ?? pageSize,
     scope: body.scope === "all" ? "all" : "own",
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Org invitations (Phase 167 / INV-01 + INV-02) — the invitation client fns.
+//
+// Mirrors the `getOrgMembers`/`getOrgAudit` shape exactly: `getAuthHeaders()` auto-
+// injects the active-org `X-Org-Id` (D-166-06) so the server RE-VALIDATES the caller's
+// org membership + the `org:invite` gate (the client is never the boundary — T-167-17);
+// `ApiError` on non-OK; a defensive `?? fallback` envelope unwrap. The write bodies
+// (send/accept) are JSON-serialized. Delivery is link-first (D-167-02): send/resend
+// return the raw-token invite LINK for the inviter to copy/share (T-167-18 — the raw
+// token lives ONLY in that link, never stored/logged separately).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** One invitation row from `GET /org/invitations` (Phase 167). `token_hash` is NEVER
+ *  returned (T-161-04) — only the lifecycle-visible fields. `status` ∈
+ *  pending/accepted/expired/revoked. */
+export interface Invitation {
+  id: string
+  email: string | null
+  role: string
+  status: string
+  expires_at: string | null
+  invited_by?: string | null
+  created_at?: string | null
+}
+
+/** `POST /org/invitations` result — the copy/share `link` (raw token, link-first
+ *  D-167-02) + the created pending `invitation`. */
+export interface SendInvitationResult {
+  link: string
+  invitation: Invitation
+}
+
+/** `POST /org/invitations/accept` result — the org the invitee JOINED, their granted
+ *  `role`, and `joined` (true on the first successful join; false on an idempotent
+ *  already-accepted re-accept). */
+export interface AcceptInvitationResult {
+  org_id: string
+  role: string
+  joined: boolean
+}
+
+/** Send an org invitation (`POST /org/invitations`; org:invite-gated server-side).
+ *  Returns the link-first copy/share URL (D-167-02) + the created pending invitation.
+ *  The role is validated server-side to member/org-admin (400 otherwise). */
+export async function sendInvitation(
+  email: string,
+  role: string,
+): Promise<SendInvitationResult> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/org/invitations`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ email, role }),
+  })
+  if (!res.ok) throw new ApiError("Failed to send the invitation.", res.status)
+  const body = (await res.json()) as Partial<SendInvitationResult>
+  return {
+    link: body.link ?? "",
+    invitation: (body.invitation ?? {}) as Invitation,
+  }
+}
+
+/** List the active org's invitations (`GET /org/invitations`; org:invite-gated). An
+ *  optional `status` chip filters by lifecycle state. `token_hash` is never returned. */
+export async function listInvitations(status?: string): Promise<Invitation[]> {
+  const headers = await getAuthHeaders()
+  const params = new URLSearchParams()
+  if (status) params.set("status", status)
+  const qs = params.toString()
+  const res = await fetch(`${API_BASE}/org/invitations${qs ? `?${qs}` : ""}`, { headers })
+  if (!res.ok) throw new ApiError("Failed to load the invitations.", res.status)
+  const body = (await res.json()) as { invitations?: Invitation[] }
+  return body.invitations ?? []
+}
+
+/** Re-mint a fresh token + expiry for a pending invite (`POST /org/invitations/{id}/resend`;
+ *  org:invite-gated). Returns the FRESH copy/share link (D-167-02). A non-pending /
+ *  cross-org id → 404 server-side. */
+export async function resendInvitation(id: string): Promise<{ link: string }> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/org/invitations/${id}/resend`, {
+    method: "POST",
+    headers,
+  })
+  if (!res.ok) throw new ApiError("Failed to resend the invitation.", res.status)
+  const body = (await res.json()) as { link?: string }
+  return { link: body.link ?? "" }
+}
+
+/** Revoke a pending invite (`DELETE /org/invitations/{id}`; org:invite-gated). A soft
+ *  `status='revoked'` flip server-side (keeps the audit trail); a non-pending / cross-org
+ *  id → 404. Returns 204 No Content (no body to parse). */
+export async function revokeInvitation(id: string): Promise<void> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/org/invitations/${id}`, {
+    method: "DELETE",
+    headers,
+  })
+  if (!res.ok) throw new ApiError("Failed to revoke the invitation.", res.status)
+}
+
+/** Accept an invitation via its raw token (`POST /org/invitations/accept`; INV-02 — the
+ *  JIT seam). Token-gated server-side (get_current_user ONLY): the org comes from the
+ *  VALIDATED token, NOT the `X-Org-Id` header (which the accept route ignores — an
+ *  invitee is not yet a member). Idempotent + join-additive (D-167-01). Consumed by
+ *  Plan 06's accept landing. */
+export async function acceptInvitation(token: string): Promise<AcceptInvitationResult> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/org/invitations/accept`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ token }),
+  })
+  if (!res.ok) throw new ApiError("Failed to accept the invitation.", res.status)
+  const body = (await res.json()) as Partial<AcceptInvitationResult>
+  return {
+    org_id: body.org_id ?? "",
+    role: body.role ?? "member",
+    joined: body.joined ?? false,
   }
 }
