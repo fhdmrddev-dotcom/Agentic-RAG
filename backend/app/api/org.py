@@ -229,11 +229,44 @@ async def get_org_members(
             "email": r["email"],
             "role": r["role"],
             "joined_at": r["joined_at"].isoformat() if r["joined_at"] else None,
+            # Adoption state is server-derived (never a client flag): a membership row → active.
+            "state": invitation_service.derive_adoption_state(None, has_membership=True),
         }
         for r in rows
     ]
+
+    # Adoption chips (INV-01): surface the org's still-PENDING invitees (no membership yet) so
+    # the roster renders not-yet-invited / pending / active from server truth. Scoped to the
+    # server-validated active_org, behind the same require_org_manage gate (service-role read —
+    # org_invitations has email directly, no auth.users join; the list_users_roster precedent).
+    member_emails = {m["email"] for m in members if m["email"]}
+    invite_rows = await pool.fetch(
+        "SELECT id, email, role, status, created_at, expires_at "
+        "FROM public.org_invitations "
+        "WHERE org_id = $1 AND status = 'pending' AND expires_at > now() "
+        "ORDER BY created_at DESC",
+        active_org,
+    )
+    pending_invitations = [
+        {
+            "id": str(r["id"]),
+            "email": r["email"],
+            "role": r["role"],
+            "status": r["status"],
+            # A pending invite whose email is NOT yet a member → the 'pending' adoption chip.
+            "state": invitation_service.derive_adoption_state(
+                r["status"], has_membership=False
+            ),
+            "invited_at": r["created_at"].isoformat() if r["created_at"] else None,
+            "expires_at": r["expires_at"].isoformat() if r["expires_at"] else None,
+        }
+        for r in invite_rows
+        if r["email"] not in member_emails  # already a member → shows as active, not pending
+    ]
+
     return {
         "members": members,
+        "pending_invitations": pending_invitations,
         "page": max(1, page),
         "page_size": page_size,
         "total": total,
@@ -412,3 +445,115 @@ async def list_org_invitations(
             for r in rows
         ]
     }
+
+
+@router.post("/invitations/{invite_id}/resend")
+async def resend_org_invitation(
+    request: Request,
+    invite_id: str,
+    current_user: dict = Depends(require_org_invite),
+    audit_supabase: Client = Depends(get_user_supabase_client),
+):
+    """Re-mint a fresh token + expiry for a pending invite (INV-01; org:invite-gated).
+
+    UPDATEs the pending invite's token_hash + expires_at on the user-JWT connection (the
+    mig-104 ``org_invitations_update`` RLS ``WITH CHECK (org:invite)`` backstops the app gate),
+    pinned to ``id AND org_id=active_org AND status='pending'`` — a non-pending / cross-org id
+    matches no row → 404. Returns the FRESH link, re-issues the email, and audits with an
+    EXPLICIT org_id=active_org.
+    """
+    active_org = deps._to_uuid(request.state.active_org)
+    inv_uuid = deps._to_uuid(invite_id)
+    if inv_uuid is None:
+        raise HTTPException(status_code=404, detail="Invitation not found")
+
+    raw, token_hash = invitation_service.mint_invite_token()
+    expires_at = datetime.now(timezone.utc) + timedelta(days=7)
+
+    async with get_user_pg_connection(request, current_user) as conn:
+        row = await conn.fetchrow(
+            "UPDATE public.org_invitations "
+            "SET token_hash = $1, expires_at = $2, updated_at = now() "
+            "WHERE id = $3 AND org_id = $4 AND status = 'pending' "
+            "RETURNING id, email, role",
+            token_hash, expires_at, inv_uuid, active_org,
+        )
+        org_row = (
+            await conn.fetchrow(
+                "SELECT name FROM public.organizations WHERE id = $1", active_org
+            )
+            if row is not None
+            else None
+        )
+
+    if row is None:
+        raise HTTPException(status_code=404, detail="Invitation not found")
+
+    org_name = org_row["name"] if org_row else "your organization"
+    link = compose_invite_link(raw)
+    try:
+        get_email_provider().send_invite(row["email"], link, org_name)
+    except Exception as exc:  # link-first: delivery never fails the resend
+        logger.error("invite email re-delivery failed for %s: %s", row["email"], exc)
+
+    await write_audit_entry(
+        user_id=current_user["id"],
+        action_type=_INVITE_AUDIT_ACTION,
+        metadata={
+            "event": "invitation.resend",
+            "invitation_id": str(row["id"]),
+            "email": row["email"],
+            "role": row["role"],
+        },
+        supabase=audit_supabase,
+        org_id=str(request.state.active_org),  # EXPLICIT active_org (T-167-23)
+    )
+
+    return {
+        "link": link,
+        "invitation": {"id": str(row["id"]), "email": row["email"], "role": row["role"]},
+    }
+
+
+@router.delete("/invitations/{invite_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def revoke_org_invitation(
+    request: Request,
+    invite_id: str,
+    current_user: dict = Depends(require_org_invite),
+    audit_supabase: Client = Depends(get_user_supabase_client),
+):
+    """Revoke a pending invite (INV-01; org:invite-gated).
+
+    Sets ``status='revoked'`` (a soft state flip, NOT a hard DELETE — keeps the audit trail;
+    the mig-104 ``org_invitations_update`` RLS gates it) pinned to ``id AND org_id=active_org
+    AND status='pending'`` — a non-pending / cross-org id matches no row → 404. Records an
+    EXPLICIT org_id=active_org audit row, then returns 204.
+    """
+    active_org = deps._to_uuid(request.state.active_org)
+    inv_uuid = deps._to_uuid(invite_id)
+    if inv_uuid is None:
+        raise HTTPException(status_code=404, detail="Invitation not found")
+
+    async with get_user_pg_connection(request, current_user) as conn:
+        row = await conn.fetchrow(
+            "UPDATE public.org_invitations SET status = 'revoked', updated_at = now() "
+            "WHERE id = $1 AND org_id = $2 AND status = 'pending' "
+            "RETURNING id, email",
+            inv_uuid, active_org,
+        )
+
+    if row is None:
+        raise HTTPException(status_code=404, detail="Invitation not found")
+
+    await write_audit_entry(
+        user_id=current_user["id"],
+        action_type=_INVITE_AUDIT_ACTION,
+        metadata={
+            "event": "invitation.revoke",
+            "invitation_id": str(row["id"]),
+            "email": row["email"],
+        },
+        supabase=audit_supabase,
+        org_id=str(request.state.active_org),  # EXPLICIT active_org (T-167-23)
+    )
+    return None
