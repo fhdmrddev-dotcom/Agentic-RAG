@@ -40,6 +40,9 @@ import { useOrg } from "@/providers/OrgProvider"
 import { useTechnicalNames } from "@/providers/TechnicalNamesProvider"
 import { LockedTab } from "@/components/admin/LockedTab"
 import { OrgBand } from "./OrgBand"
+import { OrgMembersTab } from "./OrgMembersTab"
+import { OrgAuditTab } from "./OrgAuditTab"
+import { OrgSettingsTab } from "./OrgSettingsTab"
 
 interface OrgAdminShellProps {
   /** Return to the ordinary app surface (navigates to "chat"). */
@@ -114,12 +117,17 @@ export function OrgAdminShell({ onBack }: OrgAdminShellProps) {
   const [activeTab, setActiveTab] = useState<OrgAdminTab>("members")
 
   // 068-A roster: `null` until the Members tab is first opened (lazy — no roster read on
-  // a Settings-only visit); the shell owns the fetch, OrgMembersTab is a pure leaf.
+  // a Settings-only visit); the shell owns the fetch + the search state, OrgMembersTab is
+  // a pure leaf. Search filters the LOADED page client-side (never an unbounded fetch).
   const [members, setMembers] = useState<OrgMember[] | null>(null)
+  const [memberQuery, setMemberQuery] = useState("")
   // 067-A audit: the current server page + its in-flight flag; `null` until the Audit
   // tab is first opened. The load-bearing `scope` flag rides ON this page (server truth).
+  // The shell owns the filter + 1-based page state; OrgAuditTab reports intent via callbacks.
   const [auditResult, setAuditResult] = useState<OrgAuditPage | null>(null)
   const [auditLoading, setAuditLoading] = useState(false)
+  const [auditFilters, setAuditFilters] = useState<OrgAuditFilters>({})
+  const [auditPage, setAuditPage] = useState(1)
 
   // Guard setState-after-unmount (ControlRoomPage idiom) so a late fetch never writes
   // into an unmounted tree.
@@ -160,13 +168,25 @@ export function OrgAdminShell({ onBack }: OrgAdminShellProps) {
   }, [])
 
   // ── Lazy per-tab fetch: fetch Members the first time the tab is opened (and on each
-  //    re-open), fetch Audit on tab-open. A non-manager never fires either — the fetch
-  //    stays off the wire (belt to the server 403). ──
+  //    re-open); fetch Audit on tab-open AND whenever the filters/page change (the shell
+  //    owns that state). A non-manager never fires either — the fetch stays off the wire
+  //    (belt to the server 403). ──
   useEffect(() => {
     if (!canManage) return
     if (activeTab === "members") void fetchMembers()
-    if (activeTab === "audit") void fetchAudit({}, 1)
-  }, [activeTab, canManage, fetchMembers, fetchAudit])
+    if (activeTab === "audit") void fetchAudit(auditFilters, auditPage)
+  }, [activeTab, canManage, fetchMembers, fetchAudit, auditFilters, auditPage])
+
+  // ── Audit filter/page intent from OrgAuditTab. A filter change resets to page 1 (the
+  //    scoped total shifts); a page change walks the server pages. Both re-run the fetch
+  //    effect above, which threads the fresh server `scope` back into the leaf. ──
+  const handleAuditFiltersChange = useCallback((next: OrgAuditFilters) => {
+    setAuditFilters(next)
+    setAuditPage(1)
+  }, [])
+  const handleAuditPageChange = useCallback((page: number) => {
+    setAuditPage(Math.max(1, page))
+  }, [])
 
   const active = TABS.find((t) => t.id === activeTab) ?? TABS[0]
 
@@ -243,20 +263,27 @@ export function OrgAdminShell({ onBack }: OrgAdminShellProps) {
       </div>
 
       <div className="flex-1 overflow-y-auto">
-        {/* Body switch lands in Task 2 (the live leaves + the 4 LockedTab fallthrough).
-            This temporary skeleton keeps the fetch orchestration exercised + compiling. */}
-        {active.locked ? (
-          <LockedTab title={active.label} description={active.lockedDescription} />
-        ) : activeTab === "members" ? (
-          <div className="px-6 py-6 text-sm text-muted-foreground">
-            {members == null ? "Loading members…" : `${members.length} members loaded`}
-          </div>
+        {/* Body switch (copy of the ControlRoomPage:630-793 shape): the 3 live leaves,
+            then the FINAL LockedTab fallthrough that serves all 4 locked tabs from their
+            phase-number-free `lockedDescription` (T-146-10 / T-166-13). */}
+        {activeTab === "members" ? (
+          <OrgMembersTab members={members} query={memberQuery} onQueryChange={setMemberQuery} />
         ) : activeTab === "audit" ? (
-          <div className="px-6 py-6 text-sm text-muted-foreground">
-            {auditLoading ? "Loading activity…" : `${auditResult?.total ?? 0} entries`}
-          </div>
+          // Thread the audit page straight through: the load-bearing `scope` flag rides ON
+          // `result`, so the RLS-honest degrade renders from server truth (T-166-11).
+          <OrgAuditTab
+            result={auditResult}
+            loading={auditLoading}
+            filters={auditFilters}
+            onFiltersChange={handleAuditFiltersChange}
+            onPageChange={handleAuditPageChange}
+            showTechnical={showTechnical}
+            onToggleTechnical={toggleTechnical}
+          />
+        ) : activeTab === "settings" ? (
+          <OrgSettingsTab orgName={orgName} />
         ) : (
-          <div className="px-6 py-6 text-sm text-muted-foreground">Organization settings</div>
+          <LockedTab title={active.label} description={active.lockedDescription} />
         )}
       </div>
     </div>
