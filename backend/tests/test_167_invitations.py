@@ -200,10 +200,13 @@ def test_roster_surfaces_adoption_state(
     _install_perms(monkeypatch, {"org:manage": True})
     # fetchrow: get_active_org_id membership → get_org_members count.
     mock_asyncpg_pool.set_fetchrow_results([{"role": "org-admin"}, {"n": 1}])
-    # fetch: roster members → pending invitations.
+    # fetch: roster members page → ALL org member emails (WR-03 dedupe set) → pending invitations.
     mock_asyncpg_pool.set_fetch_results([
         [{"user_id": CALLER_ID, "email": "member@example.com", "role": "org-admin",
           "joined_at": None}],
+        # WR-03: the org-scoped, pagination-independent member-email set the adoption chips
+        # dedupe against (pending@example.com is NOT a member → it stays a 'pending' chip).
+        [{"email": "member@example.com"}],
         [{"id": INVITE_ID, "email": "pending@example.com", "role": "member",
           "status": "pending", "created_at": None, "expires_at": None}],
     ])
