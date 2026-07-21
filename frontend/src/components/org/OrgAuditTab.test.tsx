@@ -81,6 +81,55 @@ describe("OrgAuditTab — lighter cut (no CSV, no source switch)", () => {
   })
 })
 
+describe("OrgAuditTab — invitation lifecycle rows render metadata.event honestly (Phase 167)", () => {
+  // Phase 167-02: invitation audit rows reuse action_type='settings.update' + a
+  // metadata.event discriminator (the CHECK enum has no invitation type). The tab must
+  // render the honest event label, NOT a bare "Changed settings".
+  const INVITE_EVENTS: ReadonlyArray<{ event: string; label: string }> = [
+    { event: "invitation.send", label: "Invitation sent" },
+    { event: "invitation.resend", label: "Invitation resent" },
+    { event: "invitation.revoke", label: "Invitation revoked" },
+    { event: "invitation.accept", label: "Invitation accepted" },
+  ]
+
+  it("renders the honest event label for each invitation event, never a bare 'Changed settings'", () => {
+    const page: OrgAuditPage = {
+      entries: INVITE_EVENTS.map((e, i) => ({
+        id: `e${i}`,
+        user_id: "u1",
+        action_type: "settings.update",
+        metadata: { event: e.event },
+        created_at: "2026-07-20T10:00:00Z",
+        org_id: "o1",
+      })),
+      total: INVITE_EVENTS.length,
+      page: 1,
+      page_size: 50,
+      scope: "all",
+    }
+    render(<OrgAuditTab {...baseProps} result={page} />)
+    for (const { label } of INVITE_EVENTS) {
+      expect(screen.getByText(label)).toBeInTheDocument()
+    }
+    // The generic settings label must NOT appear for these invitation rows.
+    expect(screen.queryByText("Changed settings")).toBeNull()
+  })
+
+  it("still renders 'Changed settings' for a genuine settings.update (no invitation event)", () => {
+    const page: OrgAuditPage = {
+      entries: [
+        { id: "s1", user_id: "u1", action_type: "settings.update", metadata: { foo: "bar" }, created_at: "2026-07-20T10:00:00Z", org_id: "o1" },
+      ],
+      total: 1,
+      page: 1,
+      page_size: 50,
+      scope: "all",
+    }
+    render(<OrgAuditTab {...baseProps} result={page} />)
+    expect(screen.getByText("Changed settings")).toBeInTheDocument()
+  })
+})
+
 describe("OrgAuditTab — plain-first vocabulary + ⌥ raw-code reveal", () => {
   it("shows plain-first labels from the vocabulary map, hiding raw codes by default", () => {
     render(<OrgAuditTab {...baseProps} result={ALL_PAGE} showTechnical={false} />)

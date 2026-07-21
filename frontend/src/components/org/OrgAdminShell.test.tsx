@@ -23,13 +23,26 @@ import userEvent from "@testing-library/user-event"
 
 import { OrgAdminShell } from "./OrgAdminShell"
 import { TechnicalNamesProvider } from "@/providers/TechnicalNamesProvider"
-import { getOrgMembers, getOrgAudit } from "@/lib/api"
+import { getOrgMembers, getOrgAudit, listInvitations } from "@/lib/api"
 import { useOrg } from "@/providers/OrgProvider"
-import type { OrgAuditPage, OrgMembersPage } from "@/lib/api"
+import type { OrgAuditPage, OrgMembersPage, Invitation } from "@/lib/api"
 
 vi.mock("@/lib/api", () => ({
   getOrgMembers: vi.fn(),
   getOrgAudit: vi.fn(),
+  // Phase 167: the Invitations tab is LIVE — the shell owns the invitation fetch +
+  // the resend/revoke/send callbacks; the mounted InviteMemberDialog imports sendInvitation.
+  listInvitations: vi.fn(),
+  resendInvitation: vi.fn(),
+  revokeInvitation: vi.fn(),
+  sendInvitation: vi.fn(),
+  ApiError: class ApiError extends Error {
+    status: number
+    constructor(message: string, status: number) {
+      super(message)
+      this.status = status
+    }
+  },
 }))
 
 vi.mock("@/providers/OrgProvider", () => ({
@@ -66,12 +79,17 @@ const OWN_PAGE: OrgAuditPage = {
   scope: "own",
 }
 
-/** The 4 locked tabs and their exact phase-number-free copy (T-146-10 / T-166-13). */
+/** The 3 remaining locked tabs and their exact phase-number-free copy (T-146-10 / T-166-13).
+ *  Phase 167 flips "Invitations & Roles" LIVE, so it left this list. */
 const LOCKED_TABS: ReadonlyArray<{ tab: string; description: string }> = [
-  { tab: "Invitations & Roles", description: "Inviting people and managing roles is coming soon." },
   { tab: "SSO", description: "Single sign-on setup is coming soon." },
   { tab: "Subscription", description: "Plan and billing management is coming soon." },
   { tab: "Retention", description: "Data-retention controls are coming soon." },
+]
+
+/** A pending + accepted pair the shell threads into the live InvitationsTab. */
+const INVITES: Invitation[] = [
+  { id: "inv1", email: "pending@acme.test", role: "member", status: "pending", expires_at: "2026-07-27T00:00:00Z", created_at: "2026-07-20T00:00:00Z" },
 ]
 
 /** A roadmap-phase-number token in any shape a locked description must never carry. */
@@ -103,6 +121,7 @@ beforeEach(() => {
   mockOrg()
   vi.mocked(getOrgMembers).mockResolvedValue(MEMBERS_PAGE)
   vi.mocked(getOrgAudit).mockResolvedValue(ALL_PAGE)
+  vi.mocked(listInvitations).mockResolvedValue(INVITES)
 })
 
 describe("OrgAdminShell — live tabs mount their leaves (ADMIN-01 / D-166-01)", () => {
@@ -130,10 +149,23 @@ describe("OrgAdminShell — live tabs mount their leaves (ADMIN-01 / D-166-01)",
     expect(screen.getByText(/organization name/i)).toBeInTheDocument()
     expect(screen.getAllByText("Acme Inc").length).toBeGreaterThan(0)
   })
+
+  it("Invitations & Roles is LIVE — mounts InvitationsTab with the shell-fetched invitations (D-167-07)", async () => {
+    renderShell()
+    await userEvent.click(screen.getByRole("tab", { name: "Invitations & Roles" }))
+    // The InvitationsTab leaf renders its own heading + send affordance (NOT a LockedTab).
+    expect(await screen.findByRole("heading", { name: /invitations & roles/i })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: /send invite/i })).toBeInTheDocument()
+    // The shell-fetched invitation is threaded into the leaf (its row + pending chip render).
+    expect(await screen.findByText("pending@acme.test")).toBeInTheDocument()
+    // NOT a locked placeholder.
+    expect(screen.queryByText(/not built yet — coming soon/i)).toBeNull()
+    expect(vi.mocked(listInvitations)).toHaveBeenCalled()
+  })
 })
 
 describe("OrgAdminShell — locked tabs render LockedTab (T-146-10 / T-166-13)", () => {
-  it("each of the 4 locked tabs renders LockedTab with its title + phase-number-free copy", async () => {
+  it("each of the 3 locked tabs renders LockedTab with its title + phase-number-free copy", async () => {
     renderShell()
     for (const { tab, description } of LOCKED_TABS) {
       await userEvent.click(screen.getByRole("tab", { name: tab }))
