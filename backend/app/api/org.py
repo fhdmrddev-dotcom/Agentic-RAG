@@ -239,7 +239,17 @@ async def get_org_members(
     # the roster renders not-yet-invited / pending / active from server truth. Scoped to the
     # server-validated active_org, behind the same require_org_manage gate (service-role read —
     # org_invitations has email directly, no auth.users join; the list_users_roster precedent).
-    member_emails = {m["email"] for m in members if m["email"]}
+    # WR-03: dedupe against ALL org members (org-scoped, pagination-INDEPENDENT) — never just
+    # the current page's `members`. A pending invite whose email already belongs to a member on
+    # ANOTHER page (a re-invite, or any member beyond page_size) must NOT render a false
+    # 'pending' chip; the page-scoped set made the chip state page-dependent and inconsistent.
+    all_member_rows = await pool.fetch(
+        "SELECT u.email FROM public.org_members m "
+        "JOIN auth.users u ON u.id = m.user_id "
+        "WHERE m.org_id = $1",
+        active_org,
+    )
+    member_emails = {r["email"] for r in all_member_rows if r["email"]}
     invite_rows = await pool.fetch(
         "SELECT id, email, role, status, created_at, expires_at "
         "FROM public.org_invitations "
