@@ -96,10 +96,21 @@ export function OrgProvider({
   }, [activeOrgId])
 
   // The org-scoped, fail-closed permissions probe (re-keyed on activeOrgId). Render-only.
-  const { canManage, canAuditView, role, memberships, loading } = useOrgPermissionsProbe(
-    userId,
-    activeOrgId,
-  )
+  const { orgId: resolvedOrgId, canManage, canAuditView, role, memberships, loading } =
+    useOrgPermissionsProbe(userId, activeOrgId)
+
+  // WR-01 self-heal: when we hold NO active org yet (fresh device — no persisted hint), adopt
+  // the org the soft `/org/me` resolved as the caller's default. This makes the `X-Org-Id`
+  // header carry the honest org on the NEXT request (the probe re-keys and re-sends it), so a
+  // 2+-org session that bootstrapped header-less is no longer stranded. Guarded on
+  // `activeOrgId === null` so a rehydrated/switched org (a real user choice) is never
+  // overridden by the server default, and so the adopt fires at most once (it self-terminates
+  // when activeOrgId becomes non-null).
+  useEffect(() => {
+    if (resolvedOrgId && activeOrgId === null) {
+      setActiveOrgIdState(resolvedOrgId)
+    }
+  }, [resolvedOrgId, activeOrgId])
 
   const switchOrg = useCallback((newOrgId: string) => {
     // D-166-08: set the `X-Org-Id` header SYNCHRONOUSLY — before any effect keyed on the

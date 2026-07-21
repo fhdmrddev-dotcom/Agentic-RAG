@@ -33,17 +33,22 @@ from app.dependencies import (
     get_service_role_supabase,
     get_user_pg_connection,
     require_org_manage,
+    resolve_active_org_soft,
 )
 
 logger = logging.getLogger(__name__)
 
-# The single load-bearing security line: default-deny at the ROUTER — every /org route
-# requires a validated, server-checked membership (get_active_org_id stashes
-# request.state.active_org + org_role; D-166-06). Manager-only reads add require_org_manage.
+# Default-deny is enforced PER GUARDED ROUTE, not at the router level (WR-01). The
+# manager-only reads (/org/members, /org/audit) each declare require_org_manage, which
+# Depends on the STRICT get_active_org_id (spoof → 403; absent-header-with-2+-memberships →
+# 400) + the org:manage permission — that gate is UNCHANGED (a HARD invariant). Only the
+# bootstrap probe /org/me uses the soft resolver (resolve_active_org_soft): it keeps
+# spoof→403 but never 400s a member out of their own switcher-seeding read (D-166-06).
+# A router-level get_active_org_id CANNOT stay here — it would 400 /org/me for a fresh
+# 2+-org session, the exact circular deadlock WR-01 fixes.
 router = APIRouter(
     prefix="/org",
     tags=["org"],
-    dependencies=[Depends(get_active_org_id)],
 )
 
 
@@ -88,20 +93,31 @@ def _get_org_audit_supabase(active_org: str = Depends(get_active_org_id)) -> Cli
 async def get_org_me(
     request: Request,
     current_user: dict = Depends(get_current_user),
+    active_org: str | None = Depends(resolve_active_org_soft),
 ):
     """Membership-reachable probe for useOrgPermissionsProbe + the org switcher (ADMIN-02).
 
-    Floor-exempt (the frontend probes this on every mount — mirror admin.py:606). Reads the
-    active org + role stashed by get_active_org_id, computes can_manage / can_audit_view AS
-    THE CALLER (D-166-09), and returns the caller's memberships[] (org_members JOIN
-    organizations) on a user-JWT/RLS connection so the switcher has its data.
+    Floor-exempt (the frontend probes this on every mount — mirror admin.py:606). Uses the
+    SOFT resolver (resolve_active_org_soft, WR-01) so a fresh 2+-org session with NO X-Org-Id
+    header can still bootstrap the switcher: a present header is validated (spoof → 403), an
+    absent header resolves the caller's default org, and a caller with no membership resolves
+    to None (empty memberships[], never a 400). Computes can_manage / can_audit_view for the
+    RESOLVED org AS THE CALLER (D-166-09), and returns the caller's memberships[] (org_members
+    JOIN organizations) on a user-JWT/RLS connection so the switcher has its data.
     """
-    active_org = request.state.active_org
-    role = request.state.org_role
-    can_manage = await deps._has_org_permission(request, current_user, active_org, "org:manage")
-    can_audit_view = await deps._has_org_permission(
-        request, current_user, active_org, "org:audit_view"
-    )
+    role = request.state.org_role or "member"
+    if active_org:
+        can_manage = await deps._has_org_permission(
+            request, current_user, active_org, "org:manage"
+        )
+        can_audit_view = await deps._has_org_permission(
+            request, current_user, active_org, "org:audit_view"
+        )
+    else:
+        # No resolved org (0-membership caller): fail-closed booleans, still return the
+        # (empty) memberships[] so the client renders a switcher-less identity, not an error.
+        can_manage = False
+        can_audit_view = False
 
     async with get_user_pg_connection(request, current_user) as conn:
         rows = await conn.fetch(
@@ -115,7 +131,7 @@ async def get_org_me(
         {"org_id": str(r["org_id"]), "name": r["name"], "role": r["role"]} for r in rows
     ]
     return {
-        "org_id": str(active_org),
+        "org_id": str(active_org) if active_org else None,
         "role": role,
         "can_manage": bool(can_manage),
         "can_audit_view": bool(can_audit_view),

@@ -577,6 +577,72 @@ async def get_active_org_id(
     return active
 
 
+async def resolve_active_org_soft(
+    request: Request, current_user: dict = Depends(get_current_user)
+) -> str | None:
+    """Bootstrap-friendly active-org resolver for ``/org/me`` ONLY (WR-01).
+
+    ``/org/me`` is THE endpoint that seeds the client: it delivers ``memberships[]`` so a
+    fresh 2+-org session can populate the org switcher. But the strict ``get_active_org_id``
+    gate 400s when the ``X-Org-Id`` header is absent AND the caller has 2+ memberships — a
+    deadlock, because the one call that could seed the header is the one that 400s. This
+    resolver breaks that circular dependency for ``/org/me`` while keeping every hard
+    security invariant of ``get_active_org_id``:
+
+    - A PRESENT ``X-Org-Id`` is still validated against ``org_members`` on a user-JWT/RLS
+      connection — a spoofed/non-member (or malformed) org is STILL a 403 (T-166-01, HARD
+      invariant). The header is NEVER trusted.
+    - An ABSENT header does NOT 400: it resolves the caller's DEFAULT org (the first
+      membership by ``created_at``) so the probe always succeeds and returns the switcher's
+      data. Zero memberships → ``None`` (the handler returns an empty ``memberships[]``,
+      never an error — a member is never 400'd out of their own bootstrap probe).
+
+    Stashes ``request.state.active_org`` / ``request.state.org_role`` exactly like the strict
+    gate. Returns the resolved org id string (or ``None`` when the caller belongs to no org).
+    The manager-only reads (/org/members, /org/audit) KEEP the strict ``get_active_org_id`` +
+    ``require_org_manage`` gates — this soft resolver is NEVER wired to them (D-166-06).
+    """
+    header_org = request.headers.get("X-Org-Id")
+    async with get_user_pg_connection(request, current_user) as conn:
+        if header_org:
+            org_uuid = _to_uuid(header_org)
+            if org_uuid is None:
+                # A malformed header can never match a real membership — treat as non-member.
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="You are not a member of this organization.",
+                )
+            row = await conn.fetchrow(
+                "SELECT role FROM public.org_members WHERE org_id = $1 AND user_id = auth.uid()",
+                org_uuid,
+            )
+            if row is None:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="You are not a member of this organization.",
+                )
+            # Stash the CANONICAL uuid string (correct-by-construction here — the
+            # strict get_active_org_id gate is left byte-unchanged per the WR-01 invariant).
+            request.state.active_org = str(org_uuid)
+            request.state.org_role = row["role"]
+            return str(org_uuid)
+        rows = await conn.fetch(
+            "SELECT org_id, role FROM public.org_members "
+            "WHERE user_id = auth.uid() ORDER BY created_at"
+        )
+    if not rows:
+        # No membership: never 400 the bootstrap probe — the client renders no switcher.
+        request.state.active_org = None
+        request.state.org_role = None
+        return None
+    # Header absent: adopt the caller's default org (first membership) so the header
+    # self-heals on the next request (OrgProvider adopts perms.org_id — WR-01 client half).
+    active = str(rows[0]["org_id"])
+    request.state.active_org = active
+    request.state.org_role = rows[0]["role"]
+    return active
+
+
 async def require_org_manage(
     request: Request,
     current_user: dict = Depends(get_current_user),

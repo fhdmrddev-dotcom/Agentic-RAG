@@ -29,7 +29,16 @@ from app.api import org
 # Matches conftest.mock_user_data (the get_current_user override identity).
 CALLER_ID = "00000000-0000-0000-0000-000000000001"
 ACTIVE_ORG = "11111111-1111-1111-1111-111111111111"
+SECOND_ORG = "22222222-2222-2222-2222-222222222222"
 SPOOF_ORG = "99999999-9999-9999-9999-999999999999"
+
+# A 2+-membership caller (the Phase-167 multi-org shape). The soft /org/me resolver reads
+# rows[0] (org_id + role) as the default org; the /org/me memberships JOIN reads all three
+# keys. One canned fetch result satisfies both reads (the mock returns it for every .fetch()).
+MULTI_ORG_MEMBERSHIPS = [
+    {"org_id": ACTIVE_ORG, "name": "Acme", "role": "org-admin"},
+    {"org_id": SECOND_ORG, "name": "Beta", "role": "member"},
+]
 
 
 def _install_perms(monkeypatch, perms: dict):
@@ -137,6 +146,40 @@ def test_audit_all_org_rows_when_audit_view(client, auth_headers, mock_asyncpg_p
     assert ("org_id", ACTIVE_ORG) in spy.eq_calls, spy.eq_calls
     # Cross-member read: NO own-only user_id predicate.
     assert not any(col == "user_id" for col, _ in spy.eq_calls), spy.eq_calls
+
+
+def test_org_me_bootstraps_multi_org_without_header(client, auth_headers, mock_asyncpg_pool, monkeypatch):
+    """WR-01: a 2+-org caller with NO X-Org-Id header can still GET /org/me → 200 + memberships[].
+
+    The switcher is delivered ONLY by /org/me; before WR-01 the router-level strict gate 400'd
+    this exact call (absent header + 2+ memberships), a deadlock (the one read that seeds the
+    header is the one that 400s). The soft resolver resolves the caller's default org instead.
+    """
+    monkeypatch.setattr("app.dependencies._pg_pool", mock_asyncpg_pool)
+    # No fetchrow (header-absent branch never calls it); the memberships fetch returns 2 rows.
+    mock_asyncpg_pool.set_fetch_result(MULTI_ORG_MEMBERSHIPS)
+    _install_perms(monkeypatch, {"org:manage": True, "org:audit_view": True})
+
+    res = client.get("/org/me", headers=auth_headers)  # NO X-Org-Id header
+
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert len(body["memberships"]) == 2, body
+    # The soft resolver adopted the first membership (by created_at) as the default active org.
+    assert body["org_id"] == ACTIVE_ORG, body
+
+
+def test_members_still_400s_multi_org_without_header(client, auth_headers, mock_asyncpg_pool, monkeypatch):
+    """WR-01 invariant: /org/members KEEPS the strict gate — a 2+-org caller with NO X-Org-Id
+    header still 400s (default-deny unchanged; only /org/me relaxes to bootstrap the switcher)."""
+    monkeypatch.setattr("app.dependencies._pg_pool", mock_asyncpg_pool)
+    # get_active_org_id (via require_org_manage) header-absent branch: 2+ memberships → 400.
+    mock_asyncpg_pool.set_fetch_result(MULTI_ORG_MEMBERSHIPS)
+    _install_perms(monkeypatch, {"org:manage": True})
+
+    res = client.get("/org/members", headers=auth_headers)  # NO X-Org-Id header
+
+    assert res.status_code == 400, res.text
 
 
 def test_org_me_returns_permissions_and_memberships(client, auth_headers, mock_asyncpg_pool, monkeypatch):

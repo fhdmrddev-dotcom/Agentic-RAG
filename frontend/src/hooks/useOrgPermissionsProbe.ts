@@ -2,6 +2,10 @@ import { useEffect, useState } from "react"
 import { getOrgPermissions, type OrgMembership, type OrgPermissions } from "@/lib/api"
 
 export interface UseOrgPermissionsProbe {
+  /** The server-RESOLVED active org id (WR-01). On a fresh 2+-org session that sent no
+   *  `X-Org-Id`, the soft `/org/me` resolves the caller's default org and returns it here so
+   *  `OrgProvider` can adopt it — self-healing the header. Null on the fail-closed default. */
+  orgId: string | null
   /** True only while `org:manage` is present. Decides RENDERING ONLY (shell + rail
    *  shield) — never a security boundary (see the SECURITY NOTE below). */
   canManage: boolean
@@ -94,6 +98,7 @@ export function useOrgPermissionsProbe(
   }, [userId, activeOrgId])
 
   return {
+    orgId: perms.org_id,
     canManage: perms.can_manage,
     canAuditView: perms.can_audit_view,
     role: perms.role,
