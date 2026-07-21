@@ -208,7 +208,7 @@ Ship only if CORE lands clean and budget remains. First-to-cut ordering: SSO/OID
 - [x] 166-01-PLAN.md — Backend authz + org router (get_active_org_id X-Org-Id validation · require_org_manage · /org/me (carries memberships[]) · /org/members · /org/audit service-role+app-authz+run_in_threadpool) [Wave 1]
 - [x] 166-02-PLAN.md — Frontend org context + probe + API client (OrgProvider outside StreamsProvider · useOrgPermissionsProbe · X-Org-Id injection · 067.5 switchOrg teardown reuse) [Wave 1]
 - [x] 166-03-PLAN.md — Org tab leaves (OrgBand indigo · OrgMembersTab read-only · OrgAuditTab lighter+RLS-honest degrade · OrgSettingsTab light org-config home) [Wave 2]
-- [ ] 166-04-PLAN.md — OrgAdminShell composition (3 live + 4 LockedTab tabs · lazy per-tab fetch · scope-threaded audit degrade) [Wave 3]
+- [x] 166-04-PLAN.md — OrgAdminShell composition (3 live + 4 LockedTab tabs · lazy per-tab fetch · scope-threaded audit degrade) [Wave 3]
 - [ ] 166-05-PLAN.md — Identity anchor + reachability (079-C ProfileMenu · indigo Shield-mirror · ChatLayout org-admin mount) [Wave 4]
 **UI hint**: yes
 
