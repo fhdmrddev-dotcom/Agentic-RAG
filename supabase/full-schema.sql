@@ -5651,8 +5651,9 @@ CREATE POLICY workspace_versions_select_own ON public.workspace_file_versions FO
 -- MAINTENANCE: when a NEW migration adds a storage bucket, an auth.users
 -- trigger, or a realtime table, mirror it here (idempotently). Sources:
 --   storage  -> migrations 017 (skill-files), 029 (documents, sandbox-outputs),
---               054 (workspace-files), 111 (skill-files read policy: legacy
---               global flag retired -> s.is_system OR s.is_org_shared, D-165-01)
+--               054 (workspace-files), 111 (skill-files read policy: legacy global
+--               flag retired -> s.is_system OR s.is_org_shared, D-165-01), 112 (skill-files
+--               read policy: shared branch ORG-GATED to current_user_org_ids(), SEED-125 CR-02)
 --   auth     -> migration 001 (on_auth_user_created)
 --   realtime -> migrations 002 (documents), 014 (folders), 032 (messages)
 -- ============================================================
@@ -5709,8 +5710,12 @@ CREATE POLICY "Users can delete own sandbox outputs" ON storage.objects FOR DELE
   USING (bucket_id = 'sandbox-outputs' AND (storage.foldername(name))[1] = (select auth.uid()::text));
 
 -- skill-files policies (read allows owner OR files belonging to a system built-in
--- or an org-shared skill — mig 111 D-165-01 semantic split: legacy global flag retired,
--- reconciled to the mig-109 skill_files table-RLS shape s.is_system OR s.is_org_shared)
+-- OR an org-shared skill WITHIN the caller's org — mig 112 SEED-125 CR-02: the shared
+-- branch is ORG-GATED to genuinely match the mig-109 skill_files TABLE-RLS shape
+-- [is_system universal OUTSIDE the org gate; owner/is_org_shared INSIDE
+-- org_id ∈ current_user_org_ids()]. mig 111's earlier "reconciled" comment was inaccurate —
+-- its branch was s.is_system OR s.is_org_shared with NO org predicate, a cross-org read leak;
+-- 112 closes it. Storage RLS runs under the user JWT so auth.uid()/current_user_org_ids() resolve.)
 DROP POLICY IF EXISTS "Users can read own skill files" ON storage.objects;
 CREATE POLICY "Users can read own skill files" ON storage.objects FOR SELECT TO authenticated
   USING (
@@ -5720,7 +5725,14 @@ CREATE POLICY "Users can read own skill files" ON storage.objects FOR SELECT TO 
       OR EXISTS (
         SELECT 1 FROM public.skill_files sf
         JOIN public.skills s ON s.id = sf.skill_id
-        WHERE sf.file_path = name AND (s.is_system = true OR s.is_org_shared = true)
+        WHERE sf.file_path = name
+          AND (
+            s.is_system = true
+            OR (
+              s.org_id IN (SELECT public.current_user_org_ids())
+              AND (s.user_id = (select auth.uid()) OR s.is_org_shared = true)
+            )
+          )
       )
     )
   );

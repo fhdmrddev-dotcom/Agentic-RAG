@@ -1,7 +1,9 @@
 ---
 seed_id: SEED-125
 title: Skill load/read tools leak skill instructions + files cross-org via org-blind service-role skill resolution
-status: open
+status: closed
+closed: 2026-07-22
+closed_by: "Dedicated security quick-fix (2026-07-22): CR-01 code — 6 tool_dispatcher.py sites org-gated via one shared helper reusing folder_utils._resolve_caller_org_ids (is_system escape preserved, fail-closed), proven by 7 live two-org legs (org B refused cross-org load_skill + read_skill_file; is_system still cross-org). CR-02 storage — mig 112 applied local (org-gates the skill-files storage READ policy explicitly; the leak was already transitively org-gated via the skills-RLS join, so mig 112 is defense-in-depth + the false-comment fix). two-org regression test added. Mig 112 owed on cloud (099->112, next operator push)."
 planted: 2026-07-21
 phase_origin: "Phase 165 code review (165-REVIEW.md CR-01 + CR-02) — verified against the running code: the six .or_(is_org_shared.eq.true) skill-resolution sites run on the service-role BYPASSRLS producer client (ctx.supabase) with no org_id predicate"
 folded_into: null
