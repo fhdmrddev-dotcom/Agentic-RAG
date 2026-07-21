@@ -22,7 +22,15 @@ The current chapter — **Skill Eval Studio + Self-Improving (v3.2)** — is abo
 
 ---
 
-## 🟢 Latest — the app now has a staff-only Control Room (v3.3, in progress)
+## 🟢 Latest — your own identity corner + an organization home (v3.4, in progress)
+
+This chapter turns the app from "just you" into "you, inside an organization" — safely, with everyone's data walled off from everyone else's behind the scenes. This first visible piece is the **human-facing corner** of that.
+
+- **A real profile menu.** The bottom of the sidebar now has a proper identity anchor — your name, email, a role badge (**Org-admin** or **Member**), the theme toggle, and sign-out, all in one tidy menu. If you ever belong to more than one organization, an **org switcher** appears right there; switching cleanly swaps everything to the new org (and never mixes the two orgs' data). Today everyone belongs to exactly one org, so you just see the quiet name button — no clutter. 🟢 *Use it now.*
+- **An organization admin area.** If you manage your org, a second shield — in **indigo** (distinct from the operator's amber) — sits on the sidebar and opens an **org admin console**: a read-only member list, an activity log scoped to your org (you see everyone's if you're allowed, otherwise just your own — and it says so honestly), and a light org-settings home. Four more tabs (invitations, single sign-on, subscription, retention) show an honest "coming soon." A regular member doesn't see the shield at all. 🟢 *Use it now (org admins).*
+- **Honest by construction.** The org you're acting in is re-checked on the server every request — you can't trick the app into showing another org's data. *(Final live cross-provider testing is the last step before this is signed off.)*
+
+## 🟢 Earlier — the app now has a staff-only Control Room (v3.3, shipped)
 
 This new chapter is about making the whole platform manageable by a trusted person — the "operator" — right from the app, no developer tools needed.
 
