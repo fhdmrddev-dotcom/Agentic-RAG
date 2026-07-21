@@ -53,6 +53,7 @@ import {
   recordControlPlaneEvent,
   revokeOperator,
   runModelDiscovery,
+  setFeatureAudience,
   setFeatureVisibility,
   setFlag,
   setModelCapability,
@@ -213,9 +214,19 @@ export function ControlRoomPage({ identity, onBack }: ControlRoomPageProps) {
   const [registryRows, setRegistryRows] = useState<ModelRegistryRow[] | null>(null)
   // 069-A: the current per-feature audience map (enum values, never booleans). Seeded
   // from the day-one polarity (see DEFAULT_VISIBILITY); each flip updates it + records.
-  const [visibility, setVisibility] = useState<Record<GovernedFeature, FeatureAudience>>(
+  // Phase 167 (VIS-01): the audience enum grows a third value `role` (a greenlist).
+  const [visibility, setVisibility] = useState<Record<GovernedFeature, FeatureAudience | "role">>(
     DEFAULT_VISIBILITY,
   )
+  // Phase 167 (VIS-01 / D-167-06): the greenlisted roles per feature — only meaningful when
+  // that feature's audience is `role`. Each role-flip writes through setFeatureAudience +
+  // updates this map (no read endpoint yet, mirrors the seeded-shell-state visibility map).
+  const [greenlist, setGreenlist] = useState<Record<GovernedFeature, string[]>>({
+    skill_studio: [],
+    model_management: [],
+    workflow_authoring: [],
+    governance_health: [],
+  })
   // Phase 154 (D-01a): the two-audience toggle state is now the ONE app-wide
   // shared reveal context (was a local useState). Flipping it here and flipping
   // it in Settings move the SAME switch — no drift. The variable name stays
@@ -487,14 +498,23 @@ export function ControlRoomPage({ identity, onBack }: ControlRoomPageProps) {
     [fetchRoster, pulseRecording],
   )
 
-  // ── 069-A visibility write. The audience is an ENUM (never a boolean). On success we
-  //    optimistically reflect the new audience in the shell map (the write is recorded
-  //    server-side + propagates within the ~30s TTL) and pulse the band marker. On
-  //    failure we RE-THROW so the card surfaces its retry (and the map stays put). ──
+  // ── 069-A + 167 visibility write. The audience is an ENUM (never a boolean). The `role`
+  //    greenlist routes through setFeatureAudience (roles[] allowlist-validated server-side,
+  //    Plan 03); everyone/operators keep the binary setFeatureVisibility path. On success we
+  //    reflect the new audience (+ roles) in the shell map (recorded server-side, propagates
+  //    within the ~30s TTL) and pulse the band marker. On failure we RE-THROW so the card
+  //    surfaces its retry (and the map stays put). ──
   const handleSetVisibility = useCallback(
-    async (feature: GovernedFeature, audience: FeatureAudience) => {
-      await setFeatureVisibility(feature, audience)
-      if (alive.current) setVisibility((prev) => ({ ...prev, [feature]: audience }))
+    async (feature: GovernedFeature, audience: FeatureAudience | "role", roles: string[] = []) => {
+      if (audience === "role") {
+        await setFeatureAudience(feature, "role", roles)
+      } else {
+        await setFeatureVisibility(feature, audience)
+      }
+      if (alive.current) {
+        setVisibility((prev) => ({ ...prev, [feature]: audience }))
+        if (audience === "role") setGreenlist((prev) => ({ ...prev, [feature]: roles }))
+      }
       pulseRecording()
     },
     [pulseRecording],
@@ -750,6 +770,7 @@ export function ControlRoomPage({ identity, onBack }: ControlRoomPageProps) {
             />
             <FeatureVisibility
               visibility={visibility}
+              greenlist={greenlist}
               onSetVisibility={handleSetVisibility}
               showTechnical={showTechnical}
             />
