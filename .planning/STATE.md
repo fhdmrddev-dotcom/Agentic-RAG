@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v3.4
 milestone_name: Multi-Tenancy & Org Access
 status: executing
-last_updated: "2026-07-21T15:12:31.843Z"
-last_activity: 2026-07-21 -- Phase 166 planning complete
+last_updated: "2026-07-21T15:14:11.250Z"
+last_activity: 2026-07-21 -- Phase 166 execution started
 progress:
   total_phases: 28
   completed_phases: 7
@@ -22,7 +22,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-20 — Phase 163 THE ATOMIC CRUX complete; membership RLS enforced)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 166 — org admin shell + org switcher + profile menu anchor
+**Current focus:** Phase 166 — org-admin-shell-org-switcher-profile-menu-anchor
 
 ## Deferred Items
 
@@ -40,11 +40,11 @@ Items acknowledged and deferred at milestone close on 2026-07-18 (44 open `audit
 
 ## Current Position
 
-Phase: 166
-Plan: Not started
-Status: Ready to execute
+Phase: 166 (org-admin-shell-org-switcher-profile-menu-anchor) — EXECUTING
+Plan: 1 of 5
+Status: Executing Phase 166
 Next action: **Phase 166 discuss-phase COMPLETE 2026-07-21** — `166-CONTEXT.md` committed (`ce8b06a3`). 4 gray areas locked (all operator-approved recommendations): **(D-166-01 tab depth)** the 7-tab org-admin shell ships **3 tabs LIVE** — Members (read-only roster over `org_members`) · Audit · Settings (org-config home) — the other 4 as `LockedTab` "coming soon" wired to their owners (Invitations/Roles→167, SSO→168, Subscription/Retention→STRETCH 170); **(D-166-02 single-org UX)** org switcher renders **only at 2+ orgs**, but the org-admin shell **IS reachable for your personal org** via `org:manage` (the 167 invitation bootstrap seam); **(D-166-03 Settings IA)** = **LIGHT split** — personal sliver→profile menu, org-config home behind `org:manage`, **defer** bulk global-knob relocation → v3.5 config pass (SEED-117 §1); **(D-166-04 audit)** backed by `audit_log` **only** (`org:audit_view`=cross-member org read, member-sees-own via RLS), lighter `AuditTab` cut, CSV deferred, excludes `harness_audit`/`operator_audit_log`. **Landmines carried forward (do NOT re-decide):** hybrid switch = JWT membership + **server-validated `X-Org-Id`**; `<OrgContext>` wraps **OUTSIDE `<StreamsProvider>`** (`App.tsx:209`); preserve the **067.5 `clearThreadBucket` teardown guard** in `StreamsProvider.tsx` (G-5 hot file); `current_user_has_permission()` (mig 104) enforcement is **net-new** (no route calls it yet). Reported-bugs cross-check clean (no open `surface: Agentic-RAG` bug overlaps this domain). **Next: `/gsd:sketch 166`** (G-2 — profile↔switcher composition, role badge, shell entry point; operator-approved mockup = acceptance bar) → then `/clear` + `/gsd:plan-phase 166`. **Cloud parity owed:** migs 099→111 + `SECRETS_ENCRYPTION_KEY`, in order, at next operator-gated push.
-Last activity: 2026-07-21 -- Phase 166 planning complete
+Last activity: 2026-07-21 -- Phase 166 execution started
 
 Progress: [██████████] 100%
 
