@@ -557,3 +557,60 @@ async def revoke_org_invitation(
         org_id=str(request.state.active_org),  # EXPLICIT active_org (T-167-23)
     )
     return None
+
+
+@router.post("/invitations/accept")
+async def accept_org_invitation(
+    body: AcceptInvitationBody,
+    current_user: dict = Depends(get_current_user),
+    audit_supabase: Client = Depends(get_user_supabase_client),
+):
+    """Accept an invitation via its token (INV-02 — the JIT seam; token-gated).
+
+    Depends on ``get_current_user`` ONLY — NO ``require_org_invite`` / NO ``X-Org-Id``: the
+    invitee is not yet a member, so the org comes from the VALIDATED token, never the client
+    (Pitfall 2). ``accept_invitation`` (Plan 01) runs the whole check → advisory-lock →
+    ``INSERT … org_members … ON CONFLICT DO NOTHING`` → guarded status flip on the singleton
+    pool (the token-authorized service-role/BYPASSRLS path the user-JWT RLS cannot take). It is
+    idempotent + re-runnable, so the Plan-06 landing can safely call it on the FIRST
+    authenticated session regardless of email-confirm timing (RESEARCH OQ1), and join-additive
+    (D-167-01 — the invitee KEEPS their personal org).
+
+    On a fresh successful join the audit row carries the INVITATION's org_id (the org joined),
+    NEVER the ORDER-BY-less mig-106 autofill — which, for a 2+-org invitee, would tag the wrong
+    org (T-167-23). Status mapping: unknown token → 404; expired / revoked → 409; a valid
+    accept (or an idempotent already-accepted re-accept) → 200.
+    """
+    token_hash = invitation_service.hash_token(body.token)
+    pool = await deps.get_pg_pool()
+    result = await invitation_service.accept_invitation(
+        pool, token_hash, current_user["id"]
+    )
+
+    reason = result.get("reason")
+    if reason == "not_found":
+        raise HTTPException(status_code=404, detail="This invitation is no longer valid.")
+    # already_accepted is an idempotent no-op (200) — only a genuinely unclaimable invite
+    # (expired / revoked) is rejected.
+    if not result["claimable"] and reason != "already_accepted":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"This invitation cannot be accepted ({reason}).",
+        )
+
+    # Audit ONLY the FIRST successful join (claimable) — carrying the org the invitee JOINED
+    # (result["org_id"]), never active_org (the accept path resolves none) nor the autofill.
+    if result["claimable"]:
+        await write_audit_entry(
+            user_id=current_user["id"],
+            action_type=_INVITE_AUDIT_ACTION,
+            metadata={"event": "invitation.accept", "role": result["role"]},
+            supabase=audit_supabase,
+            org_id=result["org_id"],  # the INVITATION's org (T-167-23)
+        )
+
+    return {
+        "org_id": result["org_id"],
+        "role": result["role"],
+        "joined": result["joined"],
+    }
