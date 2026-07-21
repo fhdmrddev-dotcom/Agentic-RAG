@@ -2,6 +2,7 @@ import { useState, useEffect } from "react"
 import type { User, Session } from "@supabase/supabase-js"
 import { supabase, SUPABASE_CLIENT_REHYDRATED } from "../lib/supabase"
 import { clearCacheForUser } from "@/lib/streamsCache"
+import { ACTIVE_ORG_STORAGE_KEY, setActiveOrgId } from "@/lib/api"
 
 interface UseAuth {
   user: User | null
@@ -64,6 +65,17 @@ export function useAuth(): UseAuth {
     // auth token so the next user on a shared origin starts clean. Use the
     // locally-tracked user (avoids an extra network round-trip via getUser).
     if (user?.id) clearCacheForUser(user.id)
+    // WR-03: the persisted active-org id ("active-org-id") is device-scoped and would
+    // otherwise survive sign-out — so the NEXT user on a shared device sends the PRIOR
+    // user's org id in X-Org-Id on their very first request (a 403 they can't recover from
+    // pre-WR-01). Clear both the localStorage hint AND the in-memory api.ts header var here,
+    // in lockstep with the cache drop, so a fresh session starts with no stale org.
+    try {
+      window.localStorage.removeItem(ACTIVE_ORG_STORAGE_KEY)
+    } catch {
+      // private-mode / SSR — the in-memory clear below is the load-bearing one.
+    }
+    setActiveOrgId(null)
     await supabase.auth.signOut()
   }
 
