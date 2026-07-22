@@ -32,7 +32,7 @@ import { Button } from "@/components/ui/button"
 import { SignInForm } from "@/components/auth/SignInForm"
 import { SignUpForm } from "@/components/auth/SignUpForm"
 import { Sparkles, CheckCircle2, AlertTriangle, Loader2 } from "lucide-react"
-import { acceptInvitation, ApiError } from "@/lib/api"
+import { acceptInvitation, ApiError, ACTIVE_ORG_STORAGE_KEY } from "@/lib/api"
 
 interface Props {
   /** The authenticated user (or null when signed out) — supplied by App's useAuth. When this
@@ -95,6 +95,16 @@ export function AcceptInvitePage({ user, onSignIn, onSignUp }: Props) {
           window.sessionStorage.removeItem(PENDING_TOKEN_KEY)
         } catch {
           /* private-mode — nothing was persisted */
+        }
+        // Land the invitee IN the org they just joined (not their auto-created personal
+        // org). Seed the active-org id BEFORE the redirect so OrgProvider re-mounts with
+        // the invited org active — otherwise the join is invisible behind the switcher.
+        if (result.org_id) {
+          try {
+            window.localStorage.setItem(ACTIVE_ORG_STORAGE_KEY, result.org_id)
+          } catch {
+            /* private-mode — the switcher still exposes the new membership */
+          }
         }
         setState({ kind: result.joined ? "joined" : "already" })
         // Redirect to the app root so OrgProvider re-probes on a fresh mount and the 166

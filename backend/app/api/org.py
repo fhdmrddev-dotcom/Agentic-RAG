@@ -369,13 +369,26 @@ async def send_org_invitation(
     expires_at = datetime.now(timezone.utc) + timedelta(days=7)  # A1 default — 7d
 
     async with get_user_pg_connection(request, current_user) as conn:
+        # Dedup (IN-02): if a still-pending invite already exists for this (org, email),
+        # REFRESH it (new token + role + 7-day expiry) instead of inserting a duplicate —
+        # i.e. re-inviting behaves as a resend, so the invitations list never doubles up.
+        # Case-insensitive on email; the mig-104 org_invitations_update WITH CHECK (org:invite)
+        # RLS admits the caller (who holds org:invite via require_org_invite).
         inv_row = await conn.fetchrow(
-            "INSERT INTO public.org_invitations "
-            "(org_id, email, role, token_hash, status, expires_at, invited_by) "
-            "VALUES ($1, $2, $3, $4, 'pending', $5, auth.uid()) "
+            "UPDATE public.org_invitations "
+            "SET role = $3, token_hash = $4, expires_at = $5, updated_at = now() "
+            "WHERE org_id = $1 AND lower(email) = lower($2) AND status = 'pending' "
             "RETURNING id, email, role, status, expires_at",
             active_org, email, role, token_hash, expires_at,
         )
+        if inv_row is None:
+            inv_row = await conn.fetchrow(
+                "INSERT INTO public.org_invitations "
+                "(org_id, email, role, token_hash, status, expires_at, invited_by) "
+                "VALUES ($1, $2, $3, $4, 'pending', $5, auth.uid()) "
+                "RETURNING id, email, role, status, expires_at",
+                active_org, email, role, token_hash, expires_at,
+            )
         org_row = await conn.fetchrow(
             "SELECT name FROM public.organizations WHERE id = $1", active_org
         )
