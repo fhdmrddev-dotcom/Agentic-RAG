@@ -109,12 +109,22 @@ def test_generate_suggestions_empty_lines_filtered():
 # ---------------------------------------------------------------------------
 
 def test_generate_suggestions_uses_sub_agent_model_override():
-    """Set settings.sub_agent_model = 'custom-model', verify create called with that model."""
+    """A PROVIDER-SAFE settings.sub_agent_model override wins — create is called with it.
+
+    Phase 175 XPROV-03 (D-03) supersession: the override is now routed through
+    ``provider_safe_utility_model``, which DROPS a cross-provider / unrecognised id
+    BEFORE the call (an anthropic-active user with ``sub_agent_model='custom-model'``
+    — inferring to the ollama fallback bucket — now falls through to the anthropic
+    provider default instead of sending a wrong-provider id). So this test uses a
+    PROVIDER-COMPATIBLE override (anthropic-active + a ``claude-*`` id) to prove the
+    override-wins path stays intact under the guard. The cross-provider DROP path is
+    proven in ``test_threads_title_gen.py::test_suggestion_cross_provider_override_dropped``.
+    """
     mock_client = _make_mock_client("Q1?\nQ2?\nQ3?")
 
     with patch("app.services.suggestion_service.get_llm_client", return_value=mock_client), \
          patch("app.services.suggestion_service.settings") as mock_settings:
-        mock_settings.sub_agent_model = "custom-model"
+        mock_settings.sub_agent_model = "claude-haiku-custom"  # infers anthropic == active → kept
         mock_settings.llm_model = "fallback-model"
 
         from app.services import suggestion_service
@@ -126,7 +136,7 @@ def test_generate_suggestions_uses_sub_agent_model_override():
 
     create_call = mock_client.chat.completions.create.call_args
     model_used = create_call.kwargs.get("model") or (create_call.args[0] if create_call.args else None)
-    assert model_used == "custom-model", f"Expected custom-model, got {model_used!r}"
+    assert model_used == "claude-haiku-custom", f"Expected claude-haiku-custom, got {model_used!r}"
 
 
 # ---------------------------------------------------------------------------
