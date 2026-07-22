@@ -312,6 +312,14 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
       // parent re-renders with the new `thread` prop (50-500ms after
       // onCreateThread resolves), and every delta in the gap is silently
       // dropped — the empty-until-end-of-run user-observable failure.
+      //
+      // Phase 176-04 (RENDER-03 / D-10.1): mark the just-created thread pending-send
+      // BEFORE setViewingThread fires its reconcile, so that nav reconcile preserves
+      // the optimistic temp sendMessage is about to write. markThreadPendingSend adds
+      // ONLY to pendingSendThreadsRef (not sendingThreadsRef), so sendMessage's
+      // duplicate-guard is untripped and the real send below still dispatches; the
+      // provider releases the pending flag when the send resolves/aborts.
+      streamActions.markThreadPendingSend(activeThread.id)
       setViewingThread(activeThread.id)
     }
     await sendMessage(
@@ -322,7 +330,7 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
       agentMode,
       selectedProvider || undefined,
     )
-  }, [thread, scopeFolderId, onCreateThread, selectedModel, onTitleUpdate, agentMode, selectedProvider, sendMessage, setViewingThread])
+  }, [thread, scopeFolderId, onCreateThread, selectedModel, onTitleUpdate, agentMode, selectedProvider, sendMessage, setViewingThread, streamActions])
 
   // Plan 075.4-04 D-075.4-SC#6 — onSendMessage is the stable identity passed
   // to MessageList → MessageItem (SuggestionPills onSelect). Wraps handleSend

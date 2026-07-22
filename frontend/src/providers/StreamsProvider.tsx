@@ -1150,6 +1150,16 @@ export function StreamsProvider({ children }: PropsWithChildren) {
   // per-thread. The reactive per-thread `streamingThreads` store Set (added/removed in
   // lockstep) still drives the composer's OWN-thread disable + Stop button.
   const sendingThreadsRef = useRef<Set<string>>(new Set())
+  // Phase 176-04 (RENDER-03 / D-10.1): a SIBLING to sendingThreadsRef marking threads
+  // whose send is INTENDED but not yet dispatched. ChatArea pre-marks a fresh thread
+  // here (via markThreadPendingSend) BEFORE setViewingThread fires its reconcile, so
+  // the preserve-guard (sendInFlightOnThisThread) preserves the optimistic temp across
+  // that nav reconcile even in the window before sendMessage adds to sendingThreadsRef.
+  // CRITICAL: this ref is intentionally NOT checked by sendMessage's duplicate-guard
+  // (:1807 checks ONLY sendingThreadsRef), so the pending flag does not false-early-
+  // return the real send. Cleared in lockstep with sendingThreadsRef (the send finally
+  // + the non-dispatch early-return).
+  const pendingSendThreadsRef = useRef<Set<string>>(new Set())
   // Phase 145-05 (D-145-05): per-thread last-stream-event epoch-ms. Stamped on
   // every streamingThreads add (send / reattach / reconcile-derive) and reset on
   // each stream event (onCursor); read by the inactivity watchdog (useEffect #3)
@@ -1396,6 +1406,16 @@ export function StreamsProvider({ children }: PropsWithChildren) {
           }
         },
 
+        // Phase 176-04 (RENDER-03 / D-10.1): pre-mark a thread pending-send. ChatArea
+        // calls this BEFORE setViewingThread on a fresh thread so the nav reconcile's
+        // preserve-guard sees the in-flight intent and keeps the optimistic temp.
+        // Adds ONLY to pendingSendThreadsRef — never sendingThreadsRef — so
+        // sendMessage's duplicate-guard is untripped and the real send dispatches.
+        // Released alongside sendingThreadsRef (send finally + non-dispatch early-return).
+        markThreadPendingSend: (threadId) => {
+          pendingSendThreadsRef.current.add(threadId)
+        },
+
         // Phase 068 (L-068-02 + L-068-05): reconcile in-flight lock +
         // runId-match dedup. Source: useMessages.ts:948-1144.
         // Phase 075 D-075-02: atomic swap — the parallel
@@ -1437,7 +1457,14 @@ export function StreamsProvider({ children }: PropsWithChildren) {
               // `isSendingRef.current && streamingThreadIdRef.current === threadId`).
               // Each thread's optimistic temps are now preserved on its OWN send,
               // so a reconcile on thread A no longer wipes A's temps while B streams.
-              const sendInFlightOnThisThread = sendingThreadsRef.current.has(threadId)
+              // Phase 176-04 (RENDER-03 / D-10.1): honor the sibling pending-send ref
+              // too, so a reconcile fired between ChatArea's pre-mark and sendMessage's
+              // own sendingThreadsRef.add still preserves the fresh-thread optimistic
+              // temp. Composes with the 176-01 untyped-temp supersededByPersisted branch
+              // below (a temp with a persisted twin still drops; only the preserve
+              // WINDOW widens, never the drop rule).
+              const sendInFlightOnThisThread =
+                sendingThreadsRef.current.has(threadId) || pendingSendThreadsRef.current.has(threadId)
               const liveTempPlaceholders = prev.filter((m) => {
                 if (!m.id.startsWith("temp-")) return false
                 if (m.runId) {
@@ -1827,6 +1854,9 @@ export function StreamsProvider({ children }: PropsWithChildren) {
               ),
               failedSendDrafts: new Map(s.failedSendDrafts).set(threadId, content),
             }))
+            // Phase 176-04 (RENDER-03 / D-10.1): release the pending flag — this send
+            // will not dispatch, so its pre-mark must not linger (mirrors the finally).
+            pendingSendThreadsRef.current.delete(threadId)
             return
           }
           sendingThreadsRef.current.add(threadId)
@@ -2207,6 +2237,10 @@ export function StreamsProvider({ children }: PropsWithChildren) {
             // SEED-055: release THIS thread's send slot (per-thread; other threads'
             // in-flight sends are unaffected).
             sendingThreadsRef.current.delete(threadId)
+            // Phase 176-04 (RENDER-03 / D-10.1): release the sibling pending flag in
+            // lockstep — the send has resolved/aborted, so the fresh-thread pre-mark
+            // is done. Deleting a non-present key is a no-op on the non-fresh path.
+            pendingSendThreadsRef.current.delete(threadId)
             // Plan 075.4-01 D-075.4-A1: per-thread streamingThreads delete.
             // This is the AUTHORITATIVE streaming-end write — clearThreadBucket
             // no longer writes here (D-075.4-A1 invariant; see L:617).

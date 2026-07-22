@@ -161,6 +161,13 @@ export interface StreamsState {
     ) => void
     clearThreadBucket: (surface: SurfaceId) => void
     setViewingThread: (threadId: string | null) => void
+    /** Phase 176-04 (RENDER-03 / D-10.1): mark a thread as pending-send BEFORE
+     *  setViewingThread fires its reconcile, so the preserve-guard preserves the
+     *  optimistic temp across that nav reconcile. Adds ONLY to the sibling
+     *  pendingSendThreadsRef — NOT sendingThreadsRef — so sendMessage's duplicate-
+     *  guard is not tripped and the real send still dispatches. Cleared when the
+     *  send resolves/aborts (or on the non-dispatch early-return). */
+    markThreadPendingSend: (threadId: string) => void
     sendMessage: (
       threadId: string,
       content: string,
@@ -339,6 +346,9 @@ export const useStreamsStore = create<StreamsState>()(subscribeWithSelector(() =
     setMessagesForBucket: () => {},
     clearThreadBucket: () => {},
     setViewingThread: () => {},
+    // Phase 176-04 (RENDER-03): synchronous ref-mutation no-op stub — the provider
+    // overwrites it with the real pendingSendThreadsRef writer on mount.
+    markThreadPendingSend: () => {},
     sendMessage: notMounted,
     reconcile: notMounted,
     stopStream: notMounted,

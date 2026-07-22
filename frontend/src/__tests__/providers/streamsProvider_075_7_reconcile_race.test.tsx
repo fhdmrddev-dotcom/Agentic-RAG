@@ -683,8 +683,13 @@ describe("Phase 176-04 RENDER-03 — fresh-thread pending-send flag honored by t
 
     const { result } = renderProvider()
 
-    // Pre-mark pending — this must NOT make sendMessage's duplicate-guard early-return.
+    // Mirror ChatArea's fresh-thread ordering exactly: pre-mark pending, THEN
+    // setViewingThread (pools the thread + fires the nav reconcile), THEN sendMessage.
+    // The pre-mark must NOT make sendMessage's duplicate-guard early-return.
     result.current.markThreadPendingSend(THREAD_ID)
+    await act(async () => {
+      result.current.setViewingThread(THREAD_ID)
+    })
 
     let sendPromise!: Promise<void>
     await act(async () => {
