@@ -6,7 +6,7 @@ status: planning
 last_updated: "2026-07-22T10:58:27.364Z"
 last_activity: 2026-07-22
 progress:
-  total_phases: 0
+  total_phases: 7
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -42,10 +42,10 @@ Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 op
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: Not started (roadmap created — CORE 174-177 + STRETCH 178-180)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-07-22 — Milestone v3.5 started
+Status: Roadmap created — ready to plan Phase 174
+Last activity: 2026-07-22 — v3.5 ROADMAP.md created (7 phases; 23/23 requirements mapped)
 
 ### Quick Tasks Completed
 
@@ -131,6 +131,39 @@ Items acknowledged and deferred at the **v3.2 milestone close on 2026-07-10** (4
 **FILE-01 (Phase 144, Agent-Driven Skill File Attachment)** — the one undelivered requirement; **deferred → v3.3** (gated STRETCH, not executed). Rolls forward with the workflow-file cluster (SEED-110 template upload, SEED-112 folder-scope).
 
 **Open `surface: Agentic-RAG` reports (roll forward into the v3.3 UAT blast radius):** BUG-260609-02/-04, BUG-260610-01, BUG-260623-01, BUG-260706-01, BUG-260707-03, BUG-260708-01/-02, BUG-260710-01/-02 (nav/display + provider-polish), plus the deferred agent-loop / todo-loop notes. Cross-check at `/gsd:discuss-phase` per the reported-bugs mandate.
+
+## Roadmap shape (v3.5, created 2026-07-22)
+
+Numbering continues from v3.4's last CORE phase (168) but **SKIPS the reserved 169-173** (the deferred v3.4 STRETCH carry-forwards — Dept-Admin, Entitlements, Permission-Aware Citations, OIDC SSO, Dept-Skills; fold back per their own `re_open_trigger`s in `.planning/v3.4-STRETCH-CARRYFORWARD.md`, NOT reused here) → **CORE Phases 174-177**, then **STRETCH Phases 178-180** (gated behind CORE — ship only if CORE lands clean and budget remains; v2.9 105-109 / v3.1 125-131 / v3.2 138-144 / v3.3 156-159 / v3.4 169-173 precedent). Migrations: this is a CLEANUP milestone — prefer app-layer fixes; live head = 113, **next free slot = 114 reserved ONLY if a specific bug fix genuinely needs schema** (none expected — don't manufacture migrations). Scope source: `.planning/REQUIREMENTS.md` (14 CORE + 9 STRETCH = 23 reqs). No research phase (bug-fix / polish over known surfaces).
+
+### CORE (committed) — Phases 174-177:
+
+| Phase | Name | REQ-IDs | SC# | Flags |
+|---|---|---|---|---|
+| 174 | Run-State & Lifecycle Honesty | STATE-01, STATE-02, STATE-03, STATE-04 | 5 | **SC#10**; **G-2 sketch** (honest run-state "feels like"); **G-5** (`MessageItem`/`StreamsProvider`/`useMessages`/`threads.py`); reported-bugs fold (5); UI hint; no threat model; no migration (runs.status authoritative — FND-01/145) |
+| 175 | Cross-Provider Streaming Fidelity | XPROV-01, XPROV-02, XPROV-03 | 4 | **SC#10**; **G-5** (gateway/adapter/sanitizer boundary — `openai_compat.py`/`thread_title.py`); **red line D-14**; reported-bugs fold (4); OpenRouter-400s OUT (experimental); no threat model; no migration |
+| 176 | Chat Render Correctness + Exec Reliability | RENDER-01, RENDER-02, RENDER-03, RENDER-04, EXEC-01 | 5 | **SC#10**; **G-2 sketch** (render visual); **G-5** (`MessageItem`/`useMessages`/`StreamsProvider`; EXEC → `sandbox_service`/`tool_dispatcher`); reported-bugs fold (4 + 2 minor); UI hint; no threat model; migration only if RENDER-04 needs (unlikely) |
+| 177 | v3.4 Org-Surface Polish | ORGUX-01, ORGUX-02 | 3 | **G-2 sketch** (org-surface "feels like"); **G-5 light** (`StreamsProvider` — `<OrgContext>` OUTSIDE the stream path, 067.5 Branch-D3 guard); rolls in 166/167/168 live-UAT status-lag; UI hint; **no SC#10** (not streamed state); **no threat model** (polish over already-secured 166-168, not new authz); no migration |
+
+### STRETCH (gated behind CORE) — Phases 178-180:
+
+| Phase | Name | REQ-IDs | SC# | Depends |
+|---|---|---|---|---|
+| 178 | Chat UI/UX Polish Pass (SEED-045 umbrella) | POLISH-01, POLISH-02, POLISH-03, POLISH-04, POLISH-05 | 4 | — (SEED-045 anchors shipped in 156); **SC#10** (run-state todos + workspace panel + provider logos touch live state); **G-2 sketch**; **G-5** (`ToolCallPanel`/`MessageItem`/workspace panel/`providerLogo`); SEED-098 = verify/close only; UI hint |
+| 179 | Plain-Language / Terminology Extensions | LANG-01 | 2 | — (extends Phase-154; best after 177); label layer (no SC#10, no G-2, no G-5); red line (no enum/API break, Deep byte-identical); UI hint |
+| 180 | Agent-Loop Behavior Honesty | LOOP-01, LOOP-02, LOOP-03 | 4 | — (touches the agent loop — most careful STRETCH); **SC#10**; **G-5** (`agent_loop.py`/`anthropic_service.py` — both hot-file rows); **red line D-14**; reported-bugs fold (3 deferred majors + BUG-260626-02/-03); may warrant careful decomposition |
+
+- **Coverage:** 23/23 requirements mapped (14 CORE + 9 STRETCH); 0 unmapped, 0 duplicates. Every requirement → exactly one phase.
+- **Sequencing rationale:** Run-state / lifecycle honesty FIRST (174) — it stabilizes the run-lifecycle surface every later chat phase renders on (empty bubbles, stop indicators, timers). Cross-provider streaming fidelity (175) then lands on a clean surface at the adapter/sanitizer boundary. Chat render correctness + exec reliability (176) shares that stabilized render surface. Org-surface polish (177) is independent (polish over the already-secured v3.4 surfaces) — sequenced after 174 only so the shared nav/profile shell is stable. STRETCH gated behind CORE: the chat polish pass (178), then plain-language extensions (179, after org labels exist), then agent-loop behavior honesty (180 — the most careful, touches `agent_loop.py`, last).
+- **SC#10 (cross-provider mandate):** 174, 175, 176 (CORE chat surface) + 178 (run-state todos / workspace panel / provider logos touch live state) + 180 (agent loop). ORGUX (177) + LANG (179) deliberately NOT flagged — neither touches streamed state.
+- **G-2 sketch-gated:** 174 (honest run-state), 176 (render visual), 177 (org-surface polish), 178 (polish seeds). `/gsd:sketch` before `/gsd:spec-phase` / `/gsd:discuss-phase`. LANG (179) = label layer, no sketch (Phase-154 precedent).
+- **G-5 hot files (audit at discuss-phase):** `MessageItem.tsx` / `StreamsProvider.tsx` / `useMessages.ts` (174, 176, 178), `ToolCallPanel.tsx` + workspace panel (178), `threads.py` (174 run-lifecycle — extraction paid down in 162.5 but the file stays hot), `agent_loop.py` + `anthropic_service.py` (180 — both hot-file ledger rows), the gateway/adapter/sanitizer boundary (175).
+- **Reported-bugs mandate:** this milestone IS the parked chat-surface backlog's home — cross-check `.planning/reported-bugs/` (`surface: Agentic-RAG`, status open/deferred) at each `/gsd:discuss-phase` and fold matching reports; some "open" reports may be already-fixed-pending-verification (triage fix-vs-verify). CORE phases 174-176 own most of the backlog; 180 owns the deferred agent-loop majors.
+- **Threat models (secure-phase):** NONE this milestone — UI / bug-fix cleanup; ORGUX (177) is polish over the already-secured 166–168 surfaces (`threats_open: 0`), not new authz. Flag one only if a discuss-phase surfaces a real trust boundary.
+- **Red line (D-14):** Deep Mode byte-identical; provider differences stay at the gateway/adapter/sanitizer boundary; no new runtime. Load-bearing on 175 (provider params/strip) and 180 (agent-loop behavior).
+- **Cloud parity owed:** migrations 099–113 + `SECRETS_ENCRYPTION_KEY` still owed at the next production push (no new v3.5 migrations expected).
+
+Roadmap detail: `.planning/ROADMAP.md` (active v3.5 section). Requirements + traceability: `.planning/REQUIREMENTS.md`.
 
 ## Roadmap shape (v3.4, created 2026-07-18)
 

@@ -106,36 +106,36 @@ Which phases cover which requirements. Populated during roadmap creation (`/gsd:
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| STATE-01 | TBD | Pending |
-| STATE-02 | TBD | Pending |
-| STATE-03 | TBD | Pending |
-| STATE-04 | TBD | Pending |
-| XPROV-01 | TBD | Pending |
-| XPROV-02 | TBD | Pending |
-| XPROV-03 | TBD | Pending |
-| RENDER-01 | TBD | Pending |
-| RENDER-02 | TBD | Pending |
-| RENDER-03 | TBD | Pending |
-| RENDER-04 | TBD | Pending |
-| EXEC-01 | TBD | Pending |
-| ORGUX-01 | TBD | Pending |
-| ORGUX-02 | TBD | Pending |
-| POLISH-01 | TBD | Pending (STRETCH) |
-| POLISH-02 | TBD | Pending (STRETCH) |
-| POLISH-03 | TBD | Pending (STRETCH) |
-| POLISH-04 | TBD | Pending (STRETCH) |
-| POLISH-05 | TBD | Pending (STRETCH) |
-| LANG-01 | TBD | Pending (STRETCH) |
-| LOOP-01 | TBD | Pending (STRETCH) |
-| LOOP-02 | TBD | Pending (STRETCH) |
-| LOOP-03 | TBD | Pending (STRETCH) |
+| STATE-01 | Phase 174 | Pending |
+| STATE-02 | Phase 174 | Pending |
+| STATE-03 | Phase 174 | Pending |
+| STATE-04 | Phase 174 | Pending |
+| XPROV-01 | Phase 175 | Pending |
+| XPROV-02 | Phase 175 | Pending |
+| XPROV-03 | Phase 175 | Pending |
+| RENDER-01 | Phase 176 | Pending |
+| RENDER-02 | Phase 176 | Pending |
+| RENDER-03 | Phase 176 | Pending |
+| RENDER-04 | Phase 176 | Pending |
+| EXEC-01 | Phase 176 | Pending |
+| ORGUX-01 | Phase 177 | Pending |
+| ORGUX-02 | Phase 177 | Pending |
+| POLISH-01 | Phase 178 | Pending (STRETCH) |
+| POLISH-02 | Phase 178 | Pending (STRETCH) |
+| POLISH-03 | Phase 178 | Pending (STRETCH) |
+| POLISH-04 | Phase 178 | Pending (STRETCH) |
+| POLISH-05 | Phase 178 | Pending (STRETCH) |
+| LANG-01 | Phase 179 | Pending (STRETCH) |
+| LOOP-01 | Phase 180 | Pending (STRETCH) |
+| LOOP-02 | Phase 180 | Pending (STRETCH) |
+| LOOP-03 | Phase 180 | Pending (STRETCH) |
 
 **Coverage:**
-- CORE requirements: 14 total
-- STRETCH requirements: 9 total
-- Mapped to phases: 0 (set by roadmapper) ⚠️
-- Unmapped: 23 (until roadmap created)
+- CORE requirements: 14 total → Phases 174-177
+- STRETCH requirements: 9 total → Phases 178-180
+- Mapped to phases: 23 ✓
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-07-22*
-*Last updated: 2026-07-22 after v3.5 milestone requirements definition*
+*Last updated: 2026-07-22 after v3.5 roadmap creation (23/23 requirements mapped to Phases 174-180)*
