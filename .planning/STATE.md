@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.5
 milestone_name: UX Consolidation & Chat Polish
 status: executing
-last_updated: "2026-07-22T13:04:20.574Z"
-last_activity: 2026-07-22 -- Phase 174 planning complete
+last_updated: "2026-07-22T13:11:45.903Z"
+last_activity: 2026-07-22 -- Phase 174 Plan 1 (STATE-03) complete
 progress:
   total_phases: 20
   completed_phases: 0
   total_plans: 4
-  completed_plans: 0
+  completed_plans: 1
   percent: 0
 ---
 
@@ -22,7 +22,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-20 — Phase 163 THE ATOMIC CRUX complete; membership RLS enforced)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** **v3.5 UX Consolidation & Chat Polish STARTED 2026-07-22** (defining requirements) — the parked chat-surface bug backlog + SEED-045 UI/UX polish + new v3.4 org-surface polish + SEED-085 plain-language extensions. Operator-confirmed sequencing at v3.4-close: polish cluster now (v3.5), then **Visual / No-Code Workflow Studio ([[SEED-123]]) as v3.6** (research-first; 3 hard requirements — preserve-v1/revert · study Glean/Beam/n8n · comprehensive email/JIRA integration — captured in the seed). v3.4 CORE (160-168) shipped + archived; STRETCH 169-173 fold back per their triggers.
+**Current focus:** Phase 174 — run-state-lifecycle-honesty
 
 ## Deferred Items
 
@@ -42,10 +42,10 @@ Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 op
 
 ## Current Position
 
-Phase: Not started (roadmap created — CORE 174-177 + STRETCH 178-180)
-Plan: —
+Phase: 174 (run-state-lifecycle-honesty) — EXECUTING
+Plan: 2 of 4
 Status: Ready to execute
-Last activity: 2026-07-22 -- Phase 174 planning complete
+Last activity: 2026-07-22 -- Phase 174 Plan 1 (STATE-03 pre-answer "Reasoning…" honesty) complete
 
 ### Quick Tasks Completed
 
