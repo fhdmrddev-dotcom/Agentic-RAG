@@ -425,6 +425,18 @@ class _ClosableEventStream:
                     "tool_calls": _fin_tcs,
                 }
 
+        # Stream-end DSML flush (XPROV-02a / Phase 175). The deepseek strip holds a
+        # short trailing fragment in _dsml_pending when a chunk ends in a partial
+        # OPENER prefix (it may be the opener split across chunks). If the stream ends
+        # while that fragment is still held AND we are NOT leaking, the fragment is
+        # real content — flush it as a final delta so a deepseek turn ending mid-prefix
+        # doesn't silently swallow it. Reachable ONLY on the deepseek path (only the
+        # deepseek-gated strip populates _dsml_pending) → every other provider is
+        # byte-identical. If we ARE leaking at stream end, flush nothing (the markup
+        # stays suppressed — the SC#2 no-dirty-render floor holds).
+        if _dsml_pending and not _dsml_leaking:
+            yield {"type": "delta", "content": _dsml_pending}
+
         # Stream end — emit the accumulated usage so the consumer SUMs it across
         # iterations (byte-identical to the pre-extraction per-chunk += for the
         # OpenAI-path providers). Only emit when a usage payload was seen.
