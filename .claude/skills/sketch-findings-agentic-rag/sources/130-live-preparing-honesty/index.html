@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sketch 130 · Live Pre-Answer Honesty</title>
+<link rel="stylesheet" href="../themes/default.css">
+<style>
+  body { padding-top: 52px; }
+  .stage { max-width: 780px; margin: 0 auto; padding: var(--space-6) var(--space-5) 130px; }
+  .context-line {
+    font-size: var(--text-xs); color: var(--color-text-dim); text-transform: uppercase;
+    letter-spacing: 0.09em; margin-bottom: var(--space-5); display: flex; gap: 10px; align-items: center;
+  }
+  .context-line .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--color-primary); animation: pulseGlow 1.8s infinite; }
+  .variant { display: none; }
+  .variant.active { display: block; animation: fadeSlideUp var(--dur-base) var(--ease-out); }
+
+  .blurb {
+    font-size: var(--text-sm); color: var(--color-text-muted); line-height: 1.6;
+    background: var(--color-surface); border: 1px solid var(--color-border-soft);
+    border-left: 3px solid var(--color-primary-strong); border-radius: var(--radius-md);
+    padding: var(--space-3) var(--space-4); margin-bottom: var(--space-6);
+  }
+  .blurb b { color: var(--color-text); }
+  .blurb code { font-family: var(--font-mono); font-size: 0.9em; color: var(--color-primary); }
+
+  /* ── chat rows ── */
+  .msg { display: flex; gap: 12px; margin-bottom: var(--space-5); }
+  .avatar {
+    width: 30px; height: 30px; border-radius: var(--radius-full); flex-shrink: 0;
+    display: grid; place-items: center; font-size: 13px; font-weight: 600;
+    font-family: var(--font-headline); margin-top: 2px;
+  }
+  .avatar.bot { background: linear-gradient(150deg, var(--color-primary-strong), var(--color-accent-violet)); color: #fff; }
+  .avatar.bot.streaming { animation: brandPulse 1.5s ease-in-out infinite; }
+  .avatar.user { background: var(--color-accent); color: var(--color-text-muted); }
+  .avatar.ghost { background: var(--color-accent); color: transparent; opacity: 0.6; }
+  .msg-col { flex: 1; min-width: 0; }
+  .who { font-size: 11px; color: var(--color-text-dim); margin-bottom: 5px; font-family: var(--font-mono); }
+  .bubble.user { color: var(--color-text-muted); font-size: var(--text-base); line-height: 1.6; }
+
+  /* ── shared activity atoms ── */
+  .pulse-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--color-primary);
+    box-shadow: 0 0 0 0 var(--color-primary-glow); animation: pulseGlow 1.5s infinite; flex-shrink: 0; }
+  .act-ico { font-size: 13px; }
+  .timer { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-text-muted); }
+  .timer.anchored { color: var(--color-primary); }
+
+  /* ── VARIANT A — honest single activity line ── */
+  .prep-line {
+    display: flex; align-items: center; gap: 9px; padding: 8px 0;
+    font-size: var(--text-base); color: var(--color-text);
+  }
+  .prep-line .act-label { font-weight: 500; }
+  .prep-line .act-detail { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-text-dim); }
+  .prep-line .timer { margin-left: auto; }
+  .peek {
+    margin-top: 2px; font-size: 12.5px; font-style: italic; color: var(--color-text-dim);
+    line-height: 1.55; padding-left: 17px; border-left: 2px solid var(--color-border-soft);
+  }
+
+  /* dead "Setting up agent…" (the bug) */
+  .prep-line.dead { color: var(--color-text-dim); }
+  .prep-line.dead .spinner {
+    width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--color-border);
+    border-top-color: var(--color-text-dim); animation: spin 0.9s linear infinite; flex-shrink: 0;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .broken-tag { font-family: var(--font-mono); font-size: 10px; color: var(--color-danger); opacity: 0.75; }
+
+  /* ── VARIANT B — prep stepper ── */
+  .prep-stepper {
+    display: flex; align-items: center; gap: 0; padding: 10px 12px; margin-top: 2px;
+    background: hsl(220 30% 8% / 0.5); border: 1px solid var(--color-border-soft); border-radius: var(--radius-md);
+    flex-wrap: wrap;
+  }
+  .step { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--color-text-dim); }
+  .step .node {
+    width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid var(--color-border);
+    display: grid; place-items: center; font-size: 9px; flex-shrink: 0;
+  }
+  .step.done { color: var(--color-text-muted); }
+  .step.done .node { background: var(--color-success-dim); border-color: var(--color-success); color: var(--color-success); }
+  .step.active { color: var(--color-text); font-weight: 500; }
+  .step.active .node { border-color: var(--color-primary); box-shadow: 0 0 0 3px var(--color-primary-dim); animation: pulseGlow 1.6s infinite; }
+  .step-sep { width: 22px; height: 1px; background: var(--color-border); margin: 0 8px; }
+  .stepper-detail {
+    display: flex; align-items: center; gap: 8px; margin-top: 8px; padding-left: 2px;
+    font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-text-muted);
+  }
+  .stepper-detail .timer { margin-left: auto; }
+
+  /* ── VARIANT C — run-header carries live sub-state ── */
+  .run-frame {
+    background: linear-gradient(180deg, hsl(220 30% 7% / 0.6), hsl(220 30% 7% / 0.3));
+    border: 1px solid var(--color-border); border-radius: var(--radius-lg); overflow: hidden; position: relative;
+  }
+  .run-frame.active { border-color: var(--color-primary-glow); box-shadow: var(--shadow-glow-primary); }
+  .run-header {
+    padding: 12px 15px; display: flex; align-items: center; gap: 11px;
+    border-bottom: 1px solid var(--color-border); background: hsl(220 30% 8% / 0.92);
+  }
+  .run-header .rh-meta { min-width: 0; }
+  .run-header .rh-title { font-size: var(--text-sm); font-weight: 600; color: var(--color-text); }
+  .run-header .rh-sub { font-family: var(--font-mono); font-size: 10.5px; color: var(--color-text-dim); }
+  .hdr-activity {
+    margin-left: auto; display: flex; align-items: center; gap: 8px; padding: 4px 10px;
+    border-radius: var(--radius-full); background: var(--color-primary-dim);
+    border: 1px solid var(--color-primary-glow);
+  }
+  .hdr-activity .act-label { font-size: 12px; color: var(--color-primary); font-weight: 500; }
+  .hdr-activity .act-detail { font-family: var(--font-mono); font-size: 10px; color: var(--color-text-muted); }
+  .run-header .timer { font-size: 13px; }
+  .run-progress { height: 2px; background: var(--color-primary-dim); position: relative; overflow: hidden; }
+  .run-progress::after { content: ''; position: absolute; inset: 0;
+    background: linear-gradient(90deg, transparent, var(--color-primary-glow), hsl(258 90% 66% / 0.5), transparent);
+    animation: progressShimmer 1.8s ease-in-out infinite; }
+  .run-body { padding: 13px 15px; }
+  .thought {
+    display: flex; gap: 9px; align-items: flex-start; font-size: 12.5px; font-style: italic;
+    color: var(--color-text-dim); line-height: 1.55;
+  }
+  .prep-hint {
+    margin-top: 11px; padding-top: 10px; border-top: 1px dashed var(--color-border-soft);
+    font-family: var(--font-mono); font-size: 11px; color: var(--color-text-dim);
+    display: flex; align-items: center; gap: 8px;
+  }
+  /* run-header broken (dead banner + mount timer) */
+  .run-header.dead .hdr-activity { background: transparent; border-color: transparent; }
+  .run-header.dead .hdr-activity .act-label { color: var(--color-text-dim); }
+
+  /* ── broken / nav machinery ── */
+  .broken-only { display: none; }
+  body.broken .proposed-only { display: none !important; }
+  body.broken .broken-only { display: block; }
+  .dup-avatar-row { display: none; }
+  body.broken.navdup .dup-avatar-row { display: flex; }
+  .dup-note { font-family: var(--font-mono); font-size: 10px; color: var(--color-danger); opacity: 0.75; align-self: center; }
+
+  /* ── toolbar extras (shared with 129) ── */
+  .tb-btn.on { background: rgba(239,68,68,0.28) !important; border-color: rgba(239,68,68,0.5) !important; }
+  #toast {
+    position: fixed; bottom: 64px; right: 16px; z-index: 10000; max-width: 350px;
+    background: var(--color-surface-hi); border: 1px solid var(--color-border);
+    border-radius: var(--radius-md); padding: 10px 14px; font-size: 12px; color: var(--color-text-muted);
+    box-shadow: var(--shadow-lg); opacity: 0; transform: translateY(8px);
+    transition: all var(--dur-base) var(--ease-out); pointer-events: none; line-height: 1.5;
+  }
+  #toast.show { opacity: 1; transform: translateY(0); }
+  #toast.ok { border-color: hsl(142 71% 45% / 0.5); }
+  #toast.bad { border-color: hsl(0 72% 51% / 0.5); }
+  #toast b { color: var(--color-text); }
+</style>
+</head>
+<body>
+
+<div class="variant-nav">
+  <span class="label">Sketch 130 · live pre-answer honesty</span>
+  <button class="variant-tab" onclick="showVariant('a', event)">A · Activity line</button>
+  <button class="variant-tab" onclick="showVariant('b', event)">B · Prep stepper</button>
+  <button class="variant-tab active" onclick="showVariant('c', event)">C · Run-header sub-state <span class="star">★</span></button>
+</div>
+
+<div class="stage">
+  <div class="context-line"><span class="dot"></span> Live run · the gap before the first visible token · timer + avatar honesty on nav-back</div>
+
+  <!-- ═══════════════ VARIANT A — honest activity line ═══════════════ -->
+  <div id="variant-a" class="variant">
+    <div class="blurb">
+      <b>A · Activity line.</b> Fix the banner label in place: instead of a dead <code>Setting&nbsp;up&nbsp;agent…</code>,
+      one honest line names what the model is actually doing right now — <b>Reasoning</b> · <b>Writing execute_code</b> ·
+      <b>Spinning up sandbox</b> — with a live elapsed anchored to <code>started_at</code> and a dim thought-peek. Minimal, calm.
+    </div>
+
+    <div class="msg">
+      <div class="avatar user">FR</div>
+      <div class="msg-col"><div class="who">you</div>
+        <div class="bubble user">Benchmark 5 sorting algorithms up to 10M elements and chart the results.</div></div>
+    </div>
+
+    <div class="msg">
+      <div class="dup-avatar-row" style="gap:12px">
+        <div class="avatar bot ghost">◆</div><span class="dup-note">← duplicate empty avatar (double-mount)</span>
+      </div>
+      <div class="avatar bot streaming">◆</div>
+      <div class="msg-col"><div class="who">kimi-k2.6 · turn 1</div>
+
+        <!-- proposed: honest live line -->
+        <div class="prep-line proposed-only">
+          <span class="pulse-dot"></span>
+          <span class="act-ico js-actico">💭</span>
+          <span class="act-label js-activity">Reasoning…</span>
+          <span class="act-detail js-actdetail"></span>
+          <span class="timer anchored js-timer" data-clock="anchored"></span>
+        </div>
+        <div class="peek proposed-only js-peek"></div>
+
+        <!-- broken: dead "Setting up agent…" -->
+        <div class="prep-line dead broken-only">
+          <span class="spinner"></span> Setting up agent…
+          <span class="timer js-timer" data-clock="mount" style="margin-left:12px"></span>
+          <span class="broken-tag">ignores 4,000+ reasoning tokens streaming right now</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ VARIANT B — prep stepper ═══════════════ -->
+  <div id="variant-b" class="variant">
+    <div class="blurb">
+      <b>B · Prep stepper.</b> Show the <i>shape</i> of the prep gap so a long pre-answer wait doesn't read as stuck:
+      a compact <b>Queued → Reasoning → Writing tools → Running</b> sequence with the live node lit + elapsed + a detail line.
+      More structure — read the risk: does a stepper over-explain what's often a 2-second gap?
+    </div>
+
+    <div class="msg">
+      <div class="avatar user">FR</div>
+      <div class="msg-col"><div class="who">you</div>
+        <div class="bubble user">Benchmark 5 sorting algorithms up to 10M elements and chart the results.</div></div>
+    </div>
+
+    <div class="msg">
+      <div class="dup-avatar-row" style="gap:12px">
+        <div class="avatar bot ghost">◆</div><span class="dup-note">← duplicate empty avatar (double-mount)</span>
+      </div>
+      <div class="avatar bot streaming">◆</div>
+      <div class="msg-col"><div class="who">kimi-k2.6 · turn 1</div>
+
+        <div class="proposed-only">
+          <div class="prep-stepper" id="stepperB"></div>
+          <div class="stepper-detail">
+            <span class="pulse-dot"></span>
+            <span class="act-ico js-actico">💭</span>
+            <span class="js-actdetail"></span>
+            <span class="timer anchored js-timer" data-clock="anchored"></span>
+          </div>
+          <div class="peek js-peek" style="margin-top:8px"></div>
+        </div>
+
+        <div class="prep-line dead broken-only">
+          <span class="spinner"></span> Setting up agent…
+          <span class="timer js-timer" data-clock="mount" style="margin-left:12px"></span>
+          <span class="broken-tag">no sense of the reasoning → tools → run pipeline</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ VARIANT C — run-header sub-state ═══════════════ -->
+  <div id="variant-c" class="variant active">
+    <div class="blurb">
+      <b>C · Run-header sub-state.</b> No separate banner — the run-card header (the shipped honesty instrument) carries it:
+      one <b>avatar</b>, the model + turn, a live <b>activity pill</b> that streams the current sub-state, and a timer anchored
+      to <code>started_at</code>. Fixes STATE-03 (activity) <b>and</b> STATE-04 (anchored timer + single avatar) in one surface.
+    </div>
+
+    <div class="msg">
+      <div class="avatar user">FR</div>
+      <div class="msg-col"><div class="who">you</div>
+        <div class="bubble user">Benchmark 5 sorting algorithms up to 10M elements and chart the results.</div></div>
+    </div>
+
+    <!-- proposed: run-card with live header sub-state -->
+    <div class="proposed-only">
+      <div class="run-frame active">
+        <div class="run-header">
+          <div class="avatar bot streaming">◆</div>
+          <div class="rh-meta">
+            <div class="rh-title">Sorting-algorithm benchmark</div>
+            <div class="rh-sub">kimi-k2.6 · turn 1</div>
+          </div>
+          <span class="hdr-activity">
+            <span class="pulse-dot"></span>
+            <span class="act-ico js-actico">💭</span>
+            <span class="act-label js-activity">Reasoning…</span>
+            <span class="act-detail js-actdetail"></span>
+          </span>
+          <span class="timer anchored js-timer" data-clock="anchored"></span>
+        </div>
+        <div class="run-progress"></div>
+        <div class="run-body">
+          <div class="thought"><span class="act-ico">💭</span><span class="js-peek"></span></div>
+          <div class="prep-hint"><span class="pulse-dot"></span> Waiting on the model's first tool call — the activity above is live, not idle.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- broken: dead header + mount timer + duplicate avatar -->
+    <div class="broken-only">
+      <div class="dup-avatar-row" style="gap:12px; margin-bottom:10px">
+        <div class="avatar bot ghost">◆</div><span class="dup-note">← duplicate empty avatar on nav-back</span>
+      </div>
+      <div class="run-frame active">
+        <div class="run-header dead">
+          <div class="avatar bot streaming">◆</div>
+          <div class="rh-meta">
+            <div class="rh-title">Sorting-algorithm benchmark</div>
+            <div class="rh-sub">kimi-k2.6 · turn 1</div>
+          </div>
+          <span class="hdr-activity"><span class="spinner" style="width:11px;height:11px"></span>
+            <span class="act-label">Setting up agent…</span></span>
+          <span class="timer js-timer" data-clock="mount"></span>
+        </div>
+        <div class="run-progress"></div>
+        <div class="run-body">
+          <div class="prep-hint" style="color:var(--color-danger); opacity:0.8">
+            timer reseeds from mount on nav-back · header ignores the reasoning stream</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<div class="sketch-toolbar">
+  <button class="tb-btn" onclick="navAwayBack()">Nav away &amp; back&nbsp;⤢</button>
+  <button class="tb-btn" id="brokenBtn" onclick="toggleBroken()">Today (broken)</button>
+  <select onchange="document.querySelector('link[href*=themes]').href='../themes/'+this.value+'.css'">
+    <option value="default">Deep Midnight</option>
+  </select>
+</div>
+
+<script>
+/* ── the anchored run clock (STATE-04): elapsed derives from started_at, never mount ── */
+let startedAt = Date.now() - 41000;   // this run is already 41s deep — the "is it stuck?" moment
+let mountAt   = startedAt;             // proposed ignores this; broken (wrongly) counts from it
+
+/* ── honest pre-answer sub-states (STATE-03), cycling for the demo ── */
+const PHASES = [
+  { key:'reasoning', ico:'💭', label:'Reasoning…',            detail:t=>tok(t)+' reasoning tokens',
+    peek:'planning: generate arrays 10⁴…10⁷ → time each of quicksort, mergesort, heapsort, timsort, radix → chart runtime vs N' },
+  { key:'writing',   ico:'⚙️', label:'Writing execute_code…', detail:()=>'composing the benchmark script',
+    peek:'drafting: import numpy, timeit; build sizes = [1e4, 1e5, 1e6, 1e7]; loop sorts; collect timings…' },
+  { key:'sandbox',   ico:'▲',  label:'Spinning up sandbox…',  detail:()=>'building container · matplotlib, numpy, pandas',
+    peek:'cold-start: creating the Docker sandbox for this thread (first run in this chat)…' },
+];
+const CYCLE = 3600;                    // ms per sub-state in the demo
+function fmt(ms){ const s=Math.max(0,Math.floor(ms/1000)); return s<60 ? s+'s' : Math.floor(s/60)+'m '+(s%60)+'s'; }
+function tok(ms){ return (1400 + Math.floor(ms/2.6)).toLocaleString(); }  // reasoning tokens climb ~380/s
+
+function tick(){
+  const now = Date.now();
+  const idx = Math.floor((now/CYCLE)) % PHASES.length;
+  const p = PHASES[idx];
+  const phaseElapsed = now % CYCLE;
+
+  document.querySelectorAll('.js-timer').forEach(el=>{
+    const base = el.dataset.clock === 'mount' ? mountAt : startedAt;
+    el.textContent = fmt(now - base);
+  });
+  document.querySelectorAll('.js-activity').forEach(el=> el.textContent = p.label);
+  document.querySelectorAll('.js-actico').forEach(el=> el.textContent = p.ico);
+  document.querySelectorAll('.js-actdetail').forEach(el=> el.textContent = '· ' + p.detail(phaseElapsed));
+  document.querySelectorAll('.js-peek').forEach(el=> el.textContent = p.peek);
+  renderStepper(p.key);
+}
+
+const STEPS = [
+  { key:'queued',    label:'Queued' },
+  { key:'reasoning', label:'Reasoning' },
+  { key:'writing',   label:'Writing tools' },
+  { key:'sandbox',   label:'Running' },
+];
+function renderStepper(activeKey){
+  const host = document.getElementById('stepperB');
+  if(!host) return;
+  const order = ['queued','reasoning','writing','sandbox'];
+  const ai = order.indexOf(activeKey);
+  host.innerHTML = STEPS.map((s,i)=>{
+    const state = i < ai ? 'done' : i === ai ? 'active' : '';
+    const node = i < ai ? '✓' : (i===ai ? '' : (i+1));
+    return `<div class="step ${state}"><span class="node">${node}</span>${s.label}</div>`
+         + (i < STEPS.length-1 ? '<span class="step-sep"></span>' : '');
+  }).join('');
+}
+
+setInterval(tick, 200); tick();
+
+/* ── controls ── */
+function showVariant(id, ev){
+  document.querySelectorAll('.variant').forEach(v=>v.classList.remove('active'));
+  document.querySelectorAll('.variant-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('variant-'+id).classList.add('active');
+  ev.target.classList.add('active');
+}
+
+function toggleBroken(){
+  const on = document.body.classList.toggle('broken');
+  if(!on) document.body.classList.remove('navdup');
+  const btn = document.getElementById('brokenBtn');
+  btn.classList.toggle('on', on); btn.textContent = on ? 'Today (broken) ●' : 'Today (broken)';
+  showToast(on
+    ? "<b>Today (broken).</b> Dead <code>Setting up agent…</code> while the model reasons — then hit Nav to reset the timer."
+    : "<b>Proposed.</b> Honest live sub-state + timer anchored to <code>started_at</code>.", on?'bad':'ok');
+}
+
+function navAwayBack(){
+  const broken = document.body.classList.contains('broken');
+  if(broken){
+    mountAt = Date.now();                       // the bug: elapsed reseeds from remount
+    document.body.classList.add('navdup');      // the bug: duplicate empty avatar appears
+    showToast("<b>Nav away &amp; back.</b> Broken: timer reset to <b>~0s</b> (was 40s+) and a <b>duplicate empty avatar</b> appeared. STATE-04.", 'bad');
+  } else {
+    showToast("<b>Nav away &amp; back.</b> Proposed: timer kept climbing from <code>started_at</code> ✓, still <b>one</b> avatar.", 'ok');
+  }
+}
+
+let tt;
+function showToast(html, kind){
+  const t = document.getElementById('toast');
+  t.innerHTML = html; t.className = 'show ' + (kind||'');
+  clearTimeout(tt); tt = setTimeout(()=> t.className = t.className.replace('show','').trim(), 4600);
+}
+</script>
+</body>
+</html>

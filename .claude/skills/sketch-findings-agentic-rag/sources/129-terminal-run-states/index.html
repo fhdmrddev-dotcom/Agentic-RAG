@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sketch 129 · Terminal Run States</title>
+<link rel="stylesheet" href="../themes/default.css">
+<style>
+  body { padding-top: 52px; }
+
+  /* ── Stage (chat column) ── */
+  .stage { max-width: 780px; margin: 0 auto; padding: var(--space-6) var(--space-5) 120px; }
+  .context-line {
+    font-size: var(--text-xs); color: var(--color-text-dim); text-transform: uppercase;
+    letter-spacing: 0.09em; margin-bottom: var(--space-5); display: flex; gap: 10px; align-items: center;
+  }
+  .context-line .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--color-success); }
+  .variant { display: none; }
+  .variant.active { display: block; animation: fadeSlideUp var(--dur-base) var(--ease-out); }
+
+  .blurb {
+    font-size: var(--text-sm); color: var(--color-text-muted); line-height: 1.6;
+    background: var(--color-surface); border: 1px solid var(--color-border-soft);
+    border-left: 3px solid var(--color-primary-strong); border-radius: var(--radius-md);
+    padding: var(--space-3) var(--space-4); margin-bottom: var(--space-6);
+  }
+  .blurb b { color: var(--color-text); }
+
+  /* ── Chat message rows ── */
+  .msg { display: flex; gap: 12px; margin-bottom: var(--space-6); }
+  .avatar {
+    width: 30px; height: 30px; border-radius: var(--radius-full); flex-shrink: 0;
+    display: grid; place-items: center; font-size: 13px; font-weight: 600;
+    font-family: var(--font-headline); margin-top: 2px;
+  }
+  .avatar.bot { background: linear-gradient(150deg, var(--color-primary-strong), var(--color-accent-violet)); color: #fff; }
+  .avatar.user { background: var(--color-accent); color: var(--color-text-muted); }
+  .msg-col { flex: 1; min-width: 0; }
+  .who { font-size: 11px; color: var(--color-text-dim); margin-bottom: 4px; font-family: var(--font-mono); }
+
+  .bubble { font-size: var(--text-base); line-height: 1.62; color: var(--color-text); }
+  .bubble.user { color: var(--color-text-muted); }
+  .bubble b { color: var(--color-text); font-weight: 600; }
+
+  /* Workflow launch chip (user launches a workflow) */
+  .wf-launch {
+    display: inline-flex; align-items: center; gap: 8px; font-size: var(--text-sm);
+    padding: 7px 12px; border-radius: var(--radius-md); background: var(--color-primary-dim);
+    border: 1px solid var(--color-primary-glow); color: var(--color-primary);
+    font-family: var(--font-mono);
+  }
+  .wf-launch .play { font-size: 11px; }
+
+  /* ── The terminal-state vocabulary ── the real design contribution ── */
+
+  /* Tier 1 · DIM — the user stopped it on purpose (quiet/calm) */
+  .term-inline {
+    display: inline-flex; align-items: center; gap: 8px; margin-top: 10px;
+    font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-text-dim);
+    padding: 3px 0; user-select: none;
+  }
+  .term-inline .gl { color: var(--color-text-muted); font-size: 13px; }
+  .term-inline .meta { color: var(--color-text-dim); opacity: 0.85; }
+  .term-inline .keyed {
+    font-size: 9.5px; padding: 1px 5px; border-radius: var(--radius-sm);
+    border: 1px dashed var(--color-border); color: var(--color-text-dim);
+    opacity: 0; transition: opacity var(--dur-fast); cursor: help;
+  }
+  .term-inline:hover .keyed { opacity: 1; }
+
+  /* the "cancelled — no output yet" BODY (replaces the empty bubble) */
+  .term-body {
+    display: flex; flex-direction: column; gap: 3px; margin-top: 2px;
+    font-family: var(--font-mono); font-size: var(--text-sm); color: var(--color-text-muted);
+    padding: 10px 12px; border-radius: var(--radius-md);
+    background: hsl(220 30% 9% / 0.5); border: 1px dashed var(--color-border);
+  }
+  .term-body .lead { display: flex; align-items: center; gap: 8px; color: var(--color-text-muted); }
+  .term-body .lead .gl { color: var(--color-text-dim); }
+  .term-body .sub { font-size: 11px; color: var(--color-text-dim); padding-left: 21px; }
+
+  /* Tier 2/3 · framed notice — amber (blocked) / red (failed) */
+  .term-notice {
+    display: flex; gap: 10px; margin-top: 4px; padding: 11px 13px;
+    border-radius: var(--radius-md); border: 1px solid; align-items: flex-start;
+  }
+  .term-notice .ico { font-size: 13px; margin-top: 1px; flex-shrink: 0; }
+  .term-notice .nt-body { flex: 1; min-width: 0; }
+  .term-notice .nt-title { font-size: var(--text-sm); font-weight: 600; margin-bottom: 2px; }
+  .term-notice .nt-reason { font-size: 12.5px; line-height: 1.5; }
+  .term-notice .nt-where {
+    display: block; margin-top: 5px; font-family: var(--font-mono); font-size: 10.5px;
+    color: var(--color-text-dim);
+  }
+  .term-notice.amber { background: var(--color-warning-dim); border-color: hsl(38 92% 60% / 0.4); }
+  .term-notice.amber .ico, .term-notice.amber .nt-title { color: var(--color-warning); }
+  .term-notice.amber .nt-reason { color: hsl(38 60% 78%); }
+  .term-notice.red { background: var(--color-danger-dim); border-color: hsl(0 72% 51% / 0.42); }
+  .term-notice.red .ico, .term-notice.red .nt-title { color: hsl(0 80% 78%); }
+  .term-notice.red .nt-reason { color: hsl(0 60% 82%); }
+
+  /* small state pill (used in variant B header treatment) */
+  .state-pill {
+    display: inline-flex; align-items: center; gap: 5px; font-family: var(--font-mono);
+    font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.05em;
+    padding: 2px 7px; border-radius: var(--radius-full); border: 1px solid;
+  }
+  .state-pill .d { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+  .state-pill.dim   { color: var(--color-text-dim); border-color: var(--color-border); }
+  .state-pill.amber { color: var(--color-warning); border-color: hsl(38 92% 60% / 0.4); background: var(--color-warning-dim); }
+  .state-pill.red   { color: hsl(0 80% 78%); border-color: hsl(0 72% 51% / 0.4); background: var(--color-danger-dim); }
+
+  /* Variant B — left-accent framed band wrapping the whole interrupted message */
+  .framed {
+    border: 1px solid var(--color-border-soft); border-left: 3px solid var(--color-border);
+    border-radius: var(--radius-md); padding: 11px 13px; background: hsl(220 30% 8% / 0.4);
+  }
+  .framed.dim   { border-left-color: var(--color-text-dim); }
+  .framed.amber { border-left-color: var(--color-warning); background: var(--color-warning-dim); }
+  .framed.red   { border-left-color: var(--color-danger); background: var(--color-danger-dim); }
+  .framed-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .framed-head .ft { font-size: 12px; color: var(--color-text-muted); font-weight: 500; }
+  .framed .bubble { color: var(--color-text-muted); }
+
+  /* ── the "broken (today)" rendering — reproduces the real bug ── */
+  .broken-only { display: none; }
+  body.broken .proposed-only { display: none !important; }
+  body.broken .broken-only { display: block; }
+  .broken-empty {
+    height: 22px; border-radius: var(--radius-sm);
+    /* faint empty bubble — avatar + nothing (the bug) */
+  }
+  .broken-empty::after {
+    content: 'ⓘ empty bubble — reads as broken';
+    font-size: 10px; color: var(--color-danger); opacity: 0.55; font-family: var(--font-mono);
+  }
+  /* in broken mode a stopped message loses its marker and looks like a normal answer */
+  .broken-note {
+    display: none; font-size: 10px; color: var(--color-danger); opacity: 0.7;
+    font-family: var(--font-mono); margin-top: 8px;
+  }
+  body.broken .broken-note { display: block; }
+
+  /* ── toolbar extras ── */
+  .tb-btn.on { background: rgba(239,68,68,0.28) !important; border-color: rgba(239,68,68,0.5) !important; }
+  #toast {
+    position: fixed; bottom: 64px; right: 16px; z-index: 10000; max-width: 340px;
+    background: var(--color-surface-hi); border: 1px solid var(--color-border);
+    border-radius: var(--radius-md); padding: 10px 14px; font-size: 12px; color: var(--color-text-muted);
+    box-shadow: var(--shadow-lg); opacity: 0; transform: translateY(8px);
+    transition: all var(--dur-base) var(--ease-out); pointer-events: none; line-height: 1.5;
+  }
+  #toast.show { opacity: 1; transform: translateY(0); }
+  #toast.ok { border-color: hsl(142 71% 45% / 0.5); }
+  #toast.bad { border-color: hsl(0 72% 51% / 0.5); }
+  #toast b { color: var(--color-text); }
+
+  .reloading { animation: reloadFade 0.5s var(--ease-out); }
+  @keyframes reloadFade { 0% { opacity: 1; } 40% { opacity: 0.15; } 100% { opacity: 1; } }
+</style>
+</head>
+<body>
+
+<div class="variant-nav">
+  <span class="label">Sketch 129 · terminal run states</span>
+  <button class="variant-tab" onclick="showVariant('a', event)">A · Quiet inline</button>
+  <button class="variant-tab" onclick="showVariant('b', event)">B · Framed notice</button>
+  <button class="variant-tab active" onclick="showVariant('c', event)">C · Tiered (synthesis) <span class="star">★</span></button>
+</div>
+
+<div class="stage">
+  <div class="context-line"><span class="dot"></span> Chat transcript · how a stopped / cancelled / blocked / failed run reads at rest</div>
+
+  <!-- ══════════════════ VARIANT A — Quiet inline everywhere ══════════════════ -->
+  <div id="variant-a" class="variant">
+    <div class="blurb">
+      <b>A · Quiet inline.</b> Every terminal state is a thin dim mono line — the lightest possible touch on the calm transcript.
+      A stopped answer keeps its partial text with a <code>⊘ Response stopped</code> footer; a no-output cancel becomes a quiet
+      dashed body; even <i>blocked</i> and <i>failed</i> are one colored inline line. Read the risk: does a genuine failure feel loud <i>enough</i>?
+    </div>
+
+    <!-- user -->
+    <div class="msg">
+      <div class="avatar user">FR</div>
+      <div class="msg-col"><div class="who">you</div>
+        <div class="bubble user">Summarize the Q3 board deck and flag anything that changed vs Q2.</div></div>
+    </div>
+    <!-- STOPPED WITH CONTENT (openai, 1606 chars) -->
+    <div class="msg">
+      <div class="avatar bot">◆</div>
+      <div class="msg-col"><div class="who">gpt-5.4</div>
+        <div class="bubble">The Q3 board deck covers four themes — revenue, margin, headcount, and the FY guide. Revenue landed at
+          <b>$48.2M</b>, up 12% QoQ, driven mostly by the enterprise segment. Gross margin held at <b>71%</b>. Headcount…</div>
+        <div class="term-inline proposed-only" title="derived from runs.status = 'cancelled'">
+          <span class="gl">⊘</span> Response stopped <span class="meta">· 1,606 chars · 12s</span>
+          <span class="keyed">runs.status = cancelled</span>
+        </div>
+        <div class="broken-note">today: marker is live-only → after reload this looks like a normal, just-shorter answer</div>
+      </div>
+    </div>
+
+    <!-- user -->
+    <div class="msg">
+      <div class="avatar user">FR</div>
+      <div class="msg-col"><div class="who">you</div>
+        <div class="bubble user">Try deepseek — same question.</div></div>
+    </div>
+    <!-- CANCELLED, NO OUTPUT (deepseek, cancelled before first token) -->
+    <div class="msg">
+      <div class="avatar bot">◆</div>
+      <div class="msg-col"><div class="who">deepseek-v4-flash</div>
+        <div class="term-body proposed-only" title="runs.status='cancelled' · content_len=0">
+          <span class="lead"><span class="gl">⊘</span> Cancelled — no output yet</span>
+          <span class="sub">stopped at 7s, before the model's first visible token</span>
+        </div>
+        <div class="broken-only broken-empty"></div>
+      </div>
+    </div>
+
+    <!-- user launches a workflow -->
+    <div class="msg">
+      <div class="avatar user">FR</div>
+      <div class="msg-col"><div class="who">you</div>
+        <span class="wf-launch"><span class="play">▶</span> Doc Q&amp;A</span></div>
+    </div>
+    <!-- BLOCKED (kill-switch 403) — amber, but still just an inline line in A -->
+    <div class="msg">
+      <div class="avatar bot">◆</div>
+      <div class="msg-col"><div class="who">workflow</div>
+        <div class="term-inline proposed-only" style="color:var(--color-warning)" title="403 · workflows kill-switch">
+          <span class="gl" style="color:var(--color-warning)">⊘</span> Blocked — workflows are disabled by the administrator
+          <span class="meta" style="color:hsl(38 60% 70%)">· nothing ran</span>
+        </div>
+        <div class="broken-only broken-empty"></div>
+      </div>
+    </div>
+
+    <!-- FAILED (sandbox timeout) — red inline line in A -->
+    <div class="msg">
+      <div class="avatar bot">◆</div>
+      <div class="msg-col"><div class="who">gpt-5.4 · run failed</div>
+        <div class="term-inline proposed-only" style="color:hsl(0 80% 76%)" title="runs.status='failed' · error present">
+          <span class="gl" style="color:hsl(0 80% 76%)">✕</span> Failed — the sandbox timed out after 180s
+          <span class="meta" style="color:hsl(0 55% 72%)">· phase: execute_code</span>
+        </div>
+        <div class="broken-only broken-empty"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════ VARIANT B — Framed notice everywhere ══════════════════ -->
+  <div id="variant-b" class="variant">
+    <div class="blurb">
+      <b>B · Framed notice.</b> Every interrupted state gets a left-accent framed band + a small state pill, so the state is
+      scannable at a glance without reading a footer. Consistent and unmissable — but read the risk: does framing the common,
+      deliberate <i>Stopped</i> add chrome to a calm transcript?
+    </div>
+
+    <div class="msg">
+      <div class="avatar user">FR</div>
+      <div class="msg-col"><div class="who">you</div>
+        <div class="bubble user">Summarize the Q3 board deck and flag anything that changed vs Q2.</div></div>
+    </div>
+    <!-- STOPPED WITH CONTENT, framed -->
+    <div class="msg">
+      <div class="avatar bot">◆</div>
+      <div class="msg-col"><div class="who">gpt-5.4</div>
+        <div class="framed dim proposed-only">
+          <div class="framed-head"><span class="state-pill dim"><span class="d"></span> Stopped</span>
+            <span class="ft">you stopped this response · 1,606 chars · 12s</span></div>
+          <div class="bubble">The Q3 board deck covers four themes — revenue, margin, headcount, and the FY guide. Revenue landed at
+            <b>$48.2M</b>, up 12% QoQ, driven mostly by the enterprise segment. Gross margin held at <b>71%</b>. Headcount…</div>
+        </div>
+        <div class="broken-only"><div class="bubble">The Q3 board deck covers four themes — revenue, margin, headcount, and the FY guide. Revenue landed at
+          <b>$48.2M</b>, up 12% QoQ… <span class="broken-note" style="display:inline">← today: no marker, looks complete</span></div></div>
+      </div>
+    </div>
+
+    <div class="msg">
+      <div class="avatar user">FR</div>
+      <div class="msg-col"><div class="who">you</div>
+        <div class="bubble user">Try deepseek — same question.</div></div>
+    </div>
+    <!-- CANCELLED NO OUTPUT, framed -->
+    <div class="msg">
+      <div class="avatar bot">◆</div>
+      <div class="msg-col"><div class="who">deepseek-v4-flash</div>
+        <div class="framed dim proposed-only">
+          <div class="framed-head"><span class="state-pill dim"><span class="d"></span> Cancelled</span>
+            <span class="ft">no output yet — stopped at 7s, before the first visible token</span></div>
+        </div>
+        <div class="broken-only broken-empty"></div>
+      </div>
+    </div>
+
+    <div class="msg">
+      <div class="avatar user">FR</div>
+      <div class="msg-col"><div class="who">you</div>
+        <span class="wf-launch"><span class="play">▶</span> Doc Q&amp;A</span></div>
+    </div>
+    <!-- BLOCKED, framed amber -->
+    <div class="msg">
+      <div class="avatar bot">◆</div>
+      <div class="msg-col"><div class="who">workflow</div>
+        <div class="framed amber proposed-only">
+          <div class="framed-head"><span class="state-pill amber"><span class="d"></span> Blocked</span>
+            <span class="ft" style="color:var(--color-warning)">disabled by the administrator</span></div>
+          <div class="bubble">Workflows are currently turned off. <b>Nothing ran</b> — no run was started, so nothing was charged or logged against your quota.</div>
+        </div>
+        <div class="broken-only broken-empty"></div>
+      </div>
+    </div>
+
+    <!-- FAILED, framed red -->
+    <div class="msg">
+      <div class="avatar bot">◆</div>
+      <div class="msg-col"><div class="who">gpt-5.4 · run failed</div>
+        <div class="framed red proposed-only">
+          <div class="framed-head"><span class="state-pill red"><span class="d"></span> Failed</span>
+            <span class="ft" style="color:hsl(0 80% 78%)">sandbox timeout</span></div>
+          <div class="bubble">The code step ran past its <b>180s</b> budget and was halted. <span class="nt-where" style="display:block">phase: execute_code · 181s / 180s</span></div>
+        </div>
+        <div class="broken-only broken-empty"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════ VARIANT C — Tiered synthesis ══════════════════ -->
+  <div id="variant-c" class="variant active">
+    <div class="blurb">
+      <b>C · Tiered (synthesis).</b> The house rule made literal: <b>dim &amp; quiet</b> for states the user chose (Stopped ·
+      Cancelled — A's thin inline line), <b>amber</b> for an administrative block (not an error), <b>red framed</b> only for a
+      genuine failure (B's notice band). The louder the frame, the more it's earned. Every marker is derived from persisted
+      <code>runs.status</code> — hit <b>Reload&nbsp;⟳</b> to prove it survives.
+    </div>
+
+    <div class="msg">
+      <div class="avatar user">FR</div>
+      <div class="msg-col"><div class="who">you</div>
+        <div class="bubble user">Summarize the Q3 board deck and flag anything that changed vs Q2.</div></div>
+    </div>
+    <!-- STOPPED WITH CONTENT — quiet inline (dim) -->
+    <div class="msg">
+      <div class="avatar bot">◆</div>
+      <div class="msg-col"><div class="who">gpt-5.4</div>
+        <div class="bubble">The Q3 board deck covers four themes — revenue, margin, headcount, and the FY guide. Revenue landed at
+          <b>$48.2M</b>, up 12% QoQ, driven mostly by the enterprise segment. Gross margin held at <b>71%</b>. Headcount…</div>
+        <div class="term-inline proposed-only" title="derived from runs.status = 'cancelled'">
+          <span class="gl">⊘</span> Response stopped <span class="meta">· 1,606 chars · 12s</span>
+          <span class="keyed">runs.status = cancelled</span>
+        </div>
+        <div class="broken-note">today: marker is live-only → after reload this looks like a normal, just-shorter answer</div>
+      </div>
+    </div>
+
+    <div class="msg">
+      <div class="avatar user">FR</div>
+      <div class="msg-col"><div class="who">you</div>
+        <div class="bubble user">Try deepseek — same question.</div></div>
+    </div>
+    <!-- CANCELLED NO OUTPUT — quiet dashed body (dim) -->
+    <div class="msg">
+      <div class="avatar bot">◆</div>
+      <div class="msg-col"><div class="who">deepseek-v4-flash</div>
+        <div class="term-body proposed-only" title="runs.status='cancelled' · content_len=0">
+          <span class="lead"><span class="gl">⊘</span> Cancelled — no output yet</span>
+          <span class="sub">stopped at 7s, before the model's first visible token</span>
+        </div>
+        <div class="broken-only broken-empty"></div>
+      </div>
+    </div>
+
+    <div class="msg">
+      <div class="avatar user">FR</div>
+      <div class="msg-col"><div class="who">you</div>
+        <span class="wf-launch"><span class="play">▶</span> Doc Q&amp;A</span></div>
+    </div>
+    <!-- BLOCKED — amber framed notice (not an error, but important) -->
+    <div class="msg">
+      <div class="avatar bot">◆</div>
+      <div class="msg-col"><div class="who">workflow</div>
+        <div class="term-notice amber proposed-only">
+          <span class="ico">⊘</span>
+          <div class="nt-body">
+            <div class="nt-title">Blocked — workflows are disabled by the administrator</div>
+            <div class="nt-reason">Nothing ran. No run was started, so nothing was charged or logged against your quota.
+              <span class="nt-where">403 · workflows kill-switch · Control Plane</span></div>
+          </div>
+        </div>
+        <div class="broken-only broken-empty"></div>
+      </div>
+    </div>
+
+    <!-- FAILED — red framed notice (genuine failure, loudest) -->
+    <div class="msg">
+      <div class="avatar bot">◆</div>
+      <div class="msg-col"><div class="who">gpt-5.4 · run failed</div>
+        <div class="term-notice red proposed-only">
+          <span class="ico">✕</span>
+          <div class="nt-body">
+            <div class="nt-title">Run failed</div>
+            <div class="nt-reason">The code step ran past its 180s budget and was halted before it could answer.
+              <span class="nt-where">phase: execute_code · 181s / 180s · runs.status = failed</span></div>
+          </div>
+        </div>
+        <div class="broken-only broken-empty"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- toast for reload sim -->
+<div id="toast"></div>
+
+<!-- ── sketch toolbar ── -->
+<div class="sketch-toolbar">
+  <button class="tb-btn" onclick="simReload()">Reload&nbsp;⟳</button>
+  <button class="tb-btn" id="brokenBtn" onclick="toggleBroken()">Today (broken)</button>
+  <select onchange="document.querySelector('link[href*=themes]').href='../themes/'+this.value+'.css'">
+    <option value="default">Deep Midnight</option>
+  </select>
+</div>
+
+<script>
+function showVariant(id, ev) {
+  document.querySelectorAll('.variant').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.variant-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('variant-' + id).classList.add('active');
+  ev.target.classList.add('active');
+}
+
+function toggleBroken() {
+  const on = document.body.classList.toggle('broken');
+  const btn = document.getElementById('brokenBtn');
+  btn.classList.toggle('on', on);
+  btn.textContent = on ? 'Today (broken) ●' : 'Today (broken)';
+  showToast(on
+    ? "<b>Today (broken).</b> Cancel-before-token → empty bubble. Blocked/failed → blank body. Stopped answer → no marker."
+    : "<b>Proposed.</b> Each state derived from persisted <code>runs.status</code> — honest at rest.", on ? 'bad' : 'ok');
+}
+
+let tt;
+function simReload() {
+  const v = document.querySelector('.variant.active');
+  v.classList.remove('reloading'); void v.offsetWidth; v.classList.add('reloading');
+  const broken = document.body.classList.contains('broken');
+  showToast(broken
+    ? "<b>Reloaded.</b> The stop / blocked / failed markers were live-only state — they're <b>gone</b>. This is STATE-02's bug."
+    : "<b>Reloaded from <code>runs.status</code>.</b> Stopped · Cancelled · Blocked · Failed markers all persisted ✓", broken ? 'bad' : 'ok');
+}
+
+function showToast(html, kind) {
+  const t = document.getElementById('toast');
+  t.innerHTML = html; t.className = 'show ' + (kind || '');
+  clearTimeout(tt); tt = setTimeout(() => t.className = t.className.replace('show','').trim(), 4200);
+}
+</script>
+</body>
+</html>

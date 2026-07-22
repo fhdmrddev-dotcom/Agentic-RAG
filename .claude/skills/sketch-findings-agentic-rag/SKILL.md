@@ -1,6 +1,6 @@
 ---
 name: sketch-findings-agentic-rag
-description: Validated design decisions, CSS patterns, and visual direction for the agent's live-execution UX, the right-side workspace panel, the Phase 094 workflow-mode surfaces, the Phase 095 chat tool-card unification, AND the Phase 103 Workflow Studio (run-card frame + tool-call panel + long-run composition; panel shell, file/diff viewer, ask_user interrupt, chat↔panel seam; harness phase timeline, unified Deep/Harness execution surface, run honesty, 2-pill composer + mode clarity, Workflows page, NL workflow builder; the unified Deep tool-card frame with a status-node rail, the never-vanishes run-status strip + follow-but-release scroll, the output-files hero/working split + per-extension file icons; the requirement-first workflow Builder authoring + read-only vertical phase-spine graph + side-panel forms, the 8-stage publish gauntlet with the judge hard-wall, the built Workflows page library+launch, the workflow run surface where the panel owns the meaningful phase spine + chat carries a thin run receipt, and the three-homes app navigation/IA contract; AND the Phase 112 Document-Management surfaces — the right-side push/split document-detail shell, the per-field ConfidenceChip, and honest inline metadata editing; AND the Phase 114 Virtual-Folders surfaces — the inline no-DSL filter/view builder + relative-date control, the saved-Views sidebar group, the shared Folders+Views NavRow / folder-tree polish, and the Documents-page composition/layout; AND the Phase 117 Document-Relationships panel section — the chip-led grouped-by-direction relationships accordion added to the existing detail panel (outgoing/incoming inverse labels, the masked "no access" row, re-fetch-not-optimistic remove) and the type-first searchable-typeahead create-link picker on the MoveToFolderDialog shell); AND the Phase 127 energized Workflow Studio re-skin (the publish-gauntlet pip/energy-spine + worded verdict + raw-on-demand, the quiet-idle/alive-active live step-flow) PLUS the cross-cutting ICON CONVENTION (provider/model icons = single-source @lobehub/icons everywhere; phase-type icons = the shared 3D PHASE_GLYPHS map); AND the Phase 146–148 OPERATOR CONTROL ROOM — the operator band+tabs shell (honest locks, plain-language-first + "⌥ Technical names" reveal, non-discoverable 404), the always-on audit-ledger receipt vocabulary (✎ write mark; consequence ≠ receipt), the pinned-vitals Control Plane (dependency health + active-runs-with-Kill via the victim-naming confirm sheet + capability kill-switch grid + spatially-separated maintenance), the two-ledger audit browser (chip filters + paged table + recorded CSV export), the users roster (last-active honesty, victim-naming disable, lockout-proof self-rows, flagged operator grant), and the API-enforced feature-visibility audience map with the extensible-audience (never-boolean) forward-compat contract. Auto-loaded during UI implementation on the Agentic RAG project. Use when building or refactoring ToolCallPanel, RunCard, StreamsProvider, MessageItem, MessageList, OutputFileCard, useMessages, the workspace panel, the harness/workflow run UI, the workflow Builder/authoring, the publish gauntlet (its energized pip/energy-spine + worded verdict), the live phase spine (PhaseCard / PhaseTimeline), provider/model logos anywhere, the Workflows page, the workflow run surface, the app navigation/IA, the composer, the document detail panel, the ConfidenceChip, inline metadata editing, the documents-page right-side panel, the metadata filter/view builder, the saved-Views sidebar + folder tree (FolderNode/FolderTree NavRow), the document relationships panel section / create-link typeahead picker, any `/admin` Control-Room surface (OperatorBand, ControlRoomPage, HealthSignals, ActiveRunsSection, CapabilityGrid, MaintenancePanel, AuditTab, RecentActionsCard, LockedTab, TechnicalNamesToggle, the users roster, the feature-visibility map), any operator confirm sheet / audit receipt / kill-switch, or any chat-surface component that touches the agent's mid-execution moment.
+description: Validated design decisions, CSS patterns, and visual direction for the agent's live-execution UX, the right-side workspace panel, the Phase 094 workflow-mode surfaces, the Phase 095 chat tool-card unification, AND the Phase 103 Workflow Studio (run-card frame + tool-call panel + long-run composition; panel shell, file/diff viewer, ask_user interrupt, chat↔panel seam; harness phase timeline, unified Deep/Harness execution surface, run honesty, 2-pill composer + mode clarity, Workflows page, NL workflow builder; the unified Deep tool-card frame with a status-node rail, the never-vanishes run-status strip + follow-but-release scroll, the output-files hero/working split + per-extension file icons; the requirement-first workflow Builder authoring + read-only vertical phase-spine graph + side-panel forms, the 8-stage publish gauntlet with the judge hard-wall, the built Workflows page library+launch, the workflow run surface where the panel owns the meaningful phase spine + chat carries a thin run receipt, and the three-homes app navigation/IA contract; AND the Phase 112 Document-Management surfaces — the right-side push/split document-detail shell, the per-field ConfidenceChip, and honest inline metadata editing; AND the Phase 114 Virtual-Folders surfaces — the inline no-DSL filter/view builder + relative-date control, the saved-Views sidebar group, the shared Folders+Views NavRow / folder-tree polish, and the Documents-page composition/layout; AND the Phase 117 Document-Relationships panel section — the chip-led grouped-by-direction relationships accordion added to the existing detail panel (outgoing/incoming inverse labels, the masked "no access" row, re-fetch-not-optimistic remove) and the type-first searchable-typeahead create-link picker on the MoveToFolderDialog shell); AND the Phase 127 energized Workflow Studio re-skin (the publish-gauntlet pip/energy-spine + worded verdict + raw-on-demand, the quiet-idle/alive-active live step-flow) PLUS the cross-cutting ICON CONVENTION (provider/model icons = single-source @lobehub/icons everywhere; phase-type icons = the shared 3D PHASE_GLYPHS map); AND the Phase 146–148 OPERATOR CONTROL ROOM — the operator band+tabs shell (honest locks, plain-language-first + "⌥ Technical names" reveal, non-discoverable 404), the always-on audit-ledger receipt vocabulary (✎ write mark; consequence ≠ receipt), the pinned-vitals Control Plane (dependency health + active-runs-with-Kill via the victim-naming confirm sheet + capability kill-switch grid + spatially-separated maintenance), the two-ledger audit browser (chip filters + paged table + recorded CSV export), the users roster (last-active honesty, victim-naming disable, lockout-proof self-rows, flagged operator grant), and the API-enforced feature-visibility audience map with the extensible-audience (never-boolean) forward-compat contract; AND the 2026-07-22 catch-up wrap of five earlier sessions plus the first v3.5 sketch — the Phase 149 MODEL REGISTRY (instrument-table capability editor with the enabled→picker two-layer coupling + propose-only discovery that never auto-enables an un-returned capability), the Phase 152 WORKFLOW RUN INPUTS (the inline-grow Run modal with a bounded per-run scope override + the victim-naming delete cascade where threads become normal chats), the Phase 153 INLINE CITATIONS (per-claim superscript marker attach-on-settle + absence-as-signal + the numbered [n] References footer + hover-peek click-through), the Phase 156 CHAT-HISTORY HOME (collapsed-rail New Chat+Search + the permanent 58px icon rail + a dedicated history column + ⌘K global finder), the Phase 166 ORG-ADMIN shell + identity (org-indigo band+tabs with 3 live + 4 honest locked tabs + RLS-honest audit, the merged identity/org-switcher menu + the org-admin rail Shield-mirror), and the Phase 174 RUN-STATE & LIFECYCLE HONESTY (the tiered dim/amber/red terminal-state vocabulary keyed off persisted runs.status so it survives reload + the run-card header carrying a live pre-answer sub-state + an anchored-from-started_at timer + a single avatar). Auto-loaded during UI implementation on the Agentic RAG project. Use when building or refactoring ToolCallPanel, RunCard, StreamsProvider, MessageItem, MessageList, OutputFileCard, useMessages, the workspace panel, the Model Registry tab, the workflow RunModal / delete-cascade confirm, inline citation markers / the References footer, the nav rail / chat-history column / ⌘K palette, the org-admin shell / org switcher / identity anchor, the honest terminal run-states (cancelled/stopped/blocked/failed) or the pre-answer preparing header, the harness/workflow run UI, the workflow Builder/authoring, the publish gauntlet (its energized pip/energy-spine + worded verdict), the live phase spine (PhaseCard / PhaseTimeline), provider/model logos anywhere, the Workflows page, the workflow run surface, the app navigation/IA, the composer, the document detail panel, the ConfidenceChip, inline metadata editing, the documents-page right-side panel, the metadata filter/view builder, the saved-Views sidebar + folder tree (FolderNode/FolderTree NavRow), the document relationships panel section / create-link typeahead picker, any `/admin` Control-Room surface (OperatorBand, ControlRoomPage, HealthSignals, ActiveRunsSection, CapabilityGrid, MaintenancePanel, AuditTab, RecentActionsCard, LockedTab, TechnicalNamesToggle, the users roster, the feature-visibility map), any operator confirm sheet / audit receipt / kill-switch, or any chat-surface component that touches the agent's mid-execution moment.
 ---
 
 <context>
@@ -16,7 +16,7 @@ description: Validated design decisions, CSS patterns, and visual direction for 
 
 **Acceptance bar:** the **long execution in progress** moment — 30+ seconds into a multi-tool run. Can the user instantly read what the agent did, what it's doing, and trust it's still on track? This directly addresses the documented lived-experience UAT-gap pattern (regressions hiding in slow streams).
 
-**Sketch sessions wrapped:** 2026-05-24 (live-execution UX — sketches 001–003), 2026-05-29 (workspace panel — sketches 004–007), 2026-06-04 (workflow legibility + mode clarity — sketches 008–013, Phase 094), 2026-06-05 (chat tool-card unification — sketches 014–016, Phase 095), 2026-06-14 (Workflow Studio authoring, publish gauntlet, run surface + navigation IA — sketches 018-023, Phase 103), 2026-06-17 (document detail panel + honest metadata editing — sketches 027-028, Phase 112), 2026-06-19 (virtual folders — filter/view builder, relative-date control, saved-Views sidebar + folder-tree NavRow, Documents-page composition — sketches 029-033, Phase 114), 2026-06-20 (document relationships — chip-led grouped-by-direction panel section + type-first typeahead create-link picker — sketches 034-035, Phase 117), 2026-06-27 (Workflow Studio energized re-skin — gauntlet pip/energy-spine + worded verdict + raw-on-demand, quiet-idle/alive-active living step-flow, + the cross-cutting icon convention — sketches 051-052, Phase 127), and the 2026-07-04 batch wrap of six further sessions — 2026-06-16 (Settings provider picker + re-embed lifecycle — sketches 024-026, Phase 111.1), 2026-06-21 (auto-classification — 036-037, Phase 118; governance health — 038-040, Phase 119), 2026-06-23/25 (Trigger Tuner — 041-045, Phases 123/123.1), 2026-06-26 (workflow soul + strict/loose two doors — 046-047, Phase 124), 2026-06-27 (cross-provider chat polish — 048-050, Phase 128), 2026-07-03 (Skill Studio — 053-057, Phase 137), 2026-07-04 (eval production-clean: matrix runs + determinate progress + engine health — 058-060, Phase 137.1), and 2026-07-11 (the Operator Control Room three-session wrap — shell + receipts 061-062 Phase 146; control-plane composition/active-runs-Kill/controls + the assembled linkage contract 063-066 Phase 147; governance audit-browser/users/feature-visibility 067-069 Phase 148)
+**Sketch sessions wrapped:** 2026-05-24 (live-execution UX — sketches 001–003), 2026-05-29 (workspace panel — sketches 004–007), 2026-06-04 (workflow legibility + mode clarity — sketches 008–013, Phase 094), 2026-06-05 (chat tool-card unification — sketches 014–016, Phase 095), 2026-06-14 (Workflow Studio authoring, publish gauntlet, run surface + navigation IA — sketches 018-023, Phase 103), 2026-06-17 (document detail panel + honest metadata editing — sketches 027-028, Phase 112), 2026-06-19 (virtual folders — filter/view builder, relative-date control, saved-Views sidebar + folder-tree NavRow, Documents-page composition — sketches 029-033, Phase 114), 2026-06-20 (document relationships — chip-led grouped-by-direction panel section + type-first typeahead create-link picker — sketches 034-035, Phase 117), 2026-06-27 (Workflow Studio energized re-skin — gauntlet pip/energy-spine + worded verdict + raw-on-demand, quiet-idle/alive-active living step-flow, + the cross-cutting icon convention — sketches 051-052, Phase 127), and the 2026-07-04 batch wrap of six further sessions — 2026-06-16 (Settings provider picker + re-embed lifecycle — sketches 024-026, Phase 111.1), 2026-06-21 (auto-classification — 036-037, Phase 118; governance health — 038-040, Phase 119), 2026-06-23/25 (Trigger Tuner — 041-045, Phases 123/123.1), 2026-06-26 (workflow soul + strict/loose two doors — 046-047, Phase 124), 2026-06-27 (cross-provider chat polish — 048-050, Phase 128), 2026-07-03 (Skill Studio — 053-057, Phase 137), 2026-07-04 (eval production-clean: matrix runs + determinate progress + engine health — 058-060, Phase 137.1), and 2026-07-11 (the Operator Control Room three-session wrap — shell + receipts 061-062 Phase 146; control-plane composition/active-runs-Kill/controls + the assembled linkage contract 063-066 Phase 147; governance audit-browser/users/feature-visibility 067-069 Phase 148), and the 2026-07-22 catch-up batch wrapping five previously-unwrapped sessions — 2026-07-12 (Model Registry capability editor + discovery propose-confirm — 070-071, Phase 149), 2026-07-14 (Workflow run inputs modal + delete cascade — 072-073, Phase 152), 2026-07-15 (inline citation marker + click-through — 074-075, Phase 153), 2026-07-16 (collapsed nav rail + chat-history home + ⌘K — 076-078, Phase 156), 2026-07-21 (identity anchor/org switcher + org-admin shell — 079-080, Phase 166) — plus 2026-07-22 (run-state & lifecycle honesty: tiered terminal states + live pre-answer honesty — 129-130, Phase 174, the first v3.5 sketch)
 </context>
 
 <design_direction>
@@ -474,6 +474,42 @@ The gated `/admin` zone. Full detail: `references/control-room-shell-and-receipt
 |------|-----------|--------------|
 | Matrix, Progress & Engine Health | [references/eval-production-clean.md](references/eval-production-clean.md) | **058-A** matrix = ONE grouped card of 055-B sub-rows (history never floods); one "▣ feeds gate" chip; footer = history-derived mean±stddev (≥2 runs) + Δ lift + deterministic tagged analyst notes; one-click all-configured launcher. **059-A** thin determinate unit bar (cases × 2 + judge; scales to any case count) + per-arm durations as they land + inline violet "◇" advisory `case_feedback` (never a verdict). **060-A** Settings engine-health tile board (✓/✗ per provider, staleness always shown, ✗ = verbatim provider error; ENGINE ≠ model quality) + the judge knob on the 024-A picker with a registry-only list + effective-default 🔒 footer. |
 
+**Model Registry & Discovery (sketches 070–071, Phase 149):**
+
+| Area | Reference | Key Decision |
+|------|-----------|--------------|
+| Model Registry & Discovery | [references/model-registry-and-discovery.md](references/model-registry-and-discovery.md) | **070-A** registry editor = provider-grouped instrument table + inline-edit over the REAL mig-053 columns (068-A roster lineage); the `enabled`→`✓ in picker / ✕ hidden` coupling chip + 🔓/🔒 lock (the SEED-116 two-layer pattern's operator half); OVR-vs-DEF honesty + Reset; schema gaps flagged (`?`), never faked. **071-A** discovery = per-provider live cards (stable-ts, verbatim-error-excluded-not-failed) → ✚New/±Changed/⊘Vanished groups; **propose-only is the hero (SC#3)** — IDs-only providers yield amber "unknown — you set it" inputs, a new model is NEVER auto-enabled; vanished ≠ deleted; every write → 062-A ledger (`model.capability.set` / `model.discover`). |
+
+**Workflow Run Inputs & Safe Delete (sketches 072–073, Phase 152):**
+
+| Area | Reference | Key Decision |
+|------|-----------|--------------|
+| Workflow Run Inputs & Safe Delete | [references/workflow-run-inputs-and-delete.md](references/workflow-run-inputs-and-delete.md) | **072-A** run inputs fold into the LIVE 560px `RunModal` inline-grows (read-only chip → inline `<select>` + quiet `TemplateUpload` button) — the SEED-112 scope shape = a per-run OVERRIDE over the author default, **narrow-only + server-enforced (Phase-098), model can't widen**; `template_input` provenance = honest "stored untrusted / never Jinja-fed" note. **073-A** delete = victim-naming confirm sheet (the 064/068 pattern): **Permanently removed** (definition · versions · run records) vs **Kept — not touched** (chat threads become normal chats — the WFIN-03 no-orphans reassurance); in-flight = cancel-then-delete via the heal path; ✎ recorded. |
+
+**Inline Citations (sketches 074–075, Phase 153):**
+
+| Area | Reference | Key Decision |
+|------|-----------|--------------|
+| Inline Citations | [references/inline-citations.md](references/inline-citations.md) | **074-A** marker = superscript numeral chip, **per-claim sparing** (framing prose flows unmarked → absence-as-signal); **attach-on-settle**, never speculative mid-token; absence taught by an ⓘ, never a banner. **075-A** click-through = hover-peek → click-to-pin popover (Perplexity/Claude.ai-cited feel) as the quick path; today's unnumbered `CitationList` restructured into a **numbered `[n]` References footer keyed 1:1 to the markers**, open-by-default, bidirectional. The binding is **set-membership-safe** (marker `n` = `citations[n]` by construction — no re-ask, read-only). G-5 `MessageItem.tsx`; provider-uniform (SC#10). |
+
+**Chat History & Nav Rail (sketches 076–078, Phase 156):**
+
+| Area | Reference | Key Decision |
+|------|-----------|--------------|
+| Chat History & Nav Rail | [references/chat-history-and-nav.md](references/chat-history-and-nav.md) | **076-B** the collapsed 64px rail keeps New Chat (+) **and** Search (⌕) reachable (icon+tooltip; Search click → expand + focus) — the Anchor-1 fix. **078-D (pivot synthesis)** organizing the list inside a growing sidebar can't win — nav + history compete for one column — so **nav → a permanent 58px icon rail** (growth decoupled forever), **history → a full-height column** with an inline filter (077's search + Today/Yesterday/7d/30d/Older grouping, pure-frontend from `Thread.updated_at`/`folder_id`), **+ ⌘K global finder** (the column filters what you see; ⌘K jumps anywhere). The rail must never re-absorb the history list. |
+
+**Org-Admin Shell & Identity (sketches 079–080, Phase 166):**
+
+| Area | Reference | Key Decision |
+|------|-----------|--------------|
+| Org-Admin Shell & Identity | [references/org-admin-and-identity.md](references/org-admin-and-identity.md) | **079-C** hybrid: identity + org-scoped role badge (`◆ Org-admin` / `Member`) + the org switcher (renders **only at 2+ orgs**, solo = quiet name button) in ONE merged rail-footer menu, **but org-admin is a rail Shield-mirror parallel to the operator amber shield** (SEED-113's user-side mirror, in indigo); admin entry **honestly vanishes** for a member; switch teardown preserves the 067.5 clear-guard. **080-A** the 7-tab shell = **org-indigo** 061-B band+tabs (**amber stays operator-only**), 3 live (Members read-only · Audit · Settings) + 4 honest locked "coming soon" tabs (no roadmap numbers); audit degrades **RLS-honest** ("you see only your own"), never silent-empty. |
+
+**Run-State & Lifecycle Honesty (sketches 129–130, Phase 174):**
+
+| Area | Reference | Key Decision |
+|------|-----------|--------------|
+| Run-State & Lifecycle Honesty | [references/run-state-honesty.md](references/run-state-honesty.md) | **129-C** the terminal vocabulary = a tier ladder keyed off persisted `runs.status`, loudness earned by severity: **dim** for user-chosen (Stopped · "Cancelled — no output yet" replacing the empty bubble) → **amber** for an admin block (kill-switch refusal reason) → **red framed** only for a genuine failure; every marker derived from durable state so it **survives reload** (STATE-01/02). **130-C** the shipped run-card **header** carries a live pre-answer sub-state (Reasoning / Writing execute_code / Spinning up sandbox — counting `reasoning_delta`/`tool_args_progress` as activity, replacing the dead "Setting up agent…"), a timer **anchored to `started_at`** (not mount), and a **single avatar** — fixing STATE-03 + STATE-04 in one instrument. Render layer over state + already-emitted wire events; Deep byte-identical (D-14). G-5: `MessageItem`/`StreamsProvider`/`useMessages`. |
+
 ## Theme
 
 The winning theme file is at [sources/themes/default.css](sources/themes/default.css). Tokens are direct mirrors of `frontend/src/index.css :.dark` — so transitioning sketches to React code should be a straight port, not a rebuild.
@@ -545,6 +581,19 @@ Original sketch HTML files are preserved in `sources/` for complete reference. E
 - [sources/067-audit-browser/](sources/067-audit-browser/) — winner: A (chip filters + paged table; both-ledger source switch; recorded CSV export; B feed / C query-rail preserved)
 - [sources/068-users-and-access/](sources/068-users-and-access/) — winner: A (instrument-table roster; victim-naming disable; flagged operator grant; B expandable / C detail-panel preserved)
 - [sources/069-feature-visibility/](sources/069-feature-visibility/) — winner: A (audience rows; B live end-user preview = documented enhancement; C in-Controls foil = the rejected placement)
+- [sources/070-model-capability-editor/](sources/070-model-capability-editor/) — winner: A (instrument table + inline edit; enabled→picker coupling chip + lock; OVR-vs-DEF honesty)
+- [sources/071-model-discovery-propose-confirm/](sources/071-model-discovery-propose-confirm/) — winner: A (grouped new/changed/vanished diff; propose-only "unknown — you set it" hero; verbatim provider error)
+- [sources/072-run-inputs-modal/](sources/072-run-inputs-modal/) — winner: A (inline-grows chip→select + quiet upload; bounded per-run scope override; B 3-way toggle = SEED-112 alt)
+- [sources/073-workflow-delete-cascade/](sources/073-workflow-delete-cascade/) — winner: A (victim-naming sheet: removed vs kept · threads→normal chats; B type-to-confirm / C archive preserved)
+- [sources/074-inline-citation-marker/](sources/074-inline-citation-marker/) — winner: A (superscript numeral chip, attach-on-settle; absence-as-signal; ▶ replay-the-stream demo)
+- [sources/075-citation-clickthrough/](sources/075-citation-clickthrough/) — winner: A (hover-peek → click-to-pin + numbered References footer; B scroll+flash / C panel preserved)
+- [sources/076-collapsed-nav-rail/](sources/076-collapsed-nav-rail/) — winner: B (New Chat + Search rail; per-frame Proposed⇄Today-broken toggle)
+- [sources/077-thread-list-organization/](sources/077-thread-list-organization/) — reframed by 078 (no winner; its search + date/folder grouping = 078's column content)
+- [sources/078-chat-history-home/](sources/078-chat-history-home/) — winner: D (synthesis: permanent 58px icon rail + history column + ⌘K; renders the whole app frame)
+- [sources/079-identity-anchor-and-org-switcher/](sources/079-identity-anchor-and-org-switcher/) — winner: C (hybrid merged menu + org-admin rail Shield-mirror; Solo⇄Multi + Member⇄Org-admin controls)
+- [sources/080-org-admin-shell/](sources/080-org-admin-shell/) — winner: A (org-indigo band+tabs, 3 live + 4 locked; RLS-honest audit degrade; Plain⇄⌥Technical toggle)
+- [sources/129-terminal-run-states/](sources/129-terminal-run-states/) — winner: C (tiered dim/amber/red terminal vocabulary off runs.status; Today-broken + Reload sims)
+- [sources/130-live-preparing-honesty/](sources/130-live-preparing-honesty/) — winner: C (run-header live sub-state + anchored timer + single avatar; live clock, Nav-away-and-back sim)
 
 **Phase 094 grounding** — [sources/094-grounding/](sources/094-grounding/) holds `BRIEF.md` (real harness SSE events + the "wire-only / dropped by `api.ts`" analysis) and `DATA-CONTRACT.md` (the event/wire data contract + the real-vs-invented field boundary). Read these for exact event names and which fields actually exist before wiring any 008–013 surface.
 
@@ -663,6 +712,42 @@ Load and apply this skill when:
 - Adding an operator audit action or receipt — inherit the 062-A vocabulary (plain sentence + ✎ write mark; the ledger is the receipt; polls never logged)
 - Touching feature visibility or access-control storage — the extensible-audience contract (never booleans; one swappable resolver; SEED-115 / v3.4 org-RBAC)
 - Working on any phase tagged `admin`, `operator`, `control-room`, `control-plane`, `kill-switches`, `audit`, `users`, `feature-visibility`, or on Phases 146/147/148 follow-ups (149 Model Registry / 150 Secrets inhabit the same shell)
+
+**Model Registry & Discovery (sketches 070–071, Phase 149) — load when:**
+
+- Building the Control Room Model Registry tab body — the instrument-table capability editor over `model_capabilities_overrides`, the `enabled`→picker coupling chip + lock, OVR-vs-DEF display, or the discovery propose-confirm flow (`references/model-registry-and-discovery.md`)
+- Building ANY propose-only surface (never auto-apply a value the source didn't return — the SC#3 pattern) or a per-provider discovery/health run with verbatim-error-excluded-not-failed
+- Working on any phase tagged `model-registry`, `discovery`, `model-01`, `model-02`, `two-layer`, or on Phase 149 (150 Secrets inhabits the same shell)
+
+**Workflow Run Inputs & Safe Delete (sketches 072–073, Phase 152) — load when:**
+
+- Extending the `RunModal` (`WorkflowsPage.tsx`) with run inputs — a template file upload or an editable KB-folder scope; the scope is a bounded per-run override, server-enforced, never a widen (`references/workflow-run-inputs-and-delete.md`)
+- Building a delete/destructive-cascade confirm for a workflow (or anything with downstream victims) — the victim-naming removed-vs-kept sheet, threads-become-normal-chats, cancel-then-delete for in-flight
+- Working on any phase tagged `run-inputs`, `wfin-01`/`02`/`03`, `template-upload`, `kb-scope`, `workflow-delete`, `cascade`, or on Phase 152
+
+**Inline Citations (sketches 074–075, Phase 153) — load when:**
+
+- Building per-claim inline citation markers, the streamed attach-on-settle behavior, absence-as-signal, the click-through popover, or the numbered `[n]` References footer (`references/inline-citations.md`)
+- Touching the citation render in `MessageItem.tsx` / `MarkdownRenderer` (G-5) or `CitationList.tsx` — the marker `n` = `citations[n]` set-membership rule (never a post-hoc re-ask)
+- Working on any phase tagged `inline-citations`, `cite-01`, `citation-footer`, `absence-as-signal`, or on Phase 153 (and SEED-119 cited-vs-retrieved superset footer → v3.5 Phase 178)
+
+**Chat History & Nav Rail (sketches 076–078, Phase 156) — load when:**
+
+- Building or refactoring the collapsed nav rail (New Chat + Search reachability), the permanent 58px icon rail, the dedicated chat-history column + its inline filter/date-grouping, or the ⌘K global finder (`references/chat-history-and-nav.md`)
+- Tempted to organize the thread list inside a growing sidebar (the reframed dead-end) — decouple nav growth from history instead
+- Working on any phase tagged `nav`, `chat-history`, `thread-list`, `command-palette`, `rail`, `polish-01`, `seed-045`, or on Phase 156 / the v3.5 Phase 178 chat-polish umbrella
+
+**Org-Admin Shell & Identity (sketches 079–080, Phase 166) — load when:**
+
+- Building the profile identity anchor / org switcher / role badge in the `NavPanel` rail footer, or the org-admin console (band+tabs, Members roster, org audit, Settings, locked tabs) — reuse the 061-B shell in **org-indigo**, amber stays operator-only (`references/org-admin-and-identity.md`)
+- Applying tenancy-surface honesty: switcher only at 2+ orgs, admin entry vanishes for a member, audit degrades RLS-honest not silent-empty, `<OrgContext>` stays OUTSIDE the stream path (067.5 clear-guard)
+- Working on any phase tagged `org-admin`, `org-switcher`, `tenancy`, `identity-anchor`, `admin-01`..`05`, `seed-113`, or on Phase 166 / the v3.5 Phase 177 org-surface polish (ORGUX-01/02)
+
+**Run-State & Lifecycle Honesty (sketches 129–130, Phase 174) — load when:**
+
+- Building the honest terminal-state vocabulary (Stopped / Cancelled-no-output / Blocked / Failed) keyed off persisted `runs.status`, the pre-answer live sub-state (replacing "Setting up agent…"), the anchored-from-`started_at` timer, or the single-avatar fix (`references/run-state-honesty.md`)
+- Touching `MessageItem.tsx` / `StreamsProvider.tsx` / `useMessages.ts` / `threads.py` run-lifecycle to render a cancel/kill/failed state, an empty-bubble suppression, or a nav-back timer/avatar reconcile — a render layer over state, Deep byte-identical (D-14)
+- Working on any phase tagged `run-state`, `lifecycle`, `state-01`..`04`, `cancelled`, `stopped`, `preparing`, `anchored-timer`, or on Phase 174 (the v3.5 run-state honesty foundation the later chat phases render on)
 
 Skip when:
 
@@ -796,6 +881,37 @@ Skip when:
 - 067-audit-browser (winner: A — filter strip + paged table, both ledgers)
 - 068-users-and-access (winner: A — instrument table + graded guards)
 - 069-feature-visibility (winner: A — audience rows + extensible-audience contract)
+
+**Phase 149 — Model Registry & Discovery (2026-07-12):**
+
+- 070-model-capability-editor (winner: A — instrument table + inline edit; the enabled→picker two-layer coupling + lock)
+- 071-model-discovery-propose-confirm (winner: A — grouped new/changed/vanished diff; propose-only "you set it" hero, never auto-enable)
+
+**Phase 152 — Workflow Run Inputs & Safe Delete (2026-07-14):**
+
+- 072-run-inputs-modal (winner: A — inline-grows: chip→`<select>` + quiet upload; bounded per-run scope override)
+- 073-workflow-delete-cascade (winner: A — victim-naming confirm sheet; threads become normal chats)
+
+**Phase 153 — Inline Citations (2026-07-15):**
+
+- 074-inline-citation-marker (winner: A — superscript numeral chip, attach-on-settle; absence-as-signal)
+- 075-citation-clickthrough (winner: A — hover-peek → click-to-pin + numbered References footer)
+
+**Phase 156 — Chat History & Nav Rail (2026-07-16):**
+
+- 076-collapsed-nav-rail (winner: B — New Chat + Search rail, icon+tooltip)
+- 077-thread-list-organization (reframed by 078, no winner — its search/date/folder grouping is 078's column content)
+- 078-chat-history-home (winner: D — synthesis: permanent 58px icon rail + full-height history column + ⌘K)
+
+**Phase 166 — Org-Admin Shell & Identity (2026-07-21):**
+
+- 079-identity-anchor-and-org-switcher (winner: C — hybrid merged identity+switcher menu + org-admin rail Shield-mirror)
+- 080-org-admin-shell (winner: A — org-indigo band+tabs; 3 live + 4 honest locked; RLS-honest audit)
+
+**Phase 174 — Run-State & Lifecycle Honesty (2026-07-22):**
+
+- 129-terminal-run-states (winner: C — tiered dim/amber/red terminal vocabulary keyed off persisted `runs.status`)
+- 130-live-preparing-honesty (winner: C — run-header carries the live sub-state + anchored timer + single avatar)
 
 Excluded: 017-cross-thread-run-stop (orphan — no README, no MANIFEST row, no locked winner).
 </metadata>

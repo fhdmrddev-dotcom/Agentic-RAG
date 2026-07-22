@@ -1,5 +1,52 @@
 # Sketch Wrap-Up Summary
 
+## Wrap-up 2026-07-22 — v3.3/v3.4 catch-up + first v3.5 sketch (Phases 149/152/153/156/166 + 174)
+
+**Date:** 2026-07-22
+**Sketches processed:** 13 (13 included, 0 excluded) — 11 previously-unwrapped from v3.3/v3.4 + 2 new from v3.5
+**Design areas (6 new reference files):** model-registry-and-discovery · workflow-run-inputs-and-delete · inline-citations · chat-history-and-nav · org-admin-and-identity · run-state-honesty
+**Skill output:** `./.claude/skills/sketch-findings-agentic-rag/` (append mode — now covers 070–080 + 129–130; the Processed list had stalled at 069)
+
+### Why this batch existed
+
+The `--wrap-up` was never run after Phases 149/152/153/156/166 — the skill's Processed list stopped at sketch **069** (Phase 148), leaving 11 operator-approved sketches recorded only in MANIFEST + their READMEs, not in the loadable skill. This caught all 11 up plus the 2 new Phase-174 run-state sketches, so the skill is complete + current through v3.5's first phase.
+
+### Included Sketches
+
+| # | Name | Winner | Design Area | Phase |
+|---|------|--------|-------------|-------|
+| 070 | model-capability-editor | A | Model Registry & Discovery | 149 |
+| 071 | model-discovery-propose-confirm | A | Model Registry & Discovery | 149 |
+| 072 | run-inputs-modal | A | Workflow Run Inputs & Safe Delete | 152 |
+| 073 | workflow-delete-cascade | A | Workflow Run Inputs & Safe Delete | 152 |
+| 074 | inline-citation-marker | A | Inline Citations | 153 |
+| 075 | citation-clickthrough | A | Inline Citations | 153 |
+| 076 | collapsed-nav-rail | B | Chat History & Nav Rail | 156 |
+| 077 | thread-list-organization | _(reframed by 078 — no winner)_ | Chat History & Nav Rail | 156 |
+| 078 | chat-history-home | D | Chat History & Nav Rail | 156 |
+| 079 | identity-anchor-and-org-switcher | C | Org-Admin Shell & Identity | 166 |
+| 080 | org-admin-shell | A | Org-Admin Shell & Identity | 166 |
+| 129 | terminal-run-states | C | Run-State & Lifecycle Honesty | 174 |
+| 130 | live-preparing-honesty | C | Run-State & Lifecycle Honesty | 174 |
+
+### Key Decisions (headline per area)
+
+1. **Model Registry & Discovery:** instrument-table capability editor over the real mig-053 columns + the `enabled`→picker two-layer coupling chip + lock; discovery is **propose-only** — a new/un-returned capability is NEVER auto-enabled (SC#3), vanished ≠ deleted, verbatim provider errors excluded-not-failed.
+2. **Workflow Run Inputs & Safe Delete:** the Run modal inline-grows (chip→`<select>` + quiet upload) with a **bounded, server-enforced per-run scope override** (SEED-112); delete = the 064/068 **victim-naming sheet** where threads become normal chats (WFIN-03 no-orphans).
+3. **Inline Citations:** per-claim superscript marker, **attach-on-settle**, absence-as-signal via an ⓘ; hover-peek → click-to-pin + a numbered `[n]` References footer keyed 1:1; the binding is **set-membership-safe** (`n` = `citations[n]`, no re-ask).
+4. **Chat History & Nav Rail:** the collapsed rail keeps New Chat + Search; the **pivot** — nav → a permanent 58px icon rail (growth decoupled), history → a full-height column + ⌘K, so a growing nav can never starve history.
+5. **Org-Admin Shell & Identity:** merged identity/org-switcher menu (switcher only at 2+ orgs) + org-admin as a rail **Shield-mirror**; the 7-tab shell reuses 061-B band+tabs in **org-indigo** (amber stays operator), 3 live + 4 honest locked, audit degrades **RLS-honest**.
+6. **Run-State & Lifecycle Honesty:** the tiered **dim → amber → red** terminal vocabulary keyed off persisted `runs.status` (survives reload — STATE-01/02); the run-card header carries a **live pre-answer sub-state** + a timer **anchored to `started_at`** + a single avatar (STATE-03/04). The sharpest statement of the through-line: honesty derived from durable state, rendered in the calmest surface that can carry it, loudness earned by severity.
+
+### Cross-cutting patterns now reusable in the skill
+
+- The **victim-naming confirm sheet** (064/068) generalizes to any destructive action with downstream victims (073).
+- **Propose-only** (071) generalizes to any surface applying external values — never auto-apply what the source didn't return.
+- **RLS-honest degrade** (080) — a permission-gated view shows "you see only your own", never a silent-empty list.
+- The run-state primitives (129/130) are the foundation the rest of v3.5's chat surface renders on (176 render correctness, 178 chat polish).
+
+---
+
 ## Wrap-up 2026-07-11 — Operator Control Room (Phases 146–148)
 
 **Date:** 2026-07-11
