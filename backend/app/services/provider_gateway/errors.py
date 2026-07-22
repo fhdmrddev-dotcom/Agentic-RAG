@@ -66,6 +66,7 @@ ErrorKind = Literal[
     "auth",
     "billing",
     "bad_request",
+    "reasoning_tools_unsupported",
     "server",
     "context_overflow",
     "unknown",
@@ -96,6 +97,48 @@ def _has_insufficient_quota(exc: Exception) -> bool:
             return True
         if err == "insufficient_quota":
             return True
+    return False
+
+
+# Phase 175 XPROV-01 (D-04): the exact OpenAI 400 substrings for the reasoning-first
+# tools-unsupported constraint (gpt-5.6-class). Matched only against the STRUCTURED body
+# message, lower-cased — never str(exc) — so a crafted top-level message cannot force a
+# misclassification of an unrelated 400 (T-175-03-02).
+_REASONING_TOOLS_SIGNATURES = (
+    "function tools with reasoning_effort are not supported",
+    "reasoning_effort to 'none'",
+    "/v1/responses",
+)
+
+
+def _is_bad_request(exc: Exception) -> bool:
+    """True when the exception represents an HTTP 400 (typed subclass OR numeric status)."""
+    if _isinstance_any(exc, _OpenAIBadRequestError, _AnthropicBadRequestError):
+        return True
+    status = getattr(exc, "status_code", None)
+    return isinstance(status, int) and status == 400
+
+
+def _has_reasoning_tools_signature(exc: Exception) -> bool:
+    """Detect the gpt-5.6 reasoning-tools-unsupported 400 from its STRUCTURED body.
+
+    Mirrors :func:`_has_insufficient_quota`: reads ``exc.body["error"]["message"]`` (and the
+    reinforcing ``param == "reasoning_effort"``) — NEVER a loose scan of ``str(exc)`` (the
+    exact info-tampering guard T-175-03-02). Returns False when there is no structured body,
+    so any 400 lacking the signature stays ``bad_request`` (D-14).
+    """
+    body = getattr(exc, "body", None)
+    if not isinstance(body, dict):
+        return False
+    err = body.get("error")
+    if not isinstance(err, dict):
+        return False
+    if err.get("param") == "reasoning_effort":
+        return True
+    msg = err.get("message")
+    if isinstance(msg, str):
+        low = msg.lower()
+        return any(sig in low for sig in _REASONING_TOOLS_SIGNATURES)
     return False
 
 
@@ -137,6 +180,13 @@ def classify_provider_error(provider: str, exc: Exception) -> ErrorKind:
 
     # Anthropic + all OpenAI-compatible providers (openai/deepseek/moonshot/glm/
     # zhipu/minimax/openrouter) and any unrecognized provider name.
+    # Phase 175 XPROV-01 (D-04): the gpt-5.6-class reasoning-tools 400 gets a dedicated honest
+    # kind BEFORE the generic bad_request classification. NARROW by construction — fires only
+    # when the error is a 400 AND its STRUCTURED body carries the reasoning-tools signature
+    # (mirrors _has_insufficient_quota); a 400 lacking the signature is untouched (bad_request,
+    # D-14) and a crafted str(exc) cannot force it (T-175-03-02).
+    if _is_bad_request(exc) and _has_reasoning_tools_signature(exc):
+        return "reasoning_tools_unsupported"
     # isinstance against the typed SDK subclasses FIRST (where importable).
     if _isinstance_any(exc, _OpenAIRateLimitError, _AnthropicRateLimitError):
         # A rate-limit is rate_limit even if a billing code rides along —
@@ -187,6 +237,11 @@ _MESSAGES: dict[str, str] = {
     "bad_request": (
         "*Model parameter error — this model may not support the current "
         "configuration.*"
+    ),
+    "reasoning_tools_unsupported": (
+        "*This reasoning model can't use tools on the current endpoint yet, so "
+        "it was switched to prompt-based tools automatically. If tool calls keep "
+        "failing, pick a non-reasoning OpenAI model in Settings.*"
     ),
     "context_overflow": (
         "*The conversation has grown too long for this model's context window. "
