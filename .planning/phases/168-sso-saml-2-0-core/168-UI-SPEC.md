@@ -1,7 +1,7 @@
 ---
 phase: 168
 slug: sso-saml-2-0-core
-status: draft
+status: approved
 shadcn_initialized: true
 preset: none
 created: 2026-07-22
