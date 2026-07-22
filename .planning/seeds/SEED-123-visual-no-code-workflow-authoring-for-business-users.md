@@ -49,5 +49,15 @@ The engine the operator is happy with stays. This is a new authoring + observabi
 
 v3.4 is the one-way multi-tenancy door — orthogonal. This is a Large net-new UX build (canvas + node model + observability). It is **better after v3.4** (orgs/roles enable per-dept authoring). Operator preference is to prioritize it on the UX track right after v3.4 — see `operator_preference` frontmatter; confirm at v3.4-close `/gsd:new-milestone`. **Recommendation on record:** do NOT bundle this Large build with the lighter UI/UX-polish + chat-polish cluster ([[SEED-045]]) — they are different kinds of work (build vs cleanup); sequence them as adjacent-but-separate milestones.
 
+## v3.4-close confirmation (2026-07-22) — sequencing locked + hard requirements added
+
+At the v3.4-close `/gsd:new-milestone`, the operator **confirmed** the recorded sequencing: **v3.5 = UX Consolidation & Chat Polish** (the lighter cleanup cluster — [[SEED-045]] + the parked chat-surface bug backlog + new v3.4 org-surface polish + plain-language extensions), then **this seed = v3.6 = Visual Workflow Studio**, run **research-first**. The two stay separate milestones (do NOT bundle the Large build with the polish pass — re-confirmed).
+
+**Three operator-stated HARD requirements for the v3.6 build (captured verbatim so they become acceptance gates, not hopes):**
+
+1. **Preserve v1 + revert-at-any-time.** The existing, working workflow engine AND its current authoring doors ("Describe & run" / "Author & govern") must stay untouched and **feature-flagged**, so if the visual canvas breaks anything we flip the flag off and land back on exactly today's behavior. Revertibility is a milestone acceptance gate, not a nice-to-have. (Already the design intent — "build ON what exists, NOT a rewrite" + the standing D-14 red line / flag-gated harness / Deep byte-identical — but now an explicit, tested gate.)
+2. **Study the best-in-class and beat them.** Research **Glean AI + Beam AI + n8n** (the three the operator named) — plus the no-code class (Zapier / Make / Flowise / LangFlow) — for how each reconciles easy drag-and-drop authoring with governed/safe/observable execution. Take the best patterns; the bar is to compete with and beat them.
+3. **Comprehensive external-integration story.** A no-code builder eventually connects to the outside world — **email, JIRA, and other external providers**. This ties the visual-builder milestone to the **connector / integration platform** (Open Platform track — REST API + MCP + service accounts, [[SEED-013]] / [[SEED-031]]). Open research question the v3.6 milestone MUST answer up front: does the builder ship its own connector framework, or does it sequence with / depend on Open Platform? Decide via research, not blind.
+
 ## Related
 [[SEED-051]] (NL workflow authoring — realized; the AI-seed half) · [[SEED-086]] (visual multi-agent representation — run-viz sibling) · [[SEED-045]] (UI/UX polish pass — the adjacent cleanup track) · [[SEED-085]] (user-vs-admin terminology) · [[SEED-052]] (interactive HITL todo-driven execution) · [[SEED-113]] (profile/identity — the org-authoring context).

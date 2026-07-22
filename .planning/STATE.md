@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v3.4
-milestone_name: Multi-Tenancy & Org Access
-status: Awaiting next milestone
-last_updated: "2026-07-22T10:37:13.776Z"
-last_activity: 2026-07-22 — Milestone v3.4 completed and archived
+milestone: v3.5
+milestone_name: UX Consolidation & Chat Polish
+status: planning
+last_updated: "2026-07-22T10:58:27.364Z"
+last_activity: 2026-07-22
 progress:
-  total_phases: 28
-  completed_phases: 10
-  total_plans: 56
-  completed_plans: 56
-  percent: 36
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -22,7 +22,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-20 — Phase 163 THE ATOMIC CRUX complete; membership RLS enforced)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** v3.4 CORE (160-168) SHIPPED + archived 2026-07-22. STRETCH 169-173 DEFERRED (carry-forward guide `.planning/v3.4-STRETCH-CARRYFORWARD.md`). **Next: visual no-code workflow authoring (SEED-123)** — an authoring layer over the existing harness engine; start via `/gsd:new-milestone` (or `/gsd:sketch` the node canvas first). Operator pref: UX track before Open Platform (SEED-045 chat-polish, then SEED-123).
+**Current focus:** **v3.5 UX Consolidation & Chat Polish STARTED 2026-07-22** (defining requirements) — the parked chat-surface bug backlog + SEED-045 UI/UX polish + new v3.4 org-surface polish + SEED-085 plain-language extensions. Operator-confirmed sequencing at v3.4-close: polish cluster now (v3.5), then **Visual / No-Code Workflow Studio ([[SEED-123]]) as v3.6** (research-first; 3 hard requirements — preserve-v1/revert · study Glean/Beam/n8n · comprehensive email/JIRA integration — captured in the seed). v3.4 CORE (160-168) shipped + archived; STRETCH 169-173 fold back per their triggers.
 
 ## Deferred Items
 
@@ -42,10 +42,10 @@ Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 op
 
 ## Current Position
 
-Phase: Milestone v3.4 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-07-22 — Milestone v3.4 completed and archived
+Status: Defining requirements
+Last activity: 2026-07-22 — Milestone v3.5 started
 
 ### Quick Tasks Completed
 
