@@ -56,6 +56,18 @@ vi.mock("@/lib/api", () => ({
   getActiveRuns: mockGetActiveRuns,
   getSnapshot: mockGetSnapshot,
   cancelRun: mockCancelRun,
+  // Phase 176-04 RENDER-03: StreamsProvider's non-dispatch early-return stashes a
+  // quiet reconcileErrors hint as an ApiError (the same 099-08 seam carrier that
+  // renders a custom banner message). The provider imports ApiError from this module,
+  // so the mock must provide a compatible constructor or `new ApiError(...)` throws.
+  ApiError: class ApiError extends Error {
+    status: number
+    constructor(message: string, status: number) {
+      super(message)
+      this.name = "ApiError"
+      this.status = status
+    }
+  },
 }))
 
 vi.mock("@/lib/supabase", () => ({
@@ -93,6 +105,7 @@ beforeEach(() => {
     streamingThreads: new Set<string>(),
     fallbackNotices: new Map<string, string>(),
     reconcileErrors: new Map<string, Error>(),
+    failedSendDrafts: new Map<string, string>(),
     loadingThreads: new Set<string>(),
     subscriptionsByThread: new Map<string, Set<string>>(),
   })
@@ -487,5 +500,97 @@ describe("Phase 174-04 STATE-04 — pre-runId double-mount collapses to one avat
     // The temp-a/temp-b twin collapses to temp-a; the amber + harness rows survive.
     const assistantIds = rendered.filter((m) => m.role === "assistant").map((m) => m.id)
     expect(assistantIds).toEqual(["temp-a", "temp-amber", "harness-ans"])
+  })
+})
+
+/**
+ * Phase 176-04 RENDER-03 (D-10.2 / D-11) — honesty guarantee on the non-dispatch
+ * early-return.
+ *
+ * sendMessage's duplicate-guard (`if (sendingThreadsRef.current.has(threadId))
+ * return`) protects against a re-entrant/racing second send into a thread that is
+ * already sending (SEED-055 per-thread mutex). It USED to return SILENTLY — so if a
+ * fresh-thread reconcile race ever routed the real send through this branch, the
+ * user's just-typed message vanished with no trace (the intermittent silent
+ * send-drop, BUG-260603-01).
+ *
+ * Fix (Task 1): before returning, stash the dropped draft in `failedSendDrafts` +
+ * a quiet `reconcileErrors` hint through the EXISTING 099-08 recovery seam (the same
+ * store-update shape as the ApiError rollback path) so ChatArea's
+ * `prefillMessage={failedDraft ?? …}` restores the composer text and the per-thread
+ * banner surfaces the honest hint. No new toast/error channel (D-11). The
+ * successful-dispatch path and the ApiError rollback are untouched.
+ */
+describe("Phase 176-04 RENDER-03 — non-dispatch early-return stashes an honest recoverable draft", () => {
+  it("stashes failedSendDrafts + a quiet reconcileErrors hint when a second same-thread send hits the duplicate-guard", async () => {
+    const THREAD_ID = "thread-nondispatch"
+
+    // Gate postMessage so the FIRST send stays in flight (sendingThreadsRef holds
+    // THREAD_ID) while the SECOND send fires and hits the duplicate-guard.
+    let resolvePost!: (resp: { run_id: string; message_id: string }) => void
+    const postPromise = new Promise<{ run_id: string; message_id: string }>((resolve) => {
+      resolvePost = resolve
+    })
+    mockPostMessage.mockImplementation(() => postPromise)
+    mockGetSnapshot.mockResolvedValue({
+      messages: [],
+      active_runs: [],
+      since_cursors: {},
+      runs_status: {},
+      recently_active: [],
+    })
+
+    const { result } = renderProvider()
+
+    // Send #1 — dispatches, suspends at the gated postMessage → the thread is now in
+    // sendingThreadsRef for the duration.
+    let firstSend!: Promise<void>
+    await act(async () => {
+      firstSend = result.current.sendMessage(THREAD_ID, "first message")
+    })
+    expect(mockPostMessage).toHaveBeenCalledTimes(1)
+
+    // Send #2 into the SAME thread — hits the duplicate-guard non-dispatch early-return.
+    await act(async () => {
+      await result.current.sendMessage(THREAD_ID, "second dropped message")
+    })
+
+    // The second send did NOT dispatch (postMessage still called exactly once)…
+    expect(mockPostMessage).toHaveBeenCalledTimes(1)
+
+    // …but it was NOT silently lost: the dropped draft + a quiet retry hint are
+    // stashed on the EXISTING failedSendDrafts / reconcileErrors seam.
+    const state = useStreamsStore.getState()
+    expect(state.failedSendDrafts.get(THREAD_ID)).toBe("second dropped message")
+    expect(state.reconcileErrors.get(THREAD_ID)?.message).toBe("Couldn't send — tap to retry")
+
+    // Finish the first send cleanly so no promise dangles.
+    mockSubscribeToRun.mockResolvedValue(undefined)
+    await act(async () => {
+      resolvePost({ run_id: "run-1", message_id: "msg-1" })
+    })
+    void firstSend
+  })
+
+  it("a normal successful send stashes nothing (no false send-drop hint)", async () => {
+    const THREAD_ID = "thread-clean-send"
+    mockPostMessage.mockResolvedValue({ run_id: "run-ok", message_id: "msg-ok" })
+    mockSubscribeToRun.mockResolvedValue(undefined)
+    mockGetSnapshot.mockResolvedValue({
+      messages: [],
+      active_runs: [],
+      since_cursors: {},
+      runs_status: {},
+      recently_active: [],
+    })
+
+    const { result } = renderProvider()
+    await act(async () => {
+      await result.current.sendMessage(THREAD_ID, "clean message")
+    })
+
+    const state = useStreamsStore.getState()
+    expect(state.failedSendDrafts.has(THREAD_ID)).toBe(false)
+    expect(state.reconcileErrors.has(THREAD_ID)).toBe(false)
   })
 })

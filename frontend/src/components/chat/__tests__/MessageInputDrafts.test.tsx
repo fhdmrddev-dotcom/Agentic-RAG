@@ -72,4 +72,45 @@ describe("099-08 per-thread composer drafts", () => {
     rerender(<MessageInput onSend={onSend} disabled={false} threadId={null} />)
     expect(textarea().value).toBe("typed before any thread exists")
   })
+
+  it("restores a stashed send-drop draft via the prefill seam even after a send cleared the box", () => {
+    // Phase 176-04 RENDER-03 (D-10.2): MessageInput clears the composer
+    // synchronously on send (setValue("") + composerDraftsByThread.delete). When a
+    // send takes the non-dispatch early-return, ChatArea feeds the stashed
+    // failedSendDrafts value back through `prefillMessage`; the composer must
+    // re-populate from prefillMessage even though it was JUST cleared, so the user
+    // never loses the message. This is the load-bearing restore that closes the loop.
+    const onSend = vi.fn()
+    const onClearPrefill = vi.fn()
+    const { rerender } = render(
+      <MessageInput
+        onSend={onSend}
+        disabled={false}
+        threadId="thread-A"
+        prefillMessage={null}
+        onClearPrefill={onClearPrefill}
+      />,
+    )
+
+    // Type + send → the box is cleared synchronously by handleSend.
+    fireEvent.change(textarea(), { target: { value: "dropped message" } })
+    fireEvent.keyDown(textarea(), { key: "Enter" })
+    expect(onSend).toHaveBeenCalledWith("dropped message")
+    expect(textarea().value).toBe("")
+
+    // The send-drop recovery restores the stashed draft through the prefill seam.
+    rerender(
+      <MessageInput
+        onSend={onSend}
+        disabled={false}
+        threadId="thread-A"
+        prefillMessage="dropped message"
+        onClearPrefill={onClearPrefill}
+      />,
+    )
+    expect(textarea().value).toBe("dropped message")
+    // The prefill effect consumes the value once (onClearPrefill fires so it does
+    // not re-fill on every subsequent render).
+    expect(onClearPrefill).toHaveBeenCalled()
+  })
 })
