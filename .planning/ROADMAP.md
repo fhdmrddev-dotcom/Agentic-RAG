@@ -232,7 +232,13 @@ Ship only if CORE lands clean and budget remains. First-to-cut ordering: SSO/OID
   1. An org-admin registers a SAML 2.0 IdP via Supabase's native SAML SP (Cloud Pro+ managed OR self-hosted GoTrue, un-gated), provisioned via `supabase sso add`; users route to it by email domain.
   2. On first SSO login, JIT provisioning (INV-02's seam) creates the `org_members` row, and attribute→claim mapping feeds department import.
   3. Email/password fallback is RETAINED (SSO enforcement explicitly deferred) — an existing user can still sign in the old way; no `python3-saml` (Supabase owns the SAML parsing).
-**Plans**: TBD
+**Plans**: 6 plans
+- [ ] 168-01-PLAN.md — Migration 113: sso_configs firming + the load-bearing org-admin `sso:manage` grant (+ status/approval columns, lowercased-domain uniqueness, encrypted mgmt-token column) [BLOCKING live apply]
+- [ ] 168-02-PLAN.md — Deployment config + one provider-CRUD proxy service (two env-switched adapters, fail-closed) + public-domain blocklist
+- [ ] 168-03-PLAN.md — `require_sso_manage` authz guard + domain-gated idempotent JIT `provision_sso_membership` (member-only, dup-email-tolerant)
+- [ ] 168-04-PLAN.md — org.py SSO endpoints (`/org/sso/providers` CRUD · `/org/sso/route` · `/org/sso/provision`) + operator approval + `/org/me` can_manage_sso
+- [ ] 168-05-PLAN.md — Frontend data + auth layer (api SSO fns · canManageSso fail-closed flag · `signInWithSSO` · SSO-session JIT provision-then-reprobe)
+- [ ] 168-06-PLAN.md — SSO tab live in the 166 shell + identifier-first `SignInForm` (password fallback retained)
 **UI hint**: yes
 
 #### Phase 169: Dept-Admin Shell (STRETCH)
