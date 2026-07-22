@@ -33,8 +33,9 @@ import logging
 import openai
 from starlette.concurrency import run_in_threadpool
 
-from app.config import settings, _SUB_AGENT_MODEL_DEFAULTS
+from app.config import settings, _SUB_AGENT_MODEL_DEFAULTS, get_model_capability
 from app.services.openai_service import _uses_max_completion_tokens
+from app.services.sub_agent_models import provider_safe_utility_model
 from app.utils.db import aexec
 
 logger = logging.getLogger(__name__)
@@ -124,9 +125,16 @@ def generate_thread_title(
             )
         else:
             # Multi-model providers: try sub-agent override, then provider default, then fallback.
-            override = (
+            # Phase 175 XPROV-03 (D-03): drop a stale cross-provider sub_agent_model
+            # (its inferred provider != active) BEFORE the call via the shared guard.
+            # When the guard returns None (cross-provider mismatch) we keep the existing
+            # fall-through to _SUB_AGENT_MODEL_DEFAULTS[provider] — so no 404 is raised →
+            # no fallback_model emit → no misleading banner (D-04 suppress-when-fine is
+            # automatic). A same-provider override still passes through byte-identically.
+            override = provider_safe_utility_model(
+                user_settings,
                 (user_settings.sub_agent_model if user_settings else "")
-                or settings.sub_agent_model
+                or settings.sub_agent_model,
             )
             if override:
                 model = override
