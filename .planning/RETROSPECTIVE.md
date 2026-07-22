@@ -587,6 +587,42 @@ Made the platform operable + configurable by a non-developer operator from the U
 - Model mix: predominantly Opus (execution + orchestration + the secure-phase auditor).
 - ~8 days, 14 phases (95 plans / 212 tasks); one late STRETCH add (159); Chrome-MCP live UAT drove verification across the admin + model registry surfaces.
 
+## Milestone: v3.4 — Multi-Tenancy & Org Access
+
+**Shipped:** 2026-07-22
+**Phases:** 10 (160–168, incl. the 162.5 refactor) | **Plans:** 56 | **Tasks:** 121
+
+### What Was Built
+The one-way RLS door that turns Agentic RAG from a per-user app into an org-aware multi-tenant platform. A ratify-not-relitigate Tenancy ADR (160), the 8-table org/dept/role schema with correct-from-birth membership RLS + `current_user_org_ids()` (mig 104, 161), personal-org backfill across 35 tables (105/106, 162), the `threads.py` producer extraction (2444→1214 LOC, `agent_loop` byte-identical — 162.5), the atomic RLS rewrite + per-request user-JWT client swap so membership RLS is ENFORCED on every request path (107/108/109, 163), the SECDEF audit + `document_chunks`/`skill_embeddings` org-scoping + the two-org isolation exit-gate suite (110, 164), `is_global` semantic retirement to `is_org_shared`/`is_system_global` (111, 165), the org-admin shell/switcher/profile/audit + Settings split (166), invitations/roles/greenlists/JIT/per-user-prefs (167), and SAML SSO self-service where Supabase is the SP (113, 168). 22/22 CORE requirements. STRETCH 169-173 deferred with triggers.
+
+### What Worked
+- **The atomic-crux sequencing held.** Bundling TEN-01+02+04 into one phase (163) — never "policies now, client later" — plus the extraction-first Wave 0 (162.5) — meant RLS became the real gate in one reviewable transition, not a half-enforced limbo.
+- **A live two-org isolation suite as the exit gate, not doc review.** `test_v3_4_org_isolation.py` (built red-then-green in 164, re-run after 166/167/168) is a MEASURED cross-org proof — a single-org fixture stays green even if isolation is completely broken.
+- **Deep code review caught Criticals the passing suite missed** — the SEED-124 KB browse-tool leak (164) and the SEED-125 skill-resolution leak, both service-role org-blind paths the RLS suite didn't reach; each closed with a fix + two-org regression legs.
+- **Provider-docs-first on SSO paid off** — Supabase IS the SAML SP (0 new hard deps); one env-selected provider-CRUD proxy (Cloud vs self-hosted, one body) honored the 4-tier no-code-fork contract.
+- **Secure-phase registered + closed a net-new threat the plan-time model missed** — T-168-11 metadata_url SSRF, fixed in-phase.
+
+### What Was Inefficient
+- **Live UAT can't run locally for SSO** — the local Supabase CLI ships SAML disabled, so the SSO round-trip + the SC#10 cross-provider passes roll forward to cloud; 166/167/168 verification stays `human_needed` at close.
+- **The schema-drift gate keeps false-positiving** on SQL-editor-applied migrations (recommending the forbidden `db push`) — bypassed with live psycopg2 column evidence each phase.
+- **Cloud parity accumulated hard** — migrations 104-113 + `SECRETS_ENCRYPTION_KEY` all owed on cloud in one ordered batch at the next push.
+- **`is_global` retirement surfaced 30 stale tests** the grep/collect gates missed (Wave 1 ran pre-migration), and pg_dump-only regen missed cross-schema bootstrap artifacts.
+
+### Patterns Established
+- **Atomic security transitions** — RLS + the client that enforces it ship in one phase; never split the policy from the role swap.
+- **Two-tenant exit gate** — a dedicated isolation suite re-run after every surface phase; single-tenant fixtures can't prove isolation.
+- **JIT membership as a token-free / attribute-free member-only insert** — advisory lock + ON CONFLICT DO NOTHING, role HARDCODED `member` (SSO attributes can never elevate).
+- **Env-selected transport adapters over a code fork** (D-160) — Cloud vs self-hosted differ only in base URL + auth header.
+
+### Key Lessons
+- Never re-execute an already-applied migration (close out manually).
+- Deep review + secure-phase catch what a green suite doesn't — verify findings, then act.
+- STRETCH 171 (permission-aware citations) is correct-sequencing-deferred: its leak surface is latent under membership RLS until cross-user folder-sharing ships.
+
+### Cost Observations
+- Model mix: executor opus, verifier sonnet (per config); worktrees off → sequential on main tree.
+- Delivered CORE in ~4 days (2026-07-18 → 07-22); STRETCH deferred to preserve momentum toward the visual workflow builder (SEED-123).
+
 ## Cross-Milestone Trends
 
 | Milestone | Phases | Plans | Avg Plans/Phase | Timeline |

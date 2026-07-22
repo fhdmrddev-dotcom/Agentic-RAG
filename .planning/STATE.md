@@ -2,16 +2,15 @@
 gsd_state_version: 1.0
 milestone: v3.4
 milestone_name: Multi-Tenancy & Org Access
-status: ready_to_plan
-last_updated: 2026-07-22T09:59:20.537Z
-last_activity: 2026-07-22
+status: Awaiting next milestone
+last_updated: "2026-07-22T10:37:13.776Z"
+last_activity: 2026-07-22 — Milestone v3.4 completed and archived
 progress:
   total_phases: 28
   completed_phases: 10
   total_plans: 56
   completed_plans: 56
   percent: 36
-stopped_at: Phase 168 complete (6/6) — ready to discuss Phase 169
 ---
 
 # Project State
@@ -23,31 +22,30 @@ stopped_at: Phase 168 complete (6/6) — ready to discuss Phase 169
 See: .planning/PROJECT.md (updated 2026-07-20 — Phase 163 THE ATOMIC CRUX complete; membership RLS enforced)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 169 — dept admin shell (stretch)
+**Current focus:** v3.4 CORE (160-168) SHIPPED + archived 2026-07-22. STRETCH 169-173 DEFERRED (carry-forward guide `.planning/v3.4-STRETCH-CARRYFORWARD.md`). **Next: visual no-code workflow authoring (SEED-123)** — an authoring layer over the existing harness engine; start via `/gsd:new-milestone` (or `/gsd:sketch` the node canvas first). Operator pref: UX track before Open Platform (SEED-045 chat-polish, then SEED-123).
 
 ## Deferred Items
 
-Items acknowledged and deferred at milestone close on 2026-07-18 (44 open `audit-open` artifacts — all noise or by-design backlog; none block v3.3):
+Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 open `audit-open` artifacts — all noise, by-design forward backlog, or live-UAT status-lag; none block the close):
 
 | Category | Count | Disposition |
 |----------|-------|-------------|
-| Seeds (dormant) | 9 | By-design v3.4+ backlog — 003 deploy-flexibility, 004 org-multi-tenancy, 040 model-registry-self-service, 041 conversation-compaction, 042 chat-input-modalities, 043 sandbox-package-mgmt, 045 ui-ux-polish, 046 library-health, 084 starter-workflow-library. Preserved with re-open triggers. |
-| Quick tasks (missing) | 22 | Stale legacy index refs (Jan–May 2026); underlying files gone. Noise, not open work. |
+| Seeds (dormant) | 9 | By-design forward backlog with re-open triggers — 003 deploy-flexibility, 004 org-multi-tenancy (largely delivered by v3.4; STRETCH remnants), 040 model-registry-self-service, 041 conversation-compaction, 042 chat-input-modalities, 043 sandbox-package-mgmt, **045 ui-ux-polish (next UX track)**, 046 library-health, 084 starter-workflow-library. |
+| Quick tasks (missing) | 22 | Stale legacy index refs; underlying files gone. Noise, not open work. |
 | Todo (empty) | 1 | Malformed/empty entry. Noise. |
-| UAT gaps | 7 | All terminal-positive (resolved / passed / accepted) — none failing. |
-| Verification gaps | 5 | All `human_needed` — satisfied by phase-level live UAT this milestone. |
+| UAT gaps | 3 | `partial` — the 166/167/168 live-UAT files (cross-provider SC#10 + the SSO round-trip, which needs cloud + a real IdP). Roll forward. |
+| Verification gaps | 3 | `human_needed` — 166/167/168 VERIFICATION, satisfied when the live UAT runs. Roll forward. |
+
+**v3.4 STRETCH carry-forwards (deferred with triggers → `.planning/v3.4-STRETCH-CARRYFORWARD.md`):** 169 Dept-Admin Shell · 170 Entitlement + Retention/Rate-Limit footholds · 171 Permission-Aware Citations (correct-sequencing: leak latent till dept/role folder-sharing ships) · 172 OIDC SSO (customer-triggered) · 173 Dept-Targeted Skills + rollout gating. **Cloud parity owed:** migrations 104-113 + `SECRETS_ENCRYPTION_KEY` at next production push.
 
 **Open reported bugs rolling forward** to a planned post-v3.3 chat-polish phase (none were folded into 146–159): BUG-260708-01/-02 (major), BUG-260714-01 (major), BUG-260712-02, BUG-260718-02/-03/-04, BUG-260609-02/-04, BUG-260610-01, BUG-260623-01, BUG-260706-01, BUG-260707-03; deferred BUG-260626-02/-03, BUG-260711-02; external BUG-260714-02 (OpenRouter). BUG-260718-01 CLOSED (folded into 159).
 
 ## Current Position
 
-Phase: 169
-Plan: Not started
-Status: Ready to plan
-Next action: **Execute Plan 168-05**. **168-04 COMPLETE 2026-07-22** (SSO endpoint wiring — the request layer): `/org/sso/providers` CRUD (POST/GET/PUT/DELETE, all `require_sso_manage`) writes on the caller's user-JWT connection so mig-104 RLS is the wall; server-pinned org_id; Control 1 (`is_public_domain`) rejects public domains 422 BEFORE any provider call; fail-closed create (GoTrue provider first → row only on success → status `pending_approval`); delete-provider-BEFORE-row (T-168-09, 502 keeps the row on upstream failure). `/org/sso/route` = FULLY PUBLIC (zero auth deps, no-Authorization-header 200) boolean-only active-only anti-enumeration lookup (T-168-10). `/org/sso/provision` resolves org from the authenticated `auth.identities` SSO provider (never a client claim) → `provision_sso_membership` (member-only); password-user 200 no-op; inactive-config 403 (D-168-04). `/org/me` exposes `can_manage_sso`. `POST /admin/sso/configs/{id}/approve` (require_operator) flips pending→active + approved_by/at (D-168-05 Control 2); non-operator 404. 4 commits (`82b798a8` authz RED · `609e6f04` CRUD GREEN · `dc0d0712` routing RED · `2eee27d9` route/provision/approve GREEN); **15/15 new integration tests green** (real local Postgres via ASGITransport; regression `-k "168 or 167 or org_isolation"` = 109 passed). NO migration. Deviations: DELETE upstream-failure 502-keeps-row + PUT re-runs blocklist on domain change (both Rule 2). **SSO-01 stays Pending** (phase-spanning, plans 02-06). **Prior: 168-03 COMPLETE 2026-07-22** (require_sso_manage + domain-gated JIT): `require_sso_manage` = strict active-org, `sso:manage`-gated verbatim mirror of `require_org_invite` (SSO-specific 403; fail-closed until the mig-113 grant from Plan 01 lands); `provision_sso_membership` = advisory-lock + `INSERT … ON CONFLICT (org_id,user_id) DO NOTHING`, role HARDCODED `member` (`$3` bind, NO function param, never a SAML attribute — D-168-03/T-168-03), on the BYPASSRLS singleton pool (the SSO user is not yet a member), duplicate-email-tolerant (keys on (org_id,user_id) UUID, not email — T-168-08) + join-additive (D-167-01). 3 commits (`bc14f085` guard · `81a62788` RED · `d85985d7` GREEN); **5/5 live integration tests green** (8× concurrent-converge → exactly one membership). NO migration. **168-02 COMPLETE 2026-07-22** (SSO deployment config + provider-CRUD proxy): `sso_provider_service.py` = ONE async service, TWO env-selected transport adapters (Cloud `api.supabase.com` Management API single-Bearer vs self-hosted GoTrue Admin API both-headers) — ONE identical `build_body` (D-160 no-code-fork), fail-closed on non-2xx (`SsoProviderError`), `create` returns `provider_id`, `delete` calls the API first (no orphan, T-168-09), mgmt `sbp_` token decrypted at call time via the Phase-150 cipher + never logged (T-168-04, caplog-proven). `sso_domain_blocklist.py` = hardcoded `PUBLIC_EMAIL_DOMAINS` + `is_public_domain()` anti-hijack Control 1 (T-168-02, no runtime fetch). Config: `supabase_project_ref` + `supabase_self_hosted` adapter switch; `supabase_management_token` added to `SECRET_COLUMNS` (12→13, boot-swept). Deploy-artifact parity (D-16) for both SSO env vars (backend/.env.example + onebox + compose + OPERATOR.md); `check-deploy-drift.sh` exit 0. **13/13 unit tests green** (TDD RED→GREEN). 3 commits (`a5add126` config foundation · `3c7c39d2` RED · `635a634f` GREEN). Deviation: added the 2 SSO vars to backend/.env.example (Rule 2 — keeps the onebox-header contract true). **SSO-01 stays Pending** (phase-spanning, plans 02-06). **Isolates the token-bearing network seam so Plan 04's `/org/sso/providers` endpoints are pure wiring.** **Cloud parity owed:** migs 099→**113** + `SECRETS_ENCRYPTION_KEY`, in order (113 carries the swept `supabase_management_token` column), at next operator-gated push.
-Last activity: 2026-07-22
-
-Progress: [██████████] 100%
+Phase: Milestone v3.4 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-07-22 — Milestone v3.4 completed and archived
 
 ### Quick Tasks Completed
 
