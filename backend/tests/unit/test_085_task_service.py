@@ -123,18 +123,27 @@ def test_resolve_with_no_user_settings_uses_global_settings():
     assert result == settings.llm_model
 
 
-def test_resolve_empty_llm_models_list_lets_override_pass_through():
-    """Edge case: user has no llm_models declared -> resolver can't validate,
-    so override_model is trusted (matches sub_agent_service.py:67 conditional)."""
+def test_resolve_empty_llm_models_list_confident_cross_provider_falls_to_default():
+    """Phase 175 XPROV-03 (D-03) — SUPERSEDES the pre-175 empty-list passthrough.
+
+    Previously an empty available_models list meant the resolver could not
+    validate, so it TRUSTED any override (leaking e.g. a 'claude-3' onto an
+    openai-active caller — the blind spot). The folded inferred-provider gate
+    now catches a CONFIDENT cross-provider override by INFERENCE (no list
+    needed) and returns the active provider's default. (An UNRECOGNISED id still
+    passes through — the fold fires only on a confident known-provider mismatch;
+    see test_utility_model_guard.py.)"""
+    from app.config import _SUB_AGENT_MODEL_DEFAULTS
     from app.services.sub_agent_models import resolve_sub_agent_model_safely
     us = _StubUserSettings(
         active_provider="openai",
         llm_model="gpt-4o",
-        llm_models="",  # empty — no validation possible
+        llm_models="",  # empty — but inference still detects cross-provider
     )
-    # Without a llm_models list, the helper cannot detect cross-provider —
-    # it must trust the override and let downstream provider errors surface.
-    assert resolve_sub_agent_model_safely(us, override_model="claude-3") == "claude-3"
+    # "claude-3" infers to anthropic != openai → dropped for the openai default.
+    result = resolve_sub_agent_model_safely(us, override_model="claude-3")
+    assert result == _SUB_AGENT_MODEL_DEFAULTS["openai"] == "gpt-5.4-mini"
+    assert result != "claude-3"
 
 
 # ---------------------------------------------------------------------------
@@ -214,27 +223,30 @@ def test_resolve_short_circuits_when_candidate_in_active_list():
     assert result == "gpt-5.4-mini"
 
 
-def test_resolve_with_empty_active_models_list_skips_validation():
-    """Plan 05: if the user's llm_models is empty, there's nothing to
-    validate against, so the helper returns the candidate without engaging
-    the new safety net.
+def test_resolve_with_empty_active_models_list_infers_cross_provider():
+    """Phase 175 XPROV-03 (D-03) — SUPERSEDES the pre-175 empty-list trade-off.
 
-    This preserves the pre-Plan-05 behavior for users who haven't yet
-    populated their provider's model list (fresh installs / partial settings
-    rows).
+    Pre-175 an empty available_models list skipped the cross-provider check and
+    returned the stale candidate as-is ("we trust the caller when we have no
+    list"). The folded inferred-provider gate now closes that blind spot by
+    inference: a CONFIDENT cross-provider candidate falls to the active
+    provider's default even with no list to validate against. (An UNRECOGNISED
+    id still passes through — the fold fires only on a confident known-provider
+    mismatch; see test_utility_model_guard.py.)
     """
+    from app.config import _SUB_AGENT_MODEL_DEFAULTS
     from app.services.sub_agent_models import resolve_sub_agent_model_safely
 
     us = _StubUserSettings(
         active_provider="anthropic",
-        llm_model="gpt-4.1",  # would normally be cross-provider
-        llm_models="",  # empty — no list to validate against
+        llm_model="gpt-4.1",  # stale cross-provider (infers to openai)
+        llm_models="",  # empty — inference detects the mismatch without a list
     )
     result = resolve_sub_agent_model_safely(us, override_model=None)
-    # Without an llm_models list, validation is skipped — return candidate
-    # as-is. Documents the trade-off: we trust the caller when we have
-    # no list to compare against.
-    assert result == "gpt-4.1"
+    # gpt-4.1 infers to openai != anthropic → dropped for the anthropic default.
+    assert result == _SUB_AGENT_MODEL_DEFAULTS["anthropic"]
+    assert result == "claude-haiku-4-5-20251001"
+    assert result != "gpt-4.1"
 
 
 # ---------------------------------------------------------------------------
