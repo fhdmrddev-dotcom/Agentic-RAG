@@ -76,8 +76,21 @@ export function outerBannerLabel(
   // pre-tools placeholder text — every other branch is unchanged and Deep mode
   // (isHarness=false, the default) is byte-identical.
   isHarness = false,
+  // Phase 174 / STATE-03: a reasoning model (Kimi ~4,000 reasoning tokens, GLM,
+  // DeepSeek) streams reasoning BEFORE any tool or visible token exists, so the
+  // pre-first-token window currently reads as a dead "Setting up agent…". Count
+  // the already-stamped reasoning signal (message.reasoningContent, accumulated
+  // cross-provider at StreamsProvider onReasoningDelta — no new backend event) as
+  // activity: surface "Reasoning…" instead. Mirrors the isHarness additive-default
+  // shape above — default false keeps every existing caller + Deep Mode
+  // byte-identical (D-14). Anthropic/Google never emit reasoning_delta, so they
+  // keep the calm fallback by design (not a bug).
+  reasoningActive = false,
 ): string {
-  if (!hasAnyTools && !isPlanning) return isHarness ? "Starting workflow…" : "Setting up agent…"
+  if (!hasAnyTools && !isPlanning) {
+    if (reasoningActive) return "Reasoning…"
+    return isHarness ? "Starting workflow…" : "Setting up agent…"
+  }
   if (isPlanning) return "Thinking…"
   if (!activeTool) return "Synthesizing answer…"
   if (activeTool.name === "search_documents") return "Searching knowledge base…"

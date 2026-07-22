@@ -617,7 +617,12 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
           // No tools yet — first LLM call is thinking
           <span className="flex items-center gap-2 text-muted-foreground text-sm animate-fadeSlideUp">
             <Loader2 className="w-4 h-4 animate-spin text-primary" />
-            <span className="italic">{outerBannerLabel(null, false, message.isPlanning ?? false, workflowLock != null)}</span>
+            {/* Phase 174 / STATE-03: count already-stamped cross-provider reasoning
+                as activity so the pre-first-token window reads "Reasoning…" instead
+                of the dead "Setting up agent…". Scoped to the reasoning-before-any-
+                token window (no content yet). Anthropic/Google never emit reasoning,
+                so they keep the calm fallback (by design). No new backend state (D-08). */}
+            <span className="italic">{outerBannerLabel(null, false, message.isPlanning ?? false, workflowLock != null, !message.content && !!message.reasoningContent)}</span>
             <span className="flex gap-1 items-center">
               <span className="w-1.5 h-1.5 rounded-full bg-primary animate-dotBounce" style={{ animationDelay: "0ms" }} />
               <span className="w-1.5 h-1.5 rounded-full bg-primary animate-dotBounce" style={{ animationDelay: "160ms" }} />
