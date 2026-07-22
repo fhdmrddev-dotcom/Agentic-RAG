@@ -303,3 +303,87 @@ async def test_workspace_read_coerces_str_int_line_args() -> None:
     assert isinstance(captured["start_line"], int)
     assert isinstance(captured["end_line"], int)
     assert result.result == "hello world"
+
+
+# ---------------------------------------------------------------------------
+# EXEC-01 (Phase 176-03) — reliable declared library install + bounded auto-heal.
+# ---------------------------------------------------------------------------
+from unittest.mock import MagicMock  # noqa: E402
+
+
+class _FakeConsole:
+    """Stand-in for llm_sandbox's ConsoleOutput (exit_code + stdout + stderr)."""
+
+    def __init__(self, exit_code: int = 0, stdout: str = "", stderr: str = ""):
+        self.exit_code = exit_code
+        self.stdout = stdout
+        self.stderr = stderr
+
+
+def test_pip_install_uses_system_interpreter_no_stream_callbacks():
+    """_pip_install must issue `python -m pip install` via session.execute_command
+    with NO on_stdout/on_stderr stream callbacks (non-stream => reliable exit_code),
+    targeting the SAME interpreter as `python -u` (Defect B)."""
+    from app.services.tool_dispatcher import _pip_install
+
+    session = MagicMock()
+    session.execute_command.return_value = _FakeConsole(exit_code=0)
+
+    res = _pip_install(session, ["fpdf2", "some-pkg"])
+
+    assert res.exit_code == 0
+    assert session.execute_command.call_count == 1
+    (cmd,), kwargs = session.execute_command.call_args
+    assert cmd.startswith("python -m pip install --disable-pip-version-check ")
+    assert "fpdf2" in cmd and "some-pkg" in cmd
+    # No stream callbacks => non-streaming => reliable exit_code.
+    assert "on_stdout" not in kwargs and "on_stderr" not in kwargs
+
+
+@pytest.mark.asyncio
+async def test_declared_install_retries_once_and_surfaces_stderr():
+    """A declared install returning a non-zero exit code is retried EXACTLY once,
+    and on persistent failure the pip stderr is surfaced (NOT swallowed)."""
+    from app.services.tool_dispatcher import _install_declared_libraries
+
+    session = MagicMock()
+    session.execute_command.return_value = _FakeConsole(
+        exit_code=1, stderr="ERROR: No matching distribution found for badpkg"
+    )
+
+    stderr = await _install_declared_libraries(session, ["badpkg"])
+
+    # exactly two calls: initial attempt + one retry (D-02.1)
+    assert session.execute_command.call_count == 2
+    assert "No matching distribution" in stderr
+
+
+@pytest.mark.asyncio
+async def test_declared_install_retry_success_returns_empty():
+    """A transient failure that succeeds on the single retry surfaces NO error."""
+    from app.services.tool_dispatcher import _install_declared_libraries
+
+    session = MagicMock()
+    session.execute_command.side_effect = [
+        _FakeConsole(exit_code=1, stderr="temporary network error"),
+        _FakeConsole(exit_code=0),
+    ]
+
+    stderr = await _install_declared_libraries(session, ["fpdf2"])
+
+    assert session.execute_command.call_count == 2
+    assert stderr == ""
+
+
+@pytest.mark.asyncio
+async def test_declared_install_success_first_try_single_call():
+    """A clean install proceeds with a single call and no surfaced error."""
+    from app.services.tool_dispatcher import _install_declared_libraries
+
+    session = MagicMock()
+    session.execute_command.return_value = _FakeConsole(exit_code=0)
+
+    stderr = await _install_declared_libraries(session, ["fpdf2"])
+
+    assert session.execute_command.call_count == 1
+    assert stderr == ""
