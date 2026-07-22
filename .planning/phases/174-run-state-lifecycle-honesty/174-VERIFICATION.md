@@ -1,8 +1,9 @@
 ---
 phase: 174-run-state-lifecycle-honesty
 verified: 2026-07-22T14:24:45Z
-status: human_needed
-score: 9/9 code-level must-haves verified (1 additional SC#10 live-UAT truth requires human testing)
+uat_completed: 2026-07-22
+status: passed
+score: 9/9 code-level must-haves verified + operator live UAT PASSED (all 5 STATE requirements) + DB-confirmed
 overrides_applied: 0
 human_verification:
   - test: "DeepSeek early-cancel → full cold reload keeps 'cancelled — no output yet'"
@@ -28,6 +29,18 @@ human_verification:
 # Phase 174: Run-State & Lifecycle Honesty Verification Report
 
 **Phase Goal:** Every run's lifecycle (setting up → streaming → stop/cancel/kill → navigation) is honestly reflected in the chat surface — no empty bubbles (STATE-01a), no blank killed-workflow card (STATE-01b), no lost stop indicators across nav+reload (STATE-02), no hidden setup activity (STATE-03), no timer/avatar glitches on nav (STATE-04) — verified across providers with Deep Mode byte-identical.
+
+## ✅ Live UAT Result — operator-driven, 2026-07-22 (status → passed)
+
+The operator ran the SC#10 live UAT. **All 5 STATE requirements passed.** Cross-checked against the live local DB (`localhost:54322`, superuser bypass) for the same session:
+
+- **STATE-01a — PASSED + DB-confirmed.** 3 `cancelled` runs in the session, ALL with assistant `content_len = 0` (early-cancel before first token: "explain how photosynthesis works" ×2, "5 words") → rendered "cancelled — no output yet". Matches the render condition exactly.
+- **STATE-02 — PASSED (operator-observed).** "Response stopped" survived nav + full cold reload (derived from persisted `runs.status`).
+- **STATE-03 — PASSED (operator-observed).** Reasoning-heavy prompt ("compare 3 sorting algorithms", `content_len=4330`, completed) showed live "Reasoning…"; Anthropic/Google keep the calm fallback by design.
+- **STATE-04 — PASSED (operator-observed).** Multi-minute workflow nav kept the timer climbing + single avatar.
+- **STATE-01b — PASSED, with an honest surface correction (operator-accepted).** The killed-workflow reason renders in the **Run window (RunModal)**, NOT as a chat amber bubble. Root cause traced: the Run-from-page launch path is `ChatLayout.doRun` → `postMessage` (NOT `StreamsProvider.sendMessage`); on the kill-switch 403 it (a) `deleteLaunchThread` — removing the orphan thread — and (b) re-throws so the RunModal renders the server's verbatim reason (WR-04, Phase 152, landed AFTER the bug was filed). **DB confirms zero orphan/blank workflow threads in the session** → the concrete failure (empty chat card + stuck composer) is genuinely closed. The Phase-174 amber `blockedNotice` branch in `StreamsProvider.sendMessage` remains a correct defensive handler for a 403 on the **chat-send** path (the app-layer ban-mid-send companion case, not the workflow-launch path). Operator decision (2026-07-22): **accept the Run-window surface as the honest, cleaner outcome** (no orphan thread) — this satisfies the STATE-01b intent (honest reason, no blank card, composer usable) even though the surface differs from sketch 129-C's chat amber block. No further code change required.
+
+**DB evidence (session, last 3h):** 5 completed + 3 cancelled(empty) runs; 7 threads, none orphaned/blank. Cross-provider + multi-tool (KB query + Doc Q&A workflow) exercised.
 
 **Verified:** 2026-07-22T14:24:45Z
 **Status:** human_needed

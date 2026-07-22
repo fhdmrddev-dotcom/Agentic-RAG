@@ -1,9 +1,10 @@
 ---
-status: partial
+status: passed
 phase: 174-run-state-lifecycle-honesty
 source: [174-VERIFICATION.md, 174-VALIDATION.md]
 started: 2026-07-22
 updated: 2026-07-22
+result: "All 5 STATE requirements PASSED (operator-driven 2026-07-22). STATE-01a DB-confirmed (3 empty cancelled runs). STATE-01b passed via the Run-window surface (doRun deletes the orphan thread + shows the reason in the modal; DB confirms zero orphan threads) — operator accepted this as the honest, cleaner outcome vs a chat amber bubble."
 ---
 
 # Phase 174 — Human UAT (SC#10 4-axis live cross-provider)
