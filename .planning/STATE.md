@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v3.5
 milestone_name: UX Consolidation & Chat Polish
-status: executing
-last_updated: "2026-07-22T17:15:46.706Z"
+status: verifying
+last_updated: "2026-07-22T17:27:22.525Z"
 last_activity: 2026-07-22
 progress:
   total_phases: 20
   completed_phases: 1
   total_plans: 8
-  completed_plans: 7
+  completed_plans: 8
   percent: 5
 ---
 
@@ -44,7 +44,7 @@ Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 op
 
 Phase: 175 (cross-provider-streaming-fidelity) — EXECUTING
 Plan: 4 of 4
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-07-22
 
 ### Quick Tasks Completed
@@ -420,6 +420,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 122 P02 | ~13min | 2 tasks (TDD) tasks | 3 files files |
 | Phase 122 P03 | ~6min | 2 tasks | 3 files |
 | Phase 175 P01 | ~35min | 2 tasks (1 TDD) | 5 files |
+| Phase 175 P04 | ~7min | 2 tasks (2 TDD) | 5 files |
 | Phase 123 P01 | 9min | 2 tasks | 8 files |
 | Phase 123 P02 | 7min | 2 tasks | 3 files |
 | Phase 123 P03 | 12min | 2 tasks | 6 files |
@@ -487,6 +488,8 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 
 ## Decisions
 
+- [Phase 175]: 175-04 (XPROV-03 D-03/D-04): title-gen + suggestion route their `sub_agent_model` override through `provider_safe_utility_model` — a cross-provider/unrecognised id is dropped BEFORE the call so no wrong-provider 404 → no `fallback_model` emit → no misleading banner (suppress-when-fine is automatic, no new branch). The 404 fallback branch + the `fallback_model`→`title` ordering invariant are untouched, so a genuine same-provider 404 still emits `fallback_model` honestly.
+- [Phase 175]: 175-04 (XPROV-04 D-05): the title call injects a per-MODEL reasoning-off param driven generically off `get_model_capability(model).get("reasoning_off")` — `thinking_disabled` → `extra_body={"thinking":{"type":"disabled"}}` (DISABLE mirror of the DeepSeek ENABLE block), `effort_none` → `reasoning_effort="none"`; the full Plan-01 SAFE set (11+2) injects with NO hardcoded id list, UNSAFE rows inject an empty dict. Budget (30/160) + inline-await ordering byte-identical (D-14); empty/refusal on a SAFE provider still derives a real title.
 - [Phase ?]: 118-02: classification-rules routes return RuleResponse(**row) so live CRUD tests can call coroutines directly (read .is_global/.id/.enabled); service imported as a module to avoid create_rule shadowing
 - [Phase ?]: 118-02: removed 5 stale xfail markers in test_118_rule_crud.py so the CRUD tests are genuinely GREEN (xpass would silently mask a future regression)
 - [Phase ?]: Phase 118-03: classification rule-eval spliced into ingest_document before the single persist write — own+global leak-safe read (no auth.uid in the BG task, D-118-8), first-match-wins ONE _classification suggestion, NEVER a folder move (CLASS-02)

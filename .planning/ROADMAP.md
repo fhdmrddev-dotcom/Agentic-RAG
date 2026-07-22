@@ -103,7 +103,7 @@ Committed as gated phases (ship only if CORE lands clean and budget remains; v2.
 - [x] 175-01-PLAN.md — Foundation: capability markers (reasoning_first + reasoning_off SAFE list) + shared provider-safe utility-model guard (XPROV-01/03/04 substrate) [Wave 1]
 - [x] 175-02-PLAN.md — XPROV-02: DSML strip stream-end flush + honest-incomplete leak signal (Option-B post-drain, existing `error` event) [Wave 1]
 - [x] 175-03-PLAN.md — XPROV-01: reasoning_first STRUCTURED gate in resolve_calling_mode + honest reasoning-tools-unsupported error copy [Wave 2]
-- [ ] 175-04-PLAN.md — XPROV-03/04: provider-safe guard at title-gen + suggestion + per-MODEL reasoning-off title call [Wave 2]
+- [x] 175-04-PLAN.md — XPROV-03/04: provider-safe guard at title-gen + suggestion + per-MODEL reasoning-off title call [Wave 2]
 **Flags**: SC#10; G-5 (gateway/adapter/sanitizer boundary — `openai_compat.py` DeepSeek strip, the `openai_service` param builder, `thread_title.py`; audit at discuss); red line D-14 (adapter boundary only); reported-bugs fold (`BUG-260714-01`, `BUG-260711-02` [deferred — triage fix-vs-verify], `BUG-260708-01`, `BUG-260623-01`, `BUG-260722-01` → XPROV-04); OpenRouter-specific 400s stay OUT (experimental — fix only if native-safe + low-complexity); no threat model; no migration.
 
 #### Phase 176: Chat Render Correctness + Exec Reliability
@@ -188,7 +188,7 @@ Committed as gated phases (ship only if CORE lands clean and budget remains; v2.
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 174. Run-State & Lifecycle Honesty | 0/? | Not started | - |
-| 175. Cross-Provider Streaming Fidelity | 0/4 | Planned | - |
+| 175. Cross-Provider Streaming Fidelity | 4/4 | Executed — ready for verification | 2026-07-22 |
 | 176. Chat Render Correctness + Exec Reliability | 0/? | Not started | - |
 | 177. v3.4 Org-Surface Polish | 0/? | Not started | - |
 | 178 (STRETCH). Chat UI/UX Polish Pass | 0/? | Gated (behind CORE) | - |
