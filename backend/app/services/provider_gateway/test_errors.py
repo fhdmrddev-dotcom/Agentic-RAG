@@ -328,6 +328,24 @@ def test_generic_400_without_signature_still_bad_request():
     assert classify_provider_error("openai", exc) == "bad_request"
 
 
+def test_invalid_reasoning_effort_value_400_stays_bad_request():
+    # WR-02 (Phase 175 code-review): XPROV-04 injects reasoning_effort="none" on the
+    # title call, so an *invalid VALUE* 400 (param == "reasoning_effort" but a
+    # non-reasoning-tools message) is now reachable. It must NOT be mislabeled as the
+    # reasoning-tools-unsupported hint — the message signature is the sole authority.
+    exc = MagicMock(spec=[])
+    exc.status_code = 400
+    exc.body = {
+        "error": {
+            "message": "Invalid value: 'none'. Supported values are 'low', 'medium', 'high'.",
+            "type": "invalid_request_error",
+            "param": "reasoning_effort",
+            "code": None,
+        }
+    }
+    assert classify_provider_error("openai", exc) == "bad_request"
+
+
 def test_reasoning_tools_signature_only_in_str_is_not_reclassified():
     # T-175-03-02 tamper guard: the signature appearing ONLY in str(exc) (no structured
     # body) must NOT force reclassification — detection anchors on body["error"], never a

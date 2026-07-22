@@ -122,10 +122,16 @@ def _is_bad_request(exc: Exception) -> bool:
 def _has_reasoning_tools_signature(exc: Exception) -> bool:
     """Detect the gpt-5.6 reasoning-tools-unsupported 400 from its STRUCTURED body.
 
-    Mirrors :func:`_has_insufficient_quota`: reads ``exc.body["error"]["message"]`` (and the
-    reinforcing ``param == "reasoning_effort"``) — NEVER a loose scan of ``str(exc)`` (the
-    exact info-tampering guard T-175-03-02). Returns False when there is no structured body,
-    so any 400 lacking the signature stays ``bad_request`` (D-14).
+    Mirrors :func:`_has_insufficient_quota`: reads ``exc.body["error"]["message"]`` —
+    NEVER a loose scan of ``str(exc)`` (the exact info-tampering guard T-175-03-02).
+    Returns False when there is no structured body, so any 400 lacking the signature
+    stays ``bad_request`` (D-14).
+
+    WR-02 (Phase 175 code-review): the MESSAGE signature is the sole authority. An
+    earlier ``param == "reasoning_effort"`` short-circuit was too broad — an *invalid
+    reasoning_effort VALUE* 400 (now reachable because XPROV-04 injects
+    ``reasoning_effort="none"`` on the title call) also carries ``param ==
+    "reasoning_effort"`` but is a DIFFERENT error and must stay ``bad_request``.
     """
     body = getattr(exc, "body", None)
     if not isinstance(body, dict):
@@ -133,8 +139,6 @@ def _has_reasoning_tools_signature(exc: Exception) -> bool:
     err = body.get("error")
     if not isinstance(err, dict):
         return False
-    if err.get("param") == "reasoning_effort":
-        return True
     msg = err.get("message")
     if isinstance(msg, str):
         low = msg.lower()
