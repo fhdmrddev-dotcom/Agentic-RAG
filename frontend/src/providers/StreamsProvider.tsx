@@ -2066,6 +2066,28 @@ export function StreamsProvider({ children }: PropsWithChildren) {
                   ),
                 ),
               }))
+            } else if (err instanceof ApiError && err.status === 403) {
+              // Phase 174 Plan 03 (STATE-01b / D-04 / D-05 / sketch 129-C amber tier):
+              // an administrative block — the workflows kill-switch (workflow_kickoff.py:200
+              // "Workflows are currently disabled by the administrator") or the app-layer ban,
+              // both raised as a 403 BEFORE any run/message is inserted. This is NOT a failure
+              // (red) and NOT the 400/409 rollback-banner path — it is 129-C's AMBER tier.
+              // DIVERGE from the 409/400 rollback shape: KEEP the user bubble, and REPLACE the
+              // empty assistant placeholder with an honest in-chat amber notice carrying the
+              // server's message verbatim (rendered as React text, never HTML — T-174-03-01).
+              // Keyed narrowly to status===403 and placed BEFORE the generic ApiError branch
+              // so the 400 disabled-skill + 409 workflow-lock rollback paths stay byte-identical
+              // (D-05). No run_id / runs query — the 403 fires before any INSERT (Pitfall 5).
+              useStreamsStore.getState().actions.setMessagesForBucket(surfaceId, threadId, (prev) =>
+                prev.map((m) =>
+                  m.id === assistantId ? { ...m, blockedNotice: { message: err.message } } : m,
+                ),
+              )
+              // D-04: guarantee the composer is never left locked. The kickoff lock is only
+              // seeded AFTER run_id (a 403 never gets there), so this is a defensive no-op in
+              // the common case — keyed by the OWNING threadId closure (A25 per-thread
+              // isolation), never a global flag, so a parallel Thread B is untouched.
+              useStreamsStore.getState().actions.clearWorkflowLockForThread(threadId)
             } else if (err instanceof ApiError) {
               // 099-08 (UAT L10): a non-409 kickoff/send refusal (e.g. the 400
               // disabled-skill gate). Mirror the 409 rollback shape — drop BOTH
