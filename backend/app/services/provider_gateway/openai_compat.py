@@ -191,6 +191,13 @@ class _ClosableEventStream:
         self._raw = raw_stream
         self._provider = active_provider_name
         self._calling_mode = calling_mode
+        # XPROV-02b (Phase 175): set True inside _normalize the moment a DeepSeek DSML
+        # leak begins (tool-call markup written as visible text). The consumer reads it
+        # post-drain and emits the existing 'error' SSE event so the turn ends honestly
+        # instead of silently incomplete. Stays False for clean/non-deepseek streams
+        # (D-14 default-inert) — the consumer's read is getattr-defaulted so plain
+        # anthropic/google generators (which lack this attr) are byte-identical.
+        self.dsml_leaked = False
         self._gen = self._normalize()
 
     def __iter__(self):
@@ -317,6 +324,12 @@ class _ClosableEventStream:
                                 _visible, _dsml_pending, _dsml_leaking
                             )
                         )
+                        # XPROV-02b: once the opener appears, _dsml_leaking latches
+                        # True — surface it on the instance so the consumer can emit
+                        # one honest 'error' post-drain. Idempotent; never edits the
+                        # per-chunk emit dicts or the finish dict (Option B, D-14).
+                        if _dsml_leaking:
+                            self.dsml_leaked = True
                     if _visible:
                         yield {"type": "delta", "content": _visible}
                 else:

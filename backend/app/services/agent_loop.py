@@ -112,6 +112,17 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+# XPROV-02b (Phase 175 / D-02b): fixed honest-incomplete copy for a detected DeepSeek
+# DSML leak (the model wrote a tool call as visible text, so it never ran). Emitted via
+# the EXISTING 'error' SSE event from the post-drain hook. Deliberately a FIXED string —
+# it MUST NOT interpolate the model's raw (attacker-controllable) leaked markup, so it
+# cannot break the SSE contract or echo injected content (T-175-02-02).
+DSML_LEAK_ERROR_MESSAGE = (
+    "The model tried to call a tool but wrote it as text, so it didn't run. "
+    "Please retry."
+)
+
+
 # ---------------------------------------------------------------------------
 # Phase 129 D-01 / D-03 (MP-04): MiniMax truncated-tool-args repair primitives
 # ---------------------------------------------------------------------------
@@ -2154,6 +2165,18 @@ async def run_agent_loop(
                             _on_chunk,
                             close_fn=stream.close,
                         )
+
+                        # XPROV-02b (Phase 175, Option B — post-drain, deepseek-leak-only).
+                        # If the sanitizer detected a DSML leak (DeepSeek wrote a tool call
+                        # as visible text, so the tool never ran), end the turn HONESTLY via
+                        # the EXISTING 'error' SSE event — no new event type, no per-chunk
+                        # edit. The getattr default keeps every non-deepseek / non-leak
+                        # stream byte-identical (anthropic/google streams lack the attr).
+                        if getattr(stream, "dsml_leaked", False):
+                            await _emit(
+                                redis, run_id, 'error',
+                                message=DSML_LEAK_ERROR_MESSAGE,
+                            )
 
                         # Parse tool calls based on calling mode
                         if calling_mode == CallingMode.STRUCTURED:
