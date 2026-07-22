@@ -19,8 +19,10 @@ Endpoints:
                      org:audit_view -> all org rows; else own-only + scope="own" (RLS-honest,
                      never a silent empty list — ADMIN-04 / D-166-04). No CSV (lighter cut).
 """
+import ipaddress
 import logging
 from datetime import datetime, timedelta, timezone
+from urllib.parse import urlparse
 
 import re
 
@@ -672,9 +674,40 @@ class SsoProviderBody(BaseModel):
     @field_validator("metadata_url")
     @classmethod
     def _validate_metadata_url(cls, v: str) -> str:
+        # SSRF guard (T-168-11 / WR-02): a SAML IdP metadata endpoint is always a PUBLIC https
+        # URL. GoTrue fetches this URL server-side, so on the self-hosted tier an ``sso:manage``
+        # org-admin could otherwise aim the operator's GoTrue at internal/loopback targets
+        # (169.254.169.254 cloud metadata, 127.0.0.1, RFC-1918, ``file://``) = an authenticated
+        # SSRF primitive. Reject non-https schemes and non-public hosts at the boundary, BEFORE
+        # any provider-CRUD call — proportionate for all tiers (a real IdP URL is public https).
+        # A DNS name that resolves to an internal IP (rebinding) is left to GoTrue's own fetch:
+        # a blocking DNS resolve in a sync validator would violate the async-no-blocking-IO rule
+        # and still could not pin GoTrue's later resolution.
         v = (v or "").strip()
         if not v:
             raise ValueError("An identity-provider metadata URL is required.")
+        parsed = urlparse(v)
+        if parsed.scheme.lower() != "https":
+            raise ValueError("The metadata URL must be an https:// URL.")
+        host = (parsed.hostname or "").strip()
+        if not host:
+            raise ValueError("The metadata URL must include a valid host.")
+        low = host.lower()
+        if low == "localhost" or low.endswith(".localhost"):
+            raise ValueError("The metadata URL host is not allowed.")
+        try:
+            ip = ipaddress.ip_address(host)
+        except ValueError:
+            ip = None
+        if ip is not None and (
+            ip.is_loopback
+            or ip.is_private
+            or ip.is_link_local
+            or ip.is_reserved
+            or ip.is_multicast
+            or ip.is_unspecified
+        ):
+            raise ValueError("The metadata URL host is not allowed.")
         return v
 
     @field_validator("email_domain")
