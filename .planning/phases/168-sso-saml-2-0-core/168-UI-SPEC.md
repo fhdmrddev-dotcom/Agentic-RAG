@@ -31,40 +31,42 @@ created: 2026-07-22
 
 ## Spacing Scale
 
-Tailwind default 4px grid (source of truth = `sketch-findings` "4px grid `--space-1`..`--space-16`"). Declared values used by this phase:
+Tailwind default 4px grid (source of truth = `sketch-findings` "4px grid `--space-1`..`--space-16`"). **This phase snaps every spacing value to the grid** — the 166/167 sibling tabs ship a few off-grid half-steps (`py-0.5`/`px-3.5`/`gap-2.5`), but the SSO tab uses the canonical token instead (see the intentional-deviation note below) so it passes the grid gate.
 
 | Token | Value | Usage |
 |-------|-------|-------|
-| xs | 4px | Icon↔label gaps (`gap-1`), chip inner padding |
-| sm | 8px | Compact stacks (`space-y-2` between Label + Input), inline gaps (`gap-2`) |
-| md | 16px | Default element/field spacing (`space-y-4` in forms) |
+| xs | 4px | Icon↔label gaps (`gap-1`), chip vertical padding (`py-1`), tab-strip icon gap |
+| sm | 8px | Compact stacks (`space-y-2` between Label + Input), inline gaps (`gap-2`), tab-strip button padding (`py-2`) |
+| md | 16px | Default element/field spacing (`space-y-4` in forms), list-row horizontal padding (`px-4`) |
 | lg | 24px | Tab-body padding (`px-6 py-6` on the section shell) |
 | xl | 32px | Between major sections inside a tab |
 | 2xl | 48px | (unused this phase) |
 | 3xl | 64px | (unused this phase) |
 
-Exceptions (accepted — inherited 1:1 from the 166/167 sibling tabs so the SSO tab does not read as foreign; do NOT introduce new odd values beyond these):
-- **2px** (`py-0.5`, `mt-0.5`) — status/role chip vertical padding + chip sub-line.
-- **6px** (`py-1.5`, `gap-1.5`) — tab-strip button padding + CTA icon gap.
-- **10px** (`gap-2.5`, `rounded-[10px]`) — section-card radius + heading icon gap (matches `--radius` 0.625rem).
-- **14px** (`px-3.5`) — list-row horizontal padding.
-- Avatar/status dots: `h-9 w-9` (36px) circle, reused from `InvitationsTab` rows.
+**Non-spacing values (exempt from the 4px grid — listed here so they aren't mistaken for spacing):**
+- **Corner radius:** `--radius` = 0.625rem (10px) via `rounded-lg` — the section-card + chip radius. This is a radius token, not spacing.
+- **Fixed icon/avatar sizing:** heading icon `h-[18px] w-[18px]`; row avatar/status dot `h-9 w-9` (36px, itself a multiple of 4). These are fixed component dimensions, not layout spacing.
+
+**Intentional-deviation note (for the executor):** where a sibling tab uses an off-grid value — `InvitationsTab` chips at `py-0.5` (2px), rows at `px-3.5` (14px), heading gap `gap-2.5` (10px) — the SSO tab deliberately uses the grid token (`py-1`, `px-4`, `gap-2`) to satisfy the spacing gate. Do NOT "fix" these back to match the sibling's odd values; the small rhythm difference is an accepted, gate-required deviation.
 
 ---
 
 ## Typography
 
-Inherited from the locked Aether system (`index.css` + the 166/167 tabs). The phase must match these exactly — weights are the established system set (400/500/600/700), NOT a per-phase reinvention.
+Inherited from the locked Aether system (`index.css`), constrained to **exactly two weights for this phase's surfaces: 400 (regular) + 700 (bold)**. Distinction that the sibling tabs draw with a 500/600 weight is carried here by **size + `uppercase tracking-wide` + color** instead of a third/fourth weight.
 
 | Role | Size | Weight | Line Height | Font / Notes |
 |------|------|--------|-------------|--------------|
 | Section heading | 16px (`text-base`) | 700 (`font-bold`) | 1.2 | Manrope (`font-headline`) — tab title, e.g. "Single sign-on" |
+| Prose emphasis | 14px (`text-sm`) | 700 (`font-bold`) | 1.5 | Inter — empty-state heading + the org/domain name in the remove-confirm sheet |
 | Body / input | 14px (`text-sm`) | 400 | 1.5 | Inter — field values, helper prose, button labels |
 | Helper / caption | 12px (`text-xs`) | 400 | 1.5 | Inter — under-field guidance, honesty notes |
-| Micro-label / chip | 11px (`text-[11px]`) | 500 (`font-medium`) | 1.4 | Inter — uppercase field labels (`uppercase tracking-wide`), status/role chips |
+| Micro-label / chip | 11px (`text-[11px]`) | 400 | 1.4 | Inter — uppercase field labels (`uppercase tracking-wide`) + status/role chips; distinction is size + uppercase + tone, NOT weight |
 | Identifier / URL | 11–14px | 400 | 1.5 | JetBrains Mono (`font-mono`) — SP metadata URLs (Entity ID, ACS URL), `provider_id`, the copyable metadata-URL echo |
 
-Emphasis inside body prose uses **600** (`font-semibold`) sparingly (empty-state headings, the org/domain name in a confirm sheet) — the established 166 pattern. The reserved-warning amber tint is NEVER used for text in this indigo zone.
+**Two-weight set = 400 + 700.** The reserved-warning amber tint is never used for text in this indigo zone.
+
+**Intentional-deviation note (for the executor):** `InvitationsTab`/`OrgSettingsTab` render micro-labels and chips at `font-medium` (500). The SSO tab intentionally drops that to **400 + `uppercase tracking-wide`** to stay within the 2-weight contract — do NOT bump the SSO chip/label back to 500 to match the sibling.
 
 ---
 
@@ -124,7 +126,8 @@ Emphasis inside body prose uses **600** (`font-semibold`) sparingly (empty-state
 ## Interaction Contracts (phase surfaces)
 
 ### 1. SSO tab (`SsoTab.tsx`) — inside `OrgAdminShell`, indigo zone
-- **Layout:** sibling of `OrgSettingsTab` — `mx-auto max-w-2xl px-6 py-6` → `section` `rounded-[10px] border border-border bg-card px-5 py-5`; heading = lucide icon `h-[18px] w-[18px] text-primary` + `font-headline text-base font-bold`. Tab flips from `LockedTab` → live in the `OrgAdminShell` TABS switch (render-gated on `can_manage_sso`; server `sso:manage` is the wall).
+- **Primary visual anchor:** before a connection exists, the anchor is the **"Add SSO connection" primary CTA**; once a connection exists, the anchor shifts to the **connection row + its status chip** (the one element that answers "is SSO live?" at a glance). Everything else (SP-metadata well, helper prose) is secondary.
+- **Layout:** sibling of `OrgSettingsTab` — `mx-auto max-w-2xl px-6 py-6` → `section` `rounded-lg border border-border bg-card px-5 py-5`; heading = lucide icon `h-[18px] w-[18px] text-primary` + `font-headline text-base font-bold`. Tab flips from `LockedTab` → live in the `OrgAdminShell` TABS switch (render-gated on `can_manage_sso`; server `sso:manage` is the wall).
 - **Connection create form:** two fields — **Metadata URL** (`Input type=url`, mono value, placeholder `https://idp.example.com/saml/metadata`) + **Email domain** (`Input`, lowercased, placeholder `example.com`). Domain blocklist rejects public domains inline (422 → the public-domain error copy) BEFORE any provider call. Primary CTA "Add SSO connection". No XML upload — metadata URL only (D-168-01).
 - **SP-metadata display:** a read-only well showing Entity ID (`{SUPABASE_URL}/auth/v1/sso/saml/metadata`), ACS URL (`{SUPABASE_URL}/auth/v1/sso/saml/acs`), NameID format (`emailAddress`) as mono values, each Copy-able. Static per deployment — no API call to obtain.
 - **Connection state:** once created, the form collapses to a connection row = domain + `provider_id` (opaque mono chip) + the status chip (Pending approval / Active / Disabled) + a **Remove connection** destructive action (victim-naming confirm sheet — graded-guard rule: target-specific destructive → name the victim domain).
@@ -132,6 +135,7 @@ Emphasis inside body prose uses **600** (`font-semibold`) sparingly (empty-state
 - **States to cover (Dimension 2):** loading · empty (no connection) · pending-approval · active · disabled · create-error (each of the 4 error copies) · removing (`↻ updating`) · non-manager (honest-absent CTA).
 
 ### 2. Identifier-first login (rework `SignInForm.tsx`)
+- **Primary visual anchor:** the **single email field + "Continue" CTA** — the resting form is a 3-second read (one input, one button). The password field and the "Sign in with SSO" link are secondary and appear only when the flow calls for them.
 - **Resting state:** ONE email field + **Continue** button (the password field is hidden). Preserves the existing `space-y-4` form rhythm, `Label` + `Input` pattern, `Button className="w-full"`.
 - **On Continue:** look the domain up (`GET /org/sso/route?domain=`). **Match** → `signInWithSSO({ domain })` → manual `window.location.href = data.url` redirect to the IdP. **No match** → reveal the password field with `animate-fadeSlideUp` (the established 0.3s reveal), CTA relabels to **Sign In** (today's `signInWithPassword` path, unchanged). RETAINED password fallback — nobody is locked out (D-168-02, SC#3).
 - **Escape hatch:** a small secondary **Sign in with SSO** link (indigo, `text-sm underline`) under the form for IdP-initiated / no-domain edge cases (`{ providerId }` fallback).
