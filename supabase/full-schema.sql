@@ -640,6 +640,7 @@ CREATE TABLE public.app_settings (
     tavily_api_key text,
     setup_complete boolean DEFAULT false NOT NULL,
     model_discovery_filter_enabled boolean DEFAULT true NOT NULL,
+    supabase_management_token text,
     CONSTRAINT app_settings_extraction_table_engine_pdf_check CHECK ((extraction_table_engine_pdf = ANY (ARRAY['camelot'::text, 'pdfplumber'::text])))
 );
 
@@ -1738,7 +1739,11 @@ CREATE TABLE public.sso_configs (
     provider_id text,
     attribute_mapping jsonb DEFAULT '{}'::jsonb NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    status text DEFAULT 'pending_approval'::text NOT NULL,
+    approved_by uuid,
+    approved_at timestamp with time zone,
+    CONSTRAINT sso_configs_status_check CHECK ((status = ANY (ARRAY['pending_approval'::text, 'active'::text, 'disabled'::text])))
 );
 
 
@@ -3314,6 +3319,13 @@ CREATE INDEX skill_files_user_id_idx ON public.skill_files USING btree (user_id)
 --
 
 CREATE INDEX skills_user_id_idx ON public.skills USING btree (user_id);
+
+
+--
+-- Name: sso_configs_email_domain_lower_unique; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX sso_configs_email_domain_lower_unique ON public.sso_configs USING btree (lower(email_domain)) WHERE (email_domain IS NOT NULL);
 
 
 --
