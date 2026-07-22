@@ -119,9 +119,13 @@ Committed as gated phases (ship only if CORE lands clean and budget remains; v2.
   4. An approved skill/description version pointer updates in the UI without a reload (RENDER-04).
   5. The `execute_code` `libraries` parameter installs the requested packages reliably — no silent no-op, no wasted retry rounds (EXEC-01).
 
-**Plans**: TBD
+**Plans**: 4 plans (2 waves) — created 2026-07-22
+- [ ] 176-01-PLAN.md — RENDER-01 + RENDER-02: StreamsProvider reconcile correctness (user-bubble content-supersede drop + mount-path onTerminal un-fold by run.run_id) [Wave 1]
+- [ ] 176-02-PLAN.md — RENDER-04: Skill-Studio live version pointer (refreshVersions mirror of refreshGate + VersionsTab refreshNonce) [Wave 1]
+- [ ] 176-03-PLAN.md — EXEC-01: reliable execute_code install (python -m pip same-interpreter, retry x1) + bounded ModuleNotFound auto-heal + honest tool result [Wave 1]
+- [ ] 176-04-PLAN.md — RENDER-03: honest send-drop (non-dispatch → failedSendDrafts/reconcileErrors seam) + fresh-thread pending-send ordering [Wave 2, depends 176-01]
 **UI hint**: yes
-**Flags**: SC#10 (chat UI state + agent loop); G-2 sketch (render visual work); G-5 (`MessageItem.tsx`, `useMessages.ts`, `StreamsProvider.tsx`; EXEC-01 → `sandbox_service.py`/`tool_dispatcher.py`; audit at discuss); reported-bugs fold (`BUG-260712-02`, `BUG-260707-03`, `general-chat-intermittent-silent-send-drop`, `BUG-260706-01`; related minor `BUG-260609-02`/`-04`, `BUG-260708-02`); no threat model; migration only if RENDER-04 truly needs one (likely realtime/refetch — none expected).
+**Flags**: SC#10 (chat UI state + agent loop); G-2 sketch (render visual — D-13: NO fresh sketch, sketch 014 + StreamingNarration are the anchor); G-5 (`StreamsProvider.tsx` render-layer only — additive reconcile at existing seams, no refactor-first; EXEC-01 → `tool_dispatcher.py` only, sandbox_service unchanged); reported-bugs fold (`BUG-260712-02`, `BUG-260707-03`, `general-chat-intermittent-silent-send-drop`, `BUG-260706-01`, `BUG-260708-02`; minor `BUG-260609-02`/`-04` deferred → Phase 178); honest threat model (no new trust boundary — all `accept`); no migration (D-16 — all app-layer).
 
 #### Phase 177: v3.4 Org-Surface Polish
 
@@ -189,7 +193,7 @@ Committed as gated phases (ship only if CORE lands clean and budget remains; v2.
 |-------|----------------|--------|-----------|
 | 174. Run-State & Lifecycle Honesty | 0/? | Not started | - |
 | 175. Cross-Provider Streaming Fidelity | 4/4 | Executed — ready for verification | 2026-07-22 |
-| 176. Chat Render Correctness + Exec Reliability | 0/? | Not started | - |
+| 176. Chat Render Correctness + Exec Reliability | 0/4 | Planned (2 waves) | - |
 | 177. v3.4 Org-Surface Polish | 0/? | Not started | - |
 | 178 (STRETCH). Chat UI/UX Polish Pass | 0/? | Gated (behind CORE) | - |
 | 179 (STRETCH). Plain-Language / Terminology Extensions | 0/? | Gated (behind CORE) | - |
