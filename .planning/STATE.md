@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v3.5
 milestone_name: UX Consolidation & Chat Polish
 status: executing
-last_updated: "2026-07-22T16:54:26.687Z"
+last_updated: "2026-07-22T17:05:40.278Z"
 last_activity: 2026-07-22
 progress:
   total_phases: 20
@@ -43,9 +43,9 @@ Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 op
 ## Current Position
 
 Phase: 175 (cross-provider-streaming-fidelity) — EXECUTING
-Plan: 2 of 4
-Status: 175-01 complete (XPROV-01/03/04 substrate landed) — ready to execute Wave 1 (175-02/03)
-Last activity: 2026-07-22 -- Phase 175 Plan 01 complete (capability markers + inferred-provider guard; zero net-new test failures)
+Plan: 3 of 4
+Status: Ready to execute
+Last activity: 2026-07-22
 
 ### Quick Tasks Completed
 
@@ -482,6 +482,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 168 P04 | 32min | 2 tasks | 4 files |
 | Phase 168 P05 | 14min | 2 tasks | 7 files |
 | Phase 168 P06 | 11min | 2 tasks | 6 files |
+| Phase 175 P02 | 15min | 2 tasks | 4 files |
 
 ## Decisions
 
@@ -607,6 +608,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase 168]: 168-06: SSO tab live + identifier-first login fails OPEN to password on any route-lookup failure (T-168-07) — no lockout; SSO-01 COMPLETE
 - [Phase ?]: Phase 175-01: reasoning_off marked per-MODEL across the whole docs-confirmed-SAFE set (13 rows), not per-provider-default
 - [Phase ?]: Phase 175-01: XPROV-03 folded gate fires only on a CONFIDENT known-provider mismatch (excludes fallback bucket); sub_agent_service.py (4th site) byte-frozen keeps its own guard — D-03 coverage is 3/4
+- [Phase ?]: 175-02: DSML stream-end flush (deepseek-gated, D-14) + honest leak signal via the EXISTING error SSE event through an Option-B post-drain hook
 
 ## Operator Next Steps
 

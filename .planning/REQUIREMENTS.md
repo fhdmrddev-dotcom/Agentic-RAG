@@ -25,7 +25,7 @@ The parked chat-surface bug backlog + v3.4 org-surface polish. Each maps to exac
 ### XPROV — Cross-provider streaming fidelity
 
 - [x] **XPROV-01**: Newer reasoning models (gpt-5.6 and class) send correct request params — no model-parameter 400 errors on chat or with tools
-- [ ] **XPROV-02**: DeepSeek tool-call markup never leaks into the visible chat content (re-parse/strip guard holds on long turns)
+- [x] **XPROV-02**: DeepSeek tool-call markup never leaks into the visible chat content (re-parse/strip guard holds on long turns)
 - [x] **XPROV-03**: Title-generation cross-provider fallback is honest — no misleading fallback banner when a provider succeeds
 
 *Source reports: `BUG-260714-01-gpt56-model-parameter-error`, `BUG-260711-02-gpt56-reasoning-tools-chat-completions-400` (deferred), `BUG-260708-01-deepseek-tool-call-markup-leak-reparse`, `BUG-260623-01-title-gen-cross-provider-fallback-banner`.*
@@ -111,7 +111,7 @@ Which phases cover which requirements. Populated during roadmap creation (`/gsd:
 | STATE-03 | Phase 174 | Complete |
 | STATE-04 | Phase 174 | Complete |
 | XPROV-01 | Phase 175 | Complete |
-| XPROV-02 | Phase 175 | Pending |
+| XPROV-02 | Phase 175 | Complete |
 | XPROV-03 | Phase 175 | Complete |
 | RENDER-01 | Phase 176 | Pending |
 | RENDER-02 | Phase 176 | Pending |
