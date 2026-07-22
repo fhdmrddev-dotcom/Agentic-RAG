@@ -73,10 +73,13 @@ afterEach(() => {
 })
 
 describe("AcceptInvitePage — unauthenticated invitee (INV-01)", () => {
-  it("renders the invite-branded auth (SignIn) and does NOT accept yet", () => {
+  it("renders the invite-branded auth (identifier-first SignIn) and does NOT accept yet", () => {
     render(<AcceptInvitePage {...makeProps({ user: null })} />)
     expect(screen.getByText(/you've been invited/i)).toBeInTheDocument()
-    expect(screen.getByRole("button", { name: /^sign in$/i })).toBeInTheDocument()
+    // Phase 168: the SignInForm is identifier-first — the resting CTA is "Continue" (the
+    // password field + "Sign In" reveal only after the domain lookup). Its presence proves
+    // the auth form rendered for the unauthenticated invitee.
+    expect(screen.getByRole("button", { name: /continue/i })).toBeInTheDocument()
     expect(acceptMock).not.toHaveBeenCalled()
   })
 })
