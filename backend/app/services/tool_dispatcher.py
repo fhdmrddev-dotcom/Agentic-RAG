@@ -1483,20 +1483,81 @@ def _pip_install(session, libs: "list[str]"):
     )
 
 
-async def _install_declared_libraries(session, libraries: "list[str]") -> str:
+class _SandboxCommandTimeout(Exception):
+    """A bounded blocking sandbox call exceeded its wall-clock ceiling and the
+    container was killed to free the wedged (uncancellable) thread (096/SEED-063).
+    Carries the ceiling so the caller can build an honest aborted message."""
+
+    def __init__(self, timeout_s):
+        self.timeout_s = timeout_s
+        super().__init__(f"sandbox command exceeded {timeout_s}s wall-clock limit")
+
+
+async def _run_bounded_sandbox(func, *args, thread_id, timeout_s):
+    """Run a BLOCKING sandbox call ``func(*args)`` off the event loop, bounded by a
+    wall-clock ``timeout_s`` (``None``/``<=0`` disables the cap — operator escape hatch,
+    mirrors the primary run at ``:1784``).
+
+    A Python thread blocked in ``session.execute_command`` cannot be cancelled, so on
+    overrun this KILLS the sandbox container (the only way to free the thread — 096 /
+    SEED-063), abandons the orphaned future (retrieving its eventual exception in a
+    done-callback so asyncio doesn't log "exception never retrieved"), and raises
+    ``_SandboxCommandTimeout``. Uses ``asyncio.wait`` (which never cancels the future
+    itself) rather than ``asyncio.wait_for`` so the abandoned thread keeps running
+    harmlessly until the kill lands, exactly like the primary drain loop. Returns the
+    call's result when it completes within the ceiling.
+    """
+    loop = asyncio.get_running_loop()
+    fut = loop.run_in_executor(None, func, *args)
+    if not timeout_s or timeout_s <= 0:
+        return await fut
+    done, _pending = await asyncio.wait({fut}, timeout=timeout_s)
+    if not done:
+        logger.warning(
+            "bounded sandbox command wall-clock timeout (%ss) thread=%s — "
+            "killing sandbox container", timeout_s, thread_id,
+        )
+        try:
+            await run_in_threadpool(sandbox_manager.kill_session, thread_id)
+        except Exception:  # noqa: BLE001 — abort path never raises
+            logger.exception(
+                "kill_session failed after bounded-command timeout thread=%s", thread_id,
+            )
+        fut.add_done_callback(lambda f: f.cancelled() or f.exception())
+        raise _SandboxCommandTimeout(timeout_s)
+    return fut.result()
+
+
+async def _install_declared_libraries(
+    session, libraries: "list[str]", *, thread_id=None, timeout_s=None,
+) -> str:
     """Install declared `libraries` deterministically; retry ONCE on a non-zero exit.
 
     Returns the pip stderr IFF the install STILL failed after the retry (else "") so
     the caller can carry the honest reason into the tool result — NEVER silently
     swallowed (D-01/D-02.1). A thread-side raise is surfaced as the reason too.
+
+    CR-01 (176): each blocking `pip install` is routed through `_run_bounded_sandbox`
+    so a hung install (network stall) can't wedge the run forever — a wall-clock
+    overrun kills the container and surfaces an honest aborted reason, mirroring the
+    primary run's wall-clock abort. `thread_id`/`timeout_s` default to no-bound so
+    unit callers stay unchanged.
     """
     try:
-        res = await run_in_threadpool(_pip_install, session, libraries)
+        res = await _run_bounded_sandbox(
+            _pip_install, session, libraries, thread_id=thread_id, timeout_s=timeout_s)
         if getattr(res, "exit_code", 0):
-            res = await run_in_threadpool(_pip_install, session, libraries)  # retry once
+            res = await _run_bounded_sandbox(  # retry once
+                _pip_install, session, libraries, thread_id=thread_id, timeout_s=timeout_s)
         if getattr(res, "exit_code", 0):
             return (getattr(res, "stderr", "") or "") or "pip install exited non-zero"
         return ""
+    except _SandboxCommandTimeout as _t:  # CR-01 — hung install killed + surfaced honestly
+        logger.warning("declared pip install exceeded wall-clock limit: %s", _t)
+        return (
+            f"pip install exceeded the {_t.timeout_s}s wall-clock limit and was "
+            "aborted (the sandbox container was killed to free it)."
+        )
     except Exception as _e:  # noqa: BLE001 — surface, never swallow (D-01)
         logger.warning("declared pip install raised thread-side: %s", _e)
         return f"{type(_e).__name__}: {_e}"
@@ -1737,7 +1798,11 @@ async def _handle_execute_code(args: dict, ctx: ToolContext) -> ToolResult:
             # `python -u` code run; non-stream → reliable exit_code), retry once. A
             # persistent failure surfaces via the honest tool result below — NEVER
             # silently swallowed as it was with the venv-targeted `session.install`.
-            _declared_install_stderr = await _install_declared_libraries(session, libraries)
+            _declared_install_stderr = await _install_declared_libraries(
+                session, libraries,
+                thread_id=ctx.thread_id,
+                timeout_s=settings.sandbox_exec_timeout_seconds,
+            )
 
         start_time = time_mod.time()
 
@@ -3021,15 +3086,40 @@ async def _autoheal_missing_module(
 
     await _heal_bound_record(ctx, healed_fallback, module)
 
+    # CR-01 (176): both the heal install and the re-run are bounded by the SAME
+    # wall-clock ceiling the primary run uses (096/SEED-063) so a healed-then-runaway
+    # script — or a hung `pip install` — can never wedge the run into a 40-minute
+    # zombie. `thread_id` is what `_run_bounded_sandbox`/`kill_session` need to free
+    # the container on overrun; absent (unit ctx) → no bound.
+    _thread_id = getattr(ctx, "thread_id", None)
+    _exec_timeout_s = settings.sandbox_exec_timeout_seconds
+
     # Install the missing module into the SYSTEM interpreter (python -m pip, retry once).
-    _install_stderr = await _install_declared_libraries(session, [module])
+    _install_stderr = await _install_declared_libraries(
+        session, [module], thread_id=_thread_id, timeout_s=_exec_timeout_s)
     if _install_stderr:
         return {"install_failed": _install_failed_detail(module, _install_stderr)}
 
-    # Install OK — re-run the code ONCE, threadpool-wrapped (session.execute_command is
-    # synchronous/blocking — D-v2.5-01), reusing the container-resident code_file. Do NOT
-    # re-enter the async drain (Pitfall 1).
-    new_result = await run_in_threadpool(session.execute_command, f"python -u {code_file}")
+    # Install OK — re-run the code ONCE, bounded by the wall-clock ceiling (a blocking
+    # session.execute_command in a threadpool thread cannot be cancelled — D-v2.5-01),
+    # reusing the container-resident code_file. Do NOT re-enter the async drain
+    # (Pitfall 1). On overrun `_run_bounded_sandbox` has already killed the container;
+    # surface an honest aborted note (never a silent zombie), mirroring the primary
+    # run's `[execution aborted]` / 124 completion.
+    try:
+        new_result = await _run_bounded_sandbox(
+            session.execute_command, f"python -u {code_file}",
+            thread_id=_thread_id, timeout_s=_exec_timeout_s)
+    except _SandboxCommandTimeout as _t:
+        logger.warning(
+            "auto-heal re-run wall-clock timeout (%ss) thread=%s module=%s — "
+            "container killed", _t.timeout_s, _thread_id, module,
+        )
+        return {"install_failed": _install_failed_detail(
+            module,
+            f"installed, but the re-run exceeded the {_t.timeout_s}s wall-clock "
+            "execution limit and was aborted.",
+        )}
     still_missing = _extract_missing_module(
         getattr(new_result, "stdout", "") or "", getattr(new_result, "stderr", "") or ""
     )

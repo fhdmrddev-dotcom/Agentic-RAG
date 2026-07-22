@@ -395,9 +395,12 @@ async def test_declared_install_success_first_try_single_call():
 class _FakeCtx:
     """Minimal ToolContext stand-in exposing only the heal-bound inputs."""
 
-    def __init__(self, redis=None, run_id=None):
+    def __init__(self, redis=None, run_id=None, thread_id=None):
         self.redis = redis
         self.run_id = run_id
+        # CR-01 (176): the wall-clock abort needs a thread_id to kill_session on
+        # overrun. Absent (None) → the bounded helper runs unbounded (no-timeout).
+        self.thread_id = thread_id
 
 
 def test_extract_missing_module_reads_stderr_and_stdout():
@@ -576,3 +579,112 @@ async def test_autoheal_declared_failure_no_module_surfaces_honestly():
     assert result is not None and result.get("install_failed") is not None
     assert "No matching distribution" in result["install_failed"]["reason"]
     assert session.execute_command.call_count == 0  # nothing to heal, just surface
+
+
+# ---------------------------------------------------------------------------
+# CR-01 (Phase 176) — the heal re-run + pip installs must be bounded by the SAME
+# wall-clock ceiling the PRIMARY run uses (096/SEED-063), so a healed-then-runaway
+# script (or a hung `pip install`) can't wedge the run into a 40-minute zombie.
+# ---------------------------------------------------------------------------
+import threading  # noqa: E402
+
+
+@pytest.mark.asyncio
+async def test_run_bounded_sandbox_timeout_kills_container_and_raises(monkeypatch):
+    """A blocking sandbox call that overruns the wall-clock ceiling KILLS the
+    container (the only way to free an uncancellable thread) and raises
+    _SandboxCommandTimeout — mirroring the primary run's 096/SEED-063 abort."""
+    from app.services import tool_dispatcher as td
+
+    killed: dict = {}
+    monkeypatch.setattr(
+        td.sandbox_manager, "kill_session", lambda tid: killed.setdefault("tid", tid)
+    )
+
+    release = threading.Event()
+
+    def _blocking(_cmd):
+        # Bounded wait so the abandoned executor thread ALWAYS frees (never hangs
+        # pytest at exit); the ceiling below fires long before this returns.
+        release.wait(timeout=2.0)
+        return _FakeConsole(exit_code=0)
+
+    with pytest.raises(td._SandboxCommandTimeout):
+        await td._run_bounded_sandbox(
+            _blocking, "python -u /tmp/x.py", thread_id="thread-runaway", timeout_s=0.05
+        )
+
+    # The container was killed to free the wedged thread.
+    assert killed.get("tid") == "thread-runaway"
+    release.set()  # free the abandoned thread promptly
+
+
+@pytest.mark.asyncio
+async def test_run_bounded_sandbox_disabled_ceiling_runs_unbounded(monkeypatch):
+    """timeout_s in {None, 0, <0} disables the cap (operator escape hatch) — the call
+    completes and kill_session is NEVER touched."""
+    from app.services import tool_dispatcher as td
+
+    killed: dict = {}
+    monkeypatch.setattr(
+        td.sandbox_manager, "kill_session", lambda tid: killed.setdefault("tid", tid)
+    )
+
+    for disabled in (None, 0, -1):
+        res = await td._run_bounded_sandbox(
+            lambda _c: _FakeConsole(exit_code=0, stdout="ok"),
+            "python -u /tmp/x.py", thread_id="t", timeout_s=disabled,
+        )
+        assert res.stdout == "ok"
+    assert killed == {}  # never killed on the disabled path
+
+
+@pytest.mark.asyncio
+async def test_autoheal_rerun_timeout_surfaces_honest_and_no_exec_result(monkeypatch):
+    """CR-01: when the healed RE-RUN overruns the ceiling, the auto-heal returns an
+    honest `install_failed` (installed-but-aborted) and adopts NO exec_result — so the
+    run is a clean, honest failure instead of a wedged zombie."""
+    from app.services import tool_dispatcher as td
+
+    async def _fake_bounded(func, *args, thread_id, timeout_s):
+        # pip install (func is _pip_install) succeeds; the `python -u` re-run overruns.
+        if func is td._pip_install:
+            return _FakeConsole(exit_code=0)
+        raise td._SandboxCommandTimeout(timeout_s)
+
+    monkeypatch.setattr(td, "_run_bounded_sandbox", _fake_bounded)
+
+    session = MagicMock()
+    ctx = _FakeCtx(redis=None, run_id=None, thread_id="thread-heal")
+
+    result = await td._autoheal_missing_module(
+        session=session, ctx=ctx, code_file="/tmp/run-abc.py",
+        stdout="", stderr="ModuleNotFoundError: No module named 'fpdf2'",
+        declared_install_stderr="", healed_fallback=set(),
+    )
+
+    assert result is not None
+    assert result.get("exec_result") is None  # aborted re-run is NOT adopted
+    assert result.get("install_failed") is not None
+    assert result["install_failed"]["module"] == "fpdf2"
+    assert "aborted" in result["install_failed"]["reason"].lower()
+
+
+@pytest.mark.asyncio
+async def test_declared_install_pip_timeout_surfaces_honest_reason(monkeypatch):
+    """CR-01: a hung `pip install` (network stall) that overruns the ceiling surfaces
+    an honest aborted reason (never silently swallowed, never a wedged run)."""
+    from app.services import tool_dispatcher as td
+
+    async def _fake_bounded(func, *args, thread_id, timeout_s):
+        raise td._SandboxCommandTimeout(timeout_s)
+
+    monkeypatch.setattr(td, "_run_bounded_sandbox", _fake_bounded)
+
+    session = MagicMock()
+    stderr = await td._install_declared_libraries(
+        session, ["fpdf2"], thread_id="thread-x", timeout_s=0.05
+    )
+
+    assert "aborted" in stderr.lower()
+    assert "limit" in stderr.lower()
