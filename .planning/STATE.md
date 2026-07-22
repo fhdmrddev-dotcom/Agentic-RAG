@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.5
 milestone_name: UX Consolidation & Chat Polish
 status: executing
-last_updated: "2026-07-22T20:26:08.318Z"
+last_updated: "2026-07-22T20:41:52.329Z"
 last_activity: 2026-07-22
 progress:
   total_phases: 20
   completed_phases: 2
   total_plans: 12
-  completed_plans: 9
+  completed_plans: 11
   percent: 10
 ---
 
@@ -43,7 +43,7 @@ Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 op
 ## Current Position
 
 Phase: 176 (chat-render-correctness-exec-reliability) — EXECUTING
-Plan: 3 of 4
+Plan: 4 of 4
 Status: Ready to execute
 Last activity: 2026-07-22
 
@@ -487,6 +487,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 175 P03 | 3min | 2 tasks | 4 files |
 | Phase 176 P01 | 13min | 2 tasks | 3 files |
 | Phase 176 P02 | 13min | 2 tasks | 6 files |
+| Phase 176 P03 | 35min | 2 tasks | 2 files |
 
 ## Decisions
 
@@ -620,6 +621,9 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase ?]: Phase 176-01 RENDER-01 (D-05b): dup user bubble is born in the reconcile merge — dropped via a content-supersede check (supersededByPersisted) in the untyped-temp preserve branch; 075.7 preserve held (D-06)
 - [Phase ?]: Phase 176-01 RENDER-02 (D-07): mount-path onTerminal mirrors the send-path content-reconcile keyed on run.run_id — backgrounded run un-folds live, no reload; content-only swap; send-path untouched (D-14)
 - [Phase ?]: 176-02 (RENDER-04): live version pointer fix is a frontend refetch only — refreshVersions mirrors refreshGate + a versionsNonce, no migration/no realtime (D-12/D-16)
+- [Phase ?]: 176-03 (EXEC-01): declared execute_code libraries install via python -m pip (system interpreter, non-stream => reliable exit_code), retry x1, never swallowed — replaces the venv-targeted failure-swallowing session.install (D-01/D-02.1)
+- [Phase ?]: 176-03 (EXEC-01): undeclared ModuleNotFound auto-heal (install + threadpool-wrapped re-run once) bounded 1-per-module-per-RUN via a per-run Redis set heal_attempted:{run_id}, graceful call-local fallback; read+written entirely in tool_dispatcher.py — no ctx field, no agent_loop touch (D-02.2/D-04)
+- [Phase ?]: 176-03 (EXEC-01): honest install_failed note on the model-facing llm_content only; persisted/UI tool_result stays a normal error — mirrors the runtime_gap pattern (D-03)
 
 ## Operator Next Steps
 

@@ -41,7 +41,7 @@ The parked chat-surface bug backlog + v3.4 org-surface polish. Each maps to exac
 
 ### EXEC — Code execution reliability
 
-- [ ] **EXEC-01**: The `execute_code` tool's `libraries` parameter installs the requested packages reliably (no silent no-op / wasted retry rounds)
+- [x] **EXEC-01**: The `execute_code` tool's `libraries` parameter installs the requested packages reliably (no silent no-op / wasted retry rounds)
 
 *Source report: `BUG-260708-02-execute-code-libraries-param-unreliable-install`.*
 
@@ -117,7 +117,7 @@ Which phases cover which requirements. Populated during roadmap creation (`/gsd:
 | RENDER-02 | Phase 176 | Complete |
 | RENDER-03 | Phase 176 | Pending |
 | RENDER-04 | Phase 176 | Complete |
-| EXEC-01 | Phase 176 | Pending |
+| EXEC-01 | Phase 176 | Complete |
 | ORGUX-01 | Phase 177 | Pending |
 | ORGUX-02 | Phase 177 | Pending |
 | POLISH-01 | Phase 178 | Pending (STRETCH) |
