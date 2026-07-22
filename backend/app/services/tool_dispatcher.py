@@ -1955,6 +1955,13 @@ async def _handle_execute_code(args: dict, ctx: ToolContext) -> ToolResult:
         # (never a raw traceback under a 'completed' status). Provider-uniform, no
         # `provider ==` fork; a clean run never enters here (Deep byte-identical — D-04).
         _install_failed_note: "dict | None" = None
+        # WR-02 (176): True once a heal RE-RUN produced a new result. The re-run runs
+        # WITHOUT on_stdout/on_stderr, so its output never streamed as code_stdout/
+        # code_stderr deltas — the live card still holds the FIRST run's pre-heal error
+        # text. This flag drives the corrective stdout/stderr carried on the completion
+        # event below so the live card reflects the run of record, not a stale error
+        # under a success badge.
+        _healed_rerun = False
         if actual_exit_code != 0:
             _heal = await _autoheal_missing_module(
                 session=session, ctx=ctx, code_file=code_file,
@@ -1967,6 +1974,7 @@ async def _handle_execute_code(args: dict, ctx: ToolContext) -> ToolResult:
                     exec_result = _heal["exec_result"]
                     duration_ms = int((time_mod.time() - start_time) * 1000)
                     actual_exit_code = _derive_actual_exit_code(exec_result)
+                    _healed_rerun = True
                 if _heal.get("install_failed") is not None:
                     _install_failed_note = _heal["install_failed"]
 
@@ -2005,9 +2013,20 @@ async def _handle_execute_code(args: dict, ctx: ToolContext) -> ToolResult:
             output_file_list = delta_files
 
         # Emit completion event (SAND-06)
-        await ctx.emit(ctx.redis, ctx.run_id, 'code_execution_complete',
-                       exit_code=actual_exit_code, duration_ms=duration_ms,
-                       execution_id=execution_id, output_files=output_file_list)
+        _complete_kwargs: dict = dict(
+            exit_code=actual_exit_code, duration_ms=duration_ms,
+            execution_id=execution_id, output_files=output_file_list,
+        )
+        # WR-02 (176): on a heal re-run, carry the HEALED run's authoritative
+        # stdout/stderr + a `healed` marker so the client REPLACES the stale pre-heal
+        # delta text (which never got superseded — the re-run had no stream callbacks)
+        # with the real output of record. Guarded on `_healed_rerun` → the normal
+        # (non-heal) completion is byte-identical (D-14); a clean run never sets it.
+        if _healed_rerun:
+            _complete_kwargs["healed"] = True
+            _complete_kwargs["stdout"] = exec_result.stdout or ""
+            _complete_kwargs["stderr"] = exec_result.stderr or ""
+        await ctx.emit(ctx.redis, ctx.run_id, 'code_execution_complete', **_complete_kwargs)
 
         exec_status = "completed" if actual_exit_code == 0 else "error"
         tool_result = json.dumps({

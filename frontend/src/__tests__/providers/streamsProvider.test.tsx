@@ -1741,6 +1741,98 @@ describe("075.6 Req #5 — argsCodeText reducer slice", () => {
 })
 
 // =============================================================================
+// Phase 176 WR-02 — healed re-run output is the output of record on the live card.
+//
+// The auto-heal re-run streams NO code_stdout/code_stderr deltas, so after a heal
+// the live outputLines still hold the FIRST run's pre-heal error text (e.g. a
+// ModuleNotFoundError). The backend now carries the healed run's authoritative
+// stdout/stderr on the code_execution_complete event with a `healed` marker; the
+// reducer REPLACES the stale outputLines so the card never renders pre-heal error
+// text under a green success badge. The normal (non-heal) completion is untouched.
+// =============================================================================
+describe("Phase 176 WR-02 — healed completion replaces stale pre-heal output", () => {
+  async function setupRunningExecuteCode(threadId = "thread-heal", runId = "run-heal") {
+    const recorder = makeSseRecorder()
+    mockPostMessage.mockResolvedValueOnce({ run_id: runId, message_id: `user-msg-${runId}` })
+    const { result } = renderProvider()
+    await act(async () => {
+      result.current.setViewingThread(threadId)
+    })
+    let sendPromise!: Promise<void>
+    await act(async () => {
+      sendPromise = result.current.sendMessage(threadId, "make a pdf")
+    })
+    await waitFor(() => expect(mockSubscribeToRun).toHaveBeenCalled())
+    const cb = recorder.forRun(runId) as StreamCallbacks
+    // Drive an execute_code tool into the running state + stream the pre-heal error.
+    act(() => {
+      cb.onToolStart!("execute_code", { code: "import fpdf2" })
+    })
+    act(() => {
+      cb.onCodeStderr!("ModuleNotFoundError: No module named 'fpdf2'")
+    })
+    return { cb, threadId, sendPromise }
+  }
+
+  function execTool(threadId: string) {
+    const bucket = useStreamsStore.getState().bucketsBySurface.get("chat")?.get(threadId) ?? []
+    const assistantMsg = [...bucket].reverse().find((m) => m.role === "assistant")
+    return assistantMsg?.tool_calls?.find((c) => c.name === "execute_code")
+  }
+
+  it("replaces the pre-heal stderr with the healed stdout when the completion is marked healed", async () => {
+    const { cb, threadId, sendPromise } = await setupRunningExecuteCode()
+
+    // Pre-heal: the card holds the ModuleNotFoundError stderr.
+    await waitFor(() => {
+      const tc = execTool(threadId)
+      expect(tc?.outputLines?.some((l) => l.content.includes("ModuleNotFoundError"))).toBe(true)
+    })
+
+    // Healed completion: exit 0 + the healed run's authoritative stdout/stderr.
+    act(() => {
+      cb.onCodeExecutionComplete!(0, 1234, [], undefined, {
+        stdout: "PDF built successfully\nsaved report.pdf",
+        stderr: "",
+      })
+    })
+
+    await waitFor(() => {
+      const tc = execTool(threadId)
+      // The stale ModuleNotFoundError is GONE; the healed output is the record.
+      expect(tc?.outputLines?.some((l) => l.content.includes("ModuleNotFoundError"))).toBe(false)
+      expect(tc?.outputLines).toEqual([
+        { kind: "stdout", content: "PDF built successfully" },
+        { kind: "stdout", content: "saved report.pdf" },
+      ])
+      expect(tc?.exitCode).toBe(0)
+    })
+
+    void sendPromise
+  })
+
+  it("leaves streamed outputLines untouched on a NORMAL (non-heal) completion (G-5 shared path intact)", async () => {
+    const { cb, threadId, sendPromise } = await setupRunningExecuteCode("thread-normal", "run-normal")
+
+    // Normal completion — NO healed payload (5th arg omitted).
+    act(() => {
+      cb.onCodeExecutionComplete!(1, 100, [], "boom")
+    })
+
+    await waitFor(() => {
+      const tc = execTool(threadId)
+      // Streamed stderr is preserved verbatim; nothing is replaced.
+      expect(tc?.outputLines).toEqual([
+        { kind: "stderr", content: "ModuleNotFoundError: No module named 'fpdf2'" },
+      ])
+      expect(tc?.exitCode).toBe(1)
+    })
+
+    void sendPromise
+  })
+})
+
+// =============================================================================
 // 099-08 (UAT L10) — a kickoff/send refusal surfaces the server detail.
 // A non-409 ApiError rolls back BOTH optimistic temps, sets the per-thread
 // banner to the SERVER's detail string, and stashes the typed prompt; 409 +

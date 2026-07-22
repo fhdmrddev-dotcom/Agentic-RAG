@@ -810,13 +810,34 @@ export function makeStreamCallbacks(opts: {
       durationMs: number,
       outputFiles: OutputFile[],
       error?: string,
+      healed?: { stdout: string; stderr: string },
     ) => {
+      // WR-02 (176): a healed re-run streams NO code_stdout/code_stderr deltas, so the
+      // live outputLines still hold the FIRST run's pre-heal error text (e.g. a
+      // ModuleNotFoundError). When the completion carries the healed run of record,
+      // REPLACE outputLines with it — split into per-line entries to match the
+      // streamed/reload-reconstruct shape — so the card never shows stale error text
+      // under a success badge. Guarded on `healed` → the normal path leaves
+      // outputLines untouched (byte-identical, G-5 shared render path intact).
+      const healedLines: { kind: "stdout" | "stderr"; content: string }[] | undefined = healed
+        ? [
+            ...(healed.stdout || "").split("\n").filter(Boolean).map((content) => ({ kind: "stdout" as const, content })),
+            ...(healed.stderr || "").split("\n").filter(Boolean).map((content) => ({ kind: "stderr" as const, content })),
+          ]
+        : undefined
       setMessages((prev) =>
         prev.map((m) => {
           if (m.id !== assistantId) return m
           const updated = (m.tool_calls ?? []).map((tc) =>
             tc.name === "execute_code" && tc.status === "running"
-              ? { ...tc, exitCode, executionDurationMs: durationMs, outputFiles, errorMessage: error }
+              ? {
+                  ...tc,
+                  exitCode,
+                  executionDurationMs: durationMs,
+                  outputFiles,
+                  errorMessage: error,
+                  ...(healedLines !== undefined ? { outputLines: healedLines } : {}),
+                }
               : tc,
           )
           return { ...m, tool_calls: updated }

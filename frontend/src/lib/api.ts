@@ -402,6 +402,11 @@ export interface StreamCallbacks {
     durationMs: number,
     outputFiles: OutputFile[],
     error?: string,
+    /** WR-02 (176): present only when the run was auto-healed (missing module
+     * installed + code re-run). The re-run streams NO code_stdout/code_stderr
+     * deltas, so the live card still holds the pre-heal error text; when set, the
+     * client replaces the streamed outputLines with this healed run of record. */
+    healed?: { stdout: string; stderr: string },
   ) => void
   /** Phase 075.1 Plan 04 Atom E (B-260519-11 + BUG-260514-01): cumulative
    * sandbox-output file list emitted after the agent loop terminates.
@@ -764,6 +769,14 @@ export async function subscribeToRun(
             parsed.duration_ms as number,
             (parsed.output_files ?? []) as OutputFile[],
             parsed.error as string | undefined,
+            // WR-02 (176): healed re-run's authoritative output, present only when the
+            // backend auto-healed a missing module and re-ran the code.
+            parsed.healed
+              ? {
+                  stdout: (parsed.stdout as string | undefined) ?? "",
+                  stderr: (parsed.stderr as string | undefined) ?? "",
+                }
+              : undefined,
           )
         // Phase 075.1 Plan 04 Atom E (B-260519-11 + BUG-260514-01) —
         // cumulative final-outputs panel. Backend emits exactly one
