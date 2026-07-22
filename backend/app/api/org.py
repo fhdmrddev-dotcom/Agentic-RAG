@@ -913,3 +913,79 @@ async def delete_sso_provider(
         org_id=str(request.state.active_org),
     )
     return None
+
+
+# ── /org/sso/route — the FULLY PUBLIC, pre-login domain lookup (D-168-02 / T-168-10) ──
+@router.get("/sso/route")
+async def sso_route(domain: str = Query(...)):
+    """Identifier-first login routing — a FULLY PUBLIC, anonymous, pre-login read.
+
+    Declares NO ``get_current_user`` / auth / active-org dependency of ANY kind: the login page
+    calls this BEFORE any session or Authorization header exists, so an auth dependency would
+    403 every anonymous visitor and, via Plan 06's error handling, lock out ALL login. This is
+    the ONLY unauthenticated read on the org surface — do NOT copy ``/org/me``'s
+    ``Depends(get_current_user)`` shape (PATTERNS.md "No Analog Found").
+
+    Runs on the singleton/service-role pool: ``SELECT 1 FROM sso_configs WHERE
+    lower(email_domain)=lower($1) AND status='active'``. Returns ONLY ``{"sso": bool}`` keyed
+    STRICTLY on domain→active-config presence — never a provider_id/org_id/any internal field,
+    and NEVER whether an email/account exists (anti-enumeration, T-168-10). A non-active config
+    (pending/disabled) routes nobody until an operator approves it (T-168-01).
+    """
+    dom = (domain or "").strip().lower()
+    if not dom:
+        return {"sso": False}
+    pool = await deps.get_pg_pool()
+    found = await pool.fetchval(
+        "SELECT 1 FROM public.sso_configs "
+        "WHERE lower(email_domain) = lower($1) AND status = 'active' LIMIT 1",
+        dom,
+    )
+    return {"sso": bool(found)}
+
+
+# ── /org/sso/provision — the domain-gated JIT (SSO-01 / D-168-04) ──────────────────
+@router.post("/sso/provision")
+async def provision_sso(current_user: dict = Depends(get_current_user)):
+    """Domain-gated JIT: join the org of the caller's AUTHENTICATED SSO provider (D-168-04).
+
+    ``Depends(get_current_user)`` ONLY — NO X-Org-Id, NO require_* gate (the SSO user isn't a
+    member yet). The org is resolved from the authenticated provider IDENTITY, never a client
+    claim: read the caller's ``auth.identities`` SSO row (service-role) → strip the ``sso:``
+    prefix → match ``sso_configs.provider_id`` WHERE ``status='active'`` → org_id. Then
+    ``provision_sso_membership`` inserts a single 'member' row (role HARDCODED in the service —
+    the endpoint passes NO role, T-168-03). Idempotent + safe to call on every SIGNED_IN.
+
+    A password user (no SSO identity) is a 200 no-op — never an error (they hit this by
+    mistake). A resolved provider whose config is NOT active is a fail-closed 403 (T-168-01).
+    """
+    pool = await deps.get_pg_pool()  # singleton BYPASSRLS — the SSO user is not yet a member
+    ident = await pool.fetchrow(
+        "SELECT provider FROM auth.identities "
+        "WHERE user_id = $1 AND provider LIKE 'sso:%' LIMIT 1",
+        current_user["id"],
+    )
+    if ident is None:
+        # A password user hit this by mistake — a 200 no-op, never an error.
+        return {"org_id": None, "role": None, "joined": False}
+
+    provider = ident["provider"] or ""
+    provider_uuid = provider[len("sso:"):] if provider.startswith("sso:") else provider
+    cfg = await pool.fetchrow(
+        "SELECT org_id FROM public.sso_configs WHERE provider_id = $1 AND status = 'active'",
+        provider_uuid,
+    )
+    if cfg is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="SSO isn't configured for your organization.",
+        )
+
+    result = await invitation_service.provision_sso_membership(
+        pool, cfg["org_id"], current_user["id"]
+    )
+    return {
+        "org_id": result["org_id"],
+        "role": result["role"],
+        "joined": result["joined"],
+    }

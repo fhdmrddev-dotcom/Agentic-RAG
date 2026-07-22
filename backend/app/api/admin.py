@@ -1658,3 +1658,47 @@ async def run_model_discovery(
         for d in discovered
     ]
     return {**diff, "providers": providers_summary}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Phase 168 (SSO-01 / D-168-05 Control 2) — operator approval of a pending SSO connection
+# ══════════════════════════════════════════════════════════════════════════════
+#
+# The second anti-hijack control: an org-admin CREATES a connection (it lands
+# status='pending_approval' — org.py create_sso_provider), but an OPERATOR — not the creating
+# org-admin — flips it live. Until then the pending config routes nobody (org.py /sso/route +
+# /sso/provision both filter status='active'). This is a minimal operator affordance on the
+# service-role pool behind the router-level require_operator gate (byte-identical 404 to
+# non-operators; no RLS backstop). Floor-attached: an approval is a deliberate, recorded action.
+
+
+@router.post("/sso/configs/{config_id}/approve", status_code=status.HTTP_204_NO_CONTENT)
+async def approve_sso_config(
+    config_id: UUID,
+    request: Request,
+    _floor: None = Depends(operator_audit_floor),
+):
+    """Flip a pending_approval SSO connection to active (D-168-05 Control 2; operator-only).
+
+    Guarded ``WHERE id=$1 AND status='pending_approval'`` on the singleton pool: an already-
+    active / unknown id matches no row → the byte-identical /admin 404 (non-discoverable).
+    Records ``approved_by`` (the acting operator) + ``approved_at`` for the D-168-05 audit
+    trail, and a plain-language ``sso.approve`` ledger row.
+    """
+    operator_id = request.state.operator["id"]  # set by require_operator (router gate)
+    pool = await deps.get_pg_pool()
+    row = await pool.fetchrow(
+        "UPDATE public.sso_configs "
+        "SET status = 'active', approved_by = $2, approved_at = now() "
+        "WHERE id = $1 AND status = 'pending_approval' "
+        "RETURNING id, email_domain",
+        config_id, deps._to_uuid(operator_id),
+    )
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="SSO configuration not found"
+        )
+
+    request.state.audit_label = f"Approved SSO for {row['email_domain'] or 'a domain'}"
+    request.state.audit_action = "sso.approve"
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
