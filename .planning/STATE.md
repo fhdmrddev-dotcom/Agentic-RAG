@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.5
 milestone_name: UX Consolidation & Chat Polish
 status: executing
-last_updated: "2026-07-22T16:23:44.189Z"
-last_activity: 2026-07-22 -- Phase 175 planning complete
+last_updated: "2026-07-22T16:54:26.687Z"
+last_activity: 2026-07-22
 progress:
   total_phases: 20
   completed_phases: 1
   total_plans: 8
-  completed_plans: 4
+  completed_plans: 5
   percent: 5
 ---
 
@@ -22,7 +22,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-20 — Phase 163 THE ATOMIC CRUX complete; membership RLS enforced)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 175 — cross provider streaming fidelity
+**Current focus:** Phase 175 — cross-provider-streaming-fidelity
 
 ## Deferred Items
 
@@ -42,10 +42,10 @@ Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 op
 
 ## Current Position
 
-Phase: 175
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-07-22 -- Phase 175 planning complete
+Phase: 175 (cross-provider-streaming-fidelity) — EXECUTING
+Plan: 2 of 4
+Status: 175-01 complete (XPROV-01/03/04 substrate landed) — ready to execute Wave 1 (175-02/03)
+Last activity: 2026-07-22 -- Phase 175 Plan 01 complete (capability markers + inferred-provider guard; zero net-new test failures)
 
 ### Quick Tasks Completed
 
@@ -419,6 +419,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 122 P04 | 5min | 2 tasks | 4 files |
 | Phase 122 P02 | ~13min | 2 tasks (TDD) tasks | 3 files files |
 | Phase 122 P03 | ~6min | 2 tasks | 3 files |
+| Phase 175 P01 | ~35min | 2 tasks (1 TDD) | 5 files |
 | Phase 123 P01 | 9min | 2 tasks | 8 files |
 | Phase 123 P02 | 7min | 2 tasks | 3 files |
 | Phase 123 P03 | 12min | 2 tasks | 6 files |
@@ -604,6 +605,8 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase ?]: 168-05: signInWithSSO redirects the browser MANUALLY (window.location.href); supabase-js does not auto-navigate (D-168-02); password path untouched (SC#3)
 - [Phase ?]: 168-05: SSO callback fires provisionSso() once then a reprobeNonce bump re-probes /org/me so the JIT-joined org resolves in the switcher (D-168-04)
 - [Phase 168]: 168-06: SSO tab live + identifier-first login fails OPEN to password on any route-lookup failure (T-168-07) — no lockout; SSO-01 COMPLETE
+- [Phase ?]: Phase 175-01: reasoning_off marked per-MODEL across the whole docs-confirmed-SAFE set (13 rows), not per-provider-default
+- [Phase ?]: Phase 175-01: XPROV-03 folded gate fires only on a CONFIDENT known-provider mismatch (excludes fallback bucket); sub_agent_service.py (4th site) byte-frozen keeps its own guard — D-03 coverage is 3/4
 
 ## Operator Next Steps
 
