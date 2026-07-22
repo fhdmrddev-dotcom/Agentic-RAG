@@ -1804,7 +1804,31 @@ export function StreamsProvider({ children }: PropsWithChildren) {
           // `isSendingRef` boolean silently dropped it). Added synchronously here,
           // before the optimistic placeholders, so a fresh-thread reconcile's
           // preserve-guard sees it immediately.
-          if (sendingThreadsRef.current.has(threadId)) return
+          if (sendingThreadsRef.current.has(threadId)) {
+            // Phase 176-04 RENDER-03 (D-10.2 / D-11): the duplicate-guard non-dispatch
+            // path USED to return SILENTLY — so if a fresh-thread reconcile race ever
+            // routed the real send through here, the user's just-typed message vanished
+            // with no trace (BUG-260603-01, the intermittent silent send-drop). Honesty
+            // guarantee: stash the dropped draft + a quiet retry hint through the EXISTING
+            // 099-08 recovery seam (the SAME reconcileErrors + failedSendDrafts store
+            // shape as the ApiError rollback below). ChatArea's
+            // `prefillMessage={failedDraft ?? …}` restores the composer text and the
+            // per-thread banner surfaces the hint — the user never loses a message even
+            // if a race fires. The hint is an ApiError (400) so the existing banner
+            // renders its custom message (a plain Error would show the misleading
+            // "Couldn't load latest messages" copy) and hides the misleading reload-Retry
+            // (400 ∈ NON_RETRYABLE) — the composer prefill is the real retry affordance.
+            // No new toast/error channel (D-11). The successful-dispatch path and the
+            // ApiError rollback are untouched.
+            useStreamsStore.setState((s) => ({
+              reconcileErrors: new Map(s.reconcileErrors).set(
+                threadId,
+                new ApiError("Couldn't send — tap to retry", 400),
+              ),
+              failedSendDrafts: new Map(s.failedSendDrafts).set(threadId, content),
+            }))
+            return
+          }
           sendingThreadsRef.current.add(threadId)
 
           // Optimistic user message.
