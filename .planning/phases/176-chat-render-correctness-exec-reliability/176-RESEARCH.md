@@ -439,14 +439,17 @@ Not a rename/refactor/migration phase — no stored-data/OS-registered/secret re
 
 **These are the only `[ASSUMED]` items.** Everything else is `[VERIFIED: …source]` or `[CITED]`.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **RENDER-03 honesty route (i vs ii)** — populate `failedSendDrafts` on non-dispatch (reuses D-11 seam) vs. await-dispatch-then-clear (needs `sendMessage` to signal drops).
    - What we know: route (i) is smaller and D-11-aligned; the prefill+banner seam already restores text.
-   - Recommendation: route (i); add the await-signal only if UAT still shows a lost draft.
+   - RESOLVED: route (i) — implemented by Plan 176-04 (add the await-signal only if UAT still shows a lost draft).
 2. **RENDER-04 VersionsTab refetch mechanism** — nonce-prop bump vs. lift-versions-to-shell.
-   - Recommendation: nonce-prop (matches the existing self-fetch pattern; smallest diff).
+   - RESOLVED: nonce-prop (matches the existing self-fetch pattern; smallest diff) — implemented by Plan 176-02.
 3. **EXEC-01 declared install: `python -m pip` vs `sys.executable -m pip`** — the code run is a literal `python -u`, so `python -m pip` matches. Confirm `python` on PATH in the custom image resolves to the same interpreter as `python -u` (it does in `python:3.11-slim`; verify once live).
+   - RESOLVED: `python -m pip install` — implemented by Plan 176-03 (same-interpreter as the `python -u` code run); live PATH confirmation is a VALIDATION.md check.
+4. **EXEC-01 heal-bound scope (operator call, 2026-07-22)** — call-local set vs. run-scoped store.
+   - RESOLVED: run-scoped via a per-run Redis key keyed by `ctx.run_id`, read/written entirely inside `tool_dispatcher.py` (faithful to D-03 "no wasted retry rounds"; honors D-04 "no `agent_loop.py` touch"; degrades gracefully to call-local if Redis is unavailable) — implemented by Plan 176-03 Task 2.
 
 ## Environment Availability
 
