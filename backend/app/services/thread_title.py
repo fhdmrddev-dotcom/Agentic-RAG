@@ -159,11 +159,28 @@ def generate_thread_title(
             },
             {"role": "user", "content": f"Generate a title for this message: {first_user_message[:200]}"},
         ]
+        # Phase 175 XPROV-04 (D-05): inject the per-MODEL reasoning-off param on the
+        # title call so a SAFE reasoning provider spends its tiny 30/160-token budget
+        # on the actual title instead of hidden chain-of-thought (BUG-260722-01).
+        # Keyed GENERICALLY off the Plan-01 ``reasoning_off`` capability marker — the
+        # WHOLE docs-confirmed-SAFE set (11 thinking_disabled + 2 effort_none Google
+        # rows) is covered with NO hardcoded id list; a future SAFE row needs no change
+        # here. UNSAFE models carry no marker → empty dict → the create call is
+        # byte-identical (D-14) and _clean_llm_title still derives on empty content.
+        _reasoning_off = get_model_capability(model).get("reasoning_off")
+        if _reasoning_off == "thinking_disabled":
+            # DISABLE mirror of the proven DeepSeek ENABLE block (openai_service.py:1826-1831).
+            _reasoning_off_kwargs: dict = {"extra_body": {"thinking": {"type": "disabled"}}}
+        elif _reasoning_off == "effort_none":
+            _reasoning_off_kwargs = {"reasoning_effort": "none"}
+        else:
+            _reasoning_off_kwargs = {}
         response = client.chat.completions.create(
             model=model,
             messages=title_messages,
             stream=False,
             **{token_param: _title_max_tokens},
+            **_reasoning_off_kwargs,
         )
         # _clean_llm_title strips <think> blocks, markdown/quotes, and refusals,
         # falling back to a derived title (never bare 'New Chat') on empty content.
