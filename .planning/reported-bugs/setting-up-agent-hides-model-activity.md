@@ -4,9 +4,9 @@ title: '"Setting up agent…" hides real model activity for up to a minute — r
 reported: 2026-06-07
 surface: Agentic-RAG
 severity: major
-status: open
+status: folded
 affected_areas: [frontend/chat-banner, backend/dispatch-latency, sandbox]
-folded_into: null
+folded_into: "174"
 verified_closed_by: null
 related_seeds: [SEED-065, SEED-066, SEED-067]
 re_open_trigger: "Reviewed at /gsd:discuss-phase 128 (2026-06-27) — PARTIAL fold: the TDP-02 description-window sub-cause (the agent's 'about to…' tc.args.description surfacing during the preparing window) IS addressed by Phase 128 (CONTEXT D-04). Causes (b) banner ignores reasoning/arg-streaming activity (toolMeta.ts:73) and (c) title-gen serializes run-start (threads.py:1039 — G-5 extraction-due) are NOT folded — out of 128's sketched scope. Stays OPEN. Re-open/route the remaining two causes into the next chat-surface run-legibility & latency phase."

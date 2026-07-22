@@ -4,9 +4,9 @@ title: "Stopped" indicator on a cancelled message disappears after navigating aw
 reported: 2026-07-10
 surface: Agentic-RAG
 severity: minor
-status: open
+status: folded
 affected_areas: [frontend/streaming, frontend/chat-display]
-folded_into: null
+folded_into: "174"
 verified_closed_by: null
 related_seeds: []
 re_open_trigger: null
