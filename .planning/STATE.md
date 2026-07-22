@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v3.5
 milestone_name: UX Consolidation & Chat Polish
-status: verifying
-last_updated: "2026-07-22T13:51:49.129Z"
+status: ready_to_plan
+last_updated: 2026-07-22T15:02:30.054Z
 last_activity: 2026-07-22
 progress:
   total_phases: 20
@@ -11,6 +11,7 @@ progress:
   total_plans: 4
   completed_plans: 4
   percent: 5
+stopped_at: Phase 174 complete (4/4) — ready to discuss Phase 175
 ---
 
 # Project State
@@ -22,7 +23,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-20 — Phase 163 THE ATOMIC CRUX complete; membership RLS enforced)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 174 — run-state-lifecycle-honesty
+**Current focus:** Phase 175 — cross provider streaming fidelity
 
 ## Deferred Items
 
@@ -42,10 +43,10 @@ Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 op
 
 ## Current Position
 
-Phase: 174 (run-state-lifecycle-honesty) — ALL PLANS COMPLETE, ready for verification
-Plan: 4 of 4 (complete)
-Status: Phase complete — ready for /gsd:verify-work
-Last activity: 2026-07-22 -- Phase 174 Plan 4 (STATE-04 workflow-run timer anchor + single avatar: kickoff placeholder now stamps startedAt for the 095.1 RunCard timer [RunCard-only path — RunStatusStrip untouched]; dedupMessagesByRunId collapses the same-send pre-runId double-mount twin without erasing the STATE-01b amber/failed temp rows; plan verify 72/72 green, 0 net-new vs SEED-056 rot) complete
+Phase: 175
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-07-22
 
 ### Quick Tasks Completed
 
