@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.5
 milestone_name: UX Consolidation & Chat Polish
 status: executing
-last_updated: "2026-07-22T17:05:40.278Z"
+last_updated: "2026-07-22T17:15:46.706Z"
 last_activity: 2026-07-22
 progress:
   total_phases: 20
   completed_phases: 1
   total_plans: 8
-  completed_plans: 5
+  completed_plans: 7
   percent: 5
 ---
 
@@ -43,7 +43,7 @@ Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 op
 ## Current Position
 
 Phase: 175 (cross-provider-streaming-fidelity) — EXECUTING
-Plan: 3 of 4
+Plan: 4 of 4
 Status: Ready to execute
 Last activity: 2026-07-22
 
@@ -483,6 +483,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 168 P05 | 14min | 2 tasks | 7 files |
 | Phase 168 P06 | 11min | 2 tasks | 6 files |
 | Phase 175 P02 | 15min | 2 tasks | 4 files |
+| Phase 175 P03 | 3min | 2 tasks | 4 files |
 
 ## Decisions
 
@@ -609,6 +610,8 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase ?]: Phase 175-01: reasoning_off marked per-MODEL across the whole docs-confirmed-SAFE set (13 rows), not per-provider-default
 - [Phase ?]: Phase 175-01: XPROV-03 folded gate fires only on a CONFIDENT known-provider mismatch (excludes fallback bucket); sub_agent_service.py (4th site) byte-frozen keeps its own guard — D-03 coverage is 3/4
 - [Phase ?]: 175-02: DSML stream-end flush (deepseek-gated, D-14) + honest leak signal via the EXISTING error SSE event through an Option-B post-drain hook
+- [Phase ?]: D-175-03-01: reasoning_first STRUCTURED gate sits ABOVE db_native in resolve_calling_mode — the hard gpt-5.6 tools+reasoning 400 constraint wins over an operator native_tools=True override (XPROV-01 D-01)
+- [Phase ?]: D-175-03-02: reasoning_tools_unsupported detection anchors on structured body[error] signature (message substrings / param==reasoning_effort), never str(exc) — a crafted message cannot misclassify an unrelated 400 (XPROV-01 D-04)
 
 ## Operator Next Steps
 
