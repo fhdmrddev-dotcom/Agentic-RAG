@@ -18,7 +18,7 @@ The parked chat-surface bug backlog + v3.4 org-surface polish. Each maps to exac
 - [x] **STATE-01**: A cancelled or killed run never leaves an empty chat bubble or an orphaned run card — the surface honestly reflects "cancelled — no output yet"
 - [ ] **STATE-02**: The "Response stopped" / stop indicator survives navigation away-and-back AND a full reload
 - [x] **STATE-03**: The "Setting up agent…" state no longer hides live model activity — the user sees the model working during setup
-- [ ] **STATE-04**: Run timers stay accurate across navigation — no timer reset or duplicate avatar when navigating to a workflow run
+- [x] **STATE-04**: Run timers stay accurate across navigation — no timer reset or duplicate avatar when navigating to a workflow run
 
 *Source reports: `cancelled-run-empty-bubble-early-cancel`, `killed-workflow-empty-chat-card`, `cancelled-run-stop-indicator-lost-on-navigation`, `setting-up-agent-hides-model-activity`, `BUG-260610-01-workflow-run-nav-timer-reset-duplicate-avatar`.*
 
@@ -109,7 +109,7 @@ Which phases cover which requirements. Populated during roadmap creation (`/gsd:
 | STATE-01 | Phase 174 | Complete |
 | STATE-02 | Phase 174 | Pending |
 | STATE-03 | Phase 174 | Complete |
-| STATE-04 | Phase 174 | Pending |
+| STATE-04 | Phase 174 | Complete |
 | XPROV-01 | Phase 175 | Pending |
 | XPROV-02 | Phase 175 | Pending |
 | XPROV-03 | Phase 175 | Pending |
