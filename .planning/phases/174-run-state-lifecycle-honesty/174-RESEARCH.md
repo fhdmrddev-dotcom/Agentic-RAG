@@ -346,7 +346,7 @@ onReasoningDelta: (delta) => {
 | A2 | The "companion app-layer ban 403" the SPEC notes is (or will be) a plain `403` on the send path, so `status === 403` covers it | Open Q5 | If a future ban uses a different status, it won't route to amber — low risk, current code has only the kill-switch 403. |
 | A3 | The workflow run in chat renders through `RunCard` when it accumulates `tool_calls` (harness phases run Deep tools) | Open Q4 | If a pure-workflow run uses a separate strip with its own timer, STATE-04 timer fix targets that component instead — plan confirms. |
 
-## Open Questions (the six research questions — answered)
+## Open Questions (RESOLVED)
 
 **1. STATE-01a/02 verify-first confirmation — is `run_status='cancelled'` populated for the empty early-cancel row?**
 - **Answered: YES, verify-only, no surgical fix expected.** The empty assistant row IS persisted (`agent_loop.py:1507`), the finalizer links `runs.message_id` + writes `status='cancelled'` on the terminal path (`run_producer.py:180-191`), and the reload zip keys on `message_id` not content (`threads.py:350-353`). The only path where the marker wouldn't render is when NO assistant row was inserted at all — but then there is no empty bubble to fix either. **Recommendation:** UAT-verify on DeepSeek early cancel + one other provider, live + full cold reload; hold a surgical patch in reserve only if UAT contradicts this.
