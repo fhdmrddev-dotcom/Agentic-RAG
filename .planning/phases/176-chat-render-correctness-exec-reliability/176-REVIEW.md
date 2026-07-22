@@ -24,7 +24,17 @@ findings:
   warning: 2
   info: 4
   total: 7
-status: issues_found
+findings_open:
+  critical: 0
+  warning: 0
+  info: 4
+  total: 4
+status: fixed
+resolution: "CR-01 + WR-01 + WR-02 fixed via /gsd:code-review 176 --fix (2026-07-23). 4 Info findings remain as advisory."
+fix_commits:
+  - "7098cd0b — CR-01 bound heal re-run + pip installs by the execute_code wall-clock abort"
+  - "b946cac8 — WR-01 dedup optimistic user temp by message_id identity, not cross-clock timestamp"
+  - "41097139 — WR-02 healed re-run output is the output of record on the live code card"
 ---
 
 # Phase 176: Code Review Report
@@ -32,7 +42,30 @@ status: issues_found
 **Reviewed:** 2026-07-22T21:27:49Z
 **Depth:** standard
 **Files Reviewed:** 15
-**Status:** issues_found
+**Status:** fixed (Critical + Warning resolved; 4 Info advisory)
+
+## Resolution (2026-07-23)
+
+The Critical Blocker and both Warnings were fixed and re-verified green
+(backend `test_tool_dispatcher.py` 31/31; frontend touched suite 42/42):
+
+- **CR-01 (Critical) → fixed** `7098cd0b` — new `_run_bounded_sandbox` helper
+  routes the auto-heal re-run **and** both pip-install paths through the same
+  wall-clock abort the primary run uses (`asyncio.wait` + container `kill_session`
+  on overrun, `abandon_on_cancel=False`-safe), returning an honest
+  `install_failed` instead of wedging the run. Closes the re-opened zombie-run risk.
+- **WR-01 (Warning) → fixed** `b946cac8` — RENDER-01 dedup now keys on
+  `registeredUserMsgId` (message_id identity), not a skew-fragile cross-clock
+  `created_at >=`. Masking 2099-timestamp test rewritten to exercise the skew case.
+- **WR-02 (Warning) → fixed** `41097139` — the healed run's stdout/stderr is now
+  the output of record on the live code card (`healed` marker on the completion
+  event replaces the stale pre-heal error). Live per-line streaming of the re-run
+  deferred as disproportionate machinery (persisted result was already correct).
+
+**Still open (advisory, not fixed):** the 4 Info findings (IN-01 Redis TTL leak on
+EXPIRE-after-SADD, IN-02 arbitrary import-name install / import≠package mismatch,
+IN-03 mislabeled `install_failed.reason` on already-attempted, IN-04 unconditional
+`versionsNonce` bump).
 
 ## Summary
 
