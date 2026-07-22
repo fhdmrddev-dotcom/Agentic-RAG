@@ -203,6 +203,14 @@ export interface Message {
    * names BOTH models (rendered as an inline notice in MessageItem). Absent on the common
    * enabled path — the swap is never silent (never a dropped event). */
   modelFallbackNotice?: { disabledModel: string; fallbackModel: string; message: string }
+  /** Phase 174 Plan 03 (STATE-01b / D-04): honest administrative-block notice. Stamped by
+   * StreamsProvider's `sendMessage` catch on an `ApiError.status === 403` (the workflows
+   * kill-switch / app-layer ban), which fires BEFORE any run/message is inserted. Replaces
+   * the empty assistant placeholder with an amber in-chat bubble carrying the server's
+   * `ApiError.message` verbatim (e.g. "Workflows are currently disabled by the administrator").
+   * Render-only, no persistence, no migration — the 403 authz stays server-side; this only
+   * makes the refusal honest instead of a blank workflow card. Sibling of `modelFallbackNotice`. */
+  blockedNotice?: { message: string }
 }
 
 export interface DocumentMetadata {
