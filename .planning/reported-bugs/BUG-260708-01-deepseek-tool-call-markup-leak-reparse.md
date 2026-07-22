@@ -4,9 +4,9 @@ title: DeepSeek leaks native tool-call markup into chat; strip shipped, re-parse
 reported: 2026-07-08
 surface: Agentic-RAG
 severity: major
-status: open
+status: folded
 affected_areas: [backend/streaming, provider/deepseek, agent-loop, skills]
-folded_into: null
+folded_into: 175
 verified_closed_by: null
 related_seeds: [SEED-034]
 re_open_trigger: null

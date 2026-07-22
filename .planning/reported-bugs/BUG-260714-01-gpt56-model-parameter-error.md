@@ -4,9 +4,9 @@ title: GPT-5.6 Sol/Terra/Luna fail with "Model parameter error — may not suppo
 reported: 2026-07-14
 surface: Agentic-RAG
 severity: major
-status: open
+status: folded
 affected_areas: [backend/model-registry, provider/openai, chat/streaming]
-folded_into: null
+folded_into: 175
 verified_closed_by: null
 related_seeds: [SEED-088]
 re_open_trigger: null

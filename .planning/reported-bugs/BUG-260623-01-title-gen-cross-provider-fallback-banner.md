@@ -4,9 +4,9 @@ title: Title-gen "Model X unavailable — using Y" banner when sub_agent_model p
 reported: 2026-06-23
 surface: Agentic-RAG
 severity: minor
-status: open
+status: folded
 affected_areas: [backend/title-generation, backend/sub-agent-model-resolution, cross-provider-parity]
-folded_into: null
+folded_into: 175
 verified_closed_by: null
 related_seeds: []
 re_open_trigger: null
