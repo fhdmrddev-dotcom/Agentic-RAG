@@ -277,3 +277,72 @@ def test_wiring_unknown_error_renders_neutral_message_with_bounded_detail():
     assert "billing" not in user_msg.lower()
     assert "provider returned an error" in user_msg.lower()
     assert "connection reset by peer" in user_msg
+
+
+# ───────── Phase 175 XPROV-01 (D-04) — reasoning-tools-unsupported 400 ───────
+# gpt-5.6-class reasoning models 400 when a native `tools` param rides with reasoning
+# ("Function tools with reasoning_effort are not supported ... use /v1/responses or set
+# reasoning_effort to 'none'"). This specific 400 gets a dedicated honest kind instead of
+# the generic bad_request — anchored on the STRUCTURED body signature (mirrors
+# _has_insufficient_quota), NEVER a loose str(exc) scan (T-175-03-02).
+
+_REASONING_400_BODY = {
+    "error": {
+        "message": (
+            "Function tools with reasoning_effort are not supported with this "
+            "model. Use /v1/responses or set reasoning_effort to 'none'."
+        ),
+        "type": "invalid_request_error",
+        "param": "reasoning_effort",
+        "code": None,
+    }
+}
+
+
+def test_openai_reasoning_tools_400_is_reasoning_tools_unsupported():
+    # The structured reasoning-tools 400 signature classifies as the dedicated kind,
+    # NOT the generic bad_request (D-04).
+    exc = MagicMock(spec=[])
+    exc.status_code = 400
+    exc.body = _REASONING_400_BODY
+    assert classify_provider_error("openai", exc) == "reasoning_tools_unsupported"
+
+
+def test_reasoning_tools_message_is_fixed_copy_no_raw_detail():
+    # T-175-03-01: fixed, actionable copy; NEVER interpolates the raw provider body.
+    raw = _REASONING_400_BODY["error"]["message"]
+    msg = message_for_kind("reasoning_tools_unsupported", raw)
+    assert raw not in msg
+    low = msg.lower()
+    # honest + actionable: names tools + reasoning so the hint is meaningful
+    assert "tool" in low
+    assert "reasoning" in low
+
+
+def test_generic_400_without_signature_still_bad_request():
+    # D-14: a 400 whose structured body lacks the reasoning-tools signature is
+    # byte-identical (bad_request) — the narrow branch does NOT reclassify it.
+    exc = MagicMock(spec=[])
+    exc.status_code = 400
+    exc.body = {"error": {"message": "Unknown parameter: 'foo'.", "param": "foo"}}
+    assert classify_provider_error("openai", exc) == "bad_request"
+
+
+def test_reasoning_tools_signature_only_in_str_is_not_reclassified():
+    # T-175-03-02 tamper guard: the signature appearing ONLY in str(exc) (no structured
+    # body) must NOT force reclassification — detection anchors on body["error"], never a
+    # loose str() scan. A crafted message string can't hijack an unrelated 400.
+    exc = _FakeOpenAIError(
+        400,
+        "Function tools with reasoning_effort are not supported. Use /v1/responses.",
+        code=None,
+        body=None,
+    )
+    assert classify_provider_error("openai", exc) == "bad_request"
+
+
+def test_reasoning_tools_message_does_not_regress_other_kinds():
+    # Sanity: the new kind is additive — the specific-kind info-disclosure control still
+    # holds (no raw-detail leak) for the reasoning-tools copy too.
+    secret = "sk-SUPERSECRETKEY-do-not-leak"
+    assert secret not in message_for_kind("reasoning_tools_unsupported", secret)
