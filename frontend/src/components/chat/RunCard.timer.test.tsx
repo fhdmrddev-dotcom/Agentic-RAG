@@ -123,6 +123,39 @@ describe("RunCard — D-05 true reload timer (completedAt − startedAt)", () =>
     expect(strip.textContent).toMatch(/⏱/)
   })
 
+  it("(g) STATE-04 nav-back anchor — a streaming run derives elapsed from the stamped startedAt, NOT a remount-fresh created_at", () => {
+    // Phase 174-04 (D-11): the workflow-run timer reset bug. On a nav-back remount
+    // the row RunCard reads can carry a FRESH created_at (~now) while the run has
+    // actually been streaming for minutes. The Phase 174-04 kickoff stamp puts a
+    // stable `startedAt` on the placeholder; this locks the CONSUMER contract that
+    // RunCard.tsx:122 (runStartMs = startedAt ?? created_at) climbs from that
+    // anchor, so the timer reads real elapsed instead of reseeding to ~0.
+    const now = Date.now()
+    render(
+      <RunCard
+        message={makeMessage({
+          // Remount-fresh created_at (~now) — the pre-fix fallback would read ~0s.
+          created_at: new Date(now).toISOString(),
+          // The stamped anchor: this run actually started ~5 minutes ago.
+          startedAt: new Date(now - 300_000).toISOString(),
+          completedAt: undefined,
+          runStatus: "streaming",
+        } as Partial<Message>)}
+        isStreaming={true}
+      />,
+    )
+    const strip = screen.getByTestId("run-status-strip")
+    // Elapsed is derived from startedAt (~300s), emphatically NOT from the fresh
+    // created_at (~0s). Parse the leading duration; a minutes-form "Xm Ys" or a
+    // large seconds value both satisfy "kept climbing, no mount-reseed".
+    expect(strip.textContent).toMatch(/⏱/)
+    const minMatch = strip.textContent?.match(/(\d+)m/)
+    const secMatch = strip.textContent?.match(/([\d.]+)s/)
+    const totalSeconds = (minMatch ? parseInt(minMatch[1], 10) * 60 : 0) + (secMatch ? parseFloat(secMatch[1]) : 0)
+    // ~5 minutes from the anchor — far above the ~0 a fresh-created_at reseed gives.
+    expect(totalSeconds).toBeGreaterThanOrEqual(290)
+  })
+
   it("(d) BUG-260606-02 guard — a day-old created_at with a real 3s run reads ~3s, never ~1440m", () => {
     const now = Date.now()
     render(

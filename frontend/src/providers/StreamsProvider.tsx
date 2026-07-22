@@ -1862,6 +1862,17 @@ export function StreamsProvider({ children }: PropsWithChildren) {
                     runId: run_id,
                     model: resolvedModel ?? undefined,
                     provider: resolvedProvider ?? undefined,
+                    // Phase 174-04 (STATE-04 / D-11): anchor the run-strip timer to a
+                    // stable wall-clock baseline so a nav-back remount keeps climbing
+                    // instead of reseeding elapsed from component mount (a multi-minute
+                    // workflow run reading "28s"). The kickoff POST response carries no
+                    // started_at (verified :1807-1818), so we use client send-time; the
+                    // persisted runs.started_at enrich (api.ts started_at→startedAt)
+                    // corrects any drift ≤ one RTT on the next hydrate. RunCard.tsx:122
+                    // (runStartMs = startedAt ?? created_at) is the already-correct 095.1
+                    // consumer — this stamps its SOURCE, no consumer edit, no backend
+                    // field (D-14: Deep byte-identical; the stamp is additive).
+                    startedAt: new Date().toISOString(),
                   }
                 return m
               }),
