@@ -107,6 +107,13 @@ None for this plan — the only manual step was the operator applying migration 
 - Plan 04 will enforce the `status`/domain-uniqueness approval gate at login-routing time.
 - No blockers.
 
+## Self-Check: PASSED
+
+- FOUND: `supabase/migrations/113_sso_configs_firming.sql`
+- FOUND: `supabase/full-schema.sql`
+- FOUND: `.planning/phases/168-sso-saml-2-0-core/168-01-SUMMARY.md`
+- FOUND commit `9e7cb2e1` (Task 1) · `ef154e1a` (Task 3) · `cbd492b8` (SUMMARY)
+
 ---
 *Phase: 168-sso-saml-2-0-core*
 *Completed: 2026-07-22*

@@ -233,7 +233,7 @@ Ship only if CORE lands clean and budget remains. First-to-cut ordering: SSO/OID
   2. On first SSO login, JIT provisioning (INV-02's seam) creates the `org_members` row (member role only). *(Attribute→claim mapping for department import is DEFERRED to Phase 169 — departments aren't live this milestone; this phase maps email/name identity attributes only and stores no department data. See 168-CONTEXT.md Deferred Ideas.)*
   3. Email/password fallback is RETAINED (SSO enforcement explicitly deferred) — an existing user can still sign in the old way; no `python3-saml` (Supabase owns the SAML parsing).
 **Plans**: 6 plans
-- [ ] 168-01-PLAN.md — Migration 113: sso_configs firming + the load-bearing org-admin `sso:manage` grant (+ status/approval columns, lowercased-domain uniqueness, encrypted mgmt-token column) [BLOCKING live apply]
+- [x] 168-01-PLAN.md — Migration 113: sso_configs firming + the load-bearing org-admin `sso:manage` grant (+ status/approval columns, lowercased-domain uniqueness, encrypted mgmt-token column) [BLOCKING live apply]
 - [ ] 168-02-PLAN.md — Deployment config + one provider-CRUD proxy service (two env-switched adapters, fail-closed) + public-domain blocklist
 - [ ] 168-03-PLAN.md — `require_sso_manage` authz guard + domain-gated idempotent JIT `provision_sso_membership` (member-only, dup-email-tolerant)
 - [ ] 168-04-PLAN.md — org.py SSO endpoints (`/org/sso/providers` CRUD · `/org/sso/route` · `/org/sso/provision`) + operator approval + `/org/me` can_manage_sso

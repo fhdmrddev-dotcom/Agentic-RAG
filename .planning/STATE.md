@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.4
 milestone_name: Multi-Tenancy & Org Access
 status: executing
-last_updated: "2026-07-22T07:11:48.357Z"
-last_activity: 2026-07-22 -- Phase 168 planning complete
+last_updated: "2026-07-22T07:50:14.368Z"
+last_activity: 2026-07-22
 progress:
   total_phases: 28
   completed_phases: 9
   total_plans: 56
-  completed_plans: 50
+  completed_plans: 51
   percent: 32
 ---
 
@@ -22,7 +22,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-20 — Phase 163 THE ATOMIC CRUX complete; membership RLS enforced)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 168 — SSO SAML 2.0 (CORE): context gathered + **UI-SPEC approved 2026-07-22** (168-UI-SPEC.md, 6/6 dimensions PASS after 2 revisions — 2 surfaces: the SSO org-admin tab [sibling of OrgSettingsTab/InvitationsTab in the 166 shell] + identifier-first login rework of SignInForm.tsx; 0 new visual language, 0 new frontend deps — `supabase-js` ships `signInWithSSO`). Decisions: D-168-01 full self-service via metadata URL · D-168-02 identifier-first login · D-168-03 email+name-only member-only JIT · D-168-04 domain-gated JIT tolerating dup-email · D-168-05 operator/domain-ownership approval + block public domains. Next: `/gsd:plan-phase 168`. (Phase 167 EXECUTED + secured 2026-07-22; live UAT pending.)
+**Current focus:** Phase 168 — sso-saml-2-0-core
 
 ## Deferred Items
 
@@ -40,13 +40,13 @@ Items acknowledged and deferred at milestone close on 2026-07-18 (44 open `audit
 
 ## Current Position
 
-Phase: 167 (invitations-roles-greenlists-jit-per-user-prefs) — EXECUTED; code-verified + SECURED; **live UAT (human_needed) pending**
-Plan: 7 of 7 complete
+Phase: 168 (sso-saml-2-0-core) — EXECUTING
+Plan: 2 of 6
 Status: Ready to execute
 Next action: **Operator live UAT** (`167-VERIFICATION.md` = `human_needed`, items in `167-HUMAN-UAT.md`): SC#10 4-axis (VIS-02 cross-provider model routing is the load-bearing axis; **incl. WR-04 db_override cross-provider re-resolution**) + invite→accept→join E2E + greenlist hide==refuse two-user proof — need running uvicorn + browser + provider keys + a seeded 2nd-org membership. Then flip VERIFICATION → passed. **Gates:** frontend `tsc` exit 0 · backend 76 passed (167 + org gate + isolation) · org-isolation exit-gate 23/23 (no regression) · secure-phase **24/24 threats CLOSED (0 open, ASVS L2)** · code-review **1 blocker + 5 warnings → ALL FIXED** (CR-01 = role-greenlist resolved `_highest_role`→org-admin-for-everyone; fixed to validated active-org role, fail-closed to member + 3 real-resolver tests; WR-01 resend run_in_threadpool; WR-02 email HTML-escape; WR-03 pagination-independent adoption dedup; WR-04 db_override provider re-resolve [human-verify]; WR-05 GET /admin/visibility server-truth seed). Pre-existing Phase-145/163 test rot logged (not a regression). **✅ SEED-125 (skills cross-org leak) CLOSED 2026-07-22** (dedicated security quick-fix): CR-01 code — 6 `tool_dispatcher.py` service-role skill-resolution sites org-gated via one shared helper (reuses `folder_utils._resolve_caller_org_ids`, `is_system` escape preserved, fail-closed), proven by 7 live two-org legs; CR-02 storage — **mig 112 applied local** (org-gates the skill-files storage READ policy; leak was already transitively org-gated via the skills-RLS join → defense-in-depth + false-comment fix); two-org regression test added; full-schema regenerated (no-reset). **Cloud parity owed (email-provider env vars synced to deploy artifacts same-commit; mig 112 = pure storage-RLS DDL, no seed/env):** migs 099→**112** + `SECRETS_ENCRYPTION_KEY`, in order, at next operator-gated push. **Next: `/gsd:discuss-phase 168`** (SSO SAML — SEED-125 now closed, so the JIT onboarding path no longer widens a live leak).
-Last activity: 2026-07-22 -- Phase 168 planning complete
+Last activity: 2026-07-22
 
-Progress: [██████████] 100%
+Progress: [█████████░] 91%
 
 ### Quick Tasks Completed
 
@@ -443,6 +443,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 164 P02 | 30 | 2 tasks | 8 files |
 | Phase 164 P164-03 | 42min | 2 tasks | 3 files |
 | Phase 164 P164-04 | 35min | 3 tasks | 5 files |
+| Phase 168 P01 | 12min | 3 tasks | 2 files |
 
 ## Decisions
 
