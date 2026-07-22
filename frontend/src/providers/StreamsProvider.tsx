@@ -1671,6 +1671,42 @@ export function StreamsProvider({ children }: PropsWithChildren) {
                 // gate lives in the helper; not awaited (never blocks teardown);
                 // best-effort (.catch belt-and-suspenders — the helper swallows).
                 void _reconcileTodosOnTerminal(threadId, kind).catch(() => {})
+                // Phase 176 RENDER-02 (D-07): mirror the send-path onTerminal
+                // content-reconcile (:2004-2027) onto the mount/reconcile path so a
+                // BACKGROUNDED parallel-thread run un-folds its final answer LIVE on
+                // switch-back with no reload. message.content is the accumulated
+                // narration+answer blob (onDelta only APPENDS — the :358 invariant);
+                // the backend persists only the clean final answer. On a clean Deep
+                // terminal, swap JUST this run's assistant content to the persisted
+                // answer so StreamingNarration's fold gives way to a clean answer.
+                // Keyed on run.run_id (this path's runId — registeredRunId is
+                // undefined here; Pitfall 2). Content-ONLY (preserves tool_calls /
+                // suggestions / output-files / runStatus), far lighter than a full
+                // loadMessages replace; the .finally() loadMessages floor remains the
+                // reload-time backstop (D-v2.5-03). SEED-094 (backend stray last-line)
+                // stays OUT (D-09) — this faithfully renders whatever was persisted.
+                if (kind === "done" || kind === "reader_done") {
+                  const rid = run.run_id
+                  getMessages(threadId)
+                    .then((persisted) => {
+                      const answer = persisted.find(
+                        (m) => m.runId === rid && m.role === "assistant",
+                      )
+                      if (!answer) return
+                      useStreamsStore
+                        .getState()
+                        .actions.setMessagesForBucket(surfaceId, threadId, (prev) =>
+                          prev.map((m) =>
+                            m.runId === rid &&
+                            m.role === "assistant" &&
+                            m.content !== answer.content
+                              ? { ...m, content: answer.content }
+                              : m,
+                          ),
+                        )
+                    })
+                    .catch(() => {})
+                }
                 if (errorPayload === "buffer_expired") {
                   useStreamsStore
                     .getState()
