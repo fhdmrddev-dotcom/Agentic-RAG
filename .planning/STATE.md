@@ -3,10 +3,10 @@ gsd_state_version: 1.0
 milestone: v3.5
 milestone_name: UX Consolidation & Chat Polish
 status: planning
-last_updated: "2026-07-22T10:58:27.364Z"
-last_activity: 2026-07-22
+last_updated: "2026-07-22T12:03:36.814Z"
+last_activity: 2026-07-22 — v3.5 ROADMAP.md created (7 phases; 23/23 requirements mapped)
 progress:
-  total_phases: 7
+  total_phases: 20
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
