@@ -4605,6 +4605,10 @@ export interface OrgPermissions {
   role: string
   can_manage: boolean
   can_audit_view: boolean
+  /** Phase 168 (SSO-01): true while the caller holds `sso:manage` — gates the SSO tab
+   *  (render-only; the backend `require_sso_manage` gate is the wall, T-168-06). Lockstep
+   *  sibling of `can_manage`/`can_audit_view`; fail-closed default `false`. */
+  can_manage_sso: boolean
   memberships: OrgMembership[]
 }
 
@@ -4697,6 +4701,8 @@ export async function getOrgPermissions(): Promise<OrgPermissions> {
     role: body.role ?? "member",
     can_manage: body.can_manage ?? false,
     can_audit_view: body.can_audit_view ?? false,
+    // Phase 168 (SSO-01): fail-closed unwrap — an absent/false flag hides the SSO tab.
+    can_manage_sso: body.can_manage_sso ?? false,
     memberships: body.memberships ?? [],
   }
 }
@@ -4755,6 +4761,152 @@ export async function getOrgAudit(
     page: body.page ?? page,
     page_size: body.page_size ?? pageSize,
     scope: body.scope === "all" ? "all" : "own",
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 168 (SSO-01) — the SSO connection client fns. Backs the SSO tab (the
+// org-admin manage surface) + the identifier-first login route lookup + the
+// silent JIT provision that runs on the SSO callback.
+//
+// SECURITY NOTE (mirror of the /org note above): the manage fns decide RENDERING
+// ONLY. The backend `require_sso_manage` router gate (Plan 04) over mig 104's
+// `current_user_has_permission` SECDEF helper is the sole authority — a forged
+// `can_manage_sso` in the browser reaches no data (T-168-06). The management
+// token / any provider secret is NEVER returned to or stored in the browser
+// (T-168-04) — only the opaque `provider_id` + lifecycle fields cross the wire.
+//
+// `getSsoRoute` is the ONE exception to the `getAuthHeaders` shape: it is called
+// PRE-auth from the login page (before any session/active-org exists), so it is a
+// BARE fetch with no `Authorization`/`X-Org-Id` — the endpoint is membership-free
+// and boolean-only (anti-enumeration, T-168-10). `createSsoProvider` /
+// `updateSsoProvider` read the server `{detail}` before throwing so the four
+// UI-SPEC create-error messages (public-domain reject, metadata-URL unreachable,
+// etc.) surface verbatim to the SsoTab (mirror of postMessage's 099-08 unwrap).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** One SSO connection row from `GET /org/sso/providers` (Plan 04). `provider_id` is the
+ *  opaque GoTrue provider handle (null only in the brief create window); `status` is server
+ *  truth — only `active` routes logins (`pending_approval` awaits operator approval, D-168-05).
+ *  NO secret / management token is ever present on this shape (T-168-04). */
+export interface SsoConfig {
+  id: string
+  email_domain: string
+  provider_id: string | null
+  status: "pending_approval" | "active" | "disabled"
+  approved_at: string | null
+}
+
+/** Read a non-OK response's FastAPI `{detail}` string (or a fallback) so the server's
+ *  actionable create/update copy (public-domain reject, unreachable metadata URL) survives
+ *  onto the thrown `ApiError` (mirror of postMessage's 099-08 detail unwrap). */
+async function ssoErrorDetail(res: Response, fallback: string): Promise<string> {
+  const body = (await res.json().catch(() => null)) as { detail?: unknown } | null
+  return typeof body?.detail === "string" ? body.detail : fallback
+}
+
+/** Look up whether an email domain routes to an active SSO connection (`GET
+ *  /org/sso/route?domain=`, Plan 04). Called PRE-auth from the identifier-first login page,
+ *  so it is a BARE fetch — NO `Authorization`, NO `X-Org-Id` (the endpoint is fully public +
+ *  boolean-only, anti-enumeration T-168-10). Defensive `{ sso: body.sso ?? false }`. The
+ *  login form fails OPEN to the password field if this throws (D-168-02 / SC#3). */
+export async function getSsoRoute(domain: string): Promise<{ sso: boolean }> {
+  const params = new URLSearchParams({ domain })
+  const res = await fetch(`${API_BASE}/org/sso/route?${params}`)
+  if (!res.ok) throw new ApiError("Failed to look up the SSO route.", res.status)
+  const body = (await res.json()) as { sso?: boolean }
+  return { sso: body.sso ?? false }
+}
+
+/** List the active org's SSO connections (`GET /org/sso/providers`, Plan 04 — sso:manage-
+ *  gated). Mirrors `getOrgMembers`: `getAuthHeaders()` auto-injects `X-Org-Id`, `ApiError`
+ *  on non-OK, a defensive envelope unwrap. */
+export async function listSsoConfigs(): Promise<SsoConfig[]> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/org/sso/providers`, { headers })
+  if (!res.ok) throw new ApiError("Failed to load the SSO connections.", res.status)
+  const body = (await res.json()) as { providers?: SsoConfig[] }
+  return body.providers ?? []
+}
+
+/** Create an SSO connection from an IdP metadata URL + email domain (`POST
+ *  /org/sso/providers`, Plan 04 — sso:manage-gated). The server calls the provider-CRUD API
+ *  first (fail-closed), rejects public domains 422 BEFORE any provider call (Control 1), and
+ *  lands the row `pending_approval` (D-168-05). The server `{detail}` is surfaced verbatim so
+ *  the SsoTab renders the actionable create-error copy. NEVER carries a secret in/out. */
+export async function createSsoProvider(
+  metadataUrl: string,
+  emailDomain: string,
+): Promise<SsoConfig> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/org/sso/providers`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ metadata_url: metadataUrl, email_domain: emailDomain }),
+  })
+  if (!res.ok) {
+    throw new ApiError(await ssoErrorDetail(res, "Failed to add the SSO connection."), res.status)
+  }
+  return (await res.json()) as SsoConfig
+}
+
+/** Update an SSO connection (`PUT /org/sso/providers/{id}`, Plan 04 — sso:manage-gated). A
+ *  domain change re-runs the public-domain blocklist server-side; the server `{detail}` is
+ *  surfaced verbatim (same actionable-copy contract as create). */
+export async function updateSsoProvider(
+  id: string,
+  patch: { metadata_url?: string; email_domain?: string },
+): Promise<SsoConfig> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/org/sso/providers/${id}`, {
+    method: "PUT",
+    headers,
+    body: JSON.stringify(patch),
+  })
+  if (!res.ok) {
+    throw new ApiError(await ssoErrorDetail(res, "Failed to update the SSO connection."), res.status)
+  }
+  return (await res.json()) as SsoConfig
+}
+
+/** Remove an SSO connection (`DELETE /org/sso/providers/{id}`, Plan 04 — sso:manage-gated).
+ *  The server deletes the GoTrue provider FIRST, then the row (no orphan, T-168-09); a 502
+ *  keeps the row on upstream failure. Returns 204 No Content (no body to parse). */
+export async function deleteSsoProvider(id: string): Promise<void> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/org/sso/providers/${id}`, {
+    method: "DELETE",
+    headers,
+  })
+  if (!res.ok) throw new ApiError("Failed to remove the SSO connection.", res.status)
+}
+
+/** Silently provision org membership for a first-time SSO user (`POST /org/sso/provision`,
+ *  Plan 04 — get_current_user ONLY, NO X-Org-Id / org gate). The server resolves the org from
+ *  the caller's AUTHENTICATED SSO identity (`auth.identities`, never a client claim) and
+ *  hardcodes role `member` (D-168-03 / T-168-03 — the client sends NO role/org). Idempotent +
+ *  join-additive (safe to call on every SIGNED_IN); a password user gets a 200 no-op
+ *  (`joined: false`). Fired by `OrgProvider` on an SSO session before the `/org/me` re-probe. */
+export async function provisionSso(): Promise<{
+  org_id: string | null
+  role: string | null
+  joined: boolean
+}> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/org/sso/provision`, {
+    method: "POST",
+    headers,
+  })
+  if (!res.ok) throw new ApiError("Failed to provision the SSO membership.", res.status)
+  const body = (await res.json()) as {
+    org_id?: string | null
+    role?: string | null
+    joined?: boolean
+  }
+  return {
+    org_id: body.org_id ?? null,
+    role: body.role ?? null,
+    joined: body.joined ?? false,
   }
 }
 

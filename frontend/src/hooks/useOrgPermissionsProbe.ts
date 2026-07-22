@@ -27,6 +27,9 @@ const CLOSED: OrgPermissions = {
   role: "member",
   can_manage: false,
   can_audit_view: false,
+  // Phase 168 (SSO-01): fail-CLOSED default — a blip must never flash the SSO tab to a
+  // non-manager (same load-bearing polarity as can_manage/can_audit_view, T-168-06).
+  can_manage_sso: false,
   memberships: [],
 }
 
