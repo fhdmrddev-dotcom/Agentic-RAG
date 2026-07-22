@@ -4,9 +4,9 @@ title: Final answer stays folded inside the streaming-narration collapsible afte
 reported: 2026-07-07
 surface: Agentic-RAG
 severity: minor                    # FIXED 2026-07-07 (same day) — scoped content reconcile at clean Deep terminal
-status: open                      # stays open pending ONE live Deep run confirming the answer resolves un-folded without reload
+status: folded                    # folded_into 176 (2026-07-22) — extend reconcile to nav/mount path + live-verify; see 176-CONTEXT.md D-07/D-08
 affected_areas: [frontend/chat-ui, frontend/streaming]
-folded_into: null
+folded_into: "176"
 verified_closed_by: null
 related_seeds: [SEED-094]
 re_open_trigger: null

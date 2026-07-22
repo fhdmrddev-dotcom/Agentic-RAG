@@ -4,9 +4,9 @@ title: After approving a description proposal, the Studio version pointer (heade
 reported: 2026-07-06
 surface: Agentic-RAG
 severity: minor
-status: open
+status: folded
 affected_areas: [frontend/skills-studio, skills, self-improvement]
-folded_into: null
+folded_into: "176"
 verified_closed_by: null
 related_seeds: []
 re_open_trigger: null
