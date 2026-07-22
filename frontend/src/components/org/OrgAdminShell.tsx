@@ -29,9 +29,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Lock } from "lucide-react"
 
 import {
+  createSsoProvider,
+  deleteSsoProvider,
   getOrgAudit,
   getOrgMembers,
   listInvitations,
+  listSsoConfigs,
   resendInvitation,
   revokeInvitation,
   type Invitation,
@@ -39,6 +42,7 @@ import {
   type OrgAuditPage,
   type OrgMember,
   type PendingInvitation,
+  type SsoConfig,
 } from "@/lib/api"
 import { cn } from "@/lib/utils"
 import { useOrg } from "@/providers/OrgProvider"
@@ -49,6 +53,7 @@ import { OrgMembersTab } from "./OrgMembersTab"
 import { OrgAuditTab } from "./OrgAuditTab"
 import { OrgSettingsTab } from "./OrgSettingsTab"
 import { InvitationsTab } from "./InvitationsTab"
+import { SsoTab } from "./SsoTab"
 
 interface OrgAdminShellProps {
   /** Return to the ordinary app surface (navigates to "chat"). */
@@ -83,12 +88,9 @@ const TABS: readonly TabDef[] = [
   // Phase 167 (D-167-07): the invitations home is LIVE — the org shell owns the
   // invitation fetch + mutations; the leaf is InvitationsTab.
   { id: "invitations", label: "Invitations & Roles", locked: false },
-  {
-    id: "sso",
-    label: "SSO",
-    locked: true,
-    lockedDescription: "Single sign-on setup is coming soon.",
-  },
+  // Phase 168 (D-168-01 / SSO-01): the SSO home is LIVE — the org shell owns the SSO-config
+  // fetch + create/remove mutations; the leaf is SsoTab (render-gated on canManageSso).
+  { id: "sso", label: "SSO", locked: false },
   {
     id: "subscription",
     label: "Subscription",
@@ -111,7 +113,7 @@ const MEMBERS_PAGE_SIZE = 50
 const AUDIT_PAGE_SIZE = 50
 
 export function OrgAdminShell({ onBack }: OrgAdminShellProps) {
-  const { activeOrgId, orgs, role, canManage, loading } = useOrg()
+  const { activeOrgId, orgs, role, canManage, canManageSso, loading } = useOrg()
   // Phase 154 (D-01a): the ⌥ two-audience reveal is the ONE app-wide shared value.
   // The shell reads it here and threads it to OrgBand + OrgAuditTab so the band toggle
   // and the audit raw-code reveal always move together (never two toggles that disagree).
@@ -130,6 +132,9 @@ export function OrgAdminShell({ onBack }: OrgAdminShellProps) {
   // Phase 167 (INV-01): the Invitations & Roles tab list; `null` until first opened (lazy —
   // no invitation read on a Members-only visit). The shell owns the fetch; the leaf is pure.
   const [invitations, setInvitations] = useState<Invitation[] | null>(null)
+  // Phase 168 (SSO-01): the SSO tab connections; `null` until first opened (lazy — no SSO read
+  // on a non-SSO visit). The shell owns the fetch + create/remove; SsoTab is a pure leaf.
+  const [ssoConfigs, setSsoConfigs] = useState<SsoConfig[] | null>(null)
   // 067-A audit: the current server page + its in-flight flag; `null` until the Audit
   // tab is first opened. The load-bearing `scope` flag rides ON this page (server truth).
   // The shell owns the filter + 1-based page state; OrgAuditTab reports intent via callbacks.
@@ -168,6 +173,18 @@ export function OrgAdminShell({ onBack }: OrgAdminShellProps) {
     }
   }, [])
 
+  // The SSO connections fetch — guarded, honest-degrade (keeps the last-known list on a blip),
+  // mirroring fetchInvitations. The shell owns it; SsoTab is a pure leaf (T-168-06: the fetch
+  // is server-gated on sso:manage — a forced client mount still 403s).
+  const fetchSsoConfigs = useCallback(async () => {
+    try {
+      const list = await listSsoConfigs()
+      if (alive.current) setSsoConfigs(list)
+    } catch {
+      /* keep the last-known SSO connection list */
+    }
+  }, [])
+
   // The org audit fetch threads the server's `scope` flag straight through on the
   // returned page — the RLS-honest degrade (scope==='own') renders from server truth,
   // never a client decision (T-166-11).
@@ -200,7 +217,19 @@ export function OrgAdminShell({ onBack }: OrgAdminShellProps) {
     if (activeTab === "members") void fetchMembers()
     if (activeTab === "audit") void fetchAudit(auditFilters, auditPage)
     if (activeTab === "invitations") void fetchInvitations()
-  }, [activeTab, canManage, fetchMembers, fetchAudit, fetchInvitations, auditFilters, auditPage])
+    // The SSO fetch has its OWN gate (sso:manage) — org:manage alone must not read it.
+    if (activeTab === "sso" && canManageSso) void fetchSsoConfigs()
+  }, [
+    activeTab,
+    canManage,
+    canManageSso,
+    fetchMembers,
+    fetchAudit,
+    fetchInvitations,
+    fetchSsoConfigs,
+    auditFilters,
+    auditPage,
+  ])
 
   // ── Invitation mutations (INV-01): the shell performs the write on the caller's org
   //    (X-Org-Id + the org:invite server gate is the real wall — T-167-17) and re-fetches.
@@ -235,6 +264,33 @@ export function OrgAdminShell({ onBack }: OrgAdminShellProps) {
       }
     },
     [fetchInvitations, fetchMembers],
+  )
+
+  // ── SSO mutations (SSO-01): the shell performs the write on the caller's org (X-Org-Id +
+  //    the sso:manage server gate + the mig-104 RLS are the real wall — T-168-06) then
+  //    re-fetches (re-fetch-not-optimistic, D-117-9 lineage). Create RE-THROWS so SsoTab's
+  //    form can surface the server `{detail}` create-error copy; remove swallows + re-fetches
+  //    (the row reflects server truth on the refresh). ──
+  const handleSsoCreate = useCallback(
+    async (metadataUrl: string, emailDomain: string): Promise<void> => {
+      try {
+        await createSsoProvider(metadataUrl, emailDomain)
+      } finally {
+        await fetchSsoConfigs()
+      }
+    },
+    [fetchSsoConfigs],
+  )
+
+  const handleSsoRemove = useCallback(
+    async (id: string): Promise<void> => {
+      try {
+        await deleteSsoProvider(id)
+      } finally {
+        await fetchSsoConfigs()
+      }
+    },
+    [fetchSsoConfigs],
   )
 
   // ── Audit filter/page intent from OrgAuditTab. A filter change resets to page 1 (the
@@ -358,6 +414,16 @@ export function OrgAdminShell({ onBack }: OrgAdminShellProps) {
           />
         ) : activeTab === "settings" ? (
           <OrgSettingsTab orgName={orgName} />
+        ) : activeTab === "sso" ? (
+          // Phase 168 (D-168-01 / SSO-01): the live SSO home. The shell owns the fetch +
+          // create/remove; SsoTab is a pure leaf. canManageSso is the render-only gate
+          // (sso:manage is the server wall — T-168-06).
+          <SsoTab
+            configs={ssoConfigs}
+            canManageSso={canManageSso}
+            onCreate={handleSsoCreate}
+            onRemove={handleSsoRemove}
+          />
         ) : (
           <LockedTab title={active.label} description={active.lockedDescription} />
         )}

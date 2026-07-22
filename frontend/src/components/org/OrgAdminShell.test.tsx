@@ -23,9 +23,9 @@ import userEvent from "@testing-library/user-event"
 
 import { OrgAdminShell } from "./OrgAdminShell"
 import { TechnicalNamesProvider } from "@/providers/TechnicalNamesProvider"
-import { getOrgMembers, getOrgAudit, listInvitations } from "@/lib/api"
+import { getOrgMembers, getOrgAudit, listInvitations, listSsoConfigs } from "@/lib/api"
 import { useOrg } from "@/providers/OrgProvider"
-import type { OrgAuditPage, OrgMembersPage, Invitation } from "@/lib/api"
+import type { OrgAuditPage, OrgMembersPage, Invitation, SsoConfig } from "@/lib/api"
 
 vi.mock("@/lib/api", () => ({
   getOrgMembers: vi.fn(),
@@ -36,6 +36,10 @@ vi.mock("@/lib/api", () => ({
   resendInvitation: vi.fn(),
   revokeInvitation: vi.fn(),
   sendInvitation: vi.fn(),
+  // Phase 168: the SSO tab is LIVE — the shell owns the SSO-config fetch + create/remove.
+  listSsoConfigs: vi.fn(),
+  createSsoProvider: vi.fn(),
+  deleteSsoProvider: vi.fn(),
   ApiError: class ApiError extends Error {
     status: number
     constructor(message: string, status: number) {
@@ -79,10 +83,10 @@ const OWN_PAGE: OrgAuditPage = {
   scope: "own",
 }
 
-/** The 3 remaining locked tabs and their exact phase-number-free copy (T-146-10 / T-166-13).
- *  Phase 167 flips "Invitations & Roles" LIVE, so it left this list. */
+/** The 2 remaining locked tabs and their exact phase-number-free copy (T-146-10 / T-166-13).
+ *  Phase 167 flipped "Invitations & Roles" LIVE and Phase 168 flipped "SSO" LIVE, so both
+ *  left this list. */
 const LOCKED_TABS: ReadonlyArray<{ tab: string; description: string }> = [
-  { tab: "SSO", description: "Single sign-on setup is coming soon." },
   { tab: "Subscription", description: "Plan and billing management is coming soon." },
   { tab: "Retention", description: "Data-retention controls are coming soon." },
 ]
@@ -90,6 +94,11 @@ const LOCKED_TABS: ReadonlyArray<{ tab: string; description: string }> = [
 /** A pending + accepted pair the shell threads into the live InvitationsTab. */
 const INVITES: Invitation[] = [
   { id: "inv1", email: "pending@acme.test", role: "member", status: "pending", expires_at: "2026-07-27T00:00:00Z", created_at: "2026-07-20T00:00:00Z" },
+]
+
+/** An active SSO connection the shell threads into the live SsoTab (Phase 168). */
+const SSO_CONFIGS: SsoConfig[] = [
+  { id: "sso1", email_domain: "acme.test", provider_id: "prov-abc123", status: "active", approved_at: "2026-07-21T00:00:00Z" },
 ]
 
 /** A roadmap-phase-number token in any shape a locked description must never carry. */
@@ -123,6 +132,7 @@ beforeEach(() => {
   vi.mocked(getOrgMembers).mockResolvedValue(MEMBERS_PAGE)
   vi.mocked(getOrgAudit).mockResolvedValue(ALL_PAGE)
   vi.mocked(listInvitations).mockResolvedValue(INVITES)
+  vi.mocked(listSsoConfigs).mockResolvedValue(SSO_CONFIGS)
 })
 
 describe("OrgAdminShell — live tabs mount their leaves (ADMIN-01 / D-166-01)", () => {
@@ -163,6 +173,19 @@ describe("OrgAdminShell — live tabs mount their leaves (ADMIN-01 / D-166-01)",
     // NOT a locked placeholder.
     expect(screen.queryByText(/not built yet — coming soon/i)).toBeNull()
     expect(vi.mocked(listInvitations)).toHaveBeenCalled()
+  })
+
+  it("SSO is LIVE — mounts SsoTab with the shell-fetched connections (D-168-01)", async () => {
+    renderShell()
+    await userEvent.click(screen.getByRole("tab", { name: "SSO" }))
+    // The SsoTab leaf renders its own heading + create CTA (NOT a LockedTab).
+    expect(await screen.findByRole("heading", { name: /single sign-on/i })).toBeInTheDocument()
+    // The shell-fetched connection is threaded into the leaf (its domain + server-truth chip).
+    expect(await screen.findByText("acme.test")).toBeInTheDocument()
+    expect(screen.getByTestId("sso-status")).toHaveTextContent(/active/i)
+    // NOT a locked placeholder.
+    expect(screen.queryByText(/not built yet — coming soon/i)).toBeNull()
+    expect(vi.mocked(listSsoConfigs)).toHaveBeenCalled()
   })
 })
 
