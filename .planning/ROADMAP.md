@@ -230,7 +230,7 @@ Ship only if CORE lands clean and budget remains. First-to-cut ordering: SSO/OID
 **Requirements**: SSO-01
 **Success Criteria** (what must be TRUE):
   1. An org-admin registers a SAML 2.0 IdP via Supabase's native SAML SP (Cloud Pro+ managed OR self-hosted GoTrue, un-gated), provisioned via `supabase sso add`; users route to it by email domain.
-  2. On first SSO login, JIT provisioning (INV-02's seam) creates the `org_members` row, and attribute→claim mapping feeds department import.
+  2. On first SSO login, JIT provisioning (INV-02's seam) creates the `org_members` row (member role only). *(Attribute→claim mapping for department import is DEFERRED to Phase 169 — departments aren't live this milestone; this phase maps email/name identity attributes only and stores no department data. See 168-CONTEXT.md Deferred Ideas.)*
   3. Email/password fallback is RETAINED (SSO enforcement explicitly deferred) — an existing user can still sign in the old way; no `python3-saml` (Supabase owns the SAML parsing).
 **Plans**: 6 plans
 - [ ] 168-01-PLAN.md — Migration 113: sso_configs firming + the load-bearing org-admin `sso:manage` grant (+ status/approval columns, lowercased-domain uniqueness, encrypted mgmt-token column) [BLOCKING live apply]

@@ -586,18 +586,21 @@ base64 -w 0 -i pk_rsa1.der          # → GOTRUE_SAML_PRIVATE_KEY (single line, 
 
 **These A-items are exactly what the ONE live round-trip must confirm** — they are the reason D-168-06 requires a live test rather than docs-only.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Where does the Cloud `sbp_` management token live — Phase-150 encrypted `app_settings` column, or an env var?**
+   - **RESOLVED (Plan 02):** the encrypted `app_settings.supabase_management_token` column (added to `secret_cipher.SECRET_COLUMNS`, mig 113), decrypted only at call time in `sso_provider_service.get_management_token()`. NOT an env var — honors D-168-01 "never env sprawl."
    - What we know: D-168-01 says "Phase-150 encrypted secrets store, never env sprawl." CLAUDE.md says "env vars are for secrets and infra only." The token is ONE deployment-level secret. `secret_cipher.SECRET_COLUMNS` is a *fixed 12-column allowlist* — using it means adding an `app_settings` column + extending the allowlist.
    - What's unclear: whether the operator wants to rotate the token via the Control Room UI (→ encrypted column) or set it once at deploy (→ env var, CLAUDE.md-consistent, simpler, but contradicts "never env sprawl").
    - Recommendation: honor D-168-01 — add `supabase_management_token` to `app_settings` + `SECRET_COLUMNS`, operator-editable in the Control Room (one secret, rotatable, encrypted at rest). Confirm with the operator at plan/discuss time; the env-var path is the low-effort fallback.
 
 2. **Should `/org/sso/provision` be an explicit frontend-called endpoint, or folded into the `/org/me` bootstrap?**
+   - **RESOLVED (Plan 04):** an explicit idempotent `POST /org/sso/provision` (NOT folded into `/org/me` — a read must never perform a write); called on `SIGNED_IN` for SSO sessions, then `/org/me` is re-probed.
    - What we know: `/org/me` returns empty memberships until JIT runs, so provisioning must precede org resolution.
    - Recommendation: an explicit idempotent `POST /org/sso/provision` called on `SIGNED_IN` for SSO sessions (mirrors the 167 `/invite` accept landing), then re-probe `/org/me`. Folding into `/org/me` GET would make a read perform a write (surprising, harder to reason about).
 
 3. **Exact `name_id_format` to request** — `emailAddress` vs `persistent`. `emailAddress` gives a human-readable, email-keyed NameID that most IdPs support and aligns with email-auto-detection. Recommend `emailAddress`; confirm the target IdPs (Okta/Azure/Google) accept it during the live test.
+   - **RESOLVED (Plan 02):** `name_id_format="emailAddress"` is locked in `sso_provider_service.build_body`.
 
 ## Environment Availability
 
