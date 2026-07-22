@@ -387,3 +387,192 @@ async def test_declared_install_success_first_try_single_call():
 
     assert session.execute_command.call_count == 1
     assert stderr == ""
+
+
+# ---------------------------------------------------------------------------
+# EXEC-01 (Phase 176-03) — run-scoped ModuleNotFound auto-heal + honest result.
+# ---------------------------------------------------------------------------
+class _FakeCtx:
+    """Minimal ToolContext stand-in exposing only the heal-bound inputs."""
+
+    def __init__(self, redis=None, run_id=None):
+        self.redis = redis
+        self.run_id = run_id
+
+
+def test_extract_missing_module_reads_stderr_and_stdout():
+    from app.services.tool_dispatcher import _extract_missing_module
+
+    assert _extract_missing_module(
+        "", "ModuleNotFoundError: No module named 'fpdf2'"
+    ) == "fpdf2"
+    # mirrors _classify_runtime_gap out_l (stdout is scanned too, lowercased)
+    assert _extract_missing_module(
+        "Traceback...\nModuleNotFoundError: No module named 'seaborn'", ""
+    ) == "seaborn"
+    assert _extract_missing_module("all good", "") is None
+
+
+def test_install_failed_detail_shape():
+    from app.services.tool_dispatcher import _install_failed_detail
+
+    detail = _install_failed_detail("badpkg", "ERROR: " + "x" * 500)
+    assert detail["module"] == "badpkg"
+    assert len(detail["reason"]) <= 300  # truncated ~300 chars
+    assert "Could not install badpkg" in detail["hint"]
+    # preinstalled-lib hint from docs/SANDBOX-PACKAGES.md
+    assert "reportlab" in detail["hint"] and "pandas" in detail["hint"]
+    assert "Do not retry" in detail["hint"]
+
+
+@pytest.mark.asyncio
+async def test_autoheal_installs_and_reruns_once():
+    """(b) An undeclared ModuleNotFoundError installs X via `python -m pip install`
+    then re-runs the code exactly once (threadpool-wrapped) and adopts the result."""
+    from app.services.tool_dispatcher import _autoheal_missing_module
+
+    session = MagicMock()
+    session.execute_command.side_effect = [
+        _FakeConsole(exit_code=0),                      # pip install fpdf2
+        _FakeConsole(exit_code=0, stdout="PDF built"),  # re-run of python -u <file>
+    ]
+    ctx = _FakeCtx(redis=None, run_id=None)  # call-local bound path
+
+    result = await _autoheal_missing_module(
+        session=session, ctx=ctx, code_file="/tmp/run-abc.py",
+        stdout="", stderr="ModuleNotFoundError: No module named 'fpdf2'",
+        declared_install_stderr="", healed_fallback=set(),
+    )
+
+    assert result is not None and result.get("exec_result") is not None
+    assert result["exec_result"].stdout == "PDF built"
+    calls = session.execute_command.call_args_list
+    assert len(calls) == 2
+    assert "python -m pip install" in calls[0].args[0] and "fpdf2" in calls[0].args[0]
+    assert calls[1].args[0] == "python -u /tmp/run-abc.py"
+
+
+@pytest.mark.asyncio
+async def test_autoheal_run_scoped_bound_second_miss_no_reinstall():
+    """(c) A module already heal-attempted THIS run (per-run Redis set says so) goes
+    straight to the honest result — the run-scoped store is consulted, no re-install."""
+    from app.services.tool_dispatcher import _autoheal_missing_module
+
+    session = MagicMock()
+    redis = MagicMock()
+    redis.sismember = AsyncMock(return_value=True)  # already attempted this run
+    redis.sadd = AsyncMock()
+    redis.expire = AsyncMock()
+    ctx = _FakeCtx(redis=redis, run_id="run-123")
+
+    result = await _autoheal_missing_module(
+        session=session, ctx=ctx, code_file="/tmp/run-abc.py",
+        stdout="", stderr="ModuleNotFoundError: No module named 'fpdf2'",
+        declared_install_stderr="", healed_fallback=set(),
+    )
+
+    redis.sismember.assert_awaited_once()
+    assert redis.sismember.await_args.args[0] == "heal_attempted:run-123"
+    # NO install / re-run — straight to the honest result
+    assert session.execute_command.call_count == 0
+    assert result is not None and result.get("install_failed") is not None
+    assert result["install_failed"]["module"] == "fpdf2"
+
+
+@pytest.mark.asyncio
+async def test_autoheal_redis_unavailable_falls_back_to_call_local():
+    """(d) Redis raising on the bound check/record must NOT break execute_code —
+    the heal falls back to the call-local set and still proceeds/bounds once."""
+    from app.services.tool_dispatcher import _autoheal_missing_module
+
+    session = MagicMock()
+    session.execute_command.side_effect = [
+        _FakeConsole(exit_code=0),                       # pip install
+        _FakeConsole(exit_code=0, stdout="ok"),          # re-run
+    ]
+    redis = MagicMock()
+    redis.sismember = AsyncMock(side_effect=RuntimeError("redis down"))
+    redis.sadd = AsyncMock(side_effect=RuntimeError("redis down"))
+    redis.expire = AsyncMock(side_effect=RuntimeError("redis down"))
+    ctx = _FakeCtx(redis=redis, run_id="run-xyz")
+    fallback: set[str] = set()
+
+    result = await _autoheal_missing_module(
+        session=session, ctx=ctx, code_file="/tmp/run-abc.py",
+        stdout="", stderr="ModuleNotFoundError: No module named 'fpdf2'",
+        declared_install_stderr="", healed_fallback=fallback,
+    )
+
+    # did not raise; healed via call-local fallback
+    assert result is not None and result.get("exec_result") is not None
+    assert "fpdf2" in fallback  # recorded in the call-local bound
+    assert session.execute_command.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_autoheal_install_failure_returns_honest_result():
+    """A genuine bad package: install fails → honest install_failed with pip stderr,
+    NO re-run."""
+    from app.services.tool_dispatcher import _autoheal_missing_module
+
+    session = MagicMock()
+    session.execute_command.return_value = _FakeConsole(
+        exit_code=1, stderr="ERROR: No matching distribution found for badpkg"
+    )
+    ctx = _FakeCtx(redis=None, run_id=None)
+
+    result = await _autoheal_missing_module(
+        session=session, ctx=ctx, code_file="/tmp/run-abc.py",
+        stdout="", stderr="ModuleNotFoundError: No module named 'badpkg'",
+        declared_install_stderr="", healed_fallback=set(),
+    )
+
+    assert result is not None and result.get("install_failed") is not None
+    assert result["install_failed"]["module"] == "badpkg"
+    assert "No matching distribution" in result["install_failed"]["reason"]
+    # install attempt (retry x1) happened, but NO re-run of the code
+    assert session.execute_command.call_count == 2  # install + one retry
+    assert all(
+        "python -m pip install" in c.args[0]
+        for c in session.execute_command.call_args_list
+    )
+
+
+@pytest.mark.asyncio
+async def test_autoheal_known_missing_module_not_healed():
+    """A KNOWN_MISSING permanent gap (markitdown) is left to _classify_runtime_gap —
+    the auto-heal passes through (None), never installs."""
+    from app.services.tool_dispatcher import _autoheal_missing_module
+
+    session = MagicMock()
+    ctx = _FakeCtx(redis=None, run_id=None)
+
+    result = await _autoheal_missing_module(
+        session=session, ctx=ctx, code_file="/tmp/run-abc.py",
+        stdout="", stderr="ModuleNotFoundError: No module named 'markitdown'",
+        declared_install_stderr="", healed_fallback=set(),
+    )
+
+    assert result is None
+    assert session.execute_command.call_count == 0
+
+
+@pytest.mark.asyncio
+async def test_autoheal_declared_failure_no_module_surfaces_honestly():
+    """(a) A persistent declared-install failure with no ModuleNotFound in output
+    still surfaces an honest result (not swallowed)."""
+    from app.services.tool_dispatcher import _autoheal_missing_module
+
+    session = MagicMock()
+    ctx = _FakeCtx(redis=None, run_id=None)
+
+    result = await _autoheal_missing_module(
+        session=session, ctx=ctx, code_file="/tmp/run-abc.py",
+        stdout="", stderr="RuntimeError: something unrelated",
+        declared_install_stderr="ERROR: No matching distribution found for badpkg",
+        healed_fallback=set(),
+    )
+
+    assert result is not None and result.get("install_failed") is not None
+    assert "No matching distribution" in result["install_failed"]["reason"]
+    assert session.execute_command.call_count == 0  # nothing to heal, just surface
