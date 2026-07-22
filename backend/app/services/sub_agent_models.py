@@ -75,10 +75,14 @@ def provider_safe_utility_model(
     D-085-16 and keeps its own populated-list-only inline guard).
 
     Rule (per the inferred provider, NOT list-membership — RESEARCH XPROV-03
-    Finding 6): drop a cross-provider candidate (its inferred provider differs
-    from the active provider) BEFORE any provider call; keep a same-provider
-    candidate; never block a flexible provider (openrouter/ollama route by
-    arbitrary id); return ``None`` on a falsy candidate.
+    Finding 6; fallback-bucket carve-out aligned with resolve_sub_agent_model_safely
+    per WR-01): drop a candidate when its inferred provider is a DIFFERENT KNOWN
+    provider than the active one, BEFORE any provider call. KEEP it when it is a
+    same-provider candidate, an UNRECOGNISED id (infers to the fallback bucket; may be
+    a valid custom / fine-tuned id), or the active provider is flexible
+    (openrouter/ollama route by arbitrary id). Return ``None`` on a falsy candidate.
+    In legacy / no-active-provider mode a RECOGNISED cross-provider id still drops to
+    ``None`` (the caller's own provider-safe default is safer than an unvalidated id).
 
     T-175-01-02: this only changes WHICH utility model id is sent — it never
     touches the caller's RLS/auth context (request-scoped per Phase-163 D-03).
@@ -88,8 +92,25 @@ def provider_safe_utility_model(
     active = (user_settings.active_provider if user_settings else "") or ""
     if not override_candidate:
         return None
+    # Flexible providers (openrouter/ollama) route by arbitrary id → never blocked.
+    if active in _FLEXIBLE_PROVIDERS:
+        return override_candidate
     inferred = _infer_provider_for(override_candidate)
-    if inferred == active or active in _FLEXIBLE_PROVIDERS:
+    # WR-01 (Phase 175 code-review): align with the sibling gate
+    # resolve_sub_agent_model_safely on the fallback-bucket carve-out. An UNRECOGNISED
+    # id infers to the fallback bucket (_INFERENCE_FALLBACK_PROVIDER) — that is NOT a
+    # confident cross-provider mismatch (it may be a valid custom / fine-tuned id, e.g.
+    # an OpenAI ``ft:…`` model, the pattern table doesn't know), so pass it through
+    # instead of silently dropping it. Drop ONLY a candidate whose inferred provider is
+    # a DIFFERENT KNOWN provider than the active one.
+    #
+    # NOTE: the empty-active (legacy / no user_settings) case is INTENTIONALLY stricter
+    # here than the sibling — with no active provider AND no per-provider default to
+    # fall to, this helper's title/suggestion callers prefer dropping a RECOGNISED
+    # cross-provider id to None (→ their own provider-safe default) over sending it
+    # unvalidated. A real request always carries an active_provider; this is the edge
+    # case, and test_none_user_settings_cross_provider_returns_none pins it.
+    if inferred == active or inferred == _INFERENCE_FALLBACK_PROVIDER:
         return override_candidate
     return None
 
