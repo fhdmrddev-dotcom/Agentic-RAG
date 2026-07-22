@@ -2173,10 +2173,25 @@ async def run_agent_loop(
                         # edit. The getattr default keeps every non-deepseek / non-leak
                         # stream byte-identical (anthropic/google streams lack the attr).
                         if getattr(stream, "dsml_leaked", False):
-                            await _emit(
-                                redis, run_id, 'error',
-                                message=DSML_LEAK_ERROR_MESSAGE,
+                            # XPROV-02b fix (Phase 175 code-review CR-01): a DSML leak is
+                            # NOT a provider crash — the stream completed; DeepSeek merely
+                            # wrote a tool call as visible text (the tool never ran). Surface
+                            # the honest notice the SAME way the provider-error path does
+                            # (~L2800 below): append it to `full_content` so it PERSISTS in the
+                            # finalized assistant message, and emit it as a `delta` so the live
+                            # view shows it inline. Do NOT emit the terminal `error` SSE event:
+                            # api.ts (frontend/src/lib/api.ts:838) treats `error` as terminal
+                            # (onTerminal + return) while THIS path keeps streaming and
+                            # finalizes the run as `completed` — that mismatch showed a phantom
+                            # terminal error over a silently-empty persisted turn, the exact
+                            # "silently incomplete" outcome XPROV-02b set out to fix.
+                            _leak_notice = (
+                                f"\n\n{DSML_LEAK_ERROR_MESSAGE}"
+                                if full_content
+                                else DSML_LEAK_ERROR_MESSAGE
                             )
+                            full_content += _leak_notice
+                            await _emit(redis, run_id, 'delta', content=_leak_notice)
 
                         # Parse tool calls based on calling mode
                         if calling_mode == CallingMode.STRUCTURED:

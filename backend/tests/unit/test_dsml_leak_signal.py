@@ -2,16 +2,19 @@
 
 When DeepSeek writes a tool call as visible text (`<｜｜DSML｜｜tool_calls>…`), the
 sanitizer suppresses the markup so it never renders — but the turn is then silently
-incomplete (the tool never ran). Option B surfaces that via a single EXISTING `error`
-SSE event, driven off a `stream.dsml_leaked` flag set inside `_normalize`.
+incomplete (the tool never ran). The honest notice is surfaced the SAME way the
+provider-error path is (code-review CR-01 fix): appended to the finalized content AND
+emitted as a `delta` — NOT the terminal `error` SSE event — driven off a
+`stream.dsml_leaked` flag set inside `_normalize`.
 
 These tests prove:
   1. `_normalize` flips `stream.dsml_leaked` True on a leaking deepseek stream,
      leaves it False on a clean deepseek stream, and never sets it on a
      non-deepseek stream (D-14 default-inert).
-  2. The agent_loop post-drain guard emits exactly ONE fixed-copy `error` event when
-     the flag is set, and ZERO otherwise (including when the attr is absent — the
-     `getattr` default that keeps anthropic/google streams byte-identical).
+  2. The agent_loop post-drain guard emits exactly ONE fixed-copy `delta` event AND
+     persists the notice in `full_content` when the flag is set, and does NOTHING
+     otherwise (including when the attr is absent — the `getattr` default that keeps
+     anthropic/google streams byte-identical).
 """
 import asyncio
 from types import SimpleNamespace
@@ -70,36 +73,53 @@ class _EmitRecorder:
         self.calls.append((event_type, kwargs))
 
 
-async def _post_drain_guard(stream, emit):
-    """Mirror of the agent_loop Option-B post-drain hook (kept in lockstep; the copy
-    is single-sourced via DSML_LEAK_ERROR_MESSAGE)."""
+async def _post_drain_guard(stream, emit, full_content=""):
+    """Mirror of the agent_loop Option-B post-drain hook (CR-01 fix, kept in lockstep;
+    the copy is single-sourced via DSML_LEAK_ERROR_MESSAGE).
+
+    A DSML leak is surfaced the SAME way the provider-error path is: the honest notice
+    is APPENDED to full_content (so it persists in the finalized assistant message) and
+    emitted as a `delta` (so the live view shows it inline). It is NOT the terminal
+    `error` event — api.ts treats `error` as terminal while this path keeps streaming
+    and finalizes the run as `completed` (the CR-01 mismatch)."""
     if getattr(stream, "dsml_leaked", False):
-        await emit(None, "run-1", "error", message=DSML_LEAK_ERROR_MESSAGE)
+        notice = (
+            f"\n\n{DSML_LEAK_ERROR_MESSAGE}" if full_content else DSML_LEAK_ERROR_MESSAGE
+        )
+        full_content += notice
+        await emit(None, "run-1", "delta", content=notice)
+    return full_content
 
 
-def test_guard_emits_exactly_one_error_when_leaked():
+def test_guard_emits_delta_and_persists_when_leaked():
     stream, _ = _drive([_fake_chunk("hi " + _DSML_OPENER + "tool_calls>")])
     emit = _EmitRecorder()
-    asyncio.run(_post_drain_guard(stream, emit))
+    final = asyncio.run(_post_drain_guard(stream, emit, full_content="hi "))
+    # Exactly one event, and it is a `delta` (NOT terminal `error`).
     assert len(emit.calls) == 1
     event_type, kwargs = emit.calls[0]
-    assert event_type == "error"
-    assert kwargs["message"] == DSML_LEAK_ERROR_MESSAGE
+    assert event_type == "delta"
+    assert kwargs["content"].endswith(DSML_LEAK_ERROR_MESSAGE)
+    # The notice PERSISTS in the finalized content (the CR-01 fix — no silent turn).
+    assert final.endswith(DSML_LEAK_ERROR_MESSAGE)
 
 
 def test_guard_no_emit_on_clean_deepseek():
     stream, _ = _drive([_fake_chunk("clean answer")])
     emit = _EmitRecorder()
-    asyncio.run(_post_drain_guard(stream, emit))
+    final = asyncio.run(_post_drain_guard(stream, emit, full_content="clean answer"))
     assert emit.calls == []
+    # Clean stream: content is untouched (no notice appended).
+    assert final == "clean answer"
 
 
 def test_guard_no_emit_when_attr_absent():
     # anthropic/google streams are plain generators with no dsml_leaked attr — the
-    # getattr default keeps them byte-identical (no emit).
+    # getattr default keeps them byte-identical (no emit, content untouched).
     emit = _EmitRecorder()
-    asyncio.run(_post_drain_guard(object(), emit))
+    final = asyncio.run(_post_drain_guard(object(), emit, full_content="native answer"))
     assert emit.calls == []
+    assert final == "native answer"
 
 
 def test_error_message_is_fixed_and_has_no_raw_interpolation():
