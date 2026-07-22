@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v3.4
 milestone_name: Multi-Tenancy & Org Access
 status: "**Phase 167 EXECUTED 2026-07-22** (7/7 plans, ~36 commits, sequential main-tree). **NO MIGRATION** — `org_invitations` (mig 104), `feature_visibility` JSONB (mig 098), `user_settings.preferences` (mig 011) all pre-existed forward-compatibly; schema-drift false, no `supabase/` change. Delivered: email+link invitations (stdlib token, hashed, expiry, none-log default / resend env-switch) · token-gated app-layer accept (INV-02 JIT: advisory-lock + ON CONFLICT, join-additive) · 166 "Invitations & Roles" tab LIVE + roster adoption chips · VIS-01 role greenlists (extend-not-fork `require_visible`) · VIS-02 per-user model default (revived `user_settings.preferences`, two-layer + operator lock, D-14 no-op) · `/invite?token=` accept page."
-last_updated: "2026-07-22T05:13:06.151Z"
+last_updated: "2026-07-22T06:02:15.120Z"
 last_activity: 2026-07-22 -- Phase 167 executed, code-verified, secured; live UAT pending
 progress:
   total_phases: 28
@@ -22,7 +22,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-20 — Phase 163 THE ATOMIC CRUX complete; membership RLS enforced)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 168 — SSO SAML 2.0 (CORE): context gathered 2026-07-22 (D-168-01 full self-service via metadata URL · D-168-02 identifier-first login · D-168-03 email+name-only member-only JIT · D-168-04 domain-gated JIT tolerating dup-email · D-168-05 operator/domain-ownership approval + block public domains). Next: `/gsd:plan-phase 168`. (Phase 167 EXECUTED + secured 2026-07-22; live UAT pending.)
+**Current focus:** Phase 168 — SSO SAML 2.0 (CORE): context gathered + **UI-SPEC approved 2026-07-22** (168-UI-SPEC.md, 6/6 dimensions PASS after 2 revisions — 2 surfaces: the SSO org-admin tab [sibling of OrgSettingsTab/InvitationsTab in the 166 shell] + identifier-first login rework of SignInForm.tsx; 0 new visual language, 0 new frontend deps — `supabase-js` ships `signInWithSSO`). Decisions: D-168-01 full self-service via metadata URL · D-168-02 identifier-first login · D-168-03 email+name-only member-only JIT · D-168-04 domain-gated JIT tolerating dup-email · D-168-05 operator/domain-ownership approval + block public domains. Next: `/gsd:plan-phase 168`. (Phase 167 EXECUTED + secured 2026-07-22; live UAT pending.)
 
 ## Deferred Items
 
