@@ -38,9 +38,10 @@ from app.dependencies import (
     get_user_supabase_client,
     require_org_invite,
     require_org_manage,
+    require_sso_manage,
     resolve_active_org_soft,
 )
-from app.services import invitation_service
+from app.services import invitation_service, sso_domain_blocklist, sso_provider_service
 from app.services.audit_service import write_audit_entry
 from app.services.email_provider import compose_invite_link, get_email_provider
 
@@ -163,11 +164,17 @@ async def get_org_me(
         can_audit_view = await deps._has_org_permission(
             request, current_user, active_org, "org:audit_view"
         )
+        # Phase 168 (SSO-01 / D-168-01): drives the SSO tab's manage affordance. sso:manage is
+        # held by org-admin (+ super-admin) after the mig-113 grant; a member resolves False.
+        can_manage_sso = await deps._has_org_permission(
+            request, current_user, active_org, "sso:manage"
+        )
     else:
         # No resolved org (0-membership caller): fail-closed booleans, still return the
         # (empty) memberships[] so the client renders a switcher-less identity, not an error.
         can_manage = False
         can_audit_view = False
+        can_manage_sso = False
 
     async with get_user_pg_connection(request, current_user) as conn:
         rows = await conn.fetch(
@@ -185,6 +192,7 @@ async def get_org_me(
         "role": role,
         "can_manage": bool(can_manage),
         "can_audit_view": bool(can_audit_view),
+        "can_manage_sso": bool(can_manage_sso),
         "memberships": memberships,
     }
 
@@ -641,3 +649,267 @@ async def accept_org_invitation(
         "role": result["role"],
         "joined": result["joined"],
     }
+
+
+# ── SSO provider CRUD (SSO-01 / D-168-01) — sso:manage-gated, RLS-walled ─────────
+# The org-admin self-service surface. Every write lands on the CALLER'S user-JWT connection so
+# the mig-104 ``sso_configs_insert/update/delete`` RLS (sso:manage AND org_id ∈
+# current_user_org_ids) is the real wall; ``require_sso_manage`` inherits the STRICT
+# get_active_org_id (spoofed/non-member X-Org-Id → 403). The provider-CRUD HTTP call is the
+# Plan-02 service; org_id is ALWAYS server-pinned to ``request.state.active_org`` (never client).
+
+# Reuse the valid 'settings.update' action_type (the audit_log CHECK admits it; this phase authors
+# NO migration) — the real SSO event lives in metadata.event (org.py:56-62 landmine).
+_SSO_AUDIT_ACTION = "settings.update"
+
+
+class SsoProviderBody(BaseModel):
+    """POST/PUT /org/sso/providers body — the IdP metadata URL + the org's own email domain."""
+
+    metadata_url: str
+    email_domain: str
+
+    @field_validator("metadata_url")
+    @classmethod
+    def _validate_metadata_url(cls, v: str) -> str:
+        v = (v or "").strip()
+        if not v:
+            raise ValueError("An identity-provider metadata URL is required.")
+        return v
+
+    @field_validator("email_domain")
+    @classmethod
+    def _normalize_domain(cls, v: str) -> str:
+        # Lowercase + strip so the mig-113 lower(email_domain) UNIQUE index and the blocklist
+        # both see a canonical host (GMAIL.COM / " acme.com " → the stored value).
+        v = (v or "").strip().lower()
+        if not v:
+            raise ValueError("An organization email domain is required.")
+        return v
+
+
+def _sso_config_public(row) -> dict:
+    """Serialize an sso_configs row for the client — NEVER a secret (no management token)."""
+    return {
+        "id": str(row["id"]),
+        "email_domain": row["email_domain"],
+        "provider_id": row["provider_id"],
+        "status": row["status"],
+        "approved_at": row["approved_at"].isoformat() if row["approved_at"] else None,
+    }
+
+
+@router.post("/sso/providers")
+async def create_sso_provider(
+    request: Request,
+    body: SsoProviderBody,
+    current_user: dict = Depends(require_sso_manage),
+    audit_supabase: Client = Depends(get_user_supabase_client),
+):
+    """Create a SAML connection (SSO-01; sso:manage-gated, lands pending_approval).
+
+    Control 1 (D-168-05 / T-168-02): a public/free email domain is rejected 422 BEFORE any
+    provider call — an org-admin must not be able to hijack gmail.com et al. Fail-closed
+    (T-168-05a): the GoTrue provider is created FIRST; only on success is the sso_configs row
+    written (a provider-CRUD failure → 422 + NO row). The INSERT runs on the caller's user-JWT
+    connection (mig-104 ``sso_configs_insert`` RLS is the wall); org_id is server-pinned; status
+    defaults 'pending_approval' — an operator, not the creator, flips it active (Task 2).
+    """
+    active_org = deps._to_uuid(request.state.active_org)  # server-pinned, NEVER client
+    email_domain = body.email_domain  # already lowercased/stripped by the validator
+
+    # Control 1 — reject public/free domains BEFORE the provider call (no call, no row).
+    if sso_domain_blocklist.is_public_domain(email_domain):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Public email domains can't be used for SSO. Enter your organization's own domain.",
+        )
+
+    # Fail-closed: create the GoTrue provider first; a failure writes NO sso_configs row.
+    try:
+        provider_id = await sso_provider_service.create_provider(
+            body.metadata_url, [email_domain]
+        )
+    except sso_provider_service.SsoProviderError:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "We couldn't set up SSO for that domain — check the identity-provider metadata "
+                "URL, and make sure the domain isn't already configured for another provider."
+            ),
+        )
+
+    async with get_user_pg_connection(request, current_user) as conn:
+        row = await conn.fetchrow(
+            "INSERT INTO public.sso_configs (org_id, email_domain, provider_id) "
+            "VALUES ($1, $2, $3) "
+            "RETURNING id, email_domain, provider_id, status, approved_at",
+            active_org, email_domain, provider_id,
+        )
+
+    await write_audit_entry(
+        user_id=current_user["id"],
+        action_type=_SSO_AUDIT_ACTION,
+        metadata={
+            "event": "sso.provider.create",
+            "config_id": str(row["id"]),
+            "email_domain": email_domain,
+            "provider_id": provider_id,
+        },
+        supabase=audit_supabase,
+        org_id=str(request.state.active_org),  # EXPLICIT active_org (T-167-23)
+    )
+    return _sso_config_public(row)
+
+
+@router.get("/sso/providers")
+async def list_sso_providers(
+    request: Request,
+    current_user: dict = Depends(require_sso_manage),
+):
+    """List the active org's SAML connections (SSO-01; sso:manage-gated).
+
+    Reads sso_configs for the server-validated active org on the user-JWT connection (mig-104
+    ``sso_configs_select`` RLS scopes to current_user_org_ids). Returns only
+    id/email_domain/provider_id/status/approved_at — NEVER the management token or any secret.
+    """
+    active_org = deps._to_uuid(request.state.active_org)
+    async with get_user_pg_connection(request, current_user) as conn:
+        rows = await conn.fetch(
+            "SELECT id, email_domain, provider_id, status, approved_at "
+            "FROM public.sso_configs WHERE org_id = $1 ORDER BY created_at DESC",
+            active_org,
+        )
+    return {"providers": [_sso_config_public(r) for r in rows]}
+
+
+@router.put("/sso/providers/{config_id}")
+async def update_sso_provider(
+    request: Request,
+    config_id: str,
+    body: SsoProviderBody,
+    current_user: dict = Depends(require_sso_manage),
+    audit_supabase: Client = Depends(get_user_supabase_client),
+):
+    """Update a SAML connection's metadata/domain (SSO-01; sso:manage-gated).
+
+    Re-runs the public-domain blocklist on any domain change (Control 1 stays enforced on
+    edit). Reflects the change into the GoTrue provider via the service, then updates the row on
+    the user-JWT connection (mig-104 ``sso_configs_update`` RLS gates it). A cross-org / unknown
+    id matches no row → 404.
+    """
+    active_org = deps._to_uuid(request.state.active_org)
+    cfg_uuid = deps._to_uuid(config_id)
+    if cfg_uuid is None:
+        raise HTTPException(status_code=404, detail="SSO configuration not found")
+
+    email_domain = body.email_domain
+    if sso_domain_blocklist.is_public_domain(email_domain):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Public email domains can't be used for SSO. Enter your organization's own domain.",
+        )
+
+    async with get_user_pg_connection(request, current_user) as conn:
+        existing = await conn.fetchrow(
+            "SELECT provider_id FROM public.sso_configs WHERE id = $1 AND org_id = $2",
+            cfg_uuid, active_org,
+        )
+    if existing is None:
+        raise HTTPException(status_code=404, detail="SSO configuration not found")
+
+    provider_id = existing["provider_id"]
+    if provider_id:
+        try:
+            await sso_provider_service.update_provider(
+                provider_id, body.metadata_url, [email_domain]
+            )
+        except sso_provider_service.SsoProviderError:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="We couldn't update SSO for that domain — check the metadata URL and domain.",
+            )
+
+    async with get_user_pg_connection(request, current_user) as conn:
+        row = await conn.fetchrow(
+            "UPDATE public.sso_configs SET email_domain = $3, updated_at = now() "
+            "WHERE id = $1 AND org_id = $2 "
+            "RETURNING id, email_domain, provider_id, status, approved_at",
+            cfg_uuid, active_org, email_domain,
+        )
+    if row is None:
+        raise HTTPException(status_code=404, detail="SSO configuration not found")
+
+    await write_audit_entry(
+        user_id=current_user["id"],
+        action_type=_SSO_AUDIT_ACTION,
+        metadata={
+            "event": "sso.provider.update",
+            "config_id": str(row["id"]),
+            "email_domain": email_domain,
+        },
+        supabase=audit_supabase,
+        org_id=str(request.state.active_org),
+    )
+    return _sso_config_public(row)
+
+
+@router.delete("/sso/providers/{config_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_sso_provider(
+    request: Request,
+    config_id: str,
+    current_user: dict = Depends(require_sso_manage),
+    audit_supabase: Client = Depends(get_user_supabase_client),
+):
+    """Delete a SAML connection (SSO-01; sso:manage-gated) — provider FIRST, then the row.
+
+    Calls ``sso_provider_service.delete_provider`` (the source of truth) BEFORE deleting the
+    sso_configs row so a GoTrue provider is never orphaned while its domain still routes
+    (T-168-09). An upstream delete failure → 502 and the row is KEPT. A cross-org / unknown id
+    matches no row → 404.
+    """
+    active_org = deps._to_uuid(request.state.active_org)
+    cfg_uuid = deps._to_uuid(config_id)
+    if cfg_uuid is None:
+        raise HTTPException(status_code=404, detail="SSO configuration not found")
+
+    async with get_user_pg_connection(request, current_user) as conn:
+        existing = await conn.fetchrow(
+            "SELECT email_domain, provider_id FROM public.sso_configs "
+            "WHERE id = $1 AND org_id = $2",
+            cfg_uuid, active_org,
+        )
+    if existing is None:
+        raise HTTPException(status_code=404, detail="SSO configuration not found")
+
+    provider_id = existing["provider_id"]
+    if provider_id:
+        # Provider FIRST (never orphan the GoTrue provider — T-168-09).
+        try:
+            await sso_provider_service.delete_provider(provider_id)
+        except sso_provider_service.SsoProviderError:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="We couldn't remove the SSO provider upstream — nothing was deleted. Try again.",
+            )
+
+    async with get_user_pg_connection(request, current_user) as conn:
+        row = await conn.fetchrow(
+            "DELETE FROM public.sso_configs WHERE id = $1 AND org_id = $2 RETURNING id",
+            cfg_uuid, active_org,
+        )
+    if row is None:
+        raise HTTPException(status_code=404, detail="SSO configuration not found")
+
+    await write_audit_entry(
+        user_id=current_user["id"],
+        action_type=_SSO_AUDIT_ACTION,
+        metadata={
+            "event": "sso.provider.delete",
+            "config_id": str(row["id"]),
+            "email_domain": existing["email_domain"],
+        },
+        supabase=audit_supabase,
+        org_id=str(request.state.active_org),
+    )
+    return None
