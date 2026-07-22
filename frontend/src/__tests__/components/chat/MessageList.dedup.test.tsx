@@ -134,3 +134,46 @@ describe("BUG-260626-01 — MessageList dedups same-runId temp + persisted rows"
     expect(screen.getAllByTestId("mi")).toHaveLength(3)
   })
 })
+
+describe("STATE-04 (Phase 174-04 / D-12) — MessageList renders exactly one pre-runId avatar", () => {
+  it("renders ONE avatar for the same-send double-mount twin (two adjacent empty temp/no-runId assistant rows)", () => {
+    render(
+      <MessageList
+        isStreaming={true}
+        messages={[
+          user({ id: "u1" }),
+          asst({ id: "temp-a", runId: undefined, content: "" }),
+          asst({ id: "temp-b", runId: undefined, content: "" }),
+        ]}
+      />
+    )
+    const rows = screen.getAllByTestId("mi")
+    // u1 (user) + exactly ONE collapsed assistant placeholder.
+    expect(rows).toHaveLength(2)
+    const assistantRows = rows.filter((r) => r.getAttribute("data-id")?.startsWith("temp-"))
+    expect(assistantRows).toHaveLength(1)
+    expect(assistantRows[0].getAttribute("data-id")).toBe("temp-a")
+  })
+
+  it("MANDATORY REGRESSION — keeps BOTH a STATE-01b amber(blockedNotice) temp row AND a later send's temp placeholder (the amber avatar is never collapsed)", () => {
+    render(
+      <MessageList
+        isStreaming={true}
+        messages={[
+          user({ id: "u1" }),
+          asst({
+            id: "temp-amber",
+            runId: undefined,
+            content: "",
+            blockedNotice: { message: "Workflows are currently disabled by the administrator" },
+          }),
+          user({ id: "u2" }),
+          asst({ id: "temp-new", runId: undefined, content: "" }),
+        ]}
+      />
+    )
+    const ids = screen.getAllByTestId("mi").map((r) => r.getAttribute("data-id"))
+    expect(ids).toContain("temp-amber")
+    expect(ids).toContain("temp-new")
+  })
+})

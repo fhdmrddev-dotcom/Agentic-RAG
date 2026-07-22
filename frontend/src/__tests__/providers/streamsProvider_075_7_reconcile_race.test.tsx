@@ -73,6 +73,8 @@ vi.mock("@/lib/supabase", () => ({
 import { StreamsProvider, useStreamActions } from "@/providers/StreamsProvider"
 import { useStreamsStore } from "@/stores/streamsStore"
 import type { StreamCallbacks } from "@/lib/api"
+import { dedupMessagesByRunId } from "@/lib/dedupMessages"
+import type { Message } from "@/types"
 
 function renderProvider() {
   return renderHook(() => useStreamActions(), {
@@ -264,5 +266,49 @@ describe("Phase 075.7 — reconcile-vs-sendMessage MERGE race (fresh-thread fres
         useStreamsStore.getState().bucketsBySurface.get("chat")?.get(THREAD_ID) ?? []
       expect(bucket).toHaveLength(0)
     })
+  })
+})
+
+/**
+ * Phase 174-04 (STATE-04 / D-12) — the pre-runId window this file guards is also
+ * where a duplicate avatar can appear: the mount / first-SSE race can leave TWO
+ * empty optimistic assistant placeholders for the SAME send in the bucket BEFORE
+ * a runId exists (BUG-260610-01 reproduces even on fast OpenAI — a race, not
+ * latency). The MessageList render seam (dedupMessagesByRunId) now collapses ONLY
+ * that same-send twin — two ADJACENT empty temp/no-runId assistant rows — so
+ * exactly one avatar renders, WITHOUT erasing the STATE-01b amber (blockedNotice)
+ * bubble or a failed-send placeholder (both permanent temp/no-runId rows).
+ */
+function bucketRow(overrides: Partial<Message>): Message {
+  return {
+    id: "x",
+    thread_id: "thread-fresh",
+    user_id: "",
+    role: "assistant",
+    content: "",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    tool_calls: [],
+    ...overrides,
+  } as Message
+}
+
+describe("Phase 174-04 STATE-04 — pre-runId double-mount collapses to one avatar at the render seam", () => {
+  it("collapses the same-send twin but leaves the amber/failed row + a genuine harness answer untouched", () => {
+    // The transient bucket during the pre-runId race: user row + two empty
+    // same-send placeholders (the double-mount), then — from an EARLIER send in
+    // the same thread — a permanent STATE-01b amber row and a genuine harness
+    // answer (real id, no runId). Only the same-send twin may collapse.
+    const rendered = dedupMessagesByRunId([
+      bucketRow({ id: "u1", role: "user", content: "hi" }),
+      bucketRow({ id: "temp-a", runId: undefined, content: "" }),
+      bucketRow({ id: "temp-b", runId: undefined, content: "" }),
+      bucketRow({ id: "u0", role: "user", content: "earlier" }),
+      bucketRow({ id: "temp-amber", runId: undefined, content: "", blockedNotice: { message: "blocked" } }),
+      bucketRow({ id: "harness-ans", runId: undefined, content: "workflow answer" }),
+    ])
+    // The temp-a/temp-b twin collapses to temp-a; the amber + harness rows survive.
+    const assistantIds = rendered.filter((m) => m.role === "assistant").map((m) => m.id)
+    expect(assistantIds).toEqual(["temp-a", "temp-amber", "harness-ans"])
   })
 })
