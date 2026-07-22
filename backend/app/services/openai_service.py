@@ -1661,6 +1661,20 @@ def resolve_calling_mode(model_id: str, user_settings: "UserEffectiveSettings | 
     """Determine whether to use native API tools or structured JSON prompting."""
     cap = get_model_capability(model_id)
 
+    # Phase 175 XPROV-01 (D-01): reasoning-first OpenAI models (gpt-5.6-class) reject a
+    # chat.completions call that carries BOTH a native `tools` param AND reasoning with a hard
+    # 400 ("Function tools with reasoning_effort are not supported ... use /v1/responses or set
+    # reasoning_effort to 'none'"). Route them STRUCTURED so tools go via XML injection — the
+    # `tools` param (and any reasoning_effort) is dropped at the `else: pass` no-tools branch
+    # below, so the 400 can NEVER fire and reasoning stays ON. This gate sits ABOVE the
+    # db_native / effective_native resolution ON PURPOSE (RESEARCH Open Q2): the hard OpenAI API
+    # constraint must WIN over an operator native_tools=True override — a forced native toggle
+    # cannot re-trigger the 400. It also short-circuits before the OpenRouter strategy branch.
+    # Capability-keyed, NEVER a hardcoded id-list (D-122-04); a model with no reasoning_first key
+    # is byte-identical to today (default-inert, D-14).
+    if cap.get("reasoning_first"):
+        return CallingMode.STRUCTURED
+
     # Phase 149 (SC#1 / D-149-16): an operator's native_tools toggle must change the NEXT
     # request's routing. Read the DB override SYNC from the same warm _model_overrides_cache the
     # max_output clamp uses (_resolve_db_native_tools — no await on the hot path; None on a
