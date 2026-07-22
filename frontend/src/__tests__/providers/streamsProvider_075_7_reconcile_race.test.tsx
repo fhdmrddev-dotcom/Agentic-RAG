@@ -594,3 +594,148 @@ describe("Phase 176-04 RENDER-03 — non-dispatch early-return stashes an honest
     expect(state.reconcileErrors.has(THREAD_ID)).toBe(false)
   })
 })
+
+/**
+ * Phase 176-04 RENDER-03 (D-10.1) — fresh-thread ordering tighten via a sibling
+ * pending-send ref honored by the preserve-guard.
+ *
+ * On a fresh thread ChatArea does onCreateThread → setViewingThread (fires the
+ * nav reconcile) → sendMessage (whose sendingThreadsRef.add lives INSIDE
+ * sendMessage, i.e. AFTER the nav reconcile fires). To tighten that ordering,
+ * ChatArea now pre-marks the thread via `markThreadPendingSend(threadId)` BEFORE
+ * setViewingThread, adding it to a SIBLING `pendingSendThreadsRef`. The
+ * preserve-guard's `sendInFlightOnThisThread` honors BOTH refs, so the reconcile
+ * the nav triggers preserves the optimistic temp even in the pre-`sendingThreadsRef`
+ * window. Critically the duplicate-guard at sendMessage's top still checks ONLY
+ * `sendingThreadsRef`, so the pending flag does NOT trip it — the real send still
+ * dispatches (a tripped guard would drop the send, which Task 1's honesty guard
+ * would then merely recover; here we want the send to ACTUALLY go).
+ */
+describe("Phase 176-04 RENDER-03 — fresh-thread pending-send flag honored by the preserve-guard (D-10.1)", () => {
+  it("a reconcile fired while ONLY the pending flag is set preserves the optimistic temp", async () => {
+    const THREAD_ID = "thread-pending-preserve"
+    mockGetSnapshot.mockResolvedValue({
+      messages: [],
+      active_runs: [],
+      since_cursors: {},
+      runs_status: {},
+      recently_active: [],
+    })
+
+    const { result } = renderProvider()
+
+    // Pre-mark pending-send BEFORE the nav reconcile (mirrors ChatArea handleSend).
+    // This does NOT add to sendingThreadsRef — only the sibling pending ref.
+    result.current.markThreadPendingSend(THREAD_ID)
+
+    // Seed the optimistic user temp a fresh send would write (untyped — no runId).
+    useStreamsStore.setState((s) => {
+      const surfMap = new Map(s.bucketsBySurface.get("chat") ?? new Map())
+      surfMap.set(THREAD_ID, [
+        {
+          id: "temp-user",
+          thread_id: THREAD_ID,
+          user_id: "",
+          role: "user",
+          content: "fresh hi",
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          tool_calls: [],
+        },
+      ])
+      const nextBuckets = new Map(s.bucketsBySurface)
+      nextBuckets.set("chat", surfMap)
+      return { bucketsBySurface: nextBuckets }
+    })
+
+    // Fire the reconcile the nav triggers. sendingThreadsRef is EMPTY — only the
+    // pending flag is set. The negative companion above proves that WITHOUT an
+    // in-flight marker the stray untyped temp is discarded; here the pending flag
+    // makes sendInFlightOnThisThread true so the temp SURVIVES.
+    await act(async () => {
+      result.current.setViewingThread(THREAD_ID)
+    })
+
+    await waitFor(() => {
+      const bucket =
+        useStreamsStore.getState().bucketsBySurface.get("chat")?.get(THREAD_ID) ?? []
+      expect(bucket).toHaveLength(1)
+      expect(bucket[0].id).toBe("temp-user")
+    })
+  })
+
+  it("does NOT trip the duplicate-guard — the real send dispatches — and clears the pending flag on resolve", async () => {
+    const THREAD_ID = "thread-pending-dispatch"
+
+    let resolvePost!: (resp: { run_id: string; message_id: string }) => void
+    const postPromise = new Promise<{ run_id: string; message_id: string }>((resolve) => {
+      resolvePost = resolve
+    })
+    mockPostMessage.mockImplementation(() => postPromise)
+    mockSubscribeToRun.mockResolvedValue(undefined)
+    mockGetSnapshot.mockResolvedValue({
+      messages: [],
+      active_runs: [],
+      since_cursors: {},
+      runs_status: {},
+      recently_active: [],
+    })
+
+    const { result } = renderProvider()
+
+    // Pre-mark pending — this must NOT make sendMessage's duplicate-guard early-return.
+    result.current.markThreadPendingSend(THREAD_ID)
+
+    let sendPromise!: Promise<void>
+    await act(async () => {
+      sendPromise = result.current.sendMessage(THREAD_ID, "real send")
+    })
+
+    // The duplicate-guard checks ONLY sendingThreadsRef — the pending flag does not
+    // trip it — so the real send DISPATCHED, and nothing was stashed as a send-drop
+    // (Task 1's honesty guard did NOT fire on this legitimate send).
+    expect(mockPostMessage).toHaveBeenCalledTimes(1)
+    expect(useStreamsStore.getState().failedSendDrafts.has(THREAD_ID)).toBe(false)
+
+    // Resolve so the send completes and the finally clears BOTH refs.
+    await act(async () => {
+      resolvePost({ run_id: "run-p", message_id: "msg-p" })
+    })
+    await waitFor(() => expect(mockSubscribeToRun).toHaveBeenCalledTimes(1))
+    await act(async () => {
+      await sendPromise
+    })
+
+    // Cleared-on-resolve: overwrite the bucket with a lone stray untyped temp and
+    // fire a fresh reconcile. With the pending flag now cleared (and no send in
+    // flight), the preserve-guard discards it — proving the flag was released.
+    useStreamsStore.setState((s) => {
+      const surfMap = new Map(s.bucketsBySurface.get("chat") ?? new Map())
+      surfMap.set(THREAD_ID, [
+        {
+          id: "temp-stray",
+          thread_id: THREAD_ID,
+          user_id: "",
+          role: "assistant",
+          content: "stale",
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          tool_calls: [],
+        },
+      ])
+      const nextBuckets = new Map(s.bucketsBySurface)
+      nextBuckets.set("chat", surfMap)
+      return { bucketsBySurface: nextBuckets }
+    })
+
+    await act(async () => {
+      result.current.setViewingThread(THREAD_ID)
+    })
+
+    await waitFor(() => {
+      const bucket =
+        useStreamsStore.getState().bucketsBySurface.get("chat")?.get(THREAD_ID) ?? []
+      expect(bucket.some((m) => m.id === "temp-stray")).toBe(false)
+    })
+  })
+})
