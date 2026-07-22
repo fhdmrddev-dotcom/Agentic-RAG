@@ -1490,24 +1490,25 @@ export function StreamsProvider({ children }: PropsWithChildren) {
                     (!dbRunIds.has(m.runId) && m.runStatus === "streaming")
                   )
                 }
-                // Phase 176 RENDER-01 (D-05 option b / D-06): a single send must
-                // render exactly ONE user bubble. Drop the untyped user temp ONLY
-                // once the snapshot already holds its identical-content persisted
-                // twin. This mirrors the assistant-side !dbRunIds.has(runId) drop
-                // above (BUG-260609-03/-01) — but user temps carry no runId, so they
-                // dedup against the snapshot by CONTENT, not runId. The 075.7
-                // preserve-guard is NOT weakened: with no twin in the snapshot the
-                // temp is still preserved (dedup-against-the-snapshot, never
-                // stop-preserving-temps). Guarded by created_at >= the temp so an
-                // older same-content row from a prior identical turn can't drop the
-                // fresh temp.
-                const supersededByPersisted = snapshot.messages.some(
-                  (s) =>
-                    s.role === "user" &&
-                    s.content === m.content &&
-                    !s.id.startsWith("temp-") &&
-                    new Date(s.created_at) >= new Date(m.created_at),
-                )
+                // Phase 176 RENDER-01 (D-05 option b / D-06) + WR-01: a single send
+                // must render exactly ONE user bubble. Drop the untyped user temp ONLY
+                // once the snapshot holds its OWN persisted twin, matched by IDENTITY —
+                // the real message_id stamped as `registeredUserMsgId` when postMessage
+                // resolved (send path below). The PRIOR guard matched on CONTENT + a
+                // cross-clock `created_at >=` inequality, which was skew-fragile: the
+                // temp's created_at is the CLIENT clock while the persisted row's is the
+                // SERVER clock, so a client-ahead skew made the genuine twin compare
+                // "older" → the temp was NOT superseded → a duplicate user bubble that
+                // persisted to reload (WR-01). Identity is skew-free AND immune to any
+                // backend content trim/normalization. The 075.7 / D-06 preserve is
+                // intact: a still-in-flight temp with no registeredUserMsgId yet has no
+                // CONFIRMED twin → preserved (never stop preserving temps); its twin is
+                // deduped on the send path by the same message_id identity.
+                const supersededByPersisted =
+                  m.registeredUserMsgId !== undefined &&
+                  snapshot.messages.some(
+                    (s) => !s.id.startsWith("temp-") && s.id === m.registeredUserMsgId,
+                  )
                 return sendInFlightOnThisThread && !supersededByPersisted
               })
               return [...snapshot.messages, ...liveTempPlaceholders]
@@ -1961,9 +1962,23 @@ export function StreamsProvider({ children }: PropsWithChildren) {
             // Phase 095.1-07 (GAP-2): also stamp the RESOLVED model/provider so the
             // RunCard run-sub shows `{provider} · {model}` LIVE. Coerce null →
             // undefined to match the Message type (string | undefined, not | null).
-            useStreamsStore.getState().actions.setMessagesForBucket(surfaceId, threadId, (prev) =>
-              prev.map((m) => {
-                if (m.id === userMsg.id) return { ...m, id: message_id }
+            useStreamsStore.getState().actions.setMessagesForBucket(surfaceId, threadId, (prev) => {
+              // Phase 176 WR-01: a reconcile can race AHEAD of this resolve and merge
+              // the persisted user twin (id === message_id) into the bucket while the
+              // temp is still untyped. Blindly swapping the temp id to message_id would
+              // then mint a SECOND row with the same id (duplicate user bubble +
+              // duplicate React key). If the twin is already present, DROP the temp
+              // instead of swapping; otherwise swap its id to the real message_id (the
+              // WR-04 contract) AND stamp registeredUserMsgId so any later reconcile
+              // dedups it by IDENTITY (skew-free), never the old created_at compare.
+              const persistedTwinPresent = prev.some(
+                (x) => x.role === "user" && !x.id.startsWith("temp-") && x.id === message_id,
+              )
+              return prev
+                .filter((m) => !(m.id === userMsg.id && persistedTwinPresent))
+                .map((m) => {
+                if (m.id === userMsg.id)
+                  return { ...m, id: message_id, registeredUserMsgId: message_id }
                 if (m.id === assistantId)
                   return {
                     ...m,
@@ -1983,8 +1998,8 @@ export function StreamsProvider({ children }: PropsWithChildren) {
                     startedAt: new Date().toISOString(),
                   }
                 return m
-              }),
-            )
+              })
+            })
 
             // Step 2: open the GET stream and dispatch SSE events to per-message-id callbacks.
             const callbacks: StreamCallbacks = makeStreamCallbacks({

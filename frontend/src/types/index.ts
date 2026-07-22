@@ -160,6 +160,13 @@ export interface Message {
   stopped?: boolean
   /** Phase 063 (D-063-04 / RESEARCH Open Question 2): the Redis Stream run_id this assistant message is/was streamed from. Set by reconcile and sendMessage paths; absent for DB-only loaded messages until backfilled. Used by Stop semantics (DELETE /runs/{runId}) and Resume button visibility logic. */
   runId?: string
+  /** Phase 176 WR-01: the REAL persisted message_id a user optimistic temp was
+   * registered as when postMessage resolved. Lets the reconcile MERGE dedup an
+   * in-flight user temp against its OWN persisted twin by IDENTITY (skew-free),
+   * replacing the old cross-clock `created_at >=` content compare that rendered a
+   * duplicate user bubble under client-ahead clock skew. Absent until postMessage
+   * resolves (a still-in-flight temp has no confirmed twin → preserved, D-06). */
+  registeredUserMsgId?: string
   /** Phase 063 (D-063-04) + Phase 066 (D-066-04, 09): lifecycle status of the underlying run. Mirrors public.runs.status enum values post-migration 038 (5 values). Resume button surfaces when runStatus === 'failed' || runStatus === 'timed_out' (D-066-09 — no auto-retry for paid LLM calls per D-v2.5-05). The 'timed_out' value (NEW in 066) renders an "Agent reached time limit" banner; 'cancelled' renders "Response stopped"; 'failed' renders the Resume button without a banner. */
   runStatus?: "streaming" | "completed" | "failed" | "cancelled" | "timed_out"
   /** Phase 095.1-03 (D-04 model attribution): the REAL resolved model/provider

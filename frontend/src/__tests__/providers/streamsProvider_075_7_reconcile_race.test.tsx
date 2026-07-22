@@ -283,19 +283,25 @@ describe("Phase 075.7 — reconcile-vs-sendMessage MERGE race (fresh-thread fres
 })
 
 /**
- * Phase 176 RENDER-01 (D-05 option b / D-06) — a single send must render exactly
- * ONE user bubble. The optimistic user temp (no runId) + the persisted user row
- * used to reconcile to TWO: the 075.7-widened preserve-guard kept the untyped temp
- * unconditionally while a send was in flight, so once the snapshot ALSO carried the
- * persisted twin the merge returned both (BUG-260712-02, "dup user bubble for the
- * life of the view").
+ * Phase 176 RENDER-01 (D-05 option b / D-06) + WR-01 — a single send must render
+ * exactly ONE user bubble, and the dedup must be IDENTITY-based (the persisted
+ * message_id), never a cross-clock created_at compare.
  *
- * Fix: inside the untyped-temp branch, compute `supersededByPersisted` against the
- * snapshot — role user, equal content, non-temp id, created_at >= the temp — and
- * DROP the temp only once its persisted twin exists. This dedups against the
- * snapshot (mirror of the assistant-side !dbRunIds.has(runId) drop, but user temps
- * match on CONTENT, not runId) WITHOUT weakening the 075.7 preserve (a temp with no
- * twin in the snapshot is still preserved — D-06, never stop preserving temps).
+ * WR-01 root cause: the optimistic user temp's created_at is the CLIENT clock; its
+ * persisted twin's created_at is the SERVER clock. The ORIGINAL guard dropped the
+ * temp only when `serverTs >= clientTs`, so a client-ahead skew (a common few-second
+ * drift) made the genuine twin compare "older" → the temp was NOT superseded → BOTH
+ * rows rendered = a duplicate user bubble that persisted to reload. The old test
+ * hardcoded a `2099` twin timestamp, which always beat the temp's clock and so hid
+ * the skew hole entirely.
+ *
+ * Fix: the temp is deduped against its OWN persisted twin by message_id IDENTITY —
+ * stamped as `registeredUserMsgId` when postMessage resolves (reconcile path), and,
+ * for a reconcile that races AHEAD of the resolve, dropped at swap time when the
+ * twin (id === message_id) is already merged. Both are skew-free and content-
+ * normalization-proof. D-06 preserve is intact: a still-in-flight temp with no
+ * confirmed twin survives. These tests exercise the EARLIER-server-timestamp skew
+ * case that used to hide the bug, under both race orderings.
  */
 type TestSnapshot = {
   messages: Message[]
@@ -305,15 +311,15 @@ type TestSnapshot = {
   recently_active: never[]
 }
 
-describe("Phase 176 RENDER-01 — content-supersede drop (untyped user temp vs persisted twin)", () => {
-  it("drops the optimistic user temp once the snapshot holds its identical-content persisted twin (one user bubble)", async () => {
+describe("Phase 176 RENDER-01 / WR-01 — identity-based user-temp dedup (skew-immune)", () => {
+  it("drops the optimistic user temp for its persisted twin under CLIENT-AHEAD clock skew — reconcile races ahead of the resolve (one user bubble)", async () => {
     const THREAD_ID = "thread-dup"
     const RUN_ID = "run-dup"
     const REAL_USER_MSG_ID = "persisted-user-row"
     const CONTENT = "say hi briefly"
 
     // Gate getSnapshot so reconcile's MERGE fires AFTER the optimistic writes but
-    // BEFORE postMessage stamps the runId — the exact race window RENDER-01 targets.
+    // BEFORE postMessage stamps the message_id — the exact race window WR-01 targets.
     let resolveSnapshot!: (snap: TestSnapshot) => void
     const snapshotPromise = new Promise<TestSnapshot>((resolve) => {
       resolveSnapshot = resolve
@@ -337,15 +343,19 @@ describe("Phase 176 RENDER-01 — content-supersede drop (untyped user temp vs p
       sendPromise = result.current.sendMessage(THREAD_ID, CONTENT)
     })
 
-    // Pre-check: exactly one optimistic user temp (no runId) in the bucket.
+    // Pre-check: exactly one optimistic user temp (no message_id yet) in the bucket.
     const bucketPre =
       useStreamsStore.getState().bucketsBySurface.get("chat")?.get(THREAD_ID) ?? []
     expect(bucketPre.filter((m) => m.role === "user")).toHaveLength(1)
-    expect(bucketPre.find((m) => m.role === "user")?.id.startsWith("temp-")).toBe(true)
+    const tempUser = bucketPre.find((m) => m.role === "user")
+    expect(tempUser?.id.startsWith("temp-")).toBe(true)
 
-    // Resolve getSnapshot with a snapshot that ALREADY holds the persisted user
-    // row: identical content, non-temp id, created_at newer than the temp. Pre-fix
-    // this is where the merge returned TWO user rows (temp + persisted).
+    // Resolve getSnapshot with the persisted twin BUT with a server created_at
+    // EARLIER than the temp's client created_at — the client-ahead skew the old
+    // `created_at >=` guard got wrong (it kept BOTH rows). The reconcile runs
+    // pre-resolve, so the temp has no registeredUserMsgId yet → it is PRESERVED here
+    // (D-06); the identity dedup lands at the postMessage resolve below.
+    const skewedEarlier = new Date(Date.parse(tempUser!.created_at) - 5000).toISOString()
     await act(async () => {
       resolveSnapshot({
         messages: [
@@ -355,8 +365,8 @@ describe("Phase 176 RENDER-01 — content-supersede drop (untyped user temp vs p
             user_id: "user-1",
             role: "user",
             content: CONTENT,
-            created_at: "2099-01-01T00:00:00Z",
-            updated_at: "2099-01-01T00:00:00Z",
+            created_at: skewedEarlier,
+            updated_at: skewedEarlier,
             tool_calls: [],
           } as Message,
         ],
@@ -369,8 +379,17 @@ describe("Phase 176 RENDER-01 — content-supersede drop (untyped user temp vs p
       await Promise.resolve()
     })
 
-    // ASSERT: EXACTLY ONE user bubble — the temp was superseded by its persisted
-    // twin (drop-against-snapshot). Pre-fix: two user rows.
+    // Resolve postMessage with the SAME message_id the snapshot twin carries. The
+    // swap path sees the twin already merged → DROPS the temp (never mints a second
+    // same-id row), leaving exactly ONE user bubble — the persisted twin. Under the
+    // OLD skew-fragile guard this ended as two same-id user rows.
+    await act(async () => {
+      resolvePost({ run_id: RUN_ID, message_id: REAL_USER_MSG_ID })
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+    await waitFor(() => expect(mockSubscribeToRun).toHaveBeenCalledTimes(1))
+
     const bucketPost =
       useStreamsStore.getState().bucketsBySurface.get("chat")?.get(THREAD_ID) ?? []
     const userRows = bucketPost.filter((m) => m.role === "user")
@@ -378,18 +397,99 @@ describe("Phase 176 RENDER-01 — content-supersede drop (untyped user temp vs p
     expect(userRows[0].id).toBe(REAL_USER_MSG_ID)
     expect(userRows[0].id.startsWith("temp-")).toBe(false)
 
+    void sendPromise
+  })
+
+  it("dedups by identity when postMessage resolves BEFORE the reconcile — realistic ordering, still skew-immune (one user bubble)", async () => {
+    const THREAD_ID = "thread-dup-2"
+    const RUN_ID = "run-dup-2"
+    const REAL_USER_MSG_ID = "persisted-user-row-2"
+    const CONTENT = "say hi briefly"
+
+    let resolveSnapshot!: (snap: TestSnapshot) => void
+    const snapshotPromise = new Promise<TestSnapshot>((resolve) => {
+      resolveSnapshot = resolve
+    })
+    mockGetSnapshot.mockImplementation(() => snapshotPromise)
+
+    let resolvePost!: (resp: { run_id: string; message_id: string }) => void
+    const postPromise = new Promise<{ run_id: string; message_id: string }>((resolve) => {
+      resolvePost = resolve
+    })
+    mockPostMessage.mockImplementation(() => postPromise)
+
+    const { result } = renderProvider()
+
+    await act(async () => {
+      result.current.setViewingThread(THREAD_ID)
+    })
+
+    let sendPromise!: Promise<void>
+    await act(async () => {
+      sendPromise = result.current.sendMessage(THREAD_ID, CONTENT)
+    })
+
+    const tempUser =
+      (useStreamsStore.getState().bucketsBySurface.get("chat")?.get(THREAD_ID) ?? []).find(
+        (m) => m.role === "user",
+      )
+    expect(tempUser?.id.startsWith("temp-")).toBe(true)
+
+    // Resolve postMessage FIRST: the temp id is swapped to the real message_id and
+    // registeredUserMsgId is stamped BEFORE the reconcile merges the twin.
     await act(async () => {
       resolvePost({ run_id: RUN_ID, message_id: REAL_USER_MSG_ID })
+      await Promise.resolve()
+      await Promise.resolve()
     })
-    await waitFor(() => expect(mockSubscribeToRun).toHaveBeenCalledTimes(1))
+    const midUser =
+      (useStreamsStore.getState().bucketsBySurface.get("chat")?.get(THREAD_ID) ?? []).find(
+        (m) => m.role === "user",
+      )
+    expect(midUser?.id).toBe(REAL_USER_MSG_ID)
+    expect(midUser?.registeredUserMsgId).toBe(REAL_USER_MSG_ID)
+
+    // Reconcile merges the persisted twin with an EARLIER server created_at (skew).
+    // The swapped (non-temp) row is replaced by the snapshot twin — one user bubble.
+    const skewedEarlier = new Date(Date.parse(midUser!.created_at) - 5000).toISOString()
+    await act(async () => {
+      resolveSnapshot({
+        messages: [
+          {
+            id: REAL_USER_MSG_ID,
+            thread_id: THREAD_ID,
+            user_id: "user-1",
+            role: "user",
+            content: CONTENT,
+            created_at: skewedEarlier,
+            updated_at: skewedEarlier,
+            tool_calls: [],
+          } as Message,
+        ],
+        active_runs: [],
+        since_cursors: {},
+        runs_status: {},
+        recently_active: [],
+      })
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    const bucketPost =
+      useStreamsStore.getState().bucketsBySurface.get("chat")?.get(THREAD_ID) ?? []
+    const userRows = bucketPost.filter((m) => m.role === "user")
+    expect(userRows).toHaveLength(1)
+    expect(userRows[0].id).toBe(REAL_USER_MSG_ID)
 
     void sendPromise
   })
 
-  it("preserves the temp when the snapshot holds a DIFFERENT-content user row (the drop is content-scoped, not a blanket stop-preserving)", async () => {
-    // D-06 guard: the fix must NOT weaken the 075.7 preserve. When the snapshot
-    // carries a genuinely different (earlier-turn) persisted user row, the in-flight
-    // temp has NO twin → it must survive (two distinct user bubbles are correct).
+  it("preserves the in-flight temp when the snapshot holds a prior-turn user row (no registered twin → survives, D-06 intact)", async () => {
+    // D-06 guard: the WR-01 identity fix must NOT weaken the 075.7 preserve. A
+    // pre-resolve temp carries no registeredUserMsgId yet, so it has NO confirmed
+    // twin — it survives regardless of a prior-turn persisted row's content (the
+    // identity match is scoped to the temp's OWN message_id, never content). Two
+    // distinct user bubbles are correct here.
     const THREAD_ID = "thread-distinct"
     const RUN_ID = "run-distinct"
     const CONTENT = "brand new question"
