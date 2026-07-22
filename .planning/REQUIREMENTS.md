@@ -34,7 +34,7 @@ The parked chat-surface bug backlog + v3.4 org-surface polish. Each maps to exac
 
 - [x] **RENDER-01**: No duplicate user message bubble (optimistic temp row + persisted row must reconcile to one)
 - [x] **RENDER-02**: The final answer renders un-folded at a clean terminal — no reload required to see it out of the narration fold
-- [ ] **RENDER-03**: No intermittent silent send-drop — a submitted general-chat message always sends or surfaces an honest failure
+- [x] **RENDER-03**: No intermittent silent send-drop — a submitted general-chat message always sends or surfaces an honest failure
 - [x] **RENDER-04**: An approved skill/description version pointer updates in the UI without a reload
 
 *Source reports: `BUG-260712-02-duplicate-user-bubble-optimistic-temp-plus-persisted-row`, `BUG-260707-03-final-answer-stays-folded-in-narration-until-reload`, `general-chat-intermittent-silent-send-drop`, `BUG-260706-01-approve-description-version-pointer-stale-until-reload`. Related open minor: `BUG-260609-02`, `BUG-260609-04`.*
@@ -115,7 +115,7 @@ Which phases cover which requirements. Populated during roadmap creation (`/gsd:
 | XPROV-03 | Phase 175 | Complete |
 | RENDER-01 | Phase 176 | Complete |
 | RENDER-02 | Phase 176 | Complete |
-| RENDER-03 | Phase 176 | Pending |
+| RENDER-03 | Phase 176 | Complete |
 | RENDER-04 | Phase 176 | Complete |
 | EXEC-01 | Phase 176 | Complete |
 | ORGUX-01 | Phase 177 | Pending |
