@@ -18,6 +18,7 @@ import io
 import json
 import logging
 import os
+import shlex
 import time as time_mod
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Callable, Awaitable
@@ -1458,6 +1459,82 @@ async def _handle_read_skill_file(args: dict, ctx: ToolContext) -> ToolResult:
     return ToolResult(result=tool_result)
 
 
+# ---------------------------------------------------------------------------
+# EXEC-01 (Phase 176-03 / D-01..D-04) — reliable declared-library install +
+# bounded ModuleNotFound auto-heal, ENTIRELY inside the tool dispatcher (below the
+# provider adapter boundary → provider-uniform, Deep byte-identical). See
+# `_handle_execute_code` for the wiring; the run-scoped heal-bound helpers live at
+# `_heal_bound_seen` / `_heal_bound_record` alongside `_NO_MODULE_RE`.
+# ---------------------------------------------------------------------------
+def _pip_install(session, libs: "list[str]"):
+    """Install `libs` into the SANDBOX SYSTEM interpreter via `python -m pip`.
+
+    Deliberately NOT `session.install(...)`: (A) `session.install` swallows pip
+    failures (returns None on a non-zero exit — our try/except was dead code) and
+    (B) it targets the venv pip, whose site-packages are invisible to the code run
+    (`python -u <file>` = the SYSTEM interpreter). Running `python -m pip` here
+    matches the run interpreter AND — with NO on_stdout/on_stderr callbacks — makes
+    `session.execute_command` NON-streaming, so `ConsoleOutput.exit_code` and
+    `.stderr` are RELIABLE. SYNCHRONOUS/blocking → call via `run_in_threadpool`.
+    """
+    joined = " ".join(shlex.quote(lib) for lib in libs)
+    return session.execute_command(
+        f"python -m pip install --disable-pip-version-check {joined}"
+    )
+
+
+async def _install_declared_libraries(session, libraries: "list[str]") -> str:
+    """Install declared `libraries` deterministically; retry ONCE on a non-zero exit.
+
+    Returns the pip stderr IFF the install STILL failed after the retry (else "") so
+    the caller can carry the honest reason into the tool result — NEVER silently
+    swallowed (D-01/D-02.1). A thread-side raise is surfaced as the reason too.
+    """
+    try:
+        res = await run_in_threadpool(_pip_install, session, libraries)
+        if getattr(res, "exit_code", 0):
+            res = await run_in_threadpool(_pip_install, session, libraries)  # retry once
+        if getattr(res, "exit_code", 0):
+            return (getattr(res, "stderr", "") or "") or "pip install exited non-zero"
+        return ""
+    except Exception as _e:  # noqa: BLE001 — surface, never swallow (D-01)
+        logger.warning("declared pip install raised thread-side: %s", _e)
+        return f"{type(_e).__name__}: {_e}"
+
+
+# Error markers that force a stdout-only "success" to be reclassified as a failure
+# (the streamed exit code from a bare `python -u` run is always 0 — Defect C). Hoisted
+# to module scope so both the initial derivation and the post-heal re-derivation share
+# one definition.
+_EXEC_ERROR_MARKERS = (
+    "Traceback (most recent call last)",
+    "Error:",
+    "Exception:",
+    "ModuleNotFoundError",
+    "ImportError",
+    "SyntaxError",
+    "NameError",
+    "TypeError",
+    "ValueError",
+    "RuntimeError",
+    "AttributeError",
+    "KeyError",
+    "IndexError",
+)
+
+
+def _derive_actual_exit_code(exec_result) -> int:
+    """Derive the effective exit code: a bare `python -u` run streams exit_code 0
+    even on a Python traceback (Defect C), so an exit-0 run whose stdout carries a
+    Python error marker is bumped to 1."""
+    code = getattr(exec_result, "exit_code", None) or 0
+    if code == 0:
+        stdout_text = getattr(exec_result, "stdout", "") or ""
+        if any(m in stdout_text for m in _EXEC_ERROR_MARKERS):
+            return 1
+    return code
+
+
 async def _handle_execute_code(args: dict, ctx: ToolContext) -> ToolResult:
     """Execute code in the sandbox container.
 
@@ -1639,6 +1716,14 @@ async def _handle_execute_code(args: dict, ctx: ToolContext) -> ToolResult:
             except OSError:
                 pass
 
+        # EXEC-01 (D-01/D-02.1): declared-install hardening + per-run heal bookkeeping.
+        # `_declared_install_stderr` carries a persistent declared-install failure
+        # forward to the honest tool result (never swallowed); `_healed_modules_fallback`
+        # is the call-local heal bound used only when Redis is unavailable (graceful
+        # degrade — a Redis hiccup must never break execute_code).
+        _declared_install_stderr = ""
+        _healed_modules_fallback: set[str] = set()
+
         # Install libraries
         if libraries:
             # SAND (silence fix): honest 'installing libraries' phase for the pip
@@ -1648,13 +1733,11 @@ async def _handle_execute_code(args: dict, ctx: ToolContext) -> ToolResult:
                            tool_index=ctx.tool_index,
                            elapsed_seconds=round(time_mod.time() - _setup_started, 1),
                            phase='installing_libraries')
-            try:
-                await run_in_threadpool(session.install, libraries=libraries)
-            except Exception as _install_err:
-                logger.warning(
-                    "sandbox library install failed thread=%s err=%s",
-                    ctx.thread_id, type(_install_err).__name__,
-                )
+            # EXEC-01: `python -m pip install` (system interpreter → visible to the
+            # `python -u` code run; non-stream → reliable exit_code), retry once. A
+            # persistent failure surfaces via the honest tool result below — NEVER
+            # silently swallowed as it was with the venv-targeted `session.install`.
+            _declared_install_stderr = await _install_declared_libraries(session, libraries)
 
         start_time = time_mod.time()
 
