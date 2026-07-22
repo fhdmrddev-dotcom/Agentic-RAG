@@ -193,6 +193,71 @@ async def accept_invitation(
             }
 
 
+# ── the domain-gated idempotent SSO JIT (Phase 168, SSO-01) ───────────────────
+
+async def provision_sso_membership(
+    pool: asyncpg.Pool, org_id, user_id: str
+) -> dict:
+    """Idempotently join ``org_id`` on behalf of an authenticated SSO ``user_id`` (SSO-01).
+
+    The sibling of ``accept_invitation``: SAME advisory-lock + ``ON CONFLICT DO NOTHING``
+    convergence skeleton, but with the invite-specific machinery DROPPED — there is no token
+    lookup, no invitation-status flip, no claimability check. The org is NOT resolved
+    here: the Plan-04 endpoint resolves it from the authenticated SSO provider (email domain →
+    provider → org, D-168-04) and passes the already-validated ``org_id`` in. This function's
+    only job is the load-bearing idempotent, member-only insert.
+
+    Runs on the singleton asyncpg pool (the BYPASSRLS ``postgres`` role): the SSO user is not
+    yet a member, so the user-JWT ``org_members_insert`` RLS policy (which needs ``org:manage``)
+    would DENY the write — exactly the same authorized service-role path as the 167 accept.
+
+    Convergence for N concurrent first-logins (all inside one transaction):
+      * ``pg_advisory_xact_lock(hashtext(org_id||user_id))`` serializes racing provisions on
+        this exact (org, user) — auto-released at COMMIT (T-168-05);
+      * ``INSERT … org_members … ON CONFLICT (org_id, user_id) DO NOTHING`` is the hard
+        DB-level guarantee (backed by the mig-104 UNIQUE(org_id,user_id)) — exactly one row.
+
+    The role is HARDCODED ``'member'`` — passed as the ``$3`` bind, NEVER a function parameter
+    and NEVER derived from a SAML attribute (D-168-03 / T-168-03, the Phase-167 CR-01
+    greenlist-leak class; fail-closed to the lowest privilege).
+
+    Duplicate-email tolerance (T-168-08, RESEARCH Pitfall 3): the membership keys on
+    ``(org_id, user_id)`` UUID — email is not in the key. A same-email password account is a
+    DIFFERENT ``auth.users`` UUID, so it provisions an INDEPENDENT membership, never conflated.
+
+    Join-additive (D-167-01): an SSO user who already had a personal (or any other) org KEEPS
+    it and simply gains this one. Returns ``{org_id, user_id, role, joined}`` where ``joined``
+    is True ONLY when THIS call inserted a NEW row (a re-provision / lost race is ``False``).
+    Every value is a ``$n`` bind — never f-string SQL.
+    """
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            # Serialize concurrent first-logins on this exact (org, user) so racing provisions
+            # converge (transaction-scoped; auto-released at COMMIT).
+            await conn.execute(
+                "SELECT pg_advisory_xact_lock(hashtext($1))",
+                str(org_id) + str(user_id),
+            )
+
+            # The hard convergence guarantee: at most one membership per (org, user). The role
+            # is the HARDCODED literal 'member' — never a parameter, never a SAML attribute.
+            insert_tag = await conn.execute(
+                "INSERT INTO public.org_members (org_id, user_id, role) "
+                "VALUES ($1, $2, $3) ON CONFLICT (org_id, user_id) DO NOTHING",
+                org_id,
+                user_id,
+                "member",
+            )
+            joined = _rowcount(insert_tag) == 1
+
+    return {
+        "org_id": str(org_id),
+        "user_id": user_id,
+        "role": "member",
+        "joined": joined,
+    }
+
+
 # ── adoption-state derivation (server-computed, never a client flag) ──────────
 
 def derive_adoption_state(invite_status: str | None, has_membership: bool) -> str:
