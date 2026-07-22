@@ -1463,7 +1463,25 @@ export function StreamsProvider({ children }: PropsWithChildren) {
                     (!dbRunIds.has(m.runId) && m.runStatus === "streaming")
                   )
                 }
-                return sendInFlightOnThisThread
+                // Phase 176 RENDER-01 (D-05 option b / D-06): a single send must
+                // render exactly ONE user bubble. Drop the untyped user temp ONLY
+                // once the snapshot already holds its identical-content persisted
+                // twin. This mirrors the assistant-side !dbRunIds.has(runId) drop
+                // above (BUG-260609-03/-01) — but user temps carry no runId, so they
+                // dedup against the snapshot by CONTENT, not runId. The 075.7
+                // preserve-guard is NOT weakened: with no twin in the snapshot the
+                // temp is still preserved (dedup-against-the-snapshot, never
+                // stop-preserving-temps). Guarded by created_at >= the temp so an
+                // older same-content row from a prior identical turn can't drop the
+                // fresh temp.
+                const supersededByPersisted = snapshot.messages.some(
+                  (s) =>
+                    s.role === "user" &&
+                    s.content === m.content &&
+                    !s.id.startsWith("temp-") &&
+                    new Date(s.created_at) >= new Date(m.created_at),
+                )
+                return sendInFlightOnThisThread && !supersededByPersisted
               })
               return [...snapshot.messages, ...liveTempPlaceholders]
             })

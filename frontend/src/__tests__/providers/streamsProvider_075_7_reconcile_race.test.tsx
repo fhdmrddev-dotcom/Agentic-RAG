@@ -270,6 +270,183 @@ describe("Phase 075.7 — reconcile-vs-sendMessage MERGE race (fresh-thread fres
 })
 
 /**
+ * Phase 176 RENDER-01 (D-05 option b / D-06) — a single send must render exactly
+ * ONE user bubble. The optimistic user temp (no runId) + the persisted user row
+ * used to reconcile to TWO: the 075.7-widened preserve-guard kept the untyped temp
+ * unconditionally while a send was in flight, so once the snapshot ALSO carried the
+ * persisted twin the merge returned both (BUG-260712-02, "dup user bubble for the
+ * life of the view").
+ *
+ * Fix: inside the untyped-temp branch, compute `supersededByPersisted` against the
+ * snapshot — role user, equal content, non-temp id, created_at >= the temp — and
+ * DROP the temp only once its persisted twin exists. This dedups against the
+ * snapshot (mirror of the assistant-side !dbRunIds.has(runId) drop, but user temps
+ * match on CONTENT, not runId) WITHOUT weakening the 075.7 preserve (a temp with no
+ * twin in the snapshot is still preserved — D-06, never stop preserving temps).
+ */
+type TestSnapshot = {
+  messages: Message[]
+  active_runs: never[]
+  since_cursors: Record<string, string>
+  runs_status: Record<string, string>
+  recently_active: never[]
+}
+
+describe("Phase 176 RENDER-01 — content-supersede drop (untyped user temp vs persisted twin)", () => {
+  it("drops the optimistic user temp once the snapshot holds its identical-content persisted twin (one user bubble)", async () => {
+    const THREAD_ID = "thread-dup"
+    const RUN_ID = "run-dup"
+    const REAL_USER_MSG_ID = "persisted-user-row"
+    const CONTENT = "say hi briefly"
+
+    // Gate getSnapshot so reconcile's MERGE fires AFTER the optimistic writes but
+    // BEFORE postMessage stamps the runId — the exact race window RENDER-01 targets.
+    let resolveSnapshot!: (snap: TestSnapshot) => void
+    const snapshotPromise = new Promise<TestSnapshot>((resolve) => {
+      resolveSnapshot = resolve
+    })
+    mockGetSnapshot.mockImplementation(() => snapshotPromise)
+
+    let resolvePost!: (resp: { run_id: string; message_id: string }) => void
+    const postPromise = new Promise<{ run_id: string; message_id: string }>((resolve) => {
+      resolvePost = resolve
+    })
+    mockPostMessage.mockImplementation(() => postPromise)
+
+    const { result } = renderProvider()
+
+    await act(async () => {
+      result.current.setViewingThread(THREAD_ID)
+    })
+
+    let sendPromise!: Promise<void>
+    await act(async () => {
+      sendPromise = result.current.sendMessage(THREAD_ID, CONTENT)
+    })
+
+    // Pre-check: exactly one optimistic user temp (no runId) in the bucket.
+    const bucketPre =
+      useStreamsStore.getState().bucketsBySurface.get("chat")?.get(THREAD_ID) ?? []
+    expect(bucketPre.filter((m) => m.role === "user")).toHaveLength(1)
+    expect(bucketPre.find((m) => m.role === "user")?.id.startsWith("temp-")).toBe(true)
+
+    // Resolve getSnapshot with a snapshot that ALREADY holds the persisted user
+    // row: identical content, non-temp id, created_at newer than the temp. Pre-fix
+    // this is where the merge returned TWO user rows (temp + persisted).
+    await act(async () => {
+      resolveSnapshot({
+        messages: [
+          {
+            id: REAL_USER_MSG_ID,
+            thread_id: THREAD_ID,
+            user_id: "user-1",
+            role: "user",
+            content: CONTENT,
+            created_at: "2099-01-01T00:00:00Z",
+            updated_at: "2099-01-01T00:00:00Z",
+            tool_calls: [],
+          } as Message,
+        ],
+        active_runs: [],
+        since_cursors: {},
+        runs_status: {},
+        recently_active: [],
+      })
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    // ASSERT: EXACTLY ONE user bubble — the temp was superseded by its persisted
+    // twin (drop-against-snapshot). Pre-fix: two user rows.
+    const bucketPost =
+      useStreamsStore.getState().bucketsBySurface.get("chat")?.get(THREAD_ID) ?? []
+    const userRows = bucketPost.filter((m) => m.role === "user")
+    expect(userRows).toHaveLength(1)
+    expect(userRows[0].id).toBe(REAL_USER_MSG_ID)
+    expect(userRows[0].id.startsWith("temp-")).toBe(false)
+
+    await act(async () => {
+      resolvePost({ run_id: RUN_ID, message_id: REAL_USER_MSG_ID })
+    })
+    await waitFor(() => expect(mockSubscribeToRun).toHaveBeenCalledTimes(1))
+
+    void sendPromise
+  })
+
+  it("preserves the temp when the snapshot holds a DIFFERENT-content user row (the drop is content-scoped, not a blanket stop-preserving)", async () => {
+    // D-06 guard: the fix must NOT weaken the 075.7 preserve. When the snapshot
+    // carries a genuinely different (earlier-turn) persisted user row, the in-flight
+    // temp has NO twin → it must survive (two distinct user bubbles are correct).
+    const THREAD_ID = "thread-distinct"
+    const RUN_ID = "run-distinct"
+    const CONTENT = "brand new question"
+    const EARLIER_CONTENT = "an earlier different message"
+
+    let resolveSnapshot!: (snap: TestSnapshot) => void
+    const snapshotPromise = new Promise<TestSnapshot>((resolve) => {
+      resolveSnapshot = resolve
+    })
+    mockGetSnapshot.mockImplementation(() => snapshotPromise)
+
+    let resolvePost!: (resp: { run_id: string; message_id: string }) => void
+    const postPromise = new Promise<{ run_id: string; message_id: string }>((resolve) => {
+      resolvePost = resolve
+    })
+    mockPostMessage.mockImplementation(() => postPromise)
+
+    const { result } = renderProvider()
+
+    await act(async () => {
+      result.current.setViewingThread(THREAD_ID)
+    })
+
+    let sendPromise!: Promise<void>
+    await act(async () => {
+      sendPromise = result.current.sendMessage(THREAD_ID, CONTENT)
+    })
+
+    await act(async () => {
+      resolveSnapshot({
+        messages: [
+          {
+            id: "persisted-earlier-row",
+            thread_id: THREAD_ID,
+            user_id: "user-1",
+            role: "user",
+            content: EARLIER_CONTENT,
+            created_at: "2099-01-01T00:00:00Z",
+            updated_at: "2099-01-01T00:00:00Z",
+            tool_calls: [],
+          } as Message,
+        ],
+        active_runs: [],
+        since_cursors: {},
+        runs_status: {},
+        recently_active: [],
+      })
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    // Both user rows present: the earlier persisted one AND the in-flight temp
+    // (no identical-content twin → still preserved, 075.7 intact).
+    const bucketPost =
+      useStreamsStore.getState().bucketsBySurface.get("chat")?.get(THREAD_ID) ?? []
+    const userRows = bucketPost.filter((m) => m.role === "user")
+    expect(userRows).toHaveLength(2)
+    expect(userRows.some((m) => m.content === CONTENT && m.id.startsWith("temp-"))).toBe(true)
+    expect(userRows.some((m) => m.content === EARLIER_CONTENT)).toBe(true)
+
+    await act(async () => {
+      resolvePost({ run_id: RUN_ID, message_id: "real-user-msg-distinct" })
+    })
+    await waitFor(() => expect(mockSubscribeToRun).toHaveBeenCalledTimes(1))
+
+    void sendPromise
+  })
+})
+
+/**
  * Phase 174-04 (STATE-04 / D-12) — the pre-runId window this file guards is also
  * where a duplicate avatar can appear: the mount / first-SSE race can leave TWO
  * empty optimistic assistant placeholders for the SAME send in the bucket BEFORE
