@@ -53,7 +53,7 @@ Requirements for the v3.4 release. Each maps to exactly one roadmap phase.
 
 ### SSO
 
-- [ ] **SSO-01**: An org-admin can register a SAML 2.0 IdP via Supabase's native SAML SP (Cloud Pro+ managed OR self-hosted GoTrue, un-gated); users route by email domain; attribute→claim mapping feeds department import; JIT provisioning (INV-02) creates membership on first login; email/password fallback is **retained** (SSO enforcement explicitly deferred). *(No `python3-saml` — Supabase owns the SAML parsing.)*
+- [x] **SSO-01**: An org-admin can register a SAML 2.0 IdP via Supabase's native SAML SP (Cloud Pro+ managed OR self-hosted GoTrue, un-gated); users route by email domain; attribute→claim mapping feeds department import; JIT provisioning (INV-02) creates membership on first login; email/password fallback is **retained** (SSO enforcement explicitly deferred). *(No `python3-saml` — Supabase owns the SAML parsing.)*
 
 ### Access Projection & Preferences
 
@@ -133,7 +133,7 @@ Populated during roadmap creation (each requirement maps to exactly one phase; n
 | INV-02 | 167 | Pending |
 | VIS-01 | 167 | Pending |
 | VIS-02 | 167 | Pending |
-| SSO-01 | 168 | Pending |
+| SSO-01 | 168 | Complete |
 | ADMIN-06 | 169 | Pending (STRETCH) |
 | ENT-01 | 170 | Pending (STRETCH) |
 | ENT-02 | 170 | Pending (STRETCH) |
