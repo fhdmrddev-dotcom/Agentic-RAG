@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v3.4
 milestone_name: Multi-Tenancy & Org Access
-status: verifying
-last_updated: "2026-07-22T09:21:12.820Z"
+status: ready_to_plan
+last_updated: 2026-07-22T09:59:20.537Z
 last_activity: 2026-07-22
 progress:
   total_phases: 28
@@ -11,6 +11,7 @@ progress:
   total_plans: 56
   completed_plans: 56
   percent: 36
+stopped_at: Phase 168 complete (6/6) — ready to discuss Phase 169
 ---
 
 # Project State
@@ -22,7 +23,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-20 — Phase 163 THE ATOMIC CRUX complete; membership RLS enforced)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 168 — sso-saml-2-0-core
+**Current focus:** Phase 169 — dept admin shell (stretch)
 
 ## Deferred Items
 
@@ -40,9 +41,9 @@ Items acknowledged and deferred at milestone close on 2026-07-18 (44 open `audit
 
 ## Current Position
 
-Phase: 168 (sso-saml-2-0-core) — EXECUTING
-Plan: 6 of 6
-Status: Phase complete — ready for verification
+Phase: 169
+Plan: Not started
+Status: Ready to plan
 Next action: **Execute Plan 168-05**. **168-04 COMPLETE 2026-07-22** (SSO endpoint wiring — the request layer): `/org/sso/providers` CRUD (POST/GET/PUT/DELETE, all `require_sso_manage`) writes on the caller's user-JWT connection so mig-104 RLS is the wall; server-pinned org_id; Control 1 (`is_public_domain`) rejects public domains 422 BEFORE any provider call; fail-closed create (GoTrue provider first → row only on success → status `pending_approval`); delete-provider-BEFORE-row (T-168-09, 502 keeps the row on upstream failure). `/org/sso/route` = FULLY PUBLIC (zero auth deps, no-Authorization-header 200) boolean-only active-only anti-enumeration lookup (T-168-10). `/org/sso/provision` resolves org from the authenticated `auth.identities` SSO provider (never a client claim) → `provision_sso_membership` (member-only); password-user 200 no-op; inactive-config 403 (D-168-04). `/org/me` exposes `can_manage_sso`. `POST /admin/sso/configs/{id}/approve` (require_operator) flips pending→active + approved_by/at (D-168-05 Control 2); non-operator 404. 4 commits (`82b798a8` authz RED · `609e6f04` CRUD GREEN · `dc0d0712` routing RED · `2eee27d9` route/provision/approve GREEN); **15/15 new integration tests green** (real local Postgres via ASGITransport; regression `-k "168 or 167 or org_isolation"` = 109 passed). NO migration. Deviations: DELETE upstream-failure 502-keeps-row + PUT re-runs blocklist on domain change (both Rule 2). **SSO-01 stays Pending** (phase-spanning, plans 02-06). **Prior: 168-03 COMPLETE 2026-07-22** (require_sso_manage + domain-gated JIT): `require_sso_manage` = strict active-org, `sso:manage`-gated verbatim mirror of `require_org_invite` (SSO-specific 403; fail-closed until the mig-113 grant from Plan 01 lands); `provision_sso_membership` = advisory-lock + `INSERT … ON CONFLICT (org_id,user_id) DO NOTHING`, role HARDCODED `member` (`$3` bind, NO function param, never a SAML attribute — D-168-03/T-168-03), on the BYPASSRLS singleton pool (the SSO user is not yet a member), duplicate-email-tolerant (keys on (org_id,user_id) UUID, not email — T-168-08) + join-additive (D-167-01). 3 commits (`bc14f085` guard · `81a62788` RED · `d85985d7` GREEN); **5/5 live integration tests green** (8× concurrent-converge → exactly one membership). NO migration. **168-02 COMPLETE 2026-07-22** (SSO deployment config + provider-CRUD proxy): `sso_provider_service.py` = ONE async service, TWO env-selected transport adapters (Cloud `api.supabase.com` Management API single-Bearer vs self-hosted GoTrue Admin API both-headers) — ONE identical `build_body` (D-160 no-code-fork), fail-closed on non-2xx (`SsoProviderError`), `create` returns `provider_id`, `delete` calls the API first (no orphan, T-168-09), mgmt `sbp_` token decrypted at call time via the Phase-150 cipher + never logged (T-168-04, caplog-proven). `sso_domain_blocklist.py` = hardcoded `PUBLIC_EMAIL_DOMAINS` + `is_public_domain()` anti-hijack Control 1 (T-168-02, no runtime fetch). Config: `supabase_project_ref` + `supabase_self_hosted` adapter switch; `supabase_management_token` added to `SECRET_COLUMNS` (12→13, boot-swept). Deploy-artifact parity (D-16) for both SSO env vars (backend/.env.example + onebox + compose + OPERATOR.md); `check-deploy-drift.sh` exit 0. **13/13 unit tests green** (TDD RED→GREEN). 3 commits (`a5add126` config foundation · `3c7c39d2` RED · `635a634f` GREEN). Deviation: added the 2 SSO vars to backend/.env.example (Rule 2 — keeps the onebox-header contract true). **SSO-01 stays Pending** (phase-spanning, plans 02-06). **Isolates the token-bearing network seam so Plan 04's `/org/sso/providers` endpoints are pure wiring.** **Cloud parity owed:** migs 099→**113** + `SECRETS_ENCRYPTION_KEY`, in order (113 carries the swept `supabase_management_token` column), at next operator-gated push.
 Last activity: 2026-07-22
 
