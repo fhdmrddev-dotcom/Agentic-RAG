@@ -33,10 +33,12 @@ import {
 import type { ReactNode } from "react"
 import {
   ACTIVE_ORG_STORAGE_KEY,
+  provisionSso,
   setActiveOrgId as syncActiveOrgHeader,
   type OrgMembership,
 } from "@/lib/api"
 import { useOrgPermissionsProbe } from "@/hooks/useOrgPermissionsProbe"
+import { supabase } from "@/lib/supabase"
 
 export interface OrgValue {
   /** The active org id (the `X-Org-Id` the server re-validates). Null before any org resolves. */
@@ -49,6 +51,9 @@ export interface OrgValue {
   canManage: boolean
   /** True while the caller holds `org:audit_view` — unlocks the cross-member audit read. */
   canAuditView: boolean
+  /** Phase 168 (SSO-01): true while the caller holds `sso:manage` — gates the SSO tab
+   *  (render-only; `require_sso_manage` is the wall, T-168-06). Lockstep with `canManage`. */
+  canManageSso: boolean
   /** True until the per-session org probe resolves. */
   loading: boolean
   /** Switch the active org: syncs the `X-Org-Id` header SYNCHRONOUSLY (D-166-08) then flips
@@ -83,6 +88,10 @@ export function OrgProvider({
   children: ReactNode
 }) {
   const [activeOrgId, setActiveOrgIdState] = useState<string | null>(getInitialOrg)
+  // Phase 168 (SSO-01): an opaque bump key handed to the probe. The SSO-callback JIT effect
+  // increments it after `provisionSso()` so `/org/me` re-resolves with the newly-joined org's
+  // memberships (a first-time SSO session's probe is empty until the provision lands, D-168-04).
+  const [reprobeNonce, setReprobeNonce] = useState(0)
 
   // Persist to localStorage on every change AND keep the api-client header in lockstep —
   // this also runs on MOUNT, re-syncing the header to the rehydrated org (belt-and-suspenders
@@ -95,9 +104,17 @@ export function OrgProvider({
     syncActiveOrgHeader(activeOrgId)
   }, [activeOrgId])
 
-  // The org-scoped, fail-closed permissions probe (re-keyed on activeOrgId). Render-only.
-  const { orgId: resolvedOrgId, canManage, canAuditView, role, memberships, loading } =
-    useOrgPermissionsProbe(userId, activeOrgId)
+  // The org-scoped, fail-closed permissions probe (re-keyed on activeOrgId + the SSO reprobe
+  // nonce). Render-only.
+  const {
+    orgId: resolvedOrgId,
+    canManage,
+    canAuditView,
+    canManageSso,
+    role,
+    memberships,
+    loading,
+  } = useOrgPermissionsProbe(userId, activeOrgId, reprobeNonce)
 
   // WR-01 self-heal: when we hold NO active org yet (fresh device — no persisted hint), adopt
   // the org the soft `/org/me` resolved as the caller's default. This makes the `X-Org-Id`
@@ -112,6 +129,47 @@ export function OrgProvider({
     }
   }, [resolvedOrgId, activeOrgId])
 
+  // Phase 168 (SSO-01 / D-168-04): silent JIT membership provision on the SSO callback.
+  // A first-time SSO user's `/org/me` returns EMPTY memberships until the JIT runs — the org
+  // is resolved SERVER-SIDE from the authenticated SSO provider (`auth.identities`), never a
+  // client claim, and the role is hardcoded `member` (T-168-03). So on a SIGNED_IN *SSO*
+  // session we call `provisionSso()` exactly once (keyed on `userId` → at most once per
+  // sign-in), then bump `reprobeNonce` to re-probe `/org/me` so the newly-joined org resolves
+  // (WR-01 self-heal then adopts it into the switcher). It is idempotent + a plain-password
+  // session is a 200 no-op, so the SSO guard below is a network-call optimization, not a
+  // security boundary. Provision failure is non-fatal for rendering — the user still lands.
+  useEffect(() => {
+    if (!userId) return
+    let cancelled = false
+    void (async () => {
+      // Read the live session to detect an SSO login: the SSO identity lands as
+      // `provider: 'sso:<provider_uuid>'` on `auth.identities` + `app_metadata.provider(s)`
+      // (RESEARCH lines 232-249). A password session skips the network call entirely.
+      const { data } = await supabase.auth.getSession()
+      const u = data.session?.user
+      if (cancelled || !u || u.id !== userId) return
+      const primary = u.app_metadata?.provider
+      const providers = (u.app_metadata?.providers as string[] | undefined) ?? []
+      const isSso =
+        (typeof primary === "string" && primary.startsWith("sso:")) ||
+        providers.some((p) => typeof p === "string" && p.startsWith("sso:")) ||
+        (u.identities ?? []).some(
+          (i) => typeof i.provider === "string" && i.provider.startsWith("sso:"),
+        )
+      if (!isSso) return
+      try {
+        await provisionSso()
+      } catch {
+        // Non-fatal: the app still renders; a later re-probe / manual retry recovers.
+        return
+      }
+      if (!cancelled) setReprobeNonce((n) => n + 1)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [userId])
+
   const switchOrg = useCallback((newOrgId: string) => {
     // D-166-08: set the `X-Org-Id` header SYNCHRONOUSLY — before any effect keyed on the
     // active org runs (React flushes child effects on the next commit) — so the
@@ -122,8 +180,17 @@ export function OrgProvider({
   }, [])
 
   const value = useMemo<OrgValue>(
-    () => ({ activeOrgId, orgs: memberships, role, canManage, canAuditView, loading, switchOrg }),
-    [activeOrgId, memberships, role, canManage, canAuditView, loading, switchOrg],
+    () => ({
+      activeOrgId,
+      orgs: memberships,
+      role,
+      canManage,
+      canAuditView,
+      canManageSso,
+      loading,
+      switchOrg,
+    }),
+    [activeOrgId, memberships, role, canManage, canAuditView, canManageSso, loading, switchOrg],
   )
 
   return <OrgContext.Provider value={value}>{children}</OrgContext.Provider>

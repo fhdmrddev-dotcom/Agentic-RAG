@@ -10,6 +10,12 @@ interface UseAuth {
   loading: boolean
   signIn: (email: string, password: string) => Promise<void>
   signUp: (email: string, password: string) => Promise<void>
+  /** Phase 168 (SSO-01 / D-168-02): start a SAML SSO login for an email domain. GoTrue
+   *  resolves domain→provider server-side and returns a redirect `url` the browser must
+   *  follow MANUALLY (supabase-js does not auto-navigate). The existing `onAuthStateChange`
+   *  picks up `SIGNED_IN` after the IdP callback. Sibling of `signIn` — the password path
+   *  (`signInWithPassword`) is untouched + always available (SC#3). */
+  signInWithSSO: (domain: string) => Promise<void>
   signOut: () => Promise<void>
 }
 
@@ -60,6 +66,17 @@ export function useAuth(): UseAuth {
     if (error) throw error
   }
 
+  // Phase 168 (SSO-01 / D-168-02): the SSO sibling of `signIn`. `signInWithSSO({ domain })`
+  // asks GoTrue (server-side) for the IdP redirect URL; the browser must be redirected
+  // MANUALLY (`window.location.href = data.url`) — supabase-js does not auto-navigate. On
+  // success the browser leaves for the IdP; on error we surface it to the caller (the login
+  // form falls back to the password field). `signInWithPassword` above is UNTOUCHED (SC#3).
+  const signInWithSSO = async (domain: string) => {
+    const { data, error } = await supabase.auth.signInWithSSO({ domain })
+    if (error) throw error
+    if (data?.url) window.location.href = data.url
+  }
+
   const signOut = async () => {
     // Phase 068.5 B-01: drop the current user's cache BEFORE clearing the
     // auth token so the next user on a shared origin starts clean. Use the
@@ -79,5 +96,5 @@ export function useAuth(): UseAuth {
     await supabase.auth.signOut()
   }
 
-  return { user, session, loading, signIn, signUp, signOut }
+  return { user, session, loading, signIn, signUp, signInWithSSO, signOut }
 }

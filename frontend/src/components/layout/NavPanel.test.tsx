@@ -45,6 +45,7 @@ function orgValue(over: Partial<OrgValue>): OrgValue {
     role: "org-admin",
     canManage: false,
     canAuditView: false,
+    canManageSso: false,
     loading: false,
     switchOrg: vi.fn(),
     ...over,

@@ -102,6 +102,7 @@ function mockOrg(overrides: Record<string, unknown> = {}) {
     role: "org-admin",
     canManage: true,
     canAuditView: true,
+    canManageSso: true,
     loading: false,
     switchOrg: vi.fn(),
     ...overrides,
