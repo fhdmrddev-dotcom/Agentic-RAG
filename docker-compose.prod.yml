@@ -57,6 +57,11 @@ services:
       EMAIL_PROVIDER: ${EMAIL_PROVIDER:-none}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       INVITE_FROM_EMAIL: ${INVITE_FROM_EMAIL:-}
+      # Phase 168 (SSO-01) — SAML provider-CRUD transport adapter (config, NOT secrets). Also read
+      # from env_file above; listed here (with Cloud-path defaults) to self-document the knob. The
+      # Cloud sbp_ management token is NOT here — it lives encrypted in app_settings (D-168-01).
+      SUPABASE_PROJECT_REF: ${SUPABASE_PROJECT_REF:-}
+      SUPABASE_SELF_HOSTED: ${SUPABASE_SELF_HOSTED:-false}
     depends_on:
       redis:
         condition: service_healthy

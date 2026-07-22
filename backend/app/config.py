@@ -756,6 +756,21 @@ class Settings(BaseSettings):
     supabase_publishable_key: str = ""
     supabase_secret_key: str = ""
 
+    # Phase 168 (SSO — SAML 2.0 CORE, D-168-01 / D-160 4-tier no-code-fork contract) — the
+    # provider-CRUD transport adapter switch. Supabase Auth IS the SAML SP; sso_provider_service
+    # makes ONE authenticated call per operation, selecting Cloud-vs-self-hosted transport by env
+    # (identical request body, different base URL + auth headers). Both are CONFIG, not secrets:
+    #   * supabase_project_ref  — Cloud Management API path var (Dashboard → Project Settings →
+    #                             General → Reference ID). Empty on self-hosted / until SSO is used.
+    #   * supabase_self_hosted  — False (default) = Cloud path (api.supabase.com Management API +
+    #                             the sbp_ token in app_settings.supabase_management_token). True =
+    #                             self-hosted GoTrue Admin API ({supabase_url}/auth/v1/admin/…,
+    #                             authed by the service_role key already in config above).
+    # The Cloud sbp_ token itself is NOT here — it lives encrypted in app_settings (Phase-150
+    # cipher), per CLAUDE.md "env vars are for secrets and infra only" (D-168-01).
+    supabase_project_ref: str = ""
+    supabase_self_hosted: bool = False
+
     # Active provider — set this to switch between providers
     # Options: openai | anthropic | google | openrouter | ollama | deepseek | moonshot | minimax | zhipu
     # Leave blank to use the legacy LLM_API_KEY / LLM_BASE_URL directly.

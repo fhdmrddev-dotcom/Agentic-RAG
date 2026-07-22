@@ -42,13 +42,20 @@ logger = logging.getLogger(__name__)
 # by a blind decrypt (Pitfall 1).
 _ENVELOPE_PREFIX = "enc:v1:"
 
-# The 12 secret columns, verbatim from main.py:125-130 (_API_KEY_COLUMNS). This module
-# is the SINGLE source of the allowlist going forward; Plan 04 re-points main.py here.
+# The 13 secret columns — the 12 provider/API keys verbatim from main.py:125-130
+# (_API_KEY_COLUMNS) plus supabase_management_token (Phase 168 / mig 113, D-168-01). This
+# module is the SINGLE source of the allowlist going forward; Plan 04 re-points main.py here.
+# Adding a name here is all it takes for main.py's boot sweep_row to encrypt that
+# app_settings column at rest via the same MultiFernet cipher — no bespoke crypto.
 SECRET_COLUMNS: frozenset[str] = frozenset({
     "openai_api_key", "anthropic_api_key", "google_api_key",
     "openrouter_api_key", "ollama_api_key", "deepseek_api_key",
     "moonshot_api_key", "minimax_api_key", "zhipu_api_key",
     "embedding_api_key", "rerank_api_key", "tavily_api_key",
+    # Phase 168 (SSO — SAML CORE, D-168-01): the Cloud Supabase Management/PAT (sbp_) token the
+    # provider-CRUD proxy bears. Encrypted at rest like every other secret; read + decrypted only
+    # at call time by sso_provider_service, never logged.
+    "supabase_management_token",
 })
 
 
