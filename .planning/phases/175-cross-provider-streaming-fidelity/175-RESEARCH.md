@@ -362,19 +362,19 @@ if _dsml_pending and not _dsml_leaking:
 
 **These A1-A4 need confirmation at UAT before their claims become locked.** A2 in particular is why the capability marker (not a code id-list) is mandatory — the verdict is data the operator can correct per row.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Does deepseek-v4 leak DSML delimiter variants beyond `<｜｜DSML｜｜`?**
+1. **(DEFERRED -> live UAT, Plan 175-02) Does deepseek-v4 leak DSML delimiter variants beyond `<｜｜DSML｜｜`?**
    - What we know: the shipped strip covers exactly one opener; the bug documents only that variant.
    - What's unclear: whether other DeepSeek tool-call special tokens can leak into visible content.
-   - Recommendation: run the long-turn (~26+ tool call) DeepSeek UAT and inspect the raw content channel; if only `<｜｜DSML｜｜` appears, keep the single opener + add the stream-end flush; else broaden the match. Do NOT over-engineer without a repro (D-02a re-parse is deferred).
+   - Recommendation: run the long-turn (~26+ tool call) DeepSeek UAT and inspect the raw content channel; if only `<｜｜DSML｜｜` appears, keep the single opener + add the stream-end flush; else broaden the match. Do NOT over-engineer without a repro (D-02a re-parse is deferred). **STATUS: DEFERRED to live UAT** — the single-opener strip + stream-end flush ship in Plan 175-02; alternate-delimiter breadth is decided only if the long-turn DeepSeek UAT surfaces another variant.
 
-2. **Does an operator's `native_tools=True` override outrank `reasoning_first`?**
+2. **(RESOLVED, Plan 175-03) Does an operator's `native_tools=True` override outrank `reasoning_first`?**
    - What we know: both are read in `resolve_calling_mode`.
-   - Recommendation: `reasoning_first` should WIN (hard API constraint). Place the gate above the `effective_native` resolution. Confirm at plan time.
+   - Recommendation: `reasoning_first` should WIN (hard API constraint). Place the gate above the `effective_native` resolution. **STATUS: RESOLVED** — locked in Plan 175-03: the `reasoning_first` gate sits ABOVE the `effective_native` resolution, so it outranks an operator `native_tools=True` override.
 
-3. **`sub_agent_service.py` is byte-frozen (D-085-16) but D-03 names it as one of the 4 sites.**
-   - Recommendation: fold the inferred-provider check into `resolve_sub_agent_model_safely` (which `task_service` uses) so the leverage covers the shared helper; get an explicit operator nod before editing the frozen `sub_agent_service.py`, or document that its inline list-membership guard + provider-correct default already cover it in practice.
+3. **(RESOLVED, Plan 175-01 Task 2) `sub_agent_service.py` is byte-frozen (D-085-16) but D-03 names it as one of the 4 sites.**
+   - Recommendation: fold the inferred-provider check into `resolve_sub_agent_model_safely` (which `task_service` uses) so the leverage covers the shared helper; get an explicit operator nod before editing the frozen `sub_agent_service.py`, or document that its inline list-membership guard + provider-correct default already cover it in practice. **STATUS: RESOLVED** — Plan 175-01 Task 2 folds the inferred-provider gate into `resolve_sub_agent_model_safely` (covering thread_title / suggestion / task_service = 3/4 sites); the byte-frozen `sub_agent_service.py` is NOT edited and retains its populated-list-only inline guard (documented as 3/4-not-4/4 coverage, no operator edit sought).
 
 ## Environment Availability
 
