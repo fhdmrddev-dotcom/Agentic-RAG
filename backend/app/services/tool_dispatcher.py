@@ -1877,27 +1877,33 @@ async def _handle_execute_code(args: dict, ctx: ToolContext) -> ToolResult:
         end_time = time_mod.time()
         duration_ms = int((end_time - start_time) * 1000)
 
-        # Derive actual exit code
-        actual_exit_code = getattr(exec_result, "exit_code", None) or 0
-        if actual_exit_code == 0:
-            stdout_text = exec_result.stdout or ""
-            _error_markers = (
-                "Traceback (most recent call last)",
-                "Error:",
-                "Exception:",
-                "ModuleNotFoundError",
-                "ImportError",
-                "SyntaxError",
-                "NameError",
-                "TypeError",
-                "ValueError",
-                "RuntimeError",
-                "AttributeError",
-                "KeyError",
-                "IndexError",
+        # Derive actual exit code (Defect C: a bare `python -u` streams exit 0 even on a
+        # traceback → bump to 1 on a stdout error marker).
+        actual_exit_code = _derive_actual_exit_code(exec_result)
+
+        # EXEC-01 (D-02.2 / D-03) — bounded, RUN-SCOPED ModuleNotFound auto-heal. On a
+        # FAILED run, install the missing module (system interpreter) + re-run the code
+        # ONCE, bounded 1-per-module-per-RUN via a per-run Redis key on ctx.run_id (with
+        # a graceful call-local fallback). A successful heal adopts the re-run result and
+        # flows through the normal DB-log / harvest / completion path below; a persistent
+        # failure attaches an honest `install_failed` note to the MODEL-facing llm_content
+        # (never a raw traceback under a 'completed' status). Provider-uniform, no
+        # `provider ==` fork; a clean run never enters here (Deep byte-identical — D-04).
+        _install_failed_note: "dict | None" = None
+        if actual_exit_code != 0:
+            _heal = await _autoheal_missing_module(
+                session=session, ctx=ctx, code_file=code_file,
+                stdout=exec_result.stdout or "", stderr=exec_result.stderr or "",
+                declared_install_stderr=_declared_install_stderr,
+                healed_fallback=_healed_modules_fallback,
             )
-            if any(m in stdout_text for m in _error_markers):
-                actual_exit_code = 1
+            if _heal is not None:
+                if _heal.get("exec_result") is not None:
+                    exec_result = _heal["exec_result"]
+                    duration_ms = int((time_mod.time() - start_time) * 1000)
+                    actual_exit_code = _derive_actual_exit_code(exec_result)
+                if _heal.get("install_failed") is not None:
+                    _install_failed_note = _heal["install_failed"]
 
         # Log execution to DB (SAND-09)
         exec_row = await aexec(
@@ -1980,6 +1986,13 @@ async def _handle_execute_code(args: dict, ctx: ToolContext) -> ToolResult:
             _llm_payload["runtime_gap"] = _gap
             if ctx.dead_gap_tokens_in_run is not None:
                 ctx.dead_gap_tokens_in_run.add(_gap["token"])
+        # EXEC-01 (D-03) — honest install-failure note on the MODEL-facing llm_content
+        # only (the persisted/UI `tool_result` stays a normal error). Mirrors the
+        # runtime_gap injection above; only set on a FAILED run, so `status` is already
+        # "error". Mutually exclusive with runtime_gap (KNOWN_MISSING modules are never
+        # healed, unknown modules are never classified as a permanent gap).
+        if _install_failed_note is not None:
+            _llm_payload["install_failed"] = _install_failed_note
         llm_content = json.dumps(_llm_payload)
         ctx.spawn(write_audit_entry(
             user_id=ctx.current_user["id"],
@@ -2894,6 +2907,136 @@ def _code_references_dead_token(code: str, token: str) -> bool:
             rf"\b{_re_filename.escape(token)}\b", code, _re_filename.IGNORECASE
         ) is not None
     return token.lower() in code.lower()
+
+
+# ---------------------------------------------------------------------------
+# EXEC-01 (Phase 176-03 / D-02.2 / D-03) — run-scoped ModuleNotFound auto-heal.
+# Reuses `_NO_MODULE_RE` for extraction and `_pip_install` (system interpreter) for
+# the install; the 1-per-module-per-RUN bound lives in a per-run Redis SET keyed on
+# `ctx.run_id` (`heal_attempted:{run_id}`, SADD/SISMEMBER + EXPIRE 600 — same run-buffer
+# TTL discipline as `run:{run_id}` / eval_runner_service / skill_tuner) with a graceful
+# call-local fallback when Redis is unavailable. Entirely below the provider boundary
+# → provider-uniform, and a literal no-op for any run where the code succeeds (a clean
+# run never enters the heal), so Deep behavior stays byte-identical (D-04/D-14).
+# ---------------------------------------------------------------------------
+_PREINSTALLED_HINT_LIBS = (
+    "reportlab, pandas, matplotlib, python-docx, python-pptx, openpyxl, "
+    "docxtpl, numpy, scipy, seaborn, plotly, pypdf"
+)
+_HEAL_BOUND_TTL_S = 600  # run-buffer TTL (eval_runner_service:79 / skill_tuner:114)
+
+
+def _extract_missing_module(stdout: str, stderr: str) -> "str | None":
+    """Extract the missing module from a ModuleNotFoundError via the shared
+    `_NO_MODULE_RE`, scanning stdout+stderr lowercased (mirrors `_classify_runtime_gap`
+    `out_l`). None when there is no `No module named 'X'` signal."""
+    out_l = f"{stdout or ''}\n{stderr or ''}".lower()
+    m = _NO_MODULE_RE.search(out_l)
+    return m.group(1) if m else None
+
+
+def _install_failed_detail(module: str, reason: str) -> dict:
+    """Model-facing honest payload for a persistent install/heal failure. The reason
+    (pip stderr) is truncated ~300 chars; the hint points at the preinstalled set so
+    the model can pivot instead of blindly retrying (D-03)."""
+    return {
+        "module": module,
+        "reason": (reason or "").strip()[:300],
+        "hint": (
+            f"Could not install {module}. Use a preinstalled library "
+            f"({_PREINSTALLED_HINT_LIBS}) or tell the user this package is "
+            "unavailable. Do not retry the same install."
+        ),
+    }
+
+
+async def _heal_bound_seen(ctx, healed_fallback: set, module: str) -> bool:
+    """True if `module` was already heal-attempted anywhere in THIS run. Consults the
+    per-run Redis set (`heal_attempted:{ctx.run_id}`); on ANY Redis error/unavailability
+    falls back to the call-local set. `ctx.redis` is a redis.asyncio client so sismember
+    is awaited directly (NO run_in_threadpool — that wraps only the blocking sandbox
+    session.* calls; D-v2.5-01)."""
+    redis = getattr(ctx, "redis", None)
+    run_id = getattr(ctx, "run_id", None)
+    if redis is not None and run_id is not None:
+        try:
+            return bool(await redis.sismember(f"heal_attempted:{run_id}", module))
+        except Exception as _e:  # noqa: BLE001 — a Redis hiccup must never break execute_code
+            logger.warning("heal-bound sismember failed (call-local fallback): %s", _e)
+    return module in healed_fallback
+
+
+async def _heal_bound_record(ctx, healed_fallback: set, module: str) -> None:
+    """Record `module` as heal-attempted for THIS run in the per-run Redis set (SADD +
+    EXPIRE so it self-expires with the run buffer); falls back to the call-local set on
+    any Redis error/unavailability."""
+    redis = getattr(ctx, "redis", None)
+    run_id = getattr(ctx, "run_id", None)
+    if redis is not None and run_id is not None:
+        try:
+            key = f"heal_attempted:{run_id}"
+            await redis.sadd(key, module)
+            await redis.expire(key, _HEAL_BOUND_TTL_S)
+            return
+        except Exception as _e:  # noqa: BLE001 — degrade gracefully
+            logger.warning("heal-bound sadd failed (call-local fallback): %s", _e)
+    healed_fallback.add(module)
+
+
+async def _autoheal_missing_module(
+    *, session, ctx, code_file: str, stdout: str, stderr: str,
+    declared_install_stderr: str, healed_fallback: set,
+) -> "dict | None":
+    """Bounded ModuleNotFound auto-heal for a FAILED execute_code run (D-02.2 / D-03).
+
+    Returns one of:
+      * ``None`` — nothing to heal (no ModuleNotFound + no declared failure, or a
+        KNOWN_MISSING permanent gap → left to ``_classify_runtime_gap``).
+      * ``{"install_failed": {...}}`` — honest note for ``llm_content`` (no re-run).
+      * ``{"exec_result": <ConsoleOutput>}`` — the code was re-run clean; adopt it.
+      * ``{"exec_result": <ConsoleOutput>, "install_failed": {...}}`` — re-ran but still
+        missing → adopt the new result AND attach the honest note.
+    """
+    module = _extract_missing_module(stdout, stderr)
+    if module is None:
+        # No ModuleNotFound signal — but a persistent DECLARED install failure must
+        # still surface honestly rather than be swallowed (D-01).
+        if declared_install_stderr:
+            return {"install_failed": _install_failed_detail(
+                "the declared libraries", declared_install_stderr)}
+        return None
+
+    # KNOWN_MISSING permanent gaps (e.g. markitdown) are reshaped by _classify_runtime_gap
+    # — never install/heal them here.
+    if module in KNOWN_MISSING_MODULES:
+        return None
+
+    # Run-scoped 1-per-module bound: a module already heal-attempted anywhere in this
+    # run (INCLUDING a prior execute_code call — the actual BUG-260708-02 behavior, which
+    # a call-local set cannot bound) goes straight to the honest result, no re-install.
+    if await _heal_bound_seen(ctx, healed_fallback, module):
+        return {"install_failed": _install_failed_detail(
+            module, declared_install_stderr or "Already attempted to install this module "
+            "earlier in this run; it did not resolve.")}
+
+    await _heal_bound_record(ctx, healed_fallback, module)
+
+    # Install the missing module into the SYSTEM interpreter (python -m pip, retry once).
+    _install_stderr = await _install_declared_libraries(session, [module])
+    if _install_stderr:
+        return {"install_failed": _install_failed_detail(module, _install_stderr)}
+
+    # Install OK — re-run the code ONCE, threadpool-wrapped (session.execute_command is
+    # synchronous/blocking — D-v2.5-01), reusing the container-resident code_file. Do NOT
+    # re-enter the async drain (Pitfall 1).
+    new_result = await run_in_threadpool(session.execute_command, f"python -u {code_file}")
+    still_missing = _extract_missing_module(
+        getattr(new_result, "stdout", "") or "", getattr(new_result, "stderr", "") or ""
+    )
+    if still_missing is not None:
+        return {"exec_result": new_result,
+                "install_failed": _install_failed_detail(still_missing, "")}
+    return {"exec_result": new_result}
 
 
 _REPEAT_BLOCKED_NOTE = (
