@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v3.5
 milestone_name: UX Consolidation & Chat Polish
 status: executing
-last_updated: "2026-07-22T20:10:47.482Z"
+last_updated: "2026-07-22T20:26:08.318Z"
 last_activity: 2026-07-22
 progress:
   total_phases: 20
@@ -43,7 +43,7 @@ Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 op
 ## Current Position
 
 Phase: 176 (chat-render-correctness-exec-reliability) — EXECUTING
-Plan: 2 of 4
+Plan: 3 of 4
 Status: Ready to execute
 Last activity: 2026-07-22
 
@@ -486,6 +486,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 175 P02 | 15min | 2 tasks | 4 files |
 | Phase 175 P03 | 3min | 2 tasks | 4 files |
 | Phase 176 P01 | 13min | 2 tasks | 3 files |
+| Phase 176 P02 | 13min | 2 tasks | 6 files |
 
 ## Decisions
 
@@ -618,6 +619,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase ?]: D-175-03-02: reasoning_tools_unsupported detection anchors on structured body[error] signature (message substrings / param==reasoning_effort), never str(exc) — a crafted message cannot misclassify an unrelated 400 (XPROV-01 D-04)
 - [Phase ?]: Phase 176-01 RENDER-01 (D-05b): dup user bubble is born in the reconcile merge — dropped via a content-supersede check (supersededByPersisted) in the untyped-temp preserve branch; 075.7 preserve held (D-06)
 - [Phase ?]: Phase 176-01 RENDER-02 (D-07): mount-path onTerminal mirrors the send-path content-reconcile keyed on run.run_id — backgrounded run un-folds live, no reload; content-only swap; send-path untouched (D-14)
+- [Phase ?]: 176-02 (RENDER-04): live version pointer fix is a frontend refetch only — refreshVersions mirrors refreshGate + a versionsNonce, no migration/no realtime (D-12/D-16)
 
 ## Operator Next Steps
 
