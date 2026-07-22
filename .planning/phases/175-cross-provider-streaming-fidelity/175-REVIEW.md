@@ -27,7 +27,15 @@ findings:
   warning: 3
   info: 2
   total: 6
-status: issues_found
+status: resolved
+resolution:
+  resolved: 2026-07-22
+  CR-01: fixed (3d0b59eb) — DSML leak notice appended to full_content + emitted as delta, terminal error dropped
+  WR-02: fixed (070dc350) — reasoning-tools 400 classify requires message signature, not param alone; +regression test
+  WR-01: fixed (bbe8ee03) — provider_safe_utility_model passes unrecognised ids through (fallback-bucket carve-out); legacy empty-active drop intentionally preserved (documented)
+  WR-03: deferred → SEED-127 (latent/pre-GA — forced-emission path on a reasoning_first model; proper fix is structured-forced-emission design work)
+  IN-01: addressed-by-alignment (leak-signal test mirror updated to the delta contract)
+  IN-02: noted (gpt-5.6 reasoning_off post-GA revisit — folds into SEED-040)
 ---
 
 # Phase 175: Code Review Report
