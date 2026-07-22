@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.4
 milestone_name: Multi-Tenancy & Org Access
 status: executing
-last_updated: "2026-07-22T07:50:14.368Z"
+last_updated: "2026-07-22T08:07:25.386Z"
 last_activity: 2026-07-22
 progress:
   total_phases: 28
   completed_phases: 9
   total_plans: 56
-  completed_plans: 51
+  completed_plans: 52
   percent: 32
 ---
 
@@ -41,12 +41,12 @@ Items acknowledged and deferred at milestone close on 2026-07-18 (44 open `audit
 ## Current Position
 
 Phase: 168 (sso-saml-2-0-core) — EXECUTING
-Plan: 2 of 6
+Plan: 3 of 6
 Status: Ready to execute
-Next action: **Operator live UAT** (`167-VERIFICATION.md` = `human_needed`, items in `167-HUMAN-UAT.md`): SC#10 4-axis (VIS-02 cross-provider model routing is the load-bearing axis; **incl. WR-04 db_override cross-provider re-resolution**) + invite→accept→join E2E + greenlist hide==refuse two-user proof — need running uvicorn + browser + provider keys + a seeded 2nd-org membership. Then flip VERIFICATION → passed. **Gates:** frontend `tsc` exit 0 · backend 76 passed (167 + org gate + isolation) · org-isolation exit-gate 23/23 (no regression) · secure-phase **24/24 threats CLOSED (0 open, ASVS L2)** · code-review **1 blocker + 5 warnings → ALL FIXED** (CR-01 = role-greenlist resolved `_highest_role`→org-admin-for-everyone; fixed to validated active-org role, fail-closed to member + 3 real-resolver tests; WR-01 resend run_in_threadpool; WR-02 email HTML-escape; WR-03 pagination-independent adoption dedup; WR-04 db_override provider re-resolve [human-verify]; WR-05 GET /admin/visibility server-truth seed). Pre-existing Phase-145/163 test rot logged (not a regression). **✅ SEED-125 (skills cross-org leak) CLOSED 2026-07-22** (dedicated security quick-fix): CR-01 code — 6 `tool_dispatcher.py` service-role skill-resolution sites org-gated via one shared helper (reuses `folder_utils._resolve_caller_org_ids`, `is_system` escape preserved, fail-closed), proven by 7 live two-org legs; CR-02 storage — **mig 112 applied local** (org-gates the skill-files storage READ policy; leak was already transitively org-gated via the skills-RLS join → defense-in-depth + false-comment fix); two-org regression test added; full-schema regenerated (no-reset). **Cloud parity owed (email-provider env vars synced to deploy artifacts same-commit; mig 112 = pure storage-RLS DDL, no seed/env):** migs 099→**112** + `SECRETS_ENCRYPTION_KEY`, in order, at next operator-gated push. **Next: `/gsd:discuss-phase 168`** (SSO SAML — SEED-125 now closed, so the JIT onboarding path no longer widens a live leak).
+Next action: **Execute Plan 168-03** (`require_sso_manage` authz guard + domain-gated idempotent JIT `provision_sso_membership`, member-only + dup-email-tolerant — independent of the 168-02 seam, unblocked). **168-02 COMPLETE 2026-07-22** (SSO deployment config + provider-CRUD proxy): `sso_provider_service.py` = ONE async service, TWO env-selected transport adapters (Cloud `api.supabase.com` Management API single-Bearer vs self-hosted GoTrue Admin API both-headers) — ONE identical `build_body` (D-160 no-code-fork), fail-closed on non-2xx (`SsoProviderError`), `create` returns `provider_id`, `delete` calls the API first (no orphan, T-168-09), mgmt `sbp_` token decrypted at call time via the Phase-150 cipher + never logged (T-168-04, caplog-proven). `sso_domain_blocklist.py` = hardcoded `PUBLIC_EMAIL_DOMAINS` + `is_public_domain()` anti-hijack Control 1 (T-168-02, no runtime fetch). Config: `supabase_project_ref` + `supabase_self_hosted` adapter switch; `supabase_management_token` added to `SECRET_COLUMNS` (12→13, boot-swept). Deploy-artifact parity (D-16) for both SSO env vars (backend/.env.example + onebox + compose + OPERATOR.md); `check-deploy-drift.sh` exit 0. **13/13 unit tests green** (TDD RED→GREEN). 3 commits (`a5add126` config foundation · `3c7c39d2` RED · `635a634f` GREEN). Deviation: added the 2 SSO vars to backend/.env.example (Rule 2 — keeps the onebox-header contract true). **SSO-01 stays Pending** (phase-spanning, plans 02-06). **Isolates the token-bearing network seam so Plan 04's `/org/sso/providers` endpoints are pure wiring.** **Cloud parity owed:** migs 099→**113** + `SECRETS_ENCRYPTION_KEY`, in order (113 carries the swept `supabase_management_token` column), at next operator-gated push.
 Last activity: 2026-07-22
 
-Progress: [█████████░] 91%
+Progress: [█████████░] 93%
 
 ### Quick Tasks Completed
 
@@ -444,6 +444,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 164 P164-03 | 42min | 2 tasks | 3 files |
 | Phase 164 P164-04 | 35min | 3 tasks | 5 files |
 | Phase 168 P01 | 12min | 3 tasks | 2 files |
+| Phase 168 P02 | 13min | 2 tasks | 9 files |
 
 ## Decisions
 
@@ -560,6 +561,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase ?]: Phase 164-04 (D-164-02): producer retrieval RPCs + text-to-SQL/grep query_user_documents run over the Phase-163 asyncpg get_user_pg_connection user-context via a shared retrieval_service._call_as_user seam — never the request JWT (expires mid-run) nor service-role (auth.uid()=NULL → 0 rows).
 - [Phase ?]: Phase 164-04 (D-164-04): _inject_user_id + _inject_user_id_for_grep DELETED — RLS on the INVOKER query_user_documents over the user-context is the cross-user gate; _inject_folder_scope + SELECT-only/no-semicolon guards RETAINED; query_user_documents NOT made DEFINER.
 - [Phase ?]: Phase 164-04: asyncpg has no pgvector codec — embeddings formatted as '[...]'::public.vector (_vector_literal); id/document_id cast ::text for str-key parity with the old PostgREST JSON. Deep Mode byte-identical (DB-connection-seam swap only, no provider fork, D-14).
+- [Phase ?]: 168-02: SSO provider-CRUD = ONE async service, TWO env-selected transport adapters (Cloud Management API vs self-hosted GoTrue); identical body, fail-closed on non-2xx, delete-via-API-first; mgmt token decrypted at call time (Phase-150 cipher), never logged. SSO-01 stays Pending (delivered across plans 02-06).
 
 ## Operator Next Steps
 
