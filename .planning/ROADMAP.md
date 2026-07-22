@@ -237,7 +237,7 @@ Ship only if CORE lands clean and budget remains. First-to-cut ordering: SSO/OID
 - [x] 168-02-PLAN.md — Deployment config + one provider-CRUD proxy service (two env-switched adapters, fail-closed) + public-domain blocklist
 - [x] 168-03-PLAN.md — `require_sso_manage` authz guard + domain-gated idempotent JIT `provision_sso_membership` (member-only, dup-email-tolerant)
 - [x] 168-04-PLAN.md — org.py SSO endpoints (`/org/sso/providers` CRUD · `/org/sso/route` · `/org/sso/provision`) + operator approval + `/org/me` can_manage_sso
-- [ ] 168-05-PLAN.md — Frontend data + auth layer (api SSO fns · canManageSso fail-closed flag · `signInWithSSO` · SSO-session JIT provision-then-reprobe)
+- [x] 168-05-PLAN.md — Frontend data + auth layer (api SSO fns · canManageSso fail-closed flag · `signInWithSSO` · SSO-session JIT provision-then-reprobe)
 - [ ] 168-06-PLAN.md — SSO tab live in the 166 shell + identifier-first `SignInForm` (password fallback retained)
 **UI hint**: yes
 
