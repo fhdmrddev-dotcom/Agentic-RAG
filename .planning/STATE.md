@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v3.4
 milestone_name: Multi-Tenancy & Org Access
-status: executing
-last_updated: "2026-07-21T19:10:02.479Z"
-last_activity: 2026-07-21 -- Phase 167 execution started
+status: "**Phase 167 EXECUTED 2026-07-22** (7/7 plans, ~36 commits, sequential main-tree). **NO MIGRATION** — `org_invitations` (mig 104), `feature_visibility` JSONB (mig 098), `user_settings.preferences` (mig 011) all pre-existed forward-compatibly; schema-drift false, no `supabase/` change. Delivered: email+link invitations (stdlib token, hashed, expiry, none-log default / resend env-switch) · token-gated app-layer accept (INV-02 JIT: advisory-lock + ON CONFLICT, join-additive) · 166 "Invitations & Roles" tab LIVE + roster adoption chips · VIS-01 role greenlists (extend-not-fork `require_visible`) · VIS-02 per-user model default (revived `user_settings.preferences`, two-layer + operator lock, D-14 no-op) · `/invite?token=` accept page."
+last_updated: "2026-07-22T05:13:06.151Z"
+last_activity: 2026-07-22 -- Phase 167 executed, code-verified, secured; live UAT pending
 progress:
   total_phases: 28
-  completed_phases: 8
+  completed_phases: 9
   total_plans: 50
-  completed_plans: 43
-  percent: 29
+  completed_plans: 50
+  percent: 32
 ---
 
 # Project State
