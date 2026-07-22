@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v3.5
 milestone_name: UX Consolidation & Chat Polish
-status: verifying
-last_updated: "2026-07-22T17:27:22.525Z"
+status: ready_to_plan
+last_updated: 2026-07-22T18:22:32.708Z
 last_activity: 2026-07-22
 progress:
   total_phases: 20
@@ -11,6 +11,7 @@ progress:
   total_plans: 8
   completed_plans: 8
   percent: 5
+stopped_at: Phase 175 complete (4/4) — ready to discuss Phase 176
 ---
 
 # Project State
@@ -22,7 +23,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-20 — Phase 163 THE ATOMIC CRUX complete; membership RLS enforced)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 175 — cross-provider-streaming-fidelity
+**Current focus:** Phase 176 — chat render correctness + exec reliability
 
 ## Deferred Items
 
@@ -42,9 +43,9 @@ Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 op
 
 ## Current Position
 
-Phase: 175 (cross-provider-streaming-fidelity) — EXECUTING
-Plan: 4 of 4
-Status: Phase complete — ready for verification
+Phase: 176
+Plan: Not started
+Status: Ready to plan
 Last activity: 2026-07-22
 
 ### Quick Tasks Completed
