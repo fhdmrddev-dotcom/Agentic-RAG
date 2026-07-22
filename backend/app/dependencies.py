@@ -767,3 +767,34 @@ async def require_org_invite(
             detail="You do not have permission to invite members.",
         )
     return current_user
+
+
+async def require_sso_manage(
+    request: Request,
+    current_user: dict = Depends(get_current_user),
+    active_org: str = Depends(get_active_org_id),
+) -> dict:
+    """sso:manage gate for the org SSO provider-CRUD routes (Phase 168, SSO-01 / D-168-01).
+
+    A VERBATIM mirror of ``require_org_invite`` with the permission key swapped to
+    ``sso:manage``: ``_has_org_permission(active_org, 'sso:manage')`` runs mig-104's
+    ``current_user_has_permission`` SECDEF helper AS THE CALLER on a user-JWT connection. On
+    False → 403 (a legitimate product feature an end user can understand, NOT the /admin
+    byte-identical 404 — mirrors require_org_invite / require_org_manage).
+
+    The ``sso:manage`` grant for org-admin (+ super-admin) is seeded by MIGRATION 113 (Plan
+    01) — that role_permissions row is what flips this gate LIVE over the mig-104
+    ``current_user_has_permission`` SECDEF helper; before it lands, no role holds ``sso:manage``
+    and every SSO write is 403 (fail-closed).
+
+    Inherits the STRICT ``get_active_org_id`` (spoofed/non-member ``X-Org-Id`` → 403;
+    absent-header-with-2+-memberships → 400) — NEVER ``resolve_active_org_soft`` — so every SSO
+    write is pinned to the server-validated active org. FastAPI dedupes the shared
+    ``get_active_org_id`` resolution across the endpoint's dependencies.
+    """
+    if not await _has_org_permission(request, current_user, active_org, "sso:manage"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to manage SSO for this organization.",
+        )
+    return current_user
