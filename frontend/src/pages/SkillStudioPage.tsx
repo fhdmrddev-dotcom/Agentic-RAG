@@ -66,6 +66,12 @@ export function SkillStudioPage({ skillId, tab, onTabChange, onBack }: Props) {
   const [gate, setGate] = useState<PublishGate | null>(null)
   const [versions, setVersions] = useState<SkillVersion[]>([])
   const [cases, setCases] = useState<TestCase[]>([])
+  // 176-02 (RENDER-04): a monotonic bump the Versions tab consumes so its OWN self-fetch
+  // re-runs when a version is promoted (mirrors refreshGate's on-demand re-pull, but for
+  // the leaf that fetches versions/runs/proposals itself). Never reset on skill switch —
+  // VersionsTab already refetches on skillId change; the nonce only forces the extra
+  // in-place refetch after an approve.
+  const [versionsNonce, setVersionsNonce] = useState(0)
   const currentSkillRef = useRef(skillId)
 
   useEffect(() => {
@@ -103,6 +109,23 @@ export function SkillStudioPage({ skillId, tab, onTabChange, onBack }: Props) {
         if (currentSkillRef.current === requested) setGate(g)
       })
       .catch(() => {})
+  }, [skillId])
+
+  // Re-pull the shell's versions list on demand (skill-switch-guarded, mirror of
+  // refreshGate). The Triggering tab calls this via onVersionPromoted after a description
+  // proposal is approved so deriveLiveVersion re-derives and the header vN + the Versions
+  // LIVE badge update WITHOUT a reload (RENDER-04 / BUG-260706-01 — the DB was already
+  // correct; only the shell's once-per-skillId `versions` snapshot had gone stale). Also
+  // bumps versionsNonce so VersionsTab re-runs its own versions/runs/proposals self-fetch.
+  const refreshVersions = useCallback(() => {
+    const requested = skillId
+    if (!requested) return
+    listSkillVersions(requested)
+      .then((v) => {
+        if (currentSkillRef.current === requested) setVersions(v)
+      })
+      .catch(() => {})
+    setVersionsNonce((n) => n + 1)
   }, [skillId])
 
   // skillId null → a calm centered guard with a "‹ Skills" back (the SkillTunerPage pattern).
@@ -201,10 +224,14 @@ export function SkillStudioPage({ skillId, tab, onTabChange, onBack }: Props) {
             />
           </div>
         ) : tab === "triggering" ? (
-          <TriggeringTab skillId={skillId} onBack={onBack} />
+          <TriggeringTab skillId={skillId} onBack={onBack} onVersionPromoted={refreshVersions} />
         ) : (
           <div className="px-8 py-6">
-            <VersionsTab skillId={skillId} liveVersionNumber={liveVersionNumber} />
+            <VersionsTab
+              skillId={skillId}
+              liveVersionNumber={liveVersionNumber}
+              refreshNonce={versionsNonce}
+            />
           </div>
         )}
       </div>

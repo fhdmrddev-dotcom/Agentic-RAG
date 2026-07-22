@@ -65,6 +65,13 @@ interface Props {
    *  behavior/internals (the 041/042/043/045 winners stay intact, honoring D-02); when
    *  unset the standalone page renders exactly as before. */
   embedded?: boolean
+  /** Phase 176 Plan 02 (RENDER-04): when mounted as the Studio "Triggering" tab, the
+   *  shell passes its refreshVersions callback here. handleApproveDescription calls it
+   *  after approveDescriptionProposal resolves so the shell re-runs listSkillVersions and
+   *  re-derives the live version — the header vN + Versions LIVE badge update with no
+   *  reload (BUG-260706-01). Undefined for the standalone page → behaves exactly as
+   *  before (loadSkills only). */
+  onVersionPromoted?: () => void
 }
 
 // The provider ids the backend has a representative model for (the effective scored set
@@ -95,7 +102,7 @@ const MAX_TARGETS = 8
 // mounted (no empty-pane flash) and the scoreboard is not nulled.
 type RunPhase = "idle" | "running" | "reconciling" | "done" | "error"
 
-export function SkillTunerPage({ skillId, onBack, embedded }: Props) {
+export function SkillTunerPage({ skillId, onBack, embedded, onVersionPromoted }: Props) {
   // The Tuner reuses useSkills() to read the live skill list. The one-click apply that
   // used updateSkill (PATCH /skills) is replaced by the SI-02 propose door (D-08); manual
   // description edits still use useSkills().updateSkill from the SkillsPage. `loadSkills`
@@ -541,10 +548,17 @@ export function SkillTunerPage({ skillId, onBack, embedded }: Props) {
       loadSkills().catch(() => {
         // Non-fatal: the server write landed; the header reconciles on the next fetch.
       })
+      // 176-02 (RENDER-04 / BUG-260706-01): the 079 trigger snapshotted a NEW skill version
+      // on approve. loadSkills reconciles `skill`, but the Studio shell's once-per-skillId
+      // `versions` snapshot is now stale, so deriveLiveVersion(skill, staleVersions) keeps
+      // showing the pre-approve vN. Ask the shell to refetch its versions list (and bump the
+      // Versions-tab nonce) so the header vN + the Versions LIVE badge update with no reload.
+      // Undefined on the standalone page → unchanged behavior (loadSkills only).
+      onVersionPromoted?.()
     } catch {
       setDescError("Couldn't apply the proposed description. Please try again.")
     }
-  }, [skillId, descProposal, loadSkills])
+  }, [skillId, descProposal, loadSkills, onVersionPromoted])
 
   const handleRejectDescription = useCallback(async () => {
     if (!skillId || !descProposal) return
