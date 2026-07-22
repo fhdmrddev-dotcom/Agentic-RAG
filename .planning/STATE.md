@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.5
 milestone_name: UX Consolidation & Chat Polish
 status: executing
-last_updated: "2026-07-22T19:51:59.601Z"
-last_activity: 2026-07-22 -- Phase 176 planning complete
+last_updated: "2026-07-22T20:10:47.482Z"
+last_activity: 2026-07-22
 progress:
   total_phases: 20
   completed_phases: 2
   total_plans: 12
-  completed_plans: 8
+  completed_plans: 9
   percent: 10
 ---
 
@@ -22,7 +22,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-20 — Phase 163 THE ATOMIC CRUX complete; membership RLS enforced)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 176 — chat render correctness + exec reliability
+**Current focus:** Phase 176 — chat-render-correctness-exec-reliability
 
 ## Deferred Items
 
@@ -42,10 +42,10 @@ Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 op
 
 ## Current Position
 
-Phase: 176
-Plan: Not started
+Phase: 176 (chat-render-correctness-exec-reliability) — EXECUTING
+Plan: 2 of 4
 Status: Ready to execute
-Last activity: 2026-07-22 -- Phase 176 planning complete
+Last activity: 2026-07-22
 
 ### Quick Tasks Completed
 
@@ -485,6 +485,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 168 P06 | 11min | 2 tasks | 6 files |
 | Phase 175 P02 | 15min | 2 tasks | 4 files |
 | Phase 175 P03 | 3min | 2 tasks | 4 files |
+| Phase 176 P01 | 13min | 2 tasks | 3 files |
 
 ## Decisions
 
@@ -615,6 +616,8 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase ?]: 175-02: DSML stream-end flush (deepseek-gated, D-14) + honest leak signal via the EXISTING error SSE event through an Option-B post-drain hook
 - [Phase ?]: D-175-03-01: reasoning_first STRUCTURED gate sits ABOVE db_native in resolve_calling_mode — the hard gpt-5.6 tools+reasoning 400 constraint wins over an operator native_tools=True override (XPROV-01 D-01)
 - [Phase ?]: D-175-03-02: reasoning_tools_unsupported detection anchors on structured body[error] signature (message substrings / param==reasoning_effort), never str(exc) — a crafted message cannot misclassify an unrelated 400 (XPROV-01 D-04)
+- [Phase ?]: Phase 176-01 RENDER-01 (D-05b): dup user bubble is born in the reconcile merge — dropped via a content-supersede check (supersededByPersisted) in the untyped-temp preserve branch; 075.7 preserve held (D-06)
+- [Phase ?]: Phase 176-01 RENDER-02 (D-07): mount-path onTerminal mirrors the send-path content-reconcile keyed on run.run_id — backgrounded run un-folds live, no reload; content-only swap; send-path untouched (D-14)
 
 ## Operator Next Steps
 
