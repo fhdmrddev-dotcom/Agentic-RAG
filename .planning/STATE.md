@@ -22,7 +22,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-20 — Phase 163 THE ATOMIC CRUX complete; membership RLS enforced)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 167 — invitations-roles-greenlists-jit-per-user-prefs
+**Current focus:** Phase 168 — SSO SAML 2.0 (CORE): context gathered 2026-07-22 (D-168-01 full self-service via metadata URL · D-168-02 identifier-first login · D-168-03 email+name-only member-only JIT · D-168-04 domain-gated JIT tolerating dup-email · D-168-05 operator/domain-ownership approval + block public domains). Next: `/gsd:plan-phase 168`. (Phase 167 EXECUTED + secured 2026-07-22; live UAT pending.)
 
 ## Deferred Items
 
