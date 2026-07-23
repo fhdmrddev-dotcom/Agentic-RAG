@@ -2,6 +2,7 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { HonestNotice } from "@/components/auth/HonestNotice"
 import { getSsoRoute } from "@/lib/api"
 import { useAuth } from "@/hooks/useAuth"
 
@@ -26,6 +27,10 @@ export function SignInForm({ onSubmit, onSwitch }: Props) {
   // "email" = the resting identifier step (Continue); "password" = the revealed password step
   // (Sign In). Once revealed, the form never re-hides the password — the user stays unlocked.
   const [phase, setPhase] = useState<"email" | "password">("email")
+  // D-13: display-only. True ONLY when the reveal came from a route-lookup OUTAGE (the
+  // handleContinue catch), so the revealed password field can carry a reassuring calm note.
+  // Gates NOTHING — the fail-open reveal behavior is byte-frozen (T-168-07 / SC#3).
+  const [degraded, setDegraded] = useState(false)
 
   // The identifier step: route the domain, or fail OPEN to the password field.
   const handleContinue = async () => {
@@ -42,6 +47,9 @@ export function SignInForm({ onSubmit, onSwitch }: Props) {
     } catch {
       // FAIL OPEN: a 403 / network error / route-service outage degrades to password login —
       // reveal the password field so the user can STILL sign in; never blank or lock the form.
+      // D-13: mark THIS reveal as an outage-degrade so it carries a reassuring calm note (the
+      // non-SSO reveal below is a NORMAL reveal, not a degrade — no note there).
+      setDegraded(true)
       setPhase("password")
       return
     }
@@ -124,7 +132,14 @@ export function SignInForm({ onSubmit, onSwitch }: Props) {
           />
         </div>
       )}
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {/* D-13: the outage-degrade is legible, never a lockout — a calm reassurance, not an error. */}
+      {phase === "password" && degraded && (
+        <HonestNotice severity="calm">
+          Nothing's wrong with your account — sign-in routing is temporarily unavailable, so you can
+          sign in with your password.
+        </HonestNotice>
+      )}
+      {error && <HonestNotice severity="error">{error}</HonestNotice>}
       <Button type="submit" className="w-full" disabled={loading}>
         {loading ? "Signing in…" : phase === "email" ? "Continue" : "Sign In"}
       </Button>
