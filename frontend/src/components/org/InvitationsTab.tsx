@@ -22,7 +22,8 @@ import { useState } from "react"
 import { Check, Copy, Link2, Mail, RefreshCw, X } from "lucide-react"
 
 import type { Invitation } from "@/lib/api"
-import { cn } from "@/lib/utils"
+import { OrgAvatar, RoleBadge } from "./OrgIdentity"
+import { StatusChip, statusChipMeta } from "./StatusChip"
 import { InviteMemberDialog } from "./InviteMemberDialog"
 
 interface InvitationsTabProps {
@@ -38,40 +39,6 @@ interface InvitationsTabProps {
   onResend: (id: string) => Promise<string | null>
   /** Revoke a pending invite — the shell flips it to revoked + re-fetches. */
   onRevoke: (id: string) => Promise<void>
-}
-
-/** Map the invite role to a display chip (mirrors OrgMembersTab's D-166-05 vocabulary):
- *  managers read as the indigo `◆ Org-admin` badge, everyone else as the muted badge. */
-function roleLabel(role: string): { label: string; admin: boolean } {
-  if (role === "org-admin" || role === "super-admin") return { label: "Org-admin", admin: true }
-  if (role === "dept-admin") return { label: "Dept-admin", admin: true }
-  return { label: "Member", admin: false }
-}
-
-type ChipTone = "primary" | "success" | "muted"
-
-/** Map the lifecycle status to a plain label + a 166-vocabulary tone. Pending is the live
- *  indigo chip; accepted is success-green (a positive terminal state — a green, not the
- *  reserved operator warning tint); expired/revoked are the calm muted chip. */
-function statusChip(status: string): { label: string; tone: ChipTone } {
-  switch (status) {
-    case "pending":
-      return { label: "Pending", tone: "primary" }
-    case "accepted":
-      return { label: "Accepted", tone: "success" }
-    case "expired":
-      return { label: "Expired", tone: "muted" }
-    case "revoked":
-      return { label: "Revoked", tone: "muted" }
-    default:
-      return { label: status, tone: "muted" }
-  }
-}
-
-const CHIP_TONE_CLASS: Record<ChipTone, string> = {
-  primary: "border-primary/30 bg-primary/10 text-primary",
-  success: "border-success/30 bg-success/10 text-success",
-  muted: "border-border bg-muted/40 text-muted-foreground",
 }
 
 /** The joined/expiry sub-line date — absolute, never fabricated. */
@@ -224,8 +191,7 @@ function InvitationRow({
 }: InvitationRowProps) {
   const email = inv.email ?? "unknown invitee"
   const initial = (inv.email ?? "?").trim().charAt(0).toUpperCase() || "?"
-  const role = roleLabel(inv.role)
-  const status = statusChip(inv.status)
+  const status = statusChipMeta(inv.status)
   const isPending = inv.status === "pending"
 
   return (
@@ -233,12 +199,7 @@ function InvitationRow({
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         {/* Identity: avatar + email + status sub-line. */}
         <div className="flex min-w-0 flex-[2] items-center gap-3">
-          <div
-            aria-hidden="true"
-            className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary/60 text-sm font-semibold text-white"
-          >
-            {initial}
-          </div>
+          <OrgAvatar initial={initial} />
           <div className="min-w-0">
             <div className="truncate text-sm font-medium text-foreground" title={email}>
               {email}
@@ -251,31 +212,16 @@ function InvitationRow({
           </div>
         </div>
 
-        {/* Role chip (166 vocabulary). */}
+        {/* Role chip — the shared RoleBadge (D-04). */}
         <div className="flex-none">
-          {role.admin ? (
-            <span className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
-              <span aria-hidden="true">◆</span>
-              {role.label}
-            </span>
-          ) : (
-            <span className="inline-flex items-center rounded-full border border-border bg-muted/40 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-              {role.label}
-            </span>
-          )}
+          <RoleBadge role={inv.role} />
         </div>
 
-        {/* Status chip. */}
+        {/* Status chip — the shared StatusChip (D-08). */}
         <div className="flex-none">
-          <span
-            className={cn(
-              "inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium",
-              CHIP_TONE_CLASS[status.tone],
-            )}
-            data-testid="invitation-status"
-          >
+          <StatusChip tone={status.tone} testId="invitation-status">
             {status.label}
-          </span>
+          </StatusChip>
         </div>
 
         {/* Resend / revoke — only for PENDING invites, only for an inviter (honest-absent). */}
