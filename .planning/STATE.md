@@ -22,7 +22,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-20 — Phase 163 THE ATOMIC CRUX complete; membership RLS enforced)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 178 — chat ui/ux polish pass (seed 045 umbrella) — stretch
+**Current focus:** Planning next milestone — **v3.6 Visual / No-Code Workflow Studio** (SEED-123, research-first). v3.5 STRETCH 178-180 deferred → `.planning/v3.5-STRETCH-CARRYFORWARD.md`.
 
 ## Deferred Items
 
