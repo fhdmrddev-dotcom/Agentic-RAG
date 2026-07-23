@@ -29,9 +29,9 @@ import type { ReactNode } from "react"
 import type { User } from "@supabase/supabase-js"
 import { Button } from "@/components/ui/button"
 import { AuthCardShell } from "@/components/auth/AuthCardShell"
+import { HonestNotice } from "@/components/auth/HonestNotice"
 import { SignInForm } from "@/components/auth/SignInForm"
 import { SignUpForm } from "@/components/auth/SignUpForm"
-import { CheckCircle2, AlertTriangle, Loader2 } from "lucide-react"
 import { acceptInvitation, ApiError, ACTIVE_ORG_STORAGE_KEY } from "@/lib/api"
 
 interface Props {
@@ -146,43 +146,35 @@ export function AcceptInvitePage({ user, onSignIn, onSignUp }: Props) {
       break
     case "accepting":
       subhead = "Joining the organization…"
-      body = (
-        <div className="flex items-center justify-center gap-2 py-6 text-sm text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-          <span>Accepting your invitation…</span>
-        </div>
-      )
+      // In-progress → the indigo spinner (HonestNotice progress). Copy verbatim.
+      body = <HonestNotice severity="progress">Accepting your invitation…</HonestNotice>
       break
     case "joined":
       subhead = "You're in!"
+      // Positive terminal → the green check (HonestNotice success). Copy verbatim.
       body = (
-        <div className="space-y-3 py-4 text-center">
-          <CheckCircle2 className="mx-auto h-8 w-8 text-primary" aria-hidden="true" />
-          <p className="text-sm text-muted-foreground">
-            You've joined the organization. Taking you to the app…
-          </p>
-        </div>
+        <HonestNotice severity="success">
+          You've joined the organization. Taking you to the app…
+        </HonestNotice>
       )
       break
     case "already":
       subhead = "You're already a member"
       body = (
-        <div className="space-y-3 py-4 text-center">
-          <CheckCircle2 className="mx-auto h-8 w-8 text-primary" aria-hidden="true" />
-          <p className="text-sm text-muted-foreground">
-            You already belong to this organization. Taking you to the app…
-          </p>
-        </div>
+        <HonestNotice severity="success">
+          You already belong to this organization. Taking you to the app…
+        </HonestNotice>
       )
       break
     case "missing":
       subhead = "This invite link looks incomplete"
+      // D-12: a recoverable dead-end ("ask for a fresh link") — CALM (Info, muted), never the
+      // alarming red warning glyph. Copy verbatim; the Go-to-app affordance stays.
       body = (
-        <div className="space-y-4 py-4 text-center">
-          <AlertTriangle className="mx-auto h-8 w-8 text-muted-foreground" aria-hidden="true" />
-          <p className="text-sm text-muted-foreground">
+        <div className="space-y-4">
+          <HonestNotice severity="calm">
             This invite link is missing its token. Please ask whoever invited you for a fresh link.
-          </p>
+          </HonestNotice>
           <Button variant="outline" className="w-full" onClick={goToApp}>
             Go to the app
           </Button>
@@ -191,10 +183,11 @@ export function AcceptInvitePage({ user, onSignIn, onSignUp }: Props) {
       break
     case "error":
       subhead = "We couldn't accept this invite"
+      // D-12: the 404 (invalid) / 409 (expired-or-revoked) / generic messages are ALL recoverable
+      // "ask for a fresh link" dead-ends — CALM, not red. The honest copy (:116-124) is unchanged.
       body = (
-        <div className="space-y-4 py-4 text-center">
-          <AlertTriangle className="mx-auto h-8 w-8 text-muted-foreground" aria-hidden="true" />
-          <p className="text-sm text-muted-foreground">{state.message}</p>
+        <div className="space-y-4">
+          <HonestNotice severity="calm">{state.message}</HonestNotice>
           <Button variant="outline" className="w-full" onClick={goToApp}>
             Go to the app
           </Button>
