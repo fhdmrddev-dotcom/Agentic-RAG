@@ -11,7 +11,7 @@
 // Reused from the operator roster: the header + client-side search-over-the-loaded-
 // page (never an unbounded fetch), the `members == null` loading placeholder + empty
 // state, and the avatar + email + joined identity block. The role chip maps the
-// mig-104 4-tier role to the D-166-05 `◆ Org-admin` / `Member` copy, in org-indigo.
+// mig-104 4-tier role to the D-166-05 Org-admin / Member copy, in org-indigo (via RoleBadge).
 //
 // PURE PRESENTATIONAL LEAF: props in, DOM out. The shell (Plan 04) owns the fetch +
 // the search state; this leaf renders the roster and reports query changes.
@@ -20,6 +20,8 @@ import { useMemo } from "react"
 import { Search } from "lucide-react"
 
 import type { AdoptionState, OrgMember, PendingInvitation } from "@/lib/api"
+import { RoleBadge, OrgAvatar } from "./OrgIdentity"
+import { StatusChip } from "./StatusChip"
 
 interface OrgMembersTabProps {
   /** Every roster row the shell fetched; `null` while the fetch is in flight. */
@@ -44,17 +46,16 @@ function formatJoined(iso: string | null): string {
   })
 }
 
-/** Map the mig-104 4-tier role to a display chip (D-166-05). Managers read as the
- *  indigo `◆ Org-admin` badge; members read as the muted `Member` badge. */
-function roleBadge(role: string): { label: string; admin: boolean } {
-  if (role === "org-admin" || role === "super-admin") return { label: "Org-admin", admin: true }
-  if (role === "dept-admin") return { label: "Dept-admin", admin: true }
-  return { label: "Member", admin: false }
-}
-
-/** Map the server-derived adoption state to a chip (INV-01). `active` reads as a calm muted
- *  chip; `pending` reads as the org-indigo `primary` chip (needs attention — still to join).
- *  Reuses the 166 two-shape chip vocabulary; amber stays reserved for the operator zone. */
+/**
+ * Map the server-derived member-ADOPTION state to a chip tone (INV-01).
+ *
+ * DOMAIN EXEMPTION — DO NOT "fix" this to green. Member-adoption ("Active" / "Pending") is a
+ * DISTINCT domain from the invitation / SSO LIFECYCLE that `statusChipMeta` (StatusChip.tsx)
+ * maps. An active member is the calm resting state of a roster, so `active` deliberately reads
+ * `muted` (NOT `success`-green) — otherwise a healthy org becomes a wall of green success chips.
+ * `pending` reads org-indigo `primary` (needs attention — still to join). We render this tone
+ * THROUGH the shared <StatusChip> COMPONENT (the D-08 cohesion win), but the tone MAPPING stays
+ * adoption-domain-specific and intentionally does NOT reuse the lifecycle `statusChipMeta`. */
 function adoptionChip(state: AdoptionState): { label: string; tone: "muted" | "primary" } {
   return state === "pending"
     ? { label: "Pending", tone: "primary" }
@@ -144,38 +145,25 @@ export function OrgMembersTab({
   )
 }
 
-/** The role + adoption chips shared by member + pending rows (166 two-shape vocabulary). */
+/** The role + adoption chips shared by member + pending rows. Both render through the shared
+ *  177-01 primitives: the role badge via <RoleBadge>, the adoption chip via the <StatusChip>
+ *  COMPONENT fed the adoption-domain tone (see adoptionChip). Pure spans — no interactive
+ *  element, so the roster stays a pure read leaf (zero <button>). */
 function RowChips({ role, state }: { role: string; state: AdoptionState }) {
-  const badge = roleBadge(role)
   const adoption = adoptionChip(state)
   return (
     <>
-      {/* Role chip (D-166-05) — org-indigo; managers show the ◆ badge. */}
+      {/* Role slot (D-04 / D-166-05) — the shared org-indigo Org-admin / Member badge. */}
       <div className="flex-none">
-        {badge.admin ? (
-          <span className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
-            <span aria-hidden="true">◆</span>
-            {badge.label}
-          </span>
-        ) : (
-          <span className="inline-flex items-center rounded-full border border-border bg-muted/40 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-            {badge.label}
-          </span>
-        )}
+        <RoleBadge role={role} />
       </div>
 
-      {/* Adoption chip (INV-01) — Active (muted) vs Pending (indigo primary). */}
+      {/* Adoption slot (D-08 / INV-01) — the SHARED StatusChip component fed the adoption-domain
+          tone (active→muted, NOT success-green; see adoptionChip's domain-exemption note). */}
       <div className="flex-none">
-        <span
-          data-testid="adoption-chip"
-          className={
-            adoption.tone === "primary"
-              ? "inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary"
-              : "inline-flex items-center rounded-full border border-border bg-muted/40 px-2 py-0.5 text-[11px] font-medium text-muted-foreground"
-          }
-        >
+        <StatusChip tone={adoption.tone} testId="adoption-chip">
           {adoption.label}
-        </span>
+        </StatusChip>
       </div>
     </>
   )
@@ -190,12 +178,7 @@ function MemberRow({ member }: { member: OrgMember }) {
     <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3.5 py-3">
       {/* Identity: avatar + email + joined sub-line. */}
       <div className="flex min-w-0 flex-[2] items-center gap-3">
-        <div
-          aria-hidden="true"
-          className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary/60 text-sm font-semibold text-white"
-        >
-          {initial}
-        </div>
+        <OrgAvatar initial={initial} />
         <div className="min-w-0">
           <div className="truncate text-sm font-medium text-foreground" title={email}>
             {email}
@@ -221,12 +204,7 @@ function PendingRow({ invite }: { invite: PendingInvitation }) {
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3.5 py-3">
       <div className="flex min-w-0 flex-[2] items-center gap-3">
-        <div
-          aria-hidden="true"
-          className="flex h-9 w-9 flex-none items-center justify-center rounded-full border border-dashed border-primary/40 bg-primary/[0.06] text-sm font-semibold text-primary"
-        >
-          {initial}
-        </div>
+        <OrgAvatar initial={initial} pending />
         <div className="min-w-0">
           <div className="truncate text-sm font-medium text-foreground" title={email}>
             {email}
