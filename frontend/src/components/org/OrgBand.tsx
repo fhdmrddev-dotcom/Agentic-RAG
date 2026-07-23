@@ -6,8 +6,8 @@
 // misread the user's OWN org home as a privileged danger zone). This band is the
 // app's normal primary accent (hue-239 indigo), matching the 079-C rail shield.
 //
-// Carries (080-A): the org name + an `ORG ADMIN` chip + the `◆ Org-admin` / `Member`
-// role badge (D-166-05) + the 062-A "every action recorded" marker (KEPT verbatim —
+// Carries (080-A): the org name + an `ORG ADMIN` chip + the shared RoleBadge
+// (Org-admin / Member — D-04 / D-166-05) + the 062-A "every action recorded" marker (KEPT verbatim —
 // 080-A rejects variant C precisely because it drops this honesty beat) + a
 // plain-first ⌥ Technical-names toggle (146 LANG-01).
 //
@@ -22,12 +22,14 @@ import { ChevronLeft, Shield } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { TechnicalNamesToggle } from "@/components/admin/TechnicalNamesToggle"
+import { RoleBadge } from "@/components/org/OrgIdentity"
 
 interface OrgBandProps {
   /** The active org's display name — headlines the band. */
   orgName: string
-  /** The caller's org role (mig-104 4-tier). `org-admin`/`super-admin` → the indigo
-   *  `◆ Org-admin` badge; anything else → the muted `Member` badge (D-166-05). */
+  /** The caller's org role (mig-104 4-tier). Passed straight to the shared RoleBadge,
+   *  which maps it via roleBadgeMeta (org-admin/super-admin/dept-admin → indigo admin
+   *  pill; anything else → the muted Member pill — D-04 / D-166-05). */
   role: string
   /** Return to the ordinary app surface. */
   onBack: () => void
@@ -43,11 +45,6 @@ interface OrgBandProps {
   onToggleTechnical: () => void
 }
 
-/** True for the roles that hold `org:manage` — they get the `◆ Org-admin` badge. */
-function isOrgAdminRole(role: string): boolean {
-  return role === "org-admin" || role === "super-admin"
-}
-
 /** The 080-A org-indigo band — org identity + role badge + recording marker + ⌥. */
 export function OrgBand({
   orgName,
@@ -57,8 +54,6 @@ export function OrgBand({
   showTechnical,
   onToggleTechnical,
 }: OrgBandProps) {
-  const admin = isOrgAdminRole(role)
-
   return (
     <header className="border-b border-primary/25 bg-gradient-to-b from-primary/[0.07] to-transparent px-6 py-3.5">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
@@ -74,17 +69,10 @@ export function OrgBand({
           ORG ADMIN
         </span>
 
-        {/* Role badge (D-166-05): ◆ Org-admin (indigo) for managers; Member (muted) otherwise. */}
-        {admin ? (
-          <span className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
-            <span aria-hidden="true">◆</span>
-            Org-admin
-          </span>
-        ) : (
-          <span className="inline-flex items-center rounded-full border border-border bg-muted/40 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-            Member
-          </span>
-        )}
+        {/* Role badge (D-04 / D-166-05): the ONE shared RoleBadge — the indigo admin pill
+            for managers; the muted Member pill otherwise. The inline copy is retired; the
+            glyph + tokens now live solely inside RoleBadge (roleBadgeMeta also reconciles Dept-admin). */}
+        <RoleBadge role={role} />
 
         <span className="flex-1" />
 

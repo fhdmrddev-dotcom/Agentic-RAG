@@ -6,7 +6,7 @@
 // collapsed/expanded dual-render so it works icon-only at the 58px rail) opens a
 // menu holding, top to bottom:
 //   • identity — name/email from useAuth (App already holds the user; do NOT re-fetch)
-//   • the ◆ Org-admin / Member role badge (indigo admin / muted member — D-166-05)
+//   • the shared RoleBadge — Org-admin / Member (indigo admin / muted member — D-04 / D-166-05)
 //   • the org-switcher section — renders ONLY at 2+ orgs (D-166-02); a solo user sees
 //     just the identity, no switcher chrome
 //   • the theme toggle (079-C relocates theme OUT of its standalone rail RailItem into
@@ -41,6 +41,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useAuth } from "@/hooks/useAuth"
 import { useOrgOptional } from "@/providers/OrgProvider"
+import { RoleBadge } from "@/components/org/OrgIdentity"
 
 interface ProfileMenuProps {
   /** The current theme — the menu's theme item flips its icon/label off this. */
@@ -51,12 +52,6 @@ interface ProfileMenuProps {
   onSignOut: () => void
   /** True when the rail is the 58px icon spine — the anchor renders icon-only. */
   collapsed: boolean
-}
-
-/** True for the roles that hold `org:manage` — they get the ◆ Org-admin badge
- *  (mirrors OrgBand.isOrgAdminRole so the badge copy never disagrees). */
-function isOrgAdminRole(role: string): boolean {
-  return role === "org-admin" || role === "super-admin"
 }
 
 /** The 079-C merged rail-footer identity anchor + popover. */
@@ -72,8 +67,8 @@ export function ProfileMenu({ theme, onToggleTheme, onSignOut, collapsed }: Prof
 
   const orgs = org?.orgs ?? []
   const activeOrgId = org?.activeOrgId ?? null
+  // The active org's role (D-05) — the per-org value the activeOrgId-keyed probe re-derives.
   const role = org?.role ?? "member"
-  const admin = isOrgAdminRole(role)
   // D-166-02: the switcher is chrome ONLY at 2+ orgs; a solo user (100% today) sees
   // just the identity anchor — a quiet name button, no switcher.
   const showSwitcher = orgs.length >= 2
@@ -130,16 +125,9 @@ export function ProfileMenu({ theme, onToggleTheme, onSignOut, collapsed }: Prof
             </div>
           )}
           <div className="mt-1.5">
-            {admin ? (
-              <span className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
-                <span aria-hidden="true">◆</span>
-                Org-admin
-              </span>
-            ) : (
-              <span className="inline-flex items-center rounded-full border border-border bg-muted/40 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                Member
-              </span>
-            )}
+            {/* Role badge (D-04 / D-166-05): the ONE shared RoleBadge — the same element the
+                shell band shows, reading the active org's role (D-05). No inline copy. */}
+            <RoleBadge role={role} />
           </div>
         </div>
 
