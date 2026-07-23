@@ -15,6 +15,8 @@
  *   3. with exactly 1 org NO switcher chrome renders (solo = a quiet name button).
  *   4. the popover contains a theme toggle + Sign out (sign-out lives INSIDE the menu).
  *   5. the anchor renders icon-only when collapsed (dual-render) and opens on click.
+ *   6. (Phase 177 / D-04 / D-05) the badge is the ONE shared RoleBadge and follows the
+ *      ACTIVE org's role — muted Member here, ◆ Org-admin there.
  *
  * useAuth + useOrgOptional are mocked (the menu is a presentational leaf over context).
  */
@@ -182,5 +184,58 @@ describe("ProfileMenu — collapsed-rail dual-render (sketch 079-C)", () => {
     // Opening reveals the full identity header inside the popover.
     expect(await screen.findByText("Alice Doe")).toBeInTheDocument()
     expect(screen.getAllByText("alice@example.com").length).toBeGreaterThan(0)
+  })
+})
+
+describe("ProfileMenu — per-org role display via the shared RoleBadge (Phase 177 / D-04 / D-05)", () => {
+  // D-05: the badge reflects the ACTIVE org's role. OrgProvider re-derives `role` per active
+  // org (the activeOrgId-keyed, fail-closed permissions probe), so an org switch re-drives the
+  // provider value the menu reads (`org?.role`). The menu itself adds NO switching behavior —
+  // here we assert the DISPLAY tracks that per-org role: Member when active at Globex,
+  // Org-admin when active at Acme, rendered through the ONE shared RoleBadge.
+  it("follows the active org's role — muted Member (member active org), then ◆ Org-admin (org-admin active org)", async () => {
+    const orgs = [
+      { org_id: "o1", name: "Acme", role: "org-admin" },
+      { org_id: "o2", name: "Globex", role: "member" },
+    ]
+
+    // Active org = Globex (role member) → the shared badge shows the muted Member pill.
+    vi.mocked(useOrgOptional).mockReturnValue(
+      orgValue({ activeOrgId: "o2", role: "member", orgs }),
+    )
+    const { user } = setup()
+    await user.click(screen.getByRole("button", { name: /account menu/i }))
+    const memberBadge = await screen.findByTestId("role-badge")
+    expect(memberBadge).toHaveAttribute("data-admin", "false")
+    expect(memberBadge).toHaveTextContent("Member")
+    expect(memberBadge).not.toHaveTextContent("Org-admin")
+
+    // Switch the active org = Acme (role org-admin) → the SAME shared badge now shows ◆ Org-admin
+    // (the display follows the provider's per-org role — no new switching logic in the menu).
+    cleanup()
+    vi.mocked(useOrgOptional).mockReturnValue(
+      orgValue({ activeOrgId: "o1", role: "org-admin", orgs }),
+    )
+    const { user: user2 } = setup()
+    await user2.click(screen.getByRole("button", { name: /account menu/i }))
+    const adminBadge = await screen.findByTestId("role-badge")
+    expect(adminBadge).toHaveAttribute("data-admin", "true")
+    expect(adminBadge).toHaveTextContent("Org-admin")
+  })
+
+  // D-04: the role is rendered by the ONE shared RoleBadge component (its data-testid) — the
+  // same element the OrgBand shell band renders — not a per-surface inline look-alike.
+  it("renders the role via the shared RoleBadge component (data-testid) inside the popover header", async () => {
+    vi.mocked(useOrgOptional).mockReturnValue(
+      orgValue({ role: "org-admin", orgs: [{ org_id: "o1", name: "Acme", role: "org-admin" }] }),
+    )
+    const { user } = setup()
+    await user.click(screen.getByRole("button", { name: /account menu/i }))
+
+    // Scope to the opened popover; the shared primitive renders exactly one role-badge there.
+    const menu = await screen.findByRole("menu")
+    const badge = within(menu).getByTestId("role-badge")
+    expect(badge).toBeInTheDocument()
+    expect(badge).toHaveTextContent("Org-admin")
   })
 })
