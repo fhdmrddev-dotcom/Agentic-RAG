@@ -2,16 +2,15 @@
 gsd_state_version: 1.0
 milestone: v3.5
 milestone_name: UX Consolidation & Chat Polish
-status: ready_to_plan
-last_updated: 2026-07-23T14:09:08.941Z
-last_activity: 2026-07-23 -- Phase 177 executed (5/5); verification human_needed (live visual UAT)
+status: Awaiting next milestone
+last_updated: "2026-07-23T14:19:16.763Z"
+last_activity: 2026-07-23 — Milestone v3.5 completed and archived
 progress:
   total_phases: 20
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 17
   completed_plans: 17
-  percent: 15
-stopped_at: Phase 177 complete (5/5) — ready to discuss Phase 178
+  percent: 20
 ---
 
 # Project State
@@ -45,14 +44,10 @@ Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 op
 
 ## Current Position
 
-Phase: 178
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-07-23
-
-**Phase 177 — v3.4 Org-Surface Polish (ORGUX-01/02) — COMPLETE (2026-07-23; autonomous build + operator-approved live UAT).** UI polish / family-cohesion over the shipped 166/167/168 surfaces (sketches 131-C/132-B/133-B the contract). 5 plans / 2 waves / 20 code commits. **Wave 0 extracted 3 shared primitives** — `StatusChip` (D-08, one org-zone tone vocab: primary/success/muted) · `OrgIdentity`/`RoleBadge`+`OrgAvatar` (D-04) · `HonestNotice` (D-11 severity→tone). **Wave 2 wired them across** OrgBand+ProfileMenu (D-04/05/06/07; ProfileMenu suite EXTENDED 7→9, not re-authored — plan-checker blocker fix), InvitationsTab+SsoTab (D-08/09: retired SsoTab's UPPERCASE off-grid fork + duplicated chip maps), OrgMembersTab+InviteMemberDialog (adoptionChip active→muted kept as a documented DOMAIN EXEMPTION, not a wall of green), AuthCardShell+HonestNotice (D-11/12/13/14: recoverable invite dead-ends recolored CALM; SignInForm fail-open preserved + legible — never a lockout). Verify **16/16 code must-haves** (verifier re-ran tests: 86 green; post-merge org+auth+layout 149 green; 0 net-new vs baseline `6d145860`, SEED-056). **RED LINES held** (git-verified): `StreamsProvider.tsx` + `frontend/package.json` UNTOUCHED; no authz gate/server-contract/migration change; Deep byte-identical (D-02/G-5 light). Plan-checker caught+fixed 1 blocker (existing ProfileMenu.test coverage-loss risk) + 1 warning (tone-map overclaim) before execution. **Live UAT (Chrome-driven, operator-approved 2026-07-23):** items 1–3 PASS — family-cohesion sweep of OrgBand/Members/Invitations/SSO/profile-menu on the org-admin×solo cell (one shared RoleBadge + one StatusChip vocab [Pending=indigo · Accepted=green · Active-member/Revoked=muted, the adoptionChip exemption], zero amber in the org zone, honest-absent switcher for solo); `/invite` missing-token calm `role="status"`; identifier-first + password-reveal. **Item 4 DEFERRED → CLOUD** (cross-provider org-switch teardown/reprobe + real-IdP SAML round-trip + the member & multi-org matrix cells — needs cloud + a test org + a real IdP; captured below + in `177-HUMAN-UAT.md` re_open_trigger + memory). Reported-bugs cross-check: zero fold. **Next: `/gsd:discuss-phase 178` (STRETCH — gated behind CORE + budget).**
-
-**Plan 176-04 complete (RENDER-03, 2026-07-23):** No-silent-send-drop. `sendMessage`'s duplicate-guard non-dispatch early-return no longer returns silently — it stashes the dropped draft (`failedSendDrafts`) + a quiet `reconcileErrors` hint carried as `ApiError(400, "Couldn't send — tap to retry")` through the EXISTING 099-08 recovery seam (D-11, no new channel), so ChatArea's prefill restores the composer text + the banner surfaces the honest hint (the durable D-10.2 honesty guarantee). Plus a fresh-thread ordering tighten: a sibling `pendingSendThreadsRef` + `markThreadPendingSend` action, pre-marked by ChatArea BEFORE `setViewingThread`, is honored by the preserve-guard's `sendInFlightOnThisThread` WITHOUT tripping the duplicate-guard (`:1807` still checks only `sendingThreadsRef` → the real send still dispatches; D-10.1). 176-01's RENDER-01 `supersededByPersisted` drop preserved; Deep byte-identical (D-14); no backend/migration. 2 TDD tasks / 4 commits (`b9be05a2`/`78c74f9b`/`f5352d0a`/`b491ad1b`). Vitest differential clean (25 pre-existing-rot failures identical at baseline `6f0bf297` — 0 net-new; SEED-056). Deviation: hint carried as ApiError(400) not a plain Error (the banner renders a custom message ONLY for ApiError; a plain Error would show the misleading "Couldn't load latest messages" copy). Live UAT rolls forward to 176-VALIDATION Manual-Only.
+Phase: Milestone v3.5 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-07-23 — Milestone v3.5 completed and archived
 
 ### Quick Tasks Completed
 

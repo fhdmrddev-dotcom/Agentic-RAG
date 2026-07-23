@@ -1,5 +1,26 @@
 # Milestones
 
+## v3.5 UX Consolidation & Chat Polish (Shipped: 2026-07-23)
+
+**Phases completed:** 4 phases, 17 plans, 37 tasks
+
+**Key accomplishments:**
+
+- Hardened the shipped DeepSeek DSML sanitizer with a deepseek-gated stream-end flush (no trailing content-loss) and turned a detected tool-markup leak into one honest `error` SSE event via an Option-B post-drain hook — additive, default-inert, D-14 byte-identical for every non-deepseek/clean-deepseek path.
+- A one-line `reasoning_first` STRUCTURED gate in `resolve_calling_mode` (above the native-tools read, so the hard OpenAI API constraint wins over an operator `native_tools=True`) routes gpt-5.6-class models with tools via XML injection — no `tools`/`reasoning_effort` param → no 400, reasoning stays on — plus a dedicated `reasoning_tools_unsupported` ErrorKind with fixed, actionable, non-interpolated copy for the specific gpt-5.6 reasoning-tools 400 (XPROV-01 / D-01 + D-04).
+- The shared provider-safe guard is now applied at both explicit utility-model sites (thread_title + suggestion) so a stale cross-provider `sub_agent_model` is dropped before the call — killing the false fallback banner at its root (XPROV-03/D-03/D-04) — and the title call injects a per-MODEL reasoning-off param driven generically off the Plan-01 `reasoning_off` marker so every docs-confirmed-SAFE reasoning provider produces a real 4-6 word title instead of the degenerate first-few-words fallback (XPROV-04/D-05), all additive with the tiny budget + inline-await ordering byte-identical.
+- Two additive StreamsProvider reconcile fixes: a content-supersede drop so a single send renders exactly one user bubble (RENDER-01), and a mount-path onTerminal content-reconcile keyed on run.run_id so a backgrounded parallel-thread run un-folds its final answer live with no reload (RENDER-02).
+- After approving a description proposal, the Skill Studio header `vN` and the Versions-tab LIVE badge now update with no reload — via a `refreshVersions` refetch (mirror of `refreshGate`) threaded as `onVersionPromoted`, plus a `refreshNonce` that re-runs VersionsTab's own fetch.
+- Declared `libraries` now install via `python -m pip` into the same interpreter that runs the code (retry x1, never swallowed), and an undeclared `ModuleNotFoundError` triggers a bounded, run-scoped auto-heal (install + one threadpool-wrapped re-run) with an honest `install_failed` result on persistent failure — entirely in `tool_dispatcher.py`, provider-uniform, Deep byte-identical.
+- A submitted general-chat message now always sends or surfaces an honest, recoverable failure: the sendMessage duplicate-guard's non-dispatch early-return stashes the dropped draft + a quiet retry hint through the existing recovery seam, and a sibling pending-send ref tightens fresh-thread ordering without dropping the real send.
+- Extracted the three shared org-zone primitives — one StatusChip COMPONENT (D-08), one RoleBadge/OrgAvatar identity element (D-04), and one severity-keyed HonestNotice (D-11) — as byte-identical-token extractions with co-located vitest, ZERO consumer wiring (Wave 2 wires them).
+- Rewired OrgBand + ProfileMenu to render the ONE shared `RoleBadge` (177-01) instead of two inline `◆ Org-admin / Member` copies (D-04), and audited-and-locked the honest-state matrix — per-org role (D-05), honest-absent affordances (D-06), and indigo/amber zone separation (D-07) — with the existing Phase-166 ProfileMenu suite EXTENDED (7→9 it()), never re-authored.
+- Rewired InvitationsTab + SsoTab onto the ONE shared `StatusChip` (177-01), retired each file's local `CHIP_TONE_CLASS` map AND SsoTab's documented UPPERCASE off-grid status fork (snapping the connection row to the `px-3.5 py-3` sibling grid), while keeping link-first resend, the victim-naming SSO remove confirm, and every honest-absent gate byte-identical (D-08/D-09/D-10).
+- Folded `OrgMembersTab` (roster) and `InviteMemberDialog` into the shared 177-01 org family — the roster now renders its role slot via `RoleBadge`, its adoption chip via the shared `StatusChip` COMPONENT (fed the roster's own `active→muted` adoption tone, kept as a documented domain exemption so it is not recolored to green), and both avatars via `OrgAvatar`; the invite dialog snaps to the shared 4px grid + org-zone micro-label style — all honest behaviors (pure-read-leaf, link-first) byte-identical.
+- Made "coming into an org" read as ONE calm, error-honest product surface: extracted the duplicated brand-card into a shared `AuthCardShell` (D-14), routed the `/invite` landing's six states + the sign-in error line through the shared `HonestNotice` (D-11), recolored every recoverable invite dead-end to CALM instead of alarming red (D-12), and made the sign-in fail-open a legible reassurance instead of a silent degrade (D-13) — all auth/route/accept logic byte-frozen.
+
+---
+
 ## v3.4 Multi-Tenancy & Org Access (Shipped: 2026-07-22)
 
 **Phases completed:** 10 phases, 56 plans, 121 tasks
