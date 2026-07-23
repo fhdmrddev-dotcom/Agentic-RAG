@@ -47,8 +47,8 @@ The parked chat-surface bug backlog + v3.4 org-surface polish. Each maps to exac
 
 ### ORGUX — v3.4 org-surface polish
 
-- [ ] **ORGUX-01**: The org-admin shell, org switcher, and profile-menu identity anchor are polished and honest across states (member vs org-admin, 1-org vs multi-org)
-- [ ] **ORGUX-02**: The invitations and SSO surfaces (invite dialog, invitations tab, `/invite` landing, SSO tab, identifier-first sign-in) are polished and error-honest
+- [x] **ORGUX-01**: The org-admin shell, org switcher, and profile-menu identity anchor are polished and honest across states (member vs org-admin, 1-org vs multi-org)
+- [x] **ORGUX-02**: The invitations and SSO surfaces (invite dialog, invitations tab, `/invite` landing, SSO tab, identifier-first sign-in) are polished and error-honest
 
 *Source: new v3.4 surfaces shipped in phases 166–168 (no bug reports yet — proactive polish while fresh). Cross-provider/live-UAT status-lag on 166/167/168 rolls in here.*
 
@@ -118,8 +118,8 @@ Which phases cover which requirements. Populated during roadmap creation (`/gsd:
 | RENDER-03 | Phase 176 | Complete |
 | RENDER-04 | Phase 176 | Complete |
 | EXEC-01 | Phase 176 | Complete |
-| ORGUX-01 | Phase 177 | Pending |
-| ORGUX-02 | Phase 177 | Pending |
+| ORGUX-01 | Phase 177 | Complete |
+| ORGUX-02 | Phase 177 | Complete |
 | POLISH-01 | Phase 178 | Pending (STRETCH) |
 | POLISH-02 | Phase 178 | Pending (STRETCH) |
 | POLISH-03 | Phase 178 | Pending (STRETCH) |

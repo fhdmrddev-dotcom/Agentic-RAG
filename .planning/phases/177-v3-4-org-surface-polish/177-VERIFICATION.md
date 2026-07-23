@@ -1,7 +1,7 @@
 ---
 phase: 177-v3-4-org-surface-polish
 verified: 2026-07-23T09:15:00Z
-status: human_needed
+status: passed
 score: 16/16 code-level must-haves verified
 overrides_applied: 0
 human_verification:
@@ -23,8 +23,8 @@ human_verification:
 
 **Phase Goal:** The new v3.4 org surfaces (admin shell, switcher, profile anchor, invitations, SSO sign-in) are polished + error-honest across every state — WITHOUT widening the already-secured 166–168 authz.
 **Verified:** 2026-07-23
-**Status:** human_needed
-**Re-verification:** No — initial verification
+**Status:** passed
+**Re-verification:** Yes — human UAT closed 2026-07-23 (operator-approved live Chrome-driven sweep; see 177-HUMAN-UAT.md). Items 1–3 PASS (observed live); item 4 (cross-provider org-switch + SAML + the member/multi-org matrix cells) is an operator-approved deferral to cloud testing — a blocked prerequisite gate, NOT a code gap, captured with a concrete re_open_trigger so it is not lost.
 
 ## Goal Achievement
 

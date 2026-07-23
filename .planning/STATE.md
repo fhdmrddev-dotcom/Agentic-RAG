@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v3.5
 milestone_name: UX Consolidation & Chat Polish
-status: executing
-last_updated: "2026-07-23T04:18:20.583Z"
+status: ready_to_plan
+last_updated: 2026-07-23T14:09:08.941Z
 last_activity: 2026-07-23 -- Phase 177 executed (5/5); verification human_needed (live visual UAT)
 progress:
   total_phases: 20
@@ -11,6 +11,7 @@ progress:
   total_plans: 17
   completed_plans: 17
   percent: 15
+stopped_at: Phase 177 complete (5/5) — ready to discuss Phase 178
 ---
 
 # Project State
@@ -22,7 +23,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-20 — Phase 163 THE ATOMIC CRUX complete; membership RLS enforced)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 177 — v3-4-org-surface-polish
+**Current focus:** Phase 178 — chat ui/ux polish pass (seed 045 umbrella) — stretch
 
 ## Deferred Items
 
@@ -38,16 +39,18 @@ Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 op
 
 **v3.4 STRETCH carry-forwards (deferred with triggers → `.planning/v3.4-STRETCH-CARRYFORWARD.md`):** 169 Dept-Admin Shell · 170 Entitlement + Retention/Rate-Limit footholds · 171 Permission-Aware Citations (correct-sequencing: leak latent till dept/role folder-sharing ships) · 172 OIDC SSO (customer-triggered) · 173 Dept-Targeted Skills + rollout gating. **Cloud parity owed:** migrations 104-113 + `SECRETS_ENCRYPTION_KEY` at next production push.
 
+**⚑ Phase 177 org live-UAT → CLOUD (operator-approved deferral 2026-07-23 — MUST NOT LOSE):** 3 of 4 UAT items verified live + approved; **item 4 outstanding** = (a) cross-provider org-switch teardown/reprobe, (b) a real-IdP **SAML** sign-in round-trip with no cross-org leak, (c) the two org-matrix cells un-testable on a single-org-admin local account — **multi-org** switcher present + teardown, and the **member** cell where the org-admin shield + "Organization admin" menu entry must VANISH (not disable). **Re-open trigger:** at the next cloud/prod push of the v3.4 org surfaces, stand up a **test organization** (invite a 2nd account → yields multi-org + a member) and wire a **real IdP SAML** connection, then run all of (a)–(c). Naturally pairs with the "Cloud parity owed" push above and the 166/167/168 SSO live-UAT that already rolls forward. Tracked in `.planning/phases/177-v3-4-org-surface-polish/177-HUMAN-UAT.md` (blocked test + re_open_trigger) and memory `reference_v34_org_live_uat_cloud`.
+
 **Open reported bugs rolling forward** to a planned post-v3.3 chat-polish phase (none were folded into 146–159): BUG-260708-01/-02 (major), BUG-260714-01 (major), BUG-260712-02, BUG-260718-02/-03/-04, BUG-260609-02/-04, BUG-260610-01, BUG-260623-01, BUG-260706-01, BUG-260707-03; deferred BUG-260626-02/-03, BUG-260711-02; external BUG-260714-02 (OpenRouter). BUG-260718-01 CLOSED (folded into 159).
 
 ## Current Position
 
-Phase: 177 (v3-4-org-surface-polish) — EXECUTED (5/5 plans); verification human_needed
-Plan: 5 of 5 (all complete)
-Status: Phase 177 executed + code-verified (16/16 must-haves); awaiting live visual UAT (177-HUMAN-UAT.md)
-Last activity: 2026-07-23 -- Phase 177 executed; awaiting operator live UAT
+Phase: 178
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-07-23
 
-**Phase 177 — v3.4 Org-Surface Polish (ORGUX-01/02) — EXECUTED + code-verified, `human_needed` (2026-07-23, autonomous run).** UI polish / family-cohesion over the shipped 166/167/168 surfaces (sketches 131-C/132-B/133-B the contract). 5 plans / 2 waves / 20 code commits. **Wave 0 extracted 3 shared primitives** — `StatusChip` (D-08, one org-zone tone vocab: primary/success/muted) · `OrgIdentity`/`RoleBadge`+`OrgAvatar` (D-04) · `HonestNotice` (D-11 severity→tone). **Wave 2 wired them across** OrgBand+ProfileMenu (D-04/05/06/07; ProfileMenu suite EXTENDED 7→9, not re-authored — plan-checker blocker fix), InvitationsTab+SsoTab (D-08/09: retired SsoTab's UPPERCASE off-grid fork + duplicated chip maps), OrgMembersTab+InviteMemberDialog (adoptionChip active→muted kept as a documented DOMAIN EXEMPTION, not a wall of green), AuthCardShell+HonestNotice (D-11/12/13/14: recoverable invite dead-ends recolored CALM; SignInForm fail-open preserved + legible — never a lockout). Verify **16/16 code must-haves** (verifier re-ran tests: 86 green; post-merge org+auth+layout 149 green; 0 net-new vs baseline `6d145860`, SEED-056). **RED LINES held** (git-verified): `StreamsProvider.tsx` + `frontend/package.json` UNTOUCHED; no authz gate/server-contract/migration change; Deep byte-identical (D-02/G-5 light). Plan-checker caught+fixed 1 blocker (existing ProfileMenu.test coverage-loss risk) + 1 warning (tone-map overclaim) before execution. **`human_needed`:** 4 lived-visual/live-env UAT items in `177-HUMAN-UAT.md` (family-cohesion sweep · calm invite dead-ends · fail-open feel · 166/167/168 cross-provider+SAML live-UAT rolled forward per D-03). Reported-bugs cross-check: zero fold (all open Agentic-RAG reports are chat/agent-loop/panel). **Next: operator runs `/gsd:verify-work 177` (Chrome MCP or operator-driven) to close items 1–3 → then phase.complete.**
+**Phase 177 — v3.4 Org-Surface Polish (ORGUX-01/02) — COMPLETE (2026-07-23; autonomous build + operator-approved live UAT).** UI polish / family-cohesion over the shipped 166/167/168 surfaces (sketches 131-C/132-B/133-B the contract). 5 plans / 2 waves / 20 code commits. **Wave 0 extracted 3 shared primitives** — `StatusChip` (D-08, one org-zone tone vocab: primary/success/muted) · `OrgIdentity`/`RoleBadge`+`OrgAvatar` (D-04) · `HonestNotice` (D-11 severity→tone). **Wave 2 wired them across** OrgBand+ProfileMenu (D-04/05/06/07; ProfileMenu suite EXTENDED 7→9, not re-authored — plan-checker blocker fix), InvitationsTab+SsoTab (D-08/09: retired SsoTab's UPPERCASE off-grid fork + duplicated chip maps), OrgMembersTab+InviteMemberDialog (adoptionChip active→muted kept as a documented DOMAIN EXEMPTION, not a wall of green), AuthCardShell+HonestNotice (D-11/12/13/14: recoverable invite dead-ends recolored CALM; SignInForm fail-open preserved + legible — never a lockout). Verify **16/16 code must-haves** (verifier re-ran tests: 86 green; post-merge org+auth+layout 149 green; 0 net-new vs baseline `6d145860`, SEED-056). **RED LINES held** (git-verified): `StreamsProvider.tsx` + `frontend/package.json` UNTOUCHED; no authz gate/server-contract/migration change; Deep byte-identical (D-02/G-5 light). Plan-checker caught+fixed 1 blocker (existing ProfileMenu.test coverage-loss risk) + 1 warning (tone-map overclaim) before execution. **Live UAT (Chrome-driven, operator-approved 2026-07-23):** items 1–3 PASS — family-cohesion sweep of OrgBand/Members/Invitations/SSO/profile-menu on the org-admin×solo cell (one shared RoleBadge + one StatusChip vocab [Pending=indigo · Accepted=green · Active-member/Revoked=muted, the adoptionChip exemption], zero amber in the org zone, honest-absent switcher for solo); `/invite` missing-token calm `role="status"`; identifier-first + password-reveal. **Item 4 DEFERRED → CLOUD** (cross-provider org-switch teardown/reprobe + real-IdP SAML round-trip + the member & multi-org matrix cells — needs cloud + a test org + a real IdP; captured below + in `177-HUMAN-UAT.md` re_open_trigger + memory). Reported-bugs cross-check: zero fold. **Next: `/gsd:discuss-phase 178` (STRETCH — gated behind CORE + budget).**
 
 **Plan 176-04 complete (RENDER-03, 2026-07-23):** No-silent-send-drop. `sendMessage`'s duplicate-guard non-dispatch early-return no longer returns silently — it stashes the dropped draft (`failedSendDrafts`) + a quiet `reconcileErrors` hint carried as `ApiError(400, "Couldn't send — tap to retry")` through the EXISTING 099-08 recovery seam (D-11, no new channel), so ChatArea's prefill restores the composer text + the banner surfaces the honest hint (the durable D-10.2 honesty guarantee). Plus a fresh-thread ordering tighten: a sibling `pendingSendThreadsRef` + `markThreadPendingSend` action, pre-marked by ChatArea BEFORE `setViewingThread`, is honored by the preserve-guard's `sendInFlightOnThisThread` WITHOUT tripping the duplicate-guard (`:1807` still checks only `sendingThreadsRef` → the real send still dispatches; D-10.1). 176-01's RENDER-01 `supersededByPersisted` drop preserved; Deep byte-identical (D-14); no backend/migration. 2 TDD tasks / 4 commits (`b9be05a2`/`78c74f9b`/`f5352d0a`/`b491ad1b`). Vitest differential clean (25 pre-existing-rot failures identical at baseline `6f0bf297` — 0 net-new; SEED-056). Deviation: hint carried as ApiError(400) not a plain Error (the banner renders a custom message ONLY for ApiError; a plain Error would show the misleading "Couldn't load latest messages" copy). Live UAT rolls forward to 176-VALIDATION Manual-Only.
 
