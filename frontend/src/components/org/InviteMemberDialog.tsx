@@ -192,7 +192,7 @@ export function InviteMemberDialog({ open, onClose, onCreated }: Props) {
             <div>
               <label
                 htmlFor="invite-email"
-                className="mb-1.5 block text-[0.7rem] uppercase tracking-[0.06em] text-muted-foreground"
+                className="mb-2 block text-[11px] uppercase tracking-wide text-muted-foreground"
               >
                 Email address
               </label>
@@ -212,10 +212,10 @@ export function InviteMemberDialog({ open, onClose, onCreated }: Props) {
             </div>
 
             <div>
-              <p className="mb-1.5 text-[0.7rem] uppercase tracking-[0.06em] text-muted-foreground">
+              <p className="mb-2 text-[11px] uppercase tracking-wide text-muted-foreground">
                 Role
               </p>
-              <div role="group" aria-label="Invite role" className="flex flex-wrap gap-1.5">
+              <div role="group" aria-label="Invite role" className="flex flex-wrap gap-2">
                 {ROLE_OPTIONS.map((opt) => {
                   const selected = opt.enabled && role === opt.value
                   return (
@@ -245,7 +245,7 @@ export function InviteMemberDialog({ open, onClose, onCreated }: Props) {
                   )
                 })}
               </div>
-              <p className="mt-1.5 text-xs text-muted-foreground">
+              <p className="mt-2 text-xs text-muted-foreground">
                 {ROLE_OPTIONS.find((o) => o.value === role)?.hint ??
                   "Choose the role this person gets when they join."}
               </p>
