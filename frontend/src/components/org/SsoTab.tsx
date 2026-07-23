@@ -21,21 +21,25 @@
  * server `require_sso_manage` + the mig-104 RLS are the real wall (T-168-06). NO management
  * token / secret ever crosses to this leaf — only domain / provider_id / status (T-168-04).
  *
- * Typography (UI-SPEC 2-weight 400/700): micro-labels + status chips drop the siblings'
- * `font-medium` (500) to 400 + `uppercase tracking-wide` — the distinction is size + case +
- * tone, not a third weight. Spacing snaps to the 4px grid (`gap-2`/`px-4`/`py-1`), NOT the
- * siblings' off-grid half-steps. Both are gate-required intentional deviations — do NOT
- * "fix" them back to the sibling's odd values.
+ * Typography (UI-SPEC 2-weight 400/700): the SP-metadata + create-form micro-labels stay 400 +
+ * `uppercase tracking-wide` — the distinction there is size + case + tone, not a third weight.
+ *
+ * NOTE (Phase 177 / D-08/D-09): the connection STATUS chip's former UPPERCASE, `py-1`, off-grid
+ * fork was RETIRED for family cohesion — status now renders through the ONE shared `StatusChip`
+ * (grid-correct `px-2 py-0.5`, no `uppercase tracking-wide`), and the connection row snaps to the
+ * sibling `px-3.5 py-3` row anatomy. This intentionally reverses the earlier keep-the-off-grid-fork
+ * instruction: the deviation is now the cohesion target, not a gate-required exception. The
+ * remaining `uppercase tracking-wide` are the metadata/form LABELS (a different element) — leave those.
  */
 import { useState } from "react"
 import { Check, Copy, Plus, RefreshCw, ShieldCheck, Trash2 } from "lucide-react"
 
 import type { SsoConfig } from "@/lib/api"
 import { supabase } from "@/lib/supabase"
-import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { StatusChip, type ChipTone } from "./StatusChip"
 
 interface SsoTabProps {
   /** Every SSO connection the shell fetched; `null` while the fetch is in flight. */
@@ -48,8 +52,6 @@ interface SsoTabProps {
   /** Remove a connection by id (shell deletes the provider then re-fetches — no optimism). */
   onRemove: (id: string) => Promise<void>
 }
-
-type ChipTone = "primary" | "success" | "muted"
 
 /** Map the server-truth `sso_configs.status` to a plain label + a 166-vocabulary tone. Pending
  *  is the live indigo (primary) chip — the in-zone waiting state, NEVER the reserved operator
@@ -64,14 +66,6 @@ function statusChip(status: SsoConfig["status"]): { label: string; tone: ChipTon
     default:
       return { label: "Pending approval", tone: "primary" }
   }
-}
-
-// The 166 chip tones (reused vocabulary — NEVER an invented tint; the operator amber stays
-// reserved for /admin). Identical to InvitationsTab's map; kept local (it is not exported).
-const CHIP_TONE_CLASS: Record<ChipTone, string> = {
-  primary: "border-primary/30 bg-primary/10 text-primary",
-  success: "border-success/30 bg-success/10 text-success",
-  muted: "border-border bg-muted/40 text-muted-foreground",
 }
 
 /** The deployment's Supabase (GoTrue) URL is the SAML SP. Read the value the app already
@@ -282,7 +276,7 @@ function SsoConnectionRow({ config, canManageSso, onRemove }: SsoConnectionRowPr
   }
 
   return (
-    <div className="flex flex-col gap-2 px-4 py-3">
+    <div className="flex flex-col gap-2 px-3.5 py-3">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <span className="truncate text-sm text-foreground" title={config.email_domain}>
@@ -298,16 +292,12 @@ function SsoConnectionRow({ config, canManageSso, onRemove }: SsoConnectionRowPr
           )}
         </div>
 
-        {/* Server-truth status chip (never a client guess). */}
-        <span
-          className={cn(
-            "inline-flex flex-none items-center rounded-full border px-2 py-1 text-[11px] uppercase tracking-wide",
-            CHIP_TONE_CLASS[chip.tone],
-          )}
-          data-testid="sso-status"
-        >
-          {chip.label}
-        </span>
+        {/* Server-truth status chip — the shared StatusChip (D-08; the off-grid UPPERCASE fork retired). */}
+        <div className="flex-none">
+          <StatusChip tone={chip.tone} testId="sso-status">
+            {chip.label}
+          </StatusChip>
+        </div>
 
         {/* Remove — honest-absent for a non-manager; a two-step victim-naming confirm below. */}
         {canManageSso && !confirming && (
