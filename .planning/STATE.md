@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v3.5
 milestone_name: UX Consolidation & Chat Polish
-status: verifying
-last_updated: "2026-07-22T21:16:46.956Z"
+status: ready_to_plan
+last_updated: 2026-07-23T03:04:39.231Z
 last_activity: 2026-07-22
 progress:
   total_phases: 20
@@ -11,6 +11,7 @@ progress:
   total_plans: 12
   completed_plans: 12
   percent: 15
+stopped_at: Phase 176 complete (4/4) — ready to discuss Phase 177
 ---
 
 # Project State
@@ -22,7 +23,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-20 — Phase 163 THE ATOMIC CRUX complete; membership RLS enforced)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 176 — chat-render-correctness-exec-reliability
+**Current focus:** Phase 177 — v3.4 org surface polish
 
 ## Deferred Items
 
@@ -42,9 +43,9 @@ Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 op
 
 ## Current Position
 
-Phase: 176 (chat-render-correctness-exec-reliability) — ALL 4 PLANS EXECUTED
-Plan: 4 of 4 — COMPLETE
-Status: Phase complete — ready for `/gsd:verify-work 176`
+Phase: 177
+Plan: Not started
+Status: Ready to plan
 Last activity: 2026-07-23
 
 **Plan 176-04 complete (RENDER-03, 2026-07-23):** No-silent-send-drop. `sendMessage`'s duplicate-guard non-dispatch early-return no longer returns silently — it stashes the dropped draft (`failedSendDrafts`) + a quiet `reconcileErrors` hint carried as `ApiError(400, "Couldn't send — tap to retry")` through the EXISTING 099-08 recovery seam (D-11, no new channel), so ChatArea's prefill restores the composer text + the banner surfaces the honest hint (the durable D-10.2 honesty guarantee). Plus a fresh-thread ordering tighten: a sibling `pendingSendThreadsRef` + `markThreadPendingSend` action, pre-marked by ChatArea BEFORE `setViewingThread`, is honored by the preserve-guard's `sendInFlightOnThisThread` WITHOUT tripping the duplicate-guard (`:1807` still checks only `sendingThreadsRef` → the real send still dispatches; D-10.1). 176-01's RENDER-01 `supersededByPersisted` drop preserved; Deep byte-identical (D-14); no backend/migration. 2 TDD tasks / 4 commits (`b9be05a2`/`78c74f9b`/`f5352d0a`/`b491ad1b`). Vitest differential clean (25 pre-existing-rot failures identical at baseline `6f0bf297` — 0 net-new; SEED-056). Deviation: hint carried as ApiError(400) not a plain Error (the banner renders a custom message ONLY for ApiError; a plain Error would show the misleading "Couldn't load latest messages" copy). Live UAT rolls forward to 176-VALIDATION Manual-Only.
