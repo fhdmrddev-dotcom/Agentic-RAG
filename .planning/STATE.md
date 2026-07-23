@@ -4,12 +4,12 @@ milestone: v3.5
 milestone_name: UX Consolidation & Chat Polish
 status: executing
 last_updated: "2026-07-23T04:18:20.583Z"
-last_activity: 2026-07-23 -- Phase 177 execution started
+last_activity: 2026-07-23 -- Phase 177 executed (5/5); verification human_needed (live visual UAT)
 progress:
   total_phases: 20
   completed_phases: 3
   total_plans: 17
-  completed_plans: 12
+  completed_plans: 17
   percent: 15
 ---
 
@@ -42,10 +42,12 @@ Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 op
 
 ## Current Position
 
-Phase: 177 (v3-4-org-surface-polish) — EXECUTING
-Plan: 1 of 5
-Status: Executing Phase 177
-Last activity: 2026-07-23 -- Phase 177 execution started
+Phase: 177 (v3-4-org-surface-polish) — EXECUTED (5/5 plans); verification human_needed
+Plan: 5 of 5 (all complete)
+Status: Phase 177 executed + code-verified (16/16 must-haves); awaiting live visual UAT (177-HUMAN-UAT.md)
+Last activity: 2026-07-23 -- Phase 177 executed; awaiting operator live UAT
+
+**Phase 177 — v3.4 Org-Surface Polish (ORGUX-01/02) — EXECUTED + code-verified, `human_needed` (2026-07-23, autonomous run).** UI polish / family-cohesion over the shipped 166/167/168 surfaces (sketches 131-C/132-B/133-B the contract). 5 plans / 2 waves / 20 code commits. **Wave 0 extracted 3 shared primitives** — `StatusChip` (D-08, one org-zone tone vocab: primary/success/muted) · `OrgIdentity`/`RoleBadge`+`OrgAvatar` (D-04) · `HonestNotice` (D-11 severity→tone). **Wave 2 wired them across** OrgBand+ProfileMenu (D-04/05/06/07; ProfileMenu suite EXTENDED 7→9, not re-authored — plan-checker blocker fix), InvitationsTab+SsoTab (D-08/09: retired SsoTab's UPPERCASE off-grid fork + duplicated chip maps), OrgMembersTab+InviteMemberDialog (adoptionChip active→muted kept as a documented DOMAIN EXEMPTION, not a wall of green), AuthCardShell+HonestNotice (D-11/12/13/14: recoverable invite dead-ends recolored CALM; SignInForm fail-open preserved + legible — never a lockout). Verify **16/16 code must-haves** (verifier re-ran tests: 86 green; post-merge org+auth+layout 149 green; 0 net-new vs baseline `6d145860`, SEED-056). **RED LINES held** (git-verified): `StreamsProvider.tsx` + `frontend/package.json` UNTOUCHED; no authz gate/server-contract/migration change; Deep byte-identical (D-02/G-5 light). Plan-checker caught+fixed 1 blocker (existing ProfileMenu.test coverage-loss risk) + 1 warning (tone-map overclaim) before execution. **`human_needed`:** 4 lived-visual/live-env UAT items in `177-HUMAN-UAT.md` (family-cohesion sweep · calm invite dead-ends · fail-open feel · 166/167/168 cross-provider+SAML live-UAT rolled forward per D-03). Reported-bugs cross-check: zero fold (all open Agentic-RAG reports are chat/agent-loop/panel). **Next: operator runs `/gsd:verify-work 177` (Chrome MCP or operator-driven) to close items 1–3 → then phase.complete.**
 
 **Plan 176-04 complete (RENDER-03, 2026-07-23):** No-silent-send-drop. `sendMessage`'s duplicate-guard non-dispatch early-return no longer returns silently — it stashes the dropped draft (`failedSendDrafts`) + a quiet `reconcileErrors` hint carried as `ApiError(400, "Couldn't send — tap to retry")` through the EXISTING 099-08 recovery seam (D-11, no new channel), so ChatArea's prefill restores the composer text + the banner surfaces the honest hint (the durable D-10.2 honesty guarantee). Plus a fresh-thread ordering tighten: a sibling `pendingSendThreadsRef` + `markThreadPendingSend` action, pre-marked by ChatArea BEFORE `setViewingThread`, is honored by the preserve-guard's `sendInFlightOnThisThread` WITHOUT tripping the duplicate-guard (`:1807` still checks only `sendingThreadsRef` → the real send still dispatches; D-10.1). 176-01's RENDER-01 `supersededByPersisted` drop preserved; Deep byte-identical (D-14); no backend/migration. 2 TDD tasks / 4 commits (`b9be05a2`/`78c74f9b`/`f5352d0a`/`b491ad1b`). Vitest differential clean (25 pre-existing-rot failures identical at baseline `6f0bf297` — 0 net-new; SEED-056). Deviation: hint carried as ApiError(400) not a plain Error (the banner renders a custom message ONLY for ApiError; a plain Error would show the misleading "Couldn't load latest messages" copy). Live UAT rolls forward to 176-VALIDATION Manual-Only.
 
