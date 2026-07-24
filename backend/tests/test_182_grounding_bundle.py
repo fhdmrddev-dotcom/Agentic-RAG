@@ -8,10 +8,14 @@ The cacheable server-sourced PALETTE the visual canvas binds its node-config dro
      auth can leak the route's existence. It carries `require_canvas` ALONE; stacking
      `require_visible` would raise 403 on deny and leak that the route exists.
   2. **The palette is SERVER-sourced, never a frontend constant (Pitfall 1 / SC#2).** The body
-     is `{tools, folders, skills, template_placeholders}` taken straight off the ONE shared
+     is `{tools, folders, skills, template_placeholders}` taken off the ONE shared
      `grounding.assemble_grounding_bundle` — the SAME computation `/validate`'s fidelity rules
      and NL generation consume. `tools` is proven to be the REAL in-process tool registry (it
      contains `search_documents`), not a literal list authored in this route.
+  3. **The rows are PROJECTED, never raw (CR-02).** `folders`/`skills` serialize through the
+     explicit `PaletteFolder`/`PaletteSkill` models, so `org_id` and the seeding owner's
+     `user_id` never reach the wire — the same owner-identity control `folders.py` / `kb.py` /
+     `skills.py` enforce (SEED-091 / D-164-05 / D-165-05).
 
 Runs fully OFFLINE. The 404-when-off probes need no DB (they 404 before the read). The
 flag-on reads drive the real assembler against conftest's MagicMock supabase (folder/skill
@@ -133,25 +137,61 @@ def test_grounding_bundle_returns_server_sourced_palette(client, monkeypatch):
 
 
 def test_grounding_bundle_fields_come_from_the_bundle(client, monkeypatch):
-    """Every response field is mapped straight off the shared `GroundingBundle`.
+    """Every response field is mapped straight off the shared `GroundingBundle` — PROJECTED.
 
     Fakes the assembler so the mapping is provable independently of registry contents: a
     bundle carrying distinctive tool / folder / skill / placeholder values must appear
     verbatim on the wire (and `tool_names` / `skill_ids` — the fidelity-only membership sets —
     must NOT leak into the palette response).
+
+    CR-02: the folder/skill rows here are REAL raw-row shapes (`fetch_all_folders(fields="*")`
+    returns every column of `public.folders`; the skills registry read carries the owner +
+    org columns its visibility post-filter needs). The response must carry ONLY the
+    `PaletteFolder` / `PaletteSkill` projection — `org_id` and the seeding owner's `user_id`
+    are the two fields this pins OUT. The ids are genuine UUIDs because the palette models
+    type them as `UUID` (matching `FolderResponse.id`), which the previous `"f-1"` / `"s-1"`
+    placeholders could not express.
     """
     from app.services.harness import grounding as g
 
     _flipped_on(monkeypatch)
     _inject_caller(monkeypatch)
 
+    folder_id = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    skill_id = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+    foreign_owner = "cccccccc-cccc-cccc-cccc-cccccccccccc"
+    org_id = "dddddddd-dddd-dddd-dddd-dddddddddddd"
+
     async def _fake_assemble(**_kwargs):
         return g.GroundingBundle(
             tools=["alpha_tool", "beta_tool"],
             tool_names={"alpha_tool", "beta_tool"},
-            folders=[{"id": "f-1", "name": "Q3 Reports", "parent_id": None}],
-            skills=[{"id": "s-1", "name": "Legal Review"}],
-            skill_ids={"s-1"},
+            # a RAW `fields="*"` folder row, exactly as fetch_all_folders yields it
+            folders=[
+                {
+                    "id": folder_id,
+                    "user_id": foreign_owner,
+                    "name": "Q3 Reports",
+                    "parent_id": None,
+                    "is_org_shared": True,
+                    "created_at": "2026-01-01T00:00:00+00:00",
+                    "updated_at": "2026-01-02T00:00:00+00:00",
+                    "org_id": org_id,
+                }
+            ],
+            # a RAW skills-registry row, exactly as _skill_registry yields it
+            skills=[
+                {
+                    "id": skill_id,
+                    "name": "Legal Review",
+                    "user_id": foreign_owner,
+                    "is_org_shared": True,
+                    "is_system": False,
+                    "org_id": org_id,
+                    "is_enabled": True,
+                }
+            ],
+            skill_ids={skill_id},
             placeholders=["project_name", "report_date"],
         )
 
@@ -160,10 +200,19 @@ def test_grounding_bundle_fields_come_from_the_bundle(client, monkeypatch):
     body = client.get(_PATH).json()
     assert body == {
         "tools": ["alpha_tool", "beta_tool"],
-        "folders": [{"id": "f-1", "name": "Q3 Reports", "parent_id": None}],
-        "skills": [{"id": "s-1", "name": "Legal Review"}],
+        "folders": [{"id": folder_id, "name": "Q3 Reports", "parent_id": None}],
+        "skills": [{"id": skill_id, "name": "Legal Review"}],
         "template_placeholders": ["project_name", "report_date"],
     }
+    # CR-02 stated as a negative, so a widened model fails HERE and not in review: neither the
+    # tenant id nor the seeding owner may appear ANYWHERE in the serialized palette.
+    raw = client.get(_PATH).text
+    assert org_id not in raw, "org_id leaked into the palette (CR-02)"
+    assert foreign_owner not in raw, "the seeding owner's user_id leaked into the palette (CR-02)"
+    for row in body["folders"]:
+        assert set(row) == {"id", "name", "parent_id"}, row
+    for row in body["skills"]:
+        assert set(row) == {"id", "name"}, row
 
 
 def test_grounding_bundle_rejects_a_malformed_template_asset_id(client, monkeypatch):

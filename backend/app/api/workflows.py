@@ -57,6 +57,11 @@ from app.services.harness import grounding, publish_service
 # a structural rule. There is exactly ONE lint copy and this is it (red line D-14).
 from app.services.harness.reachability import lint_workflow
 from app.services.operator_service import write_operator_audit
+# Phase 182 (CR-02) — the SAME owner-identity scrub every other folder/skill read path
+# applies (folders.py:20,34 / kb.py:123 / skills.py:218-222; SEED-091 / D-164-05 / D-165-05).
+# Imported at module level exactly as folders.py / kb.py do it; folder_utils is cycle-safe
+# (it imports only app.utils.db).
+from app.utils.folder_utils import _null_foreign_global_owner
 
 logger = logging.getLogger(__name__)
 
@@ -274,6 +279,43 @@ class ValidateResponse(BaseModel):
     verdicts: list[Verdict] = Field(default_factory=list)
 
 
+class PaletteFolder(BaseModel):
+    """One KB folder the canvas may bind a ``project_folder_id`` / ``folder_scope`` to.
+
+    An EXPLICIT projection (CR-02). ``bundle.folders`` are raw
+    ``fetch_all_folders(supabase, fields="*")`` rows — i.e. EVERY column of ``public.folders``
+    (``id, user_id, name, parent_id, is_org_shared, created_at, updated_at, org_id``). Raw DB
+    rows must NEVER reach the wire on this surface:
+
+      * ``org_id`` is deliberately absent — ``FolderResponse`` does not expose it either, and a
+        tenant identifier is not a palette field.
+      * the owner ``user_id`` is deliberately absent — SEED-091 / D-164-05 (TEN-06): a
+        non-owner reader of an org-shared folder must not learn who seeded it. Omitting the
+        column outright is strictly stronger than nulling it.
+      * ``created_at`` / ``updated_at`` are noise the palette never renders.
+
+    ``id`` / ``name`` / ``parent_id`` is not a guess at what the canvas needs — it is exactly
+    what ``grounding._render_folder_tree`` consumes to build the tree, so the picker can render
+    the full hierarchy from this and nothing more."""
+
+    id: UUID
+    name: str
+    parent_id: UUID | None = None
+
+
+class PaletteSkill(BaseModel):
+    """One enabled skill eligible for a phase ``skill_ref`` — id + display name ONLY (CR-02).
+
+    ``bundle.skills`` rows carry the owner ``user_id`` (and, post-CR-01, ``org_id`` /
+    ``is_system`` / ``is_enabled``, which the org-gated visibility post-filter needs). None of
+    that is palette data. ``skill_ref`` binds to the ``id``; the name is the label
+    ``render_grounding_prompt`` also shows. ``name`` is Optional purely so a degenerate row can
+    never 500 a read-only palette."""
+
+    id: UUID
+    name: str | None = None
+
+
 class GroundingBundleResponse(BaseModel):
     """The server-sourced PALETTE of valid building blocks (D-182-01).
 
@@ -288,8 +330,11 @@ class GroundingBundleResponse(BaseModel):
     (D-182-01): ``/validate`` fires on every canvas edit; the palette is near-static."""
 
     tools: list[str] = Field(default_factory=list)
-    folders: list[dict] = Field(default_factory=list)
-    skills: list[dict] = Field(default_factory=list)
+    # CR-02: EXPLICIT per-row models, never ``list[dict]``. A bare ``list[dict]`` shipped the raw
+    # ``folders``/``skills`` DB rows verbatim — leaking ``org_id`` + the seeding owner's
+    # ``user_id`` on a brand-new surface, bypassing the projection every sibling read applies.
+    folders: list[PaletteFolder] = Field(default_factory=list)
+    skills: list[PaletteSkill] = Field(default_factory=list)
     template_placeholders: list[str] = Field(default_factory=list)
 
 
@@ -450,6 +495,9 @@ async def get_grounding_bundle(
 
     Reads stay OWNER-scoped by ``user_id`` (V4 / T-182-03) — the palette must never widen to
     another user's folders or skills.
+
+    The response is an EXPLICIT projection (``PaletteFolder`` / ``PaletteSkill``), never the raw
+    DB rows (CR-02): ``org_id`` and the seeding owner's ``user_id`` never reach the wire.
     """
     user_id = _coerce_user_id(current_user)
     # Lazily resolved: assemble_grounding_bundle needs a pool ONLY to resolve a template
@@ -462,6 +510,17 @@ async def get_grounding_bundle(
         project_folder_id=None,
         template_asset_id=template_asset_id,
     )
+    # CR-02 — apply the SAME owner-identity scrub at the SAME seam every sibling read path uses
+    # (folders.py:20,34 / kb.py:123 / skills.py:218-222; SEED-091 / D-164-05 / D-165-05): null
+    # the seeding owner on non-owned shared/system rows before serializing. The Palette* models
+    # below then project ``user_id`` away ENTIRELY, so this is defense in depth — it keeps the
+    # sibling-route invariant honored at this seam if a future edit ever widens those models.
+    # Called WITHOUT ``visible_non_owned_ids`` (the shared-row-only form skills.py uses): the
+    # D-165-05 subtree-descendant broadening exists to null owners on rows the projection does
+    # not emit at all here, and buying it would cost a THIRD full-table folder read on a route
+    # whose whole point is being cheap and cacheable (IN-05).
+    _null_foreign_global_owner(bundle.folders, str(user_id))
+    _null_foreign_global_owner(bundle.skills, str(user_id))
     return GroundingBundleResponse(
         tools=bundle.tools,
         folders=bundle.folders,
