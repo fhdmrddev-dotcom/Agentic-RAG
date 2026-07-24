@@ -40,14 +40,20 @@ created: 2026-07-24
 
 ## Per-Task Verification Map
 
-> Filled by the planner. One row per task, mapped to the requirement / SC and a threat ref.
-> Skeleton derived from the research test map below.
+> 7 tasks across 3 plans (182-01 ×3, 182-02 ×2, 182-03 ×2). All carry `<automated>` verify
+> commands (Dimension 8 PASS — plan-checker confirmed). Status flips during execution.
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| TBD | — | — | VALID-01 | — | — | unit | `pytest tests/unit/test_182_validate.py -x` | ❌ W0 | ⬜ pending |
+| 182-01-01 | 01 | 1 | VALID-01 | T-182-SC | Owner-scoped grounding reads preserved in the ONE shared source | regression | `pytest tests/unit/test_103_grounding_fidelity.py -q` | ❌ W0 (`grounding.py`) | ⬜ pending |
+| 182-01-02 | 01 | 1 | VALID-01 | — | NL-gen delegate returns byte-identical `(prompt, tool_names, skill_ids)` | regression | `pytest tests/unit/test_103_nl_generate.py -q` | ✅ (existing guard) | ⬜ pending |
+| 182-01-03 | 01 | 1 | VALID-01 | — | Extraction-parity + NL-gen test-COUNT guard (177 lesson) | regression | `pytest tests/test_182_extraction_parity.py -x` | ❌ W0 | ⬜ pending |
+| 182-02-01 | 02 | 2 | VALID-01 | T-182-01 | `extra="forbid"` → 422; full static gauntlet → `{ok, verdicts}` severity | unit | `pytest tests/unit/test_182_validate.py -x` | ❌ W0 | ⬜ pending |
+| 182-02-02 | 02 | 2 | VALID-01 | T-182-02 | `require_canvas` alone → 404-when-off; server-sourced bundle | unit + live | `pytest tests/test_182_grounding_bundle.py -x` | ❌ W0 | ⬜ pending |
+| 182-03-01 | 03 | 3 | VALID-01 | — | Canary removed; `import canvas_canary` gone | regression | `pytest tests/test_181_off_audience.py -q` | ✅ (delete + guard) | ⬜ pending |
+| 182-03-02 | 03 | 3 | VALID-01 | T-182-02 | BOTH revert + flip-on tests repointed onto the real routes | integration | `pytest tests/test_revert_byte_identical.py tests/test_181_flip_on.py -q` | ✅ (repoint) | ⬜ pending |
 
-*Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
+*Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky · `nyquist_compliant`/`wave_0_complete` flip during execution once Wave 0 tests exist and pass.*
 
 ### Research test map (source for the planner)
 
