@@ -1,24 +1,40 @@
 """Phase 181 (REVERT-01 / D-181-01,02,04) — the require_canvas 404 gate + flip-on path.
 
-The gate half of the off-switch. Proven end-to-end via the TEMPORARY canary route
-``GET /canvas/ping`` (D-181-04 — removed/repurposed when the first real canvas route lands
-in 182/183) so the 404-when-off posture is testable NOW, before any real canvas route exists.
+The gate half of the off-switch — the OFF -> ON round trip on ONE canvas-gated route.
+
+**Phase 182 (D-182-04) — repointed onto the REAL route.** These three gate tests originally
+probed the TEMPORARY Phase-181 ``/canvas`` canary route, which existed only because no real
+canvas route did yet. 182-02 shipped the real ``require_canvas``-gated routes and 182-03 DELETED
+the canary, so they now ride ``GET /workflows/grounding-bundle`` — a body-free GET, exactly the
+canary's shape, and the surface the gate actually protects. (Without this repoint
+``test_canvas_ping_200_after_flip_on`` would have failed outright: no route -> 404, not 200.)
 
 Behaviors pinned:
-  - flag off -> ``GET /canvas/ping`` returns **404, never 403** — for an operator AND a
-    non-operator caller (the "off" resolves BEFORE the operator no-op, D-181-01), byte-
+  - flag off -> ``GET /workflows/grounding-bundle`` returns **404, never 403** — for an operator
+    AND a non-operator caller (the "off" resolves BEFORE the operator no-op, D-181-01), byte-
     identical to an unknown path;
-  - operator flip on (a stored {"audience": "everyone"} record) -> the gate is a no-op and
-    ``GET /canvas/ping`` returns 200;
+  - operator flip on (a stored {"audience": "everyone"} record) -> the gate is a no-op and the
+    SAME path returns 200 (which is also what makes the 404s above provably the GATE and not an
+    absent route);
   - ``GET /features`` returns ``visual_workflow_canvas: false`` for an operator AND an end
     user when off (the "off" guard wins over the ``op or ...`` short-circuit), and ``true``
     after the flip on.
 
 Drives the resolver via ``monkeypatch.setattr(us, "load_app_settings", ...)`` (the Phase-148
 pattern) + patches the async ``is_operator`` seam per module (dependencies for the gate,
-features for the effective map) so no live operator_users row / pg pool is needed.
+features for the effective map) so no live operator_users row / pg pool is needed. The flip-on
+read also fakes the shared ``assemble_grounding_bundle`` so this stays a pure GATE test, fully
+offline and independent of registry/DB contents (the palette's own contents are pinned in
+``test_182_grounding_bundle.py``).
+
+NOTE the ``canvas_ping`` test names are retained deliberately — they are the identifiers the
+Phase-181/182 verification maps reference. Only the probed PATH changed, never the behavior.
 """
 from types import SimpleNamespace
+
+# The real canvas-gated route these gate tests ride (182-02), replacing the deleted
+# Phase-181 ``/canvas`` canary probe (D-182-04).
+_CANVAS_PATH = "/workflows/grounding-bundle"
 
 
 async def _is_op_true(user_id):
@@ -57,8 +73,9 @@ def test_canvas_ping_404s_when_off_for_operator(client, monkeypatch):
 
     _cold_off(monkeypatch)
     monkeypatch.setattr(deps, "is_operator", _is_op_true)  # operator — must STILL 404
-    resp = client.get("/canvas/ping")
+    resp = client.get(_CANVAS_PATH)
     assert resp.status_code == 404, resp.text  # never 403 — indistinguishable from not-built
+    assert resp.status_code != 403
 
 
 def test_canvas_ping_404s_when_off_for_user(client, monkeypatch):
@@ -67,8 +84,9 @@ def test_canvas_ping_404s_when_off_for_user(client, monkeypatch):
 
     _cold_off(monkeypatch)
     monkeypatch.setattr(deps, "is_operator", _is_op_false)
-    resp = client.get("/canvas/ping")
+    resp = client.get(_CANVAS_PATH)
     assert resp.status_code == 404, resp.text
+    assert resp.status_code != 403
 
 
 def test_canvas_ping_200_after_flip_on(client, monkeypatch):
@@ -80,19 +98,43 @@ def test_canvas_ping_200_after_flip_on(client, monkeypatch):
     so this proves the flag-on no-op without a live token. (The OFF-path 404 for anonymous /
     bogus-token callers — the property CR-01 fixed — is proven in ``test_revert_byte_identical``
     with this seam left REAL.)
+
+    Phase 182 (D-182-04): repointed onto the REAL ``GET /workflows/grounding-bundle``. This is
+    the load-bearing half of the round trip — it proves the two 404s above are the GATE and not
+    an absent route, since the very same path answers 200 once the flag is on. The shared
+    ``assemble_grounding_bundle`` is faked to an EMPTY bundle so this stays a pure gate test:
+    provable with no DB and no dependence on registry contents (the palette's real contents are
+    pinned separately in ``test_182_grounding_bundle.py``).
     """
     import app.dependencies as deps
+    from app.services.harness import grounding as g
 
     _flipped_on(monkeypatch)
     monkeypatch.setattr(deps, "is_operator", _is_op_false)  # even a plain user: everyone -> pass
 
     async def _fake_caller(credentials, supabase):
-        return {"id": "u-1", "email": "u@x.co"}
+        # A UUID-shaped id: the canvas ON path hands this identity onward, so a non-UUID here
+        # would be a latent trap the moment anything downstream coerces it.
+        return {"id": "00000000-0000-0000-0000-000000000001", "email": "u@x.co"}
 
     monkeypatch.setattr(deps, "authenticate_canvas_request", _fake_caller)
-    resp = client.get("/canvas/ping")
+
+    async def _empty_bundle(**_kwargs):
+        return g.GroundingBundle(
+            tools=[], tool_names=set(), folders=[], skills=[], skill_ids=set(), placeholders=[]
+        )
+
+    monkeypatch.setattr(g, "assemble_grounding_bundle", _empty_bundle)
+
+    resp = client.get(_CANVAS_PATH)
     assert resp.status_code == 200, resp.text
-    assert resp.json() == {"ok": True}
+    # the real handler answered (the palette envelope), not some other 200
+    assert resp.json() == {
+        "tools": [],
+        "folders": [],
+        "skills": [],
+        "template_placeholders": [],
+    }
 
 
 # ── GET /features: "off" hides the key from EVERYONE (operators included) ──────
