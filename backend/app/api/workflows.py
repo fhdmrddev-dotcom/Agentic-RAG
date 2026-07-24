@@ -12,6 +12,7 @@ itself is a pure read (no writes).
 from __future__ import annotations
 
 import logging
+from typing import Literal
 from uuid import UUID
 
 import asyncpg
@@ -20,7 +21,14 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
 from app.config import settings
-from app.dependencies import get_current_user, get_pg_pool, get_redis, get_supabase, require_visible
+from app.dependencies import (
+    get_current_user,
+    get_pg_pool,
+    get_redis,
+    get_supabase,
+    require_canvas,
+    require_visible,
+)
 from app.db.workflows import (
     count_foreign_runs_on_global,
     create_workflow_definition,
@@ -38,7 +46,16 @@ from app.models.harness import WorkflowDefinition
 # stays patchable in tests (mirrors the threads.py module-import-for-patchability
 # discipline). NEVER import the orchestration fns by name — patch the module attr.
 from app.services import workflow_authoring
-from app.services.harness import publish_service
+# Phase 182 (VALID-01 / D-182-06): ``grounding`` is imported as a MODULE for the same
+# patchability reason as ``publish_service`` above — the /validate + /grounding-bundle
+# routes resolve ``grounding.<fn>`` at call time, so a test can monkeypatch the shared
+# grounding source's attributes (the Phase-103 test seam, now pointed at grounding.py).
+from app.services.harness import grounding, publish_service
+# Phase 182 (Pitfall 1): lint is imported MODULE-DIRECT from ``reachability`` (NOT via
+# ``app.services.harness``) to keep the import light — ``reachability.py`` is documented
+# "PURE — no I/O, no DB, no engine import", and the /validate seam must never re-derive
+# a structural rule. There is exactly ONE lint copy and this is it (red line D-14).
+from app.services.harness.reachability import lint_workflow
 from app.services.operator_service import write_operator_audit
 
 logger = logging.getLogger(__name__)
@@ -205,6 +222,186 @@ async def get_starter_workflows(
         )
         for r in rows
     ]
+
+
+# ══ Phase 182 (VALID-01) — the server VALIDATION SEAM ═════════════════════════
+#
+# G-5 RED LINE: these routes join THIS router (api/workflows.py), NEVER api/threads.py.
+#
+# THE ANTI-DRIFT CONTRACT (D-182-02 / D-182-06 / red line D-14): the visual canvas is a
+# pure CLIENT of this seam. Every rule it previews is the SAME copy the publish gauntlet
+# enforces — ``lint_workflow`` (structural), ``grounding.grounding_verdicts`` (fidelity),
+# ``grounding.business_requirement_missing`` (D-13), ``publish_service._interactive_phase_failures``
+# (WR-04). NOTHING is re-implemented here and NOTHING is ever re-implemented client-side;
+# the route only AGGREGATES and CLASSIFIES. `/validate` is READ-ONLY advice — it never
+# persists, never executes, and never mints a version; PUBLISH remains the enforcing gate.
+#
+# GATE (D-182-05, Pitfall 3): both routes carry ``Depends(require_canvas())`` **ALONE** — a
+# byte-identical 404 when ``visual_workflow_canvas`` is off, for EVERYONE incl. operators,
+# resolved PRE-AUTH. They must NEVER stack ``require_visible`` (which raises 403 and would
+# leak that the route exists) nor couple canvas availability to another feature's audience.
+#
+# ROUTE ORDERING: declared as explicit STATIC segments HERE, ahead of every ``/{definition_id}``
+# route below (the ``/drafts`` / ``/starters`` precedent), so no present or future path param
+# can shadow them. ``_coerce_user_id`` is defined further down at module level and resolved
+# at request time.
+class Verdict(BaseModel):
+    """One static-gauntlet finding, per-node (SC#4).
+
+    ``code`` is the machine literal (the 5 verbatim lowercase ``LintError.code`` values plus
+    the route-assigned ``folder_scope`` / ``unregistered_tool`` / ``unregistered_skill`` /
+    ``business_requirement`` / ``interactive_phase``). ``phase`` is the phase ``slug`` — the
+    node identity the canvas paints on (the 181/183 ``node id == phase.slug`` contract) — or
+    ``None`` for a workflow-global finding. ``severity`` is the ONLY net-new field (D-182-03):
+    an ORTHOGONAL UI hint (``error`` = broken/red, ``incomplete`` = still-building/grey), NOT
+    a pass/fail axis — both severities block a publish."""
+
+    code: str
+    phase: str | None = None
+    message: str
+    severity: Literal["error", "incomplete"]
+
+
+class ValidateResponse(BaseModel):
+    """The ``{ok, verdicts}`` envelope — vocabulary aligned with the existing
+    ``{ok, error, detail}`` grounding shape + the D-08 publish verdict (no new vocabulary).
+
+    ``ok == (verdicts == [])``: the FULL static gauntlet is clean, i.e. "this can pass the
+    static half of publish now". An ``incomplete``-only verdict set still sets ``ok False``
+    (an unfinished draft cannot publish either)."""
+
+    ok: bool
+    verdicts: list[Verdict] = Field(default_factory=list)
+
+
+# The severity taxonomy (D-182-03). Hard structural + grounding-fidelity breaks are ERRORS;
+# not-yet-ready conditions (``input_unsatisfied`` while wiring, a missing business
+# requirement, an interactive phase, an empty draft) are INCOMPLETE.
+_ERROR_CODES = frozenset(
+    {
+        "bad_index",
+        "orphan_phase",
+        "unsatisfiable_skip",
+        "folder_scope",
+        "unregistered_tool",
+        "unregistered_skill",
+    }
+)
+
+
+def _severity(code: str, *, phases_empty: bool) -> str:
+    """Classify a verbatim check's finding — the route's ONLY interpretive step (D-182-03).
+
+    ``no_terminal`` is emitted by ``lint_workflow`` from TWO different situations (Pitfall 2):
+    ``phases == []`` (an empty draft — the author is still building) and an unreachable
+    terminal (a genuinely broken graph). Same code, split severity, distinguished by the
+    definition the route already holds — so an empty canvas paints grey "still building",
+    never red "broken"."""
+    if code == "no_terminal":
+        return "incomplete" if phases_empty else "error"
+    if code in _ERROR_CODES:
+        return "error"
+    return "incomplete"
+
+
+@router.post(
+    "/validate",
+    response_model=ValidateResponse,
+    dependencies=[Depends(require_canvas())],  # D-182-05 — require_canvas ALONE (never require_visible)
+)
+async def validate_workflow(
+    body: WorkflowDefinition,
+    current_user: dict = Depends(get_current_user),
+    # service-role: the grounding fidelity reads span the owner's folder tree + skill
+    # registry (scoped BY HAND on user_id inside grounding.py — service-role bypasses RLS).
+    supabase=Depends(get_supabase),
+) -> ValidateResponse:
+    """Validate a raw ``WorkflowDefinition`` — the SINGLE SOURCE OF VALIDATION TRUTH (VALID-01).
+
+    Aggregates the FULL STATIC publish gauntlet (D-182-02) so the canvas previews every
+    pre-run blocker live, reusing each check VERBATIM:
+
+      1. ``lint_workflow``                          — structural (bad_index / unsatisfiable_skip /
+                                                      orphan_phase / no_terminal / input_unsatisfied)
+      2. ``grounding.grounding_verdicts``           — fidelity (folder_scope ⊆ project subtree,
+                                                      available_tools ∈ registry, skill_ref ∈ enabled)
+      3. ``grounding.business_requirement_missing`` — the D-13 publish invariant (shared with publish stage 1)
+      4. ``publish_service._interactive_phase_failures`` — the WR-04 interactive-phase pre-run block
+
+    The golden run + judge (publish stages 3-4) are LIVE-only and deliberately NOT here —
+    ``/validate`` is a static, no-provider, read-only surface called on every canvas edit.
+
+    ALWAYS HTTP 200 with the machine-renderable envelope: a dirty definition is not an HTTP
+    error, it is advice. A malformed/injected body key is a 422 for free (``WorkflowDefinition``
+    is ``extra='forbid'``) — the SHAPE tier, never relaxed to a lenient dict (V5). A phase
+    declaring ``folder_scope`` on an unbound workflow also 422s at the shape tier (the
+    ``@model_validator``), so it never reaches this handler; an empty ``phases: []`` IS
+    shape-valid and lands here as an ``incomplete`` ``no_terminal``.
+    """
+    user_id = _coerce_user_id(current_user)
+    # ONE registry read for the whole request (the palette the fidelity rules test against).
+    # ``project_folder_id`` is deliberately not passed: a bound project narrows only the
+    # per-phase folder_scope ⊆ check (which reads it off the definition itself) and the NL
+    # prose line — never the palette.
+    bundle = await grounding.assemble_grounding_bundle(
+        supabase=supabase,
+        user_id=str(user_id),
+    )
+
+    findings: list[dict] = []
+
+    # (1) structural lint — the verbatim pure check. Mapped to the SAME dict shape publish
+    # renders its lint block with (publish_service: {"code", "phase", "message"}).
+    findings.extend(
+        {"code": e.code, "phase": e.phase_slug, "message": e.message}
+        for e in lint_workflow(body)
+    )
+
+    # (2) grounding fidelity — the per-node collector over the ONE shared rule copy.
+    findings.extend(
+        await grounding.grounding_verdicts(
+            body,
+            supabase=supabase,
+            user_id=str(user_id),
+            tool_names=bundle.tool_names,
+            skill_ids=bundle.skill_ids,
+        )
+    )
+
+    # (3) the D-13 business-requirement invariant — same predicate publish stage 1 calls,
+    # same named-failure prose.
+    if grounding.business_requirement_missing(body):
+        findings.append(
+            {
+                "code": "business_requirement",
+                "phase": None,
+                "message": (
+                    "a workflow must declare exactly one business_requirement before publish"
+                ),
+            }
+        )
+
+    # (4) the WR-04 interactive-phase pre-run block — reused verbatim (one finding per phase).
+    findings.extend(
+        {
+            "code": "interactive_phase",
+            "phase": f.get("phase"),
+            "message": f.get("message"),
+        }
+        for f in publish_service._interactive_phase_failures(body)
+    )
+
+    phases_empty = len(body.phases) == 0
+    verdicts = [
+        Verdict(
+            code=f["code"],
+            phase=f.get("phase"),
+            message=f["message"],
+            severity=_severity(f["code"], phases_empty=phases_empty),
+        )
+        for f in findings
+    ]
+    return ValidateResponse(ok=(len(verdicts) == 0), verdicts=verdicts)
 
 
 # ── Phase 102 (QUAL-01 / D-07) — the server-side publish path ─────────────────
