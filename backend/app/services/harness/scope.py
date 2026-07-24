@@ -48,6 +48,34 @@ if TYPE_CHECKING:  # pragma: no cover — typing only
     from app.models.harness import WorkflowDefinition
 
 
+class FolderScopeSubsetError(ValueError):
+    """The non-⊆ phase ``folder_scope`` failure, carrying the OFFENDING PHASE SLUG.
+
+    A ``ValueError`` SUBCLASS **on purpose**: every pre-existing handler keeps working by
+    construction, with no call-site edit and no behavior change —
+    ``workflow_kickoff.py``'s ``except ValueError`` → HTTP 400 (``detail=str(err)``),
+    ``runs.py``'s best-effort Continue broad-try, ``harness_engine.py``'s resume
+    unscoped-fallback, and ``test_098_scope_governance.py``'s
+    ``pytest.raises(ValueError, match="is not a subset")``. ``super().__init__(message)``
+    keeps ``str(exc)`` and ``args`` BYTE-IDENTICAL to the plain ``ValueError`` this
+    replaces, so every message/``detail`` string on every path is unchanged.
+
+    The added ``phase_slug`` attribute is the STRUCTURAL channel for the offending phase
+    (Phase 182 SC#4 / D-182-06): the ``POST /workflows/validate`` seam keys its
+    ``folder_scope`` verdict to a NODE by reading this attribute — never by parsing the
+    message prose. The canvas is a pure client of the seam and must never re-derive a
+    server rule client-side, and a regex over free text is exactly that re-derivation.
+
+    ``phase_slug`` is keyword-only and defaults to ``None`` so a future non-phase-specific
+    ⊆ failure can still raise this type honestly (consumers read it via
+    ``getattr(exc, "phase_slug", None)`` and degrade to an unkeyed verdict).
+    """
+
+    def __init__(self, message: str, *, phase_slug: str | None = None) -> None:
+        super().__init__(message)  # str(exc) / args unchanged — the parity guarantee
+        self.phase_slug = phase_slug
+
+
 async def resolve_project_subtree(
     project_folder_id: "UUID | str | None",
     *,
@@ -203,9 +231,17 @@ async def assert_folder_scopes_subset(
     """DB-aware narrow-only ⊆ check (D-07 DB half) — raises on a non-⊆ phase scope.
 
     Resolves the project subtree, then asserts every per-phase ``folder_scope`` is a
-    subset of it. A phase scope with any id OUTSIDE the subtree raises ``ValueError``
-    (a definition-VALIDITY error the run-start callers map to a 400) — this NEVER
-    silently clips a declared scope (Pitfall 5: distinct from Plan 05's runtime clip).
+    subset of it. A phase scope with any id OUTSIDE the subtree raises
+    ``FolderScopeSubsetError`` — a ``ValueError`` SUBCLASS, so every existing
+    ``except ValueError`` caller is unaffected — carrying the offending phase's slug on
+    ``exc.phase_slug`` (a definition-VALIDITY error the run-start callers map to a 400).
+    This NEVER silently clips a declared scope (Pitfall 5: distinct from Plan 05's
+    runtime clip).
+
+    ``phase_slug`` is the STRUCTURAL channel for "which node is at fault" (Phase 182 SC#4
+    / D-182-06). The message still names the slug for humans, but no consumer may PARSE it:
+    ``grounding._folder_scope_violation`` reads the attribute so the ``/validate`` verdict
+    is keyed per-node without any regex over prose.
 
     If the workflow is unbound (``project_folder_id is None``) there is nothing to
     bound against, so this is a no-op — the structural ``@model_validator`` (Plan 01)
@@ -224,7 +260,11 @@ async def assert_folder_scopes_subset(
         if scope:
             outside = {str(f) for f in scope} - allowed
             if outside:
-                raise ValueError(
+                # Message expression UNCHANGED (both f-string fragments verbatim) — the
+                # byte-identical guarantee. Only the exception TYPE changes, plus the
+                # phase_slug attribute that carries the offending node structurally.
+                raise FolderScopeSubsetError(
                     f"phase '{phase.slug}' folder_scope is not a subset of the "
-                    f"project subtree: {sorted(outside)}"
+                    f"project subtree: {sorted(outside)}",
+                    phase_slug=phase.slug,
                 )
