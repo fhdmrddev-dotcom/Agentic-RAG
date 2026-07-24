@@ -157,3 +157,161 @@ async def test_clean_and_unbound_definitions_still_raise_nothing(monkeypatch):
     await assert_folder_scopes_subset(
         _scoped_definition(scope=[], bound=False), supabase=object(), user_id="u1"
     )
+
+
+# ── 2) COLLECTOR level — the slug reaches the verdict (THE SC#4 GUARD) ─────────
+
+
+def _folder_scope_verdict(verdicts: list[dict]) -> dict:
+    matches = [v for v in verdicts if v["code"] == "folder_scope"]
+    assert matches, f"expected a folder_scope verdict, got {[v['code'] for v in verdicts]}"
+    return matches[0]
+
+
+@pytest.mark.asyncio
+async def test_grounding_verdicts_keys_folder_scope_to_the_offending_phase(monkeypatch):
+    """SC#4 REGRESSION GUARD — `grounding_verdicts` emits `folder_scope` with a POPULATED
+    `phase`, read off the typed exception's `phase_slug`.
+
+    This test FAILS if `phase` ever reverts to `None`. That regression is exactly the
+    182-VERIFICATION BLOCKER: an unkeyed verdict forces a canvas consumer to regex the
+    message to attribute the finding to a node (the D-182-06 red line)."""
+    from app.services.harness import grounding, scope as scope_mod
+    from app.services.harness.scope import FolderScopeSubsetError
+
+    async def _raise_typed(definition, *, supabase, user_id):
+        raise FolderScopeSubsetError(
+            "phase 'p1' folder_scope is not a subset of the project subtree: "
+            f"['{_OUTSIDE}']",
+            phase_slug="p1",
+        )
+
+    monkeypatch.setattr(scope_mod, "assert_folder_scopes_subset", _raise_typed)
+
+    verdicts = await grounding.grounding_verdicts(
+        _scoped_definition(scope=[_OUTSIDE]),
+        supabase=object(),
+        user_id="u1",
+        tool_names=set(),
+        skill_ids=set(),
+    )
+
+    verdict = _folder_scope_verdict(verdicts)
+    assert verdict["phase"] == "p1", (
+        "SC#4 REGRESSION: the folder_scope verdict lost its per-node key. The offending "
+        "slug must ride FolderScopeSubsetError.phase_slug onto verdict['phase'], exactly "
+        "as unregistered_tool / unregistered_skill already do — never in prose only "
+        f"(got {verdict['phase']!r})"
+    )
+    assert "p1" in verdict["message"]  # the message is unchanged, just no longer load-bearing
+
+
+@pytest.mark.asyncio
+async def test_verdict_keying_holds_end_to_end_through_the_real_subset_check(monkeypatch):
+    """END-TO-END: NOTHING about the exception is hand-faked.
+
+    Only `resolve_project_subtree` is faked (no DB); the REAL `assert_folder_scopes_subset`
+    runs, raises for real, and `grounding_verdicts` keys the verdict off the REAL slug. This
+    proves the whole chain — a mock's attribute echoing itself would prove nothing."""
+    from app.services.harness import grounding
+
+    _patch_subtree(monkeypatch, [_PROJECT, _CHILD])
+
+    verdicts = await grounding.grounding_verdicts(
+        _scoped_definition(scope=[_OUTSIDE], slug="research"),
+        supabase=object(),
+        user_id="u1",
+        tool_names=set(),
+        skill_ids=set(),
+    )
+
+    verdict = _folder_scope_verdict(verdicts)
+    assert verdict["phase"] == "research"  # the REAL check supplied this, not a test double
+    assert verdict["message"] == (
+        "phase 'research' folder_scope is not a subset of the project subtree: "
+        f"['{_OUTSIDE}']"
+    )
+
+
+# ── 3) DEGRADATION — a plain ValueError never breaks the always-200 route ──────
+
+
+@pytest.mark.asyncio
+async def test_plain_value_error_degrades_to_an_unkeyed_verdict(monkeypatch):
+    """T-182-10: `except ValueError` is deliberately NOT narrowed and the slug is read via
+    `getattr(..., None)`. A ⊆-path `ValueError` with no `phase_slug` (a test double, or a
+    future non-phase-specific failure) yields `phase: None` and NEVER raises — `/validate`
+    is documented ALWAYS HTTP 200, so an AttributeError here would be a 500."""
+    from app.services.harness import grounding, scope as scope_mod
+
+    async def _raise_plain(definition, *, supabase, user_id):
+        raise ValueError("something else went wrong")
+
+    monkeypatch.setattr(scope_mod, "assert_folder_scopes_subset", _raise_plain)
+
+    verdicts = await grounding.grounding_verdicts(
+        _scoped_definition(scope=[_OUTSIDE]),
+        supabase=object(),
+        user_id="u1",
+        tool_names=set(),
+        skill_ids=set(),
+    )
+
+    verdict = _folder_scope_verdict(verdicts)
+    assert verdict["phase"] is None  # degrades safely — unkeyed, not a crash
+    assert verdict["message"] == "something else went wrong"
+
+
+@pytest.mark.asyncio
+async def test_short_circuit_dict_is_byte_identical_after_the_tuple_change(monkeypatch):
+    """`_check_grounding_fidelity` still returns the historical
+    `{ok, error, detail}` dict with ONLY the message as `detail` — the tuple return is an
+    internal detail, never a shape change (D-182-02 extraction-parity guarantee)."""
+    from app.services.harness import grounding
+
+    _patch_subtree(monkeypatch, [_PROJECT, _CHILD])
+
+    result = await grounding._check_grounding_fidelity(
+        _scoped_definition(scope=[_OUTSIDE]),
+        supabase=object(),
+        user_id="u1",
+        tool_names=set(),
+        skill_ids=set(),
+    )
+
+    assert result == {
+        "ok": False,
+        "error": "grounding_failed",
+        "detail": _GOLDEN_MESSAGE,
+    }
+
+
+# ── 4) ONE-SOURCE guard — the slug is NEVER extracted by parsing prose ─────────
+
+
+def test_no_message_parsing_exists_in_the_folder_scope_path():
+    """D-182-06 RED LINE, asserted structurally over the source.
+
+    The offending phase must travel on a typed exception ATTRIBUTE. If a future edit ever
+    reaches for the slug by regexing / splitting the verdict message — in the collector or
+    in the route that serializes it — this fails. (A client-side regex is the very
+    re-derivation the red line forbids; a server-side one would legitimize the pattern.)"""
+    from pathlib import Path
+
+    backend_dir = Path(__file__).resolve().parents[2]
+    forbidden = ("re.search", "re.match", "re.findall", ".split(\"'\")", ".split(\"'\", ", 'verdict["message"]')
+
+    for rel in ("app/services/harness/grounding.py", "app/api/workflows.py"):
+        src = (backend_dir / rel).read_text(encoding="utf-8")
+        for token in forbidden:
+            assert token not in src, (
+                f"{token!r} appeared in {rel} — the folder_scope slug must travel "
+                "STRUCTURALLY on FolderScopeSubsetError.phase_slug, never by parsing the "
+                "message prose (D-182-06: no validation rule is ever re-derived from "
+                "server output, server-side or client-side)"
+            )
+
+    # ... and the structural channel IS present where the verdict is built.
+    grounding_src = (backend_dir / "app/services/harness/grounding.py").read_text(encoding="utf-8")
+    assert 'getattr(exc, "phase_slug", None)' in grounding_src
+    assert '"code": "folder_scope"' in grounding_src

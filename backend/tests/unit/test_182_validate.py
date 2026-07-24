@@ -201,20 +201,27 @@ async def test_unregistered_skill_verdict_is_keyed_to_the_phase(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_folder_scope_verdict_is_workflow_global(monkeypatch):
-    """A non-⊆ per-phase folder_scope -> a workflow-global `folder_scope` verdict (phase None).
+async def test_folder_scope_verdict_is_keyed_to_the_phase(monkeypatch):
+    """A non-⊆ per-phase folder_scope -> a `folder_scope` verdict KEYED to the phase (SC#4).
 
-    `assert_folder_scopes_subset` is reused VERBATIM (it raises, naming the slug in the
-    message); we monkeypatch it to raise, exactly as test_103_grounding_fidelity does.
+    `assert_folder_scopes_subset` is reused VERBATIM; it raises `FolderScopeSubsetError`
+    (a `ValueError` subclass) carrying the offending slug on `.phase_slug`, and the
+    collector threads that attribute onto `verdict.phase`. The slug travels STRUCTURALLY —
+    the message still names it for humans, but no consumer may parse the prose to attribute
+    the finding to a node (D-182-06). We monkeypatch the check to raise, exactly as
+    test_103_grounding_fidelity does; the end-to-end proof through the REAL ⊆ walk lives in
+    tests/unit/test_182_folder_scope_keying.py.
     """
     import app.services.harness.scope as scope_mod
+    from app.services.harness.scope import FolderScopeSubsetError
 
     _patch_bundle(monkeypatch)
 
     async def _raise_subset(definition, *, supabase, user_id):
-        raise ValueError(
+        raise FolderScopeSubsetError(
             "phase 'answer' folder_scope is not a subset of the project subtree: "
-            f"['{_OUTSIDE_FOLDER}']"
+            f"['{_OUTSIDE_FOLDER}']",
+            phase_slug="answer",
         )
 
     monkeypatch.setattr(scope_mod, "assert_folder_scopes_subset", _raise_subset)
@@ -227,8 +234,8 @@ async def test_folder_scope_verdict_is_workflow_global(monkeypatch):
     )
 
     verdict = _by_code(resp, "folder_scope")
-    assert verdict.phase is None  # workflow-global; the offending slug rides the message
-    assert "answer" in verdict.message
+    assert verdict.phase == "answer"  # per-node keying (SC#4) — NOT None
+    assert "answer" in verdict.message  # the message is unchanged, just no longer load-bearing
     assert verdict.severity == "error"
 
 
