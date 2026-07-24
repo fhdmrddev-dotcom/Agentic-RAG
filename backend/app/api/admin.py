@@ -99,12 +99,17 @@ _VISIBILITY_FEATURES = {
     "model_management",
     "workflow_authoring",
     "governance_health",
+    # Phase 181 (REVERT-01 / T-181-03): the v3.6 canvas flag is operator-writable through
+    # the SAME allowlisted PUT /admin/visibility path (Off = "off", On = "everyone").
+    "visual_workflow_canvas",
 }
 # Phase 167 (VIS-01 / D-167-06): the audience enum extends to "role" (zero migration — the
 # mig-098 JSONB shape). A "role" write also carries a roles[] greenlist validated against the
 # 4-tier set (mig 104 CHECK) BEFORE the write — a free-text role must NEVER reach the JSONB
 # codec (SQLi-safe, mirrors the feature allowlist above).
-_VISIBILITY_AUDIENCES = {"everyone", "operators", "role"}
+# Phase 181 (T-181-03): "off" joins the write-allowlist so an operator can flip the canvas
+# hidden; a crafted off-allowlist audience still 400s BEFORE any JSONB write (SQLi-safe).
+_VISIBILITY_AUDIENCES = {"everyone", "operators", "role", "off"}
 _VISIBILITY_ROLES = {"super-admin", "org-admin", "dept-admin", "member"}
 
 # Phase 149 (MODEL-01 / T-149-11): the ONLY columns a capability PATCH may write — the

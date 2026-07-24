@@ -1083,6 +1083,13 @@ _GOVERNED_FEATURES: dict[str, str] = {
     "model_management": "operators",
     "workflow_authoring": "everyone",
     "governance_health": "everyone",
+    # Phase 181 (REVERT-01 / D-181-01,05): the v3.6 visual_workflow_canvas layer ships
+    # behind a governed flag whose cold default is the 5th audience enum member "off" —
+    # hidden from EVERYONE, operators included. This is the ONE authoritative cold default
+    # (an unseeded feature_visibility key falls through to it), which is why NO migration is
+    # needed: the app_settings.feature_visibility JSONB gains the key only on an operator
+    # flip via set_feature_visibility's atomic `||` merge ("off" -> "everyone" and back).
+    "visual_workflow_canvas": "off",
 }
 
 
@@ -1117,7 +1124,10 @@ def feature_audience(feature: str) -> str:
     returns a boolean, and NEVER raises. Extended in place (D-167-06) — not forked.
     """
     aud = _feature_record(feature).get("audience")
-    if aud in ("everyone", "operators", "role"):
+    # Phase 181 (D-181-01): "off" joins the accepted-enum tuple so a stored
+    # {"audience": "off"} record is HONORED rather than ignored and re-defaulted (a future
+    # re-flip to off via the DB must not silently no-op).
+    if aud in ("everyone", "operators", "role", "off"):
         return aud
     return _GOVERNED_FEATURES.get(feature, "operators")
 
@@ -1141,6 +1151,11 @@ def resolve_feature_access(feature: str, caller_role: str, caller_groups: set[st
     if aud == "everyone":
         return True
     if aud == "operators":
+        return False
+    # Phase 181 (D-181-02): explicit off-deny — belt-and-suspenders (the trailing
+    # `return False` already denies) that matches the operators short-circuit style and
+    # documents the master-switch intent.
+    if aud == "off":
         return False
     if aud == "role":
         try:
