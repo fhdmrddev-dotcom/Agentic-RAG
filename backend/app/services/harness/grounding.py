@@ -20,6 +20,10 @@ Two presentations over ONE rule set (RESEARCH Pattern 2):
     returned (byte-identical to the pre-extraction behavior).
   - ``grounding_verdicts``       — COLLECTS every violation as a per-node
     ``{code, phase, message}`` dict (the canvas needs all of them, keyed by phase slug).
+    ALL THREE fidelity rules key to a phase slug — ``folder_scope`` included: its slug is
+    threaded structurally off ``scope.FolderScopeSubsetError.phase_slug`` (Phase 182 SC#4),
+    never parsed out of the message, so Phase 184 can paint a per-node badge from the
+    verdict alone. Only a non-typed ⊆-path ``ValueError`` degrades to ``phase: None``.
 
 One computation, three consumers (RESEARCH Pattern 1):
   ``assemble_grounding_bundle`` returns the STRUCTURED ``GroundingBundle``;
@@ -345,21 +349,36 @@ def render_grounding_prompt(bundle: GroundingBundle, project_folder_id: str | No
 # call THESE helpers — there is no second implementation of any rule (D-182-06).
 
 
-async def _folder_scope_violation(wd: "WorkflowDefinition", *, supabase, user_id: str) -> str | None:
+async def _folder_scope_violation(
+    wd: "WorkflowDefinition", *, supabase, user_id: str
+) -> tuple[str, str | None] | None:
     """Rule 1 — reuse ``assert_folder_scopes_subset`` VERBATIM; never re-derive the ⊆ walk.
 
     That helper is the owner-scoped, cycle-guarded, security-reviewed check (T-098-02); it
-    raises ``ValueError`` naming the offending phase slug, and is a no-op when the
-    definition is unbound (``project_folder_id is None``). Returns the raised message on a
-    violation, else ``None``. Imported function-locally so a monkeypatch on
-    ``app.services.harness.scope`` (the Phase-103 test seam) is honored.
+    raises ``FolderScopeSubsetError`` (a ``ValueError`` subclass) naming the offending phase
+    slug, and is a no-op when the definition is unbound (``project_folder_id is None``).
+    Returns ``(message, phase_slug)`` on a violation, else ``None``. Imported
+    function-locally so a monkeypatch on ``app.services.harness.scope`` (the Phase-103 test
+    seam) is honored.
+
+    THE SLUG TRAVELS STRUCTURALLY (SC#4 / D-182-06). The offending phase rides the
+    exception's ``phase_slug`` ATTRIBUTE — it is never recovered by regexing / splitting the
+    message. The canvas is a pure client of this seam and must never re-derive a server rule
+    from server prose; parsing here would legitimize exactly that pattern one layer down.
+
+    The ``ValueError`` catch below is deliberately NOT narrowed to
+    ``FolderScopeSubsetError``: the Phase-103 / Phase-182 test doubles raise a PLAIN
+    ``ValueError`` through this same seam, and a future ⊆-path failure may too. Reading the
+    slug through ``getattr`` with a ``None`` default degrades such a case to an UNKEYED
+    verdict (``phase: None``) instead of an ``AttributeError`` — the ``/validate`` route is
+    documented ALWAYS HTTP 200, so a raise here would be a 500 (T-182-10).
     """
     from app.services.harness.scope import assert_folder_scopes_subset  # function-local
 
     try:
         await assert_folder_scopes_subset(wd, supabase=supabase, user_id=user_id)
     except ValueError as exc:
-        return str(exc)
+        return str(exc), getattr(exc, "phase_slug", None)
     return None
 
 
@@ -406,10 +425,14 @@ async def grounding_verdicts(
     """
     out: list[dict] = []
 
-    # Rule 1 — workflow-global (the offending phase slug is inside the message).
+    # Rule 1 — PER-NODE, exactly like Rules 2 and 3 below. A non-⊆ folder_scope is declared
+    # by ONE phase, so the verdict keys to that phase: the slug is threaded off
+    # ``FolderScopeSubsetError.phase_slug`` (SC#4) — structurally, never parsed out of the
+    # message. Only a non-typed ``ValueError`` off the ⊆ path leaves ``phase`` as ``None``.
     violation = await _folder_scope_violation(wd, supabase=supabase, user_id=user_id)
     if violation is not None:
-        out.append({"code": "folder_scope", "phase": None, "message": violation})
+        message, phase_slug = violation
+        out.append({"code": "folder_scope", "phase": phase_slug, "message": message})
 
     # Rules 2 + 3 — per-phase (per-node keying is natural here).
     for phase in wd.phases:
@@ -459,7 +482,9 @@ async def _check_grounding_fidelity(
     """
     violation = await _folder_scope_violation(wd, supabase=supabase, user_id=user_id)
     if violation is not None:
-        return _grounding_failed(violation)
+        # ONLY the message reaches ``detail`` — the slug is the per-node collector's
+        # concern; this dict stays byte-identical to the pre-182 NL-gen contract.
+        return _grounding_failed(violation[0])
 
     for phase in wd.phases:
         offending = _unregistered_tools(phase, tool_names)
