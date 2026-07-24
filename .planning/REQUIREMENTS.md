@@ -18,7 +18,7 @@
 
 ### VALID — the anti-drift governance seam (the differentiator)
 
-- [ ] **VALID-01**: The server exposes `POST /workflows/validate` that reuses the existing `reachability.lint_workflow` + grounding-fidelity checks verbatim — the single source of validation truth; the canvas never re-implements the rules client-side.
+- [x] **VALID-01**: The server exposes `POST /workflows/validate` that reuses the existing `reachability.lint_workflow` + grounding-fidelity checks verbatim — the single source of validation truth; the canvas never re-implements the rules client-side.
 - [ ] **VALID-02**: A user editing on the canvas is prevented from drawing a **structurally** invalid workflow — reachability / tool-whitelist / gate-wiring violations surface live *as the canvas is built* ("you cannot draw an invalid workflow"). *(Headline differentiator — no competitor validates the flow at author-time.)* Per-node grounding *strictness* is layered on top by GOVERN (graded, not blanket).
 - [ ] **VALID-03**: A user sees per-node validation status (badges / inline errors) derived from the server verdict, never from a client-side guess.
 
@@ -99,7 +99,7 @@ Which phases cover which requirements. Filled at roadmap creation 2026-07-24, re
 |-------------|-------|--------|
 | REVERT-01 | Phase 181 | Complete |
 | REVERT-02 | Phase 181 | Complete |
-| VALID-01 | Phase 182 | Pending |
+| VALID-01 | Phase 182 | Complete |
 | VALID-02 | Phase 184 | Pending |
 | VALID-03 | Phase 184 | Pending |
 | CANVAS-01 | Phase 183 | Pending |

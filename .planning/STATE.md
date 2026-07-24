@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
 status: executing
-last_updated: "2026-07-24T18:44:10.412Z"
-last_activity: 2026-07-24 -- Phase 182 Plan 01 complete (shared harness/grounding.py extracted)
+last_updated: "2026-07-24T19:12:28.282Z"
+last_activity: 2026-07-24 -- Phase 182 Plan 02 complete (POST /validate + GET /grounding-bundle mounted behind require_canvas; VALID-01 complete)
 progress:
   total_phases: 18
   completed_phases: 1
   total_plans: 6
-  completed_plans: 4
+  completed_plans: 5
   percent: 6
 ---
 
@@ -45,9 +45,9 @@ Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 op
 ## Current Position
 
 Phase: 182 (server-validation-seam) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Status: Ready to execute
-Last activity: 2026-07-24 -- Phase 182 Plan 01 complete (shared harness/grounding.py extracted; NL-gen byte-identical)
+Last activity: 2026-07-24 -- Phase 182 Plan 02 complete (the validation seam is LIVE: POST /workflows/validate returns the full static gauntlet as severity-classified per-node verdicts; GET /workflows/grounding-bundle serves the server-sourced palette; both require_canvas-gated. VALID-01 marked complete)
 
 ### Quick Tasks Completed
 
@@ -531,6 +531,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 176 P03 | 35min | 2 tasks | 2 files |
 | Phase 176 P04 | 35 | 2 tasks | 6 files |
 | Phase 182 P01 | 24min | 3 tasks | 5 files |
+| Phase 182 P02 | 22min | 2 tasks | 3 files |
 
 ## Decisions
 
@@ -671,6 +672,9 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase 182]: 182-01: one rule set, two presentations — grounding_verdicts() APPENDS per-node verdicts for /validate while _check_grounding_fidelity() SHORT-CIRCUITS to the historical {ok,error,detail} dict for NL-gen — both call the same three atomic helpers (_folder_scope_violation / _unregistered_tools / _unregistered_skill_ref) so no grounding rule can drift (D-182-02 / D-182-06 red line)
 - [Phase 182]: 182-01: the NL grounding prompt is pinned byte-for-byte by an explicit golden literal in tests/test_182_extraction_parity.py, plus exact-literal COUNT guards (2 + 6) on the Phase-103 backstop suites — the golden is never re-derived from the renderer, so a reworded heading or a squashed blank line fails; the count guard is the Phase-177 coverage-loss lesson (a failures-only differential cannot see a DELETED test)
 - [Phase 182]: 182-01: VALID-01 stays Pending after plan 01 — marked complete at the END of phase 182, not per-plan — the requirement text ('the server exposes POST /workflows/validate') only becomes true when 182-02 lands the route; all three 182 plans share VALID-01, so a per-plan mark-complete would create a false traceability record
+- [Phase ?]: 182-02: /validate + /grounding-bundle gate on require_canvas ALONE (never stacked with require_visible, whose 403 leaks route existence); both declared as STATIC segments ahead of every /{definition_id} route
+- [Phase ?]: 182-02: /validate CLASSIFIES only — severity is the route's single interpretive layer; no_terminal splits incomplete(empty draft) vs error(unreachable terminal); ok == (verdicts == []) so an incomplete-only set still blocks
+- [Phase ?]: 182-02: VALID-01 marked COMPLETE — its text (server exposes POST /workflows/validate reusing lint_workflow + grounding fidelity verbatim) is literally true as of this plan; 182-03 adds no route so a re-mark there is idempotent
 
 ## Operator Next Steps
 
