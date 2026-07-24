@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
 status: executing
-last_updated: "2026-07-24T15:28:34.271Z"
-last_activity: 2026-07-24 -- Phase 181 Plan 01 complete (backend off-switch)
+last_updated: "2026-07-24T15:52:34.007Z"
+last_activity: 2026-07-24 -- Phase 181 Plan 02 complete (frontend off-switch)
 progress:
   total_phases: 18
   completed_phases: 0
   total_plans: 3
-  completed_plans: 1
+  completed_plans: 2
   percent: 0
 ---
 
@@ -45,9 +45,9 @@ Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 op
 ## Current Position
 
 Phase: 181 (revert-foundation) — EXECUTING
-Plan: 2 of 3
-Status: 181-01 COMPLETE (backend off-switch) — Plan 02 next
-Last activity: 2026-07-24 -- 181-01 shipped: visual_workflow_canvas "off" audience + require_canvas 404 gate + canary route + test_revert_byte_identical acceptance gate (backend; zero migration, zero package)
+Plan: 3 of 3
+Status: 181-02 COMPLETE (frontend off-switch) — Plan 03 (scope-freeze) next
+Last activity: 2026-07-24 -- 181-02 shipped: GovernedFeature += visual_workflow_canvas, FeatureAudience += "off", the reused-card Off|On operator control, and the frontend revertByteIdentical nav-parity gate (FE-only; zero backend/migration/package; render-guard deferred to 182/183)
 
 ### Quick Tasks Completed
 

@@ -22,3 +22,28 @@ pre-existing failing set).
 
 **Disposition:** out of scope for Phase 181 (REVERT-01/02 is a purely additive
 feature-flag phase). Not fixed here. A dedicated test-rot cleanup pass is the correct home.
+
+## Pre-existing FRONTEND test rot (Plan 02 — out of scope, logged, NOT fixed)
+
+During the Plan 02 wave-merge full run (`npx vitest run`), **31 pre-existing failures**
+were observed across **10 test files** alongside 1846 passing (195 files). These are NOT
+caused by Phase 181 Plan 02:
+
+- Plan 02's only runtime-source edits were to `FeatureVisibility.tsx` + `ControlRoomPage.tsx`
+  (admin-only, imported by no failing file) and **type-only** additive union members in
+  `api.ts` (`GovernedFeature += visual_workflow_canvas`, `FeatureAudience += "off"`) — types
+  are erased at runtime, so no importing file's behavior changes.
+- All 4 touched/created suites are GREEN: `FeatureVisibility.a11y.test.tsx`,
+  `ControlRoomPage.test.tsx`, `nav-items.test.ts`, `revertByteIdentical.test.tsx` (22 tests).
+- The 10 failing files are in unrelated subsystems: `IngestionPage.test.tsx`,
+  `MessageItem.test.tsx`, `Plan04.frontend.test.tsx`, `useMessages.test.ts`,
+  `StreamsProvider.dedup.test.ts`, `streamsProvider.test.tsx`,
+  `streamsProvider_075_9_clientkey.test.tsx`, `PublishGauntlet.test.tsx`,
+  `soulData.test.ts`, `model-info.test.ts`. Timer/reducer/verdict/glyph/cost-tier rot —
+  the documented SEED-056 frontend-vitest rot + the streaming-reliability rot.
+- `npx tsc -b` (build mode) shows 33 pre-existing type errors, all in unrelated files
+  (chat/panel/skills/hooks/`api.test.ts`); **zero** in the 6 files this plan touched. The
+  plan's verify command `npx tsc --noEmit` exits 0.
+
+**Disposition:** out of scope for Phase 181 Plan 02. Not fixed here. Same dedicated
+frontend-test-rot cleanup home as the backend rot above.
