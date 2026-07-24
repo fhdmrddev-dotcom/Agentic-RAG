@@ -1,0 +1,154 @@
+/**
+ * Phase 181 Plan 02 (REVERT-01 / REVERT-02, D-181-03/D-181-06) — the FRONTEND half of the
+ * byte-identical revert acceptance gate. Rides the existing `frontend-tests.yml` (`npm test`)
+ * — NO new CI job (REVERT-02).
+ *
+ * Two locks:
+ *   1. NAV-SET PARITY (REVERT-01): adding `visual_workflow_canvas` to the effective map
+ *      leaves `visibleNavItems(...)` byte-identical to today, because NO `NAV_ITEMS` entry
+ *      is tagged `visual_workflow_canvas` in 181 (that entry lands WITH the view in 183).
+ *      A scope-freeze-adjacent guard also asserts no canvas nav entry slipped in early.
+ *   2. THE Off|On OPERATOR CONTROL (D-181-03): the `visual_workflow_canvas` row in the
+ *      reused `FeatureVisibility` card exposes EXACTLY a two-position Off | On control (two
+ *      radios, never the Everyone|Operators|By-role triad), On writes audience `"everyone"`
+ *      and Off writes `"off"`.
+ *
+ * DEFERRED (D-181 Claude's-discretion): the `ChatLayout` render-guard vitest — a stale
+ * canvas `activeView` must return the fallback (never the canvas) when the map is off — is
+ * intentionally NOT present here. It lands WITH the first canvas `ActiveView` render branch
+ * in Phase 182/183; there is no canvas view to guard yet in 181, so asserting it now would
+ * test a branch that does not exist.
+ */
+import { describe, it, expect, vi, afterEach } from "vitest"
+import { render, cleanup, within, fireEvent, waitFor } from "@testing-library/react"
+
+import { NAV_ITEMS, visibleNavItems } from "@/lib/nav-items"
+import { FeatureVisibility } from "./FeatureVisibility"
+import type { EffectiveFeatures, FeatureAudience, GovernedFeature } from "@/lib/api"
+
+afterEach(() => {
+  cleanup()
+})
+
+// Every EXISTING nav-tagged governed feature resolved true → the full nav set renders.
+// The canvas key is deliberately absent here (it is added per-assert below).
+const ALL_NAV_FEATURES_TRUE: EffectiveFeatures = {
+  skill_studio: true,
+  model_management: true,
+  workflow_authoring: true,
+  governance_health: true,
+}
+
+describe("revert byte-identity — nav-set parity (REVERT-01)", () => {
+  it("adding visual_workflow_canvas:false leaves visibleNavItems byte-identical", () => {
+    const baseline = visibleNavItems(ALL_NAV_FEATURES_TRUE)
+    const withCanvasOff = visibleNavItems({
+      ...ALL_NAV_FEATURES_TRUE,
+      visual_workflow_canvas: false,
+    })
+    expect(withCanvasOff).toEqual(baseline)
+  })
+
+  it("adding visual_workflow_canvas:true ALSO changes nothing (no canvas nav entry exists yet)", () => {
+    const baseline = visibleNavItems(ALL_NAV_FEATURES_TRUE)
+    const withCanvasOn = visibleNavItems({
+      ...ALL_NAV_FEATURES_TRUE,
+      visual_workflow_canvas: true,
+    })
+    // The canvas nav entry lands in 183 — until then, ON reveals nothing (byte-identical).
+    expect(withCanvasOn).toEqual(baseline)
+  })
+
+  it("no NAV_ITEMS entry is tagged visual_workflow_canvas (scope-freeze guard)", () => {
+    expect(NAV_ITEMS.some((item) => item.feature === "visual_workflow_canvas")).toBe(false)
+  })
+})
+
+// A full audience map for the card render. The canvas audience is set per-test so we can
+// exercise both the Off-selected and On-selected states of the two-position control.
+function visibilityWith(
+  canvas: FeatureAudience,
+): Record<GovernedFeature, FeatureAudience> {
+  return {
+    skill_studio: "operators",
+    model_management: "operators",
+    workflow_authoring: "everyone",
+    governance_health: "everyone",
+    visual_workflow_canvas: canvas,
+  }
+}
+
+function canvasCard(container: HTMLElement): HTMLElement {
+  return container.querySelector<HTMLElement>('[data-feature="visual_workflow_canvas"]')!
+}
+
+describe("revert byte-identity — the Off|On operator control (D-181-03)", () => {
+  it("the visual_workflow_canvas row exposes EXACTLY two radios (Off, On), not the triad", () => {
+    const { container } = render(
+      <FeatureVisibility
+        visibility={visibilityWith("off")}
+        onSetVisibility={vi.fn().mockResolvedValue(undefined)}
+        showTechnical={false}
+      />,
+    )
+    const group = within(canvasCard(container)).getByRole("radiogroup", { name: /audience/i })
+    const radios = within(group).getAllByRole("radio")
+    expect(radios).toHaveLength(2)
+    expect(within(group).getByRole("radio", { name: /^off$/i })).toBeInTheDocument()
+    expect(within(group).getByRole("radio", { name: /^on$/i })).toBeInTheDocument()
+    // The triad labels must NOT appear on this row.
+    expect(within(group).queryByRole("radio", { name: /operators only/i })).toBeNull()
+    expect(within(group).queryByRole("radio", { name: /by role/i })).toBeNull()
+  })
+
+  it("Off is checked when audience is 'off' (byte-identical cold default)", () => {
+    const { container } = render(
+      <FeatureVisibility
+        visibility={visibilityWith("off")}
+        onSetVisibility={vi.fn().mockResolvedValue(undefined)}
+        showTechnical={false}
+      />,
+    )
+    const group = within(canvasCard(container)).getByRole("radiogroup", { name: /audience/i })
+    expect(within(group).getByRole("radio", { name: /^off$/i })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    )
+    expect(within(group).getByRole("radio", { name: /^on$/i })).toHaveAttribute(
+      "aria-checked",
+      "false",
+    )
+  })
+
+  it("clicking On (from Off) writes audience 'everyone' for the canvas key", async () => {
+    const onSetVisibility = vi.fn().mockResolvedValue(undefined)
+    const { container } = render(
+      <FeatureVisibility
+        visibility={visibilityWith("off")}
+        onSetVisibility={onSetVisibility}
+        showTechnical={false}
+      />,
+    )
+    const group = within(canvasCard(container)).getByRole("radiogroup", { name: /audience/i })
+    fireEvent.click(within(group).getByRole("radio", { name: /^on$/i }))
+    await waitFor(() =>
+      expect(onSetVisibility).toHaveBeenCalledWith("visual_workflow_canvas", "everyone", []),
+    )
+  })
+
+  it("clicking Off (from On) writes audience 'off' — the master switch (hidden from everyone)", async () => {
+    const onSetVisibility = vi.fn().mockResolvedValue(undefined)
+    const { container } = render(
+      <FeatureVisibility
+        visibility={visibilityWith("everyone")}
+        onSetVisibility={onSetVisibility}
+        showTechnical={false}
+      />,
+    )
+    const group = within(canvasCard(container)).getByRole("radiogroup", { name: /audience/i })
+    fireEvent.click(within(group).getByRole("radio", { name: /^off$/i }))
+    await waitFor(() =>
+      expect(onSetVisibility).toHaveBeenCalledWith("visual_workflow_canvas", "off", []),
+    )
+  })
+})
