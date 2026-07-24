@@ -3,12 +3,32 @@
 ``publish()`` is the orchestration the ``POST /workflows/{id}/publish`` route delegates
 to (Plan 05 Task 3). A draft becomes published ONLY through here, enforcing IN ORDER:
 
-    0. load + owner-check the draft (V4 — a non-owner gets ``not_found`` -> 404)
-    1. business_requirement present?  (D-13 publish-time invariant -> 400 on absence)
-    2. structural lint               (reachability.lint_workflow — pure, no I/O)
-    3. a REAL golden run             (is_golden_run=True on the project KB — D-05, no mocks)
-    4. the judge verdict             (the llm_judge_rubric forced emission over the run's output)
-    5. flip                          (publish_definition — draft->published)
+    0.  load + owner-check the draft (V4 — a non-owner gets ``not_found`` -> 404)
+    1.  business_requirement present? (D-13 publish-time invariant -> 400 on absence)
+    2.  structural lint              (reachability.lint_workflow — pure, no I/O)
+    2.5 interactive-phase pre-run    (WR-04 — llm_human_input / ask_user cannot be validated)
+    2.6 grounding fidelity           (Phase 182 gap closure — the SHARED
+                                      ``grounding.grounding_verdicts``: folder_scope ⊆ the
+                                      project subtree, available tools ∈ the registry, a
+                                      phase skill reference ∈ the caller's enabled set)
+    3.  a REAL golden run            (is_golden_run=True on the project KB — D-05, no mocks)
+    4.  the judge verdict            (the llm_judge_rubric forced emission over the run's output)
+    5.  flip                         (publish_definition — draft->published)
+
+STAGE 2.6 IS THE ANTI-DRIFT HALF (Phase 182 / VALID-01 / D-182-02 / D-182-06). It calls the
+SAME collector ``POST /workflows/validate`` previews, so there is exactly ONE copy of every
+grounding rule and the canvas can never drift from the publish gauntlet it must ultimately
+pass. Before this stage existed, a definition naming a hallucinated tool or an inaccessible
+skill reference painted RED in ``/validate`` and published GREEN
+(``182-VERIFICATION.md`` Truth 5 / WR-01). No grounding rule is implemented here — this
+module only calls the shared one.
+
+DELIBERATELY NOT GATED — ``create_draft`` (``POST /workflows``) and ``update_draft``
+(``PATCH /workflows/{id}``) do NOT enforce grounding fidelity. This is a DECISION, not an
+oversight: a work-in-progress draft must remain storable while incomplete, or the Phase 184
+canvas editing loop becomes hostile (every keystroke that outruns its node config would be
+rejected). ``POST /workflows/validate`` is the live ADVISORY surface; PUBLISH is the
+ENFORCING gate. Anything that mints a version passes stage 2.6.
 
 A lint-clean workflow whose JUDGE fails CANNOT publish — that is the QUAL-01 hard
 blocker. Every block returns the D-08 structured verdict
@@ -26,8 +46,8 @@ pipeline ORDER and the hard-blocker contract; the REAL acceptance is the LIVE go
 against the project KB on the VALIDATION.md SC#10 4-axis scoreboard — not the mocked test.
 
 RECEIPT KEYING (the documented choice, plan Task 2 note): ``publish_attempted`` is written
-AFTER the golden run row exists (stage 3) so it carries a real ``run_id``; a stage-0/1/2
-block (before any golden run) writes ``publish_blocked`` keyed to a NULL ``run_id``
+AFTER the golden run row exists (stage 3) so it carries a real ``run_id``; EVERY pre-run
+block — stages 0, 1, 2, 2.5 and 2.6 — writes ``publish_blocked`` keyed to a NULL ``run_id``
 (``harness_audit.run_id`` is nullable — full-schema.sql:452) with the definition id in
 metadata. The governance trail is honest about whether a real run was created.
 """
@@ -173,6 +193,34 @@ async def publish_workflow(
             definition_id=definition_id,
             stage="interactive_phase",
             named_failures=interactive_failures,
+            golden_run_id=None,
+        )
+
+    # ── stage 2.6: grounding fidelity (Phase 182 gap closure — the SHARED rules) ──
+    # ORDERING RATIONALE. This is the LAST of the cheap static gates and it runs BEFORE
+    # the golden run because:
+    #   * it needs exactly what ``/validate`` needs — the definition, the owner, and the
+    #     server-side registries — and nothing whatsoever from a run;
+    #   * it is a pre-run static check (one folder read + one skill read + the in-process
+    #     tool registry), so a hallucinated tool or an inaccessible skill reference can
+    #     never burn a REAL provider run (the same posture as the lint short-circuit);
+    #   * it is placed AFTER the existing gates rather than before them, so no currently
+    #     blocking definition changes WHICH stage it blocks at — nothing is reordered.
+    grounding_failures = await _grounding_fidelity_failures(
+        definition,
+        definition_id=definition_id,
+        user_id=user_id,
+        pool=pool,
+        supabase=supabase,
+    )
+    if grounding_failures:
+        return await _block(
+            pool,
+            run_id=None,
+            user_id=user_id,
+            definition_id=definition_id,
+            stage="grounding_fidelity",
+            named_failures=grounding_failures,
             golden_run_id=None,
         )
 
@@ -448,6 +496,99 @@ def _interactive_phase_failures(definition) -> list:
     return failures
 
 
+async def _resolve_publish_supabase(supabase, *, definition_id: UUID, pool):
+    """The ONE service-role client resolution on the publish path (stage 2.6 + golden run).
+
+    Phase 163 (D-05 / T-163-05b): NO bare, org-less service-role fallback survives on the
+    publish / golden-run path. When the caller supplies no client, the org of the workflow
+    definition being published (``workflow_definitions.org_id``, backfilled post-162) is
+    read first and the client is built through the org-requiring factory in
+    ``app.dependencies`` — which REFUSES to construct without an explicit org scope, by
+    design. A falsy org therefore raises here rather than silently producing an
+    unscoped BYPASSRLS client.
+
+    Shared by ``_grounding_fidelity_failures`` and ``_drive_golden_run`` so exactly ONE
+    construction path exists (a second copy is how an org-less fallback creeps back in).
+    Also the single patchable seam the unit suites swap — ``pool`` is an ``AsyncMock``
+    there, so an un-patched resolution would hand a truthy mock to the factory.
+    """
+    if supabase is not None:
+        return supabase
+    from app import dependencies as _deps  # function-local (mirrors this module's posture)
+
+    _org_id = await pool.fetchval(
+        "SELECT org_id FROM workflow_definitions WHERE id = $1", definition_id
+    )
+    return _deps.get_service_role_supabase(_org_id)
+
+
+async def _grounding_fidelity_failures(
+    definition,
+    *,
+    definition_id: UUID,
+    user_id,
+    pool,
+    supabase,
+) -> list:
+    """Stage 2.6 — the grounding-fidelity named failures, from the ONE shared collector.
+
+    Calls ``grounding.assemble_grounding_bundle`` + ``grounding.grounding_verdicts`` — the
+    SAME copy ``POST /workflows/validate`` calls — so there is exactly ONE implementation of
+    the three grounding rules (folder scope ⊆ the bound project subtree, every declared tool
+    ∈ the real registry, every phase skill reference ∈ the caller's enabled set). D-182-02
+    reuse-verbatim / D-182-06 red line: NOTHING is re-implemented, re-shaped, re-filtered or
+    re-classified here — the collector's list is returned unchanged.
+
+    PRE-RUN STATIC CHECK: one folder read + one skill read + the in-process tool registry —
+    no provider call — so it short-circuits BEFORE the expensive golden run.
+
+    The returned dicts are the collector's ``{code, phase, message}`` — the SAME shape the
+    ``lint`` stage renders its named failures with (no new response vocabulary), per-node
+    keyed on the phase ``slug``.
+
+    FAILS CLOSED. Only the client resolution and the two collector calls are wrapped; on any
+    failure this returns a single ``grounding_unavailable`` named failure, which BLOCKS the
+    publish. A publish that cannot verify grounding must not mint a version — the same
+    fail-closed posture ``grounding._skill_registry`` already takes on its own read (CR-01).
+    Returning ``[]`` would silently publish an unverified definition, which is the exact
+    defect this stage exists to close; raising would violate ``publish_workflow``'s sealed-
+    orchestration contract (never raise into the route).
+    """
+    from app.services.harness.grounding import (  # function-local (Pitfall 4)
+        assemble_grounding_bundle,
+        grounding_verdicts,
+    )
+
+    try:
+        resolved = await _resolve_publish_supabase(
+            supabase, definition_id=definition_id, pool=pool
+        )
+        bundle = await assemble_grounding_bundle(supabase=resolved, user_id=str(user_id))
+        return await grounding_verdicts(
+            definition,
+            supabase=resolved,
+            user_id=str(user_id),
+            tool_names=bundle.tool_names,
+            skill_ids=bundle.skill_ids,
+        )
+    except Exception:  # noqa: BLE001 — fail CLOSED, never raise into the sealed orchestration
+        logger.exception(
+            "publish: grounding registry could not be resolved for definition %s — "
+            "blocking (fail-closed)",
+            definition_id,
+        )
+        return [
+            {
+                "code": "grounding_unavailable",
+                "phase": None,
+                "message": (
+                    "the grounding registry could not be resolved, so grounding fidelity "
+                    "could not be verified — publish is blocked"
+                ),
+            }
+        ]
+
+
 def _judge_named_failures(verdict: dict) -> list:
     """The D-08 named failures for a judge block — per-criterion critique + summary."""
     if verdict.get("failure"):
@@ -502,19 +643,14 @@ async def _drive_golden_run(
     from app.db.workflows import create_workflow_run, load_run_phases
     from app.services.harness_engine import _emit, run_workflow
 
-    if supabase is None:
-        # Phase 163 (D-05 / T-163-05b): NO bare, org-less service-role fallback survives on
-        # the publish / golden-run path. Build the service-role client via the org-requiring
-        # wrapper (get_service_role_supabase REFUSES to construct without an explicit org),
-        # scoped to the org of the workflow definition being published
-        # (workflow_definitions.org_id, backfilled post-162). The ephemeral validation
-        # thread INSERT below still relies on the mig-106 autofill for its own org_id.
-        from app.dependencies import get_service_role_supabase
-
-        _org_id = await pool.fetchval(
-            "SELECT org_id FROM workflow_definitions WHERE id = $1", definition_id
-        )
-        supabase = get_service_role_supabase(_org_id)
+    # The org-scoped service-role client — resolved through the ONE shared helper (Phase 182
+    # plan 06 moved the Phase-163 / T-163-05b explanation onto ``_resolve_publish_supabase``
+    # so the "no org-less fallback on the publish path" rule lives in a single place, shared
+    # with the stage-2.6 grounding read). The ephemeral validation thread INSERT below still
+    # relies on the mig-106 autofill for its own org_id.
+    supabase = await _resolve_publish_supabase(
+        supabase, definition_id=definition_id, pool=pool
+    )
 
     # ── 1. ephemeral validation thread (the golden run's anchor) ─────────────────
     from fastapi.concurrency import run_in_threadpool  # D-v2.5-01: wrap blocking supabase-py

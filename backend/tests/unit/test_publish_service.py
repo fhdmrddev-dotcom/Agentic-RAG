@@ -133,6 +133,14 @@ async def test_bad_output_blocks_publish():
     with (
         patch("app.db.workflows.get_definition", AsyncMock(return_value=row)),
         patch("app.db.workflows.write_audit", AsyncMock()),
+        # Phase 182 plan 06 — stage 2.6 (grounding fidelity) is NEUTRALISED throughout this
+        # suite: these tests pin the pipeline ORDER and the QUAL-01 hard-blocker contract,
+        # and every definition here is deliberately grounding-agnostic. The stage's own
+        # behavior (block on a hallucinated tool / an inaccessible skill reference, the
+        # fail-closed path, and the /validate-vs-publish agreement) is owned by
+        # tests/unit/test_182_publish_grounding_stage.py. Without this patch the stage would
+        # resolve a REAL service-role client, because ``pool`` is an AsyncMock.
+        patch.object(publish_service, "_grounding_fidelity_failures", AsyncMock(return_value=[])),
         patch.object(
             publish_service, "_drive_golden_run",
             AsyncMock(return_value=(golden_run_id, {"text": "you should research X"}, "completed")),
@@ -165,6 +173,7 @@ async def test_good_output_publishes():
     with (
         patch("app.db.workflows.get_definition", AsyncMock(return_value=row)),
         patch("app.db.workflows.write_audit", AsyncMock()),
+        patch.object(publish_service, "_grounding_fidelity_failures", AsyncMock(return_value=[])),
         patch.object(
             publish_service, "_drive_golden_run",
             AsyncMock(return_value=(golden_run_id, {"text": "a grounded answer [doc1]"}, "completed")),
@@ -204,6 +213,7 @@ async def test_golden_run_error_is_structured_not_raised():
     with (
         patch("app.db.workflows.get_definition", AsyncMock(return_value=row)),
         patch("app.db.workflows.write_audit", AsyncMock()),
+        patch.object(publish_service, "_grounding_fidelity_failures", AsyncMock(return_value=[])),
         patch.object(
             publish_service, "_drive_golden_run",
             AsyncMock(side_effect=RuntimeError("engine blew up")),
@@ -235,6 +245,7 @@ async def test_golden_run_timeout_blocks_not_raises():
     with (
         patch("app.db.workflows.get_definition", AsyncMock(return_value=row)),
         patch("app.db.workflows.write_audit", AsyncMock()),
+        patch.object(publish_service, "_grounding_fidelity_failures", AsyncMock(return_value=[])),
         patch.object(publish_service, "_drive_golden_run", _hang),
         patch.object(publish_service, "_judge_golden_output", AsyncMock()) as judge,
         patch("app.db.workflows.publish_definition", AsyncMock()) as flip,
@@ -332,6 +343,7 @@ async def test_concurrent_double_publish_blocks_at_already_published():
     with (
         patch("app.db.workflows.get_definition", AsyncMock(return_value=row)),
         patch("app.db.workflows.write_audit", AsyncMock(side_effect=_capture_audit)),
+        patch.object(publish_service, "_grounding_fidelity_failures", AsyncMock(return_value=[])),
         patch.object(
             publish_service, "_drive_golden_run",
             AsyncMock(return_value=(golden_run_id, {"text": "a grounded answer [doc1]"}, "completed")),
@@ -448,6 +460,7 @@ async def test_non_interactive_definition_proceeds_past_interactive_check():
     with (
         patch("app.db.workflows.get_definition", AsyncMock(return_value=row)),
         patch("app.db.workflows.write_audit", AsyncMock()),
+        patch.object(publish_service, "_grounding_fidelity_failures", AsyncMock(return_value=[])),
         patch.object(
             publish_service, "_drive_golden_run",
             AsyncMock(return_value=(golden_run_id, {"text": "a grounded answer [doc1]"}, "completed")),
