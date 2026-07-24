@@ -339,6 +339,31 @@ def render_grounding_prompt(bundle: GroundingBundle, project_folder_id: str | No
     )
 
 
+# ── the CANONICAL set of codes ``grounding_verdicts`` can emit (Phase 182 / WR-05) ──
+#
+# ONE code per atomic rule below. Published for the same derive-don't-duplicate reason
+# ``reachability.LINT_CODES`` is: ``api/workflows.py``'s ``/validate`` severity classifier
+# COMPOSES its known-code set from the two owning modules, so it can never drift from a
+# hardcoded copy of these literals (the WR-05 defect).
+#
+# ADDING A CODE: a new verdict code emitted by ``grounding_verdicts`` MUST be added here in
+# the SAME commit. ``tests/unit/test_182_severity_codes.py`` scans this file's verdict emit
+# sites and fails when the published set and the real emit sites disagree.
+#
+# DELIBERATELY NOT INCLUDED — ``grounding_unavailable``. That code is minted by
+# ``publish_service``'s fail-closed stage-2.6 wrapper (plan 182-06), never by
+# ``grounding_verdicts``, and it travels on the PUBLISH verdict's ``named_failures``, never
+# through ``/validate``. Its canonical home is ``publish_service.py``; the boundary is
+# pinned by ``test_publish_only_codes_are_an_acknowledged_boundary``.
+GROUNDING_VERDICT_CODES: frozenset[str] = frozenset(
+    {
+        "folder_scope",
+        "unregistered_skill",
+        "unregistered_tool",
+    }
+)
+
+
 # ── the three atomic grounding-fidelity rules (the ONE copy) ──────────────────
 #
 # Rule 1: every per-phase ``folder_scope`` UUID ⊆ the bound project subtree.

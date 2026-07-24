@@ -55,7 +55,9 @@ from app.services.harness import grounding, publish_service
 # ``app.services.harness``) to keep the import light — ``reachability.py`` is documented
 # "PURE — no I/O, no DB, no engine import", and the /validate seam must never re-derive
 # a structural rule. There is exactly ONE lint copy and this is it (red line D-14).
-from app.services.harness.reachability import lint_workflow
+# ``LINT_CODES`` rides the SAME import (WR-05): the severity classifier below composes its
+# known-code set from the module that OWNS the codes rather than re-declaring the literals.
+from app.services.harness.reachability import LINT_CODES, lint_workflow
 from app.services.operator_service import write_operator_audit
 # Phase 182 (CR-02) — the SAME owner-identity scrub every other folder/skill read path
 # applies (folders.py:20,34 / kb.py:123 / skills.py:218-222; SEED-091 / D-164-05 / D-165-05).
@@ -270,9 +272,11 @@ async def get_starter_workflows(
 class Verdict(BaseModel):
     """One static-gauntlet finding, per-node (SC#4).
 
-    ``code`` is the machine literal (the 5 verbatim lowercase ``LintError.code`` values plus
-    the route-assigned ``folder_scope`` / ``unregistered_tool`` / ``unregistered_skill`` /
-    ``business_requirement`` / ``interactive_phase``). ``phase`` is the phase ``slug`` — the
+    ``code`` is the machine literal, and every one of them is OWNED by the module that emits
+    it (WR-05): the 5 ``reachability.LINT_CODES`` values, the 3
+    ``grounding.GROUNDING_VERDICT_CODES`` values (``folder_scope`` / ``unregistered_tool`` /
+    ``unregistered_skill``), and the 2 ``_ROUTE_ASSIGNED_CODES`` this route mints itself
+    (``business_requirement`` / ``interactive_phase``). ``phase`` is the phase ``slug`` — the
     node identity the canvas paints on (the 181/183 ``node id == phase.slug`` contract) — or
     ``None`` for a workflow-global finding. ``severity`` is the ONLY net-new field (D-182-03):
     an ORTHOGONAL UI hint (``error`` = broken/red, ``incomplete`` = still-building/grey), NOT
@@ -355,19 +359,71 @@ class GroundingBundleResponse(BaseModel):
     template_placeholders: list[str] = Field(default_factory=list)
 
 
-# The severity taxonomy (D-182-03). Hard structural + grounding-fidelity breaks are ERRORS;
-# not-yet-ready conditions (``input_unsatisfied`` while wiring, a missing business
-# requirement, an interactive phase, an empty draft) are INCOMPLETE.
-_ERROR_CODES = frozenset(
+# ══ The severity taxonomy (D-182-03) — COMPOSED from the owning modules ══════════
+#
+# Hard structural + grounding-fidelity breaks are ERRORS; not-yet-ready conditions
+# (``input_unsatisfied`` while wiring, a missing business requirement, an interactive
+# phase, an empty draft) are INCOMPLETE.
+#
+# WR-05 (``182-VERIFICATION.md``): this block used to be a hardcoded ``frozenset`` of 6
+# string literals copied out of ``reachability`` + ``grounding``, with ``_severity``
+# returning the soft ``incomplete`` for anything it did not recognise. Both halves are now
+# fixed — the known set DERIVES from the modules that OWN the codes, and the unknown branch
+# fails LOUD (see ``_severity``). The composition, one row per owner:
+#
+#   ``reachability.LINT_CODES``           — the 5 structural codes ``lint_workflow`` emits
+#   ``grounding.GROUNDING_VERDICT_CODES`` — the 3 fidelity codes ``grounding_verdicts`` emits
+#   ``_ROUTE_ASSIGNED_CODES``             — the 2 codes THIS route mints itself
+#
+# ``tests/unit/test_182_severity_codes.py`` SCANS the two owning modules' emit sites and
+# fails if a published set drifts from what its functions can really emit. That guard is
+# load-bearing: a failures-only test differential cannot see a code that was added without
+# ever being classified, because nothing was ever asserting about it.
+#
+# PUBLISH-ONLY, deliberately NOT composed in: ``publish_service``'s fail-closed stage-2.6
+# code ``grounding_unavailable`` (plan 182-06). Its canonical home is ``publish_service.py``.
+# ``/validate`` calls ``grounding.grounding_verdicts`` DIRECTLY, never
+# ``_grounding_fidelity_failures``, so that code cannot reach this classifier — it travels
+# on the D-08 publish verdict's ``named_failures`` instead. If a future change ever routes
+# publish's named failures through ``_severity``, add it to the composition here; until then
+# the fail-loud branch would classify it ``error``, which is the correct fail-closed answer
+# anyway, so the only cost would be a log warning. The boundary is pinned by a test.
+
+# The two codes the ROUTE mints itself — neither owning module emits them:
+#   ``business_requirement`` — minted in ``validate_workflow`` from
+#                              ``grounding.business_requirement_missing(body)`` being True
+#   ``interactive_phase``    — minted in ``validate_workflow``'s
+#                              ``publish_service._interactive_phase_failures(body)`` loop
+_ROUTE_ASSIGNED_CODES: frozenset[str] = frozenset(
     {
-        "bad_index",
-        "orphan_phase",
-        "unsatisfiable_skip",
-        "folder_scope",
-        "unregistered_tool",
-        "unregistered_skill",
+        "business_requirement",
+        "interactive_phase",
     }
 )
+
+# The NOT-YET-READY set (D-182-03): the author is still building, not broken. A product
+# decision, so these stay literals — deriving them would make the taxonomy unreadable.
+_INCOMPLETE_CODES: frozenset[str] = frozenset(
+    {
+        "input_unsatisfied",
+        "business_requirement",
+        "interactive_phase",
+    }
+)
+
+# ``no_terminal`` is DUAL-SOURCE (Pitfall 2) — resolved by the split inside ``_severity``
+# BEFORE any set lookup, so it belongs to neither bucket.
+_DUAL_SOURCE_CODES: frozenset[str] = frozenset({"no_terminal"})
+
+# Everything ``/validate`` knows how to classify.
+_KNOWN_CODES: frozenset[str] = (
+    LINT_CODES | grounding.GROUNDING_VERDICT_CODES | _ROUTE_ASSIGNED_CODES
+)
+
+# DERIVED, never listed: every known code that is neither a still-building condition nor
+# the dual-source one is a hard break. Keeping the ``_ERROR_CODES`` name so any existing
+# reference still resolves — but there is no longer a literal to drift.
+_ERROR_CODES: frozenset[str] = _KNOWN_CODES - _INCOMPLETE_CODES - _DUAL_SOURCE_CODES
 
 
 def _severity(code: str, *, phases_empty: bool) -> str:
@@ -377,12 +433,37 @@ def _severity(code: str, *, phases_empty: bool) -> str:
     ``phases == []`` (an empty draft — the author is still building) and an unreachable
     terminal (a genuinely broken graph). Same code, split severity, distinguished by the
     definition the route already holds — so an empty canvas paints grey "still building",
-    never red "broken"."""
-    if code == "no_terminal":
+    never red "broken".
+
+    FAILS CLOSED on an UNRECOGNISED code (WR-05). This function used to end in a bare,
+    unconditional SOFT default, so a code nobody had classified painted grey "still building"
+    on the canvas — and the author would then hit a hard publish BLOCK they were never warned
+    about. Failing loud instead (red, plus a logged warning naming the code) is strictly the
+    safer error: a wrongly-RED verdict is visible and gets fixed, a wrongly-GREY one is
+    invisible.
+
+    That branch is a LIVE path, not a theoretical one — Phase 184 and Phase 185 both add
+    verdict codes (185 adds the GOVERN per-node grounding-mode verdict, ROADMAP SC#4).
+    """
+    # (1) the dual-source split, resolved BEFORE any set lookup.
+    if code in _DUAL_SOURCE_CODES:
         return "incomplete" if phases_empty else "error"
+    # (2) still building.
+    if code in _INCOMPLETE_CODES:
+        return "incomplete"
+    # (3) broken.
     if code in _ERROR_CODES:
         return "error"
-    return "incomplete"
+    # (4) UNKNOWN — fail LOUD, never soft (WR-05).
+    logger.warning(
+        "POST /workflows/validate: unrecognised verdict code %r — classifying it as 'error' "
+        "(fail-closed). Add it to the canonical set of the module that emits it "
+        "(reachability.LINT_CODES / grounding.GROUNDING_VERDICT_CODES / "
+        "workflows._ROUTE_ASSIGNED_CODES) and, if it is a still-building condition rather "
+        "than a break, to workflows._INCOMPLETE_CODES.",
+        code,
+    )
+    return "error"
 
 
 @router.post(
