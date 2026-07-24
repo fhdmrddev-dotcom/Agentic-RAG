@@ -1,0 +1,134 @@
+"""Phase 181 (REVERT-01 / D-181-01,02,04) — the require_canvas 404 gate + flip-on path.
+
+The gate half of the off-switch. Proven end-to-end via the TEMPORARY canary route
+``GET /canvas/ping`` (D-181-04 — removed/repurposed when the first real canvas route lands
+in 182/183) so the 404-when-off posture is testable NOW, before any real canvas route exists.
+
+Behaviors pinned:
+  - flag off -> ``GET /canvas/ping`` returns **404, never 403** — for an operator AND a
+    non-operator caller (the "off" resolves BEFORE the operator no-op, D-181-01), byte-
+    identical to an unknown path;
+  - operator flip on (a stored {"audience": "everyone"} record) -> the gate is a no-op and
+    ``GET /canvas/ping`` returns 200;
+  - ``GET /features`` returns ``visual_workflow_canvas: false`` for an operator AND an end
+    user when off (the "off" guard wins over the ``op or ...`` short-circuit), and ``true``
+    after the flip on.
+
+Drives the resolver via ``monkeypatch.setattr(us, "load_app_settings", ...)`` (the Phase-148
+pattern) + patches the async ``is_operator`` seam per module (dependencies for the gate,
+features for the effective map) so no live operator_users row / pg pool is needed.
+"""
+from types import SimpleNamespace
+
+
+async def _is_op_true(user_id):
+    return True
+
+
+async def _is_op_false(user_id):
+    return False
+
+
+def _cold_off(monkeypatch):
+    """Flag off: an empty feature_visibility map -> canvas falls to its "off" cold default."""
+    from app.models import user_settings as us
+
+    monkeypatch.setattr(us, "load_app_settings", lambda: SimpleNamespace(feature_visibility={}))
+
+
+def _flipped_on(monkeypatch):
+    """Operator On flip: a stored {"audience": "everyone"} record for the canvas key."""
+    from app.models import user_settings as us
+
+    monkeypatch.setattr(
+        us,
+        "load_app_settings",
+        lambda: SimpleNamespace(
+            feature_visibility={"visual_workflow_canvas": {"audience": "everyone"}}
+        ),
+    )
+
+
+# ── require_canvas: 404 when off (never 403), for operator AND user ────────────
+
+def test_canvas_ping_404s_when_off_for_operator(client, monkeypatch):
+    """Even an OPERATOR gets a byte-identical 404 while off — "off" resolved before the no-op."""
+    import app.dependencies as deps
+
+    _cold_off(monkeypatch)
+    monkeypatch.setattr(deps, "is_operator", _is_op_true)  # operator — must STILL 404
+    resp = client.get("/canvas/ping")
+    assert resp.status_code == 404, resp.text  # never 403 — indistinguishable from not-built
+
+
+def test_canvas_ping_404s_when_off_for_user(client, monkeypatch):
+    """A non-operator gets a 404 (never 403) while off."""
+    import app.dependencies as deps
+
+    _cold_off(monkeypatch)
+    monkeypatch.setattr(deps, "is_operator", _is_op_false)
+    resp = client.get("/canvas/ping")
+    assert resp.status_code == 404, resp.text
+
+
+def test_canvas_ping_200_after_flip_on(client, monkeypatch):
+    """After an operator flip on (audience "everyone"), the gate is a no-op -> 200."""
+    import app.dependencies as deps
+
+    _flipped_on(monkeypatch)
+    monkeypatch.setattr(deps, "is_operator", _is_op_false)  # even a plain user: everyone -> pass
+    resp = client.get("/canvas/ping")
+    assert resp.status_code == 200, resp.text
+    assert resp.json() == {"ok": True}
+
+
+# ── GET /features: "off" hides the key from EVERYONE (operators included) ──────
+
+def test_features_hides_canvas_from_operator_when_off(client, monkeypatch):
+    """The "off" guard wins over the operator short-circuit (D-181-01) — operator sees False."""
+    import app.api.features as feats
+
+    _cold_off(monkeypatch)
+    monkeypatch.setattr(feats, "is_operator", _is_op_true)
+    resp = client.get("/features")
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["features"]["visual_workflow_canvas"] is False
+
+
+def test_features_hides_canvas_from_user_when_off(client, monkeypatch):
+    """A non-operator sees visual_workflow_canvas: false when off."""
+    import app.api.features as feats
+
+    _cold_off(monkeypatch)
+    monkeypatch.setattr(feats, "is_operator", _is_op_false)
+    resp = client.get("/features")
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["features"]["visual_workflow_canvas"] is False
+
+
+def test_features_shows_canvas_after_flip_on(client, monkeypatch):
+    """After the flip on (everyone), the map reveals the canvas to operator AND user."""
+    import app.api.features as feats
+
+    _flipped_on(monkeypatch)
+
+    monkeypatch.setattr(feats, "is_operator", _is_op_true)
+    assert client.get("/features").json()["features"]["visual_workflow_canvas"] is True
+
+    monkeypatch.setattr(feats, "is_operator", _is_op_false)
+    assert client.get("/features").json()["features"]["visual_workflow_canvas"] is True
+
+
+# ── no Phase-148 regression: the 4 shipped keys keep their polarity ───────────
+
+def test_features_existing_keys_unchanged_for_user_when_off(client, monkeypatch):
+    """The 4 shipped keys resolve for a non-operator exactly as Phase 148 shipped."""
+    import app.api.features as feats
+
+    _cold_off(monkeypatch)
+    monkeypatch.setattr(feats, "is_operator", _is_op_false)
+    features = client.get("/features").json()["features"]
+    assert features["skill_studio"] is False
+    assert features["model_management"] is False
+    assert features["workflow_authoring"] is True
+    assert features["governance_health"] is True
