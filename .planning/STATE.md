@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v3.5
-milestone_name: UX Consolidation & Chat Polish
-status: Awaiting next milestone
-last_updated: "2026-07-23T14:19:16.763Z"
-last_activity: 2026-07-23 — Milestone v3.5 completed and archived
+milestone: v3.6
+milestone_name: Visual / No-Code Workflow Studio
+status: planning
+last_updated: "2026-07-24T02:47:45.607Z"
+last_activity: 2026-07-24
 progress:
-  total_phases: 20
-  completed_phases: 4
-  total_plans: 17
-  completed_plans: 17
-  percent: 20
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -38,16 +38,16 @@ Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 op
 
 **v3.4 STRETCH carry-forwards (deferred with triggers → `.planning/v3.4-STRETCH-CARRYFORWARD.md`):** 169 Dept-Admin Shell · 170 Entitlement + Retention/Rate-Limit footholds · 171 Permission-Aware Citations (correct-sequencing: leak latent till dept/role folder-sharing ships) · 172 OIDC SSO (customer-triggered) · 173 Dept-Targeted Skills + rollout gating. **Cloud parity owed:** migrations 104-113 + `SECRETS_ENCRYPTION_KEY` at next production push.
 
-**⚑ Phase 177 org live-UAT → CLOUD (operator-approved deferral 2026-07-23 — MUST NOT LOSE):** 3 of 4 UAT items verified live + approved; **item 4 outstanding** = (a) cross-provider org-switch teardown/reprobe, (b) a real-IdP **SAML** sign-in round-trip with no cross-org leak, (c) the two org-matrix cells un-testable on a single-org-admin local account — **multi-org** switcher present + teardown, and the **member** cell where the org-admin shield + "Organization admin" menu entry must VANISH (not disable). **Re-open trigger:** at the next cloud/prod push of the v3.4 org surfaces, stand up a **test organization** (invite a 2nd account → yields multi-org + a member) and wire a **real IdP SAML** connection, then run all of (a)–(c). Naturally pairs with the "Cloud parity owed" push above and the 166/167/168 SSO live-UAT that already rolls forward. Tracked in `.planning/phases/177-v3-4-org-surface-polish/177-HUMAN-UAT.md` (blocked test + re_open_trigger) and memory `reference_v34_org_live_uat_cloud`.
+**⚑ Phase 177 org live-UAT → CLOUD (operator-approved deferral 2026-07-23 — MUST NOT LOSE):** 3 of 4 UAT items verified live + approved; **item 4 outstanding** = (a) cross-provider org-switch teardown/reprobe, (b) a real-IdP **SAML** sign-in round-trip with no cross-org leak, (c) the two org-matrix cells un-testable on a single-org-admin local account — **multi-org** switcher present + teardown, and the **member** cell where the org-admin shield + "Organization admin" menu entry must VANISH (not disable). **Re-open trigger:** at the next cloud/prod push of the v3.4 org surfaces, stand up a **test organization** (invite a 2nd account → yields multi-org + a member) and wire a **real IdP SAML** connection, then run all of (a)–(c). Naturally pairs with the "Cloud parity owed" push above and the 166/167/168 SSO live-UAT that already rolls forward. Tracked in `.planning/milestones/v3.5-phases/177-v3-4-org-surface-polish/177-HUMAN-UAT.md` (blocked test + re_open_trigger; archived at v3.6 kickoff) and memory `reference_v34_org_live_uat_cloud`.
 
 **Open reported bugs rolling forward** to a planned post-v3.3 chat-polish phase (none were folded into 146–159): BUG-260708-01/-02 (major), BUG-260714-01 (major), BUG-260712-02, BUG-260718-02/-03/-04, BUG-260609-02/-04, BUG-260610-01, BUG-260623-01, BUG-260706-01, BUG-260707-03; deferred BUG-260626-02/-03, BUG-260711-02; external BUG-260714-02 (OpenRouter). BUG-260718-01 CLOSED (folded into 159).
 
 ## Current Position
 
-Phase: Milestone v3.5 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-07-23 — Milestone v3.5 completed and archived
+Status: Defining requirements
+Last activity: 2026-07-24 — Milestone v3.6 started
 
 ### Quick Tasks Completed
 
