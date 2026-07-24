@@ -63,6 +63,10 @@ async def publish_workflow(
     # helpers (which re-import them locally) — publish_workflow itself needs only these.
     from app.db.workflows import get_definition, publish_definition
     from app.models.harness import WorkflowDefinition
+    # Phase 182 (D-182-02 / Pitfall 4): the D-13 stage-1 predicate is now a SHARED
+    # one-liner in the grounding module so publish and the canvas /validate seam call
+    # ONE copy — a copy-pasted rule drifts, even a trivial one.
+    from app.services.harness.grounding import business_requirement_missing
     from app.services.harness.reachability import lint_workflow
 
     user_id_raw = user.get("id")
@@ -121,7 +125,9 @@ async def publish_workflow(
         )
 
     # ── stage 1: business_requirement present? (D-13 publish-time invariant) ─────
-    if not (definition.business_requirement or "").strip():
+    # The predicate is the SHARED grounding.business_requirement_missing (Phase 182) —
+    # behavior identical, now one source with the canvas /validate seam.
+    if business_requirement_missing(definition):
         return await _block(
             pool,
             run_id=None,
