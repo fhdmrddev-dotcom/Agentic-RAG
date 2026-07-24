@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
-status: verifying
-last_updated: "2026-07-24T16:31:26.140Z"
+status: ready_to_plan
+last_updated: 2026-07-24T17:22:25.633Z
 last_activity: 2026-07-24 -- Phase 181 Plan 03 complete (scope-freeze + operator live-close) — HARD gate #1 CLOSED; phase 3/3, awaiting /gsd:verify-work 181
 progress:
   total_phases: 18
@@ -11,6 +11,7 @@ progress:
   total_plans: 3
   completed_plans: 3
   percent: 6
+stopped_at: Phase 181 complete (3/3) — ready to discuss Phase 182
 ---
 
 # Project State
@@ -22,7 +23,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-20 — Phase 163 THE ATOMIC CRUX complete; membership RLS enforced)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 181 — revert-foundation
+**Current focus:** Phase 182 — server validation seam
 
 ## Deferred Items
 
@@ -44,10 +45,10 @@ Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 op
 
 ## Current Position
 
-Phase: 181 (revert-foundation) — ALL PLANS COMPLETE (3/3), awaiting `/gsd:verify-work 181`
-Plan: 3 of 3 — COMPLETE
-Status: **HARD gate #1 CLOSED.** 181-03 shipped the reusable scope-freeze guard + the honest full-suite differential + the operator live-close sign-off. Phase 181 (Revert Foundation) is fully executed; next step is `/gsd:verify-work 181`, then Phase 182 (Server Validation Seam, VALID-01).
-Last activity: 2026-07-24 -- 181-03 shipped: `scripts/check-181-scope-freeze.sh` (the two authoring doors + developer run surface + harness engine PROVEN absent from the phase diff — D-181-08; reusable at milestone-close), the honest full-suite differential (backend 201+1/2958 + frontend 31/1846 = ZERO net-new vs baseline, 181 suites green — D-181-06), and the operator live-close UAT (flag-off no canvas nav, `GET /features` canvas=false for the operator, Off|On flip round-trips + records named audit receipts, `/canvas/ping` 404-when-off / 200-when-on — D-181-07). Operator **approved** (`fhdmrd@gmail.com`, local app). REVERT-01/REVERT-02 satisfied; zero migration / zero package.
+Phase: 182
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-07-24
 
 ### Quick Tasks Completed
 
