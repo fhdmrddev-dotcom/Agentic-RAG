@@ -267,7 +267,7 @@ Committed as gated phases (ship only if CORE lands clean and budget remains; v2.
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 181. Revert Foundation | 3/3 | Complete (awaiting verify) | 2026-07-24 |
-| 182. Server Validation Seam | 3/3 | Complete (awaiting verify) | 2026-07-24 |
+| 182. Server Validation Seam | 3/3 | Gaps found (SC#4) | - |
 | 183. Read-Only Canvas | 0/? | Not started | - |
 | 184. Editable Canvas + Live Structural Validation | 0/? | Not started | - |
 | 185. Graded Governance — Grounding Mode + Action-Risk Dial | 0/? | Not started | - |
