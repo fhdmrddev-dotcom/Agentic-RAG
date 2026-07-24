@@ -88,7 +88,10 @@ Committed as gated phases (ship only if CORE lands clean and budget remains; v2.
   3. A `test_revert_byte_identical` gate runs in CI and at live milestone-close, asserting the flag-off product is byte-identical to today — revertibility is a tested acceptance gate, not a prose claim (REVERT-02).
   4. Any schema the milestone introduces is additive-nullable-only and every new route is flag/404-gated at every layer, so the off-switch can never leave a non-revertible remnant (Pitfall 2).
 
-**Plans**: TBD
+**Plans**: 3 plans
+- [ ] 181-01-PLAN.md — Backend off-switch: the "off" audience + 404 require_canvas gate + temporary canary route + backend byte-identical test gate (Wave 1)
+- [ ] 181-02-PLAN.md — Frontend feature wiring + operator Off|On FeatureVisibility card + frontend nav byte-identical test (Wave 2)
+- [ ] 181-03-PLAN.md — Scope-freeze script (doors/run-surface/harness frozen) + full-suite green + operator live-close UAT (Wave 3)
 **UI hint**: yes
 **Flags**: HARD gate #1 (preserve-v1/revert); red line D-14 (flag-off byte-identical, no new runtime); reuse-heavy (v3.3 `skill_studio` feature-flag pattern — known-good, repeat it); `test_revert_byte_identical` CI + live-close gate; additive-nullable-only schema; no threat model (tested-revert gate, not a trust boundary); no migration (flag key in `_GOVERNED_FEATURES`; `app_settings.feature_visibility` already exists).
 
@@ -260,7 +263,7 @@ Committed as gated phases (ship only if CORE lands clean and budget remains; v2.
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 181. Revert Foundation | 0/? | Not started | - |
+| 181. Revert Foundation | 0/3 | Planned | - |
 | 182. Server Validation Seam | 0/? | Not started | - |
 | 183. Read-Only Canvas | 0/? | Not started | - |
 | 184. Editable Canvas + Live Structural Validation | 0/? | Not started | - |
