@@ -90,8 +90,8 @@ Committed as gated phases (ship only if CORE lands clean and budget remains; v2.
 
 **Plans**: 3 plans
 - [x] 181-01-PLAN.md — Backend off-switch: the "off" audience + 404 require_canvas gate + temporary canary route + backend byte-identical test gate (Wave 1)
-- [ ] 181-02-PLAN.md — Frontend feature wiring + operator Off|On FeatureVisibility card + frontend nav byte-identical test (Wave 2)
-- [ ] 181-03-PLAN.md — Scope-freeze script (doors/run-surface/harness frozen) + full-suite green + operator live-close UAT (Wave 3)
+- [x] 181-02-PLAN.md — Frontend feature wiring + operator Off|On FeatureVisibility card + frontend nav byte-identical test (Wave 2)
+- [x] 181-03-PLAN.md — Scope-freeze script (doors/run-surface/harness frozen) + full-suite green + operator live-close UAT (Wave 3)
 **UI hint**: yes
 **Flags**: HARD gate #1 (preserve-v1/revert); red line D-14 (flag-off byte-identical, no new runtime); reuse-heavy (v3.3 `skill_studio` feature-flag pattern — known-good, repeat it); `test_revert_byte_identical` CI + live-close gate; additive-nullable-only schema; no threat model (tested-revert gate, not a trust boundary); no migration (flag key in `_GOVERNED_FEATURES`; `app_settings.feature_visibility` already exists).
 
@@ -263,7 +263,7 @@ Committed as gated phases (ship only if CORE lands clean and budget remains; v2.
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 181. Revert Foundation | 0/3 | Planned | - |
+| 181. Revert Foundation | 3/3 | Complete (awaiting verify) | 2026-07-24 |
 | 182. Server Validation Seam | 0/? | Not started | - |
 | 183. Read-Only Canvas | 0/? | Not started | - |
 | 184. Editable Canvas + Live Structural Validation | 0/? | Not started | - |
