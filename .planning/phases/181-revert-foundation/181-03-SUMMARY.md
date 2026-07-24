@@ -83,6 +83,26 @@ The four points below were observed LIVE on the operator account (`fhdmrd@gmail.
 3. **The Off | On operator control (not the triad) + named audit receipts.** Control Room → Users & Access → Feature visibility: the "Visual workflow canvas" row renders a simple two-position **Off | On** control (NOT the Everyone / Operators-only / By-role triad the other four features show). The On→Off round-trip recorded two named receipts on `GET /admin/audit` — "Made visual_workflow_canvas visible to everyone" (16:25:57Z) and "Made visual_workflow_canvas visible to off" (16:26:26Z), both attributed to the operator.
 4. **`/canvas/ping` 404-when-off, gate tracks the flag.** Authenticated `/canvas/ping` returned **404 when the flag is off** (200 when on), never 403 for an authenticated request (unauthenticated is 403 at the auth layer). Live gate-tracks-flag proof: flipping On made `/features` canvas=true + `/canvas/ping` 200; flipping Off reverted both to false + 404. The flag was left restored to Off (default).
 
+### Post-review fix (CR-01) — 2026-07-24, commit `b0e48fda`
+
+The parenthetical caveat in item 4 above ("unauthenticated is 403 at the auth layer") was a
+**byte-identity leak** and was flagged as code-review Critical **CR-01**: while off,
+`require_canvas`'s `Depends(get_current_user)` chain returned **403** for an absent
+Authorization header and **401** for a bogus/expired token BEFORE the off-flag check ran, so the
+off canvas was distinguishable from an unbuilt route for any unauthenticated caller — breaking
+the D-181-07 property for the callers who inherit `Depends(require_canvas())` in every later
+v3.6 phase.
+
+**Resolved at the root** (`backend/app/dependencies.py`), mirroring the `/admin` WR-02 pattern:
+a non-raising `_canvas_bearer_scheme` (`auto_error=False`) + a `authenticate_canvas_request`
+helper, with the off-flag check moved AHEAD of any token validation. Now **unauthenticated AND
+bogus-token callers both 404** (byte-identical `{"detail":"Not Found"}`), live-proven against
+uvicorn :8000: no-auth `403 → 404`, bogus-token `401 → 404`, matching the unbuilt-route 404.
+**Byte-identity now holds for ALL callers, not just authenticated ones.** A CR-01 regression
+(`test_require_canvas_404s_pre_auth_when_off`) locks this in on the existing CI. (Review WR-01 —
+the `"off"` audience settable on the 4 pre-existing keys — was intentionally **deferred** by the
+operator and remains a documented advisory in `181-REVIEW.md`.)
+
 ## Full-Suite Differential (D-181-06 — honest, per documented repo rot)
 
 Not a raw 0-failures claim — measured against the documented phase-start baseline; the gate is **zero net-new failures**:

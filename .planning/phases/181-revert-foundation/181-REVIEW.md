@@ -26,7 +26,13 @@ findings:
   warning: 1
   info: 1
   total: 3
+  resolved: [CR-01]
 status: issues_found
+post_review_fixes:
+  - id: CR-01
+    status: resolved
+    commit: b0e48fda
+    note: "require_canvas now resolves the off-flag BEFORE auth via a non-raising _canvas_bearer_scheme; anonymous/bogus callers get a byte-identical 404 (live-proven). WR-01 left as a documented advisory (operator deferred)."
 ---
 
 # Phase 181: Code Review Report
@@ -176,6 +182,33 @@ Also add a test that hits `/canvas/ping` **without** relying on the conftest's b
 `get_current_user` override (e.g. `app.dependency_overrides.pop(get_current_user, None)` for
 the duration of the test, or a dedicated minimal-app fixture) so this class of regression is
 caught in CI going forward — the current suite structurally cannot detect it.
+
+**✅ RESOLVED (commit `b0e48fda`, 2026-07-24):** Fixed at the root in
+`backend/app/dependencies.py`, mirroring the `/admin` WR-02 pattern. Added
+`_canvas_bearer_scheme = HTTPBearer(auto_error=False)` + a never-raising
+`authenticate_canvas_request` helper, and restructured `require_canvas()._dep` to resolve the
+`feature_audience("visual_workflow_canvas") == "off"` check **first** (against the non-raising
+credentials) so the 404 is returned to EVERY caller before any token is validated — an absent
+header, an invalid/expired token, or a banned user all fold into the same byte-identical 404,
+never a 403/401. The shared `get_current_user` / `bearer_scheme` path is untouched. The ON path
+now resolves the caller via the monkeypatchable `authenticate_canvas_request` seam (called AFTER
+the flag check), so the existing ON-case tests stay green without reintroducing auth-before-flag.
+A CR-01 regression (`test_require_canvas_404s_pre_auth_when_off` in
+`test_revert_byte_identical.py`) pops the `get_current_user` override — exactly as the WR-02
+regression does — and asserts no-header AND bogus-token → 404 (`!= 403`, `!= 401`) plus
+unbuilt-route parity; it is falsifiable against the pre-fix chain (which returned 403/401 there).
+
+**Live proof (flag off, uvicorn :8000):**
+
+```
+BEFORE (pre-fix)                 AFTER (b0e48fda)
+NO AUTH HEADER  -> 403           NO AUTH HEADER  -> 404  {"detail":"Not Found"}
+BOGUS TOKEN     -> 401           BOGUS TOKEN     -> 404  {"detail":"Not Found"}
+/canvas/<random>-> 404           /canvas/<random>-> 404  {"detail":"Not Found"}
+```
+
+Byte-identity now holds for ALL callers (not just authenticated ones); the property every later
+v3.6 canvas phase inherits via `Depends(require_canvas())` is sound.
 
 ## Warnings
 
