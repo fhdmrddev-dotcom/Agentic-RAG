@@ -7,6 +7,7 @@
 > **Convention:** this project ships **CORE** (committed) + **STRETCH** (gated behind CORE — ship only if CORE lands clean and budget remains; v2.9 105-109 / v3.1 125-131 / v3.2 138-144 / v3.3 156-159 / v3.4 169-173 / v3.5 178-180 precedent).
 > **Research base:** `.planning/research/SUMMARY.md` (+ STACK / FEATURES / ARCHITECTURE / PITFALLS). Confidence HIGH; four researchers converged on the same shape and build order.
 > **Operator scoping calls (2026-07-24):** connector depth = *governed node model CORE + thin live demo slice STRETCH*; CORE = revert→run-viz + concurrency, STRETCH = live connectors + scale.
+> **Deep competitor crawl (2026-07-24 — Beam / Glean / n8n, `.planning/research/deep-dive/`):** confirmed NONE grade strictness by KB-grounding — the operator's *strict-when-grounded / flexible-when-open* rule is category white-space → added a first-class **GOVERN** category (two per-node dials: grounding-strictness + action-risk) as a **dedicated CORE phase**. n8n SSRF-CVE lessons sharpen CONN-03.
 
 ## CORE Requirements (committed)
 
@@ -18,7 +19,7 @@
 ### VALID — the anti-drift governance seam (the differentiator)
 
 - [ ] **VALID-01**: The server exposes `POST /workflows/validate` that reuses the existing `reachability.lint_workflow` + grounding-fidelity checks verbatim — the single source of validation truth; the canvas never re-implements the rules client-side.
-- [ ] **VALID-02**: A user editing on the canvas is prevented from drawing an invalid or unsafe workflow — structural / reachability / tool-whitelist / gate violations surface live *as the canvas is built* ("you cannot draw an invalid or unsafe workflow"). *(Headline differentiator — no competitor validates the flow at author-time.)*
+- [ ] **VALID-02**: A user editing on the canvas is prevented from drawing a **structurally** invalid workflow — reachability / tool-whitelist / gate-wiring violations surface live *as the canvas is built* ("you cannot draw an invalid workflow"). *(Headline differentiator — no competitor validates the flow at author-time.)* Per-node grounding *strictness* is layered on top by GOVERN (graded, not blanket).
 - [ ] **VALID-03**: A user sees per-node validation status (badges / inline errors) derived from the server verdict, never from a client-side guess.
 
 ### CANVAS — the visual authoring surface
@@ -26,7 +27,15 @@
 - [ ] **CANVAS-01**: A user can view an existing workflow as a visual node canvas — a read-only projection of its `WorkflowDefinition` (nodes = phases, edges = flow + `skip_to_phase` branches), rendered via `@xyflow/react`.
 - [ ] **CANVAS-02**: A user can add, move, connect, and delete phase-nodes; edits round-trip losslessly back to `WorkflowDefinition` (one client serializer) and save through the **existing** draft CRUD (create-once-then-PATCH). Node layout/positions are kept OUT of the immutable definition JSONB.
 - [ ] **CANVAS-03**: A user can configure a selected node in a side panel, backed by the existing `PhaseConfig` discriminated-union schema (Pydantic stays authoritative).
-- [ ] **CANVAS-04**: The canvas expresses governance as visible rails — locked phase order, per-phase tool whitelists, and validation gates the user cannot wire around (governance rendered, never removed).
+- [ ] **CANVAS-04**: The canvas expresses governance as visible rails — locked phase order, per-phase tool whitelists, and validation gates the user cannot wire around (governance rendered, never removed). The rails are **graded** per GOVERN — strict on grounded nodes, flexible on open agentic nodes.
+
+### GOVERN — graded per-node governance (the deep-crawl differentiator)
+
+*Deep competitor crawl (Beam / Glean / n8n) confirmed NONE grade strictness by KB-grounding — category white-space, buildable directly on the existing validation-gate library. The concrete "governed ↔ flexible" reconciliation SEED-123 names: **KB-retrieval is what turns strictness ON.***
+
+- [ ] **GOVERN-01**: Each node carries a **grounding mode** — *Grounded / strict* auto-attaches the immutable `citations_required` + confidence gate (the node must cite retrieved knowledge above the confidence threshold, else fail / route to HITL) vs *Open / flexible* (an open agentic / reasoning / tool step, NOT gated on KB citation). A single workflow can freely MIX strict-grounded and open nodes; on a grounded node the strict gate is structurally enforced and NOT author-loosenable-away. Additive to the engine — Deep byte-identical when unset (D-14).
+- [ ] **GOVERN-02**: The canvas visibly marks each node's governance state (grounded-strict-cited vs open-flexible), so a business user can see which steps are trustworthy/cited vs exploratory; the "can't draw an unsafe workflow" rails apply **graded** — enforced on grounded nodes, relaxed on open ones.
+- [ ] **GOVERN-03**: Each node can carry an **action-risk** checkpoint — an outbound / write / external-action node gets an approval / human-in-the-loop gate before it executes, built on the existing `llm_human_input` phase-type substrate (the second orthogonal dial, adopted from Beam's per-node consent pattern).
 
 ### VOCAB — approachability for business users
 
@@ -53,7 +62,7 @@
 ### CONN — thin live connector slice (operator HARD gate #3, live-proof half)
 
 - [ ] **CONN-02**: A user can run 2–3 first-party **live** connectors from a workflow — email out, JIRA/ticket create, Slack notify — as the demo-able external-integration proof (MCP-backed action nodes). Broad catalog / inbound webhooks / public API sequence with Open Platform (SEED-013), NOT forked into v3.6.
-- [ ] **CONN-03**: Every connector outbound is secured — an unconditional SSRF / egress allow-list guard on every outbound fetch *regardless of credential state* (avoids the n8n "guarded only when a credential is attached" CVE class), org-scoped Fernet-encrypted credentials resolved server-side by reference (never in the definition JSONB or the client), and a dedicated cross-org credential-leak test. Rides with CONN-02; mandatory `/gsd:secure-phase` (`threats_open: 0`).
+- [ ] **CONN-03**: Every connector outbound is secured — an unconditional SSRF / egress allow-list guard on every outbound fetch *regardless of credential state* (avoids the n8n "guarded only when a credential is attached" CVE class; the sibling "authenticated ≠ safe" RCE class → sandbox all expression/template evaluation, NO arbitrary-code node on a business canvas), org-scoped Fernet-encrypted credentials resolved server-side by reference (never in the definition JSONB or the client), and a dedicated cross-org credential-leak test. Rides with CONN-02; mandatory `/gsd:secure-phase` (`threats_open: 0`).
 
 ### SCALE — conditional hardening
 
@@ -65,7 +74,7 @@
 - **OPEN-02**: Inbound webhooks / event triggers that START a workflow from an external system.
 - **OPEN-03**: Public REST API + MCP server + service accounts (the app-as-integration-target half of the Open Platform).
 - **OPEN-04**: Real-time collaborative multi-cursor canvas editing (CRDT/OT) — heavy infra; soft-lock (CONCUR-02) is the v3.6 cut.
-- **OPEN-05**: Free-placement node-layout persistence (`workflow_layouts` side table) — only if a sketch/discuss pass confirms deterministic auto-layout is insufficient; otherwise auto-layout only (zero migration).
+- **OPEN-05**: Free-placement node-layout persistence (`workflow_layouts` side table) — only if a sketch/discuss pass confirms deterministic auto-layout is insufficient; otherwise auto-layout only (zero migration). *(Sketch-conditional on Phase 184.)*
 
 ## Out of Scope
 
@@ -84,37 +93,40 @@ Explicitly excluded. Anti-features from research documented to prevent scope cre
 
 ## Traceability
 
-Which phases cover which requirements. Populated during roadmap creation (Phase column filled by the roadmapper).
+Which phases cover which requirements. Filled at roadmap creation 2026-07-24, revised same day after the deep competitor crawl added the GOVERN CORE phase (CORE Phases 181-189, STRETCH Phases 190-191; numbering skips reserved 178-180 = the v3.5 STRETCH carry-forwards).
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| REVERT-01 | TBD | Pending |
-| REVERT-02 | TBD | Pending |
-| VALID-01 | TBD | Pending |
-| VALID-02 | TBD | Pending |
-| VALID-03 | TBD | Pending |
-| CANVAS-01 | TBD | Pending |
-| CANVAS-02 | TBD | Pending |
-| CANVAS-03 | TBD | Pending |
-| CANVAS-04 | TBD | Pending |
-| VOCAB-01 | TBD | Pending |
-| VOCAB-02 | TBD | Pending |
-| VOCAB-03 | TBD | Pending |
-| RUNVIZ-01 | TBD | Pending |
-| RUNVIZ-02 | TBD | Pending |
-| CONCUR-01 | TBD | Pending |
-| CONCUR-02 | TBD | Pending |
-| CONN-01 | TBD | Pending |
-| CONN-02 (STRETCH) | TBD | Pending |
-| CONN-03 (STRETCH) | TBD | Pending |
-| SCALE-01 (STRETCH) | TBD | Pending |
+| REVERT-01 | Phase 181 | Pending |
+| REVERT-02 | Phase 181 | Pending |
+| VALID-01 | Phase 182 | Pending |
+| VALID-02 | Phase 184 | Pending |
+| VALID-03 | Phase 184 | Pending |
+| CANVAS-01 | Phase 183 | Pending |
+| CANVAS-02 | Phase 184 | Pending |
+| CANVAS-03 | Phase 184 | Pending |
+| CANVAS-04 | Phase 184 | Pending |
+| GOVERN-01 | Phase 185 | Pending |
+| GOVERN-02 | Phase 185 | Pending |
+| GOVERN-03 | Phase 185 | Pending |
+| CONCUR-01 | Phase 186 | Pending |
+| CONCUR-02 | Phase 186 | Pending |
+| VOCAB-01 | Phase 187 | Pending |
+| VOCAB-02 | Phase 187 | Pending |
+| VOCAB-03 | Phase 187 | Pending |
+| RUNVIZ-01 | Phase 188 | Pending |
+| RUNVIZ-02 | Phase 188 | Pending |
+| CONN-01 | Phase 189 | Pending |
+| CONN-02 (STRETCH) | Phase 190 | Pending |
+| CONN-03 (STRETCH) | Phase 190 | Pending |
+| SCALE-01 (STRETCH) | Phase 191 | Pending |
 
 **Coverage:**
-- CORE requirements: 17 total (REVERT ×2, VALID ×3, CANVAS ×4, VOCAB ×3, RUNVIZ ×2, CONCUR ×2, CONN-01 ×1)
-- STRETCH requirements: 3 total (CONN-02, CONN-03, SCALE-01)
-- Mapped to phases: 0 (roadmap pending)
-- Unmapped: 20 ⚠️ (filled at roadmap creation)
+- CORE requirements: 20 total (REVERT ×2, VALID ×3, CANVAS ×4, GOVERN ×3, CONCUR ×2, VOCAB ×3, RUNVIZ ×2, CONN-01 ×1) → Phases 181-189
+- STRETCH requirements: 3 total (CONN-02, CONN-03, SCALE-01) → Phases 190-191
+- Mapped to phases: 23 ✓
+- Unmapped: 0 — every requirement maps to exactly one phase; no duplicates.
 
 ---
 *Requirements defined: 2026-07-24 (after research-first domain study — 4 dimensions + synthesis)*
-*Last updated: 2026-07-24 after initial definition*
+*Last updated: 2026-07-24 — GOVERN category added after the deep competitor crawl (Beam/Glean/n8n); traceability re-mapped to Phases 181-191 (11 phases, 23 reqs)*

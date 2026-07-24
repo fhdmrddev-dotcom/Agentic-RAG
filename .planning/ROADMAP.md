@@ -19,13 +19,274 @@
 - ✅ **v3.3 Operator UX** — Phases 146-159 (shipped 2026-07-18). Operator/admin tier (gated /admin Control Room + governance) + dynamic model-registry/discovery + secrets-at-rest + workflow/agent file-inputs + inline citations + plain-language + WCAG-AA + deployment presets/install wizard. 20/20 requirements delivered.
 - ✅ **v3.4 Multi-Tenancy & Org Access** — Phases 160-168 CORE (shipped 2026-07-22); STRETCH 169-173 deferred → carry-forward guide `.planning/v3.4-STRETCH-CARRYFORWARD.md`. The load-bearing **one-way RLS door**: membership-based tenancy (Tenancy ADR → org/dept/role schema → personal-org backfill → the atomic RLS + user-JWT-client-swap crux → SECDEF audit + two-org isolation suite → `is_global` retirement → org-admin shell/switcher → invitations/roles/greenlists → SAML SSO). Migrations 104-113.
 - ✅ **v3.5 UX Consolidation & Chat Polish** — Phases 174-177 CORE (shipped 2026-07-23); STRETCH 178-180 deferred → carry-forward guide `.planning/v3.5-STRETCH-CARRYFORWARD.md`. Cleared the load-bearing chat-surface bug backlog + consolidated the accumulated UI/UX (incl. the new v3.4 org surfaces) into one coherent, honest experience: run-state & lifecycle honesty (174) · cross-provider streaming fidelity (175) · chat render correctness + exec reliability (176) · v3.4 org-surface family-cohesion polish (177). 14/14 CORE requirements delivered; no migration. Full detail archived: `.planning/milestones/v3.5-ROADMAP.md`.
-- 📋 **v3.6 Visual / No-Code Workflow Studio** ([[SEED-123]]) — the research-first next milestone (a Large net-new build, kept deliberately separate from the v3.5 cleanup): a drag-and-drop node-canvas authoring layer over the existing harness workflow engine. 3 operator hard requirements (preserve-v1 / revert-at-any-time · study Glean/Beam/n8n · comprehensive email/JIRA integration/connector story). The enterprise-GTM track (Open Platform API/MCP + connectors SEED-013/014, config-consolidation SEED-117 §1/§3) sequences after. **Authoritative map: `PRDs/SEQUENCE.md`.**
+- 🚧 **v3.6 Visual / No-Code Workflow Studio** ([[SEED-123]]) — 🚧 ACTIVE (roadmap created 2026-07-24). CORE **Phases 181-189** + STRETCH **190-191** (178-180 reserved for the v3.5 STRETCH carry-forwards, NOT reused). A drag-and-drop node-canvas authoring + non-technical live-run-observability layer ON TOP of the existing governed harness engine (build-on-not-rewrite). Headline differentiator from the deep competitor crawl (Beam/Glean/n8n): **graded governance** — strict-when-KB-grounded / flexible-when-open per node (the category white-space no competitor covers, CORE Phase 185). 3 operator HARD gates: preserve-v1 / revert-at-any-time (feature-flagged, tested byte-identical) · study + beat Glean/Beam/n8n · comprehensive email/JIRA connector story (MCP-first; own-vs-Open-Platform decided by research). One net-new dep — `@xyflow/react` v12 (MIT). The enterprise-GTM track (Open Platform API/MCP + connectors SEED-013/014, config-consolidation SEED-117 §1/§3) sequences after. **Authoritative map: `PRDs/SEQUENCE.md`.**
 
 ---
 
-## v3.5 UX Consolidation & Chat Polish — 🚧 ACTIVE (started 2026-07-22)
+## v3.6 Visual / No-Code Workflow Studio — 🚧 ACTIVE (started 2026-07-24)
 
-**Started:** 2026-07-22 (operator-confirmed UX-track sequencing at v3.4-close: the polish cluster now, Visual Workflow Studio next as v3.6). **Roadmap created:** 2026-07-22.
+**Started:** 2026-07-24 (operator-confirmed at v3.5-close — the recorded post-v3.4 sequencing: the polish cluster shipped as v3.5, this ships as v3.6, run **research-first**). **Roadmap created:** 2026-07-24 (after the research-first domain study — 4 dimensions + synthesis; `.planning/research/SUMMARY.md`, confidence HIGH). **Revised:** 2026-07-24 — a deep competitor crawl (Beam / Glean / n8n, `.planning/research/deep-dive/`) confirmed **NONE grade governance by KB-grounding**, so a first-class **GOVERN** category (per-node grounding-strictness + action-risk dials) was added as a dedicated CORE phase (185); the tail renumbered (CORE 181-189, STRETCH 190-191).
+
+**Goal:** Add a drag-and-drop, business-friendly **visual authoring + live-run observability layer** on top of the existing governed harness workflow engine — so a non-technical business user (Legal / HR / Finance) can *draw their own process* and watch it run, without losing the engine's governance rails. Build ON what exists (the read-only vertical phase-spine graph becomes editable; the visual canvas becomes a third, most-approachable authoring door alongside "Describe & run" / "Author & govern"). **NOT an engine rewrite** — the heart is a UX + integration problem over a governed engine that already exists and is trusted.
+
+**The headline differentiator (the deep-crawl white-space):** no competitor grades strictness by KB-grounding. Our category-level win is **graded governance** — a node is *strict when grounded* (must cite retrieved knowledge above a confidence threshold) and *flexible when open* (an exploratory agentic step), freely mixed in one workflow, with the strict gate structurally enforced and not author-loosenable-away. Governance is the shape of the artifact, not a bolted-on run-time check.
+
+**Red line (every phase — D-14, load-bearing):** the canvas is a pure **projection** of `WorkflowDefinition`, never a second source of truth and never a second runtime; the harness engine stays the ONLY executor; every new route is flag/404-gated at every layer; Deep Mode stays byte-identical; provider differences stay at the gateway/adapter/sanitizer boundary. Operator HARD gate #1 (`test_revert_byte_identical`) makes flag-off provably byte-identical.
+
+**Numbering:** CORE **Phases 181-189**, STRETCH **Phases 190-191**. **Phases 178-180 are RESERVED** for the deferred v3.5 STRETCH carry-forwards (Chat UI/UX Polish, Plain-Language Extensions, Agent-Loop Honesty — `.planning/v3.5-STRETCH-CARRYFORWARD.md`) and are NOT reused here (exactly as v3.5 skipped the reserved 169-173). **Stack:** one net-new dep — `@xyflow/react` v12 (^12.11.2, MIT, React-19-compatible, uses the app's existing zustand internally); `zundo` for undo/redo (Phase 184). The app is on React 19.2.4 (not 18). **Migrations:** live head = 113; **next free slot = 114 reserved ONLY IF** the nullable `workflow_layouts` side table (CANVAS-02 / OPEN-05) is confirmed needed at the Phase-184 sketch — otherwise deterministic auto-layout = ZERO migrations. Graded governance (185) is a ZERO-migration additive optional field in the definition JSONB. Phase 190 (connectors, STRETCH) likely adds an org-scoped connector-credentials table (sized at sketch; reuses `SECRETS_ENCRYPTION_KEY`, no new key).
+
+**Scope source:** `.planning/REQUIREMENTS.md` (20 CORE + 3 STRETCH = 23 reqs). **Reported-bugs mandate:** the open `surface: Agentic-RAG` chat-surface backlog stays OUT (it is the v3.5 STRETCH 178-180 chat-polish track, SEED-045 — a SEPARATE track, not this build); cross-check `.planning/reported-bugs/` at each `/gsd:discuss-phase` and fold only a report whose `affected_areas` genuinely overlaps a canvas / validate / governance / run-viz / connector surface.
+
+### Phase Table (CORE — Phases 181-189)
+
+| Phase | Name | Goal | Requirements | SC# | Flags |
+|-------|------|------|--------------|-----|-------|
+| 181 | Revert Foundation | The entire visual canvas layer flips on/off via one governed feature flag, and with it off the product is provably byte-identical to today (HARD gate #1) | REVERT-01, REVERT-02 | 4 | **HARD gate #1** (preserve-v1/revert); **red line D-14**; reuse-heavy (v3.3 `skill_studio` feature-flag pattern); `test_revert_byte_identical` CI + live-close gate; additive-nullable-only; **no threat model**; no migration; UI hint |
+| 182 | Server Validation Seam | The server exposes one source of validation truth (`POST /workflows/validate`) the canvas can call, reusing `lint_workflow` verbatim so the canvas can never drift from the publish gauntlet | VALID-01 | 4 | backend-only reuse (anti-drift seam, Pitfall 1); flag-gated 404 (inherits 181); **red line D-14**; **no SC#10**; no threat model; no migration; no `@xyflow` yet |
+| 183 | Read-Only Canvas | A user can view an existing workflow as a faithful read-only node canvas — proving the projection model before any write complexity | CANVAS-01 | 4 | **G-2 sketch**; **stack: `@xyflow/react` v12 introduced here**; **G-5 ledger** (`WorkflowCanvas.tsx`/`canvasModel.ts`/`PhaseNode.tsx` mirror `PhaseSpineGraph.tsx` — proactive glyph/parse extraction, 1st touch); pure projection (layout computed, not persisted — Pitfall 3); **red line D-14**; no SC#10; no threat model; no migration; UI hint |
+| 184 | Editable Canvas + Live Structural Validation (Round-Trip) | A user can visually author a workflow — add / move / connect / configure / delete nodes — with edits round-tripping losslessly to the definition and live server validation preventing a **structurally** invalid flow (the core deliverable; per-node grounding *strictness* is layered on by 185, not baked here) | CANVAS-02, CANVAS-03, CANVAS-04, VALID-02, VALID-03 | 5 | **CORE deliverable** (VALID-02 author-time STRUCTURAL validation — reachability/whitelist/gate-wiring); **G-2 sketch**; **stack: `zundo`**; one-serializer round-trip → EXISTING draft CRUD, layout OUT of JSONB (Pitfall 3); server-authoritative per-node badges (VALID-03); **G-5 ledger** (`WorkflowBuilderPage.tsx` = 3rd door; `PhaseNode.tsx` 2nd touch); CANVAS-04 rails are **graded per GOVERN (185)**; **migration SKETCH-CONDITIONAL** (slot 114 ONLY IF `workflow_layouts` confirmed, else ZERO); **red line D-14**; no SC#10; no threat model unless discuss surfaces one; UI hint |
+| 185 | **Graded Governance: Per-Node Grounding Mode + Action-Risk Dial** | Each node carries a grounding mode (Grounded/strict auto-attaches the immutable `citations_required` + confidence gate; Open/flexible is ungated) and an orthogonal action-risk approval checkpoint — the milestone's headline differentiator, on a working canvas | GOVERN-01, GOVERN-02, GOVERN-03 | 5 | **HEADLINE differentiator** (no competitor grades by grounding — deep-crawl white-space); ENGINE-ADDITIVE (optional `grounding_mode` field AUTO-ATTACHES the EXISTING immutable `citations_required` + confidence gate on grounded nodes; open nodes ungated); GOVERN-03 reuses the existing `llm_human_input` phase-type for the approval checkpoint; **Deep byte-identical when unset — D-14 load-bearing**; **G-2 sketch** (grounded-strict vs open-flexible badges + mode toggle "feels like"); **SC#10** (grounded citation/confidence enforcement rides the provider-sensitive retrieval/agent path — verify graded strictness holds cross-provider); **G-5 ledger** (`PhaseNode.tsx` ~3rd touch → refactor-before-3rd-touch PROACTIVELY + the validation seam); **no full threat model** (reuses the enforced gate library; the structural "not author-loosenable-away" property verified in-phase); **NO migration** (additive optional field in the WorkflowDefinition JSONB, not a column); UI hint |
+| 186 | Concurrency & Autosave | Continuous canvas autosave is safe on org-shared workflows — a cosmetic drag never mints a version or re-arms the gauntlet, and two editors cannot silently clobber each other | CONCUR-01, CONCUR-02 | 4 | autosave-in-place (CONCUR-01); soft-lock / optimistic-token co-edit guard (mirrors `publish_definition` WR-03); **parallel-editor UAT row (SC#10 parallel axis)**; mechanism (block vs warn vs merge) = sketch/discuss call; **red line D-14**; **no full SC#10**; no threat model (v3.4 org RLS enforces the share boundary); no migration; UI hint |
+| 187 | Business Vocabulary + AI-Seeded Canvas | A business user sees plain-language node verbs and can describe a workflow in natural language to get a safe, editable seeded canvas draft — the AI seed respects grounding mode (a seeded grounded node auto-gets its citation/confidence gate — safe-by-construction) | VOCAB-01, VOCAB-02, VOCAB-03 | 5 | **G-2 sketch**; **SC#10** (VOCAB-02 AI-seed rides the provider-routed `POST /generate` NL generator); extends v3.3 LANG-01 + SEED-085 + Technical-names reveal; AI-seed structurally-safe (schema IS `extra="forbid"` union — Pitfall 7) + **respects grounding mode (185)**; reuses Starter Workflow Library; acceptance bar = PM pack + Starter Library + 4 canonical seed shapes; **G-5 ledger** (`PhaseNode.tsx` + NL-seed into `WorkflowBuilderPage.tsx`); **red line D-14**; no threat model; no migration; UI hint |
+| 188 | Non-Technical Run Observability | A non-technical user can watch a workflow run on the canvas with honest, legible per-node state — including each node's grounded-cited vs open state — a business view distinct from the developer timeline, painted from the same run stream | RUNVIZ-01, RUNVIZ-02 | 5 | **G-2 sketch**; **SC#10** (live run state, all providers); one run stream / two views — `CanvasRunView` reads the SAME `usePhases(threadId)` slice `PhaseTimeline` uses (no new Redis events, no new demux); shows **grounded-cited vs open** per node (185); node state = total function over the FULL event set (Pitfall 4); reconcile-on-fetch (D-v2.5-03); **G-5 ledger** (`PhaseTimeline.tsx`/`PhaseCard.tsx`/`StreamsProvider.tsx` — hottest cluster; proactive shared phase-state extraction); `elkjs` deferred (→ 191); **red line D-14**; no threat model; no migration; UI hint |
+| 189 | Governed External-Action Node Model | A user can place a governed external-action node on the canvas whose capabilities ride the existing per-phase tool-whitelist + the 185 action-risk checkpoint — and the milestone records the own-vs-Open-Platform decision — without any live outbound egress (HARD gate #3, CORE half) | CONN-01 | 4 | **HARD gate #3 (CORE half)** — governed node vocabulary + recorded own-vs-Open-Platform decision (MCP-first, first-party-thin, Open-Platform-sequenced SEED-013/014); **NO live egress** (→ 190, STRETCH); MCP-backed node rides the EXISTING per-phase tool whitelist + reuses the 185 action-risk (GOVERN-03) approval checkpoint (zero new governance concept); **red line D-14**; no SC#10; **no threat model** (no egress yet — lands WITH 190); no migration; UI hint |
+
+### Phase Table (STRETCH — gated behind CORE — Phases 190-191)
+
+Committed as gated phases (ship only if CORE lands clean and budget remains; v2.9 105-109 / v3.1 125-131 / v3.2 138-144 / v3.3 156-159 / v3.4 169-173 / v3.5 178-180 precedent). Connectors LAST by design — the highest new security surface.
+
+| Phase | Name | Goal | Requirements | SC# | Flags |
+|-------|------|------|--------------|-----|-------|
+| 190 | Live Connector Slice + Connector Security | A user can run 2-3 first-party live connectors from a workflow (email out, JIRA/ticket create, Slack notify), with every outbound secured against SSRF, credential leakage, and cross-tenant bleed (HARD gate #3, live-proof half) | CONN-02, CONN-03 | 5 | 189 — **HARD gate #3 (live-proof half)**; **threat model / mandatory `/gsd:secure-phase` (`threats_open: 0`)**: unconditional SSRF / egress allow-list regardless of credential state (n8n CVE class), the sibling "authenticated ≠ safe" RCE class → sandbox all expression/template evaluation, NO arbitrary-code node on the business canvas, org-scoped Fernet `enc:v1:` credentials by reference (never in JSONB/client), dedicated cross-org leak test (SEED-124/125 precedent); **SC#10** (live connector slice); 2-3 first-party (email/JIRA/Slack) — broad catalog/webhooks/API stay with Open Platform (SEED-013); **migration likely** (org-scoped connector-credentials table; reuses `SECRETS_ENCRYPTION_KEY`); MCP spec-version pin; **red line D-14** |
+| 191 | Conditional Canvas Scale Hardening | The canvas stays responsive at scale — but only if a real workflow or org fan-out exceeds the expected small scale | SCALE-01 | 4 | 184 + 188 — **conditional: ship ONLY if a real workflow / org fan-out exceeds small scale** (workflows typically 5-50 phases); React Flow `onlyRenderVisibleElements` + node memoization (>~100-150 nodes); `elkjs` auto-layout only if run-viz must depict `llm_batch_agents` fan-out as branching; indexed org-scoped Workflows-list reads; **red line D-14**; no threat model; migration only if an index needs one |
+
+### Phase Checklist
+
+- [ ] **Phase 181: Revert Foundation** — governed `visual_workflow_canvas` flag (default off) + gated nav/routes + `test_revert_byte_identical` CI/live-close gate; flag-off provably byte-identical (REVERT-01, REVERT-02)
+- [ ] **Phase 182: Server Validation Seam** — `POST /workflows/validate` reusing `reachability.lint_workflow` + grounding-fidelity verbatim; single source of validation truth, flag-gated 404 (VALID-01)
+- [ ] **Phase 183: Read-Only Canvas** — view an existing workflow as an `@xyflow/react` node canvas; pure projection (`canvasModel.toCanvas`), node id = phase.slug, layout computed not persisted (CANVAS-01)
+- [ ] **Phase 184: Editable Canvas + Live Structural Validation** — add/move/connect/configure/delete nodes → one-serializer round-trip → existing draft CRUD; live per-node STRUCTURAL validation ("can't draw an invalid workflow") + governance rails (CANVAS-02..04, VALID-02/03)
+- [ ] **Phase 185: Graded Governance — Per-Node Grounding Mode + Action-Risk Dial** — grounding mode (Grounded/strict auto-attaches `citations_required`+confidence gate vs Open/flexible ungated) + action-risk approval checkpoint on `llm_human_input`; strict gate not author-loosenable-away (GOVERN-01, GOVERN-02, GOVERN-03)
+- [ ] **Phase 186: Concurrency & Autosave** — autosave-in-place (no version mint / no gauntlet re-arm) + soft-lock/optimistic-token co-edit guard + dirty-draft-guarded publish (CONCUR-01, CONCUR-02)
+- [ ] **Phase 187: Business Vocabulary + AI-Seeded Canvas** — plain-language node verbs + Technical-names reveal; NL-described → safe seeded editable canvas draft (respects grounding mode); start-from-template (VOCAB-01..03)
+- [ ] **Phase 188: Non-Technical Run Observability** — watch a run on the canvas (pending/active/passed/failed/skipped/waiting-for-you + grounded-cited vs open) from the same `usePhases` stream; honest total-function state + reconcile-on-fetch (RUNVIZ-01, RUNVIZ-02)
+- [ ] **Phase 189: Governed External-Action Node Model** — governed MCP-backed external-action node riding the existing tool whitelist + the 185 action-risk checkpoint + recorded own-vs-Open-Platform decision; NO live egress (CONN-01)
+- [ ] **Phase 190 (STRETCH): Live Connector Slice + Connector Security** — 2-3 live first-party connectors (email/JIRA/Slack) + unconditional SSRF guard + sandboxed expression eval + org-scoped Fernet credentials by reference + cross-org leak test (CONN-02, CONN-03)
+- [ ] **Phase 191 (STRETCH): Conditional Canvas Scale Hardening** — visible-element virtualization + node memoization + optional elkjs + indexed org-scoped reads, ONLY if real scale exceeds the small default (SCALE-01)
+
+### Phase Details
+
+#### Phase 181: Revert Foundation
+
+**Goal**: The entire visual canvas layer can be turned on/off by an operator via a governed feature flag, and with the flag off the product is provably byte-identical to today — the tested off-switch every later phase inherits (operator HARD gate #1).
+**Depends on**: Nothing (first phase — the revert gate must be provably true before any feature work lands on top of it).
+**Requirements**: REVERT-01, REVERT-02
+**Success Criteria** (what must be TRUE):
+
+  1. An operator can turn the visual canvas layer on/off via a new governed feature key (`visual_workflow_canvas`, default off) — the nav entry and every canvas route are gated (the shipped v3.3 `skill_studio` / feature-visibility pattern) (REVERT-01).
+  2. With the flag off, both existing authoring doors ("Describe & run" / "Author & govern") and the run surface are unchanged — no altered behavior (REVERT-01/02).
+  3. A `test_revert_byte_identical` gate runs in CI and at live milestone-close, asserting the flag-off product is byte-identical to today — revertibility is a tested acceptance gate, not a prose claim (REVERT-02).
+  4. Any schema the milestone introduces is additive-nullable-only and every new route is flag/404-gated at every layer, so the off-switch can never leave a non-revertible remnant (Pitfall 2).
+
+**Plans**: TBD
+**UI hint**: yes
+**Flags**: HARD gate #1 (preserve-v1/revert); red line D-14 (flag-off byte-identical, no new runtime); reuse-heavy (v3.3 `skill_studio` feature-flag pattern — known-good, repeat it); `test_revert_byte_identical` CI + live-close gate; additive-nullable-only schema; no threat model (tested-revert gate, not a trust boundary); no migration (flag key in `_GOVERNED_FEATURES`; `app_settings.feature_visibility` already exists).
+
+#### Phase 182: Server Validation Seam
+
+**Goal**: The server exposes a single source of validation truth the canvas can call, reusing the existing lint verbatim so the canvas can never drift from the publish gauntlet it must ultimately pass.
+**Depends on**: Phase 181 (the new route is flag-gated behind `visual_workflow_canvas`).
+**Requirements**: VALID-01
+**Success Criteria** (what must be TRUE):
+
+  1. `POST /workflows/validate` accepts a `WorkflowDefinition` and returns structural / reachability / tool-whitelist / gate verdicts by reusing `reachability.lint_workflow` + the grounding-fidelity checks verbatim (VALID-01).
+  2. The validation route is the SINGLE source of validation truth — no lint rule is re-implemented client-side; grounding lists (tools / folders / skills) come from a server-provided bundle, never a frontend constant (Pitfall 1).
+  3. The route is flag-gated behind `visual_workflow_canvas` and returns a byte-identical 404 when the flag is off (inherits Phase 181's off-switch).
+  4. The verdict shape is consumable per-node (each verdict maps to a phase / node id) so a later canvas can paint per-node badges from it — and later carry the GOVERN grounding verdict (185).
+
+**Plans**: TBD
+**Flags**: backend-only reuse (`reachability.lint_workflow` + `_check_grounding_fidelity` verbatim — the anti-drift seam, Pitfall 1); flag-gated 404 (inherits 181); red line D-14; no SC#10 (pure backend, no streaming/provider); no threat model (no new authz); no migration; no `@xyflow/react` required yet.
+
+#### Phase 183: Read-Only Canvas
+
+**Goal**: A user can view an existing workflow as a visual node canvas — a faithful read-only projection of its definition — proving the projection model cheaply before any write / persistence complexity.
+**Depends on**: Phase 181 (flag). Phase 182 seam available (not strictly needed for read-only).
+**Requirements**: CANVAS-01
+**Success Criteria** (what must be TRUE):
+
+  1. A user can open an existing workflow and see it rendered as a node canvas — nodes = phases, edges = flow + `skip_to_phase` branches — via `@xyflow/react` (CANVAS-01).
+  2. The canvas is a pure projection of the `WorkflowDefinition` (`canvasModel.toCanvas`) — node layout is computed deterministically at render, never persisted into the definition JSONB (Pitfall 3).
+  3. The canvas is read-only (nodes not draggable) and each node id equals its `phase.slug` — the identity the later run-viz paints onto.
+  4. The projection renders every one of the 4 canonical seed shapes + the PM pack faithfully — no dropped phase, no phantom edge.
+
+**Plans**: TBD
+**UI hint**: yes
+**Flags**: G-2 sketch (canvas surface "feels like"); stack — net-new dep `@xyflow/react` v12 (MIT, React-19) introduced here (never the frozen `reactflow` v11 name); G-5 ledger (new `WorkflowCanvas.tsx`/`canvasModel.ts`/`PhaseNode.tsx` mirror `PhaseSpineGraph.tsx` glyph/parse — proactively extract a shared glyph/parse module before the 3rd consumer, 1st touch); pure projection (layout computed, not persisted — Pitfall 3); red line D-14 (projection, never a runtime); no SC#10 (static projection); no threat model; no migration.
+
+#### Phase 184: Editable Canvas + Live Structural Validation (Round-Trip)
+
+**Goal**: A user can visually author a workflow — add, move, connect, configure, and delete phase-nodes — with edits round-tripping losslessly to the definition and live server validation preventing a **structurally** invalid flow. The core deliverable; per-node grounding *strictness* is layered on top by Phase 185 (GOVERN), not baked in here.
+**Depends on**: Phase 182 (validate seam) + Phase 183 (projection) — only after both are proven so drift can't sneak in.
+**Requirements**: CANVAS-02, CANVAS-03, CANVAS-04, VALID-02, VALID-03
+**Success Criteria** (what must be TRUE):
+
+  1. A user can add, move, connect, and delete phase-nodes and configure a selected node in a side panel backed by the existing `PhaseConfig` discriminated-union schema — Pydantic stays authoritative (CANVAS-02, CANVAS-03).
+  2. Edits round-trip losslessly back to `WorkflowDefinition` via one client serializer (`canvasModel.fromCanvas`) and save through the EXISTING draft CRUD (create-once-then-PATCH); node layout / positions stay OUT of the immutable definition JSONB (CANVAS-02, Pitfall 3).
+  3. As the canvas is built, **structural** violations (reachability / tool-whitelist / gate-wiring) surface live from the server validate route — the user cannot draw a structurally invalid workflow (VALID-02); per-node grounding strictness is graded on top by Phase 185.
+  4. Each node shows a per-node validation status (badge / inline error) derived from the server verdict, never a client-side guess (VALID-03).
+  5. Governance is rendered as visible rails — locked phase order, per-phase tool whitelists, and validation gates the user cannot wire around; the rails are **graded** per GOVERN (185 — strict on grounded nodes, flexible on open) (CANVAS-04).
+
+**Plans**: TBD
+**UI hint**: yes
+**Flags**: CORE deliverable (VALID-02 author-time STRUCTURAL validation); G-2 sketch (editable canvas + node config + the `workflow_layouts`-vs-auto-layout UX call); stack — `zundo` undo/redo; one-serializer round-trip → existing draft CRUD, layout OUT of JSONB (Pitfall 3 — tested byte-identical across the 4 canonical seeds + PM pack); server-authoritative per-node badges (VALID-03, never client-guess); CANVAS-04 rails graded per GOVERN (185); G-5 ledger (`WorkflowBuilderPage.tsx` = the 3rd authoring door; `PhaseNode.tsx` 2nd touch on the glyph/parse logic); migration SKETCH-CONDITIONAL — slot 114 reserved ONLY IF the nullable `workflow_layouts` side table is confirmed at sketch (OPEN-05), else ZERO migration; red line D-14; no SC#10 (authoring, no run stream); no threat model unless discuss surfaces one.
+
+#### Phase 185: Graded Governance — Per-Node Grounding Mode + Action-Risk Dial
+
+**Goal**: Each node carries a **grounding mode** — *Grounded / strict* auto-attaches the immutable `citations_required` + confidence gate (must cite retrieved knowledge above the confidence threshold, else fail / route to HITL) vs *Open / flexible* (an ungated agentic / reasoning / tool step) — plus an orthogonal **action-risk** approval checkpoint on outbound / write nodes. A single workflow freely mixes strict-grounded and open nodes; the strict gate is structurally enforced and NOT author-loosenable-away. The milestone's headline differentiator (the deep-crawl white-space no competitor covers), sequenced right after the editable canvas so it lands on a working canvas.
+**Depends on**: Phase 184 (a working editable canvas + the per-node side-panel config to attach the dials to) + Phase 182 (the validate seam that now also reports the grounding verdict).
+**Requirements**: GOVERN-01, GOVERN-02, GOVERN-03
+**Success Criteria** (what must be TRUE):
+
+  1. Each node carries a grounding mode: *Grounded / strict* auto-attaches the immutable `citations_required` + confidence gate (reusing the shipped validation-gate library); *Open / flexible* is NOT gated on KB citation (GOVERN-01).
+  2. A single workflow can freely MIX strict-grounded and open nodes; on a grounded node the strict gate is structurally enforced and NOT author-loosenable-away (GOVERN-01) — Deep byte-identical when the field is unset (D-14).
+  3. The canvas visibly marks each node's governance state (grounded-strict-cited vs open-flexible), so a business user can see which steps are trustworthy/cited vs exploratory; the "can't draw an unsafe workflow" rails apply **graded** — enforced on grounded nodes, relaxed on open ones (GOVERN-02).
+  4. Each node can carry an **action-risk** checkpoint — an outbound / write / external-action node gets an approval / human-in-the-loop gate before it executes, built on the existing `llm_human_input` phase-type substrate (GOVERN-03).
+  5. Graded strictness holds across providers — a grounded node's citation/confidence enforcement rides the provider-sensitive retrieval/agent path uniformly, Deep byte-identical when unset (SC#10 / D-14).
+
+**Plans**: TBD
+**UI hint**: yes
+**Flags**: HEADLINE differentiator (no competitor grades by KB-grounding — the Beam/Glean/n8n deep-crawl white-space; `.planning/research/deep-dive/`); ENGINE-ADDITIVE (an optional per-node `grounding_mode` field on the phase-config model that AUTO-ATTACHES the EXISTING immutable `citations_required` + confidence gate on grounded nodes — reuses the shipped validation-gate library; open nodes ungated); GOVERN-03 reuses the existing `llm_human_input` phase-type for the action-risk/approval checkpoint; Deep byte-identical when unset (D-14 load-bearing); G-2 sketch (governance state on the canvas — grounded-strict vs open-flexible badges + the mode toggle — is a "feels like" surface); SC#10 (a grounded node's citation/confidence enforcement rides the provider-sensitive retrieval/agent path — verify graded strictness holds cross-provider); G-5 ledger (`PhaseNode.tsx` node model, ~3rd touch after 183/184 → apply refactor-before-3rd-touch PROACTIVELY + the validation seam); no full threat model (reuses the enforced gate library; the structural "not author-loosenable-away" property is verified in-phase; the connector threat model lands at 190); NO migration (additive optional field in the WorkflowDefinition JSONB, not a column).
+
+#### Phase 186: Concurrency & Autosave
+
+**Goal**: Continuous canvas autosave is safe on org-shared workflows — a cosmetic drag never mints a definition version or re-arms the golden-run gauntlet, and two editors cannot silently clobber each other. Closed before real usage, not discovered live (v3.4 made workflows org-shareable).
+**Depends on**: Phase 184 (the editable canvas + draft CRUD it autosaves through).
+**Requirements**: CONCUR-01, CONCUR-02
+**Success Criteria** (what must be TRUE):
+
+  1. Editing a draft on the canvas autosaves by updating the draft row in place — a cosmetic node drag never mints a new definition version or re-arms the golden-run gauntlet (CONCUR-01).
+  2. Two people editing the same org-shared workflow cannot silently clobber each other — a concurrency guard (soft-lock / optimistic-concurrency token) protects the shared draft (CONCUR-02).
+  3. Publish is guarded against reading a dirty draft (mirrors the shipped `publish_definition` WR-03 draft-status guard).
+  4. The two-editor / parallel path is exercised in UAT (SC#10 parallel axis) — a second editor gets an honest read-only banner or a merge-safe outcome, never a silent overwrite.
+
+**Plans**: TBD
+**UI hint**: yes
+**Flags**: autosave-in-place (never mint a version / re-arm the gauntlet — CONCUR-01, the autosave version-explosion trap); soft-lock / optimistic-token co-edit guard (mirrors `publish_definition` WR-03); parallel-editor UAT row (SC#10 parallel axis) — the two-editor org-shared clobber; concurrency mechanism (block vs warn vs merge) = sketch/discuss call (research left it open); red line D-14; no full SC#10 (not cross-provider streamed); no threat model (v3.4 org RLS already enforces the share boundary); no migration.
+
+#### Phase 187: Business Vocabulary + AI-Seeded Canvas
+
+**Goal**: A business user sees plain-language node verbs and can describe a workflow in natural language to get a safe, editable seeded canvas draft (AI + visual, not either/or) — and the AI seed respects grounding mode (a seeded grounded node auto-gets its citation/confidence gate — safe-by-construction). Vocabulary work sits on the validated + graded model from Phases 182-185.
+**Depends on**: Phase 185 (the AI seed must respect grounding mode) + Phase 184 (the validated round-trip model).
+**Requirements**: VOCAB-01, VOCAB-02, VOCAB-03
+**Success Criteria** (what must be TRUE):
+
+  1. A business user sees plain-language node names / verbs ("Find documents", "Ask the AI", "Get approval", "Produce a report") with a Technical-names reveal — extending the v3.3 LANG-01 layer + SEED-085 terminology split (VOCAB-01).
+  2. A user can describe a workflow in natural language and get a seeded, editable canvas draft (wires the existing `POST /generate` NL generator, SEED-051, into `toCanvas`) (VOCAB-02).
+  3. The AI seed structurally cannot emit an unsafe node — the response schema IS the `extra="forbid"` union, the seeded draft passes the same server validate route, and a seeded grounded node auto-gets its citation/confidence gate (respects grounding mode, 185 — safe-by-construction) (VOCAB-02).
+  4. A user can start from a template / starter flow on the canvas (reuses the shipped Starter Workflow Library) (VOCAB-03).
+  5. Vocabulary expressiveness is validated against the PM pack + Starter Library + all 4 canonical seed shapes as the acceptance bar — no jargon leak, no over-simplification (not a toy demo).
+
+**Plans**: TBD
+**UI hint**: yes
+**Flags**: G-2 sketch (node vocabulary "feels like"); SC#10 (VOCAB-02 AI-seed rides the provider-routed `POST /generate` NL generator — cross-provider); extends v3.3 LANG-01 + SEED-085 + Technical-names reveal; AI-seed structurally-safe (response schema IS the `extra="forbid"` union — Pitfall 7) + respects grounding mode (185); reuses the Starter Workflow Library; acceptance bar = PM pack + Starter Library + 4 canonical seed shapes; G-5 ledger (`PhaseNode.tsx` + NL-seed wiring into `WorkflowBuilderPage.tsx`); red line D-14; no threat model; no migration.
+
+#### Phase 188: Non-Technical Run Observability
+
+**Goal**: A non-technical user can watch a workflow run on the canvas with honest, legible per-node state — including each node's grounded-cited vs open state — a business view distinct from the developer timeline, painted from the same run stream (one run stream, two views). The field's blind spot: n8n/Flowise are developer-grade, Beam is shallow.
+**Depends on**: Phase 185 (to display each node's grounded-cited vs open governance state) + Phase 184 (the node id = `phase.slug` identity).
+**Requirements**: RUNVIZ-01, RUNVIZ-02
+**Success Criteria** (what must be TRUE):
+
+  1. A non-technical user can watch a workflow run on the canvas — each node shows live state (pending / active / passed / failed / skipped / waiting-for-you), and its grounded-cited vs open governance state (RUNVIZ-01, GOVERN-02).
+  2. The run view paints from the same `usePhases(threadId)` run stream the developer `PhaseTimeline` uses — one run stream, two views; no new Redis events, no new demux (RUNVIZ-01).
+  3. Node state is a total function over the FULL event set — it never shows "done" on a `gate_failed` / `run_failed`; success is never inferred from the absence of an event (RUNVIZ-02, Pitfall 4).
+  4. The run view reconciles-on-fetch at every reconnect — Realtime is a hint, not truth (D-v2.5-03) (RUNVIZ-02).
+  5. All of the above hold across providers and live run states with Deep Mode byte-identical (SC#10).
+
+**Plans**: TBD
+**UI hint**: yes
+**Flags**: G-2 sketch (live run "feels like"); SC#10 (live run state, all providers); one run stream / two views — `CanvasRunView` reads the SAME `usePhases(threadId)` slice `PhaseTimeline` uses (no new Redis events, no new demux); shows grounded-cited vs open per node (185); node state = total function over the FULL event set (Pitfall 4); reconcile-on-fetch on reconnect (D-v2.5-03); G-5 ledger (`PhaseTimeline.tsx`/`PhaseCard.tsx`/`StreamsProvider.tsx` — the hottest cluster; proactively extract a shared phase-state module; keep the canvas OUTSIDE the stream path per the 067.5 Branch-D3 guard); `elkjs` deferred (→ Phase 191 only if `llm_batch_agents` fan-out needs a branching layout); red line D-14; no threat model; no migration.
+
+#### Phase 189: Governed External-Action Node Model
+
+**Goal**: A user can place a governed external-action node on the canvas whose capabilities ride the existing per-phase tool-whitelist + the Phase-185 action-risk (GOVERN-03) approval checkpoint — and the milestone records the own-framework-vs-Open-Platform decision — without any live outbound egress (operator HARD gate #3, CORE half).
+**Depends on**: Phase 187 (the business node vocabulary the external-action node extends) + Phase 185 (the action-risk checkpoint it reuses).
+**Requirements**: CONN-01
+**Success Criteria** (what must be TRUE):
+
+  1. A user can place a governed external-action node on the canvas whose capabilities ride the existing per-phase tool-whitelist guard (an MCP-backed node model — zero new governance concept) (CONN-01).
+  2. The external-action node is expressed in the same business vocabulary + governance rails as every other node — it cannot be wired around a gate or a whitelist, and it carries the Phase-185 action-risk approval checkpoint by default.
+  3. The milestone records the own-framework-vs-Open-Platform decision durably (research verdict: MCP-first, first-party-thin, broad catalog sequenced with Open Platform SEED-013/014) (CONN-01).
+  4. No live outbound egress ships in this phase — CORE delivers the governed node vocabulary + the recorded decision only (live connectors are Phase 190, STRETCH).
+
+**Plans**: TBD
+**UI hint**: yes
+**Flags**: HARD gate #3 (CORE half) — governed node vocabulary + recorded own-vs-Open-Platform decision (MCP-first, first-party-thin, Open-Platform-sequenced SEED-013/014; note SEED-031 is the LLM-provider seed, NOT connectors — the real track is SEED-013 + sibling SEED-014); NO live egress (→ 190, STRETCH); MCP-backed node rides the EXISTING per-phase tool whitelist + reuses the 185 action-risk (GOVERN-03) checkpoint (zero new governance concept); red line D-14; no SC#10 (design / vocabulary, no live stream); no threat model (no outbound egress yet — the threat model lands WITH Phase 190); no migration.
+
+#### Phase 190: Live Connector Slice + Connector Security — STRETCH
+
+**Goal**: A user can run 2-3 first-party live connectors from a workflow (email out, JIRA/ticket create, Slack notify), with every outbound secured against SSRF, credential leakage, and cross-tenant bleed (operator HARD gate #3, live-proof half). LAST by design — the app's first outbound-to-arbitrary-destination capability and the highest new security surface.
+**Depends on**: Phase 189 (the governed node model) — gated behind CORE completion.
+**Requirements**: CONN-02, CONN-03
+**Success Criteria** (what must be TRUE):
+
+  1. A user can run 2-3 first-party live connectors from a workflow — email out, JIRA/ticket create, Slack notify — as the demo-able external-integration proof (MCP-backed action nodes) (CONN-02).
+  2. Every connector outbound passes an unconditional SSRF / egress allow-list guard regardless of credential state — avoiding the n8n "guarded only when a credential is attached" CVE class (CONN-03).
+  3. The sibling "authenticated ≠ safe" RCE class is closed — all expression / template evaluation is sandboxed and there is NO arbitrary-code node on the business canvas (CONN-03).
+  4. Connector credentials are org-scoped, Fernet-encrypted (`enc:v1:` reuse), resolved server-side by reference — never in the definition JSONB or the client (CONN-03).
+  5. A dedicated cross-org credential-leak test passes (the SEED-124/125 precedent); the phase carries a verified SECURITY.md (`threats_open: 0`) (CONN-03). Broad catalog / inbound webhooks / public API are explicitly NOT built here — they sequence with Open Platform (SEED-013) (CONN-02).
+
+**Plans**: TBD
+**UI hint**: yes
+**Flags**: HARD gate #3 (live-proof half); threat model / mandatory `/gsd:secure-phase` (`threats_open: 0`) — unconditional SSRF / egress allow-list regardless of credential state (n8n CVE class, Pitfall 5), the sibling "authenticated ≠ safe" RCE class → sandbox all expression/template evaluation + NO arbitrary-code node, org-scoped Fernet `enc:v1:` credentials resolved server-side by reference (never in JSONB/client), a dedicated cross-org leak test (SEED-124/125 precedent); SC#10 (live connector slice, cross-provider run); 2-3 first-party connectors (email/JIRA/Slack) — broad catalog / inbound webhooks / public API sequence with Open Platform (SEED-013), NOT forked here; migration likely (org-scoped connector-credentials table — sized at discuss/sketch; reuses `SECRETS_ENCRYPTION_KEY`, no new key); MCP spec-version pin + deprecation cycle (research Gap); red line D-14 (action node, still no second runtime).
+
+#### Phase 191: Conditional Canvas Scale Hardening — STRETCH
+
+**Goal**: The canvas stays responsive at scale — but only if a real workflow or a real org fan-out exceeds the expected small scale (harness workflows are typically 5-50 phases).
+**Depends on**: Phase 184 + Phase 188 (the editable canvas + run-viz) — gated behind CORE, conditional.
+**Requirements**: SCALE-01
+**Success Criteria** (what must be TRUE):
+
+  1. If node counts exceed ~100-150, the canvas applies React Flow `onlyRenderVisibleElements` + node memoization and stays responsive (SCALE-01).
+  2. If run-viz must depict `llm_batch_agents` fan-out as a branching layout, `elkjs` auto-layout is added (only then) (SCALE-01).
+  3. Workflows-list reads stay fast at many-orgs × many-workflows scale via indexed org-scoped reads (SCALE-01).
+  4. This phase ships ONLY if a real workflow or org fan-out exceeds the expected small scale — otherwise it is not built.
+
+**Plans**: TBD
+**UI hint**: yes
+**Flags**: conditional — ship ONLY if a real workflow / org fan-out exceeds the expected small scale; React Flow `onlyRenderVisibleElements` + node memoization (>~100-150 nodes); `elkjs` auto-layout only if run-viz must depict `llm_batch_agents` fan-out as branching (prefer over the unmaintained dagre); indexed org-scoped Workflows-list reads at many-orgs × many-workflows; depends 184 + 188; red line D-14; no threat model; migration only if the index needs one.
+
+### Progress
+
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
+| 181. Revert Foundation | 0/? | Not started | - |
+| 182. Server Validation Seam | 0/? | Not started | - |
+| 183. Read-Only Canvas | 0/? | Not started | - |
+| 184. Editable Canvas + Live Structural Validation | 0/? | Not started | - |
+| 185. Graded Governance — Grounding Mode + Action-Risk Dial | 0/? | Not started | - |
+| 186. Concurrency & Autosave | 0/? | Not started | - |
+| 187. Business Vocabulary + AI-Seeded Canvas | 0/? | Not started | - |
+| 188. Non-Technical Run Observability | 0/? | Not started | - |
+| 189. Governed External-Action Node Model | 0/? | Not started | - |
+| 190 (STRETCH). Live Connector Slice + Connector Security | 0/? | Gated (behind CORE) | - |
+| 191 (STRETCH). Conditional Canvas Scale Hardening | 0/? | Gated (behind CORE) | - |
+
+**Guardrails firing (v3.6):**
+
+- **G-2 sketch-first** on Phase 183 (read-only canvas), Phase 184 (editable canvas + node config), Phase 185 (graded-governance state on the canvas — grounded-strict vs open-flexible badges + mode toggle), Phase 187 (node vocabulary "feels like"), Phase 188 (live run "feels like") — all visual / "feels like" surfaces. `/gsd:sketch` before `/gsd:spec-phase` / `/gsd:discuss-phase`. The `sketch-findings-agentic-rag` skill auto-loads on all canvas / phase-spine / run-surface work. The backend/flag phases (181, 182) and the design/decision phase (189) do not fire G-2.
+- **G-5 workflow-studio hot-file ledger (the synthesizer's explicit WATCH ITEM — track from phase 1, apply refactor-before-3rd-touch PROACTIVELY):** this milestone puts 6+ phases through the same hot-file class that triggered the 075.x chat-surface G-5 cascade. `PhaseNode.tsx` (183 read-only + 184 editable + **185 graded-governance dials = ~3rd touch → refactor-before-3rd-touch PROACTIVELY**), `PhaseSpineGraph.tsx` (183/184 reuse its glyph/parse → extract a shared glyph/parse module before the 3rd consumer), `WorkflowBuilderPage.tsx` (184 = the 3rd authoring door; 187 NL-seed), `PhaseTimeline.tsx`/`PhaseCard.tsx` (188 `CanvasRunView` reuses their phase-state derivation → extract a shared phase-state module), `StreamsProvider.tsx` (188 run stream — keep `<OrgContext>`/canvas OUTSIDE the stream path per the 067.5 Branch-D3 guard). Audit each phase's `files_modified` at discuss-phase; a match on a firing row means discuss produces a refactor recommendation FIRST.
+- **SC#10 (cross-provider mandate):** 185 (graded strictness — a grounded node's citation/confidence enforcement rides the provider-sensitive retrieval/agent path), 187 (VOCAB-02 AI-seed rides the provider-routed NL generator), 188 (RUNVIZ live run state), 190 (CONN live slice). Pure backend-reuse / flag phases (181, 182) + pure-authoring/projection phases (183, 184) are NOT flagged. Phase 186 (Concurrency) carries the SC#10 **parallel axis** (two-editor UAT row) but not full cross-provider streaming.
+- **Threat models (secure-phase):** Phase 190 (CONN-02/03 — SSRF / "authenticated ≠ safe" RCE / org-scoped credentials / cross-tenant leak; the app's first user-supplied-destination egress surface; SEED-124/125 cross-org-leak-test precedent; `threats_open: 0`). REVERT-02 (181) is a tested-revert gate, not a threat model. Phase 185 (Graded Governance) has **no full threat model** — it reuses the enforced validation-gate library; the structural "not author-loosenable-away" property is verified in-phase. NO threat model on the other pure-UX CORE canvas phases (183, 184, 186-189) unless a discuss-phase surfaces a real trust boundary. CONN-01 (189) has no live egress → its threat model lands with 190.
+- **Red line (D-14, load-bearing every phase):** the canvas is a pure projection, never a second source of truth and never a second runtime; the harness engine stays the ONLY executor; every new route flag/404-gated at every layer; Deep Mode byte-identical (graded governance is byte-identical when `grounding_mode` is unset); provider differences at the boundary. `test_revert_byte_identical` (REVERT-02) makes flag-off provably byte-identical.
+- **Migrations:** live head = 113; next free slot = 114 reserved ONLY IF the nullable `workflow_layouts` side table (OPEN-05) is confirmed at the Phase-184 sketch — otherwise deterministic auto-layout = ZERO migrations (don't manufacture one). Graded governance (185) is ZERO-migration (additive optional `grounding_mode` in the definition JSONB, not a column). Phase 190 (STRETCH) likely adds an org-scoped connector-credentials table (sized at sketch; reuses `SECRETS_ENCRYPTION_KEY`, no new key).
+- **Cloud parity owed:** migrations 099-113 + `SECRETS_ENCRYPTION_KEY` still owed at the next production push (pre-existing debt, not new v3.6 work). Any v3.6 migration rides the same next-push parity checklist.
+
+---
+
+## v3.5 UX Consolidation & Chat Polish — ✅ SHIPPED 2026-07-23 (CORE); STRETCH deferred
+
+**Started:** 2026-07-22 (operator-confirmed UX-track sequencing at v3.4-close: the polish cluster now, Visual Workflow Studio next as v3.6). **Roadmap created:** 2026-07-22. **Shipped:** 2026-07-23 (git tag `v3.5`; CORE 174-177; STRETCH 178-180 deferred → `.planning/v3.5-STRETCH-CARRYFORWARD.md`). Full detail archived → `.planning/milestones/v3.5-ROADMAP.md`.
 
 **Goal:** Clear the parked `surface: Agentic-RAG` chat-surface bug backlog and consolidate the accumulated UI/UX rough edges — including the brand-new v3.4 org surfaces — into one coherent, polished, honest experience, before the large v3.6 Visual Workflow Studio build. A **Medium cleanup milestone**: mostly bug-fix + polish, no large net-new build; deliberately kept **separate** from v3.6.
 
