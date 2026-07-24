@@ -90,6 +90,8 @@ beforeEach(() => {
     model_management: { audience: "operators", roles: [] },
     workflow_authoring: { audience: "everyone", roles: [] },
     governance_health: { audience: "everyone", roles: [] },
+    // Phase 181 — the canvas master switch seeds Off (server truth mirrors the cold-default).
+    visual_workflow_canvas: { audience: "off", roles: [] },
   })
 })
 

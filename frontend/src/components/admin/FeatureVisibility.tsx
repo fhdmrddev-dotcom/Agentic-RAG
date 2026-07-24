@@ -139,6 +139,21 @@ const FEATURES: readonly FeatureDef[] = [
     refusedApi: "Document-governance endpoints.",
     routePrefixes: "/document-governance",
   },
+  // Phase 181 (REVERT-01 / D-181-03) — the v3.6 visual-canvas master switch. UNLIKE the
+  // four above, this key renders an Off | On control (below), NOT the Everyone|Operators|
+  // By-role triad: On writes audience "everyone", Off writes "off" (hidden from EVERYONE
+  // incl. operators). Cold-default Off = today's product exactly (the tested revert gate).
+  {
+    key: "visual_workflow_canvas",
+    name: "Visual workflow canvas",
+    desc: "The drag-and-drop visual authoring + live-run canvas. Off = today's product exactly.",
+    livesOn: "Workflows",
+    glyph: Workflow,
+    uiSurface: "The visual canvas authoring door and its run view.",
+    refusedApi:
+      "Canvas view + validate/save/canvas routes (existing Describe & run / Author & govern stay open).",
+    routePrefixes: "/canvas routes (flag-gated 404)",
+  },
 ]
 
 /** The 069-A audience rows: enum control, amber-never-red, consequence line + the
@@ -214,9 +229,11 @@ function FeatureCard({
       setReceipt(
         next === "operators"
           ? "Set to Operators only · recorded"
-          : next === "role"
-            ? "Set to selected roles · recorded"
-            : "Set to Everyone · recorded",
+          : next === "off"
+            ? "Turned Off · recorded"
+            : next === "role"
+              ? "Set to selected roles · recorded"
+              : "Set to Everyone · recorded",
       )
       window.setTimeout(() => setReceipt(null), 4000)
     } catch {
@@ -287,7 +304,12 @@ function FeatureCard({
               <Check className="h-3.5 w-3.5 text-success" aria-hidden="true" />✎ {receipt}
             </span>
           )}
-          <AudienceSegments audience={audience} busy={busy} onFlip={flipTo} />
+          <AudienceSegments
+            audience={audience}
+            busy={busy}
+            onFlip={flipTo}
+            offOn={def.key === "visual_workflow_canvas"}
+          />
         </div>
       </div>
 
@@ -389,16 +411,50 @@ function FeatureCard({
 
 /** The audience segmented control — Everyone | ⛨ Operators only | 👥 By role. Reads +
  *  writes an ENUM (never a boolean); the SEED-115 forward-compat contract is what let the
- *  `role` greenlist drop in as a third position (Phase 167 / VIS-01). */
+ *  `role` greenlist drop in as a third position (Phase 167 / VIS-01).
+ *
+ *  Phase 181 (REVERT-01 / D-181-03): when `offOn` is set (the visual_workflow_canvas
+ *  master switch) the control collapses to a TWO-position Off | On variant — On writes
+ *  audience `"everyone"`, Off writes `"off"` (hidden from everyone incl. operators). The
+ *  `SegButton` primitive + the `onFlip` plumbing are reused verbatim; only the button set
+ *  differs for this one key (NOT the Everyone|Operators|By-role triad). */
 function AudienceSegments({
   audience,
   busy,
   onFlip,
+  offOn = false,
 }: {
   audience: AudienceValue
   busy: boolean
   onFlip: (next: AudienceValue) => void
+  offOn?: boolean
 }) {
+  if (offOn) {
+    return (
+      <div
+        role="radiogroup"
+        aria-label="Audience"
+        className="inline-flex items-center gap-0.5 rounded-md border border-border bg-muted/40 p-0.5"
+      >
+        <SegButton
+          selected={audience === "off"}
+          busy={busy}
+          tone="operators"
+          onClick={() => onFlip("off")}
+        >
+          Off
+        </SegButton>
+        <SegButton
+          selected={audience === "everyone"}
+          busy={busy}
+          tone="everyone"
+          onClick={() => onFlip("everyone")}
+        >
+          On
+        </SegButton>
+      </div>
+    )
+  }
   return (
     <div
       role="radiogroup"

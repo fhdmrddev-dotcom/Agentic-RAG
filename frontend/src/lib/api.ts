@@ -59,14 +59,18 @@ export class ApiError extends Error {
   }
 }
 
-/** Phase 148 (VIS-01 / D-04) — the four governed feature keys (the effective-map
- *  keys of `GET /features`). skill_studio + model_management are Operators-only on
- *  the day-one map; workflow_authoring + governance_health are Everyone (148-05). */
+/** Phase 148 (VIS-01 / D-04) — the governed feature keys (the effective-map keys of
+ *  `GET /features`). skill_studio + model_management are Operators-only on the day-one
+ *  map; workflow_authoring + governance_health are Everyone (148-05). Phase 181
+ *  (REVERT-01 / D-181-01) adds `visual_workflow_canvas` — the v3.6 visual-canvas master
+ *  switch, cold-default `"off"` (hidden from EVERYONE incl. operators; the SEED-115
+ *  enum-not-boolean contract). It joins the effective map automatically. */
 export type GovernedFeature =
   | "skill_studio"
   | "model_management"
   | "workflow_authoring"
   | "governance_health"
+  | "visual_workflow_canvas"
 
 /** The caller's effective feature→visible map. Partial so the fail-CLOSED `{}`
  *  fallback (hook error / pre-resolve) type-checks — an absent key reads as hidden. */
@@ -4045,8 +4049,11 @@ export interface UserRosterPage {
  *  the SEED-115 extensible-audience forward-compat contract: the two-position control
  *  is the degenerate two-audience case of a value designed to grow into an audience
  *  picker (IdP groups / departments at v3.4). `everyone` = all end users see it;
- *  `operators` = operators only (end users are refused server-side, not just hidden). */
-export type FeatureAudience = "everyone" | "operators"
+ *  `operators` = operators only (end users are refused server-side, not just hidden);
+ *  `off` = hidden from EVERYONE incl. operators — the Phase 181 (REVERT-01 / D-181-01)
+ *  master switch that hides an entire feature layer (the visual_workflow_canvas Off state,
+ *  resolved BEFORE the operator bypass so flag-off is byte-identical for all). */
+export type FeatureAudience = "everyone" | "operators" | "off"
 
 /** Read the users roster (`GET /admin/users`, 148-06). Plain authed GET — the router
  *  gate returns 404 to non-operators; this cross-user read is floor-EXEMPT (the `/runs`
