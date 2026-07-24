@@ -235,9 +235,26 @@ async def get_starter_workflows(
 #
 # THE ANTI-DRIFT CONTRACT (D-182-02 / D-182-06 / red line D-14): the visual canvas is a
 # pure CLIENT of this seam. Every rule it previews is the SAME copy the publish gauntlet
-# enforces — ``lint_workflow`` (structural), ``grounding.grounding_verdicts`` (fidelity),
-# ``grounding.business_requirement_missing`` (D-13), ``publish_service._interactive_phase_failures``
-# (WR-04). NOTHING is re-implemented here and NOTHING is ever re-implemented client-side;
+# enforces — and the claim is VERIFIABLE, one row per check, shared symbol -> publish stage:
+#
+#   preview check (here)                              shared symbol                    publish stage
+#   ------------------------------------------------  -------------------------------  --------------------
+#   structural lint                                   ``lint_workflow``                ``lint``
+#   grounding fidelity                                ``grounding.grounding_verdicts`` ``grounding_fidelity``
+#   business requirement present (D-13)               ``grounding.business_requirement_missing``
+#                                                                                      ``business_requirement``
+#   interactive phase cannot publish (WR-04)          ``publish_service._interactive_phase_failures``
+#                                                                                      ``interactive_phase``
+#
+# PROVENANCE: the grounding-fidelity half of that parity was added in the Phase 182 GAP
+# CLOSURE (plan 182-06). At first ship this seam PREVIEWED grounding fidelity while
+# ``publish_workflow`` did not ENFORCE it, so a definition naming a hallucinated tool or an
+# inaccessible skill reference painted red here and published green
+# (``182-VERIFICATION.md`` Truth 5 / WR-01). ``publish_service`` now runs the same collector
+# at stage 2.6; ``tests/unit/test_182_publish_grounding_stage.py`` asserts the two sides
+# report the SAME findings for the same definition, so the parity cannot silently rot again.
+#
+# NOTHING is re-implemented here and NOTHING is ever re-implemented client-side;
 # the route only AGGREGATES and CLASSIFIES. `/validate` is READ-ONLY advice — it never
 # persists, never executes, and never mints a version; PUBLISH remains the enforcing gate.
 #
@@ -566,9 +583,12 @@ async def publish_workflow(
 ) -> PublishVerdict:
     """Publish a draft (D-07) — the QUAL-01 hard gate.
 
-    Enforces, IN ORDER: business_requirement present -> structural lint -> a REAL
-    golden run on the project KB -> the judge verdict -> the draft->published flip.
-    A lint-clean workflow whose judge fails CANNOT publish.
+    Enforces, IN ORDER (the same order as ``publish_service.publish_workflow``'s stage list —
+    the two docstrings must never disagree): business_requirement present -> structural lint
+    -> the interactive-phase pre-run block (WR-04) -> grounding fidelity (Phase 182 stage 2.6,
+    the SAME shared collector ``POST /workflows/validate`` previews) -> a REAL golden run on
+    the project KB -> the judge verdict -> the draft->published flip. A lint-clean workflow
+    whose judge fails CANNOT publish.
 
     The orchestration lives in ``publish_service.publish`` (owner-scoped via
     ``get_definition``). HTTP mapping:
@@ -577,6 +597,10 @@ async def publish_workflow(
       - ``business_requirement`` (D-13) -> 400 with the structured verdict
       - any other block -> 200 ``{published: False, blocked_stage, named_failures, golden_run_id}``
       - success -> 200 ``{published: True, version, golden_run_id}``
+
+    ``grounding_fidelity`` (like ``lint`` and ``interactive_phase``) is an UNRECOGNISED
+    ``blocked_stage`` for the branches above, so it falls through to the 200 + structured
+    verdict — a new pre-run stage needs NO route branch here, only this docstring.
 
     ``definition_id`` is a path ``UUID`` -> FastAPI 422 on a malformed id (V5).
     """
@@ -616,6 +640,13 @@ def _coerce_user_id(current_user: dict) -> UUID:
     return UUID(user_id) if isinstance(user_id, str) else user_id
 
 
+# DRAFT ROUTES ARE DELIBERATELY NOT GROUNDING-GATED (Phase 182 plan 06 — a DECISION, not an
+# oversight). Neither ``create_draft`` below nor ``update_draft`` further down runs the
+# grounding-fidelity checks: a work-in-progress draft must stay storable while incomplete, or
+# the Phase 184 canvas editing loop becomes hostile — every save that outruns its node config
+# would be rejected mid-authoring. ``POST /workflows/validate`` is the live ADVISORY surface
+# (read-only, per-node verdicts, no persistence) and PUBLISH is the ENFORCING gate: nothing
+# mints a version without passing publish stage 2.6. Do not "fix" this by adding a check here.
 @router.post(
     "",
     response_model=DraftCreateResponse,
@@ -679,6 +710,8 @@ async def list_drafts(
     ]
 
 
+# NOT grounding-gated either — see the decision recorded above ``create_draft`` (Phase 182
+# plan 06): drafts stay storable while incomplete; PUBLISH is the enforcing gate.
 @router.patch(
     "/{definition_id}",
     response_model=DraftCreateResponse,
