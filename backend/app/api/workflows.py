@@ -274,6 +274,25 @@ class ValidateResponse(BaseModel):
     verdicts: list[Verdict] = Field(default_factory=list)
 
 
+class GroundingBundleResponse(BaseModel):
+    """The server-sourced PALETTE of valid building blocks (D-182-01).
+
+    This is what Phase 184's node-config dropdowns bind to — the tool names eligible for an
+    ``available_tools`` whitelist, the KB folder tree (name + id), the enabled owner/org-shared
+    skills eligible for ``skill_ref``, and (only when a ``template_asset_id`` is supplied) that
+    template's placeholder fields. **It is NEVER a frontend constant** (Pitfall 1 / SC#2): KB
+    content can never whitelist itself, so the valid sets are computed server-side by the ONE
+    shared ``grounding.assemble_grounding_bundle``.
+
+    Kept a SEPARATE cacheable ``GET`` rather than embedded in the ``/validate`` response
+    (D-182-01): ``/validate`` fires on every canvas edit; the palette is near-static."""
+
+    tools: list[str] = Field(default_factory=list)
+    folders: list[dict] = Field(default_factory=list)
+    skills: list[dict] = Field(default_factory=list)
+    template_placeholders: list[str] = Field(default_factory=list)
+
+
 # The severity taxonomy (D-182-03). Hard structural + grounding-fidelity breaks are ERRORS;
 # not-yet-ready conditions (``input_unsatisfied`` while wiring, a missing business
 # requirement, an interactive phase, an empty draft) are INCOMPLETE.
@@ -402,6 +421,53 @@ async def validate_workflow(
         for f in findings
     ]
     return ValidateResponse(ok=(len(verdicts) == 0), verdicts=verdicts)
+
+
+@router.get(
+    "/grounding-bundle",
+    response_model=GroundingBundleResponse,
+    dependencies=[Depends(require_canvas())],  # D-182-05 — require_canvas ALONE (never require_visible)
+)
+async def get_grounding_bundle(
+    current_user: dict = Depends(get_current_user),
+    # service-role: the palette read spans the owner's folder tree + skill registry (scoped
+    # BY HAND on user_id inside grounding.py — service-role bypasses RLS).
+    supabase=Depends(get_supabase),
+    template_asset_id: UUID | None = None,
+) -> GroundingBundleResponse:
+    """The cacheable server-sourced palette the canvas binds to (D-182-01).
+
+    A pure READ — no writes, no provider call. Delegates to the ONE shared
+    ``grounding.assemble_grounding_bundle`` (the SAME computation the ``/validate`` fidelity
+    rules and NL generation consume) and serializes its structured fields. The palette is
+    workflow-agnostic, so ``project_folder_id`` is not taken: a bound project narrows only the
+    per-phase ``folder_scope`` ⊆ check, never the set of valid building blocks.
+
+    ``template_placeholders`` is populated ONLY when the optional ``?template_asset_id=`` query
+    param is supplied (placeholders are per-template); the base palette returns ``[]``. A
+    malformed id is a 422 for free (``UUID`` coercion, V5); the pg pool is resolved lazily
+    because it is needed ONLY to resolve a template's bytes.
+
+    Reads stay OWNER-scoped by ``user_id`` (V4 / T-182-03) — the palette must never widen to
+    another user's folders or skills.
+    """
+    user_id = _coerce_user_id(current_user)
+    # Lazily resolved: assemble_grounding_bundle needs a pool ONLY to resolve a template
+    # asset's placeholder vocabulary, so the base palette never forces pool creation.
+    pool = await get_pg_pool() if template_asset_id is not None else None
+    bundle = await grounding.assemble_grounding_bundle(
+        supabase=supabase,
+        pool=pool,
+        user_id=str(user_id),
+        project_folder_id=None,
+        template_asset_id=template_asset_id,
+    )
+    return GroundingBundleResponse(
+        tools=bundle.tools,
+        folders=bundle.folders,
+        skills=bundle.skills,
+        template_placeholders=bundle.placeholders,
+    )
 
 
 # ── Phase 102 (QUAL-01 / D-07) — the server-side publish path ─────────────────
