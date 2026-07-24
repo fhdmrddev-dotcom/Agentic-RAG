@@ -555,6 +555,48 @@ def require_visible(feature: str):
     return _dep
 
 
+# CR-01 (Phase 181 review): the canvas gate needs its OWN auto_error=False bearer scheme for
+# the SAME reason /admin does (WR-02, ``_admin_bearer_scheme`` above) — the shared
+# ``bearer_scheme`` (auto_error=True) raises 403 on an ABSENT Authorization header, and
+# ``get_current_user`` raises 401 on an invalid/expired token, and BOTH fired BEFORE
+# ``require_canvas``'s off-flag check ever ran, leaking that a ``/canvas`` route exists (403/401
+# != the 404 an unbuilt route returns). auto_error=False hands us ``None`` for an absent header
+# so NO status can leak pre-flag. The shared ``get_current_user`` / ``bearer_scheme`` path is
+# untouched — other routes still depend on it.
+_canvas_bearer_scheme = HTTPBearer(auto_error=False)
+
+
+async def authenticate_canvas_request(
+    credentials: HTTPAuthorizationCredentials | None,
+    supabase: Client,
+) -> dict | None:
+    """Resolve the caller for the canvas surface — NEVER raises (folds every auth failure to None).
+
+    CR-01: this is the ON-path auth seam, mirroring ``authenticate_operator_request`` but
+    returning ``None`` instead of raising, so ``require_canvas`` can run the off-flag check FIRST
+    (an off canvas must 404 for EVERY caller BEFORE any token is validated — zero auth side
+    effects on the non-discoverable off path). Absent credentials / an invalid-or-expired token /
+    a banned user all resolve to ``None``; ``require_canvas`` folds ``None`` into the byte-
+    identical 404 once the flag is confirmed live. ``_is_banned`` fails OPEN (a transient DB blip
+    never locks everyone out — same posture as ``get_current_user`` / ``authenticate_operator_request``).
+
+    A dedicated helper (NOT a pre-body ``Depends`` on ``get_current_user``) keeps the shared auth
+    path untouched AND gives the ON-case tests a clean monkeypatch seam: they replace this to
+    inject a fake caller AFTER the flag check, while the CR-01 regression leaves it real to
+    exercise the genuine pre-auth 404 path.
+    """
+    if credentials is None:
+        return None
+    try:
+        response = supabase.auth.get_user(credentials.credentials)
+        user = getattr(response, "user", None)
+    except Exception:
+        return None
+    if user is None or await _is_banned(user.id):
+        return None
+    return {"id": user.id, "email": user.email}
+
+
 def require_canvas():
     """404-when-off gate for the v3.6 visual_workflow_canvas layer (REVERT-01 / D-181-02).
 
@@ -568,21 +610,42 @@ def require_canvas():
     Fail-closed: ``feature_audience`` never raises (cold cache / DB blip -> ``{}`` -> the
     ``"off"`` cold default), so any settings blip resolves to 404, never a fail-open reveal.
 
+    CR-01 (Phase 181 review): the off-flag 404 must hold for EVERY caller BEFORE auth — an
+    absent header or a bad token must NOT leak the route's existence via a 403/401. So the
+    off-check runs FIRST against the untrusted (non-raising) ``_canvas_bearer_scheme`` credentials
+    — NOT ``Depends(get_current_user)`` (auto_error=True), which raised 403/401 AHEAD of the flag.
+    Only once the flag is live do we validate the token (``authenticate_canvas_request``); an
+    anonymous / invalid / banned caller is folded into the SAME byte-identical 404 (never a
+    403/401 leak), matching the ``authenticate_operator_request`` posture. The shared
+    ``get_current_user`` / ``bearer_scheme`` path is untouched.
+
     ``feature_audience`` / ``resolve_feature_access`` are lazy-imported inside the closure to
     avoid the user_settings -> dependencies import cycle (matches ``require_visible``). Attach
     on canvas routes via ``dependencies=[Depends(require_canvas())]``.
     """
-    async def _dep(current_user: dict = Depends(get_current_user), request: Request = None):
+    async def _dep(
+        request: Request = None,
+        credentials: HTTPAuthorizationCredentials | None = Depends(_canvas_bearer_scheme),
+        supabase: Client = Depends(get_supabase),
+    ):
         from app.models.user_settings import feature_audience, resolve_feature_access
+        # (1) FLAG FIRST — 404 for ALL callers (authenticated or not, operators included) while
+        #     off, BEFORE any token is validated. CR-01: no auth-derived 403/401 can precede this.
         audience = feature_audience("visual_workflow_canvas")
         if audience == "off":
             raise _NOT_FOUND  # 404 for ALL, incl. operators — resolved FIRST (D-181-01)
-        if await is_operator(current_user["id"]):
+        # (2) flag is live -> the route EXISTS; validate the caller (never raises). An anonymous /
+        #     invalid / banned caller is a 404 too (non-discoverable — never a 403/401 leak; the
+        #     REVERT byte-identity holds for EVERY caller). CR-01.
+        caller = await authenticate_canvas_request(credentials, supabase)
+        if caller is None:
+            raise _NOT_FOUND
+        if await is_operator(caller["id"]):
             return  # operator -> no-op (only reached once the flag is NOT off)
         if audience == "everyone":
             return
         if audience == "role":
-            caller_role, caller_groups = await resolve_caller_role(request, current_user)
+            caller_role, caller_groups = await resolve_caller_role(request, caller)
             if resolve_feature_access("visual_workflow_canvas", caller_role, caller_groups):
                 return
         raise _NOT_FOUND  # 404, never 403 — REVERT byte-identity (never leak route existence)

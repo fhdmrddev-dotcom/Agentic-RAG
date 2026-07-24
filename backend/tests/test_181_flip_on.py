@@ -72,11 +72,24 @@ def test_canvas_ping_404s_when_off_for_user(client, monkeypatch):
 
 
 def test_canvas_ping_200_after_flip_on(client, monkeypatch):
-    """After an operator flip on (audience "everyone"), the gate is a no-op -> 200."""
+    """After an operator flip on (audience "everyone"), the gate is a no-op -> 200.
+
+    CR-01: the canvas gate no longer rides the blanket conftest ``get_current_user`` override;
+    the ON path resolves the caller via ``authenticate_canvas_request`` — called AFTER the
+    off-flag check so the off-state 404 stays pre-auth. Monkeypatch that seam to inject a caller
+    so this proves the flag-on no-op without a live token. (The OFF-path 404 for anonymous /
+    bogus-token callers — the property CR-01 fixed — is proven in ``test_revert_byte_identical``
+    with this seam left REAL.)
+    """
     import app.dependencies as deps
 
     _flipped_on(monkeypatch)
     monkeypatch.setattr(deps, "is_operator", _is_op_false)  # even a plain user: everyone -> pass
+
+    async def _fake_caller(credentials, supabase):
+        return {"id": "u-1", "email": "u@x.co"}
+
+    monkeypatch.setattr(deps, "authenticate_canvas_request", _fake_caller)
     resp = client.get("/canvas/ping")
     assert resp.status_code == 200, resp.text
     assert resp.json() == {"ok": True}

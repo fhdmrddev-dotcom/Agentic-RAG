@@ -92,6 +92,52 @@ def test_require_canvas_404s_when_off(client, monkeypatch):
     assert resp_user.status_code != 403
 
 
+# ── 2b) CR-01: require_canvas 404s PRE-AUTH for anonymous + bogus-token callers ───────
+
+def test_require_canvas_404s_pre_auth_when_off(client, monkeypatch):
+    """CR-01 regression: while off, /canvas/ping 404s (never 403/401) for callers who are NOT
+    already authenticated — an ABSENT Authorization header AND a BOGUS/invalid bearer token.
+
+    These are the two cases that previously LEAKED the gated route's existence: the shared
+    auto_error=True ``bearer_scheme`` raised **403** ("Not authenticated") on an absent header,
+    and ``get_current_user`` raised **401** ("Invalid or expired token") on a bad token — BOTH
+    before ``require_canvas``'s off-flag check ran, so the off canvas was distinguishable from an
+    unbuilt route for any unauthenticated caller. The fix resolves the off-flag FIRST against a
+    non-raising ``_canvas_bearer_scheme``, folding both into the byte-identical 404.
+
+    Exercises the REAL pre-auth path — the class of bug the rest of the 181 suite structurally
+    cannot catch, because conftest's blanket ``get_current_user`` override injects a user and
+    bypasses the genuine bearer scheme. So this pops that override (exactly as the /admin WR-02
+    regression pops ``authenticate_operator_request``) and leaves the canvas ON-path auth seam
+    (``authenticate_canvas_request``) REAL — nothing injects a caller, so an absent/bogus token
+    flows through as in production. Falsifiable against the pre-fix code: with the override
+    popped, the old ``Depends(get_current_user)`` chain returned 403 for the no-header case here.
+    """
+    from app.dependencies import get_current_user
+    from app.main import app
+
+    _cold_off(monkeypatch)  # flag off (cold default)
+    # Pop the blanket override so the REAL auth path runs (reset_mocks restores it next test).
+    app.dependency_overrides.pop(get_current_user, None)
+
+    # (a) NO Authorization header — pre-fix leaked 403 "Not authenticated"
+    no_auth = client.get("/canvas/ping")
+    assert no_auth.status_code == 404, no_auth.text
+    assert no_auth.status_code != 403
+    assert no_auth.status_code != 401
+
+    # (b) a bogus/invalid bearer token — pre-fix leaked 401 "Invalid or expired token"
+    bogus = client.get("/canvas/ping", headers={"Authorization": "Bearer not-a-real-token"})
+    assert bogus.status_code == 404, bogus.text
+    assert bogus.status_code != 403
+    assert bogus.status_code != 401
+
+    # parity: a nonexistent /canvas/<random> path is a byte-identical 404 too (unbuilt-route parity)
+    unknown = client.get("/canvas/__definitely_not_a_route__")
+    assert unknown.status_code == 404
+    assert no_auth.json() == unknown.json() == {"detail": "Not Found"}
+
+
 # ── 3) the 4 shipped governed features are unchanged (no 148 regression, REVERT-02) ──
 
 def test_existing_governed_features_unchanged(client, monkeypatch):
