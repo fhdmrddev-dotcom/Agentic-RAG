@@ -301,9 +301,13 @@ Not a rename/refactor/migration phase — greenfield flag scaffold. One near-cat
 
 **If any of A1-A4 is wrong, it changes the phase's core mechanism — resolve at `/gsd:discuss-phase 181` before planning.**
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **How does "default off" map onto the audience model?** (THE central design decision.)
+> All three resolved by operator during plan-phase (discuss-phase skipped) — see CONTEXT.md
+> D-181-01 (Q1: `"off"` audience, byte-identical for all incl. operators), D-181-03 (Q2: Off|On
+> toggle), D-181-04 (Q3: temporary canary route to prove the 404 now).
+
+1. **How does "default off" map onto the audience model?** (THE central design decision.) — **RESOLVED: CONTEXT.md D-181-01** (`"off"` audience + operator-bypass).
    - What we know: ROADMAP mandates reuse of `_GOVERNED_FEATURES` + `feature_visibility` (no migration) AND "default off". The audience model's native default-deny is "operators-only" (operators always pass; `require_visible`/`GET /features` short-circuit True for operators).
    - What's unclear: "off" for *everyone incl. operators* (byte-identical for all) vs "off for end-users, operators can preview" (default audience "operators").
    - Recommendation: introduce the `"off"` audience + operator-bypass (Pattern 2-3) so flag-off is byte-identical for ALL — this is the strictest reading of REVERT-02 "provably byte-identical to today" and HARD gate #1. Confirm at discuss-phase.
