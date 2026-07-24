@@ -1,10 +1,15 @@
 """SEED-125 (CR-01) — pure unit tests for the org-gated skill-visibility filter builder.
 
-``tool_dispatcher._build_skill_visibility_or`` is the single source of the corrected
-PostgREST ``.or_()`` predicate applied at all six service-role skill-resolution sites
-(load_skill / read_skill_file / execute_code injection / save_skill sibling-lint). These
-offline tests pin its shape and the two safety-critical properties independently of a live
-DB (the live two-org proof lives in tests/integration/test_v3_4_org_isolation.py):
+``app.utils.skill_visibility.build_skill_visibility_or`` is the single source of the corrected
+PostgREST ``.or_()`` predicate applied at every service-role skill-resolution site — the six in
+``tool_dispatcher`` (load_skill / read_skill_file / execute_code injection / save_skill
+sibling-lint) and, since Phase 182 (CR-01), ``harness.grounding._skill_registry`` (the
+``/workflows/validate`` + ``/workflows/grounding-bundle`` canvas seam). It was hoisted out of
+``tool_dispatcher`` into ``app.utils.skill_visibility`` when that second consumer arrived,
+because ``grounding.py`` cannot import the dispatcher (import cycle) and a copied predicate is
+the drift this rule exists to prevent. These offline tests pin its shape and the two
+safety-critical properties independently of a live DB (the live two-org proof lives in
+tests/integration/test_v3_4_org_isolation.py):
 
   * FAIL-CLOSED — an empty caller org set yields ONLY ``is_system.eq.true`` (no empty
     ``in.()`` PostgREST syntax error; 0 shared cross-org — over-restrict, never over-share).
@@ -20,7 +25,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.services.tool_dispatcher import _build_skill_visibility_or
+from app.utils.skill_visibility import build_skill_visibility_or as _build_skill_visibility_or
 
 _UID = "00000000-0000-0000-0000-000000000042"
 _ORG_A = "11111111-1111-1111-1111-111111111111"

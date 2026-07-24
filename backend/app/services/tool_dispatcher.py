@@ -26,7 +26,7 @@ from uuid import UUID
 
 from starlette.concurrency import run_in_threadpool
 
-from app.utils.db import aexec, coerce_uid
+from app.utils.db import aexec
 from app.api.kb import ls_path, tree_path, grep_path, glob_path, read_path
 # Phase 151 (FILE-02) — owner→global doc-scope fallback (mirrors read_path). Module-level
 # (patch-where-used friendly) and cycle-safe: folder_utils imports only dependencies/db,
@@ -34,6 +34,9 @@ from app.api.kb import ls_path, tree_path, grep_path, glob_path, read_path
 # SEED-125 (CR-01) — the same fail-closed caller-org resolver the SEED-124 folder fix uses,
 # reused here to org-gate service-role skill resolution (see _resolve_skill_visibility_or).
 from app.utils.folder_utils import get_globally_visible_folder_ids, _resolve_caller_org_ids
+# SEED-125 (CR-01) / Phase 182 (CR-01) — the ONE org-gated skill-visibility predicate, hoisted
+# to a shared import-light home so the grounding/canvas seam reuses it instead of copying it.
+from app.utils.skill_visibility import build_skill_visibility_or
 from app.services.retrieval_service import search_documents, resolve_document_id, fetch_full_document
 from app.services.web_search_service import web_search
 from app.services.sub_agent_service import run_sub_agent
@@ -1151,33 +1154,13 @@ def _skill_runtime_note(file_names: list[str]) -> str | None:
 # instructions + pull its bundled file bytes. This is the SKILLS analog of the SEED-124
 # folder leak Phase 165 closed on the same service-role seam.
 #
-# The single source of the corrected predicate — mirrors the mig-109 skill_files
-# table-RLS shape (FIX-A / D-165-02):
-#     visible  iff  is_system = true
-#                   OR (org_id ∈ caller_org_ids AND (user_id = caller OR is_org_shared = true))
-# ``is_system`` stays a platform-universal escape OUTSIDE the org gate (the built-in
-# skill-creator is legitimately cross-org). Fail-closed: an EMPTY caller org set → ONLY
-# ``is_system`` skills resolve (0 shared cross-org — over-restrict, never over-share).
+# Phase 182 (CR-01) HOISTED the predicate itself to ``app.utils.skill_visibility`` — the
+# grounding/canvas seam needs the SAME rule but cannot import this module (a real
+# harness.scope → task_service → tool_dispatcher cycle), and a second copy is exactly the
+# drift the one-source red line forbids. The rule, the RLS shape it mirrors and the
+# fail-closed reasoning all live in that module's docstring. This module keeps only the
+# ToolContext-shaped resolver below.
 # ─────────────────────────────────────────────────────────────────────────────
-
-def _build_skill_visibility_or(user_id: str, org_ids: set[str]) -> str:
-    """Build the PostgREST ``.or_()`` predicate string that org-gates skill resolution.
-
-    Pure + unit-testable. ``coerce_uid`` UUID-validates every runtime value spliced into
-    the ``.or_()`` grammar (a malformed id raises rather than breaking out of the DSL —
-    the service-role client has no RLS backstop). Empty ``org_ids`` returns the bare
-    ``is_system.eq.true`` term: no empty ``in.()`` (a PostgREST syntax error) AND
-    fail-closed (0 shared cross-org). Applied identically at all six resolution sites.
-    """
-    caller = coerce_uid(user_id)
-    if not org_ids:
-        return "is_system.eq.true"
-    org_list = ",".join(coerce_uid(o) for o in sorted(org_ids))
-    return (
-        f"is_system.eq.true,"
-        f"and(org_id.in.({org_list}),or(user_id.eq.{caller},is_org_shared.eq.true))"
-    )
-
 
 async def _resolve_skill_visibility_or(ctx: ToolContext) -> str:
     """Resolve the caller's org set + build the org-gated skill-visibility ``.or_()``.
@@ -1190,7 +1173,7 @@ async def _resolve_skill_visibility_or(ctx: ToolContext) -> str:
     the injection loop never fires N membership round-trips.
     """
     org_ids = await _resolve_caller_org_ids(ctx.supabase, ctx.current_user["id"])
-    return _build_skill_visibility_or(ctx.current_user["id"], org_ids)
+    return build_skill_visibility_or(ctx.current_user["id"], org_ids)
 
 
 async def _handle_load_skill(args: dict, ctx: ToolContext) -> ToolResult:

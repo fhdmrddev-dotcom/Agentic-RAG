@@ -38,9 +38,14 @@ it module-direct (``from app.services.harness.grounding import ...``).
 BLOCKING-I/O CONTRACT (D-v2.5-01): the blocking ``supabase-py`` skill read rides
 ``run_in_threadpool`` — never on the event loop.
 
-OWNER SCOPING (V4 / T-182-03 / T-103-02-03): every read is scoped by hand on ``user_id``
-(the service runs as service-role, which bypasses RLS). The palette must NEVER widen to
-another user's folders or skills — KB content can never whitelist itself.
+OWNER + ORG SCOPING (V4 / T-182-03 / T-103-02-03 / CR-01): every read is gated by hand (the
+service runs as service-role, which bypasses RLS). Owner scoping alone is NOT sufficient —
+both reads also gate on the caller's ORG membership, because ``is_org_shared`` is a
+cross-user scope and without an org term it spans cross-TENANT too: folders via
+``fetch_visible_folders`` (D-165-04 / SEED-124) and skills via the one shared rule in
+``app.utils.skill_visibility`` (CR-01 / SEED-125). Both fail closed on an unresolvable org
+set. The palette must NEVER widen to another user's or another org's folders or skills — KB
+content can never whitelist itself.
 """
 
 from __future__ import annotations
@@ -50,6 +55,13 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from starlette.concurrency import run_in_threadpool
+
+# CR-01 — module top on purpose: both are stdlib-light and cycle-free (``app.utils.db`` pulls
+# only logging/uuid/starlette; ``app.utils.skill_visibility`` pulls only ``app.utils.db``), so
+# they do not compromise this module's import-light property. ``skill_visibility`` is the ONE
+# home of the org-gated skill rule — see its docstring for the rule + the RLS shape it mirrors.
+from app.utils.db import coerce_uid
+from app.utils.skill_visibility import build_skill_visibility_or, skill_row_visible
 
 if TYPE_CHECKING:  # pragma: no cover — typing only, keeps the module import-light
     from app.models.harness import WorkflowDefinition
@@ -74,7 +86,10 @@ class GroundingBundle:
     tools: list[str] = field(default_factory=list)  # sorted(tool_names) — JSON-friendly
     tool_names: set[str] = field(default_factory=set)  # membership set for fidelity
     folders: list[dict] = field(default_factory=list)  # fetch_visible_folders rows
-    skills: list[dict] = field(default_factory=list)  # enabled owner + org-shared skills
+    # enabled skills visible to the caller: is_system, or in-org owned / org-shared (CR-01).
+    # RAW rows — the ``/grounding-bundle`` route projects them through ``PaletteSkill`` before
+    # serializing, so ``org_id`` / ``user_id`` never reach the wire (CR-02).
+    skills: list[dict] = field(default_factory=list)
     skill_ids: set[str] = field(default_factory=set)  # membership set for fidelity
     placeholders: list[str] = field(default_factory=list)  # template placeholder fields
 
@@ -82,47 +97,65 @@ class GroundingBundle:
 # ── moved verbatim from workflow_authoring (Phase 103) ────────────────────────
 
 
-def _skill_registry(supabase, user_id: str) -> list[dict]:
-    """Owner + global ENABLED skills (service-role bypasses RLS — scope by hand).
+def _skill_registry(supabase, user_id: str, caller_org_ids: set[str]) -> list[dict]:
+    """ENABLED skills VISIBLE to the caller (service-role bypasses RLS — gate by hand).
 
-    Reproduces the spike's query shape (RESEARCH A3) — ``user_id.eq OR is_org_shared`` +
-    an ``is_enabled`` filter. ``skill_ref`` in a PhaseConfig is the skill ``id`` (a UUID),
-    so the caller builds the membership set from ``s["id"]``.
+    ``skill_ref`` in a PhaseConfig is the skill ``id`` (a UUID), so the caller builds the
+    membership set from ``s["id"]``.
+
+    ORG GATE (CR-01 / SEED-125). The pre-182 predicate was
+    ``.or_(user_id.eq.<caller>,is_org_shared.eq.true)`` with a matching Python post-filter and
+    NO org term — on the BYPASSRLS service-role client that matched **every** org's
+    ``is_org_shared`` skill, so ``/grounding-bundle`` returned foreign-org skill rows and
+    ``/validate`` grounded a foreign-org ``skill_ref`` as valid. Both the pushed-down query and
+    the in-process post-filter now go through the ONE shared rule in
+    ``app.utils.skill_visibility`` (``build_skill_visibility_or`` / ``skill_row_visible``),
+    which mirrors the live ``public.skills`` SELECT policy term-for-term. The two must agree —
+    a post-filter looser than the query would re-admit exactly the rows the gate excluded — so
+    they are derived from the same module rather than hand-written twice.
+
+    ``caller_org_ids`` is resolved by the ASYNC caller (``assemble_grounding_bundle``) and
+    threaded in: this function is sync-by-contract (see below) and must not perform the
+    ``org_members`` round-trip itself. An empty set is fail-closed, NOT a bypass: only
+    ``is_system`` skills resolve.
+
+    ``coerce_uid`` UUID-validates the caller id before it is spliced into the PostgREST
+    ``.or_()`` grammar. On the service-role client that predicate IS the only owner gate, so a
+    malformed id must RAISE, never break out of the DSL. It is deliberately outside the
+    ``try`` below: a bad identity is a caller bug to surface, not a read failure to swallow.
 
     BLOCKING-I/O CONTRACT (IR-01 / D-v2.5-01): this is a plain ``def`` and calls
     synchronous ``supabase-py``. It MUST be invoked via ``run_in_threadpool`` (it is —
     ``assemble_grounding_bundle`` wraps it). NEVER call it directly from an async handler
     or the blocking read lands on the event loop."""
+    caller = coerce_uid(user_id)
+    org_ids = {coerce_uid(o) for o in (caller_org_ids or set())}
     try:
         rows = (
             supabase.table("skills")
-            .select("id,name,is_org_shared,user_id,is_enabled")
-            .or_(f"user_id.eq.{user_id},is_org_shared.eq.true")
+            # is_system + org_id are selected because the post-filter below needs them to
+            # evaluate the SAME rule the .or_() pushes down (they are projected off the wire
+            # by the route's PaletteSkill model — CR-02).
+            .select("id,name,is_org_shared,is_system,org_id,user_id,is_enabled")
+            .or_(build_skill_visibility_or(caller, org_ids))
             .execute()
             .data
         ) or []
-    except Exception:  # noqa: BLE001 — CR-01: a scoped read miss must FAIL CLOSED, never widen scope.
-        # The service runs as service-role (RLS-bypassing). A bare full-table fallback
-        # would pull EVERY user's skill rows over the wire and lean on a Python-side
-        # filter — fragile and a scope-leak risk on orphaned/None user_id rows. Retry
-        # with the SAME owner+global predicate pushed down to the DB; if that also
-        # fails, return [] (no skill grounding) rather than a possibly-polluted set.
-        logger.warning("grounding: scoped skills read failed; retrying owner-scoped, else empty")
-        try:
-            rows = (
-                supabase.table("skills")
-                .select("id,name,is_org_shared,user_id,is_enabled")
-                .or_(f"user_id.eq.{user_id},is_org_shared.eq.true")
-                .execute()
-                .data
-            ) or []
-        except Exception:  # noqa: BLE001 — fail closed: no skills rather than cross-user names.
-            logger.warning("grounding: owner-scoped skills retry failed; using empty skill set")
-            rows = []
+    except Exception:  # noqa: BLE001 — a gated read miss must FAIL CLOSED, never widen scope.
+        # The service runs as service-role (RLS-bypassing), so there is no safe fallback read:
+        # a bare full-table query would pull EVERY org's skill rows over the wire. Return []
+        # (no skill grounding) rather than a possibly-polluted set. The pre-182 code "retried"
+        # here with a byte-identical query — a duplicated no-op that made any deterministic
+        # failure fail twice, under a comment describing a narrowing that never happened. One
+        # attempt, one honest fail-closed exit.
+        logger.warning(
+            "grounding: org-gated skills read failed; using empty skill set", exc_info=True
+        )
+        return []
     return [
         r
         for r in rows
-        if r.get("is_enabled") and (str(r.get("user_id")) == str(user_id) or r.get("is_org_shared"))
+        if r.get("is_enabled") and skill_row_visible(r, caller_id=caller, org_ids=org_ids)
     ]
 
 
@@ -236,11 +269,21 @@ async def assemble_grounding_bundle(
     it. ``pool`` is only needed when ``template_asset_id`` must be resolved.
     """
     from app.services.openai_service import get_tools  # function-local
-    from app.utils.folder_utils import fetch_visible_folders  # function-local
+    from app.utils.folder_utils import (  # function-local
+        _resolve_caller_org_ids,
+        fetch_visible_folders,
+    )
 
     folders = await fetch_visible_folders(supabase, user_id)
     tool_names = {t["function"]["name"] for t in get_tools(None)}
-    skills = await run_in_threadpool(_skill_registry, supabase, user_id)
+    # CR-01 — the caller's org set gates the skill read. Resolved HERE, in the async caller,
+    # because ``_skill_registry`` is sync-by-contract (D-v2.5-01) and must not do its own
+    # ``org_members`` round-trip; it receives the set and applies the shared rule. This is the
+    # same fail-closed resolver the SEED-124 folder fix uses, and it adds no new failure mode:
+    # ``fetch_visible_folders`` on the line above already calls it internally (the duplicate
+    # round-trip is one small indexed read — folder_utils' signature is contractually fixed).
+    caller_org_ids = await _resolve_caller_org_ids(supabase, user_id)
+    skills = await run_in_threadpool(_skill_registry, supabase, user_id, caller_org_ids)
     skill_ids = {str(s["id"]) for s in skills}
     placeholders = await _resolve_template_placeholders(
         supabase=supabase,
