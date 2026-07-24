@@ -89,7 +89,7 @@ Committed as gated phases (ship only if CORE lands clean and budget remains; v2.
   4. Any schema the milestone introduces is additive-nullable-only and every new route is flag/404-gated at every layer, so the off-switch can never leave a non-revertible remnant (Pitfall 2).
 
 **Plans**: 3 plans
-- [ ] 181-01-PLAN.md — Backend off-switch: the "off" audience + 404 require_canvas gate + temporary canary route + backend byte-identical test gate (Wave 1)
+- [x] 181-01-PLAN.md — Backend off-switch: the "off" audience + 404 require_canvas gate + temporary canary route + backend byte-identical test gate (Wave 1)
 - [ ] 181-02-PLAN.md — Frontend feature wiring + operator Off|On FeatureVisibility card + frontend nav byte-identical test (Wave 2)
 - [ ] 181-03-PLAN.md — Scope-freeze script (doors/run-surface/harness frozen) + full-suite green + operator live-close UAT (Wave 3)
 **UI hint**: yes

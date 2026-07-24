@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
 status: executing
-last_updated: "2026-07-24T14:51:41.220Z"
-last_activity: 2026-07-24 -- Phase 181 planning complete
+last_updated: "2026-07-24T15:28:34.271Z"
+last_activity: 2026-07-24 -- Phase 181 Plan 01 complete (backend off-switch)
 progress:
   total_phases: 18
   completed_phases: 0
   total_plans: 3
-  completed_plans: 0
+  completed_plans: 1
   percent: 0
 ---
 
@@ -22,7 +22,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-20 — Phase 163 THE ATOMIC CRUX complete; membership RLS enforced)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Planning next milestone — **v3.6 Visual / No-Code Workflow Studio** (SEED-123, research-first). v3.5 STRETCH 178-180 deferred → `.planning/v3.5-STRETCH-CARRYFORWARD.md`.
+**Current focus:** Phase 181 — revert-foundation
 
 ## Deferred Items
 
@@ -44,10 +44,10 @@ Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 op
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Ready to execute
-Last activity: 2026-07-24 -- Phase 181 planning complete
+Phase: 181 (revert-foundation) — EXECUTING
+Plan: 2 of 3
+Status: 181-01 COMPLETE (backend off-switch) — Plan 02 next
+Last activity: 2026-07-24 -- 181-01 shipped: visual_workflow_canvas "off" audience + require_canvas 404 gate + canary route + test_revert_byte_identical acceptance gate (backend; zero migration, zero package)
 
 ### Quick Tasks Completed
 

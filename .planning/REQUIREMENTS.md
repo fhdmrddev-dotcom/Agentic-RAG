@@ -13,8 +13,8 @@
 
 ### REVERT — the tested off-switch (operator HARD gate #1)
 
-- [ ] **REVERT-01**: An operator can turn the entire visual canvas layer on/off via a new governed feature key (`visual_workflow_canvas`, default off) — the nav entry and every canvas route are gated (the shipped v3.3 `skill_studio` / feature-visibility pattern); the two existing authoring doors and the engine are untouched when off.
-- [ ] **REVERT-02**: With the flag off, the product is provably byte-identical to today — a `test_revert_byte_identical` gate (CI + live milestone-close) asserts the existing "Describe & run" / "Author & govern" doors and the run surface are unchanged. Revertibility is a tested acceptance gate, not a prose claim (extends the standing D-14 red line).
+- [x] **REVERT-01**: An operator can turn the entire visual canvas layer on/off via a new governed feature key (`visual_workflow_canvas`, default off) — the nav entry and every canvas route are gated (the shipped v3.3 `skill_studio` / feature-visibility pattern); the two existing authoring doors and the engine are untouched when off.
+- [x] **REVERT-02**: With the flag off, the product is provably byte-identical to today — a `test_revert_byte_identical` gate (CI + live milestone-close) asserts the existing "Describe & run" / "Author & govern" doors and the run surface are unchanged. Revertibility is a tested acceptance gate, not a prose claim (extends the standing D-14 red line).
 
 ### VALID — the anti-drift governance seam (the differentiator)
 
@@ -97,8 +97,8 @@ Which phases cover which requirements. Filled at roadmap creation 2026-07-24, re
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| REVERT-01 | Phase 181 | Pending |
-| REVERT-02 | Phase 181 | Pending |
+| REVERT-01 | Phase 181 | Complete |
+| REVERT-02 | Phase 181 | Complete |
 | VALID-01 | Phase 182 | Pending |
 | VALID-02 | Phase 184 | Pending |
 | VALID-03 | Phase 184 | Pending |
