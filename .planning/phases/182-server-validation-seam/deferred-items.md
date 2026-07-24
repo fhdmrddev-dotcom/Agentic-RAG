@@ -47,3 +47,49 @@ limit and scope boundary both apply.
 
 **Re-open trigger:** any phase that touches `api/runs.py`'s cancel/terminal-state vocabulary
 or `harness_engine._build_resume_context`.
+
+## D3 — 29 of 133 seed files have frontmatter that does not parse as strict YAML
+
+**Discovered:** 2026-07-25, during plan 182-05 (validating the frontmatter of the three
+new seeds against the SEED-129 reference schema).
+
+**Symptom:** `yaml.safe_load` on the `---` block fails for 28 seed files, and
+`SEED-084-starter-workflow-library.md` has no frontmatter block at all. 104 parse
+cleanly. The reference file the plan named as the schema to mirror,
+`SEED-129-residual-org-blind-service-role-skill-reads.md`, is itself one of the
+failures.
+
+**Root cause:** unquoted plain scalars containing `": "`. YAML reads the embedded
+colon-space as a nested mapping key. Example, SEED-129 line 7:
+
+```yaml
+category: security / tenancy-isolation — ... different call sites: none of them is a ...
+                                                                ^^ parse breaks here
+```
+
+Three failure signatures appear — `mapping values are not allowed here` (the
+colon-space case above), `while scanning for the next token` / `while parsing a block
+mapping` (unescaped/unbalanced quoting inside a value), and one
+`while parsing a flow sequence` (SEED-066, a malformed inline `[...]` list).
+
+**Why it matters (not cosmetic):** seed frontmatter is the machine-readable index for
+the deferred backlog — `status`, `folded_into`, `re_open_triggers`, `priority` are how
+the `audit-open` sweep at milestone close enumerates open seeds (STATE.md's v3.4 close
+counted "Seeds (dormant) | 9" from exactly this surface). A seed whose frontmatter does
+not parse is invisible to any consumer that reads it structurally, which silently
+defeats the project's preserve-every-deferred-idea rule for ~22% of the backlog. Note
+this is a LATENT risk today, not a proven live failure: it was not confirmed during this
+plan which specific tools parse seed frontmatter strictly versus regex-scrape it, and a
+lenient consumer would not have surfaced it. Confirm the consumer set before sizing a fix.
+
+**Not fixed because:** 29 files, none of them in this plan's `files_modified` (plan
+182-05 owns exactly 4 files and its own acceptance criteria forbid touching anything
+else). The three seeds this plan planted were authored quoted and verified to parse
+cleanly, so the defect is not being extended.
+
+**Re-open trigger:** any tooling change that reads seed frontmatter structurally
+(a seeds index, an `audit-open` sweep, a `/gsd:new-milestone` seed roll-up), or the next
+milestone close that counts open seeds — validate the whole directory first, since the
+count will be wrong by up to 29. A one-pass mechanical fix (quote every offending scalar,
+add frontmatter to SEED-084) plus a CI guard that parses every `.planning/seeds/*.md`
+frontmatter would close it permanently and is the recommended shape.
