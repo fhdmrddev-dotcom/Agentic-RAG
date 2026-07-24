@@ -108,7 +108,7 @@ Committed as gated phases (ship only if CORE lands clean and budget remains; v2.
   4. The verdict shape is consumable per-node (each verdict maps to a phase / node id) so a later canvas can paint per-node badges from it — and later carry the GOVERN grounding verdict (185).
 
 **Plans**: 3 plans
-- [ ] 182-01-PLAN.md — Extract grounding into one shared `harness/grounding.py` source + thin delegates + extraction-parity/count-guard (Wave 1)
+- [x] 182-01-PLAN.md — Extract grounding into one shared `harness/grounding.py` source + thin delegates + extraction-parity/count-guard (Wave 1)
 - [ ] 182-02-PLAN.md — `POST /workflows/validate` (full static gauntlet, severity verdicts) + `GET /workflows/grounding-bundle` palette + unit/integration tests (Wave 2)
 - [ ] 182-03-PLAN.md — Retire the 181 `/canvas/ping` canary + repoint BOTH `test_revert_byte_identical.py` and `test_181_flip_on.py` onto the real routes (Wave 3)
 **Flags**: backend-only reuse (`reachability.lint_workflow` + `_check_grounding_fidelity` verbatim — the anti-drift seam, Pitfall 1); flag-gated 404 (inherits 181); red line D-14; no SC#10 (pure backend, no streaming/provider); no threat model (no new authz); no migration; no `@xyflow/react` required yet.

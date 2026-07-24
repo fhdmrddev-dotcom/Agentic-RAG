@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
 status: executing
-last_updated: "2026-07-24T18:16:14.652Z"
-last_activity: 2026-07-24 -- Phase 182 planning complete
+last_updated: "2026-07-24T18:44:10.412Z"
+last_activity: 2026-07-24 -- Phase 182 Plan 01 complete (shared harness/grounding.py extracted)
 progress:
   total_phases: 18
   completed_phases: 1
   total_plans: 6
-  completed_plans: 3
+  completed_plans: 4
   percent: 6
 ---
 
@@ -22,7 +22,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-20 — Phase 163 THE ATOMIC CRUX complete; membership RLS enforced)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 182 — server validation seam
+**Current focus:** Phase 182 — server-validation-seam
 
 ## Deferred Items
 
@@ -44,10 +44,10 @@ Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 op
 
 ## Current Position
 
-Phase: 182
-Plan: Not started
+Phase: 182 (server-validation-seam) — EXECUTING
+Plan: 2 of 3
 Status: Ready to execute
-Last activity: 2026-07-24 -- Phase 182 planning complete
+Last activity: 2026-07-24 -- Phase 182 Plan 01 complete (shared harness/grounding.py extracted; NL-gen byte-identical)
 
 ### Quick Tasks Completed
 
@@ -530,6 +530,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 176 P02 | 13min | 2 tasks | 6 files |
 | Phase 176 P03 | 35min | 2 tasks | 2 files |
 | Phase 176 P04 | 35 | 2 tasks | 6 files |
+| Phase 182 P01 | 24min | 3 tasks | 5 files |
 
 ## Decisions
 
@@ -666,6 +667,10 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase ?]: 176-03 (EXEC-01): declared execute_code libraries install via python -m pip (system interpreter, non-stream => reliable exit_code), retry x1, never swallowed — replaces the venv-targeted failure-swallowing session.install (D-01/D-02.1)
 - [Phase ?]: 176-03 (EXEC-01): undeclared ModuleNotFound auto-heal (install + threadpool-wrapped re-run once) bounded 1-per-module-per-RUN via a per-run Redis set heal_attempted:{run_id}, graceful call-local fallback; read+written entirely in tool_dispatcher.py — no ctx field, no agent_loop touch (D-02.2/D-04)
 - [Phase ?]: 176-03 (EXEC-01): honest install_failed note on the model-facing llm_content only; persisted/UI tool_result stays a normal error — mirrors the runtime_gap pattern (D-03)
+- [Phase 182]: 182-01: the ONE shared grounding source is backend/app/services/harness/grounding.py, NOT reachability.py — grounding touches the DB (folders/skills) and would poison reachability's documented pure-import property (Pitfall 1); it is also deliberately NOT re-exported from harness/__init__.py
+- [Phase 182]: 182-01: one rule set, two presentations — grounding_verdicts() APPENDS per-node verdicts for /validate while _check_grounding_fidelity() SHORT-CIRCUITS to the historical {ok,error,detail} dict for NL-gen — both call the same three atomic helpers (_folder_scope_violation / _unregistered_tools / _unregistered_skill_ref) so no grounding rule can drift (D-182-02 / D-182-06 red line)
+- [Phase 182]: 182-01: the NL grounding prompt is pinned byte-for-byte by an explicit golden literal in tests/test_182_extraction_parity.py, plus exact-literal COUNT guards (2 + 6) on the Phase-103 backstop suites — the golden is never re-derived from the renderer, so a reworded heading or a squashed blank line fails; the count guard is the Phase-177 coverage-loss lesson (a failures-only differential cannot see a DELETED test)
+- [Phase 182]: 182-01: VALID-01 stays Pending after plan 01 — marked complete at the END of phase 182, not per-plan — the requirement text ('the server exposes POST /workflows/validate') only becomes true when 182-02 lands the route; all three 182 plans share VALID-01, so a per-plan mark-complete would create a false traceability record
 
 ## Operator Next Steps
 
