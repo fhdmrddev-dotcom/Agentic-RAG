@@ -58,11 +58,17 @@ async def get_effective_features(
     return {
         "features": {
             f: (
-                op
-                or feature_audience(f) == "everyone"
-                or (
-                    feature_audience(f) == "role"
-                    and resolve_feature_access(f, caller_role, caller_groups)
+                # Phase 181 (REVERT-01 / D-181-01): the "off" guard wins over the operator
+                # short-circuit, so an "off" feature (visual_workflow_canvas by default) hides
+                # from EVERYONE — operators included — keeping flag-off byte-identical for all.
+                feature_audience(f) != "off"
+                and (
+                    op
+                    or feature_audience(f) == "everyone"
+                    or (
+                        feature_audience(f) == "role"
+                        and resolve_feature_access(f, caller_role, caller_groups)
+                    )
                 )
             )
             for f in _GOVERNED_FEATURES

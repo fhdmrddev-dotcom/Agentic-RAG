@@ -555,6 +555,40 @@ def require_visible(feature: str):
     return _dep
 
 
+def require_canvas():
+    """404-when-off gate for the v3.6 visual_workflow_canvas layer (REVERT-01 / D-181-02).
+
+    A dependency FACTORY (mirrors ``require_visible``'s shape) — but it MIRRORS
+    ``require_operator``'s byte-identical 404 (NOT ``require_visible``'s 403) so the off
+    state is indistinguishable from 'the route was never built'. A 403 would leak that a
+    canvas route exists-but-forbidden; a 404 does not (D-181-02).
+
+    The master switch resolves ``"off"`` BEFORE the operator no-op (D-181-01), so an
+    operator gets the SAME 404 as an end user while off — no phantom canvas for anyone.
+    Fail-closed: ``feature_audience`` never raises (cold cache / DB blip -> ``{}`` -> the
+    ``"off"`` cold default), so any settings blip resolves to 404, never a fail-open reveal.
+
+    ``feature_audience`` / ``resolve_feature_access`` are lazy-imported inside the closure to
+    avoid the user_settings -> dependencies import cycle (matches ``require_visible``). Attach
+    on canvas routes via ``dependencies=[Depends(require_canvas())]``.
+    """
+    async def _dep(current_user: dict = Depends(get_current_user), request: Request = None):
+        from app.models.user_settings import feature_audience, resolve_feature_access
+        audience = feature_audience("visual_workflow_canvas")
+        if audience == "off":
+            raise _NOT_FOUND  # 404 for ALL, incl. operators — resolved FIRST (D-181-01)
+        if await is_operator(current_user["id"]):
+            return  # operator -> no-op (only reached once the flag is NOT off)
+        if audience == "everyone":
+            return
+        if audience == "role":
+            caller_role, caller_groups = await resolve_caller_role(request, current_user)
+            if resolve_feature_access("visual_workflow_canvas", caller_role, caller_groups):
+                return
+        raise _NOT_FOUND  # 404, never 403 — REVERT byte-identity (never leak route existence)
+    return _dep
+
+
 # ── Phase 166 (ADMIN-01/02/04) — org authz: active-org resolution + org:manage gate ──
 # The user-side mirror of require_operator, but gated on org PERMISSIONS (mig 104's
 # current_user_has_permission SECDEF helper) instead of operator membership. D-166-09: no
