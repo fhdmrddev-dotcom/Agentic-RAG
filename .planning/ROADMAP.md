@@ -114,7 +114,7 @@ Committed as gated phases (ship only if CORE lands clean and budget remains; v2.
 - [x] 182-04-PLAN.md — GAP (SC#4 blocker): thread the offending phase slug structurally out of `assert_folder_scopes_subset` so the `folder_scope` verdict is keyed per-node instead of `phase: None` (Wave 1)
 - [x] 182-05-PLAN.md — GAP (bookkeeping): plant SEED-130/131/132 for the deferred WR-03/04/07 findings + record WR-08 as a REJECTED finding answered by D-182-05 (Wave 1)
 - [x] 182-06-PLAN.md — GAP (phase-goal fidelity): enforce grounding fidelity at publish via the SAME shared `grounding_verdicts` collector + correct the two false parity claims + `/validate`-vs-publish agreement test (Wave 2)
-- [ ] 182-07-PLAN.md — GAP (WR-05): derive the severity classifier's known-code set from the owning modules + fail LOUD on an unrecognised code + drift detector (Wave 3)
+- [x] 182-07-PLAN.md — GAP (WR-05): derive the severity classifier's known-code set from the owning modules + fail LOUD on an unrecognised code + drift detector (Wave 3)
 **Flags**: backend-only reuse (`reachability.lint_workflow` + `_check_grounding_fidelity` verbatim — the anti-drift seam, Pitfall 1); flag-gated 404 (inherits 181); red line D-14; no SC#10 (pure backend, no streaming/provider); no migration; no `@xyflow/react` required yet. **Gap-closure amendment (2026-07-25):** the original "no threat model (no new authz)" flag no longer holds — plan 182-06 converts publish from advisory to ENFORCING for grounding fidelity and builds an org-scoped service-role client on that path, so all four gap-closure plans carry a `<threat_model>` block (T-182-08..23).
 
 #### Phase 183: Read-Only Canvas

@@ -93,3 +93,45 @@ milestone close that counts open seeds — validate the whole directory first, s
 count will be wrong by up to 29. A one-pass mechanical fix (quote every offending scalar,
 add frontmatter to SEED-084) plus a CI guard that parses every `.planning/seeds/*.md`
 frontmatter would close it permanently and is the recommended shape.
+
+## D4 — `test_bounded_retry_reaches_failed_after_3_attempts` audits 0 of 3 attempts
+
+**Discovered:** 2026-07-25, during plan 182-07 (a wider-than-required regression sweep
+across the harness/publish/workflow suites, run because the plan touched a module the
+publish path also imports).
+
+**Symptom:** `tests/test_harness_gates.py::test_bounded_retry_reaches_failed_after_3_attempts`
+fails at `assert _audit_failures(mock_asyncpg_pool) == 3` with `assert 0 == 3`
+(`tests/test_harness_gates.py:192`). The preceding assertion — `calls["n"] == 3`, the
+HARD retry bound — passes, so the retry loop itself is correct; only the per-attempt
+D-08 audit write is missing. Two adjacent log lines point at the same area:
+
+```
+WARNING app.services.harness_engine:harness_engine.py:532  harness failure surfacing:
+        missing thread_id/user_id on ctx for run <uuid> (run_failed emitted but failure
+        message not persisted)
+ERROR   app.services.harness_engine:harness_engine.py:1242 ask_user expiry cleanup failed
+        at fail_run site for run <uuid>  ->  KeyError: 'tool_call_id'
+```
+
+**Root cause (unverified, out of scope):** the failing surface is entirely inside
+`harness_engine.py` — the `fail_run` path's audit write and its `ask_user` expiry cleanup.
+Most likely the same class as D1/D2 (fixture drift: the test's fabricated ctx carries no
+`thread_id`/`user_id`, and a tool-call record lacks `tool_call_id`), but that was not
+confirmed, since confirming it means deciding what the engine should do with an
+identity-less ctx — an engine-contract call, not a 182 call.
+
+**Proven pre-existing:** the three source files plan 182-07 modifies
+(`app/api/workflows.py`, `app/services/harness/reachability.py`,
+`app/services/harness/grounding.py`) were temporarily replaced with their phase-start
+(`e262e9af`) copies and the SAME test produced the identical `assert 0 == 3`. Files were
+then restored from a scratchpad backup — `md5sum -c` OK, `git diff HEAD` empty. Zero
+net-new from 182-07.
+
+**Not fixed because:** unrelated file, no causal link (neither `LINT_CODES`,
+`GROUNDING_VERDICT_CODES` nor `_severity` is reachable from the engine's retry/audit
+path), and the scope boundary applies.
+
+**Re-open trigger:** the next phase that touches `harness_engine`'s `fail_run` / audit
+write path, its `ask_user` expiry cleanup, or the `test_harness_gates` suite. Worth
+pairing with D1/D2 — all three smell like the same post-v3.4 fixture drift.

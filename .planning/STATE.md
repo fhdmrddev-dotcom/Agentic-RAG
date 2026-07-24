@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
 status: executing
-last_updated: "2026-07-24T23:09:23.662Z"
-last_activity: 2026-07-25 -- Plan 182-06 executed (publish stage 2.6 ENFORCES grounding fidelity via the shared collector; /validate-vs-publish agreement test)
+last_updated: "2026-07-24T23:32:00.000Z"
+last_activity: 2026-07-25 -- Plan 182-07 executed (WR-05 closed: /validate's severity classifier composes its known-code set from the owning modules and fails LOUD on an unrecognised code; 2 falsified drift detectors + teeth self-test). LAST plan of phase 182 — phase awaits orchestrator verification, NOT complete.
 progress:
   total_phases: 18
   completed_phases: 1
   total_plans: 10
-  completed_plans: 9
+  completed_plans: 10
   percent: 6
 ---
 
@@ -536,6 +536,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 182 P04 | 47min | 2 tasks | 4 files |
 | Phase 182 P05 | 10min | 2 tasks | 5 files |
 | Phase 182 P06 | 10min | 3 tasks | 4 files |
+| Phase 182 P07 | 23min | 2 tasks | 4 files |
 
 ## Decisions
 
@@ -686,6 +687,9 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase 182]: D-182-04c: except ValueError in grounding.py deliberately NOT narrowed to the subclass + slug read via getattr(..., None) — a plain ValueError degrades to phase: None instead of a 500 on the always-HTTP-200 /validate route (T-182-10)
 - [Phase ?]: Phase 182-05: WR-08 (require_canvas-alone auth asymmetry on /validate + /grounding-bundle) REJECTED — D-182-05 locks the posture; require_visible's 403 would leak route existence and break the byte-identical-404 REVERT gate. Recorded in 182-DECISION-NOTES.md. WR-03/WR-04/WR-07 deferred as SEED-130/131/132 with concrete Phase-184/185 re-open triggers.
 - [Phase 182]: publish_workflow enforces grounding fidelity at stage 2.6 via the SHARED grounding_verdicts collector — /validate and publish now provably report the same findings (agreement test); fails CLOSED on an unresolvable registry; create_draft/update_draft deliberately NOT gated
+- [Phase 182]: 182-07 (WR-05): /validate's _severity fails CLOSED — an unrecognised verdict code classifies 'error' and logs a WARNING naming it, never the soft 'incomplete'. A wrongly-red verdict is visible and gets fixed; a wrongly-grey one silently misleads the author into a publish block.
+- [Phase 182]: 182-07: verdict-code vocabularies are OWNED by the emitting module (reachability.LINT_CODES / grounding.GROUNDING_VERDICT_CODES). Downstream classifiers COMPOSE the known set; _ERROR_CODES is derived set arithmetic with no duplicated literal, and paired source-scanning drift detectors (falsified, plus a teeth self-test) enforce the pairing.
+- [Phase 182]: 182-07: grounding_unavailable's canonical home is publish_service.py — publish-only, deliberately NOT composed into /validate's _KNOWN_CODES since /validate calls grounding_verdicts directly. Pinned by a boundary test that fails if publish ever mints a second unowned code.
 
 ## Operator Next Steps
 
