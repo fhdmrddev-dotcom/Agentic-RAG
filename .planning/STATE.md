@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
 status: executing
-last_updated: "2026-07-24T21:49:23.983Z"
-last_activity: 2026-07-24 -- Phase 182 planning complete
+last_updated: "2026-07-24T22:38:45.616Z"
+last_activity: 2026-07-25 -- Plan 182-04 executed (folder_scope verdict keyed to its phase)
 progress:
   total_phases: 18
   completed_phases: 1
   total_plans: 10
-  completed_plans: 6
+  completed_plans: 7
   percent: 6
 ---
 
@@ -45,9 +45,9 @@ Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 op
 ## Current Position
 
 Phase: 182 (server-validation-seam) — EXECUTING
-Plan: 3 of 3
-Status: Ready to execute
-Last activity: 2026-07-24 -- Phase 182 planning complete
+Plan: 5 of 7
+Status: Ready to execute (plans 01-04 complete; 04 closed the SC#4 per-node keying BLOCKER)
+Last activity: 2026-07-25 -- Plan 182-04 executed (folder_scope verdict keyed to its phase)
 
 ### Quick Tasks Completed
 
@@ -533,6 +533,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 182 P01 | 24min | 3 tasks | 5 files |
 | Phase 182 P02 | 22min | 2 tasks | 3 files |
 | Phase 182 P03 | 11min | 2 tasks | 4 files |
+| Phase 182 P04 | 47min | 2 tasks | 4 files |
 
 ## Decisions
 
@@ -678,6 +679,9 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase ?]: 182-02: VALID-01 marked COMPLETE — its text (server exposes POST /workflows/validate reusing lint_workflow + grounding fidelity verbatim) is literally true as of this plan; 182-03 adds no route so a re-mark there is idempotent
 - [Phase ?]: 182-03: the 181 /canvas/ping canary is RETIRED (D-182-04) — its 404-when-off assertions were MIGRATED onto the real routes, never dropped; every future canvas route must append its own 404-when-off probe to test_revert_byte_identical.py
 - [Phase ?]: 182-03: require_canvas 404s from TWO steps (flag off, and flag-live-but-caller-None) — a 404-when-off test that does not monkeypatch authenticate_canvas_request tests the anonymous fold, NOT the flag; the new authenticated-operator test injects the caller so D-181-01 step order is actually pinned
+- [Phase 182]: D-182-04a: FolderScopeSubsetError subclasses ValueError so all 4 pre-existing except-ValueError callers keep working by construction; super().__init__(message) keeps str(exc)/args byte-identical
+- [Phase 182]: D-182-04b: the folder_scope slug travels on a typed exception attribute (phase_slug), never by regexing the message — a source-text forbidden-token guard test pins the D-182-06 red line
+- [Phase 182]: D-182-04c: except ValueError in grounding.py deliberately NOT narrowed to the subclass + slug read via getattr(..., None) — a plain ValueError degrades to phase: None instead of a 500 on the always-HTTP-200 /validate route (T-182-10)
 
 ## Operator Next Steps
 

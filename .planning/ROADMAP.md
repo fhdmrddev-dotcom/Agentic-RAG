@@ -111,7 +111,7 @@ Committed as gated phases (ship only if CORE lands clean and budget remains; v2.
 - [x] 182-01-PLAN.md — Extract grounding into one shared `harness/grounding.py` source + thin delegates + extraction-parity/count-guard (Wave 1)
 - [x] 182-02-PLAN.md — `POST /workflows/validate` (full static gauntlet, severity verdicts) + `GET /workflows/grounding-bundle` palette + unit/integration tests (Wave 2)
 - [x] 182-03-PLAN.md — Retire the 181 `/canvas/ping` canary + repoint BOTH `test_revert_byte_identical.py` and `test_181_flip_on.py` onto the real routes (Wave 3)
-- [ ] 182-04-PLAN.md — GAP (SC#4 blocker): thread the offending phase slug structurally out of `assert_folder_scopes_subset` so the `folder_scope` verdict is keyed per-node instead of `phase: None` (Wave 1)
+- [x] 182-04-PLAN.md — GAP (SC#4 blocker): thread the offending phase slug structurally out of `assert_folder_scopes_subset` so the `folder_scope` verdict is keyed per-node instead of `phase: None` (Wave 1)
 - [ ] 182-05-PLAN.md — GAP (bookkeeping): plant SEED-130/131/132 for the deferred WR-03/04/07 findings + record WR-08 as a REJECTED finding answered by D-182-05 (Wave 1)
 - [ ] 182-06-PLAN.md — GAP (phase-goal fidelity): enforce grounding fidelity at publish via the SAME shared `grounding_verdicts` collector + correct the two false parity claims + `/validate`-vs-publish agreement test (Wave 2)
 - [ ] 182-07-PLAN.md — GAP (WR-05): derive the severity classifier's known-code set from the owning modules + fail LOUD on an unrecognised code + drift detector (Wave 3)

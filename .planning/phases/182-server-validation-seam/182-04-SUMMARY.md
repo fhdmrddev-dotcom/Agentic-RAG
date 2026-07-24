@@ -164,6 +164,12 @@ None — backend-only, no migration, no env var, no external service, no package
 - **Still open from 182-VERIFICATION (NOT this plan's scope):** the publish-enforcement gap (Truth 5 / WR-01 — `publish_workflow`, `create_draft` and `update_draft` never call the grounding-fidelity checks `/validate` previews). Plan 182-05 addresses it.
 - **Carried forward:** `deferred-items.md` D1 + D2 — pre-existing `_build_resume_context` org_id rot and `test_dual_mode_wiring` source drift, both with re-open triggers.
 
+## Self-Check: PASSED
+
+All 6 claimed files exist on disk; all 5 claimed commit hashes resolve in `git log`. The
+new suite's claimed 9 tests independently confirmed (`grep -c` = 9, `pytest` = 9 passed).
+`test_182_validate.py` test count re-confirmed at 12. No missing artifacts.
+
 ---
 *Phase: 182-server-validation-seam*
 *Completed: 2026-07-25*
