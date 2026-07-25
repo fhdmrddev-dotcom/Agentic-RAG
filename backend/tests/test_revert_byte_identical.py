@@ -26,11 +26,22 @@ the throwaway Phase-181 ``/canvas`` canary route, which was DELETED in 182-03 on
   - ``GET  /workflows/grounding-bundle`` — the primary probe: a clean GET, no request body, so
     nothing can race the flag gate (the exact shape the canary had);
   - ``POST /workflows/validate`` — probed with a MINIMAL **VALID** ``WorkflowDefinition`` body
-    (Pitfall 5). With an absent/malformed body a 422 could race the 404 and the test would pass
-    for the wrong reason, so the body is validated against the real model in-test.
+    (Pitfall 5), validated against the real model in-test so schema drift cannot silently
+    weaken the proof.
 
 This is strictly STRONGER than the canary: the gate is now proven on the surface it actually
 protects, not on a probe built to be proven.
+
+**Round-2 gap closure (plan 182-08 / CR-01).** This file used to AVOID the hostile-input case:
+the valid body was chosen specifically so a 422 could not race the 404, and the accompanying
+``!= 422`` assertion was therefore tautological (a valid body cannot 422 no matter what order
+the gate and the body decode run in). It avoided the case because the case genuinely LEAKED —
+FastAPI decodes the body before dependencies run, so ``POST /workflows/validate`` carrying
+``b"{"`` returned **422 json_invalid** while the canvas was off. The flag is now decided in
+``CanvasGateMiddleware`` AHEAD of routing and body decode (D-182-R2-01), so the hostile-input
+case is probed DIRECTLY here rather than designed around. The full non-discoverability battery
+(malformed body byte-identity, wrong-method, trailing-slash, and the ``/openapi.json`` filter in
+both flag directions) lives in ``test_182_canvas_gate.py``.
 
 Modeled on ``test_148_visibility_cold_default.py`` (monkeypatch the settings read to drive the
 cold default) + TestClient 404 probes on the real canvas routes. The response body of
@@ -129,8 +140,18 @@ def test_require_canvas_404s_when_off(client, monkeypatch):
     resp_validate = client.post(_VALIDATE_PATH, json=_MINIMAL_VALID_DEFINITION)
     assert resp_validate.status_code == 404, resp_validate.text
     assert resp_validate.status_code != 403
-    assert resp_validate.status_code != 422  # the gate fired BEFORE body validation
     assert resp_validate.status_code != 405  # and the path itself matched (not a method miss)
+
+    # CR-01 (plan 182-08): the HOSTILE-input case, probed for real. Raw ``b"{"`` with a JSON
+    # content-type — the bytes FastAPI decodes BEFORE any dependency runs. Against the
+    # pre-middleware code this line FAILS with 422 ``json_invalid``, which is exactly how an
+    # anonymous prober used to learn the route exists. (The previous ``!= 422`` assertion sat
+    # on the VALID body above and could never fail — it proved nothing.)
+    resp_malformed = client.post(
+        _VALIDATE_PATH, content=b"{", headers={"content-type": "application/json"}
+    )
+    assert resp_malformed.status_code == 404, resp_malformed.text
+    assert resp_malformed.json() == {"detail": "Not Found"}
 
     # POSITIVE CONTROL — the 404s above are the GATE, not an absent route. Both paths are
     # genuinely mounted with the probed method, so "404" cannot mean "never built" here.

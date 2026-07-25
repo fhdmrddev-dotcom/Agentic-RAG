@@ -326,8 +326,20 @@ async def test_input_unsatisfied_is_incomplete_while_wiring(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_every_severity_is_one_of_the_two_literals(monkeypatch):
-    """No verdict can carry a third severity — the taxonomy is closed (`error` | `incomplete`)."""
+async def test_a_dirty_draft_produces_verdicts_and_reports_not_ok(monkeypatch):
+    """A genuinely dirty draft yields a non-empty verdict set and `ok False`.
+
+    Round-2 gap closure (plan 182-08 / IN-04): this test used to also assert that the set of
+    emitted severities was a subset of the two allowed literals, and was named for that claim.
+    That assertion could never fail — `Verdict.severity` is typed as a two-value `Literal`, so
+    constructing an out-of-taxonomy verdict raises inside the route long before the assertion
+    runs. It was false coverage, so it is gone rather than left standing.
+
+    The closed-taxonomy claim now lives where it is actually falsifiable:
+    `test_182_severity_codes.py::test_every_known_code_classifies_exactly_as_the_pinned_table`
+    pins every emitted code against a hand-written table, and
+    `test_lint_codes_match_the_reachability_emit_sites` detects drift in the code sets.
+    """
     _patch_bundle(monkeypatch, tool_names=set())
 
     resp = await _validate(
@@ -338,7 +350,6 @@ async def test_every_severity_is_one_of_the_two_literals(monkeypatch):
     )
 
     assert resp.verdicts  # a genuinely dirty draft
-    assert {v.severity for v in resp.verdicts} <= {"error", "incomplete"}
     assert resp.ok is False
 
 
