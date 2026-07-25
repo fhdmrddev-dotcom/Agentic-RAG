@@ -8,7 +8,9 @@
  * drift this phase forbids):
  *  - tierForDefinition resolves STRICT / MIDDLE / LOOSE from the REAL enums; a
  *    null def → LOOSE without throwing.
- *  - PHASE_GLYPHS maps the 6 phase types to ⚙✎🤖⛓☺◆ exactly.
+ *  - PHASE_GLYPHS maps the 6 phase types to the verified fluent-emoji slugs exactly
+ *    (gear / memo / robot / busts-in-silhouette / raised-hand / package — the flat
+ *    unicode marks it once listed were retired by Phase 127-01).
  *  - entryInputKeys prefers input_keys → inputs[].key → ["kickoff_prompt"].
  *  - soulDeliverable returns { kind: "file" } when a terminal llm_emit phase
  *    exists and the honest { kind: "chat" } when none does (D-03).
@@ -118,15 +120,19 @@ describe("soulData.tierForDefinition — one shared tier derivation (D-02)", () 
   })
 })
 
-describe("soulData.PHASE_GLYPHS — one shared glyph map", () => {
-  it("maps the 6 phase types to ⚙✎🤖⛓☺◆ exactly", () => {
+describe("soulData.PHASE_GLYPHS — one shared icon map", () => {
+  // Corrected in Phase 183-04: this case asserted the flat unicode glyphs until
+  // Phase 127-01 (WUX-03) replaced them with verified fluent-emoji SLUG strings that
+  // phaseGlyph() resolves to bundled 3D SVG components. The assertion had been RED
+  // ever since — a red claim about the module 183 declares canonical.
+  it("maps the 6 phase types to the verified fluent-emoji slugs exactly", () => {
     expect(PHASE_GLYPHS).toMatchObject({
-      programmatic: "⚙",
-      llm_single: "✎",
-      llm_agent: "🤖",
-      llm_batch_agents: "⛓",
-      llm_human_input: "☺",
-      llm_emit: "◆",
+      programmatic: "gear",
+      llm_single: "memo",
+      llm_agent: "robot",
+      llm_batch_agents: "busts-in-silhouette",
+      llm_human_input: "raised-hand",
+      llm_emit: "package",
     })
     // Exactly the 6 known phase types — no extras.
     expect(Object.keys(PHASE_GLYPHS).sort()).toEqual(
