@@ -58,7 +58,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.middleware.canvas_gate import CanvasGateMiddleware
+from app.middleware.canvas_gate import CanvasGateMiddleware, build_canvas_aware_openapi
 from app.middleware.maintenance import MaintenanceMiddleware
 from app.middleware.setup import SetupMiddleware
 
@@ -591,6 +591,23 @@ async def lifespan(app_instance):
 
 
 app = FastAPI(title="Agentic RAG API", version="1.0.0", lifespan=lifespan)
+
+# Phase 182 (VALID-01 / D-182-R2-02) — the SCHEMA half of the canvas off-switch. `/openapi.json`
+# is anonymous + unconditional on every finalized deploy; while the canvas was off it still
+# published both gated paths and every canvas-only model, i.e. a complete map of the surface the
+# 404 hides (CR-02). This hook filters that document per request while off, and returns the app's
+# own full document untouched while on. FastAPI resolves the app's schema callable at REQUEST time
+# (applications.py:1009), so replacing the instance attribute here is honored on every request.
+#
+# Two deliberate boundaries, recorded so a future verifier does not re-raise them as leaks:
+#   * `include_in_schema=False` was REJECTED — it would hide both routes from /docs permanently,
+#     including while the canvas is ON, degrading the API docs for the whole remainder of v3.6
+#     (phases 183-189 all build on this seam). The dynamic hook tracks the live flag instead.
+#   * `GET /docs` deliberately keeps returning 200 in BOTH flag states. It is a static Swagger UI
+#     shell carrying no route information of its own — it renders whatever the filtered document
+#     says. App-wide `docs_url` gating has never been a convention in this codebase and is not
+#     introduced here.
+app.openapi = build_canvas_aware_openapi(app)
 
 # Phase 182 (VALID-01 / D-182-R2-01) — the canvas off-switch's request-path gate. Decides
 # ``visual_workflow_canvas`` BEFORE Starlette routing and before FastAPI decodes any body,
