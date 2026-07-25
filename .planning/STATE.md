@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
 status: executing
-last_updated: "2026-07-25T20:40:01.899Z"
+last_updated: "2026-07-25T21:03:52.642Z"
 last_activity: 2026-07-25
 progress:
   total_phases: 18
   completed_phases: 2
   total_plans: 22
-  completed_plans: 18
+  completed_plans: 19
   percent: 11
 ---
 
@@ -45,7 +45,7 @@ Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 op
 ## Current Position
 
 Phase: 183 (read-only-canvas) — EXECUTING
-Plan: 4 of 7
+Plan: 5 of 7
 Status: Ready to execute
 
 **Phase 183 (read-only-canvas) — CONTEXT GATHERED 2026-07-25** (`865cbde1`; `183-CONTEXT.md` + `183-DISCUSSION-LOG.md`). All 4 gray areas discussed (the two the sketches left with no winner, plus the faithfulness and G-5 calls). **D-183-01..15 locked.** Headlines: the canvas is an **in-Builder `[≣ Spine] [⬡ Canvas]` toggle** (no new ActiveView, **no nav entry** — this formally RELEASES 181's deferred nav-entry promise and `revertByteIdentical.test.tsx`'s scope-freeze assertion keeps holding); **Spine stays the default**; flag-off ⇒ the toggle **VANISHES** (@xyflow out of the render path); click fires the EXISTING `onSelectNode` → shipped `PhaseFormPanel` (zero net-new panel); plain-language step-type fallback titles (only 10/119 phases have a real `phase.name`); 2 badge slots = grounding (derived from `citation_policy` + `citations_required`, NOT 185's authored field) + "Waits for you" on `llm_human_input` only; **layout = a PURE function of the definition** (no DOM measure → SC#4 becomes a snapshot test; clipping solved in CSS); unresolvable `skip_to_phase` renders as a **visibly broken reference** (agrees with the backend's existing `UNSATISFIABLE_SKIP`, `reachability.py:154`); test-only fixture table with ONE synthetic `branching` seed (no DB seed, no new starter); named empty state with ALL canvas chrome suppressed. **G-5: extract one shared vocabulary module AND repoint `PhaseSpineGraph`** — scouting found `soulData.ts`'s header falsely claims the `PhaseSpineGraph.tsx:24-31` duplicate was already replaced; it still renders the flat text glyphs Phase 127 retired (planner note: treat in-code claims of prior extraction as unverified). **The cross-cutting icon slug swaps (`compass` / `handshake`) stay a SEPARATE dedicated task** — 5 shipped surfaces, must not ride a canvas rollback; 183 ships only the canvas-local icon-well lightening. Client parse + a parity test pinned to `reachability.parse_skip_target` (:89); **183 does NOT call `/validate`** (that arrives with 184). D-181-08's freeze on `WorkflowBuilderPage.tsx` was 181-only and does not carry forward. **G-4: 4 operator-named live-UAT scenarios recorded** (Spine⇄Canvas agree · the 5-phase maximum reads without h-overflow · the empty draft doesn't look broken · flag-off = yesterday's Builder incl. operator accounts). Reported-bugs cross-check: 6 open `Agentic-RAG` reports, none folded; BUG-260609-04's re-open trigger repointed 124 → **188**. Next: `/gsd:plan-phase 183`.
@@ -550,6 +550,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 183 P01 | 22min | 3 tasks | 6 files |
 | Phase 183 P02 | 8min | 3 tasks | 5 files |
 | Phase 183 P03 | 22min | 2 tasks | 3 files |
+| Phase 183 P04 | 21min | 3 tasks | 9 files |
 
 ## Decisions
 
@@ -726,6 +727,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase ?]: D-183-02-C: resolveJsonModule enabled in frontend/tsconfig.app.json (one added line) so shared JSON fixtures compile
 - [Phase ?]: D-183-03 plumbing: EffectiveFeaturesProvider broadcasts the ONE effective-features map (value-passing, no state, no second GET /features); a NULL context is FAIL-CLOSED
 - [Phase ?]: 183-03: the 183-07 Builder gate reads useEffectiveFeaturesOptional() and treats a null context as {} (strict === true, VANISH); it must NOT call useEffectiveFeatures() — one call site in the whole tree is the tripwire
+- [Phase ?]: 183-04: PhaseSpineGraph hard-cut onto phaseVocabulary + soulData.PHASE_GLYPHS — no re-export shim, all five importers repointed in one commit; the Spine reads the app-wide reveal via useTechnicalNamesOptional and 183-06 must mirror 'showTechnical ? technicalTitle(phase) : nodeTitle(phase)' verbatim
 
 ## Operator Next Steps
 
