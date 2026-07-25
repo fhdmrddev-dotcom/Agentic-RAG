@@ -24,7 +24,7 @@
 
 ### CANVAS — the visual authoring surface
 
-- [ ] **CANVAS-01**: A user can view an existing workflow as a visual node canvas — a read-only projection of its `WorkflowDefinition` (nodes = phases, edges = flow + `skip_to_phase` branches), rendered via `@xyflow/react`.
+- [x] **CANVAS-01**: A user can view an existing workflow as a visual node canvas — a read-only projection of its `WorkflowDefinition` (nodes = phases, edges = flow + `skip_to_phase` branches), rendered via `@xyflow/react`.
 - [ ] **CANVAS-02**: A user can add, move, connect, and delete phase-nodes; edits round-trip losslessly back to `WorkflowDefinition` (one client serializer) and save through the **existing** draft CRUD (create-once-then-PATCH). Node layout/positions are kept OUT of the immutable definition JSONB.
 - [ ] **CANVAS-03**: A user can configure a selected node in a side panel, backed by the existing `PhaseConfig` discriminated-union schema (Pydantic stays authoritative).
 - [ ] **CANVAS-04**: The canvas expresses governance as visible rails — locked phase order, per-phase tool whitelists, and validation gates the user cannot wire around (governance rendered, never removed). The rails are **graded** per GOVERN — strict on grounded nodes, flexible on open agentic nodes.
@@ -102,7 +102,7 @@ Which phases cover which requirements. Filled at roadmap creation 2026-07-24, re
 | VALID-01 | Phase 182 | Complete |
 | VALID-02 | Phase 184 | Pending |
 | VALID-03 | Phase 184 | Pending |
-| CANVAS-01 | Phase 183 | Pending |
+| CANVAS-01 | Phase 183 | Complete |
 | CANVAS-02 | Phase 184 | Pending |
 | CANVAS-03 | Phase 184 | Pending |
 | CANVAS-04 | Phase 184 | Pending |
