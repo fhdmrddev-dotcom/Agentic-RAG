@@ -38,7 +38,9 @@ DB, no provider, no network.
 from __future__ import annotations
 
 import copy
+from contextlib import ExitStack, contextmanager
 from types import SimpleNamespace
+from uuid import uuid4
 
 import pytest
 
@@ -60,6 +62,9 @@ _CHILD_A = "aaaa1111-0000-0000-0000-000000000002"  # an owned descendant (org A)
 _FOLDER_B = "bbbb2222-0000-0000-0000-000000000001"  # org-B-shared, under the project root
 
 _BR = "Deliver a cited answer to the requester."
+
+_DEF_ID = uuid4()
+_GOLDEN_RUN_ID = uuid4()
 
 
 # ── the offline fakes ─────────────────────────────────────────────────────────
@@ -434,26 +439,312 @@ def _bound_definition(*, folder_scope: list[str]):
     """A single-phase definition BOUND to the org-A project, declaring `folder_scope`."""
     from app.models.harness import WorkflowDefinition
 
-    return WorkflowDefinition.model_validate(
-        {
-            "slug": "org-scoped-wf",
-            "version": 1,
-            "name": "Org Scoped Workflow",
-            "status": "draft",
-            "business_requirement": _BR,
-            "project_folder_id": _PROJECT_A,
-            "phases": [
-                {
-                    "slug": "answer",
-                    "phase_index": 0,
-                    "config": {
-                        "phase_type": "llm_agent",
-                        "prompt": "Answer.",
-                        "available_tools": [],
-                        "folder_scope": folder_scope,
-                    },
-                    "validators": [],
-                }
-            ],
+    return WorkflowDefinition.model_validate(_bound_payload(folder_scope=folder_scope))
+
+
+def _bound_payload(*, folder_scope: list[str]) -> dict:
+    return {
+        "slug": "org-scoped-wf",
+        "version": 1,
+        "name": "Org Scoped Workflow",
+        "status": "draft",
+        "business_requirement": _BR,
+        "project_folder_id": _PROJECT_A,
+        "phases": [
+            {
+                "slug": "answer",
+                "phase_index": 0,
+                "config": {
+                    "phase_type": "llm_agent",
+                    "prompt": "Answer.",
+                    "available_tools": [],
+                    "folder_scope": folder_scope,
+                },
+                "validators": [],
+            }
+        ],
+    }
+
+
+def _skill_payload(*, skill_ref: str) -> dict:
+    """A lint-clean, NON-interactive, unbound definition whose only grounding surface is
+    its `skill_ref` — so stage 2.6 is the only thing that can block it."""
+    return {
+        "slug": "org-scoped-wf",
+        "version": 1,
+        "name": "Org Scoped Workflow",
+        "status": "draft",
+        "business_requirement": _BR,
+        "phases": [
+            {
+                "slug": "answer",
+                "phase_index": 0,
+                "config": {
+                    "phase_type": "llm_single",
+                    "prompt": "Answer the question.",
+                    "skill_ref": skill_ref,
+                },
+                "validators": [],
+            }
+        ],
+    }
+
+
+# ══ GROUP B — the REAL publish orchestration, end to end ══════════════════════
+
+
+def _row(payload: dict) -> dict:
+    """A `get_definition` row whose `definition` JSONB model_validates."""
+    from uuid import UUID
+
+    return {
+        "id": _DEF_ID,
+        "slug": payload["slug"],
+        "version": payload["version"],
+        "name": payload["name"],
+        "status": payload["status"],
+        "definition": payload,
+        "created_by": UUID(_PUBLISHER),
+    }
+
+
+@contextmanager
+def _publish_env(payload: dict):
+    """The patch stack — deliberately NARROWER than `test_182_publish_grounding_stage`'s.
+
+    Patched: the DB accessors (`get_definition` / `write_audit` / `publish_definition`) and
+    the two expensive boundaries (`_drive_golden_run` / `_judge_golden_output`).
+
+    NOT patched, and that is the whole point of this file:
+
+      * `_resolve_publish_supabase` — the REAL helper runs, so the definition's own `org_id`
+        is genuinely read from the pool and genuinely reaches the gate. The sibling file
+        patches this seam (it is testing the RULES, not the SCOPE), which is exactly why it
+        could not have caught WR-05.
+      * `assemble_grounding_bundle` / `grounding_verdicts` — the REAL org gate executes
+        against the offline fake client, so a green assertion here is the gate agreeing, not
+        a mock firing.
+    """
+    from unittest.mock import AsyncMock, patch
+
+    from app.services.harness import publish_service
+
+    drive = AsyncMock(return_value=(_GOLDEN_RUN_ID, {"text": "an answer [doc1]"}, "completed"))
+    judge = AsyncMock(
+        return_value={
+            "overall_passed": True,
+            "overall_score": 95,
+            "summary": "good",
+            "criteria": [],
         }
+    )
+    flip = AsyncMock(return_value=2)
+
+    with ExitStack() as stack:
+        stack.enter_context(
+            patch("app.db.workflows.get_definition", AsyncMock(return_value=_row(payload)))
+        )
+        stack.enter_context(patch("app.db.workflows.write_audit", AsyncMock()))
+        stack.enter_context(patch("app.db.workflows.publish_definition", flip))
+        stack.enter_context(patch.object(publish_service, "_drive_golden_run", drive))
+        stack.enter_context(patch.object(publish_service, "_judge_golden_output", judge))
+        yield SimpleNamespace(drive=drive, judge=judge, flip=flip)
+
+
+def _pool(*, org=_ORG_A, raises=None):
+    """An asyncpg-pool stand-in whose ONE relevant read is
+    `SELECT org_id FROM workflow_definitions WHERE id = $1`."""
+    from unittest.mock import AsyncMock
+
+    pool = AsyncMock()
+    pool.fetchval = (
+        AsyncMock(side_effect=raises) if raises is not None else AsyncMock(return_value=org)
+    )
+    return pool
+
+
+async def _publish(*, sb, pool):
+    from unittest.mock import AsyncMock
+
+    from app.services.harness import publish_service
+
+    return await publish_service.publish(
+        definition_id=_DEF_ID,
+        golden_input="a representative kickoff prompt",
+        user={"id": _PUBLISHER},
+        pool=pool,
+        redis=AsyncMock(),
+        supabase=sb,
+    )
+
+
+def _codes(result) -> list[str]:
+    return [f.get("code") for f in result["named_failures"] if isinstance(f, dict)]
+
+
+@pytest.mark.asyncio
+async def test_a_multi_org_publisher_cannot_publish_an_org_a_definition_naming_an_org_b_skill():
+    """THE LOAD-BEARING TEST (WR-05). An org-A definition whose `skill_ref` names an org-B
+    skill is BLOCKED at `grounding_fidelity`, even though the publisher belongs to BOTH orgs.
+
+    PRE-FIX OUTCOME: `published is True`. `_resolve_publish_supabase` had already read this
+    definition's `org_id` (to scope the BYPASSRLS client) and then discarded it, so the gate
+    resolved visibility from the PUBLISHER's org-membership union and the org-B skill grounded
+    as valid. The version was minted. Every org-A colleague who then ran that workflow got an
+    unresolvable skill — a workflow that passed the hard gate and works only for its author.
+    """
+    pool = _pool(org=_ORG_A)
+
+    with _publish_env(_skill_payload(skill_ref=_SKILL_B)) as env:
+        result = await _publish(sb=_sb(), pool=pool)
+
+    assert result["published"] is False, (
+        "WR-05: an org-A definition referencing an org-B skill PUBLISHED, because the gate "
+        "asked 'can this publisher see it?' instead of 'is this definition grounded in its "
+        "own org?'"
+    )
+    assert result["blocked_stage"] == "grounding_fidelity"
+    assert _codes(result) == ["unregistered_skill"], result["named_failures"]
+    failure = result["named_failures"][0]
+    assert failure["phase"] == "answer"  # per-node keyed like every grounding verdict (SC#4)
+    assert _SKILL_B in failure["message"]
+    env.drive.assert_not_called()  # never burn a real provider run on a cross-org definition
+    env.flip.assert_not_called()  # and certainly never mint a version
+
+
+@pytest.mark.asyncio
+async def test_the_same_definition_with_an_in_org_skill_still_publishes():
+    """THE POSITIVE CONTROL. Identical construction, org-A skill: publishes exactly as today.
+
+    Without this, the test above could pass simply because the restriction blocks everything —
+    which would be a worse bug than the one being fixed.
+    """
+    with _publish_env(_skill_payload(skill_ref=_SKILL_A)) as env:
+        result = await _publish(sb=_sb(), pool=_pool(org=_ORG_A))
+
+    assert result["published"] is True, result
+    assert result.get("blocked_stage") is None
+    env.drive.assert_awaited_once()  # stage 2.6 let it through to the golden run
+    env.flip.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_an_org_b_folder_scope_cannot_publish_on_an_org_a_definition():
+    """The FOLDER half of the same gate, through the REAL publish orchestration.
+
+    PRE-FIX OUTCOME: `published is True`. The ⊆ walk resolved a subtree from the PUBLISHER's
+    folder view, which reaches the org-B-shared child, so the phase's `folder_scope` looked
+    like a subset. At run time an org-A colleague's `fetch_visible_folders` never returns that
+    folder, the phase's ∩ empties, and the phase retrieves nothing — silently.
+    """
+    with _publish_env(_bound_payload(folder_scope=[_FOLDER_B])) as env:
+        result = await _publish(sb=_sb(), pool=_pool(org=_ORG_A))
+
+    assert result["published"] is False
+    assert result["blocked_stage"] == "grounding_fidelity"
+    assert _codes(result) == ["folder_scope"], result["named_failures"]
+    assert result["named_failures"][0]["phase"] == "answer"
+    env.drive.assert_not_called()
+    env.flip.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_an_in_org_folder_scope_still_publishes():
+    """The folder half's positive control — an org-A `folder_scope` publishes as today."""
+    with _publish_env(_bound_payload(folder_scope=[_CHILD_A])) as env:
+        result = await _publish(sb=_sb(), pool=_pool(org=_ORG_A))
+
+    assert result["published"] is True, result
+    env.drive.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_the_org_is_read_even_when_the_caller_supplies_the_client():
+    """`_resolve_publish_supabase` returns `(client, org_id)` on BOTH branches.
+
+    The caller-supplied branch must STILL read `workflow_definitions.org_id`. Returning
+    `(supabase, None)` there would silently disable the restriction in exactly the tests meant
+    to prove it — and would leave the client scope and the gate scope free to disagree about
+    which tenant a publish is acting for. One read, one org, both consumers.
+
+    PRE-FIX OUTCOME: the helper returned the bare client and the caller-supplied branch never
+    touched the pool, so `fetchval` was never awaited and the tuple unpack is a `TypeError`.
+    """
+    from app.services.harness import publish_service
+
+    pool = _pool(org=_ORG_A)
+    sb = _sb()
+
+    resolved, org_id = await publish_service._resolve_publish_supabase(
+        sb, definition_id=_DEF_ID, pool=pool
+    )
+
+    assert resolved is sb, "a supplied client must be handed back unchanged"
+    assert str(org_id) == _ORG_A
+    pool.fetchval.assert_awaited_once()
+    sql = pool.fetchval.await_args.args[0]
+    assert "org_id" in sql and "workflow_definitions" in sql, sql
+
+
+@pytest.mark.asyncio
+async def test_an_unresolvable_definition_org_blocks_fail_closed_never_widens():
+    """A definition org that cannot be READ degrades to `grounding_unavailable`, which BLOCKS.
+
+    This is plan 182-11's honest degraded finding, reached through the fail-closed
+    `except Exception`. The direction is the whole point: a publish that cannot establish
+    WHICH TENANT it is acting for must not fall back to the publisher's wider view.
+    """
+    with _publish_env(_skill_payload(skill_ref=_SKILL_B)) as env:
+        result = await _publish(
+            sb=None, pool=_pool(raises=RuntimeError("postgrest 503 on the org read"))
+        )
+
+    assert result["published"] is False
+    assert result["blocked_stage"] == "grounding_fidelity"
+    assert _codes(result) == ["grounding_unavailable"], result["named_failures"]
+    assert result["named_failures"][0]["phase"] is None
+    env.drive.assert_not_called()
+    env.flip.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_a_falsy_definition_org_blocks_rather_than_publishing_unrestricted():
+    """A FALSY org is refused on BOTH branches — it must never resolve to an unrestricted gate.
+
+    Without a client the org-requiring factory (`get_service_role_supabase`) already refuses.
+    With a client supplied there is no factory to refuse, so the helper must refuse itself:
+    otherwise the org-B skill below grounds as valid and a definition with no resolvable tenant
+    publishes against its author's whole org union.
+
+    PRE-FIX OUTCOME: `published is True` — the org was never read on this branch at all.
+    """
+    with _publish_env(_skill_payload(skill_ref=_SKILL_B)) as env:
+        result = await _publish(sb=_sb(), pool=_pool(org=None))
+
+    assert result["published"] is False, (
+        "a definition whose org resolved to nothing published against the PUBLISHER's full "
+        "org-membership union — the fail-OPEN direction"
+    )
+    assert result["blocked_stage"] == "grounding_fidelity"
+    assert _codes(result) == ["grounding_unavailable"], result["named_failures"]
+    env.drive.assert_not_called()
+    env.flip.assert_not_called()
+
+
+def test_validate_was_deliberately_not_given_a_restriction():
+    """`POST /workflows/validate` passes NO restriction — a recorded decision (T-182-55).
+
+    An author validating their own draft acts AS THEMSELVES; narrowing that surface to some
+    org would refuse folders and skills they can legitimately reach, and it is not this
+    finding. Asserted structurally so a verifier reads the asymmetry as a choice rather than
+    as an omission on the route that Phase 184 calls on every canvas edit.
+    """
+    from pathlib import Path
+
+    import app.api.workflows as wf
+
+    source = Path(wf.__file__).read_text(encoding="utf-8")
+    assert "restrict_org_ids" not in source, (
+        "the /validate seam grew an org restriction — if that is intentional it needs its own "
+        "decision record; WR-05 is about the PUBLISH gate only"
     )
