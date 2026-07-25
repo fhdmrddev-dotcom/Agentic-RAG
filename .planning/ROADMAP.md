@@ -135,7 +135,7 @@ Committed as gated phases (ship only if CORE lands clean and budget remains; v2.
   4. The projection renders every one of the 4 canonical seed shapes + the PM pack faithfully — no dropped phase, no phantom edge.
 
 **Plans**: 7 plans (4 waves)
-- [ ] 183-01-PLAN.md — Toolchain + jsdom harness: install `@xyflow/react@^12.11.2`, prove `tsc -b` + `vite build` (A4), the mandatory stylesheet at `index.css:1` (Pitfall 2/F-4), the file-local `mockReactFlow` helper, and the A1 handle spike (Wave 1)
+- [x] 183-01-PLAN.md — Toolchain + jsdom harness: install `@xyflow/react@^12.11.2`, prove `tsc -b` + `vite build` (A4), the mandatory stylesheet at `index.css:1` (Pitfall 2/F-4), the file-local `mockReactFlow` helper, and the A1 handle spike (Wave 1)
 - [ ] 183-02-PLAN.md — The ONE shared `phaseVocabulary.ts` (plain-language sentences, node titles, grounding derivation, moved read shapes) + `parseSkipTarget` corrected to backend semantics, pinned by a SHARED case table read by both a vitest suite and a pytest suite (C-1, D-183-15 amendment) (Wave 1)
 - [ ] 183-03-PLAN.md — `EffectiveFeaturesProvider`: broadcast the existing single `GET /features` map through one context so the Builder can gate the toggle without a second fetch; fail-closed semantics and the 181 gate untouched (OP-2/F-2) (Wave 1)
 - [ ] 183-04-PLAN.md — The D-183-13 HARD CUT: delete `PhaseSpineGraph`'s private glyph map / parse / labels / read shapes, repoint all FIVE importers in one commit with no shim, land the 3D marks on the Spine, delete four stale in-code claims, fix the pre-existing `soulData.test.ts` RED (Wave 2)

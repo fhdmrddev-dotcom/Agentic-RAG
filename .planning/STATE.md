@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
 status: executing
-last_updated: "2026-07-25T16:27:05.055Z"
-last_activity: 2026-07-25 -- Phase 183 planning complete
+last_updated: "2026-07-25T20:03:04.507Z"
+last_activity: 2026-07-25
 progress:
   total_phases: 18
   completed_phases: 2
   total_plans: 22
-  completed_plans: 15
+  completed_plans: 16
   percent: 11
 ---
 
@@ -22,7 +22,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-20 — Phase 163 THE ATOMIC CRUX complete; membership RLS enforced)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 183 — read-only-canvas (context gathered)
+**Current focus:** Phase 183 — read-only-canvas
 
 ## Deferred Items
 
@@ -44,15 +44,15 @@ Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 op
 
 ## Current Position
 
-Phase: 182 (server-validation-seam) — COMPLETE (round-3 closure, operator-scoped)
-Plan: 12 of 12 executed + a direct round-3 closure pass (no 4th gap-closure wave)
+Phase: 183 (read-only-canvas) — EXECUTING
+Plan: 2 of 7
 Status: Ready to execute
 
 **Phase 183 (read-only-canvas) — CONTEXT GATHERED 2026-07-25** (`865cbde1`; `183-CONTEXT.md` + `183-DISCUSSION-LOG.md`). All 4 gray areas discussed (the two the sketches left with no winner, plus the faithfulness and G-5 calls). **D-183-01..15 locked.** Headlines: the canvas is an **in-Builder `[≣ Spine] [⬡ Canvas]` toggle** (no new ActiveView, **no nav entry** — this formally RELEASES 181's deferred nav-entry promise and `revertByteIdentical.test.tsx`'s scope-freeze assertion keeps holding); **Spine stays the default**; flag-off ⇒ the toggle **VANISHES** (@xyflow out of the render path); click fires the EXISTING `onSelectNode` → shipped `PhaseFormPanel` (zero net-new panel); plain-language step-type fallback titles (only 10/119 phases have a real `phase.name`); 2 badge slots = grounding (derived from `citation_policy` + `citations_required`, NOT 185's authored field) + "Waits for you" on `llm_human_input` only; **layout = a PURE function of the definition** (no DOM measure → SC#4 becomes a snapshot test; clipping solved in CSS); unresolvable `skip_to_phase` renders as a **visibly broken reference** (agrees with the backend's existing `UNSATISFIABLE_SKIP`, `reachability.py:154`); test-only fixture table with ONE synthetic `branching` seed (no DB seed, no new starter); named empty state with ALL canvas chrome suppressed. **G-5: extract one shared vocabulary module AND repoint `PhaseSpineGraph`** — scouting found `soulData.ts`'s header falsely claims the `PhaseSpineGraph.tsx:24-31` duplicate was already replaced; it still renders the flat text glyphs Phase 127 retired (planner note: treat in-code claims of prior extraction as unverified). **The cross-cutting icon slug swaps (`compass` / `handshake`) stay a SEPARATE dedicated task** — 5 shipped surfaces, must not ride a canvas rollback; 183 ships only the canvas-local icon-well lightening. Client parse + a parity test pinned to `reachability.parse_skip_target` (:89); **183 does NOT call `/validate`** (that arrives with 184). D-181-08's freeze on `WorkflowBuilderPage.tsx` was 181-only and does not carry forward. **G-4: 4 operator-named live-UAT scenarios recorded** (Spine⇄Canvas agree · the 5-phase maximum reads without h-overflow · the empty draft doesn't look broken · flag-off = yesterday's Builder incl. operator accounts). Reported-bugs cross-check: 6 open `Agentic-RAG` reports, none folded; BUG-260609-04's re-open trigger repointed 124 → **188**. Next: `/gsd:plan-phase 183`.
 
 **G-2 sketch gate for Phase 183: SATISFIED (2026-07-25).** Sketches 134-137 committed (`01bb4c64`, `7b74d2b5`, `01d50bba`, `86f866c5`, `e35c7489`). Winners: **136-B** (horizontal left->right flow) + **137-D** (frosted-glass step cards, 3D icon floating at the left edge, plain language with technical names behind the Alt reveal, Alive-by-default motion). Locked rules the canvas phases inherit: **colour budget** (step-type colour is a tint behind the icon only — the strong colours belong to Phase 188 run status) and **motion keys off run state, never selection**. New reusable asset `.planning/sketches/themes/phase-icons-3d.js` (verified 3D fluent-emoji marks; NEVER text glyphs). Icon choices: `llm_agent` -> `compass`; `llm_batch_agents` gets a lighter icon well in-scope, with the cross-cutting `handshake` swap left open. **Two findings that must reach the 183 plan: (1) `skip_to_phase` is used ZERO times in all 95 live definitions — SC#1's branch edge needs a fixture; (2) 40 of 95 definitions have zero phases — the empty projection is the most common canvas state.**
 
-Last activity: 2026-07-25 -- Phase 183 planning complete
+Last activity: 2026-07-25
 
 ### Quick Tasks Completed
 
@@ -547,6 +547,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 182 P10 | 12min | 3 tasks | 4 files |
 | Phase 182 P11 | 28min | 3 tasks | 8 files |
 | Phase 182 P12 | 23min | 3 tasks | 8 files |
+| Phase 183 P01 | 22min | 3 tasks | 6 files |
 
 ## Decisions
 
@@ -716,6 +717,8 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase 182]: D-182-12-01: publish's grounding gate is scoped to the DEFINITION's org, not the publisher's org-membership union — one optional restrict_org_ids keyword intersected at the two points the caller's org set is already resolved (folders in folder_utils, skills in grounding), so no visibility rule is duplicated (WR-05) — _resolve_publish_supabase already read workflow_definitions.org_id to scope the BYPASSRLS client (D-05/T-163-05b) and then discarded it. It now returns (client, org_id) so one read serves both scopes. Falsified: removing both restrict_org_ids arguments makes an org-A definition naming an org-B skill publish again, while 106 other phase-182 tests stay green.
 - [Phase 182]: D-182-12-02: an optional scope restriction is forwarded to internal callees ONLY when set, so unrestricted calls stay byte-identical on the wire and the documented monkeypatch seams keep their contract — Threading the keyword unconditionally broke 18 existing tests in two files outside files_modified, because fetch_visible_folders / resolve_project_subtree / folder_scope_violations are documented test seams. A restricted call still passes it explicitly, so a stale double fails loudly rather than silently ignoring a tenancy narrowing.
 - [Phase 182]: D-182-12-03: SEED-130's 'not a security issue' verdict is CORRECTED and its Option B annotated unsafe-as-written; the dead-path fix itself stays deferred to Phase 184 (WR-06) — resolve_template_source Branch 1 accepts user_id and never reads it, then performs a raw service-role bucket download, so the UUID annotation on template_asset_id is the only — incidental — containment. Option B removes exactly that annotation. A wrong recorded verdict paired with a fix that depends on it is a control failure; correcting the record is the mitigation while the code fix is deferred.
+- [Phase ?]: 183-01: A1 resolved — a handle-free custom node renders 0 edges; PhaseNode must render hidden handles (183-06)
+- [Phase ?]: 183-01: tsc -b is RED on develop at baseline (33 pre-existing signatures, 0 xyflow) — Phase 183 tsc gates are differential (D-ITEM-183-01)
 
 ## Operator Next Steps
 
