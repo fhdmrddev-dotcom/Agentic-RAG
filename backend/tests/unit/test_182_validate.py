@@ -208,8 +208,11 @@ async def test_folder_scope_verdict_is_keyed_to_the_phase(monkeypatch):
     (a `ValueError` subclass) carrying the offending slug on `.phase_slug`, and the
     collector threads that attribute onto `verdict.phase`. The slug travels STRUCTURALLY —
     the message still names it for humans, but no consumer may parse the prose to attribute
-    the finding to a node (D-182-06). We monkeypatch the check to raise, exactly as
-    test_103_grounding_fidelity does; the end-to-end proof through the REAL ⊆ walk lives in
+    the finding to a node (D-182-06). We monkeypatch `scope.folder_scope_violations` — the
+    non-raising LIST form the per-node collector consumes since WR-04 — to RETURN one
+    violation, so the route is driven with no DB. (The raising `assert_folder_scopes_subset`
+    is the short-circuit presentation NL generation uses.) The end-to-end proof through the
+    REAL ⊆ walk, and the multi-offender WR-04 guard, live in
     tests/unit/test_182_folder_scope_keying.py.
     """
     import app.services.harness.scope as scope_mod
@@ -217,14 +220,16 @@ async def test_folder_scope_verdict_is_keyed_to_the_phase(monkeypatch):
 
     _patch_bundle(monkeypatch)
 
-    async def _raise_subset(definition, *, supabase, user_id):
-        raise FolderScopeSubsetError(
-            "phase 'answer' folder_scope is not a subset of the project subtree: "
-            f"['{_OUTSIDE_FOLDER}']",
-            phase_slug="answer",
-        )
+    async def _one_subset_violation(definition, *, supabase, user_id):
+        return [
+            FolderScopeSubsetError(
+                "phase 'answer' folder_scope is not a subset of the project subtree: "
+                f"['{_OUTSIDE_FOLDER}']",
+                phase_slug="answer",
+            )
+        ]
 
-    monkeypatch.setattr(scope_mod, "assert_folder_scopes_subset", _raise_subset)
+    monkeypatch.setattr(scope_mod, "folder_scope_violations", _one_subset_violation)
 
     resp = await _validate(
         _definition(

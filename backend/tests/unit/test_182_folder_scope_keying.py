@@ -6,22 +6,39 @@ The 182 verification found the one grounding-fidelity rule that is genuinely per
 prose. A canvas consumer could only attribute it to a node by REGEXING the message —
 exactly the client-side re-derivation the D-182-06 red line forbids.
 
-This file is the regression proof, in four layers:
+The round-2 review then found the SECOND half of the same defect (WR-04): 182-04 fixed the
+KEYING but not the MULTIPLICITY. `assert_folder_scopes_subset` raised inside its
+`for phase in definition.phases` loop, so a definition with three out-of-subtree phases
+still produced exactly ONE verdict — the author fixes node A, re-validates, and node B
+lights up. Phase 184 paints per-node badges from this verdict, so later offenders rendered
+CLEAN. The fix moved the ⊆ walk into a non-raising `scope.folder_scope_violations`, with
+`assert_folder_scopes_subset` re-raising `violations[0]` as its short-circuit presentation.
+
+This file is the regression proof, in five layers:
 
   1. SCOPE level    — the REAL `assert_folder_scopes_subset` raises a `ValueError`
                       SUBCLASS carrying the offending slug on `.phase_slug`, with a
                       BYTE-IDENTICAL message (asserted against a written-out golden
                       literal, never re-derived from the source).
+  1b. MULTIPLICITY  — `scope.folder_scope_violations` (the ONE ⊆ walk) is non-raising and
+     at the SOURCE   returns EVERY offending phase in author order, resolving the subtree
+                      exactly once; the raising form still reports the first offender only.
   2. CALLER level   — `pytest.raises(ValueError, ...)` still catches it, so
                       `workflow_kickoff`'s 400, `runs.py`'s best-effort Continue and
                       `harness_engine`'s resume fallback keep working BY CONSTRUCTION.
   3. COLLECTOR level— `grounding.grounding_verdicts` threads that slug onto the
                       `folder_scope` verdict's `phase` field (the SC#4 guard: this FAILS
                       if `phase` ever reverts to `None`), proven BOTH with a hand-faked
-                      exception AND end-to-end through the real ⊆ check.
+                      violation AND end-to-end through the real ⊆ check — and emits ONE
+                      verdict PER offending phase (the WR-04 guard), while the
+                      short-circuit presentation still reports only the first. Rule 1's
+                      new plurality is also proven to compose with the already-plural
+                      rules 2/3, preserving verdict order.
   4. DEGRADATION    — a PLAIN `ValueError` off the ⊆ path (a test double / a future
-                      non-phase-specific failure) still yields `phase: None` and never
-                      raises, so the always-HTTP-200 `/validate` contract holds.
+                      non-phase-specific failure) still yields a SINGLE `phase: None`
+                      verdict and never raises, so the always-HTTP-200 `/validate`
+                      contract holds. Its seam is the PLURAL `folder_scope_violations`,
+                      which is what the collector consumes.
 
 CONVENTION (Phase 102 posture): imports INSIDE the test bodies. Offline only — no DB:
 `assert_folder_scopes_subset` resolves `resolve_project_subtree` as a MODULE global, so
@@ -345,18 +362,26 @@ async def test_grounding_verdicts_keys_folder_scope_to_the_offending_phase(monke
 
     This test FAILS if `phase` ever reverts to `None`. That regression is exactly the
     182-VERIFICATION BLOCKER: an unkeyed verdict forces a canvas consumer to regex the
-    message to attribute the finding to a node (the D-182-06 red line)."""
+    message to attribute the finding to a node (the D-182-06 red line).
+
+    SEAM: patches `scope.folder_scope_violations` — the LIST form the collector consumes
+    since WR-04. (The raising `assert_folder_scopes_subset` is the NL-generation
+    presentation; it is exercised directly by the scope-level layer above and by
+    `test_short_circuit_dict_is_byte_identical_after_the_tuple_change` below.) The
+    SUBJECT of this test is unchanged: the slug must reach `verdict['phase']`."""
     from app.services.harness import grounding, scope as scope_mod
     from app.services.harness.scope import FolderScopeSubsetError
 
-    async def _raise_typed(definition, *, supabase, user_id):
-        raise FolderScopeSubsetError(
-            "phase 'p1' folder_scope is not a subset of the project subtree: "
-            f"['{_OUTSIDE}']",
-            phase_slug="p1",
-        )
+    async def _one_typed_violation(definition, *, supabase, user_id):
+        return [
+            FolderScopeSubsetError(
+                "phase 'p1' folder_scope is not a subset of the project subtree: "
+                f"['{_OUTSIDE}']",
+                phase_slug="p1",
+            )
+        ]
 
-    monkeypatch.setattr(scope_mod, "assert_folder_scopes_subset", _raise_typed)
+    monkeypatch.setattr(scope_mod, "folder_scope_violations", _one_typed_violation)
 
     verdicts = await grounding.grounding_verdicts(
         _scoped_definition(scope=[_OUTSIDE]),
@@ -524,13 +549,19 @@ async def test_plain_value_error_degrades_to_an_unkeyed_verdict(monkeypatch):
     """T-182-10: `except ValueError` is deliberately NOT narrowed and the slug is read via
     `getattr(..., None)`. A ⊆-path `ValueError` with no `phase_slug` (a test double, or a
     future non-phase-specific failure) yields `phase: None` and NEVER raises — `/validate`
-    is documented ALWAYS HTTP 200, so an AttributeError here would be a 500."""
+    is documented ALWAYS HTTP 200, so an AttributeError here would be a 500.
+
+    SEAM: patches `scope.folder_scope_violations` (the list form the collector consumes) to
+    RAISE. Even the plural helper degrades a raise to exactly ONE unkeyed verdict — an
+    infrastructure failure is not N findings. The catch breadth is deliberately unchanged;
+    round-2 review WR-03 (a `pydantic.ValidationError` is a `ValueError` in Pydantic v2)
+    is deferred and out of this round's scope."""
     from app.services.harness import grounding, scope as scope_mod
 
     async def _raise_plain(definition, *, supabase, user_id):
         raise ValueError("something else went wrong")
 
-    monkeypatch.setattr(scope_mod, "assert_folder_scopes_subset", _raise_plain)
+    monkeypatch.setattr(scope_mod, "folder_scope_violations", _raise_plain)
 
     verdicts = await grounding.grounding_verdicts(
         _scoped_definition(scope=[_OUTSIDE]),
@@ -540,7 +571,12 @@ async def test_plain_value_error_degrades_to_an_unkeyed_verdict(monkeypatch):
         skill_ids=set(),
     )
 
-    verdict = _folder_scope_verdict(verdicts)
+    found = _folder_scope_verdicts(verdicts)
+    assert len(found) == 1, (
+        "an infrastructure failure off the ⊆ path is ONE finding, not N — the plural "
+        f"helper must not fan it out per phase (got {len(found)})"
+    )
+    verdict = found[0]
     assert verdict["phase"] is None  # degrades safely — unkeyed, not a crash
     assert verdict["message"] == "something else went wrong"
 
