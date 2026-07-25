@@ -2,11 +2,15 @@
 sketch: 136
 name: flow-shape-and-branches
 question: "How does the whole graph read — layout direction, skip_to_phase branches, gates, terminal ends, batch fan-out — with no dropped phase and no phantom edge?"
-winner: null
+winner: "B"
 tags: [phase-183, canvas-01, canvasmodel, layout, skip-to-phase, branch-edge, fan-out, terminal, sc4-faithfulness, g2-sketch-gate]
 ---
 
 # Sketch 136: Flow shape & branch edges
+
+> **Winner: B — horizontal left → right** (operator, 2026-07-25). The familiar builder direction. The *visual
+> treatment* of that horizontal flow is superseded by **sketch 137**, which redraws it with the real 3D icons and
+> plain language; the topology findings below still stand.
 
 ## Design Question
 

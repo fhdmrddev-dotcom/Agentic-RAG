@@ -8,6 +8,11 @@ tags: [phase-183, canvas-01, xyflow, read-only, canvas-frame, entry-door, chrome
 
 # Sketch 134: Canvas frame & read-only honesty
 
+> **Superseded look, standing findings (2026-07-25).** Operator review found variants A and C here too similar to
+> tell apart, and the whole batch too technical and visually basic — it drew flat text glyphs instead of the shared
+> 3D `PHASE_GLYPHS` marks the icon convention requires. **Sketch 137** is the visual redo. What survives from this
+> sketch is its *structural* content: the canvas frame inventory and the live-data findings below.
+
 ## Design Question
 
 Phase 183 is the first time a real graph library (`@xyflow/react` v12) lands in the app. React Flow brings its

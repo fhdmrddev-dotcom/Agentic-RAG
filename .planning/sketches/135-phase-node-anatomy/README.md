@@ -8,6 +8,11 @@ tags: [phase-183, canvas-01, phasenode, node-anatomy, grounding-slot, technical-
 
 # Sketch 135: Phase node anatomy
 
+> **Superseded look, standing findings (2026-07-25).** Operator review found variants A and C here too similar to
+> tell apart, and the whole batch too technical and visually basic — it drew flat text glyphs instead of the shared
+> 3D `PHASE_GLYPHS` marks the icon convention requires. **Sketch 137** is the visual redo. What survives from this
+> sketch is its *structural* content: the node contents inventory and the live-data findings below.
+
 ## Design Question
 
 `PhaseNode.tsx` is a **G-5 hot file touched by Phase 183 (read-only), 184 (editable + config) and 185 (graded
