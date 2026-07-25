@@ -86,6 +86,28 @@ It is a dark silhouette on a dark canvas — roughly 4× dimmer than the rest of
   publish soul headers, the gauntlet stages and the live step cards. Changing it is one clean additive map swap —
   but it changes five shipped surfaces, so it is **its own decision, not Phase 183's to make quietly.**
 
+## The agent icon (operator, 2026-07-25: robot reads as generic)
+
+`robot` is the default mark for `llm_agent` — the most-used step type — and the operator's objection is fair: it is
+the single most recycled icon in AI products. Four alternatives are live in the **Agent icon** control, all verified
+present in the set and measured for legibility on Deep Midnight:
+
+| Option | Luminance | Read |
+|---|---|---|
+| **🧭 `compass`** *(recommended, sketch default)* | 157.4 | An agent works out *how* to get there instead of following a fixed script — exactly what separates `llm_agent` from `llm_single`. An object, consistent with gear / memo / package. Genuinely uncommon in AI UIs. |
+| 📡 `satellite-antenna` | 176.4 | Reaching out and gathering. Brightest and most abstract. |
+| 🧠 `brain` | 169.2 | Reads as thinking, but it is the second-most recycled AI icon after the robot. |
+| 🤖 `robot` | 134.9 | Today's mark. |
+
+**Deliberately not offered:** `sparkles` / `sparkle` (luminance ~187) — the most overused AI icon in the industry,
+which fails the operator's own criterion harder than the robot does; and `bullseye`, already taken by the Phase 127
+publish-gauntlet Goal stage.
+
+**Same caveat as the team icon:** `PHASE_GLYPHS` is shared, so changing `llm_agent` also changes the mark on the
+workflows-page card, the run and publish soul headers, the gauntlet stages and the live step cards. It is one clean
+additive map swap, but it is a **cross-cutting** change — worth doing deliberately rather than as a side effect of
+Phase 183.
+
 ## The colour-budget argument (why D exists)
 
 Operator leaned to B but liked C. There is a concrete tie-breaker, and the **Live status** control makes it visible.

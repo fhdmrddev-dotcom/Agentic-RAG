@@ -308,6 +308,13 @@
     <button type="button" data-run="needs">Needs you</button>
     <button type="button" data-run="failed">Failed</button>
   </div>
+  <span class="lbl">Agent icon</span>
+  <div class="seg" id="agentseg">
+    <button type="button" data-agent="llm_agent_compass" class="on">🧭 Compass</button>
+    <button type="button" data-agent="llm_agent_satellite">📡 Dish</button>
+    <button type="button" data-agent="llm_agent_brain">🧠 Brain</button>
+    <button type="button" data-agent="llm_agent">🤖 Robot</button>
+  </div>
   <span class="lbl">Team icon</span>
   <div class="seg" id="iconseg">
     <button type="button" data-icon="llm_batch_agents" class="on">Today</button>
@@ -416,7 +423,8 @@ var LEAD = {
      'colour does the sorting so the words don\'t have to. Warmest, but it spends the most colour, which leaves less room for status colour later.'
 };
 
-var variant = 'a', current = 'risk-register', teamIcon = 'llm_batch_agents', runMode = 'off';
+var variant = 'a', current = 'risk-register', teamIcon = 'llm_batch_agents',
+    agentIcon = 'llm_agent_compass', runMode = 'off';
 
 /* A realistic mid-run snapshot: everything before the focus step is done, the focus
    step carries the live state, everything after is idle. Mirrors the honest node-state
@@ -449,7 +457,8 @@ function render() {
     var iconSize = (variant === 'b' || variant === 'd') ? 52 : 34;
     // `busts-in-silhouette` measures avg-luma 34.5 vs 135-185 for the other five
     // marks, so it is the one glyph that can disappear on Deep Midnight.
-    var iconKey = s.icon === 'llm_batch_agents' ? teamIcon : s.icon;
+    var iconKey = s.icon === 'llm_batch_agents' ? teamIcon
+                : s.icon === 'llm_agent' ? agentIcon : s.icon;
     var rs = runStateFor(i, wf.steps.length);
     var runChip = rs ? '<div><span class="runchip ' + rs + '">' + RUN_LABEL[rs] + '</span></div>' : '';
     html +=
@@ -585,6 +594,21 @@ document.querySelectorAll('#runseg button').forEach(function (b) {
     activeIdx = -1;
     render();
     if (runMode !== 'off') toast('A run snapshot painted onto the same nodes. Compare C and D: in C the step-type colour competes with the status colour; in D the strong colours were kept free.');
+  });
+});
+var AGENT_NOTES = {
+  'llm_agent_compass': 'compass \u2014 luminance 157.4. An agent works out HOW to get there rather than following a fixed script; that is exactly what separates it from a plain write step. An object, like gear / memo / package.',
+  'llm_agent_satellite': 'satellite-antenna \u2014 luminance 176.4. Reaching out and gathering. The brightest of the four and the most abstract.',
+  'llm_agent_brain': 'brain \u2014 luminance 169.2. Reads as thinking, but it is the second-most common AI icon after the robot.',
+  'llm_agent': 'robot \u2014 luminance 134.9. The mark PHASE_GLYPHS uses today.'
+};
+document.querySelectorAll('#agentseg button').forEach(function (b) {
+  b.addEventListener('click', function () {
+    document.querySelectorAll('#agentseg button').forEach(function (o) { o.classList.remove('on'); });
+    b.classList.add('on');
+    agentIcon = b.getAttribute('data-agent');
+    render();
+    toast(AGENT_NOTES[agentIcon]);
   });
 });
 document.querySelectorAll('#iconseg button').forEach(function (b) {
