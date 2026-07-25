@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { AlertTriangle, Lock } from "lucide-react"
 import "./index.css"
 import { useAuth } from "./hooks/useAuth"
@@ -14,6 +14,10 @@ import { StreamsProvider } from "@/providers/StreamsProvider"
 import { OrgProvider } from "@/providers/OrgProvider"
 import { CitationNavProvider } from "@/lib/citationNav"
 import { TechnicalNamesProvider } from "@/providers/TechnicalNamesProvider"
+// Phase 183 (CANVAS-01 / OP-2): broadcasts the ONE effective-features map below the
+// nav so a page can gate on a governed feature without a second GET /features.
+// Value-passing only — App still owns the single useEffectiveFeatures call.
+import { EffectiveFeaturesProvider } from "@/providers/EffectiveFeaturesProvider"
 import { getMaintenanceStatus, getSetupStatus, FEATURE_FORBIDDEN_EVENT, VISIBILITY_REFUSAL, type SetupStatus } from "@/lib/api"
 import { hydrateSupabaseFromRuntime } from "@/lib/supabase"
 import { SetupWizard } from "./pages/SetupWizard"
@@ -146,8 +150,17 @@ function App() {
   // use simply does NOT render (the sketch 069-A vanish). Fails CLOSED to {} on error
   // / pre-resolve — a blip never flashes an operators-only feature to an end user
   // (T-148-FAILCLOSED). An operator's map is all-true → every nav item shows.
-  const { features: effectiveFeatures, refetch: refetchFeatures } = useEffectiveFeatures(user?.id ?? null)
+  const { features: effectiveFeatures, loading: featuresLoading, refetch: refetchFeatures } = useEffectiveFeatures(user?.id ?? null)
   const navItems = visibleNavItems(effectiveFeatures)
+  // Phase 183 (CANVAS-01 / OP-2): the SAME object the nav filter reads, memoized so
+  // descendants re-render only when the map / loading / refetch actually change
+  // (the TechnicalNamesProvider memo idiom). This is broadcast — never re-fetched:
+  // one hook call site in the whole tree keeps the budget at one GET /features per
+  // session, and the nav and any page consumer can never disagree.
+  const effectiveFeaturesValue = useMemo(
+    () => ({ features: effectiveFeatures, loading: featuresLoading, refetch: refetchFeatures }),
+    [effectiveFeatures, featuresLoading, refetchFeatures],
+  )
 
   // Phase 148 (VIS-01 / D-04): the graceful mid-session-flip bounce. If a governed
   // feature's audience is tightened while a non-operator is on its page, that page's
@@ -250,6 +263,15 @@ function App() {
             switch — so the Settings toggle and the admin Control Room toggle move
             ONE shared value and can never disagree. Default plain; localStorage. */}
         <TechnicalNamesProvider>
+          {/* Phase 183 (CANVAS-01 / OP-2): the app-wide effective-features broadcast.
+              It sits beside TechnicalNamesProvider — both are app-wide UI contexts and
+              both must cover ChatLayout's view switch, so the workflows view (and any
+              other page) can read the map. Pure plumbing: the value is the object the
+              ONE useEffectiveFeatures call above already produced, so there is no
+              second GET /features and the Phase-148 fail-closed policy is unchanged.
+              A descendant that reads a NULL context (no provider) must treat it as
+              fail-closed — every governed feature hidden. */}
+          <EffectiveFeaturesProvider value={effectiveFeaturesValue}>
           {/* Phase 153 (CITE-01 / SC#2): the citation cross-view nav provider wraps
               BOTH the chat subtree (where the citation markers/"Open document"
               affordance live) and the documents view (IngestionPage, which reads the
@@ -274,6 +296,7 @@ function App() {
               onTuneSkill={handleTuneSkill}
             />
           </CitationNavProvider>
+          </EffectiveFeaturesProvider>
         </TechnicalNamesProvider>
         </TooltipProvider>
       </StreamsProvider>
