@@ -2,755 +2,626 @@
 phase: 182-server-validation-seam
 reviewed: 2026-07-25T00:00:00Z
 depth: standard
-round: 2
+round: 3
 files_reviewed: 18
 files_reviewed_list:
   - backend/app/api/workflows.py
+  - backend/app/dependencies.py
   - backend/app/main.py
+  - backend/app/middleware/canvas_gate.py
   - backend/app/services/harness/grounding.py
   - backend/app/services/harness/publish_service.py
-  - backend/app/services/harness/reachability.py
   - backend/app/services/harness/scope.py
-  - backend/app/services/workflow_authoring.py
-  - backend/tests/test_181_flip_on.py
-  - backend/tests/test_182_extraction_parity.py
-  - backend/tests/test_182_grounding_bundle.py
+  - backend/app/utils/folder_utils.py
+  - backend/tests/test_182_canvas_gate.py
   - backend/tests/test_revert_byte_identical.py
-  - backend/tests/unit/test_103_nl_generate.py
+  - backend/tests/unit/test_182_canvas_auth.py
   - backend/tests/unit/test_182_folder_scope_keying.py
+  - backend/tests/unit/test_182_grounding_degradation.py
+  - backend/tests/unit/test_182_grounding_skill_org_gate.py
   - backend/tests/unit/test_182_publish_grounding_stage.py
+  - backend/tests/unit/test_182_publish_org_scope.py
   - backend/tests/unit/test_182_severity_codes.py
   - backend/tests/unit/test_182_validate.py
-  - backend/tests/unit/test_publish_service.py
 findings:
-  critical: 2
-  warning: 10
-  info: 7
-  total: 19
+  critical: 3
+  warning: 9
+  info: 0
+  total: 12
 status: issues_found
 ---
 
-# Phase 182: Code Review Report (round 2 — full final state, plans 182-01..07)
+# Phase 182: Code Review Report (round 3 — gap-closure plans 182-08 … 182-12)
 
 **Reviewed:** 2026-07-25
 **Depth:** standard
+**Diff base:** `ed80de3b..HEAD`
 **Files Reviewed:** 18
 **Status:** issues_found
 
 ## Summary
 
-Second adversarial pass, covering the full phase including the four gap-closure plans
-(182-04..07). All 86 tests across the phase's 10 test files pass at HEAD (`2f511f44`).
+Third adversarial pass, scoped to the five plans that exist to close round-2's findings. I
+verified each claim against the source rather than the SUMMARYs, and drove the real app with the
+flag cold-off and no credentials to falsify the two claims that are only observable at the wire.
 
-**What the gap closure genuinely fixed.** I verified each claim against the source rather
-than the summaries:
+### Round-2 dispositions, verified against HEAD
 
-- **182-04 (SC#4)** — `scope.FolderScopeSubsetError` is a real `ValueError` subclass with a
-  byte-identical `str(exc)` / `args`, and `grounding._folder_scope_violation` reads
-  `phase_slug` off the attribute (`getattr(..., None)`), never the prose. The end-to-end test
-  drives the *real* ⊆ walk, so it is not a mock echoing itself.
-- **182-06 (WR-01)** — publish stage 2.6 calls the SAME `grounding_verdicts` collector
-  `/validate` calls, blocks before the golden run, and fails closed with
-  `grounding_unavailable`. The validate-vs-publish agreement test compares two independently
-  produced `(code, phase)` sets. This is a real fix to a real, exploitable gap.
-- **182-07 (WR-05)** — `_KNOWN_CODES` really is composed from `reachability.LINT_CODES |
-  grounding.GROUNDING_VERDICT_CODES | _ROUTE_ASSIGNED_CODES`, `_ERROR_CODES` is derived, the
-  unknown branch returns `error` + logs, and the drift scanners carry a teeth self-test.
-- **Round-1 CR-01** — the un-org-gated skill predicate is gone. `app/utils/skill_visibility.py`
-  is the single home and `tool_dispatcher.py:1176` uses the same function, so query and
-  post-filter cannot diverge. I re-walked the org gate on every read
-  (`fetch_visible_folders`, `_skill_registry`, `_resolve_caller_org_ids`) and found no
-  remaining cross-org path through the grounding registry.
-
-**What did not get closed, and was never triaged.** The two round-1 criticals about the
-off-switch — CR-03 (malformed-JSON 422 before the flag gate) and CR-04 (`/openapi.json`
-advertising both routes anonymously) — appear in *no* plan, *no* seed, and *no* decision
-note. A grep across the whole phase directory returns hits only inside the two review files
-themselves. WR-03/04/07 were seeded (SEED-130/131/132) and WR-08 was formally rejected with a
-recorded rationale; these two were simply skipped. **I re-proved both empirically against the
-real app at HEAD with the flag off and no credentials:**
-
-```
-POST /workflows/validate  valid json      -> 404 {"detail":"Not Found"}
-POST /workflows/validate  MALFORMED json  -> 422 {"detail":[{"type":"json_invalid",...}]}
-POST /workflows/__nope__  (never built)   -> 405 {"detail":"Method Not Allowed"}
-GET  /openapi.json (anonymous, flag off)  -> 200   advertises both routes + all 5 schemas
-GET  /docs                                -> 200
-```
-
-Both defeat REVERT-01 / D-181-01 — operator HARD gate #1 — which is the very gate 182-03
-retired the canary in favour of.
-
-**Two findings the gap closure created or sharpened**, both about *which* failure the author
-is shown:
-
-1. `grounding._skill_registry`'s fail-closed `return []` (grounding.py:148-158) sits INSIDE
-   `assemble_grounding_bundle`, so the stage-2.6 wrapper never sees it. A transient skills
-   read failure therefore blocks publish with a **false `unregistered_skill`** naming the
-   author's `skill_ref`, not the honest `grounding_unavailable` the stage exists to emit.
-2. `/validate` is still unsealed while publish is now sealed, so the two sides of the "one
-   shared copy" claim have *opposite* postures on the same failure. Proven: a PostgREST
-   `APIError` from either the palette read or the ⊆ walk escapes `validate_workflow` as an
-   unhandled exception (HTTP 500), while the identical failure on the publish side returns a
-   structured block.
-
-**On the 182-05 open question** (does `_folder_scope_violation`'s bare `except ValueError`
-render an infrastructure error as a normal-looking `folder_scope` verdict?) — **partially
-refuted, partially confirmed and escalated.** See WR-03.
-
-### Round-1 finding dispositions
-
-| Round-1 | Status at HEAD (`2f511f44`) |
+| Round-2 | Status |
 |---|---|
-| CR-01 skills read has no org predicate | **RESOLVED** — `0559e64b`, `app/utils/skill_visibility.py`, shared with `tool_dispatcher` |
-| CR-02 palette serializes raw DB rows | **RESOLVED** — `PaletteFolder` / `PaletteSkill` + `_null_foreign_global_owner` |
-| CR-03 malformed body 422 pre-flag | **STILL LIVE, never triaged** → this review's **CR-01** |
-| CR-04 openapi / docs advertise the routes | **STILL LIVE, never triaged** → this review's **CR-02** |
-| WR-01 publish does not enforce grounding | **RESOLVED** — 182-06 stage 2.6 |
-| WR-02 unbuilt-route parity baseline (404 vs 405) | **STILL LIVE** → WR-09 |
-| WR-03 `template_placeholders` dead path | STILL LIVE, deferred as SEED-130 → WR-06 adds the security note the seed omits |
-| WR-04 `/validate` not sealed | STILL LIVE, deferred as SEED-131 → WR-02 (escalated by 182-06) |
-| WR-05 severity fails open / hardcoded literals | **RESOLVED** — 182-07 |
-| WR-06 `folder_scope` slug stranded in prose | **PARTIALLY RESOLVED** — 182-04 keys it; the multiplicity gap remains → WR-04 |
-| WR-07 `@model_validator` 422s bypass the envelope | STILL LIVE, deferred as SEED-132 — not re-reported |
-| WR-08 `require_canvas` alone drops the authoring audience | **REJECTED** with recorded rationale (`182-DECISION-NOTES.md`) — not re-reported |
-| WR-09 `_skill_registry` duplicate retry + missing `coerce_uid` | **RESOLVED** |
-| IN-01..IN-06 | all six still live — see Info |
+| CR-01 malformed body 422 pre-flag | **PARTIALLY closed.** `POST /workflows/validate` + `b"{"` is now 404 — but the gate replaced a 422-vs-405 oracle with a 404-vs-405/403 one. See **CR-01**. |
+| CR-02 `/openapi.json` advertises both routes | **CLOSED.** Verified live: both paths and all five models are absent while off, `PublishVerdict` + `HTTPValidationError` survive, and the hook never writes the filtered doc into FastAPI's memo (`canvas_gate.py:263-272`). The off→on→off test is a genuine falsifier. |
+| WR-01 false `unregistered_skill` on a degraded read | **CLOSED.** The `_skill_registry` swallow is gone, `GroundingBundle.degraded` is real, and `test_182_grounding_degradation.py` drives the REAL registry read against a raising client (not just a synthetic bundle). Discriminating. |
+| WR-02 `/validate` unsealed → HTTP 500 | **CLOSED for the two grounding stages.** The seal is deliberately scoped so the pure checks still run, and the injected exception in the test is asserted *not* to be a `ValueError` — the premise the finding rested on. |
+| WR-04 `folder_scope` multiplicity | **CLOSED.** `scope.folder_scope_violations` is the one non-raising walk; the 3-offender test runs the real walk and the "resolved exactly once" counter is a real guard. |
+| WR-05 publish org scope | **CLOSED for skills and per-phase `folder_scope`.** NOT closed for `project_folder_id` itself — see **WR-02**. |
+| WR-07 `folders` truncation | **DETECTED, not fixed.** The read is still unbounded and unfiltered; the change makes a truncation *fatal* instead of bounding it. See **CR-03** and **WR-01**. |
+| WR-08 double auth | **CLOSED.** One GoTrue round-trip + one ban query, `run_in_threadpool` added, `canvas_caller` fails closed to 404. The counting test pops conftest's override and counts at the shared seam, so it genuinely discriminates. |
+| WR-03 (`except ValueError`), WR-06/SEED-130, WR-09, WR-10, IN-01..07 | deferred / not addressed — **not re-reported**, except where this round created a new instance (**WR-06**) or made a deferral materially worse (**CR-01**, which explicitly builds on WR-09). |
+
+### What this round got wrong
+
+Three defects, all inside the fixes themselves:
+
+1. **The non-discoverability gate leaks in the opposite direction** (CR-01). Proven at HEAD, flag
+   cold-off, no credentials. The oracle is one probe:
+
+   ```
+   POST   /workflows/validate          b"{"  -> 404 {"detail":"Not Found"}
+   POST   /workflows/zzzunknown        b"{"  -> 405 {"detail":"Method Not Allowed"}
+   PATCH  /workflows/validate                -> 404      PATCH /workflows/zzzunknown   -> 403
+   GET    /workflows/validate                -> 404      GET   /workflows/zzzunknown   -> 405
+   GET    /workflows/grounding-bundle/       -> 404      GET   /workflows/zzzunknown/  -> 405
+   ```
+   Every single-segment `/workflows/<x>` answers 405 (or 403 for PATCH/DELETE); the two gated
+   names answer 404. ROADMAP SC#3 is not met.
+
+2. **The honest-failure signal has three consumers and only two branch on it** (CR-02). The
+   `GET /workflows/grounding-bundle` palette — in the same file, 80 lines below the consumer that
+   *does* branch — ignores `bundle.degraded` and serves an empty folder/skill palette at HTTP 200.
+   For the folders half this is a **net-new regression**: before this round that read had no guard
+   and a failure surfaced as a loud 500.
+
+3. **The truncation guard trades a wrong answer for a permanent outage** (CR-03). At ≥ `max-rows`
+   folders deployment-wide — a scale the new docstring itself calls "not a large deployment" —
+   every `/validate` returns `grounding_unavailable`, the palette is empty, and **publish is
+   permanently blocked**, with no pagination, no `.limit()`, and no operator remedy.
+
+---
 
 ## Critical Issues
 
-### CR-01: `POST /workflows/validate` still leaks its own existence pre-auth — one malformed byte returns 422 where an unbuilt route returns 405
+### CR-01: **BLOCKER** — the path-only canvas gate makes both gated routes uniquely enumerable by an anonymous method sweep (404 where an identically-shaped unbuilt path answers 405/403)
 
-**File:** `backend/app/api/workflows.py:469-480`; vacuous guard at
-`backend/tests/test_revert_byte_identical.py:128-133`
+**File:** `backend/app/middleware/canvas_gate.py:119-135` (the `_is_canvas_path(path) and
+_read_canvas_is_off()` short-circuit); registered at `backend/app/main.py:633`; enshrined by
+`backend/tests/test_182_canvas_gate.py:104` and `:128-148`
 
-**Issue:** FastAPI decodes the request body in `get_request_handler` **before**
-`solve_dependencies` runs, so a `json.JSONDecodeError` becomes a `RequestValidationError`
-(422) without `require_canvas` ever executing. Route-level `dependencies=[...]` are inserted
-at the front of `dependant.dependencies`, which is why a *valid* body correctly 404s — but
-that ordering only governs the dependency phase, not the body decode that precedes it.
+**Issue:** The middleware gates on **path only, for every method**, by explicit design
+(`canvas_gate.py:121-125`). The reasoning in that comment — "`GET /workflows/validate` returns 405
+… which admits a POST handler is declared at exactly that path" — is factually wrong. Every
+single-segment `/workflows/<anything>` is shadowed by `PATCH|DELETE /workflows/{definition_id}`
+(`workflows.py:866`, `:901`), so Starlette returns `Match.PARTIAL` → **405 for GET/POST/PUT and
+403 "Not authenticated" for PATCH/DELETE**, for *any* unknown name. 405 therefore admits nothing;
+returning 404 instead is what admits something.
 
-Re-verified against the real app at HEAD with `feature_visibility={}` and no `Authorization`
-header (transcript in the Summary): valid JSON → 404, malformed JSON → **422**, never-built
-sibling path → **405**. `POST /workflows/__nope__` returns 405 *even with the same malformed
-byte*, so the two are cleanly distinguishable. An anonymous scanner therefore learns that a
-POST handler is declared at exactly `/workflows/validate` while the canvas is off — the same
-class of pre-auth existence leak Phase 181's own review caught (`dependencies.py:558-566`
-documents the fix for the 403/401 variant), reappearing on the route that replaced the canary.
+Re-proved against the real app at HEAD with `feature_visibility={}` and no `Authorization` header
+(`TestClient`, anonymous):
 
-The assertion meant to cover this cannot fail. `test_revert_byte_identical.py:128` validates
-`_MINIMAL_VALID_DEFINITION` against the real model on the line above, so
-`assert resp_validate.status_code != 422` (`:132`, commented "the gate fired BEFORE body
-validation") is tautological — it asserts that a valid body is not a shape error.
+```
+canvas OFF, anonymous
+  POST   /workflows/validate          b"{"  -> 404 {"detail":"Not Found"}
+  POST   /workflows/zzzunknown        b"{"  -> 405 {"detail":"Method Not Allowed"}
+  POST   /workflows/validate/         b"{"  -> 404          POST   /workflows/zzzunknown/  -> 405
+  GET    /workflows/validate                -> 404          GET    /workflows/zzzunknown   -> 405
+  GET    /workflows/grounding-bundle/       -> 404          GET    /workflows/zzzunknown/  -> 405
+  PUT    /workflows/validate                -> 404          PUT    /workflows/zzzunknown   -> 405
+  PATCH  /workflows/validate                -> 404          PATCH  /workflows/zzzunknown   -> 403 {"detail":"Not authenticated"}
+  DELETE /workflows/grounding-bundle        -> 404          DELETE /workflows/zzzunknown   -> 403
+```
 
-**Fix:** decide the flag *before* body parsing, and make the test probe the hostile input.
+One `PATCH` sweep over a wordlist enumerates the gated canvas paths exactly: every miss is 403, the
+two hits are 404. That is a *crisper* oracle than the 422 round-2 CR-01 reported, and it is
+method-agnostic rather than confined to the declared verb — so this is round-2 **WR-09 escalated
+from "the tests are green for the wrong reason" into an exploitable enumeration**, caused by this
+round's fix. REVERT-01 / D-181-02 / ROADMAP SC#3 ("byte-identical to a path that was never built")
+is not met.
+
+The suite cannot see it because every parity assertion compares against
+`/workflows/__nope__/__nope__` — **two** segments, the one shape with no `{definition_id}` shadow,
+which is why it genuinely 404s (`test_182_canvas_gate.py:44, 104`;
+`test_revert_byte_identical.py:255`). Worse, `test_wrong_method_probe_404s_not_405`
+(`test_182_canvas_gate.py:128-148`) *requires* the leaking answer: it asserts
+`GET /workflows/validate == 404` and rejects 405 — the exact value an unbuilt path returns.
+
+**Fix:** make the gate reproduce what the router would answer if the canvas routes had never been
+declared, derived from the route table rather than hardcoded:
 
 ```python
-# app/middleware/canvas_gate.py — pure ASGI, mirrors MaintenanceMiddleware's posture
-_CANVAS_PATHS = frozenset({"/workflows/validate", "/workflows/grounding-bundle"})
-
+# canvas_gate.py — compute once at startup from app.routes with the canvas paths removed:
+#   _DECLARED_METHODS[path]  -> {"POST"} / {"GET"}
+#   _UNBUILT_ANSWER[path][m] -> the (status, body) the surviving routes produce for that method
 class CanvasGateMiddleware:
-    def __init__(self, app): self.app = app
     async def __call__(self, scope, receive, send):
-        if scope["type"] == "http" and scope["path"] in _CANVAS_PATHS:
-            from app.models.user_settings import feature_audience
-            if feature_audience("visual_workflow_canvas") == "off":
-                await JSONResponse({"detail": "Not Found"}, status_code=404)(scope, receive, send)
-                return
-        await self.app(scope, receive, send)
+        if scope.get("type") != "http":
+            await self.app(scope, receive, send); return
+        path = get_route_path(scope)                        # see WR-05 — root_path-safe
+        if not _is_canvas_path(path) or not _read_canvas_is_off():
+            await self.app(scope, receive, send); return
+        if scope["method"] not in _DECLARED_METHODS[_normalize(path)]:
+            await self.app(scope, receive, send); return    # 405/403/307 exactly as unbuilt
+        status, body = _UNBUILT_ANSWER[_normalize(path)][scope["method"]]   # 405 here today
+        await JSONResponse(body, status_code=status)(scope, receive, send)  # still pre-body-decode
 ```
 
-Keep `Depends(require_canvas())` on both routes (defense in depth — it still owns the
-role/everyone resolution), and replace the tautology with a falsifiable probe:
+and replace the two-segment baseline in both test files with a **same-shape, same-method** probe:
 
 ```python
-bad = client.post(_VALIDATE_PATH, content=b"{", headers={"content-type": "application/json"})
-assert bad.status_code == 404, bad.text   # fails on today's code (422)
+for method in ("GET", "POST", "PUT", "PATCH", "DELETE"):
+    gated   = client.request(method, _VALIDATE_PATH, content=b"{", headers=_JSON_CT)
+    unbuilt = client.request(method, "/workflows/zzzunknown", content=b"{", headers=_JSON_CT)
+    assert (gated.status_code, gated.content) == (unbuilt.status_code, unbuilt.content), method
 ```
 
-If the operator instead accepts the residual, record it as a decision in the same commit and
-narrow the REVERT-01 wording — silently claiming an unproven property is worse than an
-audited exception, which is exactly what `182-DECISION-NOTES.md` did for WR-08.
+That single loop fails on today's code for all five methods and is the honest gate.
+
+If the operator prefers not to chase byte-identity across every method/slash permutation, the
+alternative is to **narrow the REVERT-01 wording in the same commit** and record the residual as a
+decision (the `182-DECISION-NOTES.md` precedent). What must not ship is the current state: an
+unproven byte-identity claim *plus* a sharper enumeration oracle than the one it replaced.
 
 ---
 
-### CR-02: with the canvas off, anonymous `GET /openapi.json` and `/docs` publish both canvas routes and all five of their schemas
+### CR-02: **BLOCKER** — `GET /workflows/grounding-bundle` ignores `bundle.degraded` and serves an unreachable registry as "you have no folders and no skills" (HTTP 200)
 
-**File:** `backend/app/main.py:592`; routes at
-`backend/app/api/workflows.py:469-473, 569-573`
+**File:** `backend/app/api/workflows.py:670-697`; the contract it violates is written at
+`backend/app/services/harness/grounding.py:120-132`
 
-**Issue:** `app = FastAPI(title=..., version=..., lifespan=lifespan)` sets no
-`openapi_url=None` / `docs_url=None`, and neither route carries `include_in_schema=False`, so
-the schema is public and completely static with respect to the flag. Re-verified at HEAD with
-no credentials and `feature_visibility={}`:
-
-```
-GET /openapi.json -> 200
-   advertises /workflows/validate: True
-   advertises /workflows/grounding-bundle: True
-   schemas published: ValidateResponse, Verdict, GroundingBundleResponse, PaletteFolder, PaletteSkill
-GET /docs -> 200
-```
-
-`SetupMiddleware` only gates a pre-finalize box, so on any finalized deploy (including the
-live `superrag.cloud` one) this is open to the internet. This is a strictly *louder* existence
-leak than CR-01's status-code nuance: it publishes the paths, the methods, the `severity`
-literals and the full palette shape.
-
-It also directly falsifies the acceptance gate the phase repointed onto these routes.
-`test_revert_byte_identical.py:8-16` claims the off state has "the same **reachable-route
-set** … every canvas-gated route is a 404, byte-identical to a path that was never built."
-The routes are *published* regardless of the flag, and no test asserts otherwise.
-
-**Fix:** minimal, and it leaves the 404 behaviour untouched:
+**Issue:** `GroundingBundle.degraded` is documented as "THE CONTRACT **BOTH CONSUMERS** RELY ON".
+There are **three** consumers of `assemble_grounding_bundle`, and the third one — the palette route,
+80 lines below the `/validate` handler that does branch correctly — never reads it:
 
 ```python
-# workflows.py — both canvas routes
-@router.post("/validate", response_model=ValidateResponse, include_in_schema=False,
-             dependencies=[Depends(require_canvas())])
+bundle = await grounding.assemble_grounding_bundle(...)     # :674
+_null_foreign_global_owner(bundle.folders, str(user_id))    # :690
+return GroundingBundleResponse(                             # :692
+    tools=bundle.tools, folders=bundle.folders, skills=bundle.skills, ...
+)
 ```
 
-Better (keeps `/docs` useful once the canvas is on): a custom `app.openapi()` hook that drops
-`_CANVAS_PATHS` and their schemas when `feature_audience("visual_workflow_canvas") == "off"`.
-Either way, add the missing gate assertion so the property is enforced rather than asserted in
-prose:
+A folders or skills read failure (or a truncation — CR-03) therefore returns
+`{"tools":[...], "folders":[], "skills":[], "template_placeholders":[]}` at **HTTP 200**, which is
+byte-indistinguishable from a user who genuinely owns nothing. `GroundingBundleResponse` has no
+field that could carry the degradation, so no client can tell either. This is exactly the defect
+182-11 exists to close ("a vacuously-false membership test … reads as a specific, factual
+accusation"), reproduced on the surface D-182-01 says Phase 184's node-config dropdowns bind to:
+the author opens the folder picker mid-outage, sees an empty tree, and concludes their KB is gone.
+
+**For the folders half this is a net-new regression.** Before this round
+(`git show ed80de3b:backend/app/services/harness/grounding.py`) the call was
+`folders = await fetch_visible_folders(supabase, user_id)` with no guard, so a PostgREST error
+propagated and the palette 500'd — loud and honest. 182-11 wrapped it (`grounding.py:360-369`)
+without giving this consumer the branch, converting a loud failure into a silent lie.
+
+**Fix:** branch on the same signal the other two consumers use, and make the degradation part of
+the response contract rather than an invisible absence:
 
 ```python
-def test_openapi_does_not_advertise_canvas_routes_when_off(client, monkeypatch):
-    _cold_off(monkeypatch)
-    paths = client.get("/openapi.json").json()["paths"]
-    assert _BUNDLE_PATH not in paths and _VALIDATE_PATH not in paths
+class GroundingBundleResponse(BaseModel):
+    ...
+    degraded: list[str] = Field(default_factory=list)   # additive; pre-184 clients ignore it
+
+# get_grounding_bundle
+bundle = await grounding.assemble_grounding_bundle(...)
+if bundle.degraded:
+    logger.warning("GET /workflows/grounding-bundle: registries %s unresolved — "
+                   "returning a partial palette marked degraded", sorted(bundle.degraded))
+return GroundingBundleResponse(..., degraded=sorted(bundle.degraded))
 ```
+
+(Returning 503 is the other defensible posture; either way the caller must be able to distinguish
+"empty" from "unknown".) Add the regression test mirroring
+`test_validate_reports_grounding_unavailable_not_a_false_unregistered_skill`: a raising `skills`
+table must not produce a 200 whose `skills: []` is indistinguishable from a healthy empty registry.
+
+---
+
+### CR-03: **BLOCKER** — `strict=True` converts a PostgREST `max-rows` truncation into a permanent, unrecoverable shutdown of the whole grounding seam (publish included) at the scale the code itself calls normal
+
+**File:** `backend/app/utils/folder_utils.py:36-86`; opted into at
+`backend/app/services/harness/grounding.py:347-369`; consumed at
+`backend/app/services/harness/publish_service.py:637-647`
+
+**Issue:** Round-2 WR-07 asked for the read to be **bounded** ("push the predicate down and bound
+the read … at minimum add an explicit `.limit(N)` with a loud log"). Neither was done.
+`fetch_all_folders` still issues an unbounded, unfiltered, cross-tenant `select("*")`
+(`folder_utils.py:68`, `:71`) — no `user_id`/`org_id` predicate, no `.limit()`, no `.range()`
+pagination. The only change is that a truncation is now **detected and made fatal**.
+
+Follow the consequence at ≥ `max-rows` folders across all tenants — the exact threshold the new
+docstring names as reachable ("1000 folders ACROSS ALL TENANTS is not a large deployment",
+`folder_utils.py:24-26`):
+
+1. `fetch_all_folders(strict=True)` raises `FolderReadTruncatedError` on **every** call;
+2. `assemble_grounding_bundle` catches it → `folders = []`, `degraded = {"folders"}` — always;
+3. `POST /workflows/validate` returns exactly one `grounding_unavailable` verdict, `ok: False`,
+   forever, for every definition (`workflows.py:575-580`);
+4. `GET /workflows/grounding-bundle` returns an empty palette at 200, silently (CR-02);
+5. **publish stage 2.6 blocks every publish** at `blocked_stage="grounding_fidelity"` with
+   `grounding_unavailable` (`publish_service.py:640-647`). `POST /workflows/{id}/publish` is live
+   today behind `require_visible("workflow_authoring")` (audience `everyone`), independent of the
+   canvas flag — so no workflow can ever be published again;
+6. NL generation silently emits folder-blind drafts (WR-03).
+
+There is no pagination, no operator switch, no partial-result path and no remediation other than
+deleting folders. The polarity is fail-*closed*, which is right for a single blip — but this is not
+a blip: it is a permanent state that arrives at a fixed, low, deployment-wide row count and takes
+the phase's own hard gate down with it.
+
+**Fix:** bound the read so truncation cannot occur, and keep `strict` as a last-resort assertion
+rather than the mechanism:
+
+```python
+# folder_utils.fetch_all_folders — page instead of truncating
+async def fetch_all_folders(supabase, fields=..., *, strict=False, page=1000):
+    rows, start = [], 0
+    while True:
+        resp = await aexec(supabase.table("folders").select(fields).range(start, start + page - 1))
+        batch = resp.data or []
+        rows.extend(batch)
+        if len(batch) < page:
+            return rows
+        start += page
+```
+
+Better still — and what WR-07 actually asked for — push the owner+org predicate down in
+`fetch_visible_folders` so the read is proportional to the caller, not to the deployment:
+
+```python
+org_ids = await _resolve_caller_org_ids(supabase, user_id)
+q = supabase.table("folders").select(fields)
+q = q.or_(f"user_id.eq.{coerce_uid(user_id)}," +
+          (f"and(is_org_shared.eq.true,org_id.in.({','.join(sorted(org_ids))}))"
+           if org_ids else "id.is.null"))
+```
+
+Keep `FolderReadTruncatedError` as the belt-and-braces assertion after paging (it should then be
+unreachable). Add a test at the real threshold: a fake returning 1000 rows with `count=5000` must
+still yield a usable palette and a publishable definition.
+
+---
 
 ## Warnings
 
-### WR-01: a transient skills-read failure blocks publish with a FALSE `unregistered_skill` naming the author's `skill_ref`, not the honest `grounding_unavailable`
+### WR-01: **WARNING** — the truncation guard covers exactly ONE call site, not the "two grounding GATE call sites" its docstring claims, leaving the run-start ⊆ callers to answer a truncation with a false HTTP 400
 
-**File:** `backend/app/services/harness/grounding.py:148-158, 290-291`;
-`backend/app/services/harness/publish_service.py:525-589`
+**File:** `backend/app/utils/folder_utils.py:49-56`; the single opt-in at
+`backend/app/services/harness/grounding.py:361`; unprotected victims at
+`backend/app/services/workflow_kickoff.py:245-253`, `backend/app/api/runs.py:946`,
+`backend/app/services/harness_engine.py:1588`
 
-**Issue:** `_grounding_fidelity_failures`' docstring says it "FAILS CLOSED … the same
-fail-closed posture `grounding._skill_registry` already takes on its own read (CR-01)". The
-two are not the same, and the difference is the whole point of the stage.
-
-`_skill_registry`'s fail-closed exit is *inside* `assemble_grounding_bundle`:
+**Issue:** `fetch_all_folders`' new docstring says "Only the two grounding GATE call sites — the
+ones that turn this read into a verdict about the author's definition — opt in." A repo-wide grep
+finds exactly **one** `strict=True` in `app/`. Meanwhile the error class' own docstring
+(`folder_utils.py:19-22`) names `assert_folder_scopes_subset` as the primary victim — and all three
+of that function's run-start callers reach `resolve_project_subtree` →
+`fetch_visible_folders(supabase, user_id)` with `strict` defaulted to `False` (`scope.py:138`).
+`workflow_kickoff` maps the resulting `ValueError` to a hard **HTTP 400** refusing to start the run:
 
 ```python
-except Exception:  # grounding.py:148-158
-    logger.warning("grounding: org-gated skills read failed; using empty skill set", exc_info=True)
-    return []
+except ValueError as _scope_err:
+    raise HTTPException(status_code=400, detail=str(_scope_err))   # workflow_kickoff.py:249-253
 ```
 
-A PostgREST 5xx / timeout / connection reset on the skills read therefore produces
-`skills = []` → `skill_ids = set()` → the bundle is returned *successfully*. The stage-2.6
-`try` never sees an exception, so `_grounding_fidelity_failures` returns the collector's list
-unchanged — and `_unregistered_skill_ref` (grounding.py:421-427) reports **every** `skill_ref`
-as unregistered. Result:
+So under truncation the author is told "phase 'X' folder_scope is not a subset of the project
+subtree" and their run is refused — the identical false accusation, on a path the fix did not
+touch, with a worse outcome than the advisory verdict it did fix. `scope.resolve_run_scope_root`
+(`scope.py:226`) has the same exposure: a truncated read silently *drops* a legitimate per-run
+folder override.
 
-- publish returns `blocked_stage="grounding_fidelity"` with
-  `{"code": "unregistered_skill", "phase": "<slug>", "message": "phase '<slug>' references a
-  non-registered skill_ref '<uuid>'"}` — a factual accusation against a correct definition;
-- `/validate` paints that node red with the same message, so the author is actively directed
-  to "fix" a valid reference.
+**Fix:** correct the docstring to say "one call site", and either (a) thread `strict` through
+`resolve_project_subtree` / `folder_scope_violations` so the run-start callers can opt in and map
+`FolderReadTruncatedError` to a 503 rather than a 400, or (b) fix the read itself (CR-03), which
+makes the opt-in moot everywhere at once. (b) is strictly better.
 
-The honest answer already exists three lines away (`grounding_unavailable`, "we could not
-CHECK"). Note the three reads inside one bundle have three *different* postures today: folders
-raise (WR-02), tools are in-process, skills degrade silently to `[]`. That asymmetry was
-tolerable while the palette fed only an advisory surface; 182-06 made it gate a state
-transition.
+---
 
-**Fix:** let the read failure reach the caller that knows how to describe it — either
-propagate and let stage 2.6's wrapper mint `grounding_unavailable`, or carry the degradation
-on the bundle so both consumers can branch on it:
+### WR-02: **WARNING** — the WR-05 org gate never checks `project_folder_id`, so the exact run-time failure it was built to prevent still publishes clean
+
+**File:** `backend/app/services/harness/scope.py:124-156` (`resolve_project_subtree`), consumed at
+`scope.py:314-319` and `publish_service.py:648-655`
+
+**Issue:** `resolve_project_subtree` unconditionally seeds its walk with the root, regardless of
+whether the root is in the caller's (now org-restricted) visible set:
 
 ```python
-@dataclass
-class GroundingBundle:
+root = str(project_folder_id)
+folders = await fetch_visible_folders(supabase, user_id, **_org_kw)
+def _walk(rid, seen=None):
     ...
-    degraded: frozenset[str] = frozenset()   # e.g. {"skills"} / {"folders"}
-
-# _skill_registry's caller (assemble_grounding_bundle)
-try:
-    skills = await run_in_threadpool(_skill_registry, supabase, user_id, caller_org_ids)
-except Exception:
-    logger.warning(...); skills, degraded = [], degraded | {"skills"}
-
-# publish_service._grounding_fidelity_failures
-if bundle.degraded:
-    return [{"code": "grounding_unavailable", "phase": None,
-             "message": f"grounding could not be verified ({', '.join(sorted(bundle.degraded))})"}]
+    out = [rid]                       # the root is ALWAYS included, visible or not
 ```
 
-Add a regression test: `_skill_registry` raising must produce `grounding_unavailable`, never
-`unregistered_skill`.
+Trace the org-A/org-B fixture the new suite already builds
+(`test_182_publish_org_scope.py:168-202`) with `project_folder_id = _FOLDER_B` (the org-B-shared
+child) instead of `_PROJECT_A`:
+
+- restricted `fetch_visible_folders` returns `{_PROJECT_A, _CHILD_A}` — `_FOLDER_B` is excluded;
+- `_walk("_FOLDER_B")` returns `["_FOLDER_B"]`, so `allowed == {_FOLDER_B}`;
+- phases with no `folder_scope` are unchecked, and a phase scoped to `_FOLDER_B` is a subset;
+- stage 2.6 returns `[]` → **the definition publishes**.
+
+At run time an org-A colleague's kickoff resolves the same subtree from *their* view, gets
+`["_FOLDER_B"]`, and every phase retrieves from a folder they cannot read — zero documents,
+silently. That is verbatim the failure mode `publish_service.py:609-616` says the fix prevents
+("a workflow that cleared the hard gate and silently under-performs for everyone but its author").
+The restriction closed the two secondary bindings (`skill_ref`, per-phase `folder_scope`) and left
+the primary one open. The suite does not catch it because both `_bound_payload` cases bind to
+`_PROJECT_A`.
+
+**Fix:** validate the binding itself, in the one place the restricted tree is already resolved:
+
+```python
+# scope.folder_scope_violations, right after the subtree resolves
+if restrict_org_ids is not None and definition.project_folder_id is not None:
+    visible = {f["id"] for f in await fetch_visible_folders(
+        supabase, user_id, restrict_org_ids=restrict_org_ids)}
+    if str(definition.project_folder_id) not in visible:
+        violations.append(FolderScopeSubsetError(
+            f"the workflow's project_folder_id {definition.project_folder_id} is not "
+            "reachable from the definition's own organization", phase_slug=None))
+```
+
+Add the mirror test: `_bound_payload(project=_FOLDER_B)` with no per-phase scope must block at
+`grounding_fidelity`.
 
 ---
 
-### WR-02: `/validate` is still not sealed — a real PostgREST error escapes as HTTP 500, while the *same collector* on the publish side returns a structured block
+### WR-03: **WARNING** — NL generation's behaviour DID change, and the docstring asserting it did not is the reason nobody checked
 
-**File:** `backend/app/api/workflows.py:496-531`;
-`backend/app/services/harness/publish_service.py:562-589`
+**File:** `backend/app/services/harness/grounding.py:312-318`;
+`backend/app/services/workflow_authoring.py:175-184` and `:276-283`
 
-**Issue:** the handler docstring promises "ALWAYS HTTP 200 with the machine-renderable
-envelope: a dirty definition is not an HTTP error, it is advice." Nothing enforces it. Proven
-at HEAD by driving the real handler with a genuine `postgrest.exceptions.APIError`:
+**Issue:** `assemble_grounding_bundle`'s new docstring states: *"NL generation
+(`workflow_authoring`) is the third consumer and deliberately ignores `degraded`: its own fidelity
+check re-reads the folder tree through the ⊆ walk, **so its behaviour is unchanged by this
+guard**."* Both halves are false.
 
-```
-(1) palette APIError  -> ESCAPES the handler as APIError => FastAPI 500
-(2) subset APIError   -> ESCAPES as APIError            => FastAPI 500
-```
+`workflow_authoring._assemble_grounding` calls `assemble_grounding_bundle` with no
+`restrict_org_ids`, so it takes the *unconditional* `strict=True` folders read at `grounding.py:361`
+and the new blanket `except Exception`. Before this round the same call was
+`fetch_visible_folders(supabase, user_id)` with **no guard at all**, and
+`generate_workflow_definition` has no `try` around it (`workflow_authoring.py:276-283`), so a
+folders read failure propagated and surfaced. Now:
 
-Path (1) is `assemble_grounding_bundle` → `fetch_visible_folders` → `aexec` (folder_utils has
-no try/except); path (2) is `grounding_verdicts` → `_folder_scope_violation` →
-`assert_folder_scopes_subset`, whose `except ValueError` does not catch `APIError`
-(`issubclass(APIError, ValueError)` is `False` — verified).
+- a read failure or truncation → `folders = []` → `render_grounding_prompt` emits
+  `"(no folders)"` (`grounding.py:226`);
+- the model is grounded on an empty KB tree and emits a workflow that binds no folder;
+- `_check_grounding_fidelity`'s ⊆ walk is a **no-op for an unbound definition**
+  (`scope.py:124-125`: `project_folder_id is None → return None → []`), so it cannot "re-read the
+  folder tree" as claimed;
+- the caller receives `{"ok": True, "definition": …}` — a folder-blind draft presented as a
+  successful generation.
 
-This was known and deferred as SEED-131, but **182-06 changed the calculus and the seed
-predates it**: the phase built exactly the fail-closed wrapper this route needs, applied it to
-publish only, and then documented the two sides as "the SAME copy" in the seam header
-(`workflows.py:237-257`). They are the same *rules* with opposite *failure postures*, and the
-route that fires on every canvas keystroke is the unsealed one.
+Under CR-03's truncation this is not an edge case: *every* NL generation silently produces
+folder-blind drafts.
 
-**Fix:** wrap the two I/O stages and degrade honestly. Prefer an explicit
-`grounding_unavailable` finding over an empty palette, which would report false
-`unregistered_*` verdicts (WR-01):
+**Fix:** either have NL generation honour the signal, or stop claiming it is unaffected:
 
 ```python
-try:
-    bundle = await grounding.assemble_grounding_bundle(supabase=supabase, user_id=str(user_id))
-    fidelity = await grounding.grounding_verdicts(body, supabase=supabase, user_id=str(user_id),
-                                                  tool_names=bundle.tool_names,
-                                                  skill_ids=bundle.skill_ids)
-except Exception:
-    logger.warning("validate: grounding could not be resolved; structural-only verdicts",
-                   exc_info=True)
-    fidelity = [{"code": "grounding_unavailable", "phase": None,
-                 "message": "grounding could not be checked right now"}]
+# workflow_authoring — return the bundle (or bundle.degraded) from _assemble_grounding, then:
+if degraded:
+    return {"ok": False, "error": "grounding_unavailable",
+            "detail": f"the grounding registry could not be resolved "
+                      f"({', '.join(sorted(degraded))}) — not generating an ungrounded draft"}
 ```
 
-and compose `grounding_unavailable` into `_KNOWN_CODES` (as `workflows.py:383-390` already
-anticipates) so it classifies deliberately rather than through the fail-loud branch. Update
-SEED-131 to record that the wrapper now exists on the publish side.
+At minimum, correct the docstring — an inaccurate "unchanged" claim on a shared seam is what stops
+the next reader from checking.
 
 ---
 
-### WR-03: the bare `except ValueError` under the ⊆ walk swallows `pydantic.ValidationError` and renders it as a red `folder_scope` verdict — 182-05's hypothesis, half refuted and half escalated
+### WR-04: **WARNING** — `CANVAS_GATED_PATHS` is a hand-maintained duplicate of the route table with no drift guard, in a phase that ships drift scanners for everything else
 
-**File:** `backend/app/services/harness/grounding.py:394-407`
+**File:** `backend/app/middleware/canvas_gate.py:56-66`
 
-**Issue — the refutation.** The 182-05 concern was that "an infrastructure error beneath the ⊆
-walk could render as a normal-looking `folder_scope` verdict." For the errors that actually
-occur today that is **false**: `postgrest` 2.29.0 converts every non-2xx response, every
-malformed error body and every internal `ValidationError` into `APIError(Exception)`
-(`_sync/request_builder.py:79-86`, `base_request_builder.py:255-261`), which is **not** a
-`ValueError`. A DB blip therefore escapes as a 500 instead (WR-02) — the opposite failure.
+**Issue:** Both halves of the off-switch (the request gate and the schema filter) read one
+hardcoded frozenset, kept in sync with the router by a comment ("add its absolute path HERE in the
+SAME commit that mounts it"). Nothing enforces it. A Phase-183+ route that carries
+`dependencies=[Depends(require_canvas())]` but is not added to the constant silently:
 
-**Issue — the escalation.** The catch is still unsafe, because **`pydantic.ValidationError` IS
-a `ValueError` subclass in Pydantic v2** (verified: `issubclass(pydantic.ValidationError,
-ValueError) == True`). Driving the real handler with a `ValidationError` raised under
-`assert_folder_scopes_subset` produces:
+* 422s on a malformed body, 405s on a wrong method and 307s on a trailing slash while off, and
+* is published in `/openapi.json` with all its models while off
 
-```
-verdicts: [('folder_scope', None, 'error')]
-message shown to the author: "1 validation error for _M\nx\n  Input should be a valid integer, ..."
-```
+— i.e. both round-2 criticals reopen for the new route, with a green suite. This is the same class
+of defect `test_182_severity_codes.py` was written to prevent for verdict codes, on a strictly more
+security-relevant vocabulary, and it is mechanically checkable.
 
-i.e. an unrelated internal failure is presented as "your phase's `folder_scope` is not a subset
-of the project subtree", at `severity: error`. Post-182-06 the same misclassification **blocks
-publish** at `blocked_stage="grounding_fidelity"` with that bogus named failure — and, exactly
-as in WR-01, the stage-2.6 wrapper never sees it, so the honest `grounding_unavailable` is
-bypassed. This is not theoretical: the ⊆ path is one `UUID(...)` coercion or one validated
-model away from firing it, and Phase 185's graded-governance work is scheduled to extend this
-exact walk.
-
-**Fix:** narrow the catch to the type the rule owns and let anything else reach the caller that
-can describe it. The Phase-103 test doubles that raise a plain `ValueError` are the only reason
-the catch is broad — pin their contract instead of widening production code:
+**Fix:** derive the expectation from the route table:
 
 ```python
-from app.services.harness.scope import FolderScopeSubsetError
-
-try:
-    await assert_folder_scopes_subset(wd, supabase=supabase, user_id=user_id)
-except FolderScopeSubsetError as exc:
-    return str(exc), exc.phase_slug
-# anything else propagates -> the caller's fail-closed wrapper mints grounding_unavailable
-```
-
-and update `test_182_folder_scope_keying.py::test_plain_value_error_degrades_to_an_unkeyed_verdict`
-to assert the new contract (a non-`FolderScopeSubsetError` is a *read* failure, not a rule
-finding). If the broad catch must stay, at minimum exclude `pydantic.ValidationError`
-explicitly and never let a non-typed error reuse the `folder_scope` code.
-
----
-
-### WR-04: only the FIRST non-⊆ phase ever produces a `folder_scope` verdict — the collector's "every violation" contract is still not met
-
-**File:** `backend/app/services/harness/scope.py:258-270`;
-`backend/app/services/harness/grounding.py:433-460`
-
-**Issue:** 182-04 fixed the *keying* but not the *multiplicity*. `assert_folder_scopes_subset`
-`raise`s inside its `for phase in definition.phases` loop on the first offending phase, so
-`grounding_verdicts` — whose docstring says it "COLLECTS every violation … the canvas needs all
-of them at once" — emits at most one `folder_scope` verdict per definition, no matter how many
-phases are out of subtree. The author fixes node A, re-validates, and node B lights up: the
-whack-a-mole loop the per-node collector exists to eliminate.
-
-The gap closure also made the documentation overstate the fix. `grounding.py:23-26` now claims
-"ALL THREE fidelity rules key to a phase slug — `folder_scope` included … so Phase 184 can
-paint a per-node badge from the verdict alone", with no mention that it paints exactly one
-badge. `test_182_folder_scope_keying.py` uses single-offender definitions throughout, so
-nothing catches it. Compare `test_182_extraction_parity.py:271-274`, which explicitly proves
-rule 2 reports *both* offending phases — the asymmetry is visible inside the suite itself.
-
-**Fix:** collect all offenders without duplicating the ⊆ walk. Add a non-raising sibling in
-`scope.py` (one source, two presentations — the pattern `grounding.py` already uses):
-
-```python
-# scope.py
-async def folder_scope_violations(definition, *, supabase, user_id) -> list[FolderScopeSubsetError]:
-    subtree = await resolve_project_subtree(definition.project_folder_id, supabase=supabase, user_id=user_id)
-    if subtree is None:
-        return []
-    allowed = set(subtree)
-    out = []
-    for phase in definition.phases:
-        outside = {str(f) for f in (getattr(phase.config, "folder_scope", None) or [])} - allowed
-        if outside:
-            out.append(FolderScopeSubsetError(
-                f"phase '{phase.slug}' folder_scope is not a subset of the "
-                f"project subtree: {sorted(outside)}", phase_slug=phase.slug))
-    return out
-
-async def assert_folder_scopes_subset(definition, *, supabase, user_id) -> None:
-    violations = await folder_scope_violations(definition, supabase=supabase, user_id=user_id)
-    if violations:
-        raise violations[0]      # short-circuit presentation — message byte-identical
-```
-
-`grounding_verdicts` then appends one verdict per violation; `_check_grounding_fidelity` keeps
-calling the raising form, so the NL-gen `detail` string stays byte-identical. Add a
-two-bad-phase test mirroring `test_two_presentations_over_the_same_rules`. Until this ships,
-correct `grounding.py:23-26` to say "the first offending phase".
-
----
-
-### WR-05: publish validates grounding against the PUBLISHER's org-membership union, not the definition's `org_id` — the value `_resolve_publish_supabase` just read and discarded
-
-**File:** `backend/app/services/harness/publish_service.py:499-522, 562-573`;
-`backend/app/services/harness/grounding.py:289-291`
-
-**Issue:** `_resolve_publish_supabase` reads
-`SELECT org_id FROM workflow_definitions WHERE id = $1` specifically so the BYPASSRLS client is
-org-scoped (D-05 / T-163-05b). It then passes only `user_id` down:
-
-```python
-bundle = await assemble_grounding_bundle(supabase=resolved, user_id=str(user_id))
-```
-
-and `assemble_grounding_bundle` resolves visibility from `_resolve_caller_org_ids(supabase,
-user_id)` — **every** org the publisher belongs to. For a multi-org author this means publish
-green-lights a definition in org A whose `skill_ref` points at an org-B skill, or whose
-`folder_scope` names an org-B folder, because the *publisher* can see both. The `org_id` that
-was just read is used to construct the client and then never consulted for the gate.
-
-At run time the picture flips: `tool_dispatcher`'s skill resolution and `fetch_visible_folders`
-gate on the *runner's* org set, so an org-A colleague running the published workflow gets an
-unresolvable skill or an empty folder intersection — a workflow that passed the "hard gate" and
-silently under-performs for everyone but its author. This is the same shape as SEED-124 /
-SEED-125 (org-blind service-role reads), one layer up: the read is org-gated, the *scope* of
-the gate is wrong. It is not a data leak — nothing crosses a tenant boundary on the wire — but
-it is a multi-tenancy correctness gap in a brand-new publish gate, and 182-06 is what made it
-authoritative.
-
-**Fix:** intersect the gate with the definition's org rather than the publisher's union:
-
-```python
-async def _grounding_fidelity_failures(definition, *, definition_id, user_id, pool, supabase):
-    resolved, org_id = await _resolve_publish_supabase(supabase, definition_id=definition_id, pool=pool)
-    bundle = await assemble_grounding_bundle(supabase=resolved, user_id=str(user_id),
-                                             restrict_org_ids={str(org_id)})
-```
-
-Threading an optional `restrict_org_ids` into `assemble_grounding_bundle` keeps the ONE-copy
-rule — the intersection happens where `caller_org_ids` is already resolved (grounding.py:289).
-Have `_resolve_publish_supabase` return `(client, org_id)` so the org is read once (see IN-05).
-Add a test: a definition in org A whose `skill_ref` belongs to org B must block at
-`grounding_fidelity` even when the publisher is a member of both.
-
----
-
-### WR-06: the only thing preventing an un-gated service-role storage read on `/grounding-bundle` is the `UUID` annotation — and SEED-130's own Option B removes it
-
-**File:** `backend/app/api/workflows.py:579`;
-`backend/app/services/harness/grounding.py:193-241`
-
-**Issue:** `_resolve_template_placeholders` builds an `AssetRef` from a **caller-supplied**
-identifier and hands it to `resolve_template_source` Branch 1. That branch performs **zero**
-ownership, org or traversal validation — `user_id` is accepted and never read
-(`template_asset_service.py:146-181`) — and the download is a raw service-role bucket read:
-
-```python
-async def _read_from_storage(supabase, storage_path: str) -> bytes:   # workspace_service.py:169
-    return await run_in_threadpool(supabase.storage.from_(BUCKET_NAME).download, storage_path)
-```
-
-Today the exposure is contained *only* because `template_asset_id: UUID` restricts the
-reachable key space to bare-UUID objects at the bucket root, which the app never produces (real
-paths are `{user_id}/{thread_id}/{file_id}/v{n}` and `{user_id}/_library/…`). The dead-path
-consequence is round-1 WR-03 / SEED-130.
-
-**The problem is the fix guidance, not just the dead path.** SEED-130 states "**Not a security
-issue.** The path only ever narrows to `[]`; it cannot widen scope, leak a foreign asset, or
-bypass the owner scoping the rest of the bundle applies" — and then offers "Option B: retype
-the param as the storage path (`str`) and drop the UUID coercion" as one of two viable fixes.
-Option B, applied literally, turns `GET /workflows/grounding-bundle?template_asset_id=…` into
-an arbitrary-object read across every tenant's `workspace-files` objects, authenticated only by
-"is a canvas user". Whoever picks this up in Phase 184 will read the seed's security verdict and
-not re-derive it.
-
-**Fix:** whichever option is chosen, the ownership gate belongs at the seam that accepts the
-untrusted value — do not rely on the type:
-
-```python
-# grounding._resolve_template_placeholders, before building the AssetRef
-path = str(template_asset_id)
-if ".." in path or not path.startswith(f"{user_id}/"):
-    return []          # no 404/403 distinction — never an existence signal on the palette
-```
-
-Prefer Option A (keep the `UUID` param, look the row up and derive its storage path from an
-owner-scoped query) — that makes the gate structural instead of string-matched. Independently,
-amend SEED-130's `category` and "What it does NOT break" section to record that Branch 1 has no
-ownership check, so the un-gated read is visible to whoever implements the fix.
-
----
-
-### WR-07: `/validate` and publish now both gate on two unbounded full-table `folders` reads, so a PostgREST `max-rows` truncation renders as a FALSE `folder_scope` block
-
-**File:** `backend/app/services/harness/grounding.py:281, 457` (via
-`backend/app/utils/folder_utils.py:8-24, 119-129`);
-`backend/app/services/harness/publish_service.py:209-225`
-
-**Issue:** each `/validate` call performs the deployment-wide `folders` scan **twice** — once in
-`assemble_grounding_bundle` (`fetch_visible_folders` → `fetch_all_folders(fields="*")`, no
-filter, no limit) and again inside `grounding_verdicts` → `_folder_scope_violation` →
-`resolve_project_subtree` → `fetch_visible_folders`. Publish stage 2.6 does the same.
-
-Cost is out of v1 review scope; **truncation is not.** PostgREST caps unbounded selects at
-`max-rows` (Supabase's Data API default is 1000 rows). Past that cap the read silently returns a
-prefix, and every downstream conclusion is wrong in the *accusatory* direction:
-
-- `folder_map` loses ancestors → `is_in_global_subtree` returns False → org-shared folders
-  vanish from the palette;
-- `resolve_project_subtree` returns a truncated subtree → `assert_folder_scopes_subset` reports
-  a **false** `folder_scope` violation;
-- post-182-06 that false violation **blocks publish** at `blocked_stage="grounding_fidelity"`.
-
-This project targets org-scale multi-tenant production; 1000 folders *across all tenants* is not
-a large deployment. The root helper is pre-existing (`folder_utils`, outside this phase's file
-set), but 182 is what routed a new public route and a new state-transition gate through it,
-unbounded, twice per call.
-
-**Fix:** push the predicate down and bound the read.
-
-```python
-# folder_utils.fetch_visible_folders — org+owner predicate instead of a full scan
-org_ids = await _resolve_caller_org_ids(supabase, user_id)
-q = supabase.table("folders").select("id,user_id,name,parent_id,is_org_shared,org_id")
-q = q.or_(f"user_id.eq.{coerce_uid(user_id)},"
-          f"and(is_org_shared.eq.true,org_id.in.({','.join(sorted(org_ids))}))")
-```
-
-and resolve the palette + the ⊆ subtree from **one** fetch per request (thread the already
-fetched folder list into `assert_folder_scopes_subset` rather than re-reading). At minimum add
-an explicit `.limit(N)` with a loud log when `len(rows) == N`, so a truncation is observable
-instead of arriving as a fabricated `folder_scope` accusation.
-
----
-
-### WR-08: the canvas routes authenticate the caller twice, both times with blocking `supabase-py` calls on the event loop (D-v2.5-01)
-
-**File:** `backend/app/api/workflows.py:472-479, 572-578`;
-`backend/app/dependencies.py:626-652, 569-597, 254-275`
-
-**Issue:** both routes carry `dependencies=[Depends(require_canvas())]` **and**
-`current_user: dict = Depends(get_current_user)`. `require_canvas._dep` resolves the caller
-itself via `authenticate_canvas_request` → `supabase.auth.get_user(...)` + `_is_banned(...)`;
-the handler's `get_current_user` then does `supabase.auth.get_user(token)` + `_is_banned(...)`
-again on the same token. Per request that is **2 GoTrue round-trips + 2 `auth.users` pg
-queries**, on a route the phase documents as firing "on every canvas edit".
-
-`supabase.auth.get_user` is a synchronous `supabase-py` call invoked directly inside `async def`
-in both places — the pattern CLAUDE.md forbids ("Do not run blocking I/O … directly inside async
-handlers — wrap with `run_in_threadpool`", D-v2.5-01). The single-call form is pre-existing on
-`get_current_user`; the *doubling* on a keystroke-frequency route is new here. The suite cannot
-see it: conftest's blanket `get_current_user` override short-circuits one side, and
-`test_182_grounding_bundle` / `test_181_flip_on` monkeypatch the other.
-
-**Fix:** have the gate publish the identity it already validated instead of resolving it twice.
-
-```python
-# dependencies.require_canvas._dep — after the caller resolves
-request.state.canvas_caller = caller
-return caller
-
-# workflows.py — replace Depends(get_current_user) on the two canvas routes
-async def canvas_caller(request: Request) -> dict:
-    return request.state.canvas_caller
-```
-
-(`Depends(require_canvas())` inside `dependencies=[...]` discards the return value, so the
-`request.state` hand-off is the minimal change; alternatively declare
-`caller: dict = Depends(require_canvas())` as a handler parameter.) Independently, wrap
-`supabase.auth.get_user` in `run_in_threadpool` inside `authenticate_canvas_request`.
-
----
-
-### WR-09: the "unbuilt-route parity" assertions still compare against a route shape the gated routes do not have
-
-**File:** `backend/tests/test_revert_byte_identical.py:231-236`;
-`backend/tests/test_182_grounding_bundle.py:103-108`
-
-**Issue:** both tests establish parity against `GET /workflows/__nope__/__nope__` (two segments
-→ a genuine 404) because a one-segment unknown returns 405. But the gated routes *are*
-one-segment, so the honest baseline is 405. Re-verified at HEAD:
-
-```
-GET /workflows/grounding-bundle (flag off) -> 404
-GET /workflows/__nope__ (never built)      -> 405
-```
-
-Pre-181 `GET /workflows/grounding-bundle` returned 405; with the flag off it now returns 404.
-The observable response therefore *did* change with the flag off, and the comment ("the body is
-the same 404 an unknown path returns") is proven only against a shape the routes do not have.
-The tests are green for the wrong reason — precisely the failure mode
-`test_182_severity_codes.py` was written to prevent for verdict codes.
-
-**Fix:** assert the real baseline and pick a deliberate posture — either accept the residual and
-say so in the test, or make the CR-01 middleware reproduce Starlette's unmatched-route response
-for the same path+method and pin it:
-
-```python
-assert client.get(_BUNDLE_PATH).status_code == client.get("/workflows/__nope__").status_code
+def test_every_require_canvas_route_is_in_canvas_gated_paths():
+    from app.main import app
+    from app.middleware.canvas_gate import CANVAS_GATED_PATHS
+    gated = {
+        r.path for r in app.routes
+        if any(getattr(d.call, "__qualname__", "").startswith("require_canvas")
+               for d in getattr(getattr(r, "dependant", None), "dependencies", []))
+    }
+    assert gated <= set(CANVAS_GATED_PATHS), (
+        f"{sorted(gated - set(CANVAS_GATED_PATHS))} carry require_canvas but are not gated by "
+        "CanvasGateMiddleware / filtered out of /openapi.json while off"
+    )
 ```
 
 ---
 
-### WR-10: the D-182-06 source guard bans `re.search` / `re.match` / `re.findall` anywhere in a 1100-line general-purpose router
+### WR-05: **WARNING** — the middleware matches the raw ASGI `scope["path"]`, so the whole pre-routing gate is bypassed under a `root_path` / sub-path mount
 
-**File:** `backend/tests/unit/test_182_folder_scope_keying.py:292-317`
+**File:** `backend/app/middleware/canvas_gate.py:119`
 
-**Issue:** `test_no_message_parsing_exists_in_the_folder_scope_path` asserts that none of
-`("re.search", "re.match", "re.findall", ".split(\"'\")", ".split(\"'\", ", 'verdict["message"]')`
-appears anywhere in `app/api/workflows.py` (1107 lines) or
-`app/services/harness/grounding.py`. `api/workflows.py` is the whole workflows router —
-published/starter pickers, draft CRUD, publish, the destructive cascade, NL generation, and now
-the validation seam. Any future, entirely unrelated use of `re.search` in that file fails this
-test with the message "the folder_scope slug must travel STRUCTURALLY on
-FolderScopeSubsetError.phase_slug", which is not what happened.
+**Issue:** `path = scope.get("path", "")` is the raw request path *including* any `root_path`.
+Starlette routes on `get_route_path(scope)`, which strips `root_path`. Behind an ingress or an
+`--root-path /api` deploy, `scope["path"]` is `/api/workflows/validate`, `_is_canvas_path` returns
+False, and the request reaches the router — restoring the 422 / 405 / 307 leaks the middleware
+exists to close. `Depends(require_canvas())` still 404s the *declared* method (defence in depth
+held), but the body-decode and wrong-method channels — the entire reason this module exists — are
+open again. `docs/DEPLOYMENT-PIPELINE.md` puts the backend behind Coolify, so this is one
+configuration flip away.
 
-The guard also over-reaches in the other direction: it does not catch `import re as _re`,
-`regex.search`, `str.partition("'")`, or any other way to parse the message — so it is both
-false-positive-prone and trivially bypassable.
+**Fix:**
 
-**Fix:** scope the guard to the code that owns the rule rather than the whole router.
+```python
+from starlette.routing import get_route_path
+...
+path = get_route_path(scope)     # root_path-stripped, exactly what the router will match on
+```
+
+and add a probe that sets `root_path` in the scope to prove it.
+
+---
+
+### WR-06: **WARNING** — a new whole-file substring scan over the 1178-line workflows router (a fresh instance of the pattern round-2 WR-10 flagged, not a fix of it)
+
+**File:** `backend/tests/unit/test_182_publish_org_scope.py:734-751`
+
+**Issue:**
+
+```python
+source = Path(wf.__file__).read_text(encoding="utf-8")
+assert "restrict_org_ids" not in source, (
+    "the /validate seam grew an org restriction — …")
+```
+
+`app/api/workflows.py` is the whole workflows router: pickers, draft CRUD, publish, the destructive
+cascade, NL generation, and the validation seam. Any future route in that file that legitimately
+org-scopes a read fails this test with a message about `/validate`. It is simultaneously
+over-broad and trivially evaded (the name via a constant, a `**kwargs` splat, or a helper).
+`test_182_folder_scope_keying.py:611-636` scans the same file for six other tokens, so the router
+now carries two whole-file source guards from two different plans. Round-2 WR-10 named this exact
+anti-pattern; this round added a new instance rather than closing it.
+
+**Fix:** scope the guard to the two functions that own the decision:
 
 ```python
 import inspect
-from app.services.harness import grounding
-
-src = inspect.getsource(grounding._folder_scope_violation) + inspect.getsource(grounding.grounding_verdicts)
-assert "re." not in src and ".split(" not in src
-assert 'getattr(exc, "phase_slug", None)' in inspect.getsource(grounding._folder_scope_violation)
+from app.api import workflows as wf
+src = inspect.getsource(wf.validate_workflow) + inspect.getsource(wf.get_grounding_bundle)
+assert "restrict_org_ids" not in src
 ```
 
-An AST walk over `grounding_verdicts` asserting that no `Call` node targets `re.*` would be
-stronger still, and would not fire on unrelated router changes.
+---
 
-## Info
+### WR-07: **WARNING** — ~14 unreachable assertions added across the new gate/auth suites, and one of them pins the CR-01 leak as the required behaviour
 
-### IN-01: `_coerce_user_id` is still defined 215 lines after its first use
+**File:** `backend/tests/test_182_canvas_gate.py:110-114, 144-147, 166-168, 201`;
+`backend/tests/unit/test_182_canvas_auth.py:329-333, 368`;
+`backend/tests/test_revert_byte_identical.py:142-143, 197, 201, 238-239, 245-246, 250`
 
-**File:** `backend/app/api/workflows.py:503, 600` (definition at `:718`)
-**Issue:** works at runtime (module-level name, resolved at call time) but the two Phase-182
-routes were inserted above a helper they depend on; the other seven call sites all sit below it.
-Unchanged since round 1.
-**Fix:** hoist it next to `_coerce_definition` (`:91`) so every helper precedes every route.
+**Issue:** The recurring shape is
 
-### IN-02: four private (underscore) symbols now cross module boundaries
+```python
+assert resp.status_code == 404, ...
+assert resp.status_code != 422, "CR-01 regression …"     # cannot fail: 404 != 422 already proven
+```
 
-**File:** `backend/app/services/workflow_authoring.py:208-210`;
-`backend/app/api/workflows.py:66, 553`; `backend/app/services/harness/grounding.py:276-279`
-**Issue:** `grounding._check_grounding_fidelity`, `publish_service._interactive_phase_failures`,
-`folder_utils._null_foreign_global_owner` and `folder_utils._resolve_caller_org_ids` are all
-underscore-private and all imported/called from other modules — the last two are net-new in this
-phase. The underscore no longer communicates anything, and
-`test_182_publish_grounding_stage.py:406-413` now depends on the *absence* of certain identifiers
-in another module's source, which is the kind of coupling private names are supposed to prevent.
-**Fix:** promote the four to public names with one-line back-compat aliases.
+repeated for `!= 405`, `not in (307, 422)`, `not in (200, 401, 403, 422)`, `!= 500`, `!= 403`,
+`!= 401`, `not in (200, 401, 403, 422, 500)`. Every one is dominated by the equality assertion on
+the line above. Round-2 IN-04 called out exactly two of these; this round added roughly fourteen
+more, each carrying a long explanatory message that reads like coverage and provides none.
+`test_182_canvas_auth.py:329-333` is the clearest: four assertions, three unreachable.
 
-### IN-03: `assemble_grounding_bundle(project_folder_id=...)` is still accepted and ignored
+Worse than noise: `test_wrong_method_probe_404s_not_405` (`test_182_canvas_gate.py:128-148`) turns
+the dead assertion into a *specification* — it demands 404 and forbids 405 on
+`GET /workflows/validate`, which is precisely the divergence from the unbuilt baseline documented
+in CR-01. The suite now defends the leak.
 
-**File:** `backend/app/services/harness/grounding.py:258, 271-273`
-**Issue:** documented as "accepted for signature symmetry", but `/grounding-bundle` passes
-`project_folder_id=None` explicitly while `/validate` and publish stage 2.6 omit it — three call
-sites, three conventions, zero effect. A future caller may reasonably expect the palette to
-narrow.
-**Fix:** drop the parameter, or raise on a non-`None` value until narrowing is implemented.
+**Fix:** delete the dominated assertions and move their prose into the surviving equality
+assertion's message. Replace the wrong-method test with the same-shape/same-method parity loop from
+CR-01, which fails today and is what the property actually is.
 
-### IN-04: two tautological assertions survive, and one guards the exact case CR-01 breaks
+---
 
-**File:** `backend/tests/test_revert_byte_identical.py:132`;
-`backend/tests/unit/test_182_validate.py:341`
-**Issue:** `assert resp_validate.status_code != 422` runs against a body validated against the
-real model two lines earlier — it cannot fail, and the malformed body it is meant to stand in for
-*is* 422 (CR-01). `assert {v.severity for v in resp.verdicts} <= {"error", "incomplete"}` is
-guaranteed by `Verdict.severity: Literal[...]`, which would raise at construction.
-**Fix:** probe the malformed body (CR-01) and assert the taxonomy against the classifier —
-`test_182_severity_codes.py` now does the latter properly, so `:341` can simply be deleted.
+### WR-08: **WARNING** — the "fails LOUDLY" contract for the conditionally-forwarded `restrict_org_ids` keyword is silently defeated on the publish path by 182-11's seal
 
-### IN-05: stage 2.6 and the golden run each build their own service-role client and each re-read the org
+**File:** `backend/app/services/harness/scope.py:127-137` (the contract);
+`backend/app/services/harness/grounding.py:359-369` (where it is swallowed)
 
-**File:** `backend/app/services/harness/publish_service.py:562-566, 651-653`
-**Issue:** `publish_workflow` keeps `supabase=None` between the two calls, so
-`_resolve_publish_supabase` runs its `SELECT org_id …` and `create_client(...)` twice per publish,
-and the stage-2.6 client is discarded immediately. `create_client` opens an httpx client that is
-never closed. The docstring's "exactly ONE construction path exists" is true of the *code path*
-but not of the resulting clients. Neither test suite exercises the real resolution —
-`test_182_publish_grounding_stage.py` patches `_resolve_publish_supabase` and
-`test_publish_service.py` patches the whole stage — so the one net-new DB read added by 182-06
-has zero coverage.
-**Fix:** resolve once at the top of `publish_workflow` and thread the client (and the org id —
-WR-05) into both consumers; add one test that lets the real `_resolve_publish_supabase` run
-against a fake pool.
+**Issue:** 182-12 wrote the seam-contract rule for the `_org_kw` idiom explicitly:
 
-### IN-06: the fail-loud branch logs a WARNING per finding per request, on a route documented to fire on every keystroke
+> "A RESTRICTED call still passes it explicitly, so a double that cannot accept it fails **LOUDLY**
+> rather than silently ignoring a tenancy narrowing." (`scope.py:135-136`)
 
-**File:** `backend/app/api/workflows.py:457-466`
-**Issue:** the WR-05 fix is correct in polarity, but an unclassified code emitted once per phase
-on a route called on every canvas edit produces an unbounded WARNING stream with no dedupe —
-`test_182_severity_codes.py:284-288` acknowledges this ("logs a warning on EVERY request that
-produces it"). The drift detectors make this unlikely, not impossible: they cover `reachability`
-and `grounding` only, not a code minted by a future third module.
-**Fix:** dedupe per process (`functools.lru_cache` on a `_warn_unknown(code)` helper) so the
-signal survives without drowning the log.
+That holds for the three call sites inside `scope.py` and for
+`grounding._folder_scope_violations`. It does **not** hold for the one that matters most, because
+182-11 (which landed first and could not see it) wrapped the identical forwarding call in a blanket
+`except Exception`:
 
-### IN-07: `_KNOWN_CODES` snapshots `GROUNDING_VERDICT_CODES` at import time, contradicting the module-import-for-patchability comment 370 lines above
+```python
+_org_kw = {} if restrict_org_ids is None else {"restrict_org_ids": restrict_org_ids}
+try:
+    folders = await fetch_visible_folders(supabase, user_id, strict=True, **_org_kw)
+except Exception:                       # swallows TypeError from a signature drift
+    folders = []; degraded.add("folders")
+```
 
-**File:** `backend/app/api/workflows.py:49-53, 419-421`
-**Issue:** `grounding` is imported as a module with an explicit comment that the routes "resolve
-`grounding.<fn>` at call time, so a test can monkeypatch the shared grounding source's
-attributes" — but `_KNOWN_CODES` reads `grounding.GROUNDING_VERDICT_CODES` at module scope, so
-patching that attribute is a no-op and the value becomes a hard import-order dependency.
-Related: `test_182_severity_codes.py:47-58` deliberately strips only whole-line comments, not
-docstrings, so a code mentioned as `"code": "x"` in any prose block in `grounding.py` or
-`publish_service.py` would fail the drift/boundary tests.
-**Fix:** note the import-time snapshot beside `_KNOWN_CODES`, or compute it in `_severity` via a
-cached accessor if late binding is actually wanted.
+A future monkeypatch, adapter or refactor whose `fetch_visible_folders` cannot accept
+`restrict_org_ids` therefore produces `TypeError` → `degraded={"folders"}` → publish blocks with
+`grounding_unavailable`. The tenancy narrowing is dropped, the operator sees "the grounding registry
+could not be resolved", and the real cause survives only in an `exc_info` log line. The same
+`except Exception` converts a `RecursionError` from WR-09, and any genuine programming error in the
+visibility walk, into that same message.
+
+**Fix:** let programming errors through; catch only what the finding is about:
+
+```python
+except (FolderReadTruncatedError, APIError, OSError, asyncio.TimeoutError):
+    folders = []; degraded.add("folders")
+```
+
+or, if the broad catch must stay for the always-200 contract, re-raise the classes that mean "the
+code is wrong" (`TypeError`, `AttributeError`, `NameError`) before degrading, and record the
+decision next to the `scope.py:127-137` contract so the two halves stop disagreeing.
+
+---
+
+### WR-09: **WARNING** — `is_in_global_subtree` still has no cycle guard, and `folder_utils.py` was hardened this round without adding the one its sibling walk already has
+
+**File:** `backend/app/utils/folder_utils.py:115-146`; contrast
+`backend/app/services/harness/scope.py:140-154`
+
+**Issue:** The recursion memoizes *after* recursing, so the cache cannot break a cycle:
+
+```python
+if folder_id in cache: return cache[folder_id]
+f = folder_map.get(folder_id)
+...
+result = is_in_global_subtree(parent_id, folder_map, cache, caller_org_ids) if parent_id else False
+cache[folder_id] = result     # written only AFTER the recursive call returns
+```
+
+A self-parented row (`parent_id == id`) or any cyclic folder hierarchy recurses unbounded →
+`RecursionError`. `scope.resolve_project_subtree._walk` carries an explicit `seen` set for exactly
+this reason, with an IN-01 comment saying "this shared helper is the right place to harden against
+bad data" — and `folder_utils` *is* the shared helper. Every `/folders` route
+(`folders.py:17, 30, 45, 218`), the chat agent loop (`agent_loop.py:1209`) and the document-view
+resolver reach it; on those paths the result is a 500. On the grounding path it is now silently
+absorbed as `degraded={"folders"}` (WR-08), which makes the corruption harder to find, not easier.
+
+**Fix:** mirror `_walk`'s guard:
+
+```python
+def is_in_global_subtree(folder_id, folder_map, cache=None, caller_org_ids=None, _seen=None):
+    ...
+    _seen = _seen if _seen is not None else set()
+    if folder_id in _seen:
+        cache[folder_id] = False
+        return False
+    _seen.add(folder_id)
+```
 
 ---
 
 _Reviewed: 2026-07-25_
 _Reviewer: Claude (gsd-code-reviewer)_
-_Depth: standard (round 2 — full phase, plans 182-01..07)_
+_Depth: standard (round 3 — gap-closure plans 182-08 … 182-12, diff base `ed80de3b`)_
