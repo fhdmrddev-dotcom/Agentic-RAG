@@ -57,3 +57,44 @@ not typecheck, which is why the build ships despite the red `tsc`).
 "frontend vitest rot"), or the moment any Phase-183 file appears in the error list.
 
 ---
+
+## D-ITEM-183-02 — the `dangerouslySetInnerHTML` grep gate is unsatisfiable as written
+
+**Found during:** plan 183-06, Task 1.
+
+**What:** Several plans in this phase carry an acceptance criterion of the form
+`grep -c "dangerouslySetInnerHTML" <file>` **returns 0**, while the SAME task requires the
+file's docblock to carry the house T-124-01 XSS clause **verbatim** — and that clause
+contains the identifier:
+
+```
+ * XSS (T-124-01): every authored string (phase names) is rendered as a plain React
+ * text child / `title=` attribute value — never `dangerouslySetInnerHTML`.
+```
+
+The two criteria contradict each other. The phase-level `<verification>` form,
+`grep -rn "dangerouslySetInnerHTML" frontend/src/components/workflows` → 0 hits, has
+**never** been satisfiable: three shipped files already carry the same clause in prose —
+`PhaseSpine.tsx:14` (Phase 124), `WorkflowSoul.tsx:24` (Phase 124),
+`WorkflowDoorSwitch.tsx:30`.
+
+**Disposition:** NOT "fixed" by deleting the clause — the clause is the house convention
+and is required by the plan. The gate is executed in its **call form** instead, which is
+what it was always meant to mean:
+
+```bash
+grep -rEn "dangerouslySetInnerHTML\s*=" frontend/src/components/workflows   # → 0
+```
+
+That returns **0** across the whole directory including the two files plan 183-06 added.
+
+**Why it keeps happening:** this is the fourth instance in Phase 183 of a grep guard
+binding a *prefix or a comment* rather than the real call — 183-02 hit it with
+`grounding_mode`, 183-04 with `PHASE_GLYPHS`, 183-05 with the migrations path, 183-06 with
+this. A guard binds its own file's prose too.
+
+**Re-open trigger:** any future plan copying the bare-identifier form of this criterion.
+Planners should write the anchored form (`identifier\s*=` for a JSX prop, `identifier\(`
+for a call) from the start.
+
+---
