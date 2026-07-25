@@ -37,6 +37,16 @@ THREAT (T-098-02 / Information Disclosure): both functions fetch folders via
 service-role resume/Continue path RLS is bypassed, so the caller MUST pass the
 durable run owner's id (``harness_engine.py:1118-1123``) — never widen across users.
 
+  THE ORG DIMENSION (Phase 182 WR-05, extending T-098-02). Owner scoping alone stopped
+  being sufficient the moment ``is_org_shared`` existed: a folder can be visible to a
+  caller through org membership rather than ownership, so "the owner's tree" and "the
+  tree this caller can reach" are different sets (D-165-04 / SEED-124). A second axis
+  follows from that — a caller acting ON BEHALF OF a definition must additionally be
+  narrowed to THAT DEFINITION's org, or the walk resolves a subtree the definition's own
+  org cannot reach and the ⊆ rule answers a question nobody asked. The optional
+  ``restrict_org_ids`` keyword on the two non-raising functions below carries that
+  narrowing; ``None`` (every current caller) means no restriction.
+
 THREAT (T-098-11 / serialization fault): the subtree is returned as a
 ``list[str]``, NEVER a ``set`` — a ``set`` would raise in supabase-py ``json.dumps``
 on the RPC ``p_folder_ids`` param (Pitfall 1).
@@ -93,6 +103,7 @@ async def resolve_project_subtree(
     *,
     supabase: "Client",
     user_id: str,
+    restrict_org_ids: set[str] | None = None,
 ) -> list[str] | None:
     """Resolve a workflow's project binding to its folder subtree (root + descendants).
 
@@ -104,11 +115,27 @@ async def resolve_project_subtree(
     ``user_id`` MUST be the run OWNER. On the service-role resume/Continue path the
     caller passes the durable run owner (``harness_engine.py:1118-1123``), so this
     can never reach another user's folders.
+
+    ``restrict_org_ids`` (WR-05, keyword-only, default ``None`` = no restriction) is passed
+    straight through to ``fetch_visible_folders``, which owns the intersection — see its
+    docstring for the semantics, including why an EMPTY set is fail-closed rather than
+    unrestricted. Nothing about the walk changes; it simply walks a narrower tree.
     """
     if project_folder_id is None:
         return None  # unbound workflow → whole-KB (unchanged behavior)
     root = str(project_folder_id)
-    folders = await fetch_visible_folders(supabase, user_id)  # owner-scoped fetch
+    # THE SEAM-CONTRACT RULE (WR-05), applied at every internal call this plan threads the
+    # restriction through. The keyword is forwarded ONLY when it carries information, so an
+    # UNRESTRICTED call is byte-identical ON THE WIRE, not merely in outcome. That matters
+    # because these are documented MONKEYPATCH seams: ``fetch_visible_folders`` is patched as a
+    # module global by the folder-override and scope-governance suites, and
+    # ``resolve_project_subtree`` is the seam ``test_182_folder_scope_keying`` uses to run the
+    # REAL ⊆ walk against a fake subtree. Forwarding ``restrict_org_ids=None`` would break every
+    # existing double — and every future one — for callers that do not use the feature at all.
+    # A RESTRICTED call still passes it explicitly, so a double that cannot accept it fails
+    # LOUDLY rather than silently ignoring a tenancy narrowing.
+    _org_kw = {} if restrict_org_ids is None else {"restrict_org_ids": restrict_org_ids}
+    folders = await fetch_visible_folders(supabase, user_id, **_org_kw)  # owner-scoped fetch
 
     def _walk(rid: str, seen: set[str] | None = None) -> list[str]:
         # IN-01 (098 secure-phase): cycle/visited guard. A self-parented row
@@ -239,6 +266,7 @@ async def folder_scope_violations(
     *,
     supabase: "Client",
     user_id: str,
+    restrict_org_ids: set[str] | None = None,
 ) -> list[FolderScopeSubsetError]:
     """THE ⊆ walk (D-07 DB half) — the ONE implementation of rule 1, non-raising.
 
@@ -273,9 +301,18 @@ async def folder_scope_violations(
     T-098-11 notes; this function adds no new read. Pitfall 5 still applies: a non-⊆
     declared scope is a definition-VALIDITY error, NEVER a silent clip (that is Plan 05's
     distinct runtime ``scope_violation`` path in ``tool_dispatcher.py``).
+
+    ``restrict_org_ids`` (WR-05, keyword-only, default ``None`` = no restriction) rides
+    through to the subtree resolution above. It is what lets the PUBLISH gate ask "is this
+    definition's ``folder_scope`` inside a subtree its OWN org can reach?" rather than "inside
+    a subtree its multi-org author can reach" — the two differ exactly when they matter, and
+    the runner's answer is the first one. The ⊆ rule itself is unchanged; only the tree it is
+    evaluated against narrows.
     """
+    # Forwarded only when set — see the seam-contract rule in ``resolve_project_subtree``.
+    _org_kw = {} if restrict_org_ids is None else {"restrict_org_ids": restrict_org_ids}
     subtree = await resolve_project_subtree(
-        definition.project_folder_id, supabase=supabase, user_id=user_id
+        definition.project_folder_id, supabase=supabase, user_id=user_id, **_org_kw
     )
     if subtree is None:
         return []  # unbound → nothing to bound against (structural validator already guards)
@@ -326,6 +363,17 @@ async def assert_folder_scopes_subset(
     and ``test_098_scope_governance``'s ``pytest.raises(ValueError, match="is not a subset")``.
 
     Clean and unbound definitions return ``None``, exactly as before.
+
+    DELIBERATELY WITHOUT ``restrict_org_ids`` (Phase 182 WR-05 / T-182-55) — a recorded
+    decision, not an omission. The collector and ``resolve_project_subtree`` both gained that
+    optional org narrowing; this presentation did NOT, because of WHO calls it. Every caller of
+    the raising form acts AS ITSELF, never on behalf of a definition's org:
+    ``workflow_kickoff``'s HTTP 400 and ``harness_engine``'s resume / ``runs.py``'s Continue
+    fallbacks are a RUNNER starting or resuming THEIR OWN run, and
+    ``grounding._folder_scope_violation`` is an AUTHOR generating their own draft. Narrowing
+    those to some definition's org would not close a leak — it would break correct behaviour,
+    refusing folders the acting user can legitimately reach. The asymmetry is asserted by
+    ``tests/unit/test_182_publish_org_scope.py`` so a future reader meets a choice, not a gap.
     """
     violations = await folder_scope_violations(
         definition, supabase=supabase, user_id=user_id

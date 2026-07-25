@@ -179,7 +179,11 @@ def _null_foreign_global_owner(
 
 
 async def fetch_visible_folders(
-    supabase: "Client", user_id: str, *, strict: bool = False
+    supabase: "Client",
+    user_id: str,
+    *,
+    strict: bool = False,
+    restrict_org_ids: set[str] | None = None,
 ) -> list[dict]:
     """Fetch all folders visible to user: owned by user OR in an org-shared folder's subtree
     within the caller's org set (D-165-04). POSITIONAL signature unchanged — org resolution
@@ -190,8 +194,40 @@ async def fetch_visible_folders(
     ``fetch_all_folders``: opting in makes a PostgREST ``max-rows`` truncation raise
     ``FolderReadTruncatedError`` instead of silently shrinking the visible set. Only the
     grounding GATE call site passes it; every other caller is byte-identical by construction.
+
+    ``restrict_org_ids`` (WR-05, keyword-only, default ``None``) NARROWS the caller's resolved
+    org set before the visibility rule runs. The semantics are asymmetric ON PURPOSE and the
+    polarity is load-bearing (T-182-54):
+
+      * ``None``   — NO restriction. Today's behaviour, and what every caller that omits the
+        keyword gets: the chat agent loop, the four ``/folders`` routes, run-start kickoff,
+        resume, Continue and NL generation are byte-identical by construction.
+      * ``set()``  — an EMPTY restriction means NO org-shared visibility at all: only the
+        caller's OWNED folders resolve. This is the FAIL-CLOSED direction and must NEVER be
+        re-interpreted as "unrestricted" — a caller acting on behalf of a definition whose org
+        cannot be resolved must see less, never everything the caller personally can reach.
+
+    WHY THE INTERSECTION BELONGS HERE, and nowhere else (the SEED-124 lesson). This is the ONE
+    place the caller's org set is resolved for folders, so narrowing it REUSES the entire
+    existing visibility rule — ``is_in_global_subtree``'s ancestor walk, its memo cache and its
+    ``is_org_shared`` + ``org_id`` predicate all stay untouched and simply receive a smaller
+    set. Writing a second predicate one layer up (post-filtering the returned rows, say) is how
+    the SEED-124 class of leak re-opens: a post-filter looser than the rule silently re-admits
+    exactly the rows the gate excluded, and the two copies drift the first time either changes.
+
+    WHO PASSES IT: publish stage 2.6 only, with the org of the DEFINITION being published (read
+    once by ``publish_service._resolve_publish_supabase``, the same value that scopes the
+    BYPASSRLS client). A publish gate must answer "is this definition grounded in ITS OWN
+    org?", not "can this publisher see everything it names" — for a multi-org author those are
+    different questions, and the RUNNER's answer is the one that matters (WR-05).
+
+    Both sides are coerced to ``str`` so a ``UUID`` object and its string form compare equal —
+    the restriction arrives from a DB read on one path and from a caller-built set on another.
     """
     caller_org_ids = await _resolve_caller_org_ids(supabase, user_id)
+    if restrict_org_ids is not None:
+        allowed = {str(o) for o in restrict_org_ids}
+        caller_org_ids = {o for o in caller_org_ids if str(o) in allowed}
     all_folders = await fetch_all_folders(supabase, fields="*", strict=strict)
     folder_map = {f["id"]: f for f in all_folders}
     cache: dict = {}

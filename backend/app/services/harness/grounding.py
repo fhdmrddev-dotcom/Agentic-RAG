@@ -56,6 +56,21 @@ cross-user scope and without an org term it spans cross-TENANT too: folders via
 ``app.utils.skill_visibility`` (CR-01 / SEED-125). Both fail closed on an unresolvable org
 set. The palette must NEVER widen to another user's or another org's folders or skills — KB
 content can never whitelist itself.
+
+THE SECOND ORG DIMENSION (round-2 gap closure — WR-05). Gating on the CALLER's org membership
+answers "what can this person see". A caller acting ON BEHALF OF a definition — the publish
+gate — must be narrowed FURTHER, to that definition's own org, or the gate answers "can the
+publisher see this?" when the question is "is this definition grounded in its own org?". For a
+multi-org author the two answers differ, and the one that matters is the RUNNER's: at run time
+``tool_dispatcher``'s skill resolution and ``fetch_visible_folders`` gate on the runner's org
+set, so a definition green-lit on the publisher's wider view silently under-performs for every
+colleague. The optional ``restrict_org_ids`` keyword carries that narrowing; it is applied at
+the two points where the caller's org set is ALREADY resolved (here for skills, inside
+``folder_utils.fetch_visible_folders`` for folders), so no visibility rule is duplicated —
+``_skill_registry`` keeps calling the ONE shared predicate and simply receives a smaller set.
+Same family as SEED-124 / SEED-125 (org-blind service-role reads), one layer up: the read IS
+org-gated, the SCOPE of the gate was wrong. ``None`` means no restriction, so every caller
+that omits it — NL generation, ``/validate``, the palette route — is byte-identical.
 """
 
 from __future__ import annotations
@@ -279,6 +294,7 @@ async def assemble_grounding_bundle(
     project_folder_id: str | None = None,
     template_asset_id: str | None = None,
     template_placeholders: list[str] | None = None,
+    restrict_org_ids: set[str] | None = None,
 ) -> GroundingBundle:
     """Compute the server-side grounding palette for ``user_id`` (the ONE registry read).
 
@@ -300,6 +316,25 @@ async def assemble_grounding_bundle(
     shared ``grounding_unavailable_finding``. NL generation (``workflow_authoring``) is the
     third consumer and deliberately ignores ``degraded``: its own fidelity check re-reads the
     folder tree through the ⊆ walk, so its behaviour is unchanged by this guard.
+
+    ``restrict_org_ids`` (WR-05, keyword-only) narrows BOTH org-gated reads to a specific org
+    set. The polarity is load-bearing and identical to ``fetch_visible_folders``' (T-182-54):
+
+      * ``None``  — NO restriction. Every caller that omits it (NL generation, ``/validate``,
+        the ``GET /grounding-bundle`` palette) is byte-identical to before this parameter.
+      * ``set()`` — an EMPTY restriction means NO org-shared visibility: only owned folders,
+        and — via ``_skill_registry``'s already-documented fail-closed contract — only
+        ``is_system`` skills. That is the FAIL-CLOSED direction and is the CORRECT answer for
+        a definition whose org resolves to nothing. It must never be read as "unrestricted".
+
+    ONE INTERSECTION, NO SECOND PREDICATE. The folders half is applied inside
+    ``fetch_visible_folders`` (the one place its org set is resolved); the skills half is
+    applied HERE, immediately after ``_resolve_caller_org_ids``, BEFORE the set reaches
+    ``_skill_registry``. ``_skill_registry`` therefore keeps applying the ONE shared
+    ``app.utils.skill_visibility`` rule verbatim — both encodings of it — and simply receives a
+    narrower org set. Re-filtering its RESULT here instead would be a second copy of the
+    visibility rule, and a post-filter that drifts from the pushed-down query is precisely how
+    SEED-124 / SEED-125 happened.
     """
     from app.services.openai_service import get_tools  # function-local
     from app.utils.folder_utils import (  # function-local
@@ -317,8 +352,13 @@ async def assemble_grounding_bundle(
     # entirely rather than accusing a correct definition of a ``folder_scope`` violation.
     # BOUNDED RESIDUAL, recorded honestly: the two reads are separate round-trips, so a
     # truncation that appears ONLY on the second one is not caught by this check.
+    # ``restrict_org_ids`` forwarded only when set — the seam-contract rule written out in
+    # ``scope.resolve_project_subtree``. ``strict=True`` stays unconditional: it is plan
+    # 182-11's, it is this call site's whole reason for existing, and it is already part of
+    # this seam's contract.
+    _org_kw = {} if restrict_org_ids is None else {"restrict_org_ids": restrict_org_ids}
     try:
-        folders = await fetch_visible_folders(supabase, user_id, strict=True)
+        folders = await fetch_visible_folders(supabase, user_id, strict=True, **_org_kw)
     except Exception:  # noqa: BLE001 — an unreadable registry is a degradation, not a verdict
         logger.warning(
             "grounding: visible-folders read failed or was truncated; folder grounding is "
@@ -342,6 +382,14 @@ async def assemble_grounding_bundle(
     # degradation, which is the half the swallow could not express.
     try:
         caller_org_ids = await _resolve_caller_org_ids(supabase, user_id)
+        # WR-05 — THE ONE INTERSECTION for skills, at the single point the caller's org set is
+        # resolved and BEFORE it reaches the shared visibility rule. Both sides coerced to
+        # ``str`` so a UUID object and its string form compare equal. ``None`` = unrestricted;
+        # an empty result set is fail-closed (only ``is_system`` skills resolve), never a
+        # bypass — see this function's docstring for why that polarity is load-bearing.
+        if restrict_org_ids is not None:
+            _allowed = {str(o) for o in restrict_org_ids}
+            caller_org_ids = {o for o in caller_org_ids if str(o) in _allowed}
         skills = await run_in_threadpool(_skill_registry, supabase, user_id, caller_org_ids)
     except Exception:  # noqa: BLE001 — a gated read miss must FAIL CLOSED, never widen scope.
         logger.warning(
@@ -516,7 +564,11 @@ async def _folder_scope_violation(
 
 
 async def _folder_scope_violations(
-    wd: "WorkflowDefinition", *, supabase, user_id: str
+    wd: "WorkflowDefinition",
+    *,
+    supabase,
+    user_id: str,
+    restrict_org_ids: set[str] | None = None,
 ) -> list[tuple[str, str | None]]:
     """Rule 1, PER-NODE — every offending phase, not just the first (Phase 182 WR-04).
 
@@ -546,11 +598,22 @@ async def _folder_scope_violations(
     verdict. WR-03 is DEFERRED and explicitly outside this round's operator-selected scope;
     narrowing here would be unrequested scope creep and would break the documented
     degradation contract. Recorded so a future reader sees a decision, not an oversight.
+
+    ``restrict_org_ids`` (WR-05, default ``None`` = no restriction) is passed straight through
+    to the ⊆ walk's folder read so the PUBLISH gate evaluates rule 1 against the DEFINITION's
+    org rather than its multi-org author's union. Only the PLURAL helper carries it: the
+    singular ``_folder_scope_violation`` above serves NL generation, which runs in the author's
+    OWN context, not on behalf of a definition.
     """
     from app.services.harness.scope import folder_scope_violations  # function-local
 
+    # Forwarded only when set — the seam-contract rule written out in
+    # ``scope.resolve_project_subtree``. This call is a monkeypatch seam in three suites.
+    _org_kw = {} if restrict_org_ids is None else {"restrict_org_ids": restrict_org_ids}
     try:
-        violations = await folder_scope_violations(wd, supabase=supabase, user_id=user_id)
+        violations = await folder_scope_violations(
+            wd, supabase=supabase, user_id=user_id, **_org_kw
+        )
     except ValueError as exc:
         return [(str(exc), getattr(exc, "phase_slug", None))]
     return [(str(exc), getattr(exc, "phase_slug", None)) for exc in violations]
@@ -586,6 +649,7 @@ async def grounding_verdicts(
     user_id: str,
     tool_names: set[str],
     skill_ids: set[str],
+    restrict_org_ids: set[str] | None = None,
 ) -> list[dict]:
     """Collect EVERY grounding-fidelity violation as a per-node verdict dict.
 
@@ -598,6 +662,12 @@ async def grounding_verdicts(
     ``slug`` (the 181/183 ``node id == phase.slug`` contract) or ``None`` for a
     workflow-global finding. Severity classification is the ROUTE's job (D-182-03) — this
     collector never classifies, so the rules stay verbatim.
+
+    ``restrict_org_ids`` (WR-05, keyword-only, default ``None`` = no restriction) reaches rule
+    1's folder read only — rules 2 and 3 test membership against the ``tool_names`` /
+    ``skill_ids`` sets the CALLER computed, so the caller narrows those by passing the same
+    restriction to ``assemble_grounding_bundle``. Both halves of the publish gate therefore
+    share one restriction, read once from the definition's own ``org_id``.
     """
     out: list[dict] = []
 
@@ -608,7 +678,7 @@ async def grounding_verdicts(
     # copy in ``scope.py`` and is never re-derived here (D-182-06). Only a non-typed
     # ``ValueError`` off the ⊆ path leaves ``phase`` as ``None``, as one unkeyed verdict.
     for message, phase_slug in await _folder_scope_violations(
-        wd, supabase=supabase, user_id=user_id
+        wd, supabase=supabase, user_id=user_id, restrict_org_ids=restrict_org_ids
     ):
         out.append({"code": "folder_scope", "phase": phase_slug, "message": message})
 
