@@ -161,6 +161,53 @@ def _llm_single(slug: str = "answer", index: int = 0, **config_extra) -> dict:
     return {"slug": slug, "phase_index": index, "config": cfg, "validators": []}
 
 
+# ── the consumer seams ────────────────────────────────────────────────────────
+
+
+def _patch_degraded_bundle(monkeypatch, *degraded: str, skill_ids=(), tool_names=()):
+    """Swap the ONE registry read for a bundle that reports itself DEGRADED.
+
+    Patches the MODULE attribute (`app.services.harness.grounding`) — the seam both
+    consumers resolve at call time (the `test_182_validate.py` posture).
+    """
+    from app.services.harness import grounding as g
+
+    async def _fake_assemble(**_kwargs):
+        return g.GroundingBundle(
+            tools=sorted(tool_names),
+            tool_names=set(tool_names),
+            folders=[],
+            skills=[],
+            skill_ids=set(skill_ids),
+            placeholders=[],
+            degraded=frozenset(degraded),
+        )
+
+    monkeypatch.setattr(g, "assemble_grounding_bundle", _fake_assemble)
+
+
+async def _validate(definition: dict, supabase=None):
+    """Call the `/validate` handler DIRECTLY and return the ValidateResponse."""
+    from app.api import workflows as wf
+    from app.models.harness import WorkflowDefinition
+
+    return await wf.validate_workflow(
+        body=WorkflowDefinition.model_validate(definition),
+        current_user={"id": _CALLER},
+        supabase=object() if supabase is None else supabase,
+    )
+
+
+def _codes(response) -> set[str]:
+    return {v.code for v in response.verdicts}
+
+
+def _by_code(response, code: str):
+    matches = [v for v in response.verdicts if v.code == code]
+    assert matches, f"expected a {code!r} verdict, got {sorted(_codes(response))}"
+    return matches[0]
+
+
 # ═══ (A) WR-07 — the truncation-aware read, at the read itself ════════════════
 
 
@@ -416,3 +463,285 @@ async def test_the_bundle_never_raises_to_its_caller_on_either_degradation(monke
     assert bundle.folders == []
     assert bundle.skill_ids == set()
     assert bundle.tool_names, "the in-process tool registry cannot fail and must survive"
+
+
+# ═══ (C) WR-01 at BOTH consumers — "could not check", never a false accusation ══
+
+
+@pytest.mark.asyncio
+async def test_validate_reports_grounding_unavailable_not_a_false_unregistered_skill(monkeypatch):
+    """WR-01 AT `/validate`. A degraded registry must not accuse a valid skill reference.
+
+    PRE-FIX OUTCOME: the bundle came back with `skill_ids = set()` and no signal, so rule 3
+    reported `unregistered_skill` for the author's REAL id and the canvas painted that node
+    red — telling the author to "fix" a reference that is perfectly correct.
+    """
+    _patch_degraded_bundle(monkeypatch, "skills")
+
+    resp = await _validate(_definition([_llm_single("answer", 0, skill_ref=_REAL_SKILL)]))
+
+    codes = _codes(resp)
+    assert "unregistered_skill" not in codes, (
+        "WR-01 REGRESSION: an unreachable skill registry was reported as the author's "
+        f"skill reference {_REAL_SKILL} being unregistered. That is a factual accusation "
+        "against a correct definition, manufactured out of an outage."
+    )
+    assert "unregistered_tool" not in codes and "folder_scope" not in codes
+    verdict = _by_code(resp, "grounding_unavailable")
+    assert verdict.phase is None  # an unreachable registry is not attributable to a node
+    assert verdict.severity == "error"  # never the soft "incomplete" (the WR-05 posture)
+    assert resp.ok is False
+    assert "skills" in verdict.message  # names WHICH registry could not be resolved
+
+
+@pytest.mark.asyncio
+async def test_publish_blocks_with_grounding_unavailable_not_a_false_unregistered_skill():
+    """WR-01 AT PUBLISH. Same bundle, same honest answer, on the ENFORCING side.
+
+    PRE-FIX OUTCOME: publish blocked at `grounding_fidelity` with an `unregistered_skill`
+    named failure quoting the author's valid id — and the stage's own docstring claimed it
+    shared `_skill_registry`'s fail-closed posture, which was exactly the thing that was not
+    true (the swallow was INVISIBLE to this wrapper).
+    """
+    from contextlib import ExitStack
+    from unittest.mock import AsyncMock, patch
+    from uuid import UUID, uuid4
+
+    from app.services.harness import grounding as g
+    from app.services.harness import publish_service
+
+    definition = _definition([_llm_single("answer", 0, skill_ref=_REAL_SKILL)])
+    definition_id = uuid4()
+    row = {
+        "id": definition_id,
+        "slug": definition["slug"],
+        "version": definition["version"],
+        "name": definition["name"],
+        "status": definition["status"],
+        "definition": definition,
+        "created_by": UUID(_CALLER),
+    }
+
+    drive = AsyncMock(return_value=(uuid4(), {"text": "x"}, "completed"))
+    flip = AsyncMock(return_value=2)
+
+    async def _degraded_assemble(**_kwargs):
+        return g.GroundingBundle(degraded=frozenset({"skills"}))
+
+    with ExitStack() as stack:
+        stack.enter_context(patch("app.db.workflows.get_definition", AsyncMock(return_value=row)))
+        stack.enter_context(patch("app.db.workflows.write_audit", AsyncMock()))
+        stack.enter_context(patch("app.db.workflows.publish_definition", flip))
+        stack.enter_context(patch.object(publish_service, "_drive_golden_run", drive))
+        stack.enter_context(patch.object(publish_service, "_judge_golden_output", AsyncMock()))
+        stack.enter_context(
+            patch.object(
+                publish_service, "_resolve_publish_supabase", AsyncMock(return_value=object())
+            )
+        )
+        stack.enter_context(patch.object(g, "assemble_grounding_bundle", _degraded_assemble))
+        result = await publish_service.publish(
+            definition_id=definition_id,
+            golden_input="a representative kickoff prompt",
+            user={"id": _CALLER},
+            pool=AsyncMock(),
+            redis=AsyncMock(),
+        )
+
+    assert result["published"] is False
+    assert result["blocked_stage"] == "grounding_fidelity"
+    codes = [f.get("code") for f in result["named_failures"] if isinstance(f, dict)]
+    assert codes == ["grounding_unavailable"], (
+        "WR-01 REGRESSION on the publish side: an unreachable registry produced "
+        f"{codes} instead of exactly one honest grounding_unavailable."
+    )
+    assert "unregistered_skill" not in codes
+    drive.assert_not_called()  # never burn a real provider run on an unverifiable definition
+    flip.assert_not_called()  # and certainly never mint a version
+
+
+# ═══ (D) WR-07 end to end — a truncation is not a scope violation ═════════════
+
+
+@pytest.mark.asyncio
+async def test_validate_reports_grounding_unavailable_not_a_false_folder_scope():
+    """WR-07 END TO END, through the REAL assembler and the REAL ⊆ rule.
+
+    The folders read is TRUNCATED (1 row returned, 1000 reported). The definition is bound
+    to a project and declares a per-phase `folder_scope` that is NOT in the returned prefix.
+
+    PRE-FIX OUTCOME: the prefix was accepted as the whole tree, `resolve_project_subtree`
+    resolved a shrunken subtree, and the author was told their phase's `folder_scope` is not
+    a subset of the project — a fabricated governance violation that (post-182-06) BLOCKS
+    publish. Nothing about the definition is wrong; the read was short.
+    """
+    sb = _FakeSupabase(
+        folders=_FakeQuery(
+            [
+                {
+                    "id": _PROJECT,
+                    "user_id": _CALLER,
+                    "name": "project-root",
+                    "parent_id": None,
+                    "is_org_shared": False,
+                    "org_id": _ORG,
+                }
+            ],
+            count=1000,  # PostgREST's default max-rows: 1000 exist, 1 came back
+        ),
+        org_members=_FakeQuery([{"org_id": _ORG}]),
+        skills=_FakeQuery(_skill_rows()),
+    )
+
+    resp = await _validate(
+        _definition(
+            [_llm_single("answer", 0, folder_scope=[_OUTSIDE_FOLDER])],
+            project_folder_id=_PROJECT,
+        ),
+        supabase=sb,
+    )
+
+    codes = _codes(resp)
+    assert "folder_scope" not in codes, (
+        "WR-07 REGRESSION: a truncated folders read was rendered as a folder_scope "
+        "violation. The definition is correct; the read was short — and since 182-06 that "
+        "false violation blocks publish."
+    )
+    assert "grounding_unavailable" in codes
+    assert "folders" in _by_code(resp, "grounding_unavailable").message
+    assert resp.ok is False
+
+
+# ═══ (E) WR-02 — the route cannot 500 on a grounding read ════════════════════
+
+
+class _ApiErrorLike(Exception):
+    """Mirrors `postgrest.exceptions.APIError`'s shape: a plain `Exception` subclass.
+
+    NOT a `ValueError` — which is precisely why the ⊆ rule's `except ValueError` never saw
+    the real thing and it escaped `validate_workflow` as an HTTP 500.
+    """
+
+
+@pytest.mark.asyncio
+async def test_a_postgrest_style_error_from_the_collector_is_a_200_not_a_500(monkeypatch):
+    """WR-02, THE DIRECT REPRODUCTION. A non-`ValueError` off the ⊆ walk must not escape.
+
+    PRE-FIX OUTCOME: `postgrest.exceptions.APIError` propagated out of the handler and
+    FastAPI turned it into an HTTP 500 — on a route whose docstring promises ALWAYS 200 and
+    which Phase 184 calls on every canvas edit. One transient blip became a 500 storm
+    mid-authoring, with no verdict payload and nothing for the canvas to render.
+    """
+    from app.services.harness import grounding as g
+
+    # The premise, PINNED rather than assumed — the whole finding rests on it.
+    assert not issubclass(_ApiErrorLike, ValueError), (
+        "the injected exception is a ValueError, so this test would prove nothing about the "
+        "class of error that actually escapes (postgrest's APIError is not a ValueError)"
+    )
+
+    _patch_degraded_bundle(monkeypatch, tool_names={"search_documents"})  # healthy bundle
+
+    async def _boom(*_a, **_k):
+        raise _ApiErrorLike({"message": "JWT expired", "code": "PGRST301"})
+
+    monkeypatch.setattr(g, "grounding_verdicts", _boom)
+
+    resp = await _validate(_definition([_llm_single("answer", 0)]))  # must NOT raise
+
+    assert "grounding_unavailable" in _codes(resp)
+    assert _by_code(resp, "grounding_unavailable").severity == "error"
+    assert resp.ok is False
+
+
+@pytest.mark.asyncio
+async def test_a_raise_from_the_registry_read_itself_is_a_200_not_a_500(monkeypatch):
+    """The sibling escape path: `assemble_grounding_bundle` raising (WR-02's path 1).
+
+    PRE-FIX OUTCOME: the same HTTP 500, one stage earlier — `fetch_visible_folders` had no
+    guard at any level and it is the FIRST thing the handler touches.
+    """
+    from app.services.harness import grounding as g
+
+    async def _boom(**_kwargs):
+        raise _ApiErrorLike("connection reset by peer")
+
+    monkeypatch.setattr(g, "assemble_grounding_bundle", _boom)
+
+    resp = await _validate(_definition([_llm_single("answer", 0)]))  # must NOT raise
+
+    assert "grounding_unavailable" in _codes(resp)
+    assert resp.ok is False
+
+
+# ═══ (F) the seal is SCOPED — the pure checks keep running ═══════════════════
+
+
+@pytest.mark.asyncio
+async def test_structural_verdicts_survive_a_degraded_grounding_read(monkeypatch):
+    """A registry blip costs the author the THREE grounding rules, not the whole validation.
+
+    `lint_workflow`, the D-13 business-requirement check and the interactive-phase check are
+    PURE — no registry, nothing to fail — so they must run outside the seal and still
+    contribute. A blanket `try` around the handler body would have discarded them, and a
+    blanket `except` returning `ok: True` would have been WORSE than the 500 it replaced
+    (SEED-131: it paints a possibly-broken workflow green).
+    """
+    _patch_degraded_bundle(monkeypatch, "folders", "skills")
+
+    # non-contiguous indices [0, 2] -> bad_index + orphan_phase + no_terminal, and no
+    # business_requirement -> the D-13 verdict.
+    resp = await _validate(
+        _definition(
+            [_llm_single("first", 0), _llm_single("second", 2)],
+            business_requirement=None,
+        )
+    )
+
+    codes = _codes(resp)
+    assert {"bad_index", "orphan_phase", "no_terminal"} <= codes, (
+        "the structural lint verdicts vanished when grounding degraded — the seal is too "
+        f"wide. Got {sorted(codes)}."
+    )
+    assert "business_requirement" in codes, "the pure D-13 check was swallowed by the seal"
+    assert "grounding_unavailable" in codes
+    assert resp.ok is False
+    # the degraded message names BOTH unresolved registries, in sorted order
+    assert "folders, skills" in _by_code(resp, "grounding_unavailable").message
+
+
+# ═══ (G) the code is COMPOSED into the taxonomy, not hardcoded ═══════════════
+
+
+def test_grounding_unavailable_is_known_to_the_classifier_and_classifies_error():
+    """The constant-to-classifier link, pinned HERE by an explicit assertion.
+
+    `test_182_severity_codes.py`'s drift scanner matches the token sequence `"code": "<name>"`
+    in `grounding.py`'s source. This code is built from `GROUNDING_UNAVAILABLE_CODE`, never a
+    quoted literal (deliberately — a literal would make the scanner demand it join
+    `GROUNDING_VERDICT_CODES`, which `grounding_verdicts` does not emit). The scanner is
+    therefore BLIND to it, so the link is asserted here rather than left as a loophole.
+
+    Classification is `error` in BOTH `phases_empty` states: "we could not verify" must never
+    paint the soft `incomplete`. An author shown "still building" would hit a hard publish
+    block they were never warned about (the WR-05 posture 182-07 established).
+    """
+    from app.api import workflows
+    from app.services.harness import grounding
+
+    code = grounding.GROUNDING_UNAVAILABLE_CODE
+
+    assert code in workflows._KNOWN_CODES, (
+        "the degraded code is not composed into _KNOWN_CODES, so it reaches _severity as an "
+        "UNKNOWN and logs a fail-loud warning on every degraded request"
+    )
+    assert code not in workflows._INCOMPLETE_CODES
+    assert code in workflows._ERROR_CODES  # derived, not listed
+    assert workflows._severity(code, phases_empty=False) == "error"
+    assert workflows._severity(code, phases_empty=True) == "error"
+
+    # ... and it is minted from ONE builder, whose dict is the finding shape both sides use.
+    finding = grounding.grounding_unavailable_finding(frozenset({"skills"}))
+    assert set(finding) == {"code", "phase", "message"}
+    assert finding["code"] == code
+    assert finding["phase"] is None
