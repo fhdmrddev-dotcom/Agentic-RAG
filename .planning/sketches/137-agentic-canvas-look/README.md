@@ -44,6 +44,9 @@ see the energy travel into it.
   with its own contact shadow: depth you can see, not a drawn effect. The quietest of the three.
 - **C: Soft Blocks** — big friendly tiles, each kind of step with its own gentle colour wash. The most approachable
   and least technical-feeling; colour does the sorting so the words don't have to.
+- **D: Synthesis (added 2026-07-25 after operator review)** — B's floating 3D icon and frosted depth on C's
+  left-aligned layout, with per-step-type colour reduced to a **tint behind the icon** instead of a whole coloured
+  tile. See "The colour-budget argument" below — this is the variant with a reason, not just a preference.
 
 ## What all three fix from 134–136
 
@@ -78,6 +81,23 @@ It is a dark silhouette on a dark canvas — roughly 4× dimmer than the rest of
   `PHASE_GLYPHS` is deliberately shared, so this same mark also appears on the workflows-page card, the run and
   publish soul headers, the gauntlet stages and the live step cards. Changing it is one clean additive map swap —
   but it changes five shipped surfaces, so it is **its own decision, not Phase 183's to make quietly.**
+
+## The colour-budget argument (why D exists)
+
+Operator leaned to B but liked C. There is a concrete tie-breaker, and the **Live status** control makes it visible.
+
+**Phase 188 paints live run state onto these same nodes** — running / done / waiting-for-you / failed. That needs
+strong, unambiguous colour. C has already spent its colour on *step type*: a `llm_human_input` tile is amber
+whether it is waiting for you or not, and a `llm_agent` tile is indigo whether it is running or not. When status
+colour lands on top, the two meanings collide — and the run view is the surface where a wrong colour reading is
+most expensive (research Pitfall 4: a dishonest "done" is worse than a raw log).
+
+**D keeps type-colour as a small tint behind the icon**, leaving the card neutral. Flip **Live status → Mid-run /
+Needs you / Failed** and compare C against D: in D the status reads instantly because nothing else is competing
+for it.
+
+So the recommendation is **D**: it keeps what you liked about B (the floating 3D icon, the depth, the calm), takes
+C's readability (left-aligned, warm, scannable), and does not mortgage the colour Phase 188 needs.
 
 ## What to Look For
 

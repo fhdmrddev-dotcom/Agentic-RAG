@@ -155,6 +155,63 @@
   .vc .conn { width: 62px; }
   .vc .conn .line { width: 50px; }
 
+  /* ═════ D — SYNTHESIS (B's depth, C's warmth, left-aligned) ═════ */
+  .vd .node {
+    display: flex; align-items: center; gap: 16px; width: 300px; padding: 17px 18px 17px 46px;
+    margin-left: 30px; border-radius: 20px;
+    background: linear-gradient(160deg, hsl(220 30% 100% / .075), hsl(220 30% 100% / .022));
+    backdrop-filter: blur(18px) saturate(150%); -webkit-backdrop-filter: blur(18px) saturate(150%);
+    border: 1px solid hsl(220 30% 100% / .11);
+    box-shadow: 0 1px 0 hsl(220 30% 100% / .13) inset, 0 24px 48px -22px rgba(0,0,0,.95);
+  }
+  .vd .node:hover { transform: translateY(-4px); border-color: hsl(220 30% 100% / .19);
+                    box-shadow: 0 1px 0 hsl(220 30% 100% / .2) inset, 0 34px 60px -22px rgba(0,0,0,1); }
+  /* the icon overhangs the left edge and floats, with its own contact shadow (B's signature move) */
+  .vd .icowrap { position: absolute; left: -30px; top: 50%; transform: translateY(-50%); width: 62px; height: 62px; }
+  .vd .icowrap .ico3d { filter: drop-shadow(0 9px 13px rgba(0,0,0,.8)); }
+  .vd .icowrap::after {
+    content: ''; position: absolute; bottom: -3px; left: 50%; transform: translateX(-50%);
+    width: 40px; height: 8px; border-radius: 50%; background: rgba(0,0,0,.6); filter: blur(5px); z-index: 0;
+  }
+  /* per-type colour is a TINT behind the icon only — never a tile wash, so run status keeps the colour budget */
+  .vd .icowrap::before {
+    content: ''; position: absolute; inset: -5px; border-radius: 50%; z-index: 0;
+    background: radial-gradient(circle, var(--tint, hsl(220 30% 100% / .18)), transparent 68%);
+  }
+  .vd .node[data-type="llm_agent"]        { --tint: hsl(239 90% 70% / .40); }
+  .vd .node[data-type="llm_emit"]         { --tint: hsl(258 90% 70% / .40); }
+  .vd .node[data-type="programmatic"]     { --tint: hsl(200 85% 62% / .36); }
+  .vd .node[data-type="llm_batch_agents"] { --tint: hsl(170 80% 55% / .34); }
+  .vd .node[data-type="llm_human_input"]  { --tint: hsl(38 92% 62% / .38); }
+  .vd .node[data-type="llm_single"]       { --tint: hsl(220 30% 100% / .22); }
+  .vd .node[data-type="connector"]        { --tint: hsl(220 20% 70% / .22); }
+  .vd .body { min-width: 0; flex: 1; }
+  .vd .ttl { font-size: 15px; line-height: 1.3; }
+  .vd .sub { font-size: 11.5px; margin-top: 4px; line-height: 1.5; }
+  .vd .badges { display: flex; gap: 5px; margin-top: 9px; flex-wrap: wrap; }
+  .vd .conn { width: 96px; }
+  .vd .conn .line { width: 62px; }
+  .vd .stepn { left: auto; right: 10px; top: 10px; }
+
+  /* ═════ run status — a layer OVER any variant, to test the colour budget ═════ */
+  .node[data-run="done"]    { border-color: hsl(142 71% 45% / .5) !important; }
+  .node[data-run="running"] { border-color: hsl(239 100% 82% / .6) !important;
+                              box-shadow: 0 0 44px -8px hsl(239 100% 82% / .45), 0 24px 48px -22px rgba(0,0,0,.95) !important; }
+  .node[data-run="needs"]   { border-color: hsl(38 92% 60% / .65) !important;
+                              box-shadow: 0 0 42px -10px hsl(38 92% 60% / .4), 0 24px 48px -22px rgba(0,0,0,.95) !important; }
+  .node[data-run="failed"]  { border-color: hsl(0 72% 55% / .65) !important;
+                              box-shadow: 0 0 42px -10px hsl(0 72% 51% / .4), 0 24px 48px -22px rgba(0,0,0,.95) !important; }
+  .node[data-run="idle"]    { opacity: .46; }
+  .runchip {
+    display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; padding: 2px 9px;
+    font-size: 10.5px; font-weight: 600; margin-top: 8px;
+  }
+  .runchip.done    { color: hsl(142 71% 62%); background: hsl(142 71% 45% / .16); border: 1px solid hsl(142 71% 45% / .35); }
+  .runchip.running { color: hsl(239 100% 86%); background: hsl(239 100% 82% / .16); border: 1px solid hsl(239 100% 82% / .4); }
+  .runchip.needs   { color: hsl(38 92% 68%);  background: hsl(38 92% 60% / .16);  border: 1px solid hsl(38 92% 60% / .4); }
+  .runchip.failed  { color: hsl(0 85% 72%);   background: hsl(0 72% 51% / .16);   border: 1px solid hsl(0 72% 51% / .45); }
+  .runchip.idle    { color: var(--color-text-dim); background: transparent; border: 1px dashed var(--color-border); }
+
   /* step counter — the only "technical" thing kept, and it is a plain number */
   .stepn {
     position: absolute; top: -9px; left: -9px; width: 22px; height: 22px; border-radius: 50%;
@@ -212,6 +269,7 @@
   <button class="variant-tab active" data-v="a" type="button">A: Energy Flow</button>
   <button class="variant-tab" data-v="b" type="button">B: Glass Depth</button>
   <button class="variant-tab" data-v="c" type="button">C: Soft Blocks</button>
+  <button class="variant-tab" data-v="d" type="button">D: Synthesis — B’s depth + C’s warmth</button>
 </nav>
 
 <p class="lead" id="lead"></p>
@@ -224,6 +282,13 @@
   <div class="seg energy" id="feelseg">
     <button type="button" data-feel="calm">Calm</button>
     <button type="button" data-feel="alive" class="on">Alive</button>
+  </div>
+  <span class="lbl">Live status</span>
+  <div class="seg" id="runseg">
+    <button type="button" data-run="off" class="on">Off</button>
+    <button type="button" data-run="running">Mid-run</button>
+    <button type="button" data-run="needs">Needs you</button>
+    <button type="button" data-run="failed">Failed</button>
   </div>
   <span class="lbl">Team icon</span>
   <div class="seg" id="iconseg">
@@ -325,11 +390,29 @@ var LEAD = {
      'This is the energy language already shipped in the publish gauntlet and the live step-flow (Phase 127), extended onto the canvas.',
   b: '<b>B — Glass Depth.</b> Frosted translucent panels with real elevation, and the 3D icon <i>floating above</i> the card with its own ' +
      'contact shadow — depth you can actually see, not a drawn effect. The quietest of the three: one title, one line, everything else on demand.',
+  d: '<b>D \u2014 Synthesis.</b> B\u2019s floating 3D icon and frosted depth, on C\u2019s left-aligned layout so a chain of steps scans quickly. ' +
+     'The decisive change: per-step-type colour is reduced to a <i>tint behind the icon</i> rather than a whole coloured tile \u2014 which keeps the ' +
+     'strong colours free for <b>run status</b>. Turn <b>Live status</b> on and compare D against C: in C the step-type colour and the ' +
+     'running / failed colour fight each other; in D they do not.',
   c: '<b>C — Soft Blocks.</b> Big friendly tiles, each kind of step with its own gentle colour. The most approachable and the least technical-feeling — ' +
      'colour does the sorting so the words don\'t have to. Warmest, but it spends the most colour, which leaves less room for status colour later.'
 };
 
-var variant = 'a', current = 'risk-register', teamIcon = 'llm_batch_agents';
+var variant = 'a', current = 'risk-register', teamIcon = 'llm_batch_agents', runMode = 'off';
+
+/* A realistic mid-run snapshot: everything before the focus step is done, the focus
+   step carries the live state, everything after is idle. Mirrors the honest node-state
+   model in research Pitfall 4 - a node is only `done` on a real phase_completed, and
+   `idle` is never inferred to be success. */
+function runStateFor(i, total) {
+  if (runMode === 'off') return null;
+  var focus = Math.min(runMode === 'running' ? 1 : runMode === 'needs' ? 3 : 2, total - 1);
+  if (i < focus) return 'done';
+  if (i > focus) return 'idle';
+  return runMode === 'running' ? 'running' : runMode === 'needs' ? 'needs' : 'failed';
+}
+var RUN_LABEL = { done: '\u2713 Done', running: '\u25cf Working on this now',
+                  needs: '\u270b Waiting for you', failed: '\u2715 Stopped here', idle: 'Not started' };
 var x = 0, y = 0, k = 1, activeIdx = -1;
 var flow = document.getElementById('flow'), plane = document.getElementById('plane'), stage = document.getElementById('stage');
 
@@ -345,12 +428,15 @@ function render() {
     var badges = (s.badges || []).map(function (b) {
       return '<span class="badge ' + b[0] + '">' + esc(b[1]) + '</span>';
     }).join('');
-    var iconSize = variant === 'b' ? 54 : 34;
+    var iconSize = (variant === 'b' || variant === 'd') ? 52 : 34;
     // `busts-in-silhouette` measures avg-luma 34.5 vs 135-185 for the other five
     // marks, so it is the one glyph that can disappear on Deep Midnight.
     var iconKey = s.icon === 'llm_batch_agents' ? teamIcon : s.icon;
+    var rs = runStateFor(i, wf.steps.length);
+    var runChip = rs ? '<div><span class="runchip ' + rs + '">' + RUN_LABEL[rs] + '</span></div>' : '';
     html +=
       '<div class="node' + (s.soon ? ' soon' : '') + '" data-i="' + i + '" data-type="' + s.type + '"' +
+        (rs ? ' data-run="' + rs + '"' : '') +
         (s.soon ? ' style="opacity:.62"' : '') + '>' +
         '<span class="stepn">' + (i + 1) + '</span>' +
         '<div class="icowrap"><span class="halo"></span>' + icon3d(iconKey, iconSize) + '</div>' +
@@ -358,7 +444,7 @@ function render() {
           '<div class="ttl">' + esc(s.plain) + '</div>' +
           '<div class="sub">' + esc(s.sub) + '</div>' +
           '<div class="techline">' + esc(s.slug) + ' · ' + esc(s.type) + '</div>' +
-          (badges ? '<div class="badges">' + badges + '</div>' : '') +
+          (badges ? '<div class="badges">' + badges + '</div>' : '') + runChip +
         '</div>' +
       '</div>';
   });
@@ -453,6 +539,16 @@ document.querySelectorAll('#feelseg button').forEach(function (b) {
     document.querySelectorAll('#feelseg button').forEach(function (o) { o.classList.remove('on'); });
     b.classList.add('on');
     document.body.classList.toggle('alive', b.getAttribute('data-feel') === 'alive');
+  });
+});
+document.querySelectorAll('#runseg button').forEach(function (b) {
+  b.addEventListener('click', function () {
+    document.querySelectorAll('#runseg button').forEach(function (o) { o.classList.remove('on'); });
+    b.classList.add('on');
+    runMode = b.getAttribute('data-run');
+    activeIdx = -1;
+    render();
+    if (runMode !== 'off') toast('A run snapshot painted onto the same nodes. Compare C and D: in C the step-type colour competes with the status colour; in D the strong colours were kept free.');
   });
 });
 document.querySelectorAll('#iconseg button').forEach(function (b) {
