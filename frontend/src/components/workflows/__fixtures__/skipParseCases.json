@@ -1,0 +1,65 @@
+{
+  "note": "Phase 183-02 (D-183-15, operator-approved correction C-1, 2026-07-25). THE ONE canonical skip_to_phase parse case table. backend/app/services/harness/reachability.py:89-98 parse_skip_target is AUTHORITATIVE: it slices the literal 'skip_to_phase:' prefix BY LENGTH, trims, and returns the remainder or None when empty. It is NOT a lastIndexOf(':') split — which is why 'skip_to_phase:a:b' expects 'a:b'. This ONE file is read by BOTH frontend/src/components/workflows/phaseVocabulary.test.ts and backend/tests/unit/test_183_skip_parse_parity.py. Never hand-copy these rows into either suite: two hand-maintained copies are exactly the drift C-1 already demonstrated.",
+  "cases": [
+    {
+      "on_failure": "skip_to_phase:escalate",
+      "expected": "escalate",
+      "why": "the ordinary case — the slug after the prefix"
+    },
+    {
+      "on_failure": "skip_to_phase:a:b",
+      "expected": "a:b",
+      "why": "C-1: everything after the prefix is the target; a lastIndexOf(':') split would wrongly yield 'b'"
+    },
+    {
+      "on_failure": "skip_to_phase:",
+      "expected": null,
+      "why": "an empty target is not a target"
+    },
+    {
+      "on_failure": "skip_to_phase:   ",
+      "expected": null,
+      "why": "whitespace-only trims to empty, which is not a target"
+    },
+    {
+      "on_failure": "skip_to_phase:  gather  ",
+      "expected": "gather",
+      "why": "the target is trimmed on both sides"
+    },
+    {
+      "on_failure": "fail_run",
+      "expected": null,
+      "why": "the most common live disposition (x45 across the corpus) is not a skip"
+    },
+    {
+      "on_failure": "ask_user",
+      "expected": null,
+      "why": "the other live disposition (x2) is not a skip"
+    },
+    {
+      "on_failure": "retry",
+      "expected": null,
+      "why": "a non-skip disposition"
+    },
+    {
+      "on_failure": "",
+      "expected": null,
+      "why": "the empty string carries no prefix"
+    },
+    {
+      "on_failure": null,
+      "expected": null,
+      "why": "a missing on_failure — Python guards with isinstance(on_failure, str); TypeScript with typeof"
+    },
+    {
+      "on_failure": "skip_to_phase",
+      "expected": null,
+      "why": "the prefix includes the colon; without it there is no match"
+    },
+    {
+      "on_failure": "SKIP_TO_PHASE:gather",
+      "expected": null,
+      "why": "the prefix match is case-sensitive in both languages"
+    }
+  ]
+}

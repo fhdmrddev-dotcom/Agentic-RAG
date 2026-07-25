@@ -20,6 +20,7 @@
  */
 import { describe, it, expect } from "vitest"
 import phaseVocabularySource from "./phaseVocabulary?raw"
+import skipParseCases from "./__fixtures__/skipParseCases.json"
 import {
   parseSkipTarget,
   nodeTitle,
@@ -79,6 +80,28 @@ describe("phaseVocabulary.parseSkipTarget — backend parity semantics (D-183-15
   it("SKIP_PREFIX is the literal the backend slices by", () => {
     expect(SKIP_PREFIX).toBe("skip_to_phase:")
   })
+})
+
+describe("phaseVocabulary parseSkipTarget — cross-language parity pin (D-183-15 / C-1)", () => {
+  // The rows are READ from the ONE shared table; they are deliberately NOT
+  // hand-copied here. backend/tests/unit/test_183_skip_parse_parity.py parametrizes
+  // over the SAME file, so neither language can drift alone. Hand-copying would
+  // recreate exactly the two-copy problem the table exists to kill.
+  const rows = skipParseCases.cases as { on_failure: string | null; expected: string | null; why: string }[]
+
+  it("the shared table is not truncated and still carries the C-1 row", () => {
+    expect(rows.length).toBeGreaterThanOrEqual(12)
+    const c1 = rows.find((r) => r.on_failure === "skip_to_phase:a:b")
+    expect(c1).toBeDefined()
+    expect(c1?.expected).toBe("a:b")
+  })
+
+  it.each(rows.map((r) => [r.on_failure, r.expected, r.why] as const))(
+    "parity: %j → %j (%s)",
+    (onFailure, expected) => {
+      expect(parseSkipTarget(onFailure)).toBe(expected)
+    },
+  )
 })
 
 describe("phaseVocabulary.nodeTitle — the plain-language node face (D-183-06)", () => {
