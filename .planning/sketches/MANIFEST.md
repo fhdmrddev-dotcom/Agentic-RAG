@@ -579,4 +579,42 @@ G-2 sketch, BEFORE spec/discuss-phase. First sketch batch of **v3.6 Visual / No-
 
 | # | Name | Design Question | Winner | Tags |
 |---|------|----------------|--------|------|
-| 137 | agentic-canvas-look | What should the canvas actually LOOK like — modern, 3D, alive and agentic, while staying calm and non-technical? | *pending* | phase-183, canvas-01, visual-direction, 3d-icons, icon-convention, energy-language, plain-language, connectors-preview, g2-sketch-gate |
+| 137 | agentic-canvas-look | What should the canvas actually LOOK like — modern, 3D, alive and agentic, while staying calm and non-technical? | **D — Synthesis (B’s depth + C’s warmth, colour budget reserved)** ★ | phase-183, canvas-01, visual-direction, 3d-icons, icon-convention, energy-language, plain-language, connectors-preview, g2-sketch-gate |
+
+**Session decision (2026-07-25) — the v3.6 canvas visual language is LOCKED.**
+
+**136-B + 137-D.** The canvas is a **horizontal left→right flow** of **frosted-glass step cards** with a **3D
+`fluent-emoji` mark floating at the left edge**, casting its own contact shadow. Titles are **plain business
+language** ("Search the knowledge base"), one supporting line, at most two word-badges ("Must cite its sources",
+"Waits for you"); the real `phase_type` / slug lives behind the **⌥ Technical names** reveal (the shipped v3.3
+two-audience pattern). Motion is **Alive by default** — the backdrop drifts, the running step breathes, and light
+travels the edge into it — with a **Calm** setting that holds everything completely still.
+
+**The load-bearing rule this locks: the colour budget.** Per-step-type colour is a *tint behind the icon only*,
+never a whole coloured tile — because **Phase 188 needs the strong colours for run status** (running / done /
+waiting-for-you / failed). Variant C was rejected on exactly this: it spends its colour on step type, so an
+`llm_human_input` tile is amber whether or not it is actually waiting for you. **Any later phase that wants to
+colour a node by *type* must justify it against this rule.**
+
+**Two build rules that came out of the review:**
+1. **Motion keys off RUN STATE, never off selection.** The first build attached motion to the selected node, so the
+   Calm/Alive toggle silently did nothing whenever nothing was selected (operator-reported). A running step must
+   look running whether or not anyone clicked it — which is also the honest behaviour (research Pitfall 4).
+2. **Phase icons come from `themes/phase-icons-3d.js`, never text glyphs.** The 134–136 batch drew the flat unicode
+   set Phase 127 retired, and that single miss is most of why the operator read the work as "very basic … does not
+   look very agentic."
+
+**Competitor evidence backing the constrained-spine bet** (`.planning/research/deep-dive/`, crawled at milestone
+kickoff; surfaced to the operator 2026-07-25 in answer to "how do Beam / Glean do this?"): **Glean** — the strongest
+enterprise competitor — scopes drag-and-drop to **reordering steps**, not free wiring ("closer to a reorderable,
+branchable spine than an open graph"). **Beam** redesigned its builder in **July 2026** *toward* sidebar config +
+per-field completeness status, and its own docs rate the blank-canvas path "intermediate-to-advanced." **n8n**’s free
+DAG has a documented complexity cliff — 20–30 nodes before non-technical teammates lose the thread, 200 nodes
+"impossible to maintain, debug, or explain to anyone." All three ship describe→draft→refine AI authoring, so the
+AI-seed is table stakes; our differentiator is that the generator’s response schema **is** the `extra="forbid"`
+discriminated union, so it structurally cannot emit an invalid draft — plus graded grounding governance, which
+**none of the three has**.
+
+**Feeds `/gsd:spec-phase 183` / `/gsd:discuss-phase 183`** — acceptance bar = 137-D. Sketches 134–135 remain the
+structural reference (frame options, node-content inventory, live-data findings); 136 is the topology + SC#4
+faithfulness harness. Sessions: 134–137.

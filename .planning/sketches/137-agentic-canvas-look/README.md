@@ -2,11 +2,15 @@
 sketch: 137
 name: agentic-canvas-look
 question: "What should the canvas actually LOOK like — modern, 3D, alive and agentic, while staying calm and non-technical?"
-winner: null
+winner: "D"
 tags: [phase-183, canvas-01, visual-direction, 3d-icons, icon-convention, energy-language, plain-language, connectors-preview, g2-sketch-gate]
 ---
 
 # Sketch 137: How the canvas should look
+
+> **Winner: D — Synthesis** (operator, 2026-07-25). B's floating 3D icon + frosted depth, C's left-aligned
+> readability, per-step-type colour reduced to a tint behind the icon so the strong colours stay free for run
+> status. This is the canvas visual language Phases 183–188 build on.
 
 ## Why this sketch exists
 
@@ -98,6 +102,27 @@ for it.
 
 So the recommendation is **D**: it keeps what you liked about B (the floating 3D icon, the depth, the calm), takes
 C's readability (left-aligned, warm, scannable), and does not mortgage the colour Phase 188 needs.
+
+## Defect found and fixed during review (2026-07-25)
+
+Operator: *"calm and alive — when I click it I do not see a difference; I don't know if there is something broken."*
+It was broken, not a misunderstanding. Motion was attached **only** to the currently-selected node and its incoming
+edge, and several actions (switching workflow, switching Live status) reset the selection to none — so the toggle
+frequently had nothing to animate and Calm and Alive rendered identically.
+
+Fixed by making the state **ambient rather than selection-dependent**:
+
+- The backdrop drifts continuously in Alive and is completely still in Calm.
+- The **running** step breathes and pulses on its own, with no click — and the light travels the edge *into it*,
+  following the run rather than the cursor.
+- `render()` now guarantees something is always demonstrating the toggle.
+- The control is relabelled **Motion — Calm (still) / Alive (breathing)**, and the footer names what is moving.
+
+Verified by measuring computed animation state: **Alive = 4–5 running animations, Calm = exactly 0**, in every
+scenario including the one that used to fail (immediately after a workflow switch).
+
+**Design implication for the build:** motion must key off *run state*, never off selection. A step that is running
+looks running whether or not anyone clicked it — which is also the honest behaviour (research Pitfall 4).
 
 ## What to Look For
 

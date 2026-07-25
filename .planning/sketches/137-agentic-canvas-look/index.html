@@ -260,6 +260,24 @@
   }
   .amb::before { width: 520px; height: 520px; left: 8%; top: -12%; background: hsl(239 84% 45% / .22); }
   .amb::after  { width: 460px; height: 460px; right: 6%; bottom: -16%; background: hsl(258 90% 50% / .16); }
+  /* Alive = the surface breathes even with nothing selected. Calm = completely still. */
+  body.alive .amb::before { animation: drift1 19s ease-in-out infinite; }
+  body.alive .amb::after  { animation: drift2 23s ease-in-out infinite; }
+  @keyframes drift1 { 0%,100% { transform: translate(0,0) scale(1); opacity: .5 }
+                      50%     { transform: translate(70px,44px) scale(1.14); opacity: .78 } }
+  @keyframes drift2 { 0%,100% { transform: translate(0,0) scale(1); opacity: .42 }
+                      50%     { transform: translate(-58px,-38px) scale(1.11); opacity: .68 } }
+
+  /* the running step breathes on its own - no click needed */
+  .node[data-run="running"] .halo { opacity: 1; }
+  body.alive .node[data-run="running"] .halo { animation: haloPulse 2.1s ease-in-out infinite; }
+  body.alive .node[data-run="running"] { animation: cardBreathe 2.6s ease-in-out infinite; }
+  @keyframes cardBreathe { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-3px) } }
+  body.alive .runchip.running::before { content: ''; width: 6px; height: 6px; border-radius: 50%;
+    background: currentColor; animation: haloPulse 1.3s ease-in-out infinite; }
+
+  /* a still surface must look deliberately still, not broken */
+  body:not(.alive) .conn .line::after { animation: none !important; opacity: 0 !important; }
 </style>
 </head>
 <body class="alive">
@@ -278,10 +296,10 @@
   <span class="lbl">Workflow</span>
   <div class="seg" id="defseg"></div>
   <div class="spacer"></div>
-  <span class="lbl">Feel</span>
+  <span class="lbl">Motion</span>
   <div class="seg energy" id="feelseg">
-    <button type="button" data-feel="calm">Calm</button>
-    <button type="button" data-feel="alive" class="on">Alive</button>
+    <button type="button" data-feel="calm">Calm — still</button>
+    <button type="button" data-feel="alive" class="on">Alive — breathing</button>
   </div>
   <span class="lbl">Live status</span>
   <div class="seg" id="runseg">
@@ -464,17 +482,31 @@ function render() {
   });
 
   document.getElementById('footmeta').textContent = wf.meta;
-  setActive(activeIdx >= WF[current].steps.length ? -1 : activeIdx);
+  // With a run snapshot on screen the RUNNING step carries the motion by itself.
+  // Otherwise keep a step selected so the Motion toggle always has something to show
+  // (the earlier build could land on "nothing selected", which made Calm and Alive
+  // look identical - reported by the operator, 2026-07-25).
+  var want = activeIdx;
+  if (runMode === 'off' && (want < 0 || want >= wf.steps.length)) want = Math.min(1, wf.steps.length - 1);
+  if (runMode !== 'off') want = -1;
+  setActive(want);
   fit();
 }
 
 function setActive(i) {
   activeIdx = i;
+  // In a run snapshot the flowing edge follows the RUNNING step, not the selection.
+  var runningIdx = -1;
+  flow.querySelectorAll('.node').forEach(function (n) {
+    if (n.getAttribute('data-run') === 'running') runningIdx = +n.getAttribute('data-i');
+  });
+  var lit = runningIdx >= 0 ? runningIdx : i;
   flow.querySelectorAll('.node').forEach(function (n) { n.classList.toggle('active', +n.getAttribute('data-i') === i); });
-  flow.querySelectorAll('.conn').forEach(function (c) { c.classList.toggle('flowing', +c.getAttribute('data-conn') === i); });
-  document.getElementById('foottext').textContent = i < 0
-    ? 'You can look around freely — the shape is fixed because this workflow is published.'
-    : 'Showing step ' + (i + 1) + ' of ' + WF[current].steps.length + ' — click it again to deselect.';
+  flow.querySelectorAll('.conn').forEach(function (c) { c.classList.toggle('flowing', +c.getAttribute('data-conn') === lit); });
+  document.getElementById('foottext').textContent =
+    runningIdx >= 0 ? 'Step ' + (runningIdx + 1) + ' is running — switch Motion to Calm to hold it still.'
+    : i < 0 ? 'You can look around freely — the shape is fixed because this workflow is published.'
+    : 'Step ' + (i + 1) + ' of ' + WF[current].steps.length + ' selected — switch Motion to Calm to hold it still.';
 }
 
 /* ── pan / zoom ── */
@@ -538,7 +570,11 @@ document.querySelectorAll('#feelseg button').forEach(function (b) {
   b.addEventListener('click', function () {
     document.querySelectorAll('#feelseg button').forEach(function (o) { o.classList.remove('on'); });
     b.classList.add('on');
-    document.body.classList.toggle('alive', b.getAttribute('data-feel') === 'alive');
+    var on = b.getAttribute('data-feel') === 'alive';
+    document.body.classList.toggle('alive', on);
+    toast(on
+      ? 'Alive - the backdrop drifts, the working step breathes, and light travels the line into it.'
+      : 'Calm - everything holds completely still. Same layout, no motion.');
   });
 });
 document.querySelectorAll('#runseg button').forEach(function (b) {
@@ -601,8 +637,7 @@ window.addEventListener('resize', fit);
 
 document.getElementById('lead').innerHTML = LEAD.a;
 render();
-/* open on step 2 so the "alive" state is visible immediately */
-setTimeout(function () { setActive(1); }, 350);
+/* render() now guarantees something is always demonstrating the Motion toggle. */
 </script>
 </body>
 </html>
