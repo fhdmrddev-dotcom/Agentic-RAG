@@ -855,3 +855,120 @@ def test_grounding_unavailable_is_known_to_the_classifier_and_classifies_error()
     assert set(finding) == {"code", "phase", "message"}
     assert finding["code"] == code
     assert finding["phase"] is None
+
+
+# ═══ (E) Round-3 CR-02 — the PALETTE route is the third consumer ══════════════
+#
+# Verification Truth 8 / review CR-02: `GET /workflows/grounding-bundle` read the bundle's
+# DATA fields and ignored its HONESTY field, so a registry outage rendered as an empty
+# palette at HTTP 200 — indistinguishable from an author who owns nothing. This is the one
+# regression plan 182-11 INTRODUCED: before it, the same failure was a loud 500.
+#
+# EVERY TEST BELOW FAILS AGAINST THE ROUND-3 CODE (pre-fix outcome named per docstring).
+
+
+async def _palette(supabase=None, *, template_asset_id=None):
+    """Call the `/workflows/grounding-bundle` handler DIRECTLY (the `_validate` posture)."""
+    from app.api import workflows as wf
+
+    return await wf.get_grounding_bundle(
+        current_user={"id": _CALLER},
+        supabase=object() if supabase is None else supabase,
+        template_asset_id=template_asset_id,
+    )
+
+
+@pytest.mark.asyncio
+async def test_a_healthy_palette_reports_no_degradation():
+    """The control. A complete read must leave `degraded` EMPTY.
+
+    Without this, a test asserting the degraded case could pass against a handler that
+    hardcodes `degraded=["folders", "skills"]` on every request.
+    """
+    response = await _palette(_healthy_client(folder_count=2))
+
+    assert response.degraded == []
+    assert len(response.folders) == 2
+    assert response.skills, "the healthy control must actually carry skills"
+
+
+@pytest.mark.asyncio
+async def test_a_degraded_skills_read_is_named_on_the_palette_not_served_as_empty(monkeypatch):
+    """A skills-read failure says "we could not check", never "you have no skills".
+
+    PRE-FIX OUTCOME: `{"skills": [], "degraded" absent}` at HTTP 200 — the canvas draws an
+    empty skill dropdown and the author concludes their skills were deleted.
+    """
+    _patch_degraded_bundle(monkeypatch, "skills")
+
+    response = await _palette()
+
+    assert response.degraded == ["skills"], (
+        "the palette must NAME the registry it could not resolve — an empty `degraded` on a "
+        "degraded bundle is the exact lie this field exists to prevent"
+    )
+
+
+@pytest.mark.asyncio
+async def test_a_degraded_folders_read_is_named_on_the_palette(monkeypatch):
+    """Same contract for the other registry — the signal is per-registry, not a boolean."""
+    _patch_degraded_bundle(monkeypatch, "folders")
+
+    response = await _palette()
+
+    assert response.degraded == ["folders"]
+
+
+@pytest.mark.asyncio
+async def test_both_degraded_registries_are_reported_sorted(monkeypatch):
+    """Both names travel, in a STABLE order (the field is a wire payload, not a set dump)."""
+    _patch_degraded_bundle(monkeypatch, "skills", "folders")
+
+    response = await _palette()
+
+    assert response.degraded == ["folders", "skills"]
+
+
+@pytest.mark.asyncio
+async def test_a_partial_degradation_still_serves_what_did_resolve(monkeypatch):
+    """Degrading must not BLANK the half that worked.
+
+    A skills outage must not cost the author their folder tree — the failure is per-registry
+    and the palette serves whatever resolved alongside the honest marker. A handler that
+    "fails safe" by returning an empty payload would pass the degraded assertions above and
+    still be wrong.
+    """
+    from app.services.harness import grounding as g
+
+    async def _half_degraded(**_kwargs):
+        return g.GroundingBundle(
+            tools=["search_documents"],
+            tool_names={"search_documents"},
+            folders=[{"id": _PROJECT, "name": "Project"}],
+            skills=[],
+            skill_ids=set(),
+            placeholders=[],
+            degraded=frozenset({"skills"}),
+        )
+
+    monkeypatch.setattr(g, "assemble_grounding_bundle", _half_degraded)
+
+    response = await _palette()
+
+    assert response.degraded == ["skills"]
+    assert [f.name for f in response.folders] == ["Project"], (
+        "the folders that DID resolve must still be served — degrading one registry must not "
+        "blank another"
+    )
+    assert response.tools == ["search_documents"]
+
+
+def test_the_palette_response_model_can_carry_the_degradation():
+    """Structural: the field exists, defaults EMPTY, and empty means complete.
+
+    Pins the default explicitly — a `degraded` that defaulted to anything but `[]` would make
+    every healthy palette look broken.
+    """
+    from app.api.workflows import GroundingBundleResponse
+
+    assert GroundingBundleResponse().degraded == []

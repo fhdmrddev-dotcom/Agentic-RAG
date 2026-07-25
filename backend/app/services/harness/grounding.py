@@ -312,10 +312,19 @@ async def assemble_grounding_bundle(
     NEVER RAISES ON A REGISTRY FAILURE (round-2 gap closure — WR-01 / WR-02 / WR-07). Both
     DB-backed reads are guarded here and their failure is RECORDED on ``bundle.degraded``
     rather than propagated or swallowed. This is the ONE place the degradation decision is
-    made; ``/validate`` and publish stage 2.6 both branch on the result and both mint the ONE
-    shared ``grounding_unavailable_finding``. NL generation (``workflow_authoring``) is the
-    third consumer and deliberately ignores ``degraded``: its own fidelity check re-reads the
-    folder tree through the ⊆ walk, so its behaviour is unchanged by this guard.
+    made; ``/validate``, ``GET /workflows/grounding-bundle`` and publish stage 2.6 all branch on
+    the result — the first and third mint the ONE shared ``grounding_unavailable_finding``, the
+    palette route surfaces the same signal as its own ``degraded`` field.
+
+    NL generation (``workflow_authoring``) is the fourth consumer and is the ONE that still does
+    not branch. That is a KNOWN GAP, not a safe design: this docstring previously defended it by
+    claiming "its own fidelity check re-reads the folder tree through the ⊆ walk, so its
+    behaviour is unchanged by this guard" — and that claim is FALSE for the common case. A
+    freshly NL-generated draft has no ``project_folder_id`` yet, and ``scope.resolve_project_
+    subtree`` returns ``None`` for an unbound definition (``scope.py:124-125``), so the ⊆ walk is
+    a no-op that re-reads nothing. A folders-read failure during NL generation therefore yields a
+    folder-blind draft presented as ``{"ok": True}``. Tracked as SEED-133; do not re-derive the
+    disproven claim.
 
     ``restrict_org_ids`` (WR-05, keyword-only) narrows BOTH org-gated reads to a specific org
     set. The polarity is load-bearing and identical to ``fetch_visible_folders``' (T-182-54):

@@ -373,6 +373,21 @@ class GroundingBundleResponse(BaseModel):
     folders: list[PaletteFolder] = Field(default_factory=list)
     skills: list[PaletteSkill] = Field(default_factory=list)
     template_placeholders: list[str] = Field(default_factory=list)
+    # Round-3 CR-02 / verification Truth 8: the names of the registries that could NOT be
+    # resolved for this request (``"folders"`` / ``"skills"``), sorted for a stable payload.
+    # EMPTY is the only value that means "this palette is complete".
+    #
+    # Without this field the route was a LIAR AT SCALE, and specifically a liar this phase
+    # introduced: plan 182-11 moved the folders/skills read failure OUT of an exception
+    # (a loud 500 the canvas could not mistake for data) and INTO ``GroundingBundle.degraded``
+    # — a field this handler then never read. A PostgREST blip therefore rendered as
+    # ``{"folders": [], "skills": []}`` at HTTP 200: byte-indistinguishable from an author who
+    # genuinely owns nothing, on the exact surface whose whole job is to tell the canvas which
+    # building blocks are valid. The canvas would have drawn empty dropdowns and the author
+    # would have concluded their KB was gone. Degrading LOUDLY is the same contract
+    # ``/validate`` already keeps with ``grounding_unavailable`` — "we could not check" is a
+    # different sentence from "there is nothing", and the palette must be able to say it.
+    degraded: list[str] = Field(default_factory=list)
 
 
 # ══ The severity taxonomy (D-182-03) — COMPOSED from the owning modules ══════════
@@ -694,6 +709,12 @@ async def get_grounding_bundle(
         folders=bundle.folders,
         skills=bundle.skills,
         template_placeholders=bundle.placeholders,
+        # The SAME ``bundle.degraded`` branch ``validate_workflow`` makes (:575), at the SAME
+        # seam, from the SAME shared collector — this route was the one consumer that read the
+        # bundle's data fields but not its honesty field. Nothing is filtered or synthesized
+        # here: whatever DID resolve is still served (a skills-read failure must not blank the
+        # folder tree), and ``degraded`` names only what did not.
+        degraded=sorted(bundle.degraded or ()),
     )
 
 
