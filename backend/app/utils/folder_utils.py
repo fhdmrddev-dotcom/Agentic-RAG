@@ -47,8 +47,11 @@ async def fetch_all_folders(
     both columns.
 
     ``strict`` (WR-07, keyword-only, default False) makes the read TRUNCATION-AWARE: it asks
-    PostgREST for an exact count and raises ``FolderReadTruncatedError`` when fewer rows come
-    back than the server says exist. The default is load-bearing, not timidity — with
+    PostgREST for an exact count and, when fewer rows come back than the server says exist,
+    PAGINATES the remainder with ``.range()`` before giving up. ``FolderReadTruncatedError`` is
+    raised only if pagination still cannot assemble the reported total (round-3 CR-03 — the
+    detect-only form turned every gating call into a permanent outage past ``max-rows``; see the
+    block comment at the pagination loop). The default is load-bearing, not timidity — with
     ``strict=False`` this issues the byte-identical query it always has (no ``count``, no extra
     round trip, same rows). This helper sits on the chat agent-loop path
     (``agent_loop.py:1209``) and on four ``/folders`` routes; an unconditional ``count="exact"``
@@ -71,19 +74,57 @@ async def fetch_all_folders(
     resp = await aexec(supabase.table("folders").select(fields, count="exact"))
     rows = resp.data or []
     total = getattr(resp, "count", None)
-    if isinstance(total, int) and total > len(rows):
-        logger.warning(
-            "folders read TRUNCATED: %s rows returned but the server reports %s — a gating "
-            "caller would resolve a shrunken folder subtree and accuse a correct definition "
-            "of a folder_scope violation (WR-07). Failing the read instead.",
-            len(rows),
-            total,
-        )
-        raise FolderReadTruncatedError(
-            f"the folders read returned {len(rows)} of {total} rows (PostgREST max-rows "
-            "truncation) — the folder tree cannot be trusted for a scope decision"
-        )
-    return rows
+    if not isinstance(total, int) or total <= len(rows):
+        return rows
+
+    # ── PAGINATE, then verify (round-3 CR-03) ────────────────────────────────
+    # Detecting the truncation is not the same as surviving it. Until this block existed,
+    # the strict read RAISED the moment the table crossed PostgREST's ``max-rows`` cap —
+    # and because the two grounding GATE call sites are the only strict callers, that made
+    # EVERY ``/validate`` return a lone ``grounding_unavailable`` and EVERY publish block at
+    # ``grounding_fidelity``, permanently, deployment-wide, with no operator remedy. At the
+    # exact scale this module's own docstring calls ordinary ("1000 folders ACROSS ALL
+    # TENANTS is not a large deployment"), the WR-07 fix would have converted a rare
+    # transient blip into a hard outage of the whole authoring surface. "We could not check"
+    # is only an honest answer when it is also a RARE one.
+    #
+    # So: walk the remaining pages with ``.range()`` (inclusive bounds, PostgREST semantics)
+    # and only then fall back to the error, and only if the walk still cannot see everything.
+    # The raise is kept as the LAST resort — a short read that pagination cannot explain is
+    # still untrustworthy for a scope decision, and the fail-closed posture from WR-07 stands.
+    page_size = len(rows)
+    if page_size > 0:
+        while len(rows) < total:
+            page = await aexec(
+                supabase.table("folders")
+                .select(fields)
+                .range(len(rows), len(rows) + page_size - 1)
+            )
+            batch = page.data or []
+            if not batch:
+                break  # server stopped yielding — fall through to the raise below
+            rows.extend(batch)
+        if len(rows) >= total:
+            logger.info(
+                "folders read paginated: assembled %s rows in pages of %s to satisfy a "
+                "gating caller (the unpaginated read would have been capped at %s)",
+                len(rows),
+                page_size,
+                page_size,
+            )
+            return rows
+
+    logger.warning(
+        "folders read TRUNCATED: %s rows returned but the server reports %s — a gating "
+        "caller would resolve a shrunken folder subtree and accuse a correct definition "
+        "of a folder_scope violation (WR-07). Failing the read instead.",
+        len(rows),
+        total,
+    )
+    raise FolderReadTruncatedError(
+        f"the folders read returned {len(rows)} of {total} rows (PostgREST max-rows "
+        "truncation) — the folder tree cannot be trusted for a scope decision"
+    )
 
 
 async def _resolve_caller_org_ids(supabase: "Client", user_id: str) -> set[str]:

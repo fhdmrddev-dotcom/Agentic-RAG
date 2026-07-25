@@ -68,13 +68,28 @@ class _FakeQuery:
     def __init__(self, rows, count=_NO_COUNT):
         self._rows = list(rows)
         self._count = count
-        self.count_arg = None
         self.selected = None
+        self._ranged = None
+        self.range_calls = []
+        self.select_counts = []
 
     def select(self, *cols, count=None, **_kwargs):
         self.selected = cols[0] if cols else "*"
-        self.count_arg = count
+        self.select_counts.append(count)
         return self
+
+    @property
+    def count_arg(self):
+        """The count arg of the FIRST select — the one that decides whether the read is
+        truncation-aware.
+
+        Recorded per-select rather than overwritten because a real supabase-py `.table()`
+        hands back a FRESH builder per call while this double reuses one recorder: without
+        the list, CR-03's pagination follow-up would erase the very evidence these tests
+        assert on. The follow-ups correctly pass no count — re-asking would add a COUNT(*)
+        per page.
+        """
+        return self.select_counts[0] if self.select_counts else None
 
     def eq(self, *_a, **_k):
         return self
@@ -82,11 +97,46 @@ class _FakeQuery:
     def or_(self, *_a, **_k):
         return self
 
+    def range(self, start, end):
+        # Round-3 CR-03: the strict read now PAGINATES past a `max-rows` cap before giving
+        # up. This base double owns a single fixed prefix and nothing beyond it, so a ranged
+        # read past its end yields NOTHING — which models a server that will not serve more
+        # and keeps the fail-closed raise reachable.
+        self.range_calls.append((start, end))
+        self._ranged = (start, end)
+        return self
+
     def execute(self):
+        if self._ranged is not None:
+            start, end = self._ranged
+            self._ranged = None
+            return SimpleNamespace(data=self._rows[start:end + 1])
         resp = SimpleNamespace(data=list(self._rows))
         if self._count is not _NO_COUNT:
             resp.count = self._count
         return resp
+
+
+class _PagedFolders(_FakeQuery):
+    """A `folders` table that behaves like PostgREST under a real `max-rows` cap.
+
+    An unbounded select returns only the first `cap` rows but reports the TRUE total as an
+    exact count; `.range(a, b)` serves the requested slice (itself capped). This is the double
+    that distinguishes "we detected a truncation" from "we survived one" — the `_FakeQuery`
+    above can only ever prove the raise.
+    """
+
+    def __init__(self, rows, cap):
+        super().__init__(rows, count=len(rows))
+        self._all = list(rows)
+        self._cap = cap
+
+    def execute(self):
+        if self._ranged is not None:
+            start, end = self._ranged
+            self._ranged = None
+            return SimpleNamespace(data=self._all[start:end + 1][: self._cap])
+        return SimpleNamespace(data=self._all[: self._cap], count=len(self._all))
 
 
 class _FakeSupabase:
@@ -237,6 +287,10 @@ async def test_the_strict_read_raises_when_the_rows_are_short_of_the_reported_to
     a prefix indistinguishable from a complete answer — `folder_map` lost ancestors, the
     resolved project subtree shrank, and `assert_folder_scopes_subset` accused a correct
     definition of a `folder_scope` violation that (post-182-06) BLOCKS publish.
+
+    Round-3 CR-03: the raise is now the LAST resort, reached only after pagination fails to
+    assemble the reported total. This double owns nothing past its prefix, so the ranged
+    follow-up comes back empty and the fail-closed posture still holds.
     """
     from app.utils.folder_utils import FolderReadTruncatedError, fetch_all_folders
 
@@ -248,6 +302,10 @@ async def test_the_strict_read_raises_when_the_rows_are_short_of_the_reported_to
     assert sb.tables["folders"].count_arg == "exact", (
         "the strict read must ask PostgREST for an exact count — without it there is nothing "
         "to compare the returned row count against"
+    )
+    assert sb.tables["folders"].range_calls, (
+        "the strict read raised WITHOUT attempting pagination — that is the detect-only form "
+        "that turns a max-rows cap into a permanent deployment-wide outage (CR-03)"
     )
 
 
@@ -972,3 +1030,103 @@ def test_the_palette_response_model_can_carry_the_degradation():
     from app.api.workflows import GroundingBundleResponse
 
     assert GroundingBundleResponse().degraded == []
+
+
+# ═══ (F) Round-3 CR-03 — SURVIVING a max-rows cap, not merely detecting it ════
+#
+# Verification Truth 8 / review CR-03: 182-11's strict read detected a truncation and raised.
+# Because the only strict callers are the two grounding GATES, that made every /validate
+# return a lone `grounding_unavailable` and every publish block at `grounding_fidelity` —
+# permanently, deployment-wide, with no operator remedy — the moment `folders` crossed
+# PostgREST's cap. At the scale folder_utils' own docstring calls ordinary.
+#
+# "We could not check" is only honest when it is also RARE.
+
+
+@pytest.mark.asyncio
+async def test_the_strict_read_paginates_past_the_cap_and_returns_every_row():
+    """The whole point. A capped server yields the COMPLETE tree, not an exception.
+
+    PRE-FIX OUTCOME: `FolderReadTruncatedError` on every call, forever, for any deployment
+    with more folders than the cap — /validate and publish both dead.
+    """
+    from app.utils.folder_utils import fetch_all_folders
+
+    all_rows = _folder_rows(7)
+    sb = _FakeSupabase(folders=_PagedFolders(all_rows, cap=3))
+
+    got = await fetch_all_folders(sb, fields="*", strict=True)
+
+    assert got == all_rows, (
+        f"expected all {len(all_rows)} rows assembled by pagination, got {len(got)}"
+    )
+    assert sb.tables["folders"].range_calls == [(3, 5), (6, 8)], (
+        "pages must walk forward from the prefix in cap-sized, inclusive-bound ranges "
+        f"(PostgREST .range semantics); got {sb.tables['folders'].range_calls}"
+    )
+
+
+@pytest.mark.asyncio
+async def test_pagination_survives_a_cap_that_divides_the_total_exactly():
+    """The off-by-one case: the last page lands exactly on the total.
+
+    A loop that asked for one page too many would either raise or spin; a loop that stopped
+    one page short would raise with an almost-complete set. Both are caught here.
+    """
+    from app.utils.folder_utils import fetch_all_folders
+
+    all_rows = _folder_rows(6)
+    sb = _FakeSupabase(folders=_PagedFolders(all_rows, cap=3))
+
+    assert await fetch_all_folders(sb, fields="*", strict=True) == all_rows
+
+
+@pytest.mark.asyncio
+async def test_a_paginated_gate_read_produces_a_bundle_that_is_not_degraded():
+    """End to end: the cap no longer reaches the author as `grounding_unavailable`.
+
+    This is the test that would have caught CR-03 — it drives the real
+    `assemble_grounding_bundle` (the actual gate consumer) against a capped server and
+    asserts the bundle is CLEAN. Pre-fix this bundle came back `degraded={"folders"}`, which
+    /validate and publish then rendered as "we could not check your workflow" on every
+    request.
+    """
+    from app.services.harness import grounding as g
+
+    sb = _FakeSupabase(
+        folders=_PagedFolders(_folder_rows(7), cap=3),
+        org_members=_FakeQuery([{"org_id": _ORG}]),
+        skills=_FakeQuery(_skill_rows()),
+    )
+
+    bundle = await g.assemble_grounding_bundle(supabase=sb, user_id=_CALLER)
+
+    assert bundle.degraded == frozenset(), (
+        "a survivable max-rows cap still degraded the bundle — every /validate and every "
+        "publish on this deployment would report grounding_unavailable (CR-03)"
+    )
+    assert len(bundle.folders) == 7, (
+        "the gate must see the WHOLE folder tree — a short tree is what manufactures a false "
+        "folder_scope violation in the first place (WR-07)"
+    )
+
+
+@pytest.mark.asyncio
+async def test_the_default_read_never_paginates():
+    """The byte-identity control, extended. Pagination is strict-only.
+
+    The default path is the chat agent-loop path and four /folders routes; it must issue the
+    SAME single unbounded query it always has — no count, and now also no `.range()` follow-up.
+    """
+    from app.utils.folder_utils import fetch_all_folders
+
+    sb = _FakeSupabase(folders=_PagedFolders(_folder_rows(7), cap=3))
+
+    rows = await fetch_all_folders(sb, fields="*")
+
+    assert len(rows) == 3, "the default read must return the server's prefix, unexamined"
+    assert sb.tables["folders"].count_arg is None
+    assert sb.tables["folders"].range_calls == [], (
+        "the DEFAULT read paginated — that is an extra round trip added to the chat "
+        "agent-loop path and four /folders routes (T-182-48)"
+    )

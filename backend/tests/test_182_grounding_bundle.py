@@ -126,7 +126,10 @@ def test_grounding_bundle_returns_server_sourced_palette(client, monkeypatch):
     assert resp.status_code == 200, resp.text
 
     body = resp.json()
-    assert set(body) == {"tools", "folders", "skills", "template_placeholders"}
+    # `degraded` joined the contract in the round-3 gap closure (CR-02): the palette must be
+    # able to say "we could not READ your folders/skills" rather than serve an outage as an
+    # empty tree. A healthy read reports `[]` — see the assertion below.
+    assert set(body) == {"tools", "folders", "skills", "template_placeholders", "degraded"}
     assert isinstance(body["tools"], list) and body["tools"]
     assert "search_documents" in body["tools"]  # the genuine registry, not a literal
     assert body["tools"] == sorted(body["tools"])
@@ -134,6 +137,9 @@ def test_grounding_bundle_returns_server_sourced_palette(client, monkeypatch):
     assert isinstance(body["skills"], list)
     # placeholders are PER-TEMPLATE: absent ?template_asset_id= -> [] (RESEARCH A3)
     assert body["template_placeholders"] == []
+    # A resolvable read reports NO degradation. Empty is the only value that means "this
+    # palette is complete" — the honesty field must not cry wolf on a healthy request.
+    assert body["degraded"] == []
 
 
 def test_grounding_bundle_fields_come_from_the_bundle(client, monkeypatch):
@@ -203,6 +209,9 @@ def test_grounding_bundle_fields_come_from_the_bundle(client, monkeypatch):
         "folders": [{"id": folder_id, "name": "Q3 Reports", "parent_id": None}],
         "skills": [{"id": skill_id, "name": "Legal Review"}],
         "template_placeholders": ["project_name", "report_date"],
+        # Mapped off `GroundingBundle.degraded` exactly like every field above it — this fake
+        # bundle resolved cleanly, so the honest answer is the empty list (round-3 CR-02).
+        "degraded": [],
     }
     # CR-02 stated as a negative, so a widened model fails HERE and not in review: neither the
     # tenant id nor the seeding owner may appear ANYWHERE in the serialized palette.
