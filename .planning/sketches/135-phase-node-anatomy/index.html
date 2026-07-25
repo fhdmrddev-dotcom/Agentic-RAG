@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sketch 135 — Phase node anatomy (Phase 183)</title>
+<link rel="stylesheet" href="../themes/default.css">
+<style>
+  body { padding-bottom: 80px; }
+  .wrap { max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--space-6) var(--space-12); }
+
+  .note { font-size: var(--text-sm); color: var(--color-text-muted); line-height: 1.65; margin: 0 0 var(--space-5); max-width: 84ch; }
+  .note b { color: var(--color-text); }
+  code { font-family: var(--font-mono); font-size: .9em; color: var(--color-primary); background: var(--color-primary-dim); padding: 1px 4px; border-radius: 3px; }
+
+  .toolbar-row {
+    display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap;
+    padding: var(--space-3) var(--space-4); margin-bottom: var(--space-6);
+    background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md);
+  }
+  .switch { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; font-size: var(--text-sm); color: var(--color-text-muted); }
+  .switch .track { width: 34px; height: 19px; border-radius: 999px; background: var(--color-muted); border: 1px solid var(--color-border); position: relative; transition: all var(--dur-base) var(--ease-out); }
+  .switch .track::after { content: ''; position: absolute; left: 2px; top: 1.5px; width: 14px; height: 14px; border-radius: 50%; background: var(--color-text-dim); transition: all var(--dur-base) var(--ease-out); }
+  .switch.on .track { background: var(--color-primary-dim); border-color: var(--color-primary-glow); }
+  .switch.on .track::after { left: 17px; background: var(--color-primary); }
+  .switch.on { color: var(--color-text); }
+
+  h2.sec { font-family: var(--font-headline); font-size: var(--text-md); margin: var(--space-8) 0 var(--space-1); }
+  h2.sec:first-of-type { margin-top: 0; }
+  p.seclead { font-size: var(--text-sm); color: var(--color-text-dim); margin: 0 0 var(--space-4); max-width: 82ch; }
+  p.seclead em { color: var(--color-warning); font-style: normal; }
+
+  .board { display: flex; flex-wrap: wrap; gap: var(--space-4); align-items: flex-start; }
+
+  /* ═══════════ shared node atoms ═══════════ */
+  .n {
+    position: relative; box-sizing: border-box; background: var(--color-surface);
+    border: 1px solid var(--color-border); border-radius: var(--radius-md);
+    transition: all var(--dur-base) var(--ease-out); cursor: pointer; overflow: hidden;
+  }
+  .n:hover { border-color: hsl(239 100% 82% / 0.45); box-shadow: var(--shadow-md); }
+  .n.sel { border-color: var(--color-primary); box-shadow: 0 0 0 1px var(--color-primary-glow), var(--shadow-glow-primary); }
+  .n.ghost { opacity: .45; border-style: dashed; cursor: not-allowed; }
+  .n.ghost:hover { border-color: var(--color-border); box-shadow: none; }
+
+  /* grounding rail — the 185 forward slot, read TODAY from citation_policy + gates */
+  .n .rail { position: absolute; left: 0; top: 0; bottom: 0; width: 3px; }
+  .n[data-ground="strict"] .rail { background: linear-gradient(180deg, var(--color-success), hsl(142 71% 45% / .35)); }
+  .n[data-ground="flag"]   .rail { background: linear-gradient(180deg, var(--color-warning), hsl(38 92% 60% / .3)); }
+  .n[data-ground="open"]   .rail { background: transparent; }
+
+  .n-head { display: flex; align-items: center; gap: 8px; }
+  .glyph { font-size: 15px; line-height: 1; flex-shrink: 0; }
+  .title { flex: 1; min-width: 0; font-size: var(--text-sm); font-weight: 600; color: var(--color-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tname { font-family: var(--font-mono); font-size: 9px; color: var(--color-text-dim); background: var(--color-muted); border-radius: 3px; padding: 2px 5px; flex-shrink: 0; }
+  .tech { display: none; }
+  body.tech-on .tech { display: inline-flex; }
+  body.tech-on .plainonly { display: none; }
+
+  .essence { margin-top: 5px; font-size: var(--text-xs); color: var(--color-text-muted); line-height: 1.5; }
+  .essence .arrow { color: var(--color-text-dim); }
+
+  .pills { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 7px; }
+  .p {
+    display: inline-flex; align-items: center; gap: 4px; border-radius: var(--radius-full);
+    padding: 1.5px 7px; font-size: 10px; font-family: var(--font-mono); white-space: nowrap;
+    border: 1px solid var(--color-border); background: var(--color-muted); color: var(--color-text-dim);
+  }
+  .p.tool { color: var(--color-text-muted); }
+  .p.gate { color: var(--color-success); border-color: hsl(142 71% 45% / .35); background: var(--color-success-dim); }
+  .p.gate.soft { color: var(--color-warning); border-color: hsl(38 92% 60% / .35); background: var(--color-warning-dim); }
+  .p.tpl { color: var(--color-accent-violet); border-color: hsl(258 90% 66% / .4); background: hsl(258 90% 66% / .12); }
+  .p.ground { color: var(--color-success); border-color: hsl(142 71% 45% / .35); background: var(--color-success-dim); }
+  .p.ground.open { color: var(--color-text-dim); border-color: var(--color-border); background: transparent; }
+  .p.more { cursor: pointer; color: var(--color-primary); border-color: var(--color-primary-glow); background: var(--color-primary-dim); }
+  .p.fwd { color: var(--color-text-dim); border-style: dashed; background: transparent; }
+
+  .idx { position: absolute; right: 8px; top: 8px; font-family: var(--font-mono); font-size: 9px; color: var(--color-text-dim); opacity: .7; }
+
+  /* ── A: compact chip ── */
+  .va .n { width: 244px; padding: 10px 12px 10px 14px; }
+  .va .pills, .va .essence, .va .detail { display: none; }
+
+  /* ── B: rich card ── */
+  .vb .n { width: 276px; padding: 11px 13px 12px 16px; }
+  .vb .detail { display: none; }
+
+  /* ── C: two-tier (quiet at rest, blooms on select) ── */
+  .vc .n { width: 262px; padding: 10px 12px 11px 15px; }
+  .vc .n .pills { display: none; }
+  .vc .n .detail { display: none; }
+  .vc .n.sel { width: 300px; }
+  .vc .n.sel .pills { display: flex; }
+  .vc .n.sel .detail { display: block; }
+  .vc .n.sel { background: linear-gradient(180deg, hsl(239 100% 82% / 0.05), transparent 60%); }
+
+  .detail {
+    margin-top: 9px; padding-top: 9px; border-top: 1px dashed var(--color-border);
+    font-family: var(--font-mono); font-size: 10px; line-height: 1.7; color: var(--color-text-dim);
+  }
+  .detail b { color: var(--color-text-muted); font-weight: 500; }
+
+  /* the "what does this cost you" annotation under each board */
+  .verdict {
+    margin-top: var(--space-4); padding: var(--space-3) var(--space-4);
+    border-left: 2px solid var(--color-border); background: hsl(220 30% 7% / .5);
+    font-size: var(--text-xs); color: var(--color-text-muted); line-height: 1.7; max-width: 90ch;
+  }
+  .verdict b { color: var(--color-text); }
+
+  .fact {
+    display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px; border-radius: var(--radius-full);
+    font-family: var(--font-mono); font-size: 10px; background: var(--color-warning-dim);
+    border: 1px solid hsl(38 92% 60% / .35); color: var(--color-warning); margin-left: 6px;
+  }
+
+  .toast {
+    position: fixed; left: 50%; bottom: 62px; transform: translateX(-50%) translateY(10px);
+    background: var(--color-surface-hi); border: 1px solid var(--color-border); color: var(--color-text);
+    padding: 8px 14px; border-radius: var(--radius-md); font-size: var(--text-sm); box-shadow: var(--shadow-lg);
+    opacity: 0; pointer-events: none; transition: all var(--dur-base) var(--ease-out); z-index: 9998; max-width: 70ch;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<nav class="variant-nav">
+  <span class="label">Sketch 135</span>
+  <button class="variant-tab active" data-v="a" type="button">A: Compact chip</button>
+  <button class="variant-tab" data-v="b" type="button">B: Rich card</button>
+  <button class="variant-tab" data-v="c" type="button">C: Two-tier (quiet → blooms)</button>
+</nav>
+
+<div class="wrap">
+  <p class="note">
+    Every board below renders <b>the same 14 real phases</b>, pulled live from the local Supabase on 2026-07-25
+    (95 <code>workflow_definitions</code>, 119 phases). Only the <b>node anatomy</b> changes between variants.
+    <code>PhaseNode.tsx</code> is a G-5 hot file touched by 183, 184 <i>and</i> 185 — settle it once here and it doesn't get
+    rewritten three times.
+  </p>
+
+  <div class="toolbar-row">
+    <span class="switch" id="tech" role="button" tabindex="0"><span class="track"></span> ⌥ Technical names</span>
+    <span style="color:var(--color-text-dim);font-size:var(--text-xs)">— the v3.3 two-audience reveal. Off = business language, on = the real <code>phase_type</code> / tool ids.</span>
+    <div style="flex:1"></div>
+    <span class="p ground">⛨ Grounded</span>
+    <span class="p ground" style="color:var(--color-warning);border-color:hsl(38 92% 60% / .35);background:var(--color-warning-dim)">⛨ Grounded · flag</span>
+    <span class="p ground open">○ Open</span>
+  </div>
+
+  <div id="variant-a" class="variant va"></div>
+  <div id="variant-b" class="variant vb" style="display:none"></div>
+  <div id="variant-c" class="variant vc" style="display:none"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="sketch-toolbar">
+  <span>135</span>
+  <select id="theme-switcher"><option value="default">Deep Midnight</option></select>
+  <button type="button" data-vw="390">▮</button>
+  <button type="button" data-vw="768">▭</button>
+  <button type="button" data-vw="0">▬</button>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════
+   REAL phases, read live from the local Supabase (2026-07-25).
+   `ground` is DERIVED, not invented: strict = citation_policy strict OR
+   a citations_required gate; flag = citation_policy flag; open = neither.
+   `fwd` marks a forward slot that Phase 183 must leave room for but does
+   NOT build (185 governance dials, 189/190 connectors, 187 vocabulary).
+   ═══════════════════════════════════════════════════════════════════ */
+var PHASES = [
+  { sec: 'six', wf: 'literature_review', slug: 'split', idx: 0, type: 'programmatic', name: null,
+    plain: 'Split the topic into subtopics', ground: 'open',
+    tools: [], gates: [], detail: 'fn <b>split_topic</b> · input_keys <b>["topic","kickoff_prompt"]</b>' },
+  { sec: 'six', wf: 'meridian-risk-summary-good', slug: 'summarize', idx: 1, type: 'llm_single', name: null,
+    plain: 'Write the summary', ground: 'open',
+    tools: [], gates: [{ k: 'llm_judge_rubric', f: 'fail_run' }], detail: 'no tools · judged against a rubric before it can pass' },
+  { sec: 'six', wf: 'risk-register', slug: 'retrieve', idx: 0, type: 'llm_agent', name: null,
+    plain: 'Search the knowledge base for risks', ground: 'strict',
+    tools: ['search_documents'], gates: [], detail: 'grounded because its output feeds a <b>citations_required</b> emit' },
+  { sec: 'six', wf: 'eval_coverage', slug: 'fanout', idx: 1, type: 'llm_batch_agents', name: null,
+    plain: 'Review each subtopic in parallel', ground: 'open',
+    tools: ['search_documents'], gates: [], detail: 'max_parallel_agents <b>5</b> · merge <b>concat_numbered</b>' },
+  { sec: 'six', wf: 'doc_qa_human', slug: 'confirm', idx: 1, type: 'llm_human_input', name: null,
+    plain: 'Ask you to confirm', ground: 'open',
+    tools: [], gates: [], detail: 'options <b>["Looks good","Needs changes"]</b> · pauses the run' },
+  { sec: 'six', wf: 'risk-register', slug: 'emit', idx: 1, type: 'llm_emit', name: null,
+    plain: 'Produce the risk register document', ground: 'strict',
+    tools: [], tpl: 'risk-register.docx',
+    gates: [{ k: 'citations_required', f: 'fail_run' }, { k: 'output_file_valid', f: 'fail_run' }],
+    detail: 'emitter <b>render_template</b> · citation_policy <b>strict</b> · integrity_policy <b>strict</b>' },
+
+  { sec: 'stress', wf: 'dba-research-stat-summary-docx', slug: 'investigate-dba-research', idx: 0, type: 'llm_agent', name: null,
+    plain: 'Investigate the research corpus', ground: 'open',
+    tools: ['ls', 'tree', 'glob', 'grep', 'search_documents', 'query_documents', 'read_document', 'analyze_document', 'write_todos', 'remember'],
+    gates: [], detail: '<b>10 tools</b> — the widest phase in the DB' },
+  { sec: 'stress', wf: 'kb-cited-answer', slug: 'gather-evidence', idx: 0, type: 'llm_agent', name: 'Search the knowledge base',
+    plain: 'Search the knowledge base', ground: 'open',
+    tools: ['search_documents', 'query_documents', 'read_document', 'get_related_documents', 'grep', 'glob', 'ls'],
+    gates: [], detail: 'one of only <b>10 of 119</b> phases that has a real <code>phase.name</code>' },
+  { sec: 'stress', wf: 'fresh-pause-102uat', slug: 'brief', idx: 0, type: 'llm_agent', name: null,
+    plain: 'Brief me on recent activity', ground: 'open',
+    tools: ['search_documents'], gates: [{ k: 'freshness', f: 'ask_user', soft: true }],
+    detail: 'the <b>only</b> non-<code>fail_run</code> disposition in production — <b>ask_user</b> (2 of 47)' },
+  { sec: 'stress', wf: 'dba-research-stat-summary-docx', slug: 'assemble-docx', idx: 4, type: 'llm_emit', name: null,
+    plain: 'Assemble the Word document', ground: 'flag',
+    tools: [], gates: [], detail: 'emitter <b>render_docx</b> · citation_policy <b>flag</b> (not strict) · no gates' },
+
+  { sec: 'ground', wf: 'risk-register', slug: 'retrieve', idx: 0, type: 'llm_agent', name: null,
+    plain: 'Search the knowledge base for risks', ground: 'strict',
+    tools: ['search_documents'], gates: [], detail: 'KB-bound · <b>must not invent</b> — every cell traces to a source chunk' },
+  { sec: 'ground', wf: 'plan_execute_verify', slug: 'execute', idx: 1, type: 'llm_agent', name: null,
+    plain: 'Do the work — search, run code, whatever it takes', ground: 'open',
+    tools: ['search_documents', 'execute_code'], gates: [],
+    detail: 'deliberately <b>flexible</b> — an open agent step, not a governance hole' },
+
+  { sec: 'fwd', wf: '—', slug: 'send-email', idx: 2, type: 'connector', name: null, fwd: 'Phase 189 / 190',
+    plain: 'Send the report by email', ground: 'open',
+    tools: ['email.send'], gates: [], detail: 'a governed connector node — <b>not built in 183</b>; the node model must have room for it' },
+  { sec: 'fwd', wf: '—', slug: 'create-ticket', idx: 3, type: 'connector', name: null, fwd: 'Phase 189 / 190',
+    plain: 'Raise a JIRA ticket for each gap', ground: 'open',
+    tools: ['jira.create_issue'], gates: [{ k: 'human_approval', f: 'ask_user', soft: true }],
+    detail: 'action-risk checkpoint reuses the existing <code>llm_human_input</code> phase type' }
+];
+
+var GLYPH = {
+  programmatic: '⚙', llm_single: '✎', llm_agent: '🤖',
+  llm_batch_agents: '⛓', llm_human_input: '☺', llm_emit: '◆', connector: '⇄'
+};
+var TYPE_LABEL = {
+  programmatic: 'Server step', llm_single: 'AI write step', llm_agent: 'AI agent step',
+  llm_batch_agents: 'Parallel agents', llm_human_input: 'Needs you', llm_emit: 'Deliverable',
+  connector: 'Integration'
+};
+var GROUND_PILL = {
+  strict: '<span class="p ground">⛨ Grounded</span>',
+  flag:   '<span class="p ground" style="color:var(--color-warning);border-color:hsl(38 92% 60% / .35);background:var(--color-warning-dim)">⛨ Grounded · flag</span>',
+  open:   '<span class="p ground open">○ Open</span>'
+};
+
+var SECTIONS = [
+  { key: 'six',    h: 'The six phase types — as they actually appear',
+    lead: 'Every one of these is a live row. Note the title problem: <em>only 10 of 119 phases carry a real <code>phase.name</code></em>, so the fallback title is the DOMINANT case, not the edge case.' },
+  { key: 'stress', h: 'Stress cases the modal design must survive',
+    lead: 'A 10-tool phase, the one phase in the DB with a human name, the only non-<code>fail_run</code> gate disposition in production, and a <code>flag</code>-policy emit that produces a document without a citation gate.' },
+  { key: 'ground', h: 'The grounding spectrum — strict where it retrieves, flexible where it reasons',
+    lead: 'Both are legitimate. A KB-retrieval node is <b>grounded</b> (it must not invent); an agent step is <b>open</b> (it must suit any business case). Phase 185 turns this into a dial — 183 only has to make the two states <em>visually distinct today</em>, read from fields that already exist.' },
+  { key: 'fwd',    h: 'Forward slots — designed for, not built',
+    lead: 'Connector / integration nodes land in Phases 189–190. They are ghosted here so we can check the node model has room for them before <code>PhaseNode.tsx</code> is written — rather than bolting a foreign shape on later.' }
+];
+
+function titleOf(p, tech) {
+  if (tech) return p.name ? p.name : (TYPE_LABEL[p.type] + ' · ' + p.slug);
+  return p.plain;
+}
+
+function toolPills(p, max) {
+  var out = '', shown = p.tools.slice(0, max), rest = p.tools.length - shown.length;
+  shown.forEach(function (t) { out += '<span class="p tool">' + t + '</span>'; });
+  if (rest > 0) out += '<span class="p more" data-more="' + p.tools.join(', ') + '">+' + rest + ' more</span>';
+  return out;
+}
+
+function gatePills(p) {
+  var out = '';
+  (p.gates || []).forEach(function (g) {
+    out += '<span class="p gate' + (g.soft ? ' soft' : '') + '">' + (g.soft ? '◐' : '✓') + ' ' + g.k + ' → ' + g.f + '</span>';
+  });
+  if (p.tpl) out += '<span class="p tpl">▤ ' + p.tpl + '</span>';
+  return out;
+}
+
+function nodeHTML(p, variant) {
+  var tech = document.body.classList.contains('tech-on');
+  var maxTools = variant === 'b' ? 4 : 3;
+  var head =
+    '<div class="n-head">' +
+      '<span class="glyph">' + GLYPH[p.type] + '</span>' +
+      '<span class="title">' + titleOf(p, tech) + '</span>' +
+      '<span class="tname tech">' + p.type + '</span>' +
+    '</div>';
+
+  var essence = '';
+  if (variant !== 'a') {
+    var bits = [];
+    if (p.tools.length) bits.push(p.tools.length + (p.tools.length === 1 ? ' tool' : ' tools'));
+    if ((p.gates || []).length) bits.push((p.gates || []).length + ' gate' + (p.gates.length === 1 ? '' : 's'));
+    if (p.tpl) bits.push('template');
+    // WCAG 1.4.1 — the grounding rail is a COLOUR; it needs a glyph beside it so the
+    // strict/flag/open state survives a colour-blind read at rest, not only on select.
+    var mark = p.ground === 'strict' ? '<span style="color:var(--color-success)">⛨</span> '
+             : p.ground === 'flag'   ? '<span style="color:var(--color-warning)">◐</span> ' : '';
+    essence = '<div class="essence">' + mark + (tech ? '<span class="mono">' + p.slug + '</span> ' : '') +
+      (bits.length ? '<span class="arrow">·</span> ' + bits.join(' · ') : '<span class="arrow">no tools, no gates</span>') + '</div>';
+  }
+
+  var pills = '<div class="pills">' + GROUND_PILL[p.ground] + toolPills(p, maxTools) + gatePills(p) +
+    (p.fwd ? '<span class="p fwd">⌁ ' + p.fwd + '</span>' : '') + '</div>';
+
+  var detail = '<div class="detail"><b>' + p.wf + '</b> · phase_index ' + p.idx + ' · id <b>' + p.slug + '</b><br>' + p.detail + '</div>';
+
+  return '<div class="n' + (p.fwd ? ' ghost' : '') + '" data-ground="' + p.ground + '" data-slug="' + p.slug + '">' +
+    '<span class="rail"></span><span class="idx tech">' + p.idx + '</span>' +
+    head + essence + pills + detail + '</div>';
+}
+
+function render() {
+  ['a', 'b', 'c'].forEach(function (v) {
+    var host = document.getElementById('variant-' + v), html = '';
+    SECTIONS.forEach(function (s) {
+      html += '<h2 class="sec">' + s.h + '</h2><p class="seclead">' + s.lead + '</p><div class="board">';
+      PHASES.filter(function (p) { return p.sec === s.key; }).forEach(function (p) { html += nodeHTML(p, v); });
+      html += '</div>';
+    });
+    html += '<div class="verdict">' + VERDICT[v] + '</div>';
+    host.innerHTML = html;
+  });
+  wireNodes();
+}
+
+var VERDICT = {
+  a: '<b>A — Compact chip.</b> Identical to the shipped <code>PhaseSpineGraph</code> node, so the canvas and the spine read as one family and there is zero new vocabulary to learn. ' +
+     'Cost: grounding, gates, template and tool scope are all <b>invisible until you click</b> — which is exactly the information a business user needs to trust the flow, and exactly what Phase 185 is going to add. ' +
+     'A 2-node workflow shows two near-identical grey chips; nothing distinguishes the KB-grounded step from the open one.',
+  b: '<b>B — Rich card.</b> Everything is legible without a click — you can audit a whole workflow at a glance, and the grounded-vs-open distinction is unmissable. ' +
+     'Cost: a 10-tool phase is 3 lines of chips, the board gets noisy at 5 nodes, and the calm-instrument rule ("3-second read at rest") is spent up front. ' +
+     'It also leaves nowhere to <i>go</i> — 184 and 185 add config and dials with no quiet resting state to add them to.',
+  c: '<b>C — Two-tier.</b> At rest: glyph, plain title, one essence line, and the grounding rail — a 3-second read. Selected: the node <b>blooms</b> to the full pill set + provenance. ' +
+     'This is the shipped 095 tool-card language (decision #8: finished steps fold to essence, the active one blooms) applied to a canvas node, so it is not new vocabulary either. ' +
+     'It is the only variant with a designed home for what 184/185/189 will add. Cost: two states to build and test instead of one.'
+};
+
+function wireNodes() {
+  document.querySelectorAll('.n').forEach(function (n) {
+    n.addEventListener('click', function (e) {
+      if (e.target.classList.contains('more')) {
+        toast('All tools: ' + e.target.getAttribute('data-more'));
+        return;
+      }
+      if (n.classList.contains('ghost')) {
+        toast('Forward slot — connector nodes are Phase 189 / 190. Phase 183 only needs the node model to have room.');
+        return;
+      }
+      var parent = n.closest('.variant');
+      parent.querySelectorAll('.n').forEach(function (o) { if (o !== n) o.classList.remove('sel'); });
+      n.classList.toggle('sel');
+      if (n.classList.contains('sel')) toast('node.id === "' + n.getAttribute('data-slug') + '" — the phase slug (SC#3). Layout is computed at render, never stored (SC#2).');
+    });
+  });
+}
+
+var toastEl = document.getElementById('toast'), toastT = null;
+function toast(msg) {
+  toastEl.innerHTML = msg;
+  toastEl.classList.add('show');
+  clearTimeout(toastT);
+  toastT = setTimeout(function () { toastEl.classList.remove('show'); }, 3200);
+}
+
+var techBtn = document.getElementById('tech');
+function toggleTech() {
+  techBtn.classList.toggle('on');
+  document.body.classList.toggle('tech-on');
+  render();
+}
+techBtn.addEventListener('click', toggleTech);
+techBtn.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleTech(); } });
+
+document.querySelectorAll('.variant-tab').forEach(function (tab) {
+  tab.addEventListener('click', function () {
+    document.querySelectorAll('.variant').forEach(function (v) { v.style.display = 'none'; });
+    document.querySelectorAll('.variant-tab').forEach(function (t) { t.classList.remove('active'); });
+    document.getElementById('variant-' + tab.getAttribute('data-v')).style.display = 'block';
+    tab.classList.add('active');
+  });
+});
+
+document.getElementById('theme-switcher').addEventListener('change', function () {
+  document.querySelector('link[href*=themes]').href = '../themes/' + this.value + '.css';
+});
+document.querySelectorAll('[data-vw]').forEach(function (b) {
+  b.addEventListener('click', function () {
+    var w = b.getAttribute('data-vw');
+    document.querySelector('.wrap').style.maxWidth = w === '0' ? '1240px' : w + 'px';
+  });
+});
+
+render();
+</script>
+</body>
+</html>
