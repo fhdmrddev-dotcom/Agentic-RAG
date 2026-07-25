@@ -1,22 +1,20 @@
 ---
 phase: 183-read-only-canvas
-verified: 2026-07-26T03:00:00Z
-status: gaps_found
-score: 3/4 must-haves verified (SC#3 partial)
+verified: 2026-07-26T05:00:00Z
+status: human_needed
+score: 4/4 must-haves verified (SC#3 gap closed; residual Warning-level debt recorded, not blocking)
 overrides_applied: 0
-gaps:
-  - truth: "SC#3: The canvas is read-only and each node id equals phase.slug — the identity later run-viz paints onto"
-    status: partial
-    reason: "Non-draggability and node.id === phase.slug both hold structurally (verified in canvasModel.ts and by 237 passing unit/component tests). But the canvas's ONLY interaction — click a node to open the phase — is mouse-only. React Flow's node wrapper handles onClick and onKeyDown on separate paths; the keyboard path (Enter/Space) never invokes the user's onNodeClick, and because WorkflowCanvas.tsx passes a controlled `nodes` array with no `onNodesChange`, the library's internal selection state-change is also a no-op. Confirmed directly in source: WorkflowCanvas.tsx:231-233 wires selection exclusively through `onNodeClick`, with no `onKeyDown` handler anywhere in the file, and WorkflowCanvas.test.tsx contains zero `fireEvent.keyDown` assertions (grepped, zero hits). Meanwhile the model deliberately advertises the node as keyboard-operable (`ariaRole: 'button'` in canvasModel.ts:241, `nodesFocusable` left at its `true` default 'to preserve keyboard reachability' per WorkflowCanvas.tsx:12-16) — the promise is made in code/docblock and not kept. This is code-review finding CR-01 (Critical), raised 2026-07-25T22:43:52Z and NOT remediated in any subsequent commit — `git log` on WorkflowCanvas.tsx shows only the original 183-06 commit, no follow-up fix."
-    artifacts:
-      - path: "frontend/src/components/workflows/WorkflowCanvas.tsx"
-        issue: "onNodeClick is the sole selection entry point (lines 231-233); no onKeyDown/keyboard activation path exists despite nodesFocusable=true and ariaRole='button' on every phase node"
-      - path: "frontend/src/components/workflows/WorkflowCanvas.test.tsx"
-        issue: "Only fireEvent.click is exercised; the 'one tab stop per node' test asserts reachability but never activation, so the suite is green while the behavior is broken"
-    missing:
-      - "A bubbling onKeyDown handler on <ReactFlow> (or equivalent) that fires onSelectNode on Enter/Space, matching CR-01's proposed fix"
-      - "A regression test asserting fireEvent.keyDown(node, {key:'Enter'}) calls onSelectNode"
-      - "Correction of the React-Flow default ariaLabelConfig, which currently tells screen readers 'Press enter or space to select... press delete to remove it' — neither half is true on this surface (WR-06, same review)"
+re_verification:
+  previous_status: gaps_found
+  previous_score: 3/4 (SC#3 partial)
+  gaps_closed:
+    - "SC#3: keyboard activation (CR-01) — Enter/Space on a focused phase node now fires onSelectNode(slug), the same contract as click, via activateFromKeyboard wired as onKeyDown on <ReactFlow> (WorkflowCanvas.tsx:202-221, 294)"
+    - "WR-06: React Flow's default screen-reader node description (false arrow-key-move / delete-to-remove promise) replaced with an honest 'Press enter or space to open this step's details.' string (WorkflowCanvas.tsx:118-121, ARIA_LABELS)"
+    - "WR-01: groundingFor('partial') now returns the MIDDLE ◐ face, matching deriveTier's flag|partial band for the named value (phaseVocabulary.ts:228)"
+    - "WR-05: PhaseNode.tsx ESLint errors 2 -> 0 (npx eslint confirms 0 problems on the three touched files)"
+  gaps_remaining: []
+  regressions: []
+gaps: []
 deferred: []
 human_verification:
   - test: "U-1: Spine <-> Canvas agree, in both Technical-names OFF and ON modes"
@@ -35,12 +33,12 @@ human_verification:
 
 # Phase 183: Read-Only Canvas Verification Report
 
-**Phase Goal:** A user can view an existing workflow as a visual node canvas — a faithful
-read-only projection of its definition — proving the projection model cheaply before any
-write / persistence complexity.
-**Verified:** 2026-07-26T03:00:00Z
-**Status:** gaps_found
-**Re-verification:** No — initial verification
+**Phase Goal:** A user can view an existing workflow as a faithful read-only node canvas —
+proving the projection model before any write complexity.
+**Verified:** 2026-07-26T05:00:00Z
+**Status:** human_needed
+**Re-verification:** Yes — after gap-closure plan 183-08 (commits `94c9c642` / `9488bd05` /
+`bda98813`, docs `c549e0a1` / `1b9fad84`)
 
 ## Goal Achievement
 
@@ -48,120 +46,180 @@ write / persistence complexity.
 
 | # | Truth | Status | Evidence |
 |---|-------|--------|----------|
-| 1 | Nodes = phases, edges = flow + `skip_to_phase` branches, via `@xyflow/react` (CANVAS-01, SC#1) | VERIFIED | `@xyflow/react@^12.11.2` in `frontend/package.json:33`; `canvasModel.ts:toCanvas` builds one node per phase (id=slug) and a sequential edge via `phase_index+1` LOOKUP plus a `skip:` edge per parsed `skip_to_phase`. 5 core test files (`canvasModel.test.ts`, `.fixtures.test.ts`, `.purity.test.ts`, `WorkflowCanvas.test.tsx`, `WorkflowBuilderPage.canvas.test.tsx`) run green independently: 237/237 passing. |
-| 2 | Canvas is a pure projection — layout computed at render, never persisted (SC#2, Pitfall 3) | VERIFIED | `toCanvas(phases: PhaseSpecJSON[])` reads only its argument, does no DOM read/network/clock/randomness, never mutates input (`[...phases].sort(...)` non-mutating idiom), and returns fixed-pitch `x`/`y` from a frozen `CANVAS_LAYOUT` const table — no `position`/`x`/`y`/`layout` key is ever written onto a `PhaseSpecJSON`. `canvasModel.purity.test.ts` (part of the 237 green) asserts determinism + no-mutation + source has no DOM-read call. |
-| 3 | Canvas is read-only (not draggable); node id === phase.slug (SC#3) | PARTIAL — see gap | `nodesDraggable={false}` explicitly set (`WorkflowCanvas.tsx:214`) plus per-node `draggable: false` in the model; `nodes.push({ id: phase.slug, ... })` in `canvasModel.ts:236` confirms node-id-equals-slug. HOWEVER: the sole interaction (click-to-select, D-183-05) is mouse-only — keyboard Enter/Space is inert despite the node advertising `ariaRole: "button"` and staying keyboard-focusable. This is code-review CR-01 (Critical), confirmed unresolved by direct source inspection and by the absence of any `keyDown` assertion in `WorkflowCanvas.test.tsx`. |
-| 4 | Faithful projection of the 4 canonical seeds + PM pack — no dropped phase, no phantom edge (SC#4) | VERIFIED (with noted edge-case debt) | `__fixtures__/canvasFixtures.ts` carries all 4 canonical seeds (`research_summarize`, `plan_execute_verify`, `literature_review`, `doc_qa_human`), the 3 Starter Library entries, 2 PM-pack entries, `eval_coverage` (5-phase max), the empty draft, single-phase, synthetic branching, unresolvable-skip, and non-contiguous-index fixtures — 15 named fixtures, snapshot-swept in `canvasModel.fixtures.test.ts` (green). Two documented, non-blocking gaps from code review: duplicate-slug collision (WR-03) and colon-bearing-slug edge-id collision (WR-04) are real but require inputs (duplicate/colon-bearing slugs) not present in the live 95-definition/119-phase corpus this phase inventoried — logged as quality debt, not exercised by any shipped data today. |
+| 1 | Nodes = phases, edges = flow + `skip_to_phase` branches, via `@xyflow/react` (CANVAS-01, SC#1) | VERIFIED | Unchanged since the initial pass; not touched by 183-08. `canvasModel.ts:toCanvas` builds one node per phase (id = slug) and edges via `phase_index+1` lookup plus `skip:` edges. Regression evidence: 407/407 phase-suite tests green (orchestrator-run). |
+| 2 | Canvas is a pure projection — layout computed at render, never persisted (SC#2) | VERIFIED | Unchanged; not touched by 183-08. `canvasModel.purity.test.ts` (part of the 407 green) asserts determinism + no-mutation + no DOM read. |
+| 3 | Canvas is read-only (not draggable); node id === phase.slug; the canvas's one interaction (select) is operable from BOTH mouse and keyboard (SC#3) | VERIFIED — closed, with recorded residual debt (see below) | `nodesDraggable={false}` + per-node `draggable: false` hold as before. NEW: `activateFromKeyboard` (`WorkflowCanvas.tsx:202-221`) is wired as `onKeyDown` on `<ReactFlow>` (`:294`); confirmed by direct source read — Enter and Space both call `onSelectNode(id)` after the SAME `CANVAS_NODE_TYPES.phase` guard the mouse path uses, and `event.preventDefault()` stops Space from scrolling the pane. `WorkflowCanvas.test.tsx:169-198` exercises Enter, Space, and confirms the end cap / unresolved-skip stub stay inert on keydown — all passing (part of the 407 green). Read-only survives: the keyboard path's only outward call is a pure `setSelectedSlug`; no `onNodesChange` was added, so React Flow's internal node-change machinery stays a verified no-op (confirmed in `183-REVIEW-08.md`'s cross-file trace into the installed `@xyflow/react` package, which I did not re-derive but whose citations I spot-checked against the local source and found consistent). |
+| 4 | Faithful projection of the 4 canonical seeds + PM pack — no dropped phase, no phantom edge (SC#4) | VERIFIED (unchanged, with pre-existing noted edge-case debt WR-03/WR-04) | Not touched by 183-08. 15 named fixtures, snapshot-swept, green. |
 
-**Score:** 3/4 truths fully verified; 1/4 partial (SC#3 — structural read-only + identity hold; keyboard operability does not).
+**Score:** 4/4 truths verified. The SC#3 gap that gated the previous `gaps_found` pass (CR-01,
+mouse-only selection despite advertised keyboard-button semantics) is closed — confirmed by
+direct source inspection of `WorkflowCanvas.tsx`, not merely by the SUMMARY's claim.
+
+### Residual Findings From the Gap-Closure Review (183-REVIEW-08.md) — Assessed on Their Merits
+
+I read `183-REVIEW-08.md` in full and independently re-derived each of its four Warnings
+against the current source (`WorkflowCanvas.tsx`, `phaseVocabulary.ts`, `canvasModel.ts`,
+`deriveTier.ts`). All four are real; none is a fabrication or an overstated nitpick. None
+rises to Critical (the review found none, and I could not construct a write/mutation/
+drag-reenable path either). Per the project's own precedent — the parent `183-REVIEW.md`'s
+WR-02/03/04 are open Warnings that did NOT block the phase's core truths — I classify these
+the same way: real, worth a decision, not independently gaps_found-triggering.
+
+| Finding | Verified against source? | Severity | Does it re-break the closed truth? |
+|---|---|---|---|
+| **WR-08-01** — no `event.repeat` guard; a held Enter/Space re-fires the toggle ~15x/sec, can settle CLOSED | YES — `WorkflowCanvas.tsx:204` has no `event.repeat` check | Warning (reviewer's own call: "highest-priority Warning," not Critical — nothing persisted/lost) | Narrows, does not reverse: a single discrete press (the tested, common case) activates correctly and matches the click contract. Held-key behavior is a genuine residual defect for the exact population CR-01 was fixed for (keyboard/switch users). |
+| **WR-08-02** — `groundingFor`'s docblock claims canvas/soul badge agreement that is false in 3 reachable configs (`draft`+`citations_required`, `flag`+full floor-gate set, `draft`+any floor gate); the new pin (`deriveTier(policy, new Set())` over `["flag","partial"]`) is scoped to never see the promotion arms | YES — confirmed by reading `deriveTier.ts:106-118` (`hasAllFloorGates`/`hasAnyFloorGate` promotion) against `phaseVocabulary.ts:223-229` (`groundingFor` models neither promotion nor `citations_required` reconciliation) | Warning | Does not touch WR-01's named fix: `citation_policy: "partial"` with no gates now genuinely reads MIDDLE on both surfaces (the original WR-01 complaint). The broader "full agreement" claim in the docblock overshoots and should be narrowed; the disagreement in gate-carrying configs is pre-existing, not introduced by 183-08. |
+| **WR-08-03** — `ARIA_LABELS` is a bare object literal (no `satisfies Partial<AriaLabelConfig>`), so a typo or a future library key rename typechecks clean and silently reverts to React Flow's false default | YES — confirmed `WorkflowCanvas.tsx:118-121` has no type annotation | Warning (latent — a future-regression risk, not a present defect) | No — WR-06 is correctly closed today; this is a durability/guard-rail gap, not a current falsehood. |
+| **WR-08-04** — the end cap and the unresolved-skip stub (both `selectable:false, focusable:false`) still inherit `aria-describedby` pointing at the new "Press enter or space to open this step's details" string, because React Flow attaches one description to every node unconditionally | YES — confirmed `canvasModel.ts:293-304` (unresolvedSkip) and `:322-330` (endCap) set `draggable/selectable/focusable: false` but no `domAttributes` override to clear `aria-describedby` | Warning ("impact is bounded," per the reviewer, since `role` is unset on these two node types) | Narrows WR-06's closure: the fix is correct for the ~majority of nodes (real phases) but the exact two node types the CR-01 guard was built to keep inert still carry a promise they cannot honor. This is the same failure class WR-06 targeted, recurring in a smaller footprint. |
+
+**Judgment:** CR-01's core defect (no keyboard path at all) is genuinely, substantively fixed
+— not nominally. WR-06's core defect (a uniformly false library-default description) is also
+genuinely fixed for the majority case. Both fixes carry real, scoped residual debt
+(WR-08-01/04) that a conscientious team would close in a small follow-up, but neither
+residual defect reopens the state the previous verification blocked on (total non-
+functionality / total falsehood). Consistent with how the parent review's WR-02/03/04 were
+treated, I record WR-08-01 through WR-08-04 as open Warnings requiring a team decision
+(fix now vs. accept as recorded debt), not as a re-trigger of `gaps_found`. This is a judgment
+call — flagging it explicitly per the adversarial-verification instruction rather than
+silently passing it.
+
+**If the team wants a harder bar:** WR-08-01 (repeat guard) and WR-08-04 (aria-describedby
+leak on inert nodes) both have a one-to-few-line fix and a reviewer-authored test already
+specified in `183-REVIEW-08.md`. A `183-09` gap-closure plan scoped to just those two would
+close the loop tightly before Phase 184 builds on this surface.
 
 ### Required Artifacts
 
 | Artifact | Expected | Status | Details |
 |----------|----------|--------|---------|
-| `frontend/src/components/workflows/canvasModel.ts` | Pure projection function | VERIFIED | Reviewed in full; matches docblock claims; 237 tests including a dedicated purity suite pass |
-| `frontend/src/components/workflows/WorkflowCanvas.tsx` | Read-only `@xyflow/react` shell | VERIFIED (with CR-01 gap) | All interaction flags explicitly turned off except selection; `<Controls showInteractive={false}>` present, killing the drag re-enable padlock (Pitfall 1) |
-| `frontend/src/components/workflows/phaseVocabulary.ts` | Single shared glyph/parse/title vocabulary | VERIFIED | `parseSkipTarget` matches backend `reachability.py:89-98` prefix-slice semantics exactly (verified by reading both files + green cross-language parity test, 13/13 backend + TS-side green); `nodeTitle`/`technicalTitle`/`groundingFor`/`waitsForYou` all total functions, no throw paths |
-| `frontend/src/components/workflows/PhaseNode.tsx`, `PhaseSpineGraph.tsx` (repoint) | Node face rendering; Spine no longer duplicates glyph/parse | VERIFIED | `PhaseSpineGraph.tsx` now imports `PHASE_GLYPHS` from `soulData` and `parseSkipTarget` from `phaseVocabulary` — grep confirms zero remaining local re-declarations |
-| `frontend/src/pages/WorkflowBuilderPage.tsx` (toggle) | `[Spine]/[Canvas]` in-Builder toggle, flag-gated | VERIFIED | `canvasEnabled` uses the fail-closed 3-part gate (`featuresCtx !== null && !loading && === true`); `activeGraphView = canvasEnabled ? graphView : "spine"` — flag out-ranks stale session state; flag-off path renders `graphChild` alone (no wrapper, no strip) confirmed by source read and by `revertByteIdentical.test.tsx` (2/2 green) |
-| `backend/tests/unit/test_183_skip_parse_parity.py` | Cross-language parity pin | VERIFIED | Ran independently: 13/13 passed |
-| `frontend/src/components/workflows/__fixtures__/canvasFixtures.ts` | 4 canonical + PM pack + edge-case fixtures | VERIFIED | 15 named fixtures present as listed above (grep-confirmed); IN-05 notes 5 are byte-identical duplicates (info-level, non-blocking) |
+| `frontend/src/components/workflows/WorkflowCanvas.tsx` | Read-only `@xyflow/react` shell, mouse + keyboard selection | VERIFIED | `activateFromKeyboard` present and wired (`:202-221`, `:294`); `ARIA_LABELS` present (`:118-121`, untyped — WR-08-03); all read-only flags intact |
+| `frontend/src/components/workflows/WorkflowCanvas.test.tsx` | Keyboard-activation + announced-affordance regression tests | VERIFIED | Enter/Space tests (`:169-198`), WR-06 description test (`:349-367`); no `event.repeat` regression test exists (WR-08-01 gap) |
+| `frontend/src/components/workflows/phaseVocabulary.ts` | `groundingFor("partial")` = MIDDLE | VERIFIED for the named value | `:228` confirmed; docblock overclaims full agreement (WR-08-02) |
+| `frontend/src/components/workflows/PhaseNode.tsx` | Lint-clean | VERIFIED | `npx eslint` reports 0 problems (orchestrator-run, cross-checked against review's independent run) |
+| `frontend/src/components/workflows/canvasModel.ts` | Inert nodes (end cap, unresolved-skip stub) fully inert incl. ARIA | PARTIAL | `selectable`/`focusable`/`draggable` all false (confirmed `:293-304`, `:322-330`); no `domAttributes` override to suppress the inherited `aria-describedby` (WR-08-04) |
 
 ### Key Link Verification
 
 | From | To | Via | Status | Details |
 |------|-----|-----|--------|---------|
-| `WorkflowBuilderPage.tsx` | `WorkflowCanvas.tsx` | Lazy `<Suspense>`-wrapped mount, `activeGraphView === "canvas"` | WIRED | Confirmed at `WorkflowBuilderPage.tsx:469-484`; only requested when the flag is strictly on |
-| `WorkflowCanvas.tsx` | `canvasModel.toCanvas` | `useMemo(() => toCanvas(phases), [phases])` | WIRED | `WorkflowCanvas.tsx:137` |
-| `WorkflowCanvas.tsx` (click) | `WorkflowBuilderPage.handleSelectNode` | `onNodeClick` prop → `onSelectNode(node.id)` | WIRED (mouse only) | Same D-183-05 contract as `PhaseSpineGraph`; opens the existing 400px `PhaseFormPanel`. Keyboard path NOT wired (CR-01) |
-| `canvasModel.parseSkipTarget` (via `phaseVocabulary`) | `reachability.py:parse_skip_target` | Shared JSON case table, parity test | WIRED | `skipParseCases.json` read by both suites; both green independently |
-| `useEffectiveFeatures` | `WorkflowBuilderPage` toggle gate | `useEffectiveFeaturesOptional()` | WIRED | Fail-closed 3-part gate confirmed in source |
-
-### Data-Flow Trace (Level 4)
-
-| Artifact | Data Variable | Source | Produces Real Data | Status |
-|----------|---------------|--------|---------------------|--------|
-| `WorkflowCanvas` | `phases` prop | `state.definition.phases` (the live draft in `WorkflowBuilderPage`) | Yes — same draft state the Spine reads | FLOWING |
-| `WorkflowCanvas` | `projection.nodes/edges` | `canvasModel.toCanvas(phases)`, a pure client-side derivation | Yes, deterministic over real phase data, zero network (by design — D-183-15) | FLOWING |
-
-### Behavioral Spot-Checks
-
-| Behavior | Command | Result | Status |
-|----------|---------|--------|--------|
-| Core canvas unit/component suite green | `npx vitest run src/components/workflows/canvasModel.fixtures.test.ts src/components/workflows/canvasModel.test.ts src/components/workflows/canvasModel.purity.test.ts src/components/workflows/WorkflowCanvas.test.tsx src/pages/WorkflowBuilderPage.canvas.test.tsx` | 5 files / 237 tests passed | PASS |
-| Flag-off regression gate green | `npx vitest run src/components/admin/revertByteIdentical.test.tsx src/providers/EffectiveFeaturesProvider.test.tsx` | 2 files / 21 tests passed | PASS |
-| Backend parity half green | `venv/Scripts/python -m pytest tests/unit/test_183_skip_parse_parity.py -q` | 13 passed | PASS |
-| Production build succeeds, canvas is a separate lazy chunk | `npx vite build` | exit 0; `dist/assets/WorkflowCanvas-DWoW14H5.js` 174.16 kB as its own chunk | PASS |
-| Keyboard activation of a canvas node | `fireEvent.keyDown(node, {key:'Enter'})` → expect `onSelectNode` called | No such test exists in the suite; source inspection confirms no `onKeyDown` handler in `WorkflowCanvas.tsx` | FAIL (CR-01) |
-| No debt markers in phase-touched files | grep `TBD\|FIXME\|XXX\|TODO\|HACK\|PLACEHOLDER` across `canvasModel.ts`, `WorkflowCanvas.tsx`, `phaseVocabulary.ts`, `PhaseNode.tsx`, `PhaseSpineGraph.tsx` | Zero hits (one prose match for "placeholder" describing a design rule, not a stub) | PASS |
+| `WorkflowCanvas.tsx` (keyboard) | `WorkflowBuilderPage.handleSelectNode` | `onKeyDown={activateFromKeyboard}` → `onSelectNode(id)` | WIRED | Confirmed at `WorkflowCanvas.tsx:294`; same target as the mouse path (`:290-292`) |
+| `WorkflowCanvas.tsx` (mouse) | `WorkflowBuilderPage.handleSelectNode` | `onNodeClick` | WIRED (unchanged) | `:290-292` |
+| All other key links from the initial pass (projection wiring, flag gate, backend parity) | — | — | WIRED (unchanged) | Not touched by 183-08; orchestrator-run regression suites (211 tests) confirm no break |
 
 ### Requirements Coverage
 
 | Requirement | Source Plan | Description | Status | Evidence |
-|--------------|-------------|-------------|--------|----------|
-| CANVAS-01 | 183-01 through 183-07 (all 7 plans) | "A user can view an existing workflow as a visual node canvas — a read-only projection of its WorkflowDefinition (nodes = phases, edges = flow + skip_to_phase branches), rendered via @xyflow/react." | SATISFIED with one open accessibility defect | Core viewing, projection purity, and faithfulness are all verified in the codebase (mouse-driven). The requirement text itself does not explicitly demand keyboard operability, but the shipped code advertises button/focusable semantics it does not honor (CR-01), which is a real, unaddressed gap on the delivered surface. No orphaned CANVAS-* requirements found in REQUIREMENTS.md beyond CANVAS-01 (`grep "Phase 183" REQUIREMENTS.md` → exactly one row). |
+|--------------|-------------|--------------|--------|----------|
+| CANVAS-01 | 183-01 through 183-08 (all 8 plans) | "A user can view an existing workflow as a visual node canvas — a read-only projection of its WorkflowDefinition (nodes = phases, edges = flow + skip_to_phase branches), rendered via @xyflow/react." | SATISFIED | Core viewing, projection purity, faithfulness, and now keyboard operability are all verified in the codebase. `grep "Phase 183" REQUIREMENTS.md` returns exactly one CANVAS-* row — no orphaned requirements. `REQUIREMENTS.md:27` already carries `[x] CANVAS-01`; this verification treats that as the plan's aspiration, not evidence — evidence is the source-level check above. |
 
 ### Anti-Patterns Found
 
 | File | Line | Pattern | Severity | Impact |
 |------|------|---------|----------|--------|
-| `WorkflowCanvas.tsx` | 231-233 | Selection wired exclusively through mouse `onNodeClick`; no keyboard path despite `ariaRole="button"` + focusable nodes | Blocker (code review CR-01, confirmed unresolved) | Keyboard-only and screen-reader users cannot activate the canvas's only interaction; contradicts the file's own "read-only is TRUE" accessibility framing |
-| `phaseVocabulary.ts` | 210-217 (`groundingFor`) | `citation_policy: "partial"` silently folds into "No sources needed", contradicting `deriveTier.ts`'s own MIDDLE-tier honest labeling of the same value | Warning (WR-01) | Canvas badge and workflow-soul badge disagree about a real governance control for the same phase |
-| `WorkflowCanvas.tsx` | 226 | `colorMode="dark"` hardcoded regardless of the app's saved light/dark theme | Warning (WR-02) | Canvas plane renders `#141414` inside a light-themed app for light-mode users |
-| `canvasModel.ts` | 225-244 | Node id keyed on raw `phase.slug` with no collision handling; two phases sharing a slug in an unsaved (lint-ungated) draft silently collapse to one node | Warning (WR-03) | A theoretical dropped-phase faithfulness violation on draft data; not observed in the 95-definition live corpus this phase inventoried |
-| `canvasModel.ts` | 261, 289, 307, 332 | Reserved/edge id built by raw string concatenation over unconstrained slugs; a colon-bearing slug (a modeled input per correction C-1) can collide two distinct ids | Warning (WR-04) | Theoretical phantom-edge/dropped-edge faithfulness violation; same class as WR-03 |
-| `PhaseNode.tsx` | 159, 238, 289 | New (non-CI-gated) ESLint errors: `react-hooks/static-components`, unused `_props` | Info (WR-05) | Quality debt, not a build break (repo eslint is not CI-gated except the a11y-scoped config, which is clean) |
-| `WorkflowCanvas.tsx` | 208-234 | Default React-Flow screen-reader description promises "press enter or space to select... press delete to remove it", neither of which is true | Warning (WR-06, paired with CR-01) | Actively misleads assistive-technology users about the surface's real behavior |
+| `WorkflowCanvas.tsx` | 202-221 | No `event.repeat` guard on the keyboard activation handler (WR-08-01) | Warning | Held Enter/Space rapid-toggles the form panel; can settle on the wrong (closed) state |
+| `phaseVocabulary.ts` | 185-189, 208-213 | Docblock overclaims canvas/soul badge agreement beyond what `deriveTier`'s gate-promotion arms actually produce (WR-08-02) | Warning | 3 reachable phase configs still show contradicting strictness badges across the two views |
+| `WorkflowCanvas.tsx` | 118-121 | `ARIA_LABELS` untyped — a future key rename/typo typechecks clean and silently reverts WR-06 | Warning | Latent regression risk, no test protects the `default` key |
+| `canvasModel.ts` | 293-304, 322-330 | End cap + unresolved-skip stub inherit `aria-describedby` pointing at an activation promise they cannot honor | Warning | Screen-reader users hear "press enter or space to open" on the 2 node types deliberately made inert |
+| `WorkflowCanvas.tsx` / `PhaseNode.tsx` | 226, 225-244, 261/289/307/332 | Pre-existing debt WR-02 (hardcoded `colorMode="dark"`), WR-03 (slug-collision node collapse), WR-04 (colon-bearing-slug id collision) | Warning (out of scope for 183-08, recorded in parent `183-REVIEW.md`) | Unchanged from the initial pass; not re-litigated here per the plan's own scope fence |
+
+No debt markers (`TBD`/`FIXME`/`XXX`) found in any of the 5 files touched by 183-08 (grep clean, consistent with `183-REVIEW-08.md`'s own finding).
+
+### Behavioral Spot-Checks
+
+| Behavior | Command | Result | Status |
+|----------|---------|--------|--------|
+| Phase suite green (incl. new keyboard + ARIA tests) | orchestrator-run: 15 files / 407 tests | 407 passed, 0 failed | PASS |
+| Regression gate green | orchestrator-run: 21 files / 211 tests | 211 passed, 0 failed | PASS |
+| ESLint clean on the 3 touched files | `npx eslint src/components/workflows/{PhaseNode.tsx,WorkflowCanvas.tsx,phaseVocabulary.ts}` | 0 problems (per `183-REVIEW-08.md`, source-consistent) | PASS |
+| Held-key (`event.repeat`) does not double-toggle | No such test exists | source confirms no guard (`WorkflowCanvas.tsx:204`) | FAIL (WR-08-01, Warning-level, not phase-blocking per the judgment above) |
+| Inert nodes do not inherit the activation description | No such test exists | source confirms no `domAttributes` override (`canvasModel.ts:293-304`, `:322-330`) | FAIL (WR-08-04, Warning-level, not phase-blocking per the judgment above) |
+
+### Probe Execution
+
+Not applicable — no `scripts/*/tests/probe-*.sh` declared or discovered for this phase; this is a frontend component phase, not a migration/tooling phase.
 
 ### Human Verification Required
 
-See `human_verification` in frontmatter (U-1 through U-4). All four are explicitly documented in `183-VALIDATION.md` as operator-defined "I'd recognize failure here" scenarios that MUST be driven live, and `183-07-SUMMARY.md` itself marks them "⚠ OUTSTANDING" — they were never executed during this phase's build, and the flag (`visual_workflow_canvas`) cold-defaults to off, so the toggle is not even visible to end users without an operator action first.
+Four G-4 lived-experience UAT rows from `183-VALIDATION.md` remain **not yet driven live**.
+`183-VALIDATION.md`'s own "Validation Sign-Off" checklist has this item unchecked:
+`[ ] All four G-4 rows (U-1 … U-4) driven live before /gsd:verify-work`. The feature flag
+`visual_workflow_canvas` cold-defaults to `"off"`, so an operator must flip it On in the
+Control Room before U-1 through U-3 are even reachable (U-4 flips it back off as its own
+pass condition). jsdom cannot substitute for any of the four — three require perceptual/
+visual judgment (cross-view SVG-mark agreement, legibility, "doesn't look broken"), and the
+fourth requires a real operator session against live `app_settings`.
+
+### 1. U-1: Spine <-> Canvas agree, in both Technical-names OFF and ON modes
+
+**Test:** Open a real draft in the Builder. With the ⌥ reveal OFF, flip `[Spine] <-> [Canvas]`
+both ways. Turn ⌥ ON and flip both ways again.
+**Expected:** Same steps, same order, same icons in both views at a given reveal setting; a
+given phase's title text is identical across the toggle.
+**Why human:** Visual/perceptual agreement of rendered SVG marks and layout; a DOM test can
+compare slugs/labels but not visual sameness.
+
+### 2. U-2: The 5-phase maximum (`eval_coverage`) reads at default zoom
+
+**Test:** Open the `eval_coverage` definition (5 phases) on Canvas at default zoom.
+**Expected:** Titles not truncated to nonsense, no horizontal page overflow, the end cap
+visible.
+**Why human:** Legibility/truncation is perceptual; jsdom has no real layout engine.
+
+### 3. U-3: The empty draft (0 phases) doesn't look broken
+
+**Test:** Open one of the ~40 zero-phase drafts on Canvas.
+**Expected:** Reads as "nothing here yet" — no stray grid, zoom pills, or minimap floating in
+space; no ghost/placeholder node.
+**Why human:** "Doesn't look broken" is a judgment call, not an assertion.
+
+### 4. U-4: Flag off = yesterday's Builder, including on an operator account
+
+**Test:** Operator flips `visual_workflow_canvas` to Off in the Control Room, reloads, checks
+every account type including operator accounts.
+**Expected:** The `[Spine]/[Canvas]` toggle strip is gone; no `.react-flow` subtree mounts.
+**Why human:** Requires a real operator session and a live `app_settings` write; the vitest
+DOM-absence test proves only the render branch, not the end-to-end flag path through a live
+Control Room session.
 
 ### Gaps Summary
 
-The read-only canvas is real, substantively implemented, and does what its four Success
-Criteria describe for a sighted mouse user: it renders `@xyflow/react` nodes/edges as a
-faithful, deterministic, non-persisted projection of a `WorkflowDefinition`, matches the
-4 canonical seed shapes plus the PM pack, and correctly refuses to persist layout or drag
-state. All of the phase's own automated gates (237 core unit/component tests, the 21-test
-flag-off regression gate, the 13-test backend parity half, and a clean `vite build`
-producing the expected separate lazy chunk) pass when run independently — the SUMMARY
-claims on these points hold up.
+The four automated must-haves are now all VERIFIED against the source, not merely against
+SUMMARY.md's narration. The gap-closure plan (183-08) genuinely closed CR-01 (keyboard
+activation was completely absent; it is now wired, guarded, and tested for the standard
+single-press case) and substantively closed WR-06 (the library's uniformly-false screen-
+reader description is replaced with an honest one for real, focusable phase nodes) and WR-05
+(lint), and correctly fixed the named WR-01 value.
 
-The one genuine blocker is CR-01 from the phase's own code review, which remains
-unaddressed in the code as committed: the canvas's only interaction (selecting a node)
-is mouse-only despite every node advertising itself as a keyboard-focusable button. This
-is not a cosmetic nit — it is a broken accessibility contract on a surface the phase's own
-decisions (D-183-07's WCAG 1.4.1 citation, the axe-clean claims) treat as a first-class
-concern, and it was flagged Critical by the review that already ran. Five further Warnings
-(governance-label dishonesty for `partial` citation policy, a hardcoded dark canvas inside
-a light-theme app, two theoretical id-collision faithfulness edge cases, and a misleading
-screen-reader description) round out the debt but do not, on their own, defeat a Success
-Criterion given the live corpus this phase inventoried.
+A deep, independently-verified code review of that same gap-closure diff (`183-REVIEW-08.md`)
+found 0 Critical and 4 Warning findings, all of which I re-derived against current source and
+confirmed real: a missing `event.repeat` guard that lets a held key rapid-toggle the panel
+(WR-08-01); a docblock overclaim about canvas/soul badge agreement that is false in three
+gate-carrying configurations the new test pin cannot see (WR-08-02); an untyped ARIA-label
+override that would silently regress on a future library key rename (WR-08-03); and an
+`aria-describedby` leak onto the two node types the CR-01 guard exists specifically to keep
+inert (WR-08-04). None of these constitutes a write path, a mutation, a drag re-enable, or a
+reversal of the closed CR-01/WR-06 defects for the common case — they are genuine, scoped,
+Warning-level durability gaps in fixes that are otherwise real. Consistent with how this
+phase's parent review already carries three open, non-blocking Warnings (WR-02/03/04) without
+gating the phase's core truths, I record WR-08-01 through WR-08-04 the same way: real,
+surfaced explicitly, and left to a team decision rather than silently passed or used to
+force `gaps_found`.
 
-Separately — and this would gate `passed` even if CR-01 were fixed — none of the four
-G-4 lived-experience UAT rows (U-1 spine/canvas agreement, U-2 five-phase legibility, U-3
-empty-state honesty, U-4 flag-off byte-identity on a live operator session) have been
-driven live yet. The phase's own validation strategy designates these as mandatory,
-non-automatable checks required before `/gsd:verify-work`, and `183-07-SUMMARY.md`
-explicitly marks them outstanding.
+**What actually gates this phase from `passed` is unrelated to code quality: the four G-4
+lived-experience UAT rows (U-1 through U-4) have never been driven live.** This was true at
+the previous verification pass and remains true now — `183-VALIDATION.md`'s own sign-off
+checklist has that line unchecked. Per the phase's own validation strategy, this is a
+mandatory, non-automatable gate before `/gsd:verify-work` can call the phase done, so
+`human_needed` — not `passed` — is the honest status.
 
-**This looks like an intentional two-part handoff, not a fabricated claim** — the SUMMARY
-is honest about both the CR-01 defect (via the code-review artifact) and the outstanding
-UAT rows. To proceed, either fix CR-01 (small, well-scoped per the review's own patch) and
-then run U-1 through U-4 live, or record an explicit override if the team judges mouse-only
-interaction acceptable for this phase's read-only preview and wants to carry the keyboard
-fix into Phase 184.
-
-```yaml
-overrides:
-  - must_have: "SC#3: canvas nodes are keyboard-operable (Enter/Space activates the click contract)"
-    reason: "<fill in — e.g. 'draft-only read-only preview behind a default-off flag; mouse operability is sufficient for the closed beta; keyboard parity ships in Phase 184 alongside the editable canvas'>"
-    accepted_by: "<name>"
-    accepted_at: "<ISO timestamp>"
-```
+**Recommended next steps, in order:**
+1. Operator flips `visual_workflow_canvas` On in the Control Room and drives U-1, U-2, U-3
+   live; then flips it Off and confirms U-4.
+2. Separately (does not block U-1..U-4, and can happen before or after): decide whether
+   WR-08-01/02/03/04 warrant a small `183-09` gap-closure plan or should be recorded as
+   accepted debt alongside WR-02/03/04 in `183-REVIEW.md`'s ledger, carried into Phase 184.
 
 ---
 
-_Verified: 2026-07-26T03:00:00Z_
+_Verified: 2026-07-26T05:00:00Z_
 _Verifier: Claude (gsd-verifier)_
