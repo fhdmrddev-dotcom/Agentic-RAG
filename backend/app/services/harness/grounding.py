@@ -20,10 +20,16 @@ Two presentations over ONE rule set (RESEARCH Pattern 2):
     returned (byte-identical to the pre-extraction behavior).
   - ``grounding_verdicts``       — COLLECTS every violation as a per-node
     ``{code, phase, message}`` dict (the canvas needs all of them, keyed by phase slug).
-    ALL THREE fidelity rules key to a phase slug — ``folder_scope`` included: its slug is
-    threaded structurally off ``scope.FolderScopeSubsetError.phase_slug`` (Phase 182 SC#4),
-    never parsed out of the message, so Phase 184 can paint a per-node badge from the
-    verdict alone. Only a non-typed ⊆-path ``ValueError`` degrades to ``phase: None``.
+    ALL THREE fidelity rules key to a phase slug AND all three report EVERY violation, so
+    Phase 184 can paint a COMPLETE per-node badge set from one call — no node that is
+    actually broken ever renders clean. ``folder_scope``'s slug is threaded structurally
+    off ``scope.FolderScopeSubsetError.phase_slug`` (Phase 182 SC#4), never parsed out of
+    the message. Only a non-typed ⊆-path ``ValueError`` degrades to a single ``phase:
+    None`` verdict.
+    Provenance: 182-04 fixed rule 1's KEYING (the verdict names its phase); the Phase-182
+    gap closure (WR-04) then fixed its MULTIPLICITY — until then it reported only the FIRST
+    offending phase, so later offenders rendered clean and the author found them one at a
+    time.
 
 One computation, three consumers (RESEARCH Pattern 1):
   ``assemble_grounding_bundle`` returns the STRUCTURED ``GroundingBundle``;
@@ -407,6 +413,47 @@ async def _folder_scope_violation(
     return None
 
 
+async def _folder_scope_violations(
+    wd: "WorkflowDefinition", *, supabase, user_id: str
+) -> list[tuple[str, str | None]]:
+    """Rule 1, PER-NODE — every offending phase, not just the first (Phase 182 WR-04).
+
+    The plural presentation of the sibling above. ``scope.folder_scope_violations`` is the
+    ONE ⊆ walk (owner-scoped, cycle-guarded, security-reviewed — T-098-02); this helper
+    only maps its violations onto the ``(message, phase_slug)`` shape the collector emits.
+    The walk is never re-derived here (D-182-06). Imported function-locally, the same
+    posture the singular helper uses — that is what makes a monkeypatch on
+    ``app.services.harness.scope`` honored by the tests.
+
+    WHY PLURAL: the canvas needs EVERY offending node at once. Phase 184 paints a badge per
+    node from these verdicts (VALID-03), so a short-circuited rule 1 would leave the second
+    and third out-of-subtree nodes rendering CLEAN and the author would rediscover them one
+    at a time. The singular ``_folder_scope_violation`` above remains the SHORT-CIRCUIT
+    presentation NL generation keeps using (``_check_grounding_fidelity`` wants the first
+    thing to fix, and its ``detail`` string is byte-identical to the pre-182 contract).
+
+    The slug rides ``getattr(exc, "phase_slug", None)`` — the STRUCTURAL channel 182-04
+    built. It is never recovered by regexing or splitting the message; a source guard in
+    ``tests/unit/test_182_folder_scope_keying.py`` pins that red line over this whole file.
+
+    CATCH BREADTH IS DELIBERATE AND UNCHANGED. Like the singular helper, this catches
+    ``ValueError`` rather than ``FolderScopeSubsetError``, degrading an untyped failure to
+    ONE unkeyed verdict instead of raising inside an always-HTTP-200 route (T-182-10).
+    Round-2 review WR-03 argues for narrowing it — a ``pydantic.ValidationError`` IS a
+    ``ValueError`` subclass in Pydantic v2 and would render as a false ``folder_scope``
+    verdict. WR-03 is DEFERRED and explicitly outside this round's operator-selected scope;
+    narrowing here would be unrequested scope creep and would break the documented
+    degradation contract. Recorded so a future reader sees a decision, not an oversight.
+    """
+    from app.services.harness.scope import folder_scope_violations  # function-local
+
+    try:
+        violations = await folder_scope_violations(wd, supabase=supabase, user_id=user_id)
+    except ValueError as exc:
+        return [(str(exc), getattr(exc, "phase_slug", None))]
+    return [(str(exc), getattr(exc, "phase_slug", None)) for exc in violations]
+
+
 def _unregistered_tools(phase, tool_names: set[str]) -> list[str]:
     """Rule 2 — the ``available_tools`` entries of one phase that are NOT in the registry
     (order-preserving, so the short-circuit presentation reports the same first offender
@@ -442,7 +489,9 @@ async def grounding_verdicts(
 
     Same three rules as ``_check_grounding_fidelity``, but APPENDING instead of
     short-circuiting (RESEARCH Pattern 2) — the canvas needs all findings at once, keyed
-    per node. Verdict shape mirrors the publish lint block dict
+    per node. That holds for ALL THREE rules: rule 1's ⊆ check reports one verdict per
+    out-of-subtree phase (WR-04), matching rules 2 and 3. Verdict shape mirrors the publish
+    lint block dict
     (``publish_service.py``: ``{"code", "phase", "message"}``); ``phase`` is the phase
     ``slug`` (the 181/183 ``node id == phase.slug`` contract) or ``None`` for a
     workflow-global finding. Severity classification is the ROUTE's job (D-182-03) — this
@@ -450,13 +499,15 @@ async def grounding_verdicts(
     """
     out: list[dict] = []
 
-    # Rule 1 — PER-NODE, exactly like Rules 2 and 3 below. A non-⊆ folder_scope is declared
-    # by ONE phase, so the verdict keys to that phase: the slug is threaded off
-    # ``FolderScopeSubsetError.phase_slug`` (SC#4) — structurally, never parsed out of the
-    # message. Only a non-typed ``ValueError`` off the ⊆ path leaves ``phase`` as ``None``.
-    violation = await _folder_scope_violation(wd, supabase=supabase, user_id=user_id)
-    if violation is not None:
-        message, phase_slug = violation
+    # Rule 1 — PER-NODE *and* PLURAL, exactly like Rules 2 and 3 below. A non-⊆
+    # folder_scope is declared PER PHASE, so EVERY offending phase gets its own keyed
+    # verdict (WR-04): the slug is threaded off ``FolderScopeSubsetError.phase_slug`` (SC#4)
+    # — structurally, never parsed out of the message. The ⊆ walk itself is still the single
+    # copy in ``scope.py`` and is never re-derived here (D-182-06). Only a non-typed
+    # ``ValueError`` off the ⊆ path leaves ``phase`` as ``None``, as one unkeyed verdict.
+    for message, phase_slug in await _folder_scope_violations(
+        wd, supabase=supabase, user_id=user_id
+    ):
         out.append({"code": "folder_scope", "phase": phase_slug, "message": message})
 
     # Rules 2 + 3 — per-phase (per-node keying is natural here).
