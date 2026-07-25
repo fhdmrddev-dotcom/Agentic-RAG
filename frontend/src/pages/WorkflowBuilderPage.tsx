@@ -25,12 +25,65 @@
  * router): the read-only `PhaseSpineGraph` + the 400px push `PhaseFormPanel`,
  * wired exactly like the app's existing ChatLayout push grid
  * (`gridTemplateColumns: minmax(0,1fr) <44px|400px>`).
+ *
+ * ── Phase 183-07 (CANVAS-01, D-183-01 … D-183-05) — the Canvas door ─────────────
+ *
+ * THE CANVAS IS AN IN-BUILDER VIEW TOGGLE, NOT A PAGE (D-183-01). The app has no
+ * router — navigation is a `useState<ActiveView>` switch — so a standalone canvas
+ * "page" would be net-new state plumbing for no user benefit. A `[≣ Spine]
+ * [⬡ Canvas]` strip sits on this page's existing graph column and swaps ONE child
+ * of the unchanged push grid. Deliberately NO `NAV_ITEMS` entry is tagged
+ * `visual_workflow_canvas`: D-183-01 formally released the promise Phase 181
+ * deferred, and `revertByteIdentical.test.tsx`'s scope-freeze assertion depends on
+ * that entry's continued absence.
+ *
+ * SPINE IS THE DEFAULT AND THE PREFERENCE IS SESSION-ONLY (D-183-02). The Builder
+ * opens exactly as it does today; the toggle cold-starts on Spine on every mount and
+ * is never written to browser storage, to a settings row, or to any server. Phase 184
+ * owns the question of flipping the default.
+ *
+ * FLAG OFF ⇒ THE STRIP VANISHES (D-183-03). The gate is three-part and every part is
+ * load-bearing: the OPTIONAL accessor (a null context reads exactly like the empty
+ * map — fail-closed), a STRICT `true` comparison (an absent key hides, the
+ * `visibleNavItems` VANISH contract), and `!loading` (so the strip cannot flash in
+ * ~200 ms after load and shift the column). With the flag off this file renders the
+ * graph column exactly as it shipped — same element, no wrapper, no reserved space —
+ * for EVERYONE including operators (D-181-01).
+ *
+ * THE CANVAS IS CODE-SPLIT. `@xyflow/react` is ~59 KB gzip and the flag cold-defaults
+ * to off for every user, so a static import would charge today's shipped users for a
+ * subtree that never renders. The dynamic import also makes "the canvas subtree stays
+ * out of the render path" a BUILD-level fact rather than a render-branch claim. (The
+ * stylesheet still loads eagerly from `index.css` — the documented plan 183-01 trade.)
+ *
+ * ONE SELECTION CONTRACT, TWO VIEWS (D-183-05). Both views receive the identical
+ * `onSelectNode` callback, so the shipped 400px `PhaseFormPanel` opens on the clicked
+ * phase with zero net-new panel work and the toggle-off-on-reclick semantics stay
+ * here, on the page, rather than being re-implemented inside either graph.
+ *
+ * NOT BUILT HERE (D-183-04): the published-workflow canvas door. Viewing a PUBLISHED
+ * definition's canvas would require Tweak, whose draft-create call is an INSERT — so
+ * merely LOOKING would mint a v(N+1) row. Opening the Canvas view fires no request
+ * and writes nothing; no save path below is touched.
+ *
+ * (Both fences above are stated without naming the draft-create identifier or the
+ * landmark element, because this file's own suite greps the source for them and a
+ * guard that only passes by making a comment lie is a broken guard — the fifth
+ * instance of that trap in this phase, logged as D-ITEM-183-02.)
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { generateWorkflow, createWorkflowDraft, updateWorkflowDraft, listFolders, listSkills } from "@/lib/api"
 import { PhaseSpineGraph } from "@/components/workflows/PhaseSpineGraph"
 import type { PhaseSpecJSON } from "@/components/workflows/phaseVocabulary"
 import { PhaseFormPanel, type PhaseConfigPatch, type IdNameMap } from "@/components/workflows/PhaseFormPanel"
+import { useEffectiveFeaturesOptional } from "@/providers/EffectiveFeaturesProvider"
+import { cn } from "@/lib/utils"
+
+/** The read-only canvas, code-split behind the toggle (see the docblock). The module
+ *  also exports a `default`, so the `.then(...)` shim below is belt-and-braces — it
+ *  mirrors the app's ONE shipped code-split (`KnowledgeHealthPage.tsx:32`) so both
+ *  lazy boundaries read the same way. */
+const WorkflowCanvas = lazy(() => import("@/components/workflows/WorkflowCanvas").then((m) => ({ default: m.WorkflowCanvas })))
 
 /** The Builder's working definition shape (a refinement of the opaque
  *  `WorkflowDefinitionJSON` the api layer returns). */
@@ -99,6 +152,9 @@ export function WorkflowBuilderPage({ renderPublish, initial, initialDescribe, a
     initial ? { phase: "drafted", definition: initial.definition } : { phase: "empty" },
   )
   const [selectedSlug, setSelectedSlug] = useState<string | null>(null)
+  // Phase 183-07 (D-183-02): which graph the column shows. SESSION state only — it
+  // cold-starts on "spine" on every mount and is persisted nowhere.
+  const [graphView, setGraphView] = useState<"spine" | "canvas">("spine")
   // Phase 103-ux: the project (knowledge base) the generated workflow binds to.
   // Chosen at the describe step (ONE calm dropdown), passed to generate, and shown
   // by name in the draft header afterwards. When opening an existing definition,
@@ -130,6 +186,25 @@ export function WorkflowBuilderPage({ renderPublish, initial, initialDescribe, a
 
   const canDraft = describe.trim().length > 0 && state.phase !== "composing"
   const panelOpen = selectedSlug !== null
+
+  // Phase 183-07 (D-183-03) — the three-part fail-closed gate. The OPTIONAL accessor
+  // (a null context is read exactly like `{}`), `!loading` (no flash-in, no reserved
+  // space), and a strict comparison (an absent key hides).
+  const featuresCtx = useEffectiveFeaturesOptional()
+  const canvasEnabled =
+    featuresCtx !== null &&
+    !featuresCtx.loading &&
+    featuresCtx.features.visual_workflow_canvas === true
+  // The flag out-ranks stale session state: if the map is tightened mid-session while
+  // the user is on Canvas, the column falls back to the Spine rather than stranding
+  // them on a surface that just vanished.
+  const activeGraphView = canvasEnabled ? graphView : "spine"
+
+  // D-183-05 — ONE selection contract, shared by BOTH views, owned by the page. Click
+  // a node to anchor the 400px form panel; click the same node again to close it.
+  const handleSelectNode = useCallback((slug: string) => {
+    setSelectedSlug((cur) => (cur === slug ? null : slug))
+  }, [])
 
   // The current working definition (drafted state only).
   const definition = state.phase === "drafted" ? state.definition : null
@@ -387,6 +462,93 @@ export function WorkflowBuilderPage({ renderPublish, initial, initialDescribe, a
 
   // ── DRAFTED: the read-only spine graph (left) + the 400px push form panel (right). ──
   // The push grid mirrors the app's existing ChatLayout 2-state track exactly.
+
+  // The graph column's CHILD — one view or the other, never both, both fed the same
+  // three props so the canvas is a drop-in peer of the spine. `activeGraphView` is
+  // pinned to "spine" whenever the flag is off, so the lazy chunk is never requested.
+  const graphChild =
+    activeGraphView === "canvas" ? (
+      <Suspense
+        fallback={
+          <div
+            data-testid="builder-canvas-loading"
+            className="flex h-full min-w-0 items-center justify-center bg-background text-[12px] text-muted-foreground"
+          >
+            Opening the canvas…
+          </div>
+        }
+      >
+        <WorkflowCanvas
+          phases={state.definition.phases}
+          selectedSlug={selectedSlug}
+          onSelectNode={handleSelectNode}
+        />
+      </Suspense>
+    ) : (
+      <PhaseSpineGraph
+        phases={state.definition.phases}
+        selectedSlug={selectedSlug}
+        onSelectNode={handleSelectNode}
+      />
+    )
+
+  // D-183-03 — the strip renders ONLY when the flag resolves strictly on. With the
+  // flag off `graphChild` IS the grid's first child, exactly as it ships today: no
+  // wrapper element, no strip, no reserved space, nothing of the canvas in the DOM.
+  const graphColumn = canvasEnabled ? (
+    <div className="grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden">
+      {/* The house segmented control (`SkillStudioPage.tsx:191-212`). A plain div
+          host, never a nav landmark — the Phase 155 A11Y-01 rule (an interactive
+          "tablist" role must not override a landmark). Tablist semantics only. */}
+      <div
+        data-testid="builder-view-toggle"
+        role="tablist"
+        aria-label="Graph view"
+        className="flex items-center gap-1 border-b border-border/60 px-4 py-2"
+      >
+        <button
+          type="button"
+          role="tab"
+          data-testid="builder-view-spine"
+          aria-selected={activeGraphView === "spine"}
+          onClick={() => setGraphView("spine")}
+          className={cn(
+            "rounded-md px-3 py-1.5 text-[13px] transition-colors",
+            activeGraphView === "spine"
+              ? "bg-primary/10 font-semibold text-primary"
+              : "text-muted-foreground hover:bg-accent/40 hover:text-foreground",
+          )}
+        >
+          <span aria-hidden="true" className="mr-1.5">
+            ≣
+          </span>
+          Spine
+        </button>
+        <button
+          type="button"
+          role="tab"
+          data-testid="builder-view-canvas"
+          aria-selected={activeGraphView === "canvas"}
+          onClick={() => setGraphView("canvas")}
+          className={cn(
+            "rounded-md px-3 py-1.5 text-[13px] transition-colors",
+            activeGraphView === "canvas"
+              ? "bg-primary/10 font-semibold text-primary"
+              : "text-muted-foreground hover:bg-accent/40 hover:text-foreground",
+          )}
+        >
+          <span aria-hidden="true" className="mr-1.5">
+            ⬡
+          </span>
+          Canvas
+        </button>
+      </div>
+      {graphChild}
+    </div>
+  ) : (
+    graphChild
+  )
+
   return (
     <div className="flex h-full flex-col bg-background">
       <header className="flex items-center justify-between border-b border-border px-4 py-2.5">
@@ -449,11 +611,7 @@ export function WorkflowBuilderPage({ renderPublish, initial, initialDescribe, a
         className="grid min-h-0 min-w-0 flex-1 overflow-hidden motion-safe:transition-[grid-template-columns] motion-safe:duration-300"
         style={{ gridTemplateColumns: "minmax(0,1fr) " + (panelOpen ? "400px" : "44px") }}
       >
-        <PhaseSpineGraph
-          phases={state.definition.phases}
-          selectedSlug={selectedSlug}
-          onSelectNode={(slug) => setSelectedSlug((cur) => (cur === slug ? null : slug))}
-        />
+        {graphColumn}
         <PhaseFormPanel
           phase={selectedPhase}
           open={panelOpen}
