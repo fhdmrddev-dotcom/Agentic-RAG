@@ -398,3 +398,39 @@ targeting exactly these three findings, informed by the fixes both this report a
 
 *Verified: 2026-07-25T15:00:00Z*
 *Verifier: Claude (gsd-verifier)*
+
+---
+
+## Round-3 gap closure (2026-07-25) — 2 fixed, 1 accepted
+
+Operator-scoped close-out, taken after reviewing the round-3 findings and the fact that the
+phase had grown 3 plans → 12 across three fix rounds, with round 3 itself introducing a defect
+(the palette regression below). Rather than a fourth gap-closure wave, the operator directed:
+fix the two cheap-and-real gaps, and make an explicit DECISION on SC#3.
+
+| Gap | Disposition | Evidence |
+|---|---|---|
+| **Truth 8a** — `GET /workflows/grounding-bundle` ignores `bundle.degraded`, serving an outage as an empty palette (the regression 182-11 introduced) | **FIXED** — `de0810bd` | `GroundingBundleResponse.degraded` + the same branch `validate_workflow` makes. 6 tests; 4 fail under falsification, healthy control and model-default correctly do not. A partial degradation still serves what resolved. |
+| **Truth 8b (CR-03)** — the `strict=True` folders read detects a `max-rows` truncation but never bounds the read, so past the cap every `/validate` and every publish fails permanently | **FIXED** — `844b0b40` | `.range()` pagination, then verify against the count; the raise is kept as last resort so WR-07's fail-closed posture stands. Default path still issues ONE unbounded query. 4 tests fail under falsification, incl. a new guard that the raise path ATTEMPTED pagination. |
+| **Truth 8c** — NL generation (`workflow_authoring`) also ignores `degraded`, defended by a disprovable docstring claim | **PARTIALLY CLOSED** — `de0810bd` | The false claim is corrected in place (the ⊆ walk is a no-op on an unbound draft, so it "re-reads" nothing). The consumer wiring itself is planted as **SEED-133** with a Phase-187 re-open trigger. |
+| **Truth 9** — publish's org gate never checks the definition's own `project_folder_id`, so an org-A definition bound directly to an org-B folder publishes clean | **FIXED** — `671d61e6` | Under a restriction, a root that did not survive it resolves to `[]` (distinct from `None` = unbound) and `folder_scope_violations` raises it as its own unkeyed violation — required because a definition with no per-phase `folder_scope` gives the subset loop nothing to test. 5 tests; the 2 root cases fail under falsification, all 4 controls stay green. |
+| **Truth 3 (SC#3)** — the uniform flag-off 404 is uniquely identifying, because `PATCH/DELETE /workflows/{definition_id}` shadow every other single-segment name | **ACCEPTED RISK** — `e9375312` | Operator decision recorded in `182-DECISION-NOTES.md`; residual + fix sketch + four re-open triggers in **SEED-134**. What leaks is two route NAMES (no data, access, credential or tenant id), and those names go public in Phase 183/184. `test_wrong_method_probe_404s_not_405` is KEPT but annotated — WR-07 was right that it pinned the leak as required, so its docstring now says a correct fix should update the expectation, never be weakened to satisfy it. |
+
+### Test state at close-out
+
+Broad sweep (`-k "folder or grounding or scope or publish or workflow or canvas or depend or main"`):
+**385 passed, 12 failed** — the 12 failures are byte-for-byte the pre-existing set, each
+independently confirmed against baseline `ed80de3b` this session (D1, D2, and six others proven
+by differential with the working tree restored byte-exactly). Baseline was 370 passed / 12
+failed; the +15 is this closure's new tests.
+
+One regression WAS introduced and caught inside this closure: the additive `degraded` field
+broke three exact-body palette assertions (`test_182_grounding_bundle.py` ×2,
+`test_181_flip_on.py` ×1). The third was caught only by the broad sweep, not by the phase-182
+suites — worth remembering that the 181 gate test pins the whole palette envelope.
+
+### Standing residuals
+
+- **SEED-133** — NL generation is the one grounding consumer still not branching on `degraded`.
+- **SEED-134** — the SC#3 404-uniqueness enumeration. Its rationale does NOT generalize.
+- **D1–D4** in `deferred-items.md` — pre-existing test rot, untouched.
