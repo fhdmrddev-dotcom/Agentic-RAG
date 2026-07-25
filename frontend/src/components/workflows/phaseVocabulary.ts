@@ -181,6 +181,12 @@ export interface Grounding {
  * The three grounding faces. Glyphs REUSE the shipped strictness vocabulary from
  * `deriveTier.ts:57-79` (STRICT 🔒 / MIDDLE ◐ / LOOSE ○) so the whole app speaks one
  * strictness language rather than inventing a canvas-local dialect.
+ *
+ * The reuse is a BAND match, not just a glyph match: the `flag` face covers exactly
+ * the `flag | partial` band `deriveTier` calls MIDDLE (`deriveTier.ts:112-115`), so a
+ * phase cannot read one strictness on the canvas and a different one on the workflow
+ * soul a click away. `phaseVocabulary.test.ts` imports `deriveTier` and pins that
+ * agreement for both policies, so the two modules cannot drift apart silently.
  */
 const GROUNDINGS = {
   strict: { mode: "strict", words: "Must cite its sources", glyph: "🔒" },
@@ -195,9 +201,16 @@ const GROUNDINGS = {
  * field; 183 must NOT invent that field.
  *
  * `strict` when the policy is `"strict"` OR any validator declares
- * `citations_required`; `"flag"` for the flag policy; `"open"` for everything else —
- * which DELIBERATELY includes `"partial"`, `"draft"`, an absent value and any
- * future/unknown value, so the function is TOTAL and never throws.
+ * `citations_required`; the MIDDLE `flag` face for `"flag"` AND for `"partial"`;
+ * `"open"` for everything else — `"draft"`, an absent value and any future/unknown
+ * value — so the function stays TOTAL and never throws.
+ *
+ * `"partial"` reads as the middle face because it is a REAL enforcement level, not
+ * an absence of one: `deriveTier.ts:112-115` maps it to MIDDLE alongside `flag`, and
+ * `soulData.POLICY_ORDER` ranks it above `draft`. Calling it "No sources needed"
+ * here would have two governance surfaces one click apart making opposite claims
+ * about the same stored value. Totality is unaffected — it is the UNKNOWN policy,
+ * not the known-but-middling one, that falls through to `open`.
  *
  * `v.kind` is compared as a plain string and is NEVER cast to `ValidatorKind`: the
  * backend declares nine kinds while `deriveTier.ts:28-33` narrows to five, so a cast
@@ -212,7 +225,7 @@ export function groundingFor(phase: PhaseSpecJSON): Grounding {
   const hasCitationGate = validators.some((v) => v?.kind === "citations_required")
   const policy = phase.config.citation_policy
   if (policy === "strict" || hasCitationGate) return GROUNDINGS.strict
-  if (policy === "flag") return GROUNDINGS.flag
+  if (policy === "flag" || policy === "partial") return GROUNDINGS.flag
   return GROUNDINGS.open
 }
 

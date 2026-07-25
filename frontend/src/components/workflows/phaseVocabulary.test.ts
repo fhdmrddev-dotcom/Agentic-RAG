@@ -12,7 +12,8 @@
  *    the slug into the default face (D-183-06).
  *  - `groundingFor` DERIVES grounding from `citation_policy` + a
  *    `citations_required` validator and always carries a glyph beside its words
- *    (D-183-07, WCAG 1.4.1 never-colour-alone).
+ *    (D-183-07, WCAG 1.4.1 never-colour-alone), and its MIDDLE band AGREES with
+ *    `deriveTier` — pinned cross-module rather than assumed (183-08, WR-01).
  *  - Every exported resolver is TOTAL — unknown phase types, unknown citation
  *    policies, unknown validator kinds, malformed `on_failure` and a missing
  *    `validators` array all resolve honestly and never throw (CANVAS-01).
@@ -21,6 +22,7 @@
 import { describe, it, expect } from "vitest"
 import phaseVocabularySource from "./phaseVocabulary?raw"
 import skipParseCases from "./__fixtures__/skipParseCases.json"
+import { deriveTier, TIERS } from "./deriveTier"
 import {
   parseSkipTarget,
   nodeTitle,
@@ -178,11 +180,30 @@ describe("phaseVocabulary.groundingFor — derived grounding, slot 1 (D-183-07)"
     )
   })
 
-  it("'partial', 'draft', an absent policy and an unknown value all → open", () => {
-    expect(groundingFor(phase({ config: { phase_type: "llm_emit", citation_policy: "partial" } })).mode).toBe("open")
+  it("citation_policy 'partial' → the MIDDLE face, never 'no sources needed' (WR-01)", () => {
+    const g = groundingFor(phase({ config: { phase_type: "llm_emit", citation_policy: "partial" } }))
+    expect(g.mode).toBe("flag")
+    expect(g.glyph).toBe("◐")
+    expect(g.words.length).toBeGreaterThan(0)
+  })
+
+  it("'draft', an absent policy and an unknown value all → open", () => {
     expect(groundingFor(phase({ config: { phase_type: "llm_emit", citation_policy: "draft" } })).mode).toBe("open")
     expect(groundingFor(phase()).mode).toBe("open")
     expect(groundingFor(phase({ config: { phase_type: "llm_emit", citation_policy: "tomorrow" } })).mode).toBe("open")
+  })
+
+  // THE CROSS-MODULE PIN (WR-01). The canvas grounding badge and the workflow-soul
+  // strictness badge are one click apart and read the SAME stored `citation_policy`.
+  // Asserting agreement here makes "they say the same thing" a machine-checked
+  // property rather than a habit two authors have to remember.
+  it("agrees with deriveTier for the whole MIDDLE band ('flag' and 'partial')", () => {
+    for (const policy of ["flag", "partial"] as const) {
+      expect(deriveTier(policy, new Set()).id).toBe("MIDDLE")
+      expect(
+        groundingFor(phase({ config: { phase_type: "llm_emit", citation_policy: policy } })).glyph,
+      ).toBe(TIERS.MIDDLE.glyph)
+    }
   })
 
   it("never throws on a missing validators array, an unknown validator kind, or a bare config", () => {

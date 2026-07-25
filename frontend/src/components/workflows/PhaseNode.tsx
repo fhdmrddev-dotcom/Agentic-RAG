@@ -62,13 +62,13 @@
  * clause itself must be quoted verbatim in this docblock, exactly as it is in
  * `PhaseSpine.tsx`, `WorkflowSoul.tsx` and `WorkflowDoorSwitch.tsx`.)
  */
+import { createElement, type ReactNode } from "react"
 import { Handle, Position, type NodeProps } from "@xyflow/react"
 
 import { StatusChip, type ChipTone } from "@/components/org/StatusChip"
 import { PHASE_GLYPHS } from "@/components/workflows/soulData"
 import {
   CANVAS_LAYOUT,
-  type EndCapCanvasNode,
   type PhaseCanvasNode,
   type UnresolvedSkipCanvasNode,
 } from "@/components/workflows/canvasModel"
@@ -140,6 +140,27 @@ const GROUNDING_TONE: Record<Grounding["mode"], ChipTone> = {
   open: "muted",
 }
 
+/**
+ * The 3D mark, resolved at MODULE scope and returned as a `ReactNode`.
+ *
+ * Since Phase 127 the soulData value is a fluent-emoji SLUG string rather than a
+ * glyph, so `"•"` is the real visual fallback for an unmapped type (the canonical
+ * `PhaseSpine.tsx:87-89` render). The resolution deliberately does NOT happen inside
+ * a component body: `phaseGlyph()` returns a COMPONENT, and binding a component to a
+ * local during render is what `react-hooks/static-components` correctly flags —
+ * React cannot preserve state across renders for a type that is recreated. Hoisting
+ * the JSX call site into a leaf component does not clear it either (the rule fires in
+ * any component body); returning the element from a plain module-scope helper does,
+ * and it is also the honest shape — this is a lookup, not a component.
+ *
+ * The rendered output is byte-identical to the previous inline ternary: the same
+ * bundled SVG, the same `h-8 w-8`, the same `"•"` fallback.
+ */
+function renderPhaseMark(phaseType: string): ReactNode {
+  const mark = phaseGlyph(phaseType)
+  return mark ? createElement(mark, { className: "h-8 w-8" }) : (PHASE_GLYPHS[phaseType] ?? "•")
+}
+
 // ── PhaseNode — the phase card ──────────────────────────────────────────────────
 
 /**
@@ -153,11 +174,8 @@ export function PhaseNode({ data, selected }: NodeProps<PhaseCanvasNode>) {
   const technical = data.technical === true
   const title = technical ? data.technicalTitle : data.title
 
-  // The 3D mark first. Since Phase 127 the soulData value is a fluent-emoji SLUG
-  // string, not a glyph, so "•" is the real visual fallback for an unmapped type
-  // (the canonical `PhaseSpine.tsx:87-89` render).
-  const Glyph = phaseGlyph(data.phaseType)
-  const glyphFallback = PHASE_GLYPHS[data.phaseType] ?? "•"
+  // The 3D mark is resolved by the module-scope helper above — see its docblock for
+  // why the lookup does not live in this body.
   const tint = ICON_TINT[data.phaseType] ?? DEFAULT_TINT
 
   return (
@@ -235,7 +253,7 @@ export function PhaseNode({ data, selected }: NodeProps<PhaseCanvasNode>) {
           style={{ filter: "blur(5px)" }}
         />
         <span className="relative grid place-items-center text-[20px] leading-none text-foreground drop-shadow-[0_9px_13px_rgba(0,0,0,0.8)]">
-          {Glyph ? <Glyph className="h-8 w-8" /> : glyphFallback}
+          {renderPhaseMark(data.phaseType)}
         </span>
       </span>
     </div>
@@ -285,8 +303,12 @@ export function UnresolvedSkipNode({ data }: NodeProps<UnresolvedSkipCanvasNode>
  * Every flow ends in an explicit cap, never a dangling edge stub. Small, quiet,
  * neither selectable nor focusable — pure punctuation with an accessible name so a
  * screen-reader user hears where the flow stops.
+ *
+ * React Flow calls it with `NodeProps<EndCapCanvasNode>`; it reads none of them, so
+ * it declares no parameter at all. The project's ESLint config ships no `^_` ignore
+ * pattern, which is why an underscore-prefixed binding is not the escape hatch here.
  */
-export function EndCapNode(_props: NodeProps<EndCapCanvasNode>) {
+export function EndCapNode() {
   return (
     <div
       data-testid="canvas-end-cap"
