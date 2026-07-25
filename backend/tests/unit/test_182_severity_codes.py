@@ -267,7 +267,20 @@ def test_known_codes_compose_from_the_owning_modules_with_no_orphan():
     assert set(workflows._ROUTE_ASSIGNED_CODES).isdisjoint(owned), (
         "a route-minted code collided with an owning module's code — one of them must move"
     )
-    assert set(workflows._KNOWN_CODES) == owned | set(workflows._ROUTE_ASSIGNED_CODES)
+
+    # The DEGRADED bucket (round-2 gap closure — WR-01 / WR-02): an infrastructure-honesty
+    # code, not a rule finding. It is NOT in `GROUNDING_VERDICT_CODES` because
+    # `grounding_verdicts` does not emit it — both CONSUMERS of that collector mint it, from
+    # the one shared `grounding.grounding_unavailable_finding`, whenever a grounding read is
+    # unresolvable. Its string is sourced from `grounding.py`, so neither consumer carries a
+    # literal and this composition cannot drift from a copy.
+    assert set(workflows._DEGRADED_CODES) == {grounding.GROUNDING_UNAVAILABLE_CODE}
+    assert set(workflows._DEGRADED_CODES).isdisjoint(
+        owned | set(workflows._ROUTE_ASSIGNED_CODES)
+    )
+    assert set(workflows._KNOWN_CODES) == (
+        owned | set(workflows._ROUTE_ASSIGNED_CODES) | set(workflows._DEGRADED_CODES)
+    )
 
     # Exactly one classification path per known code: the three buckets PARTITION the set.
     incomplete = set(workflows._INCOMPLETE_CODES)
@@ -287,8 +300,12 @@ def test_known_codes_compose_from_the_owning_modules_with_no_orphan():
         f"{sorted(set(workflows._KNOWN_CODES) - (incomplete | errors | dual))}"
     )
 
-    # _ERROR_CODES is derived, so it must still equal the historical literal set exactly —
-    # the WR-05 fix reclassifies nothing.
+    # _ERROR_CODES is DERIVED (`_KNOWN_CODES - _INCOMPLETE_CODES - _DUAL_SOURCE_CODES`), so
+    # the literal set here is the taxonomy decision written out by hand. `grounding_unavailable`
+    # joins it by construction: widening `_KNOWN_CODES` without touching `_INCOMPLETE_CODES`
+    # drops it into the error bucket, which is the REQUIRED classification. "We could not
+    # verify" must never paint the soft `incomplete` — an author shown "still building" would
+    # hit a hard publish block nobody warned them about (the WR-05 posture).
     assert errors == {
         "bad_index",
         "orphan_phase",
@@ -296,6 +313,7 @@ def test_known_codes_compose_from_the_owning_modules_with_no_orphan():
         "folder_scope",
         "unregistered_tool",
         "unregistered_skill",
+        "grounding_unavailable",
     }
 
 
@@ -345,39 +363,49 @@ def test_drift_scanners_have_teeth():
     assert _scan(_VERDICT_EMIT_RE, "def f():\n    return 1\n") == set()
 
 
-# ── 8) BOUNDARY: publish-only codes are ACKNOWLEDGED, not accidental ─────────
+# ── 8) BOUNDARY: publish mints NO code /validate cannot classify ─────────────
 
 
-def test_publish_only_codes_are_an_acknowledged_boundary():
-    """`publish_service` mints ONE code `/validate` deliberately does not know.
+def test_publish_mints_no_code_validate_cannot_classify():
+    """The acknowledged boundary set is now EMPTY — and that is the point.
 
-    Plan 182-06 added the fail-closed stage-2.6 code `grounding_unavailable`. Its canonical
-    home is `publish_service.py`: it says "we could not CHECK", not "the definition is
-    wrong", and it travels on the D-08 publish verdict's `named_failures` — `/validate` calls
-    `grounding.grounding_verdicts` directly, never `_grounding_fidelity_failures`, so it can
-    never reach `_severity`.
+    WHAT CHANGED (round-2 gap closure — WR-01 / WR-02). Plan 182-06 gave publish a
+    fail-closed stage-2.6 code, `grounding_unavailable`, and this test acknowledged it as
+    publish-only: `/validate` called `grounding.grounding_verdicts` directly, so the code
+    could not reach `_severity`. That was a real boundary, and it was also the shape of a
+    real defect — the two sides shared the same RULES with OPPOSITE FAILURE postures, so an
+    unresolvable registry produced a structured block on the publish side and an HTTP 500 on
+    the route the canvas calls on every edit.
 
-    This test pins that boundary so it stays a DECISION. If publish mints another verdict
-    code later, this fails and forces the author to answer the question the WR-05 gap existed
-    because nobody asked: is it a `/validate` code (compose it in) or publish-only
-    (acknowledge it here)?
+    Both sides now mint that code from the ONE shared `grounding.grounding_unavailable_finding`
+    and `/validate` composes it into `_KNOWN_CODES` (as `workflows._DEGRADED_CODES`). So the
+    boundary set is empty for TWO independent reasons: the code is now known to the
+    classifier, and publish no longer spells it as a literal at all — it returns the shared
+    builder's dict.
+
+    THE FORCING FUNCTION IS INTACT. If publish ever mints a NEW verdict code of its own, this
+    scan sees the literal and fails, forcing the author to answer the question the WR-05 gap
+    existed because nobody asked: is it a `/validate` code (compose it in) or publish-only
+    (acknowledge it here, with a comment saying why)?
     """
     from app.api import workflows
+    from app.services.harness import grounding
 
     publish_codes = _scan(
         _VERDICT_EMIT_RE, _read("app", "services", "harness", "publish_service.py")
     )
     unknown_to_validate = publish_codes - set(workflows._KNOWN_CODES)
 
-    assert unknown_to_validate == {"grounding_unavailable"}, (
-        "the publish path mints a verdict code /validate does not classify, and it is not "
-        f"the one acknowledged boundary: {sorted(unknown_to_validate)}. Decide its home — "
-        "add it to the owning module's published set if /validate can emit it, or extend "
-        "this test's acknowledged set (with a comment saying why it is publish-only)."
+    assert unknown_to_validate == set(), (
+        "the publish path mints a verdict code /validate cannot classify: "
+        f"{sorted(unknown_to_validate)}. Decide its home — add it to the owning module's "
+        "published set if /validate can emit it, or acknowledge it here (with a comment "
+        "saying why it is publish-only)."
     )
 
-    # Even so, if it EVER reached the classifier the answer would be the fail-closed one.
-    # "could not verify" must never paint soft grey; the WR-05 branch gets this right by
-    # construction, which is precisely why failing closed is the correct default.
+    # The degraded code IS classified now, deliberately rather than through the fail-loud
+    # branch — and the answer is the fail-closed one in both `phases_empty` states. "Could not
+    # verify" must never paint soft grey.
+    assert grounding.GROUNDING_UNAVAILABLE_CODE in workflows._KNOWN_CODES
     assert workflows._severity("grounding_unavailable", phases_empty=False) == "error"
     assert workflows._severity("grounding_unavailable", phases_empty=True) == "error"

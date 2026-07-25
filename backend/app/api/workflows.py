@@ -257,6 +257,15 @@ async def get_starter_workflows(
 # at stage 2.6; ``tests/unit/test_182_publish_grounding_stage.py`` asserts the two sides
 # report the SAME findings for the same definition, so the parity cannot silently rot again.
 #
+# SAME RULES **AND** SAME FAILURE POSTURE (round-2 gap closure — WR-02). The row-per-check
+# table above was only half the claim: until this plan the two sides shared the rules but had
+# OPPOSITE postures when a grounding read FAILED — publish returned a structured
+# ``grounding_unavailable`` block while this route let a ``postgrest`` ``APIError`` escape as
+# an HTTP 500, and this is the route that fires on every canvas edit. Both sides now branch on
+# the SAME ``GroundingBundle.degraded`` signal and mint the SAME finding from the SAME builder
+# (``grounding.grounding_unavailable_finding``), so "one shared copy" covers what happens when
+# the shared copy cannot run.
+#
 # NOTHING is re-implemented here and NOTHING is ever re-implemented client-side;
 # the route only AGGREGATES and CLASSIFIES. `/validate` is READ-ONLY advice — it never
 # persists, never executes, and never mints a version; PUBLISH remains the enforcing gate.
@@ -387,14 +396,17 @@ class GroundingBundleResponse(BaseModel):
 # load-bearing: a failures-only test differential cannot see a code that was added without
 # ever being classified, because nothing was ever asserting about it.
 #
-# PUBLISH-ONLY, deliberately NOT composed in: ``publish_service``'s fail-closed stage-2.6
-# code ``grounding_unavailable`` (plan 182-06). Its canonical home is ``publish_service.py``.
-# ``/validate`` calls ``grounding.grounding_verdicts`` DIRECTLY, never
-# ``_grounding_fidelity_failures``, so that code cannot reach this classifier — it travels
-# on the D-08 publish verdict's ``named_failures`` instead. If a future change ever routes
-# publish's named failures through ``_severity``, add it to the composition here; until then
-# the fail-loud branch would classify it ``error``, which is the correct fail-closed answer
-# anyway, so the only cost would be a log warning. The boundary is pinned by a test.
+# NO LONGER PUBLISH-ONLY (round-2 gap closure — WR-01 / WR-02). This block used to say
+# ``grounding_unavailable`` "cannot reach this classifier" because only publish minted it.
+# That is now FALSE: BOTH consumers of the shared collector mint it, from the ONE builder
+# ``grounding.grounding_unavailable_finding``, and ``/validate`` emits it whenever a grounding
+# read is unresolvable. It is composed in below as ``_DEGRADED_CODES``.
+#
+# It is an INFRASTRUCTURE-HONESTY code, not a rule finding — which is why it lives in neither
+# owning module's verdict set (``grounding_verdicts`` does not emit it) and why it classifies
+# ``error``: an unverifiable definition must not look publishable. "We could not check" must
+# never paint the soft ``incomplete``, or the canvas would say "still building" while publish
+# says "blocked". Its STRING lives in ``grounding.py`` so neither consumer carries a literal.
 
 # The two codes the ROUTE mints itself — neither owning module emits them:
 #   ``business_requirement`` — minted in ``validate_workflow`` from
@@ -422,9 +434,15 @@ _INCOMPLETE_CODES: frozenset[str] = frozenset(
 # BEFORE any set lookup, so it belongs to neither bucket.
 _DUAL_SOURCE_CODES: frozenset[str] = frozenset({"no_terminal"})
 
+# The DEGRADED bucket: "we could not CHECK" (WR-01 / WR-02). Sourced from ``grounding.py`` so
+# the string exists in exactly one place. Deliberately NOT added to ``_INCOMPLETE_CODES`` —
+# subtracting the two soft buckets from the widened ``_KNOWN_CODES`` below drops it into the
+# derived error bucket automatically, which is the required classification.
+_DEGRADED_CODES: frozenset[str] = frozenset({grounding.GROUNDING_UNAVAILABLE_CODE})
+
 # Everything ``/validate`` knows how to classify.
 _KNOWN_CODES: frozenset[str] = (
-    LINT_CODES | grounding.GROUNDING_VERDICT_CODES | _ROUTE_ASSIGNED_CODES
+    LINT_CODES | grounding.GROUNDING_VERDICT_CODES | _ROUTE_ASSIGNED_CODES | _DEGRADED_CODES
 )
 
 # DERIVED, never listed: every known code that is neither a still-building condition nor
@@ -509,36 +527,75 @@ async def validate_workflow(
     declaring ``folder_scope`` on an unbound workflow also 422s at the shape tier (the
     ``@model_validator``), so it never reaches this handler; an empty ``phases: []`` IS
     shape-valid and lands here as an ``incomplete`` ``no_terminal``.
+
+    THAT PROMISE IS NOW ENFORCED FOR THE TWO GROUNDING I/O STAGES (round-2 gap closure —
+    WR-02). Until this plan nothing enforced it: a real ``postgrest`` ``APIError`` from either
+    the palette read or the ⊆ walk escaped as an HTTP 500 (``APIError`` is not a
+    ``ValueError``, so the ⊆ rule's catch never saw it) — while the SAME collector on the
+    publish side returned a structured block. Both stages are wrapped now and degrade to the
+    honest ``grounding_unavailable`` verdict at severity ``error``: ``ok`` is never ``True``
+    when a check did not run, and a degraded read is never dressed up as a rule finding.
+
+    THE SEAL IS SCOPED, AND ITS BOUNDARY IS RECORDED. What remains is SEED-131 / SEED-132 and
+    stays DEFERRED to Phase 184: the envelope-level design question (a top-level ``degraded``
+    marker or a third severity, instead of a verdict code), the ``@model_validator`` 422s that
+    bypass this envelope before the handler is even entered, and a contract test enforcing
+    always-200 across the WHOLE handler rather than across the grounding stages only.
     """
     user_id = _coerce_user_id(current_user)
-    # ONE registry read for the whole request (the palette the fidelity rules test against).
-    # ``project_folder_id`` is deliberately not passed: a bound project narrows only the
-    # per-phase folder_scope ⊆ check (which reads it off the definition itself) and the NL
-    # prose line — never the palette.
-    bundle = await grounding.assemble_grounding_bundle(
-        supabase=supabase,
-        user_id=str(user_id),
-    )
 
     findings: list[dict] = []
 
     # (1) structural lint — the verbatim pure check. Mapped to the SAME dict shape publish
     # renders its lint block with (publish_service: {"code", "phase", "message"}).
+    #
+    # WHY THE PURE CHECKS LIVE OUTSIDE THE SEAL BELOW: lint, the D-13 business-requirement
+    # invariant and the interactive-phase check need NO registry and cannot fail, so a
+    # registry blip must cost the author the three GROUNDING rules only — not the whole
+    # validation. A blanket try/except around the handler body would discard results that
+    # were computed perfectly well (and a blanket ``except`` returning ``ok: True`` would be
+    # strictly WORSE than the 500 it replaced — it paints a possibly-broken workflow green).
     findings.extend(
         {"code": e.code, "phase": e.phase_slug, "message": e.message}
         for e in lint_workflow(body)
     )
 
     # (2) grounding fidelity — the per-node collector over the ONE shared rule copy.
-    findings.extend(
-        await grounding.grounding_verdicts(
-            body,
+    # SEALED (WR-02): the ONLY two DB-backed stages on this route are the registry read and
+    # the collector (whose rule 1 walks the project subtree), and both are wrapped here.
+    try:
+        # ONE registry read for the whole request (the palette the fidelity rules test
+        # against). ``project_folder_id`` is deliberately not passed: a bound project narrows
+        # only the per-phase folder_scope ⊆ check (which reads it off the definition itself)
+        # and the NL prose line — never the palette.
+        bundle = await grounding.assemble_grounding_bundle(
             supabase=supabase,
             user_id=str(user_id),
-            tool_names=bundle.tool_names,
-            skill_ids=bundle.skill_ids,
         )
-    )
+        if bundle.degraded:
+            # WR-01: an unresolved registry makes every membership test vacuously false, so
+            # running the fidelity rules here would report the author's VALID tool names and
+            # skill references as unregistered — a factual accusation manufactured out of an
+            # outage. Skip them entirely and say what is actually true.
+            findings.append(grounding.grounding_unavailable_finding(bundle.degraded))
+        else:
+            findings.extend(
+                await grounding.grounding_verdicts(
+                    body,
+                    supabase=supabase,
+                    user_id=str(user_id),
+                    tool_names=bundle.tool_names,
+                    skill_ids=bundle.skill_ids,
+                )
+            )
+    except Exception:  # noqa: BLE001 — this route is documented ALWAYS HTTP 200
+        logger.warning(
+            "POST /workflows/validate: grounding could not be resolved; returning the "
+            "structural verdicts plus an honest %r verdict instead of a 500",
+            grounding.GROUNDING_UNAVAILABLE_CODE,
+            exc_info=True,
+        )
+        findings.append(grounding.grounding_unavailable_finding())
 
     # (3) the D-13 business-requirement invariant — same predicate publish stage 1 calls,
     # same named-failure prose.

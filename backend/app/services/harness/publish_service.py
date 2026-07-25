@@ -546,16 +546,28 @@ async def _grounding_fidelity_failures(
     ``lint`` stage renders its named failures with (no new response vocabulary), per-node
     keyed on the phase ``slug``.
 
-    FAILS CLOSED. Only the client resolution and the two collector calls are wrapped; on any
-    failure this returns a single ``grounding_unavailable`` named failure, which BLOCKS the
-    publish. A publish that cannot verify grounding must not mint a version — the same
-    fail-closed posture ``grounding._skill_registry`` already takes on its own read (CR-01).
-    Returning ``[]`` would silently publish an unverified definition, which is the exact
-    defect this stage exists to close; raising would violate ``publish_workflow``'s sealed-
-    orchestration contract (never raise into the route).
+    FAILS CLOSED, TWO WAYS. On any raise — and on a bundle that reports itself DEGRADED —
+    this returns a single ``grounding_unavailable`` named failure, which BLOCKS the publish.
+    A publish that cannot verify grounding must not mint a version. Returning ``[]`` would
+    silently publish an unverified definition, which is the exact defect this stage exists to
+    close; raising would violate ``publish_workflow``'s sealed-orchestration contract (never
+    raise into the route).
+
+    WHY THE DEGRADED BRANCH EXISTS (round-2 gap closure — WR-01). This docstring used to claim
+    that the posture here matched ``grounding._skill_registry``'s own fail-closed read
+    (CR-01). That was false in the way that mattered: that read's swallow was INVISIBLE to
+    this wrapper. A transient registry failure produced an EMPTY registry and a
+    bundle that returned SUCCESSFULLY, so the ``try`` below never fired, the collector ran
+    against nothing, and every membership test came back vacuously false — this stage then
+    blocked publish naming the author's own valid phase references as unregistered. A factual
+    accusation against a correct definition, sourced from an outage. The degradation now
+    travels on ``bundle.degraded`` and this stage reports "we could not CHECK" instead, from
+    the SAME builder ``POST /workflows/validate`` uses, so the two sides share one message and
+    one code string as well as one rule set.
     """
     from app.services.harness.grounding import (  # function-local (Pitfall 4)
         assemble_grounding_bundle,
+        grounding_unavailable_finding,
         grounding_verdicts,
     )
 
@@ -564,6 +576,14 @@ async def _grounding_fidelity_failures(
             supabase, definition_id=definition_id, pool=pool
         )
         bundle = await assemble_grounding_bundle(supabase=resolved, user_id=str(user_id))
+        if bundle.degraded:
+            logger.warning(
+                "publish: grounding registries %s could not be resolved for definition %s — "
+                "blocking (fail-closed) without running the fidelity rules",
+                sorted(bundle.degraded),
+                definition_id,
+            )
+            return [grounding_unavailable_finding(bundle.degraded)]
         return await grounding_verdicts(
             definition,
             supabase=resolved,
@@ -577,16 +597,7 @@ async def _grounding_fidelity_failures(
             "blocking (fail-closed)",
             definition_id,
         )
-        return [
-            {
-                "code": "grounding_unavailable",
-                "phase": None,
-                "message": (
-                    "the grounding registry could not be resolved, so grounding fidelity "
-                    "could not be verified — publish is blocked"
-                ),
-            }
-        ]
+        return [grounding_unavailable_finding()]
 
 
 def _judge_named_failures(verdict: dict) -> list:
