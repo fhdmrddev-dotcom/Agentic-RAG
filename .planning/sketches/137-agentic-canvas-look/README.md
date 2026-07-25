@@ -94,7 +94,7 @@ present in the set and measured for legibility on Deep Midnight:
 
 | Option | Luminance | Read |
 |---|---|---|
-| **🧭 `compass`** *(recommended, sketch default)* | 157.4 | An agent works out *how* to get there instead of following a fixed script — exactly what separates `llm_agent` from `llm_single`. An object, consistent with gear / memo / package. Genuinely uncommon in AI UIs. |
+| **🧭 `compass`** ★ **CHOSEN** (operator, 2026-07-25) | 157.4 | An agent works out *how* to get there instead of following a fixed script — exactly what separates `llm_agent` from `llm_single`. An object, consistent with gear / memo / package. Genuinely uncommon in AI UIs. |
 | 📡 `satellite-antenna` | 176.4 | Reaching out and gathering. Brightest and most abstract. |
 | 🧠 `brain` | 169.2 | Reads as thinking, but it is the second-most recycled AI icon after the robot. |
 | 🤖 `robot` | 134.9 | Today's mark. |

@@ -618,3 +618,22 @@ discriminated union, so it structurally cannot emit an invalid draft — plus gr
 **Feeds `/gsd:spec-phase 183` / `/gsd:discuss-phase 183`** — acceptance bar = 137-D. Sketches 134–135 remain the
 structural reference (frame options, node-content inventory, live-data findings); 136 is the topology + SC#4
 faithfulness harness. Sessions: 134–137.
+
+**Icon decisions (2026-07-25).** `llm_agent` → **🧭 `compass`** (luminance 157.4), replacing `robot` — operator: the robot
+"seems like it used everywhere in any other application". Compass is semantically exact (an agent works out *how* to
+get there rather than following a fixed script — the thing that separates `llm_agent` from `llm_single`) and it is an
+object, consistent with gear / memo / package. `sparkles` was deliberately excluded as the industry's most overused AI
+icon; `bullseye` is already taken by the Phase 127 gauntlet Goal stage. `llm_batch_agents` → the too-dark
+`busts-in-silhouette` (luminance 34.5) gets the **in-scope fix** (lighter icon well) in 183; the **cross-cutting**
+swap to `handshake` (182.6) stays open.
+
+⚠ **Both icon swaps are cross-cutting, NOT Phase 183's to ship quietly.** `PHASE_GLYPHS` is deliberately shared —
+the same mark also renders on the workflows-page card, the run + publish soul headers, the gauntlet stages and the
+live step cards. One clean additive map swap, five shipped surfaces. **Carry as a small dedicated task, not a
+side effect of the canvas phase.**
+
+**Two live-data findings that MUST reach the Phase 183 plan** (both from the 2026-07-25 Supabase read):
+1. **`skip_to_phase` is used ZERO times** across all 95 definitions / 119 phases — so SC#1's branch edge cannot be
+   demonstrated from the existing corpus. **The phase needs a fixture** (sketch 136 proposes the shape).
+2. **40 of 95 definitions have zero phases** — the empty projection is the single most common canvas state and needs
+   an honest empty state, not a blank plane.
