@@ -57,9 +57,18 @@ already-flaky 1877-test baseline.
 
 ## Per-Task Verification Map
 
-> **20 tasks across 7 plans** (183-01 ×3, 183-02 ×3, 183-03 ×2, 183-04 ×3, 183-05 ×3, 183-06 ×3,
-> 183-07 ×3). **Every task carries an `<automated>` verify command** — Dimension 8 PASS, and there is
-> no run of 3 consecutive tasks without one. Status flips during execution.
+> **23 tasks across 8 plans** (183-01 ×3, 183-02 ×3, 183-03 ×2, 183-04 ×3, 183-05 ×3, 183-06 ×3,
+> 183-07 ×3, **183-08 ×3 — gap closure**). **Every task carries an `<automated>` verify command** —
+> Dimension 8 PASS, and there is no run of 3 consecutive tasks without one. Status flips during
+> execution.
+>
+> **Plan 183-08 is the gap-closure plan** created 2026-07-26 after `/gsd:verify-work` returned
+> `gaps_found` (SC#3 partial) and the code review returned `issues_found`. Its Wave column reads
+> **GC** because `/gsd:execute-phase 183 --gaps-only` runs it as a standalone wave — the plan's own
+> frontmatter therefore carries `wave: 1`, `depends_on: []`, `gap_closure: true`. Its rows grade as
+> **differentials against the post-183-07 baselines** recorded in that plan's
+> `<measured_baselines>` block (370 / 408 / 33 `tsc` signatures / 2 ESLint errors), never as
+> absolutes.
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
@@ -83,6 +92,9 @@ already-flaky 1877-test baseline.
 | 183-07-01 | 07 | 4 | CANVAS-01 | T-183-03, T-183-12 | Strict `=== true` + `!loading` + null-fail-closed gate; no save/persist path touched | regression | `cd frontend && npx tsc -b && npx vitest run src/pages/WorkflowBuilderPage.test.tsx` | ✅ (existing) | ⬜ pending |
 | 183-07-02 | 07 | 4 | CANVAS-01 | T-183-03, T-183-12 | Flag-off VANISH proven in 5 render variants; looking mints no `workflow_definitions` row | component (jsdom) | `cd frontend && npx vitest run src/pages/WorkflowBuilderPage.canvas.test.tsx` | ❌ W0 | ⬜ pending |
 | 183-07-03 | 07 | 4 | CANVAS-01 | T-183-SC | 181 scope-freeze assertions byte-identical (comments only); lazy chunk measured (A6) | regression + build | `cd frontend && npx vitest run src/components/admin/revertByteIdentical.test.tsx && npx vite build` | ✅ (existing gate) | ⬜ pending |
+| 183-08-01 | 08 | GC | CANVAS-01 | — | RED gate: keyboard activation + ARIA-honesty assertions installed and PROVEN failing on unmodified source (the control CR-01 slipped through — the suite asserted node reachability, never activation) | component (jsdom, RED) | `cd frontend && npx vitest run src/components/workflows/WorkflowCanvas.test.tsx` — expect **exactly 3 failed** (Enter / Space / announced-affordance) | ✅ exists — 3 tests **added** | ⬜ pending |
+| 183-08-02 | 08 | GC | CANVAS-01 | T-183-01, T-183-12 | Enter/Space fire the SAME `onSelectNode(slug)` contract as a click (D-183-05); cap + broken-ref stub stay inert; ARIA strings are static literals (no definition data interpolated); activation reaches `setSelectedSlug` only — no write, no fetch, no `onNodesChange` | component (jsdom, GREEN) | `cd frontend && npx vitest run src/components/workflows/WorkflowCanvas.test.tsx src/pages/WorkflowBuilderPage.canvas.test.tsx` | ✅ exists | ⬜ pending |
+| 183-08-03 | 08 | GC | CANVAS-01 | T-183-01 | `citation_policy: "partial"` reads the MIDDLE face on BOTH governance surfaces, pinned cross-module against `deriveTier`; unknown/absent policy still falls through to `open` (totality preserved); no snapshot moved; `PhaseNode.tsx` lint-clean with byte-identical rendered output | unit + lint | `cd frontend && npx vitest run src/components/workflows && npx eslint src/components/workflows/PhaseNode.tsx` | ✅ exists — 2 tests **added**, 1 renamed | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky · `nyquist_compliant`/`wave_0_complete` flip during execution once Wave 0 tests exist and pass.*
 
@@ -210,7 +222,7 @@ fallback is operator-driven clicks with named steps.
 
 ## Validation Sign-Off
 
-- [x] All tasks have `<automated>` verify or Wave 0 dependencies — 20/20 carry an `<automated>` command
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies — 23/23 carry an `<automated>` command (20 from plans 01-07 + 3 from the 183-08 gap-closure plan)
 - [x] Sampling continuity: no 3 consecutive tasks without automated verify
 - [x] Wave 0 covers all ❌ MISSING references above
 - [x] No watch-mode flags (`vitest run`, never bare `vitest`)
