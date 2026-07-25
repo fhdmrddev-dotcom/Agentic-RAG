@@ -70,6 +70,57 @@ def _scoped_definition(*, scope: list[str], slug: str = "answer", bound: bool = 
     return WorkflowDefinition.model_validate(payload)
 
 
+def _multi_phase_definition(phases: list[dict], *, bound: bool = True):
+    """A shape-valid MULTI-phase definition — the multiplicity layer's builder (WR-04).
+
+    Each entry is ``{"slug": ..., "scope": [...] | None, "tools": [...] | None}``. The
+    single-phase ``_scoped_definition`` above is deliberately left untouched (every
+    pre-WR-04 test still drives it); this sibling exists because the whole point of the
+    multiplicity layer is that SEVERAL phases are out of subtree in ONE definition, and
+    the mixed-rule test additionally needs a phase that offends a DIFFERENT rule.
+    """
+    from app.models.harness import WorkflowDefinition
+
+    built: list[dict] = []
+    for index, spec in enumerate(phases):
+        config: dict = {
+            "phase_type": "llm_agent",
+            "prompt": "Answer.",
+            "available_tools": list(spec.get("tools") or []),
+        }
+        if spec.get("scope"):
+            config["folder_scope"] = spec["scope"]
+        built.append(
+            {
+                "slug": spec["slug"],
+                "phase_index": index,
+                "config": config,
+                "validators": [],
+            }
+        )
+    payload: dict = {
+        "slug": "multi-scoped-wf",
+        "version": 1,
+        "name": "Multi Scoped Workflow",
+        "status": "draft",
+        "phases": built,
+    }
+    if bound:
+        payload["project_folder_id"] = _PROJECT
+    return WorkflowDefinition.model_validate(payload)
+
+
+def _three_offenders():
+    """The canonical WR-04 shape: phases `a`, `b`, `c` ALL out of subtree."""
+    return _multi_phase_definition(
+        [
+            {"slug": "a", "scope": [_OUTSIDE]},
+            {"slug": "b", "scope": [_OUTSIDE]},
+            {"slug": "c", "scope": [_OUTSIDE]},
+        ]
+    )
+
+
 def _patch_subtree(monkeypatch, subtree: list[str] | None):
     """Fake ONLY the subtree resolution so the REAL ⊆ walk runs (no DB, no second walk)."""
     from app.services.harness import scope as scope_mod
@@ -157,6 +208,125 @@ async def test_clean_and_unbound_definitions_still_raise_nothing(monkeypatch):
     await assert_folder_scopes_subset(
         _scoped_definition(scope=[], bound=False), supabase=object(), user_id="u1"
     )
+
+
+# ── 1b) MULTIPLICITY at the SOURCE — ONE walk, every offender (WR-04) ─────────
+
+
+@pytest.mark.asyncio
+async def test_collector_returns_one_violation_per_offending_phase(monkeypatch):
+    """WR-04 at the RULE-SOURCE layer: `folder_scope_violations` is NON-raising and returns
+    EVERY offending phase, in `definition.phases` order, each carrying its own slug.
+
+    This is the half of WR-04 that lives below `grounding.py`. `assert_folder_scopes_subset`
+    used to `raise` INSIDE its `for phase in definition.phases` loop, so the rule physically
+    could not report more than one offender — no amount of collecting one layer up could have
+    recovered the others. The non-raising form is the ONE walk; the raising form below is a
+    presentation over it (D-182-06: the ⊆ walk is never re-derived, here or anywhere).
+    """
+    from app.services.harness.scope import FolderScopeSubsetError, folder_scope_violations
+
+    _patch_subtree(monkeypatch, [_PROJECT, _CHILD])
+
+    violations = await folder_scope_violations(
+        _three_offenders(), supabase=object(), user_id="u1"
+    )
+
+    assert [v.phase_slug for v in violations] == ["a", "b", "c"], (
+        "WR-04: the ⊆ rule must report EVERY out-of-subtree phase, in the order the author "
+        f"drew them — got {[getattr(v, 'phase_slug', None) for v in violations]!r}"
+    )
+    assert all(isinstance(v, FolderScopeSubsetError) for v in violations)
+    # Each violation carries ITS OWN message — hand-written literals, never re-derived from
+    # scope.py's f-string (a re-derivation would pass even if the wording drifted).
+    assert [str(v) for v in violations] == [
+        "phase 'a' folder_scope is not a subset of the project subtree: "
+        f"['{_OUTSIDE}']",
+        "phase 'b' folder_scope is not a subset of the project subtree: "
+        f"['{_OUTSIDE}']",
+        "phase 'c' folder_scope is not a subset of the project subtree: "
+        f"['{_OUTSIDE}']",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_collector_is_empty_for_single_clean_and_unbound_definitions(monkeypatch):
+    """One offender → a ONE-element list; a clean scope and an unbound workflow → `[]`.
+
+    The single-offender case is the 182-04 behaviour, preserved: multiplicity must not
+    change what a one-bad-phase definition reports."""
+    from app.services.harness.scope import folder_scope_violations
+
+    _patch_subtree(monkeypatch, [_PROJECT, _CHILD])
+
+    one = await folder_scope_violations(
+        _scoped_definition(scope=[_OUTSIDE]), supabase=object(), user_id="u1"
+    )
+    assert [v.phase_slug for v in one] == ["answer"]
+    assert str(one[0]) == _GOLDEN_MESSAGE  # byte-identical to the raising form's message
+
+    clean = await folder_scope_violations(
+        _scoped_definition(scope=[_CHILD]), supabase=object(), user_id="u1"
+    )
+    assert clean == []
+
+    _patch_subtree(monkeypatch, None)  # unbound → nothing to bound against
+    unbound = await folder_scope_violations(
+        _scoped_definition(scope=[], bound=False), supabase=object(), user_id="u1"
+    )
+    assert unbound == []
+
+
+@pytest.mark.asyncio
+async def test_collector_resolves_the_subtree_exactly_once(monkeypatch):
+    """The subtree is resolved ONCE for the whole definition, not once per phase.
+
+    Removing the early exit must not turn one DB-backed folder-tree walk into N of them
+    (T-182-43). A counting fake is the only honest proof — a per-phase resolve would still
+    return the right answer, just N times."""
+    from app.services.harness import scope as scope_mod
+    from app.services.harness.scope import folder_scope_violations
+
+    calls: list[str] = []
+
+    async def _counting_resolve(project_folder_id, *, supabase, user_id):
+        calls.append(str(project_folder_id))
+        return [_PROJECT, _CHILD]
+
+    monkeypatch.setattr(scope_mod, "resolve_project_subtree", _counting_resolve)
+
+    violations = await folder_scope_violations(
+        _three_offenders(), supabase=object(), user_id="u1"
+    )
+
+    assert len(violations) == 3
+    assert calls == [_PROJECT], (
+        "the subtree must be resolved exactly ONCE per collector call — "
+        f"observed {len(calls)} resolutions for a 3-phase definition"
+    )
+
+
+@pytest.mark.asyncio
+async def test_raising_form_reports_the_first_offender_only(monkeypatch):
+    """The SHORT-CIRCUIT presentation is unchanged: `assert_folder_scopes_subset` still
+    raises for the FIRST offending phase, with a byte-identical message, `args` and slug.
+
+    The two presentations diverge DELIBERATELY. Every `except ValueError` caller
+    (`workflow_kickoff`'s 400, `runs.py`'s Continue fallback, `harness_engine`'s resume
+    fallback, the NL-gen short-circuit) sees exactly what it saw before WR-04."""
+    from app.services.harness.scope import FolderScopeSubsetError, assert_folder_scopes_subset
+
+    _patch_subtree(monkeypatch, [_PROJECT, _CHILD])
+
+    with pytest.raises(FolderScopeSubsetError) as excinfo:
+        await assert_folder_scopes_subset(_three_offenders(), supabase=object(), user_id="u1")
+
+    expected = (
+        "phase 'a' folder_scope is not a subset of the project subtree: " f"['{_OUTSIDE}']"
+    )
+    assert excinfo.value.phase_slug == "a"  # first offender, not "the last one collected"
+    assert str(excinfo.value) == expected
+    assert excinfo.value.args == (expected,)
 
 
 # ── 2) COLLECTOR level — the slug reaches the verdict (THE SC#4 GUARD) ─────────
