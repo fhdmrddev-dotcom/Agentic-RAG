@@ -403,6 +403,119 @@ async def test_verdict_keying_holds_end_to_end_through_the_real_subset_check(mon
     )
 
 
+def _folder_scope_verdicts(verdicts: list[dict]) -> list[dict]:
+    return [v for v in verdicts if v["code"] == "folder_scope"]
+
+
+@pytest.mark.asyncio
+async def test_every_out_of_subtree_phase_gets_its_own_keyed_verdict(monkeypatch):
+    """WR-04 REGRESSION GUARD — a THREE-offender definition produces THREE keyed verdicts.
+
+    Driven END TO END: only `resolve_project_subtree` is faked, so the REAL ⊆ walk runs and
+    the real slugs come out of production code. Nothing about the exceptions is hand-made.
+
+    This assertion FAILS against the pre-WR-04 code with a SINGLE verdict keyed to `a`,
+    because `assert_folder_scopes_subset` raised inside its `for phase in
+    definition.phases` loop on the first offender. `grounding_verdicts` — whose own
+    docstring promises it "COLLECTS every violation ... the canvas needs all of them at
+    once" — could therefore never emit more than one `folder_scope` verdict, no matter how
+    many phases were out of subtree. Phase 184 paints per-node badges from exactly this
+    verdict (VALID-03), so nodes `b` and `c` would render CLEAN and the author would
+    rediscover them one at a time: the whack-a-mole loop the per-node collector exists to
+    eliminate. Rules 2 and 3 were already plural (see
+    `test_182_extraction_parity.py::test_two_presentations_over_the_same_rules`) — the
+    asymmetry was visible inside the suite itself.
+    """
+    from app.services.harness import grounding
+
+    _patch_subtree(monkeypatch, [_PROJECT, _CHILD])
+
+    verdicts = await grounding.grounding_verdicts(
+        _three_offenders(),
+        supabase=object(),
+        user_id="u1",
+        tool_names=set(),
+        skill_ids=set(),
+    )
+
+    found = _folder_scope_verdicts(verdicts)
+    assert [v["phase"] for v in found] == ["a", "b", "c"], (
+        "WR-04 REGRESSION: rule 1 short-circuited again. A definition with three "
+        "out-of-subtree phases emitted "
+        f"{[v['phase'] for v in found]!r} instead of ['a', 'b', 'c'] — so Phase 184 paints "
+        "one badge, nodes b and c render clean, and the author fixes them one at a time. "
+        "Every offending phase must get its OWN keyed verdict, exactly as "
+        "unregistered_tool / unregistered_skill already do."
+    )
+    # ...and each verdict carries ITS OWN message, naming ITS OWN slug.
+    for slug, verdict in zip(["a", "b", "c"], found):
+        assert verdict["message"] == (
+            f"phase '{slug}' folder_scope is not a subset of the project subtree: "
+            f"['{_OUTSIDE}']"
+        )
+
+
+@pytest.mark.asyncio
+async def test_short_circuit_still_reports_only_the_first_offender(monkeypatch):
+    """The SHORT-CIRCUIT counterpart of the test above — the two presentations diverge
+    DELIBERATELY (mirrors `test_two_presentations_over_the_same_rules`).
+
+    The SAME three-offender definition yields exactly ONE `grounding_failed` dict from
+    `_check_grounding_fidelity`, naming phase `a` only. NL generation is byte-identical:
+    it wants the first thing to fix, not the whole findings set."""
+    from app.services.harness import grounding
+
+    _patch_subtree(monkeypatch, [_PROJECT, _CHILD])
+
+    result = await grounding._check_grounding_fidelity(
+        _three_offenders(),
+        supabase=object(),
+        user_id="u1",
+        tool_names=set(),
+        skill_ids=set(),
+    )
+
+    assert result == {
+        "ok": False,
+        "error": "grounding_failed",
+        "detail": (
+            "phase 'a' folder_scope is not a subset of the project subtree: "
+            f"['{_OUTSIDE}']"
+        ),
+    }
+
+
+@pytest.mark.asyncio
+async def test_rule_1_plurality_composes_with_the_already_plural_rules(monkeypatch):
+    """MIXED RULES — rule 1's new plurality composes with rules 2 and 3, and the verdict
+    ORDER is preserved (rule 1 first, then the per-phase loop).
+
+    Phase `a` is out of subtree; phase `b` declares an unregistered tool. Both findings
+    surface, each keyed to its own node — the shape Phase 184 needs to paint a complete
+    badge set from ONE `/validate` call."""
+    from app.services.harness import grounding
+
+    _patch_subtree(monkeypatch, [_PROJECT, _CHILD])
+
+    verdicts = await grounding.grounding_verdicts(
+        _multi_phase_definition(
+            [
+                {"slug": "a", "scope": [_OUTSIDE]},
+                {"slug": "b", "tools": ["not_a_real_tool"]},
+            ]
+        ),
+        supabase=object(),
+        user_id="u1",
+        tool_names={"search_documents"},
+        skill_ids=set(),
+    )
+
+    assert [(v["code"], v["phase"]) for v in verdicts] == [
+        ("folder_scope", "a"),
+        ("unregistered_tool", "b"),
+    ]
+
+
 # ── 3) DEGRADATION — a plain ValueError never breaks the always-200 route ──────
 
 
