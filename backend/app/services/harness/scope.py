@@ -11,14 +11,26 @@ Two responsibilities, both server-side (the model never participates in scope):
      ``list[str]`` of folder ids the run's retrieval is bound to. ``None`` in →
      ``None`` out so an UNBOUND workflow keeps whole-KB behavior (unchanged).
 
-  2. ``assert_folder_scopes_subset`` — the DB half of D-07 (the structural half is
-     the ``@model_validator`` on ``WorkflowDefinition``): every per-phase
-     ``folder_scope`` MUST be a subset of the project subtree, proven against the
-     REAL owner folder tree. A non-⊆ declared scope is a definition-VALIDITY error
-     (``ValueError`` → 400 at the run-start callers), NEVER a silent clip. This is
-     a DIFFERENT failure class from Plan 05's runtime ``scope_violation`` clip
-     (a RETRIEVED row outside scope → clip+warn in ``tool_dispatcher.py``); the two
-     live in separate mechanisms (Pitfall 5 — do NOT conflate).
+  2. the narrow-only ⊆ rule — the DB half of D-07 (the structural half is the
+     ``@model_validator`` on ``WorkflowDefinition``): every per-phase ``folder_scope``
+     MUST be a subset of the project subtree, proven against the REAL owner folder tree.
+     A non-⊆ declared scope is a definition-VALIDITY error (``ValueError`` → 400 at the
+     run-start callers), NEVER a silent clip. This is a DIFFERENT failure class from
+     Plan 05's runtime ``scope_violation`` clip (a RETRIEVED row outside scope →
+     clip+warn in ``tool_dispatcher.py``); the two live in separate mechanisms
+     (Pitfall 5 — do NOT conflate).
+
+     ONE walk, TWO presentations (Phase 182 WR-04):
+       - ``folder_scope_violations`` — the walk itself. Non-raising; returns EVERY
+         offending phase in author order. The ``POST /workflows/validate`` per-node
+         collector (``grounding._folder_scope_violations``) takes this form, because the
+         canvas paints a badge per node and must not leave later offenders rendering
+         clean (ROADMAP SC#4 / VALID-03).
+       - ``assert_folder_scopes_subset`` — a thin presentation that re-raises the first
+         violation. Run-start callers (``workflow_kickoff`` → 400, ``runs.py``'s Continue
+         fallback, ``harness_engine``'s resume fallback) and the NL-generation
+         short-circuit (``grounding._folder_scope_violation``) take this form.
+     The rule exists exactly once; only the terminal action differs.
 
 THREAT (T-098-02 / Information Disclosure): both functions fetch folders via
 ``fetch_visible_folders(supabase, user_id)`` which is OWNER-scoped. On the
@@ -222,49 +234,101 @@ async def resolve_run_scope_root(
     return override or author_root or thread_folder_id
 
 
-async def assert_folder_scopes_subset(
+async def folder_scope_violations(
     definition: "WorkflowDefinition",
     *,
     supabase: "Client",
     user_id: str,
-) -> None:
-    """DB-aware narrow-only ⊆ check (D-07 DB half) — raises on a non-⊆ phase scope.
+) -> list[FolderScopeSubsetError]:
+    """THE ⊆ walk (D-07 DB half) — the ONE implementation of rule 1, non-raising.
 
-    Resolves the project subtree, then asserts every per-phase ``folder_scope`` is a
-    subset of it. A phase scope with any id OUTSIDE the subtree raises
-    ``FolderScopeSubsetError`` — a ``ValueError`` SUBCLASS, so every existing
-    ``except ValueError`` caller is unaffected — carrying the offending phase's slug on
-    ``exc.phase_slug`` (a definition-VALIDITY error the run-start callers map to a 400).
-    This NEVER silently clips a declared scope (Pitfall 5: distinct from Plan 05's
-    runtime clip).
+    Resolves the project subtree ONCE for the whole definition, then checks every
+    per-phase ``folder_scope`` against it and RETURNS one ``FolderScopeSubsetError`` per
+    offending phase, in ``definition.phases`` order so the canvas can render findings in
+    the order the author drew them. Clean definitions and unbound workflows
+    (``project_folder_id is None`` — nothing to bound against, and the structural
+    ``@model_validator`` from Plan 01 already rejects a phase ``folder_scope`` there)
+    return ``[]``.
 
-    ``phase_slug`` is the STRUCTURAL channel for "which node is at fault" (Phase 182 SC#4
-    / D-182-06). The message still names the slug for humans, but no consumer may PARSE it:
-    ``grounding._folder_scope_violation`` reads the attribute so the ``/validate`` verdict
-    is keyed per-node without any regex over prose.
+    This function NEVER raises for a rule violation. Raising is a PRESENTATION choice, and
+    it is made by the sibling below — one source, two presentations, exactly the pattern
+    ``grounding.py`` documents for its short-circuit dict versus its per-node collector:
 
-    If the workflow is unbound (``project_folder_id is None``) there is nothing to
-    bound against, so this is a no-op — the structural ``@model_validator`` (Plan 01)
-    has already rejected any phase ``folder_scope`` on an unbound workflow.
+      - ``assert_folder_scopes_subset`` (below) — the SHORT-CIRCUIT presentation. Run-start
+        callers (``workflow_kickoff`` → HTTP 400, ``runs.py``'s Continue fallback,
+        ``harness_engine``'s resume fallback) and the NL-generation short-circuit
+        (``grounding._folder_scope_violation``) all want the first offender and nothing more.
+      - the LIST form (this one) — what the ``POST /workflows/validate`` per-node collector
+        (``grounding._folder_scope_violations``) consumes, because the canvas needs EVERY
+        offending node at once. A short-circuited rule 1 would leave the second and third
+        out-of-subtree nodes rendering CLEAN in Phase 184's per-node badges, and the author
+        would rediscover them one at a time (ROADMAP SC#4 / VALID-03; Phase-182 WR-04).
 
-    Owner-scoped via ``user_id`` (same threat posture as ``resolve_project_subtree``).
+    Each violation carries the offending phase on ``.phase_slug`` — the STRUCTURAL channel
+    (Phase 182 SC#4 / D-182-06). The message still names the slug for humans, but no
+    consumer may PARSE it: consumers read the attribute, never a regex over prose.
+
+    Owner scoping and the cycle guard are inherited unchanged from
+    ``resolve_project_subtree`` — see its docstring and the module-header T-098-02 /
+    T-098-11 notes; this function adds no new read. Pitfall 5 still applies: a non-⊆
+    declared scope is a definition-VALIDITY error, NEVER a silent clip (that is Plan 05's
+    distinct runtime ``scope_violation`` path in ``tool_dispatcher.py``).
     """
     subtree = await resolve_project_subtree(
         definition.project_folder_id, supabase=supabase, user_id=user_id
     )
     if subtree is None:
-        return  # unbound → nothing to bound against (structural validator already guards)
+        return []  # unbound → nothing to bound against (structural validator already guards)
     allowed = set(subtree)
+    violations: list[FolderScopeSubsetError] = []
     for phase in definition.phases:
         scope = getattr(phase.config, "folder_scope", None)
         if scope:
             outside = {str(f) for f in scope} - allowed
             if outside:
                 # Message expression UNCHANGED (both f-string fragments verbatim) — the
-                # byte-identical guarantee. Only the exception TYPE changes, plus the
-                # phase_slug attribute that carries the offending node structurally.
-                raise FolderScopeSubsetError(
-                    f"phase '{phase.slug}' folder_scope is not a subset of the "
-                    f"project subtree: {sorted(outside)}",
-                    phase_slug=phase.slug,
+                # byte-identical guarantee, pinned against a hand-written golden literal in
+                # tests/unit/test_182_folder_scope_keying.py and by
+                # test_098_scope_governance's match="is not a subset". Only the terminal
+                # ACTION moved (append, was raise); the rule itself did not change.
+                violations.append(
+                    FolderScopeSubsetError(
+                        f"phase '{phase.slug}' folder_scope is not a subset of the "
+                        f"project subtree: {sorted(outside)}",
+                        phase_slug=phase.slug,
+                    )
                 )
+    return violations
+
+
+async def assert_folder_scopes_subset(
+    definition: "WorkflowDefinition",
+    *,
+    supabase: "Client",
+    user_id: str,
+) -> None:
+    """The SHORT-CIRCUIT presentation of ``folder_scope_violations`` — same rule, FIRST
+    offender only, raised.
+
+    Delegates the entire ⊆ walk to the collector above and re-raises its first element.
+    No part of the walk is re-implemented here (D-182-06: exactly one copy of every rule),
+    so the two forms can never disagree about what a violation IS — only about how many
+    they report.
+
+    RAISING ``violations[0]`` rather than a synthesized error is what makes the parity
+    guarantee structural: the object raised **IS** the first violation the collector built,
+    so its type (``FolderScopeSubsetError``, a ``ValueError`` SUBCLASS), its ``str(exc)``,
+    its ``args`` and its ``phase_slug`` are identical by construction rather than by careful
+    copying. Every pre-existing handler is therefore unaffected —
+    ``workflow_kickoff.py``'s ``except ValueError`` → HTTP 400 (``detail=str(err)``),
+    ``runs.py``'s best-effort Continue broad-try, ``harness_engine.py``'s resume
+    unscoped-fallback, ``grounding._folder_scope_violation``'s NL-generation short-circuit,
+    and ``test_098_scope_governance``'s ``pytest.raises(ValueError, match="is not a subset")``.
+
+    Clean and unbound definitions return ``None``, exactly as before.
+    """
+    violations = await folder_scope_violations(
+        definition, supabase=supabase, user_id=user_id
+    )
+    if violations:
+        raise violations[0]  # the collector's OWN object — parity by construction
