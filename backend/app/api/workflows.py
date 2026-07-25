@@ -22,6 +22,7 @@ from pydantic import BaseModel, Field
 
 from app.config import settings
 from app.dependencies import (
+    canvas_caller,
     get_current_user,
     get_pg_pool,
     get_redis,
@@ -264,6 +265,12 @@ async def get_starter_workflows(
 # byte-identical 404 when ``visual_workflow_canvas`` is off, for EVERYONE incl. operators,
 # resolved PRE-AUTH. They must NEVER stack ``require_visible`` (which raises 403 and would
 # leak that the route exists) nor couple canvas availability to another feature's audience.
+# WR-08 (round-2 gap closure): that gate is also where the caller is RESOLVED. It publishes the
+# validated identity on ``request.state.canvas_caller`` and both handlers read it back through
+# ``Depends(canvas_caller)`` — so the token is validated ONCE per request, not twice (the old
+# ``Depends(get_current_user)`` form re-validated the same token the gate had just accepted, at
+# 2 GoTrue round-trips + 2 ``auth.users`` ban queries per canvas edit). ``canvas_caller`` fails
+# CLOSED to the SAME 404, so the hand-off can never soften the gate.
 #
 # ROUTE ORDERING: declared as explicit STATIC segments HERE, ahead of every ``/{definition_id}``
 # route below (the ``/drafts`` / ``/starters`` precedent), so no present or future path param
@@ -473,7 +480,10 @@ def _severity(code: str, *, phases_empty: bool) -> str:
 )
 async def validate_workflow(
     body: WorkflowDefinition,
-    current_user: dict = Depends(get_current_user),
+    # WR-08: ``require_canvas`` above ALREADY validated this bearer token and published the
+    # identity on ``request.state.canvas_caller``. Consume it — do NOT re-run get_current_user,
+    # which cost a 2nd GoTrue round-trip + a 2nd auth.users ban query on every canvas edit.
+    current_user: dict = Depends(canvas_caller),
     # service-role: the grounding fidelity reads span the owner's folder tree + skill
     # registry (scoped BY HAND on user_id inside grounding.py — service-role bypasses RLS).
     supabase=Depends(get_supabase),
@@ -572,7 +582,10 @@ async def validate_workflow(
     dependencies=[Depends(require_canvas())],  # D-182-05 — require_canvas ALONE (never require_visible)
 )
 async def get_grounding_bundle(
-    current_user: dict = Depends(get_current_user),
+    # WR-08: ``require_canvas`` above ALREADY validated this bearer token and published the
+    # identity on ``request.state.canvas_caller``. Consume it — do NOT re-run get_current_user,
+    # which cost a 2nd GoTrue round-trip + a 2nd auth.users ban query on every canvas edit.
+    current_user: dict = Depends(canvas_caller),
     # service-role: the palette read spans the owner's folder tree + skill registry (scoped
     # BY HAND on user_id inside grounding.py — service-role bypasses RLS).
     supabase=Depends(get_supabase),

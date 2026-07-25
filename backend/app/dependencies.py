@@ -10,6 +10,7 @@ import httpx
 import redis.asyncio as aioredis
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from starlette.concurrency import run_in_threadpool
 from supabase import create_client, Client, ClientOptions
 
 from app.config import settings
@@ -584,11 +585,25 @@ async def authenticate_canvas_request(
     path untouched AND gives the ON-case tests a clean monkeypatch seam: they replace this to
     inject a fake caller AFTER the flag check, while the CR-01 regression leaves it real to
     exercise the genuine pre-auth 404 path.
+
+    WR-08 / D-v2.5-01 — the GoTrue read rides ``run_in_threadpool``. ``supabase-py`` is
+    SYNCHRONOUS, and this helper is awaited from an async dependency on a route the seam header
+    documents as firing "on every canvas edit". Called directly, that blocking round-trip owns the
+    event loop for its whole duration — and the SAME worker process serves the SSE chat streams,
+    so a keystroke-frequency canvas route would stall every concurrent stream on the box. Wrapping
+    it moves the wait onto the threadpool; nothing else about this helper changes (same
+    exceptions swallowed, same ``{"id", "email"}`` shape, same never-raises contract).
+
+    EXPLICIT NON-GOAL: the shared ``get_current_user`` (:254) still calls ``supabase.auth.get_user``
+    directly and is deliberately NOT changed here. That form is pre-existing, is depended on by
+    every other route in the app, and widening the fix to it is outside this phase's blast radius.
+    The asymmetry is a scoped decision, not a missed site — read WR-08 in ``182-REVIEW.md`` before
+    "finishing the job" on that one.
     """
     if credentials is None:
         return None
     try:
-        response = supabase.auth.get_user(credentials.credentials)
+        response = await run_in_threadpool(supabase.auth.get_user, credentials.credentials)
         user = getattr(response, "user", None)
     except Exception:
         return None
@@ -619,6 +634,18 @@ def require_canvas():
     403/401 leak), matching the ``authenticate_operator_request`` posture. The shared
     ``get_current_user`` / ``bearer_scheme`` path is untouched.
 
+    WR-08 (round-2 review): the gate has ALREADY validated the bearer token by the time any canvas
+    handler runs, so it PUBLISHES the resulting identity on ``request.state.canvas_caller`` and the
+    handlers consume it through ``canvas_caller`` (below) instead of re-running
+    ``get_current_user``. Before this, both routes carried ``dependencies=[Depends(require_canvas())]``
+    AND ``current_user: dict = Depends(get_current_user)``, so the SAME token was validated twice:
+    **2 GoTrue round-trips + 2 ``auth.users`` ban queries per request**, on a route documented as
+    firing on every canvas edit. It is now 1 of each. The success branches also ``return caller``
+    — a value ``dependencies=[...]`` discards, which is exactly why the ``request.state`` hand-off
+    is the load-bearing half; returning it costs nothing and makes the identity available to a
+    future ``caller: dict = Depends(require_canvas())`` handler-parameter form without a second
+    change. Every ``raise _NOT_FOUND`` deny path is untouched.
+
     ``feature_audience`` / ``resolve_feature_access`` are lazy-imported inside the closure to
     avoid the user_settings -> dependencies import cycle (matches ``require_visible``). Attach
     on canvas routes via ``dependencies=[Depends(require_canvas())]``.
@@ -640,16 +667,50 @@ def require_canvas():
         caller = await authenticate_canvas_request(credentials, supabase)
         if caller is None:
             raise _NOT_FOUND
+        # (3) WR-08 — PUBLISH the identity we just validated. The handler reads it back through
+        #     ``canvas_caller`` instead of re-validating the same token via ``get_current_user``
+        #     (which cost a 2nd GoTrue round-trip + a 2nd auth.users ban query per request).
+        #     Guarded on ``request`` because ``_dep`` declares it Optional for direct-call tests.
+        if request is not None:
+            request.state.canvas_caller = caller
         if await is_operator(caller["id"]):
-            return  # operator -> no-op (only reached once the flag is NOT off)
+            return caller  # operator -> no-op (only reached once the flag is NOT off)
         if audience == "everyone":
-            return
+            return caller
         if audience == "role":
             caller_role, caller_groups = await resolve_caller_role(request, caller)
             if resolve_feature_access("visual_workflow_canvas", caller_role, caller_groups):
-                return
+                return caller
         raise _NOT_FOUND  # 404, never 403 — REVERT byte-identity (never leak route existence)
     return _dep
+
+
+async def canvas_caller(request: Request) -> dict:
+    """The consumer half of the WR-08 hand-off — the identity ``require_canvas`` already validated.
+
+    Canvas handlers declare ``current_user: dict = Depends(canvas_caller)`` instead of
+    ``Depends(get_current_user)``. ``require_canvas`` runs first (it is in the route's
+    ``dependencies=[...]``, which FastAPI inserts at the FRONT of the dependant list) and stores
+    the validated ``{"id", "email"}`` on ``request.state.canvas_caller``; this simply hands it
+    over. The result is exactly ONE caller resolution per canvas request instead of two.
+
+    FAILS CLOSED, and the polarity matters. The ONLY way to reach a canvas handler is through
+    ``require_canvas``, which always publishes the caller before letting a request past — so an
+    absent value means the gate did not run. The honest answer to "the gate did not run" on a
+    canvas route is the SAME byte-identical ``_NOT_FOUND`` every deny path in the gate raises:
+
+      * NOT a 500 — an internal-error page is itself an existence signal on a route contracted to
+        be indistinguishable from one that was never built (REVERT-01 / D-181-02);
+      * NOT a 403 — D-182-05 forbids it outright, because 403 admits the route exists-but-forbidden
+        (the whole reason this surface uses ``require_canvas`` and never ``require_visible``);
+      * NOT a 401 — same leak, via the "you'd be allowed if you authenticated" channel (CR-01).
+
+    It can therefore never return a partially-trusted or defaulted identity (T-182-34).
+    """
+    caller = getattr(request.state, "canvas_caller", None)
+    if not caller:
+        raise _NOT_FOUND
+    return caller
 
 
 # ── Phase 166 (ADMIN-01/02/04) — org authz: active-org resolution + org:manage gate ──
