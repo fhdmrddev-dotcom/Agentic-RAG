@@ -206,6 +206,14 @@ async def publish_workflow(
     #     never burn a REAL provider run (the same posture as the lint short-circuit);
     #   * it is placed AFTER the existing gates rather than before them, so no currently
     #     blocking definition changes WHICH stage it blocks at — nothing is reordered.
+    #
+    # SEEN AND DEFERRED — IN-05 (round-2 review). ``supabase`` stays ``None`` between this
+    # stage and the golden run below, so ``_resolve_publish_supabase`` runs TWICE per publish
+    # and each self-constructed client opens an httpx client that is never closed. Resolving
+    # once and threading the pair through both would fix it, but restructuring this
+    # orchestration is outside the operator-selected scope of this round. Recorded here so the
+    # next reader meets a deferral rather than re-discovering it — and so it is not mistaken
+    # for something the WR-05 tuple change introduced (it predates it; the tuple adds no read).
     grounding_failures = await _grounding_fidelity_failures(
         definition,
         definition_id=definition_id,
@@ -496,8 +504,11 @@ def _interactive_phase_failures(definition) -> list:
     return failures
 
 
-async def _resolve_publish_supabase(supabase, *, definition_id: UUID, pool):
-    """The ONE service-role client resolution on the publish path (stage 2.6 + golden run).
+async def _resolve_publish_supabase(supabase, *, definition_id: UUID, pool) -> tuple:
+    """The ONE service-role client resolution on the publish path (stage 2.6 + golden run),
+    AND the ONE place the publish path learns which TENANT it is acting for.
+
+    Returns ``(client, org_id)``.
 
     Phase 163 (D-05 / T-163-05b): NO bare, org-less service-role fallback survives on the
     publish / golden-run path. When the caller supplies no client, the org of the workflow
@@ -507,19 +518,40 @@ async def _resolve_publish_supabase(supabase, *, definition_id: UUID, pool):
     design. A falsy org therefore raises here rather than silently producing an
     unscoped BYPASSRLS client.
 
+    THE SECOND RESPONSIBILITY (round-2 gap closure — WR-05). The definition's ``org_id`` was
+    already being read here, used to scope the CLIENT, and then thrown away. It is now
+    RETURNED, because BOTH consumers of that value read it from this one place: the client
+    scope (Phase 163 / D-05) and the grounding-gate scope (WR-05). Reading it once is what
+    makes it impossible for the two to disagree about which tenant a publish is acting for —
+    a second read is how they would drift apart.
+
+    THE ORG IS READ ON BOTH BRANCHES, deliberately. A caller-supplied client does not mean
+    "no tenant": returning ``(supabase, None)`` would silently disable the gate's restriction
+    in exactly the suites written to prove it, and would hand the gate a ``None`` scope on any
+    future caller that passes its own client. A FALSY org is refused on both branches too —
+    without a client the org-requiring factory refuses; with one, this function refuses
+    itself, since there is no factory to do it. **A falsy org must never resolve to an
+    unrestricted gate.** The refusal is a raise, which stage 2.6's fail-closed wrapper turns
+    into a ``grounding_unavailable`` block — the correct direction.
+
     Shared by ``_grounding_fidelity_failures`` and ``_drive_golden_run`` so exactly ONE
     construction path exists (a second copy is how an org-less fallback creeps back in).
     Also the single patchable seam the unit suites swap — ``pool`` is an ``AsyncMock``
     there, so an un-patched resolution would hand a truthy mock to the factory.
     """
-    if supabase is not None:
-        return supabase
     from app import dependencies as _deps  # function-local (mirrors this module's posture)
 
     _org_id = await pool.fetchval(
         "SELECT org_id FROM workflow_definitions WHERE id = $1", definition_id
     )
-    return _deps.get_service_role_supabase(_org_id)
+    if supabase is not None:
+        if not _org_id:
+            raise ValueError(
+                "publish cannot resolve the definition's org_id — refusing to run the "
+                "grounding gate against the publisher's full org-membership union (WR-05)"
+            )
+        return supabase, _org_id
+    return _deps.get_service_role_supabase(_org_id), _org_id
 
 
 async def _grounding_fidelity_failures(
@@ -564,6 +596,29 @@ async def _grounding_fidelity_failures(
     travels on ``bundle.degraded`` and this stage reports "we could not CHECK" instead, from
     the SAME builder ``POST /workflows/validate`` uses, so the two sides share one message and
     one code string as well as one rule set.
+
+    SCOPED TO THE DEFINITION'S OWN ORG (round-2 gap closure — WR-05). This gate must answer
+    "is this definition grounded in ITS OWN org?", not "can this publisher see everything it
+    names". For a MULTI-ORG author those are different questions, and the second one is the
+    wrong one: ``_resolve_publish_supabase`` had already read this definition's ``org_id`` to
+    scope the BYPASSRLS client, and then the gate discarded it and let
+    ``assemble_grounding_bundle`` resolve visibility from the publisher's ENTIRE org
+    membership. A definition in org A naming an org-B skill or an org-B folder therefore
+    passed.
+
+    The RUN-TIME picture is the one that matters, and it flips: ``tool_dispatcher``'s skill
+    resolution and ``fetch_visible_folders`` gate on the RUNNER's org set, so an org-A
+    colleague running that published workflow gets an unresolvable reference or an empty
+    folder intersection — a workflow that cleared the hard gate and silently under-performs
+    for everyone but its author, with no way to tell whether the definition or the environment
+    is at fault. Nothing crosses a tenant boundary on the wire; this is the SEED-124 /
+    SEED-125 family (org-blind service-role reads) one layer up — the read IS org-gated, the
+    SCOPE of the gate was wrong, and plan 182-06 is what made this gate authoritative.
+
+    The fix is ONE optional keyword built from the org this path already reads, passed to BOTH
+    grounding calls so the palette and the ⊆ walk agree. No visibility rule is duplicated: the
+    shared skill predicate and the folder ancestor walk are untouched and simply receive a
+    narrower org set.
     """
     from app.services.harness.grounding import (  # function-local (Pitfall 4)
         assemble_grounding_bundle,
@@ -572,10 +627,16 @@ async def _grounding_fidelity_failures(
     )
 
     try:
-        resolved = await _resolve_publish_supabase(
+        resolved, org_id = await _resolve_publish_supabase(
             supabase, definition_id=definition_id, pool=pool
         )
-        bundle = await assemble_grounding_bundle(supabase=resolved, user_id=str(user_id))
+        # WR-05 — the gate's scope IS the definition's org, read once above alongside the
+        # client scope so the two can never disagree. A raise on the way here (an unreadable
+        # or falsy org) lands in the fail-closed ``except`` below as ``grounding_unavailable``,
+        # which BLOCKS — the correct direction for a publish that cannot establish its tenant.
+        bundle = await assemble_grounding_bundle(
+            supabase=resolved, user_id=str(user_id), restrict_org_ids={str(org_id)}
+        )
         if bundle.degraded:
             logger.warning(
                 "publish: grounding registries %s could not be resolved for definition %s — "
@@ -590,6 +651,7 @@ async def _grounding_fidelity_failures(
             user_id=str(user_id),
             tool_names=bundle.tool_names,
             skill_ids=bundle.skill_ids,
+            restrict_org_ids={str(org_id)},
         )
     except Exception:  # noqa: BLE001 — fail CLOSED, never raise into the sealed orchestration
         logger.exception(
@@ -659,7 +721,11 @@ async def _drive_golden_run(
     # so the "no org-less fallback on the publish path" rule lives in a single place, shared
     # with the stage-2.6 grounding read). The ephemeral validation thread INSERT below still
     # relies on the mig-106 autofill for its own org_id.
-    supabase = await _resolve_publish_supabase(
+    # The org is IGNORED here (bound to a throwaway name) on purpose: the golden run is scoped
+    # by the CLIENT alone — every read it performs rides that already-org-scoped client, and
+    # the ephemeral validation thread INSERT relies on the mig-106 autofill. Only stage 2.6's
+    # grounding gate needs the org as a VALUE (WR-05).
+    supabase, _golden_run_org_id = await _resolve_publish_supabase(
         supabase, definition_id=definition_id, pool=pool
     )
 

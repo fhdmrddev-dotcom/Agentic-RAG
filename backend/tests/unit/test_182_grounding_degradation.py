@@ -536,7 +536,11 @@ async def test_publish_blocks_with_grounding_unavailable_not_a_false_unregistere
         stack.enter_context(patch.object(publish_service, "_judge_golden_output", AsyncMock()))
         stack.enter_context(
             patch.object(
-                publish_service, "_resolve_publish_supabase", AsyncMock(return_value=object())
+                publish_service,
+                "_resolve_publish_supabase",
+                # `(client, org_id)` since plan 182-12 (WR-05) — the org that scopes the
+                # BYPASSRLS client also scopes the grounding gate.
+                AsyncMock(return_value=(object(), _ORG)),
             )
         )
         stack.enter_context(patch.object(g, "assemble_grounding_bundle", _degraded_assemble))
@@ -644,7 +648,8 @@ async def test_publish_end_to_end_over_a_raising_skills_read_never_accuses_the_r
             patch.object(
                 publish_service,
                 "_resolve_publish_supabase",
-                AsyncMock(return_value=_skills_boom_client()),
+                # `(client, org_id)` since plan 182-12 (WR-05).
+                AsyncMock(return_value=(_skills_boom_client(), _ORG)),
             )
         )
         result = await publish_service.publish(

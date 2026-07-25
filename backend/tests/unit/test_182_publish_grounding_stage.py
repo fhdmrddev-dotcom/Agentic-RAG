@@ -36,6 +36,11 @@ _DEF_ID = uuid4()
 
 # A stand-in for the org-scoped service-role client — never a real client, never a network.
 _SUPABASE_SENTINEL = object()
+# The definition's own org. `_resolve_publish_supabase` returns `(client, org_id)` since
+# plan 182-12 (WR-05): the org it reads to scope the BYPASSRLS client ALSO scopes the
+# grounding gate, so the two can never disagree about which tenant a publish acts for. The
+# cross-org proof that this second half is load-bearing lives in `test_182_publish_org_scope.py`.
+_DEF_ORG_ID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
 
 _REGISTERED_TOOL = "search_documents"
 _OWNED_SKILL = "33333333-3333-3333-3333-333333333333"
@@ -119,6 +124,11 @@ def _publish_env(row, *, tool_names=(), skill_ids=(), resolve_raises=None):
     `pool` is an AsyncMock, so `await pool.fetchval(...)` would otherwise hand a truthy mock
     to `get_service_role_supabase`), and `grounding.assemble_grounding_bundle` (the registry
     READ). `grounding_verdicts` — the RULE — is deliberately NOT patched.
+
+    The resolver fake returns the `(client, org_id)` TUPLE that helper has returned since plan
+    182-12 (WR-05). Patching it here means this file exercises the grounding RULES against a
+    fixed org, never the org SCOPE — which is exactly why it could not have caught WR-05, and
+    why `test_182_publish_org_scope.py` deliberately leaves this seam unpatched.
     """
     from unittest.mock import AsyncMock, patch
 
@@ -141,7 +151,7 @@ def _publish_env(row, *, tool_names=(), skill_ids=(), resolve_raises=None):
     resolve = (
         AsyncMock(side_effect=resolve_raises)
         if resolve_raises is not None
-        else AsyncMock(return_value=_SUPABASE_SENTINEL)
+        else AsyncMock(return_value=(_SUPABASE_SENTINEL, _DEF_ORG_ID))
     )
     assemble = AsyncMock(return_value=_bundle(tool_names=tool_names, skill_ids=skill_ids))
 
