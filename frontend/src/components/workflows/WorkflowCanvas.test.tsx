@@ -14,6 +14,10 @@
  * The fixtures are imported from `__fixtures__/canvasFixtures.ts` rather than
  * re-declared, so the DOM layer and the projection layer can never test different
  * shapes.
+ *
+ * Phase 183-08 gap closure (CR-01 / WR-06) added the keyboard-activation block and
+ * the announced-affordance block below. Both were installed as a RED gate and
+ * observed failing on unmodified source before the fix landed.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react"
@@ -118,6 +122,12 @@ describe("WorkflowCanvas — the empty state (D-183-11)", () => {
  * the event `onNodeClick` listens to — so the selection contract is tested without
  * driving the pan gesture. The ⌥ control below sits OUTSIDE the plane and keeps
  * using `user-event`.
+ *
+ * The same driver rule governs the keyboard block that follows, and that block
+ * exists because of what this one did NOT cover: the shipped suite asserted node
+ * REACHABILITY (`.react-flow__node[tabindex="0"]` counted once per phase) but never
+ * ACTIVATION, so it stayed green over a Critical defect — every focusable node
+ * advertised a button role and did nothing at all when pressed.
  */
 describe("WorkflowCanvas — selection (D-183-05)", () => {
   it("clicking a phase node fires onSelectNode with exactly that phase's slug", () => {
@@ -146,6 +156,44 @@ describe("WorkflowCanvas — selection (D-183-05)", () => {
     renderCanvas(researchSummarize, { selectedSlug: "research" })
     expect(screen.getByTestId("canvas-node-research").getAttribute("data-selected")).toBe("true")
     expect(screen.getByTestId("canvas-node-summarize").getAttribute("data-selected")).toBe("false")
+  })
+})
+
+/**
+ * The keyboard half of the SAME D-183-05 contract. The node wrapper React Flow
+ * renders carries `data-id` and the `react-flow__node` class, and it is the element
+ * that owns the tab stop — so it is the element a keyboard user actually presses,
+ * and the element these tests dispatch on. The inner `canvas-node-*` card is a
+ * presentational child with no handlers of its own by design (one tab stop per node).
+ */
+describe("WorkflowCanvas — keyboard activation (CR-01, SC#3)", () => {
+  it("Enter on a focused phase node fires onSelectNode with exactly that phase's slug", () => {
+    const onSelectNode = vi.fn()
+    const { container } = renderCanvas(researchSummarize, { onSelectNode })
+    const node = container.querySelector('.react-flow__node[data-id="summarize"]')
+    expect(node).not.toBeNull()
+    fireEvent.keyDown(node!, { key: "Enter" })
+    expect(onSelectNode).toHaveBeenCalledTimes(1)
+    expect(onSelectNode).toHaveBeenCalledWith("summarize")
+  })
+
+  it("Space on a focused phase node fires onSelectNode with exactly that phase's slug", () => {
+    const onSelectNode = vi.fn()
+    const { container } = renderCanvas(researchSummarize, { onSelectNode })
+    const node = container.querySelector('.react-flow__node[data-id="research"]')
+    expect(node).not.toBeNull()
+    // The single space character — what KeyboardEvent.key reports for the space bar.
+    fireEvent.keyDown(node!, { key: " " })
+    expect(onSelectNode).toHaveBeenCalledTimes(1)
+    expect(onSelectNode).toHaveBeenCalledWith("research")
+  })
+
+  it("Enter on the end cap and on the unresolved-skip stub fires nothing (mirrors the mouse path)", () => {
+    const onSelectNode = vi.fn()
+    renderCanvas(unresolvableSkip, { onSelectNode })
+    fireEvent.keyDown(screen.getByTestId("canvas-end-cap"), { key: "Enter" })
+    fireEvent.keyDown(screen.getByTestId("canvas-unresolved-skip"), { key: "Enter" })
+    expect(onSelectNode).not.toHaveBeenCalled()
   })
 })
 
@@ -288,6 +336,33 @@ describe("WorkflowCanvas — accessibility", () => {
   it("has no axe violations on the empty state", async () => {
     const { container } = renderCanvas(emptyDraft)
     expect(await axe(container)).toHaveNoViolations()
+  })
+})
+
+/**
+ * WR-06 — what the screen reader is TOLD must be what the surface DOES. React Flow
+ * ships a single description element that every node points at via
+ * `aria-describedby`, and its default text promises node deletion and arrow-key
+ * movement. Neither exists on a read-only canvas, so the default is a lie told once
+ * per node.
+ */
+describe("WorkflowCanvas — the announced affordance (WR-06)", () => {
+  it("describes only what this surface does — no delete, no arrow-key movement", () => {
+    const { container } = renderCanvas(evalCoverage)
+    const desc = container.querySelector('[id^="react-flow__node-desc"]')
+    expect(desc).not.toBeNull()
+
+    const text = desc!.textContent ?? ""
+    expect(text).toMatch(/open this step's details/i)
+    expect(text).not.toMatch(/delete/i)
+    expect(text).not.toMatch(/arrow keys/i)
+    expect(text).not.toMatch(/remove it/i)
+
+    // …and it is the description a screen reader actually reaches from a node.
+    const described = container.querySelector(
+      `.react-flow__node[aria-describedby="${desc!.id}"]`,
+    )
+    expect(described).not.toBeNull()
   })
 })
 
