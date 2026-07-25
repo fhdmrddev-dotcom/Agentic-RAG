@@ -128,12 +128,16 @@ def test_canvas_ping_200_after_flip_on(client, monkeypatch):
 
     resp = client.get(_CANVAS_PATH)
     assert resp.status_code == 200, resp.text
-    # the real handler answered (the palette envelope), not some other 200
+    # the real handler answered (the palette envelope), not some other 200.
+    # `degraded` joined the envelope in the round-3 gap closure (CR-02) so the palette can
+    # distinguish "we could not READ your folders/skills" from "you have none" — this fake
+    # bundle resolved cleanly, so the honest value is the empty list.
     assert resp.json() == {
         "tools": [],
         "folders": [],
         "skills": [],
         "template_placeholders": [],
+        "degraded": [],
     }
 
 
