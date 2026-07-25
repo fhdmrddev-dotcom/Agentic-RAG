@@ -162,6 +162,26 @@ validate live, grade governance, or show run state — those are Phases 184 / 18
   `backend/app/services/harness/reachability.py:89 parse_skip_target` over a shared case table:
   `"skip_to_phase:escalate"` → `escalate`; `"skip_to_phase:a:b"` → `b` (the `lastIndexOf(":")`
   split); `"skip_to_phase:"` → null; whitespace trimmed; `fail_run` / `ask_user` / `retry` → null.
+
+  > **AMENDMENT (2026-07-25, operator-approved during `/gsd:plan-phase`) — correction C-1.**
+  > The case table above is WRONG on one row, and the decision's own premise was false. Research
+  > verified that the two parsers **do not agree today**: the backend
+  > (`reachability.py:89-98`) slices off the literal prefix
+  > (`on_failure[len("skip_to_phase:"):].strip()`), so `"skip_to_phase:a:b"` → **`"a:b"`**. The
+  > frontend (`PhaseSpineGraph.tsx:78-83`) splits on `lastIndexOf(":")` → `"b"`. The frontend's
+  > docblock at `:74-76` falsely asserts parity, and that false claim propagated into
+  > `PhaseSpineGraph.test.tsx:110-111` and then verbatim into this decision.
+  >
+  > **Resolution: align the client to the backend.** The backend is authoritative (consistent with
+  > D-182-06 "one lint copy"). The corrected shared case table is
+  > `"skip_to_phase:a:b"` → **`"a:b"`**; every other row stands. The plan therefore also rewrites
+  > the shared `parseSkipTarget`, fixes the false docblock, and updates
+  > `PhaseSpineGraph.test.tsx:110-111`. Zero live definitions use `skip_to_phase` (verified across
+  > the whole corpus), so this changes no shipped behaviour today — but left alone it becomes a
+  > real correctness bug the moment Phase 184 round-trips edges.
+  >
+  > D-183-15's **intent** (parity, no drift, the parity test as the Pitfall-3 tripwire) is
+  > unchanged and is what the plan must satisfy; only its stated example was wrong.
   Topology derivation is not a lint rule, so D-182-06 ("one lint copy, zero client-side
   re-implementation") is not breached — the parity test is what prevents the Pitfall 3 drift.
   **The canvas does NOT call `POST /workflows/validate` in 183** (that dependency arrives with
