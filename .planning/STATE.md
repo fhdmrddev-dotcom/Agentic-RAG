@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
 status: executing
-last_updated: "2026-07-25T02:55:52.148Z"
-last_activity: 2026-07-25 -- Completed 182-10-PLAN.md (folder_scope verdict multiplicity, WR-04)
+last_updated: "2026-07-25T03:27:52.184Z"
+last_activity: 2026-07-25
 progress:
   total_phases: 18
   completed_phases: 1
   total_plans: 15
-  completed_plans: 13
+  completed_plans: 14
   percent: 6
 ---
 
@@ -45,9 +45,9 @@ Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 op
 ## Current Position
 
 Phase: 182 (server-validation-seam) — EXECUTING
-Plan: 11 of 12
-Status: Executing Phase 182 — round-2 gap closure (plans 01-10 complete; 11-12 remain)
-Last activity: 2026-07-25 -- Completed 182-10-PLAN.md (folder_scope verdict multiplicity, WR-04)
+Plan: 12 of 12
+Status: Ready to execute
+Last activity: 2026-07-25
 
 ### Quick Tasks Completed
 
@@ -540,6 +540,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 182 P08 | 20min | 3 tasks | 5 files |
 | Phase 182 P09 | 25min | 2 tasks | 3 files |
 | Phase 182 P10 | 12min | 3 tasks | 4 files |
+| Phase 182 P11 | 28min | 3 tasks | 8 files |
 
 ## Decisions
 
@@ -701,6 +702,11 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase 182-09]: run_in_threadpool applied to the CANVAS auth read ONLY (D-v2.5-01) — the shared get_current_user is deliberately untouched (every route in the app depends on it) and that non-goal is recorded in authenticate_canvas_request's docstring, so the asymmetry reads as a scoped decision rather than a missed site.
 - [Phase 182-10]: WR-04 closed — the folder_scope subset walk MOVED into a non-raising scope.folder_scope_violations; assert_folder_scopes_subset is now a thin presentation that re-raises violations[0], so caller parity (type/str/args/phase_slug) holds by construction
 - [Phase 182-10]: WR-03 (narrowing the broad except ValueError in the grounding folder_scope helpers) deliberately DEFERRED and recorded in the source as a decision — out of this round's operator-selected scope
+- [Phase 182-11]: WR-01 closed — `_skill_registry`'s fail-closed swallow MOVED up to `assemble_grounding_bundle` and became `GroundingBundle.degraded`. One signal, both consumers branch identically; propagating the raise instead would have given /validate and publish two independent chances to describe the same failure differently. Falsified: restoring the swallow reproduces the exact false verdict `{'code': 'unregistered_skill', 'phase': 'answer', 'message': "... non-registered skill_ref '3333…'"}` — an outage in the log, an accusation on the wire.
+- [Phase 182-11]: WR-02 closed — the two grounding I/O stages of `/validate` are SEALED, so a non-ValueError postgrest APIError returns a structured 200 instead of a 500. The seal is SCOPED: lint, the D-13 business-requirement check and the interactive-phase check stay OUTSIDE it, so a registry blip costs three rules and not the whole validation. Falsified: removing the seal makes the injected exception ESCAPE the handler.
+- [Phase 182-11]: WR-07 closed at the two gate call sites — `fetch_all_folders`/`fetch_visible_folders` gained a keyword-only `strict=False`; `strict=True` asks for an exact count and raises `FolderReadTruncatedError`, deliberately a RuntimeError and NEVER a ValueError so the ⊆ rule's broad catch cannot re-dress an infrastructure truncation as a false `folder_scope` verdict (T-182-47). Every other caller is byte-identical and issues no extra COUNT(*).
+- [Phase 182-11]: `grounding_unavailable` composes into `/validate`'s `_KNOWN_CODES` via `_DEGRADED_CODES` and classifies `error` BY DERIVATION (`_ERROR_CODES` stays `_KNOWN_CODES - _INCOMPLETE_CODES - _DUAL_SOURCE_CODES`) — "we could not verify" must never paint the soft `incomplete`. Its string lives once, in `grounding.py`, built from a constant so the severity drift scanner cannot mistake it for a `grounding_verdicts` code; the scanner's blind spot is covered by an explicit constant-to-classifier assertion.
+- [Phase 182-11]: SEED-131 NARROWED, not closed — status stays `open` with all 4 re_open_triggers. What ships here: the sealed grounding stages + the honest code + the truncation-aware read + one shared failure posture. What stays deferred to Phase 184: the envelope-level design question (top-level degraded marker vs a third severity vs the verdict code), SEED-132's `@model_validator` 422s, any future unguarded read, and a whole-handler always-200 contract test.
 
 ## Operator Next Steps
 
