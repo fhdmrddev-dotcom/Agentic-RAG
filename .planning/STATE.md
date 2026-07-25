@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
-status: executing
-last_updated: "2026-07-25T03:27:52.184Z"
+status: verifying
+last_updated: "2026-07-25T04:00:03.444Z"
 last_activity: 2026-07-25
 progress:
   total_phases: 18
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 15
-  completed_plans: 14
-  percent: 6
+  completed_plans: 15
+  percent: 11
 ---
 
 # Project State
@@ -46,7 +46,7 @@ Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 op
 
 Phase: 182 (server-validation-seam) — EXECUTING
 Plan: 12 of 12
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-07-25
 
 ### Quick Tasks Completed
@@ -541,6 +541,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 182 P09 | 25min | 2 tasks | 3 files |
 | Phase 182 P10 | 12min | 3 tasks | 4 files |
 | Phase 182 P11 | 28min | 3 tasks | 8 files |
+| Phase 182 P12 | 23min | 3 tasks | 8 files |
 
 ## Decisions
 
@@ -707,6 +708,9 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase 182-11]: WR-07 closed at the two gate call sites — `fetch_all_folders`/`fetch_visible_folders` gained a keyword-only `strict=False`; `strict=True` asks for an exact count and raises `FolderReadTruncatedError`, deliberately a RuntimeError and NEVER a ValueError so the ⊆ rule's broad catch cannot re-dress an infrastructure truncation as a false `folder_scope` verdict (T-182-47). Every other caller is byte-identical and issues no extra COUNT(*).
 - [Phase 182-11]: `grounding_unavailable` composes into `/validate`'s `_KNOWN_CODES` via `_DEGRADED_CODES` and classifies `error` BY DERIVATION (`_ERROR_CODES` stays `_KNOWN_CODES - _INCOMPLETE_CODES - _DUAL_SOURCE_CODES`) — "we could not verify" must never paint the soft `incomplete`. Its string lives once, in `grounding.py`, built from a constant so the severity drift scanner cannot mistake it for a `grounding_verdicts` code; the scanner's blind spot is covered by an explicit constant-to-classifier assertion.
 - [Phase 182-11]: SEED-131 NARROWED, not closed — status stays `open` with all 4 re_open_triggers. What ships here: the sealed grounding stages + the honest code + the truncation-aware read + one shared failure posture. What stays deferred to Phase 184: the envelope-level design question (top-level degraded marker vs a third severity vs the verdict code), SEED-132's `@model_validator` 422s, any future unguarded read, and a whole-handler always-200 contract test.
+- [Phase 182]: D-182-12-01: publish's grounding gate is scoped to the DEFINITION's org, not the publisher's org-membership union — one optional restrict_org_ids keyword intersected at the two points the caller's org set is already resolved (folders in folder_utils, skills in grounding), so no visibility rule is duplicated (WR-05) — _resolve_publish_supabase already read workflow_definitions.org_id to scope the BYPASSRLS client (D-05/T-163-05b) and then discarded it. It now returns (client, org_id) so one read serves both scopes. Falsified: removing both restrict_org_ids arguments makes an org-A definition naming an org-B skill publish again, while 106 other phase-182 tests stay green.
+- [Phase 182]: D-182-12-02: an optional scope restriction is forwarded to internal callees ONLY when set, so unrestricted calls stay byte-identical on the wire and the documented monkeypatch seams keep their contract — Threading the keyword unconditionally broke 18 existing tests in two files outside files_modified, because fetch_visible_folders / resolve_project_subtree / folder_scope_violations are documented test seams. A restricted call still passes it explicitly, so a stale double fails loudly rather than silently ignoring a tenancy narrowing.
+- [Phase 182]: D-182-12-03: SEED-130's 'not a security issue' verdict is CORRECTED and its Option B annotated unsafe-as-written; the dead-path fix itself stays deferred to Phase 184 (WR-06) — resolve_template_source Branch 1 accepts user_id and never reads it, then performs a raw service-role bucket download, so the UUID annotation on template_asset_id is the only — incidental — containment. Option B removes exactly that annotation. A wrong recorded verdict paired with a fix that depends on it is a control failure; correcting the record is the mitigation while the code fix is deferred.
 
 ## Operator Next Steps
 
