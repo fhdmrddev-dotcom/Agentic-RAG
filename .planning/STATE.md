@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
 status: executing
-last_updated: "2026-07-25T02:23:41.593Z"
-last_activity: 2026-07-25 -- Completed 182-08-PLAN.md (pre-routing canvas gate + flag-aware OpenAPI filter)
+last_updated: "2026-07-25T02:37:46.636Z"
+last_activity: 2026-07-25 -- Completed 182-09-PLAN.md (single caller resolution on the canvas seam, WR-08)
 progress:
   total_phases: 18
   completed_phases: 1
   total_plans: 15
-  completed_plans: 11
+  completed_plans: 12
   percent: 6
 ---
 
@@ -45,9 +45,9 @@ Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 op
 ## Current Position
 
 Phase: 182 (server-validation-seam) — EXECUTING
-Plan: 9 of 12
-Status: Executing Phase 182 — round-2 gap closure (plans 01-08 complete; 09-12 remain)
-Last activity: 2026-07-25 -- Completed 182-08-PLAN.md (pre-routing canvas gate + flag-aware OpenAPI filter)
+Plan: 10 of 12
+Status: Executing Phase 182 — round-2 gap closure (plans 01-09 complete; 10-12 remain)
+Last activity: 2026-07-25 -- Completed 182-09-PLAN.md (single caller resolution on the canvas seam, WR-08)
 
 ### Quick Tasks Completed
 
@@ -538,6 +538,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 182 P06 | 10min | 3 tasks | 4 files |
 | Phase 182 P07 | 23min | 2 tasks | 4 files |
 | Phase 182 P08 | 20min | 3 tasks | 5 files |
+| Phase 182 P09 | 25min | 2 tasks | 3 files |
 
 ## Decisions
 
@@ -694,6 +695,9 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase 182-08]: D-182-R2-01 implemented as a pre-routing pure-ASGI CanvasGateMiddleware (registered FIRST = INNERMOST, inside Setup+Maintenance, under CORS); gates on PATH ONLY and normalizes one trailing slash, so the flag-off canvas is byte-identical to an unbuilt path for every method and for hostile input
 - [Phase 182-08]: D-182-R2-02 hides the canvas from /openapi.json via a request-time app.openapi hook (include_in_schema=False rejected — it would hide the routes from /docs even while ON); the removal set is derived from the ref graph, and the filtered doc is deep-copied per request and NEVER written to FastAPI's schema memo
 - [Phase 182-08]: CANVAS_GATED_PATHS in backend/app/middleware/canvas_gate.py is the ONE registration point for canvas non-discoverability — Phase 183+ adds a route's absolute path there in the SAME commit that mounts it; Depends(require_canvas()) stays on every canvas route as defense in depth (D-182-05)
+- [Phase 182-09]: WR-08 closed — require_canvas publishes the identity it already validated on request.state.canvas_caller and both canvas handlers consume it via Depends(canvas_caller) instead of re-running get_current_user. One token validation per canvas request instead of two (2 GoTrue round-trips + 2 auth.users ban queries -> 1 of each, on a route that fires on every canvas edit). Falsified: reverting the two route deps observes exactly 2, with the SAME token string twice.
+- [Phase 182-09]: canvas_caller fails CLOSED onto the SAME _NOT_FOUND every deny path in the gate raises — never 500 (itself an existence signal on a route contracted to be byte-identical to an unbuilt one), never 403 (D-182-05 forbids it outright), never 401 (CR-01's leak channel). Falsified: removing the request.state assignment yields 404, not 500.
+- [Phase 182-09]: run_in_threadpool applied to the CANVAS auth read ONLY (D-v2.5-01) — the shared get_current_user is deliberately untouched (every route in the app depends on it) and that non-goal is recorded in authenticate_canvas_request's docstring, so the asymmetry reads as a scoped decision rather than a missed site.
 
 ## Operator Next Steps
 
