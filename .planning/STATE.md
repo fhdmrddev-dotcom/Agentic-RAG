@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
 status: executing
-last_updated: "2026-07-25T02:37:46.636Z"
-last_activity: 2026-07-25 -- Completed 182-09-PLAN.md (single caller resolution on the canvas seam, WR-08)
+last_updated: "2026-07-25T02:55:52.148Z"
+last_activity: 2026-07-25 -- Completed 182-10-PLAN.md (folder_scope verdict multiplicity, WR-04)
 progress:
   total_phases: 18
   completed_phases: 1
   total_plans: 15
-  completed_plans: 12
+  completed_plans: 13
   percent: 6
 ---
 
@@ -45,9 +45,9 @@ Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 op
 ## Current Position
 
 Phase: 182 (server-validation-seam) — EXECUTING
-Plan: 10 of 12
-Status: Executing Phase 182 — round-2 gap closure (plans 01-09 complete; 10-12 remain)
-Last activity: 2026-07-25 -- Completed 182-09-PLAN.md (single caller resolution on the canvas seam, WR-08)
+Plan: 11 of 12
+Status: Executing Phase 182 — round-2 gap closure (plans 01-10 complete; 11-12 remain)
+Last activity: 2026-07-25 -- Completed 182-10-PLAN.md (folder_scope verdict multiplicity, WR-04)
 
 ### Quick Tasks Completed
 
@@ -539,6 +539,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 182 P07 | 23min | 2 tasks | 4 files |
 | Phase 182 P08 | 20min | 3 tasks | 5 files |
 | Phase 182 P09 | 25min | 2 tasks | 3 files |
+| Phase 182 P10 | 12min | 3 tasks | 4 files |
 
 ## Decisions
 
@@ -698,6 +699,8 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase 182-09]: WR-08 closed — require_canvas publishes the identity it already validated on request.state.canvas_caller and both canvas handlers consume it via Depends(canvas_caller) instead of re-running get_current_user. One token validation per canvas request instead of two (2 GoTrue round-trips + 2 auth.users ban queries -> 1 of each, on a route that fires on every canvas edit). Falsified: reverting the two route deps observes exactly 2, with the SAME token string twice.
 - [Phase 182-09]: canvas_caller fails CLOSED onto the SAME _NOT_FOUND every deny path in the gate raises — never 500 (itself an existence signal on a route contracted to be byte-identical to an unbuilt one), never 403 (D-182-05 forbids it outright), never 401 (CR-01's leak channel). Falsified: removing the request.state assignment yields 404, not 500.
 - [Phase 182-09]: run_in_threadpool applied to the CANVAS auth read ONLY (D-v2.5-01) — the shared get_current_user is deliberately untouched (every route in the app depends on it) and that non-goal is recorded in authenticate_canvas_request's docstring, so the asymmetry reads as a scoped decision rather than a missed site.
+- [Phase 182-10]: WR-04 closed — the folder_scope subset walk MOVED into a non-raising scope.folder_scope_violations; assert_folder_scopes_subset is now a thin presentation that re-raises violations[0], so caller parity (type/str/args/phase_slug) holds by construction
+- [Phase 182-10]: WR-03 (narrowing the broad except ValueError in the grounding folder_scope helpers) deliberately DEFERRED and recorded in the source as a decision — out of this round's operator-selected scope
 
 ## Operator Next Steps
 
