@@ -36,7 +36,7 @@
  * wires it to `updateWorkflowDraft` PATCH after the first `createWorkflowDraft`).
  */
 import { useId } from "react"
-import type { PhaseSpecJSON } from "./PhaseSpineGraph"
+import type { PhaseSpecJSON } from "./phaseVocabulary"
 
 /** A partial config patch the form emits on each edit. */
 export type PhaseConfigPatch = Record<string, unknown>

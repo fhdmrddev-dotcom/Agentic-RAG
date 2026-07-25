@@ -28,7 +28,8 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { generateWorkflow, createWorkflowDraft, updateWorkflowDraft, listFolders, listSkills } from "@/lib/api"
-import { PhaseSpineGraph, type PhaseSpecJSON } from "@/components/workflows/PhaseSpineGraph"
+import { PhaseSpineGraph } from "@/components/workflows/PhaseSpineGraph"
+import type { PhaseSpecJSON } from "@/components/workflows/phaseVocabulary"
 import { PhaseFormPanel, type PhaseConfigPatch, type IdNameMap } from "@/components/workflows/PhaseFormPanel"
 
 /** The Builder's working definition shape (a refinement of the opaque

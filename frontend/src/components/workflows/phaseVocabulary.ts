@@ -15,13 +15,18 @@
  * and `phaseGlyph()` (src/lib/phaseGlyph.tsx) is its render-time resolver.
  *
  * STATE OF THE EXTRACTION — read this literally, it is not a claim about the
- * future: as of this commit `PhaseSpineGraph.tsx` STILL carries its own local
- * `PHASE_GLYPHS`, `PHASE_TYPE_LABELS`, read shapes, `parseSkipTarget` and
- * `nodeTitle`. NOTHING has been repointed yet. **Plan 183-04 performs the hard cut**
- * that deletes those duplicates and points every consumer here. Do not read this
- * header as evidence that the duplicate is gone — in-code claims of a prior
- * extraction are the exact anti-drift hazard 183-CONTEXT warns about (soulData.ts's
- * own header asserted an extraction that had not happened).
+ * future: **plan 183-04 performed the hard cut**. `PhaseSpineGraph.tsx` no longer
+ * declares a glyph map, a type-label map, the read shapes, the on-fail parse or a
+ * node-title resolver — it imports them from here (and the icon vocabulary from
+ * `soulData`), with NO re-export shim left behind. Its five importers were
+ * repointed in that same commit.
+ *
+ * This paragraph is kept honest by machine, not by habit: `?raw` source guards in
+ * `PhaseSpineGraph.test.tsx` and `PhaseSpine.test.tsx` fail the moment a second
+ * copy of the glyph map or the parse reappears anywhere. In-code claims of a prior
+ * extraction are the exact anti-drift hazard 183-CONTEXT warns about — soulData.ts's
+ * own header asserted an extraction that had not happened — so treat this sentence
+ * as true only because those guards are green.
  *
  * Purity contract: this module is pure and client-side. It imports NOTHING from the
  * API client — every value here is DERIVED from definition fields that already

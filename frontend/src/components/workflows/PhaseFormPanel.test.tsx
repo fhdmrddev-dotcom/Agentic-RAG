@@ -22,7 +22,7 @@ import { render, screen } from "@testing-library/react"
 // Read the component SOURCE via Vite's ?raw loader (typechecks under `vite/client`).
 import phaseFormPanelSource from "./PhaseFormPanel?raw"
 import { PhaseFormPanel } from "./PhaseFormPanel"
-import type { PhaseSpecJSON } from "./PhaseSpineGraph"
+import type { PhaseSpecJSON } from "./phaseVocabulary"
 
 function phaseOf(config: Record<string, unknown>, extra: Partial<PhaseSpecJSON> = {}): PhaseSpecJSON {
   return {

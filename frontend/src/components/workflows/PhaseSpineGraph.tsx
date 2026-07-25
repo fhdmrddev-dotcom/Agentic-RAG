@@ -10,85 +10,47 @@
  *
  * G-5 RED LINE: this component MUST NOT import or modify the run-surface live
  * phase timeline / phase-card (those read live `usePhases`; this reads a DRAFT
- * definition JSON). It shares only the phase-type glyph vocabulary by value.
+ * definition JSON).
  *
  * The static drag-free invariant (REQ-4 acceptance c) is structural: every node
  * is a `<button>` (keyboard-selectable), there is NO `draggable` attribute, NO
  * drag handler (onDragStart / onPointerDown drag), NO connection handle, and NO
  * add-node control anywhere in the DOM. Selection NEVER reorders — clicking a
  * node only fires `onSelectNode(slug)`.
+ *
+ * Phase 183-04 (D-183-06 / D-183-08 / D-183-13) — THE HARD CUT. This file used to
+ * carry its OWN phase-glyph map (the flat text marks Phase 127 retired), its own
+ * type-label map, its own definition read shapes, its own on-fail parse and its own
+ * node-title resolver. All six are DELETED: they now live in exactly one home,
+ * `phaseVocabulary.ts` (vocabulary + parse + titles) and `soulData.ts` +
+ * `phaseGlyph()` (the icon vocabulary + its render-time resolver), so the vertical
+ * spine and the read-only canvas one toggle away cannot disagree about what a step
+ * is called, what it looks like, or where its on-fail branch goes. Nothing is
+ * re-exported from here — every consumer imports from the shared home directly.
+ *
+ * Two visible consequences, both intended:
+ *   - the spine now renders the 3D fluent-emoji marks (finishing the Phase 127
+ *     migration this file was left out of);
+ *   - the DEFAULT node face is the plain-language business sentence (D-183-06), and
+ *     the slug stays REVEALABLE through the app-wide ⌥ Technical-names state
+ *     (D-183-08). The spine is a leaf CONSUMER of that state — the control ships in
+ *     Settings, the operator band and (from 183) the canvas header, never here, so
+ *     two controls can never disagree.
  */
-
-/** The phase-type glyph vocabulary (mirrors the run-surface glyphs by VALUE — not
- *  by import; the 6th `◆` llm_emit deliverable is net-new per sketch 019-D D9). */
-const PHASE_GLYPHS: Record<string, string> = {
-  programmatic: "⚙",
-  llm_single: "✎",
-  llm_agent: "🤖",
-  llm_batch_agents: "⛓",
-  llm_human_input: "☺",
-  llm_emit: "◆",
-}
-
-/** A human label for a phase type (the node-title fallback when `phase.name` is absent). */
-const PHASE_TYPE_LABELS: Record<string, string> = {
-  programmatic: "Server step",
-  llm_single: "AI write step",
-  llm_agent: "AI agent step",
-  llm_batch_agents: "Parallel agents",
-  llm_human_input: "Needs you",
-  llm_emit: "Deliverable",
-}
+import { PHASE_GLYPHS } from "@/components/workflows/soulData"
+import {
+  nodeTitle,
+  parseSkipTarget,
+  technicalTitle,
+  type PhaseSpecJSON,
+} from "@/components/workflows/phaseVocabulary"
+import { phaseGlyph } from "@/lib/phaseGlyph"
+import { useTechnicalNamesOptional } from "@/providers/TechnicalNamesProvider"
 
 /** The verbatim read-only legend (locked contract — sketch 019-D / 103-PLAN). */
 export const READ_ONLY_LEGEND =
   "READ-ONLY GRAPH · ordered by phase_index · run order (i→i+1) · " +
   "on-fail branch (skip_to_phase) · no depends_on · no parallel lanes · inspect, don't drag"
-
-/** A validator entry as it appears in the draft definition JSON (loose shape — the
- *  Builder refines the real definition; we only read `on_failure` here). */
-export interface ValidatorJSON {
-  kind?: string
-  on_failure?: string
-  [k: string]: unknown
-}
-
-/** A phase config as it appears in the draft definition JSON. */
-export interface PhaseConfigJSON {
-  phase_type: string
-  [k: string]: unknown
-}
-
-/** A `PhaseSpec` as it appears in the draft definition JSON (the Builder's working
- *  shape — `WorkflowDefinitionJSON` is opaque at the api layer; this is the local
- *  read shape the graph + form panel agree on). */
-export interface PhaseSpecJSON {
-  slug: string
-  phase_index: number
-  name?: string | null
-  config: PhaseConfigJSON
-  validators?: ValidatorJSON[]
-}
-
-/**
- * Resolve the target slug of a `skip_to_phase:<slug>` on_failure value, mirroring
- * the backend `parse_skip_target` (reachability.py): split on the LAST ":" and
- * return the trailing slug. Returns null for any non-skip on_failure value.
- */
-export function parseSkipTarget(onFailure: string | undefined | null): string | null {
-  if (!onFailure || !onFailure.startsWith("skip_to_phase:")) return null
-  const idx = onFailure.lastIndexOf(":")
-  const slug = onFailure.slice(idx + 1).trim()
-  return slug.length > 0 ? slug : null
-}
-
-/** The node title: phase.name if present, else a non-empty fallback (type label · slug). */
-function nodeTitle(phase: PhaseSpecJSON): string {
-  const name = phase.name?.trim()
-  if (name) return name
-  const label = PHASE_TYPE_LABELS[phase.config.phase_type] ?? phase.config.phase_type
-  return `${label} · ${phase.slug}`
-}
 
 export interface PhaseSpineGraphProps {
   phases: PhaseSpecJSON[]
@@ -99,6 +61,14 @@ export interface PhaseSpineGraphProps {
 }
 
 export function PhaseSpineGraph({ phases, selectedSlug, onSelectNode }: PhaseSpineGraphProps) {
+  // D-183-08 — the app-wide ⌥ Technical-names reveal, read (never owned) here. The
+  // OPTIONAL accessor is deliberate: outside a provider it returns null and the
+  // spine falls back to plain language, so this component still renders in a
+  // provider-less unit test. The canvas (183-06) reads the SAME state with the SAME
+  // fallback ordering, which is what makes a Spine/Canvas title disagreement
+  // structurally impossible.
+  const showTechnical = useTechnicalNamesOptional()?.showTechnical ?? false
+
   // Sort by phase_index (strict run order). The input array order is irrelevant.
   const ordered = [...phases].sort((a, b) => a.phase_index - b.phase_index)
   const slugSet = new Set(ordered.map((p) => p.slug))
@@ -146,7 +116,13 @@ export function PhaseSpineGraph({ phases, selectedSlug, onSelectNode }: PhaseSpi
         {ordered.map((phase, i) => {
           const isLast = i === ordered.length - 1
           const isSelected = selectedSlug === phase.slug
-          const glyph = PHASE_GLYPHS[phase.config.phase_type] ?? "●"
+          // The 3D mark first; the soulData slug string is NOT a glyph since Phase
+          // 127, so "•" is the real visual fallback for an unmapped type.
+          const Glyph = phaseGlyph(phase.config.phase_type)
+          const glyphFallback = PHASE_GLYPHS[phase.config.phase_type] ?? "•"
+          // Resolved ONCE and used in BOTH the visible title and the accessible
+          // name, so they can never drift apart (WCAG 2.5.3 label-in-name).
+          const title = showTechnical ? technicalTitle(phase) : nodeTitle(phase)
           const isEmit = phase.config.phase_type === "llm_emit"
           // The dashed on-fail edges originating at THIS node (rendered as a labeled
           // skip-branch row beneath the node; the target slug is declared for assertion).
@@ -173,7 +149,7 @@ export function PhaseSpineGraph({ phases, selectedSlug, onSelectNode }: PhaseSpi
                   isSelected ? "ring-2 ring-primary" : "",
                 ].join(" ")}
               >
-                {glyph}
+                {Glyph ? <Glyph className="h-4 w-4" /> : glyphFallback}
               </span>
 
               {/* The node CARD — a <button> (keyboard-selectable; selection only,
@@ -185,7 +161,7 @@ export function PhaseSpineGraph({ phases, selectedSlug, onSelectNode }: PhaseSpi
                 data-phase-type={phase.config.phase_type}
                 data-selected={isSelected ? "true" : "false"}
                 aria-pressed={isSelected}
-                aria-label={`Phase ${phase.phase_index + 1}: ${nodeTitle(phase)} (${phase.config.phase_type})`}
+                aria-label={`Phase ${phase.phase_index + 1}: ${title} (${phase.config.phase_type})`}
                 onClick={() => onSelectNode(phase.slug)}
                 className={[
                   "w-full rounded-md border px-3 py-2 text-left transition-colors",
@@ -196,13 +172,13 @@ export function PhaseSpineGraph({ phases, selectedSlug, onSelectNode }: PhaseSpi
               >
                 <span className="flex items-center gap-2">
                   <span aria-hidden="true" className="text-[13px] leading-none">
-                    {glyph}
+                    {Glyph ? <Glyph className="h-4 w-4" /> : glyphFallback}
                   </span>
                   <span
                     data-testid="node-title"
                     className="min-w-0 flex-1 truncate text-[13px] font-medium text-foreground"
                   >
-                    {nodeTitle(phase)}
+                    {title}
                   </span>
                   <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
                     {phase.config.phase_type}

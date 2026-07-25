@@ -11,12 +11,17 @@
  *    a non-empty fallback when absent.
  *  - the module never imports PhaseTimeline/PhaseCard (G-5 — source-grep assertion).
  */
-import { describe, it, expect, vi } from "vitest"
-import { render, screen, within } from "@testing-library/react"
+import { describe, it, expect, vi, beforeEach } from "vitest"
+import { act, render, screen, within } from "@testing-library/react"
+import {
+  TechnicalNamesProvider,
+  useTechnicalNames,
+} from "@/providers/TechnicalNamesProvider"
 // Read the component SOURCE via Vite's ?raw loader (the idiomatic vitest way —
 // typechecks under `vite/client`, no node:fs/process needed) for the G-5 grep.
 import phaseSpineGraphSource from "./PhaseSpineGraph?raw"
-import { PhaseSpineGraph, type PhaseSpecJSON } from "./PhaseSpineGraph"
+import { PhaseSpineGraph } from "./PhaseSpineGraph"
+import type { PhaseSpecJSON } from "./phaseVocabulary"
 
 /** A 3-phase draft (intentionally OUT of phase_index order in the array to prove
  *  the component sorts; the rendered order must be 0,1,2 regardless of input order). */
@@ -36,7 +41,10 @@ const threePhases: PhaseSpecJSON[] = [
   {
     slug: "emit",
     phase_index: 1,
-    // name intentionally ABSENT → the fallback (type label / slug) must render.
+    // name intentionally ABSENT → the fallback must render. Since D-183-06 that
+    // fallback is the plain-language sentence ("Produce the deliverable") with NO
+    // slug in it; the old "<type label> · <slug>" form is still reachable behind the
+    // ⌥ reveal (D-183-08) — covered by the "technical names" block at the bottom.
     config: { phase_type: "llm_emit", prompt: "emit", emitter: "render_template", citation_policy: "strict" },
   },
 ]
@@ -83,17 +91,25 @@ describe("PhaseSpineGraph — read-only vertical spine", () => {
     const emitNode = screen.getByTestId("spine-node-emit")
     const title = within(emitNode).getByTestId("node-title")
     expect(title.textContent?.trim().length ?? 0).toBeGreaterThan(0)
+    // …and with the reveal OFF that fallback carries no slug (D-183-06).
+    expect(title.textContent).not.toContain("emit")
   })
 
-  it("renders the phase-type glyphs (each node card carries its type glyph)", () => {
+  it("renders the 3D phase-type mark on each node card (data-phase-type + svg hooks)", () => {
+    // Migrated from literal unicode assertions to the durable hooks the 127-01
+    // migration established (PhaseSpine.test.tsx:38-55): the flat text glyphs this
+    // file used to assert no longer render — the spine draws the bundled 3D marks.
     render(<PhaseSpineGraph phases={threePhases} selectedSlug={null} onSelectNode={vi.fn()} />)
     // Scope to each node card so the bullet + card duplication doesn't skew counts.
     const gather = screen.getByTestId("spine-node-gather")
     const review = screen.getByTestId("spine-node-review")
     const emit = screen.getByTestId("spine-node-emit")
-    expect(within(gather).getByText("🤖")).toBeInTheDocument() // llm_agent
-    expect(within(review).getByText("🤖")).toBeInTheDocument() // llm_agent
-    expect(within(emit).getByText("◆")).toBeInTheDocument() // llm_emit
+    expect(gather.getAttribute("data-phase-type")).toBe("llm_agent")
+    expect(review.getAttribute("data-phase-type")).toBe("llm_agent")
+    expect(emit.getAttribute("data-phase-type")).toBe("llm_emit")
+    expect(gather.querySelector("svg")).not.toBeNull()
+    expect(review.querySelector("svg")).not.toBeNull()
+    expect(emit.querySelector("svg")).not.toBeNull()
   })
 
   it("renders a 'View only' badge and the read-only legend", () => {
@@ -107,8 +123,10 @@ describe("PhaseSpineGraph — read-only vertical spine", () => {
     render(<PhaseSpineGraph phases={skipPhases} selectedSlug={null} onSelectNode={vi.fn()} />)
     const skipEdges = screen.getAllByTestId("skip-edge")
     expect(skipEdges).toHaveLength(1)
-    // The edge resolves its target the parse_skip_target way (split on the last ":")
-    // → "human-confirm". The edge declares its target slug for assertion.
+    // The target is resolved by slicing off the literal `skip_to_phase:` prefix BY
+    // LENGTH — the backend's semantics (reachability.py:89-98), which the shared
+    // parseSkipTarget now matches (correction C-1). This fixture's on_failure has no
+    // extra colon, so the expected value is unchanged by that correction.
     expect(skipEdges[0].getAttribute("data-target-slug")).toBe("human-confirm")
   })
 
@@ -154,7 +172,109 @@ describe("PhaseSpineGraph — read-only vertical spine", () => {
     const src = phaseSpineGraphSource
     expect(src).not.toMatch(/PhaseTimeline/)
     expect(src).not.toMatch(/PhaseCard/)
-    // No graph lib import either.
-    expect(src).not.toMatch(/react-flow|reactflow|\bd3\b|dagre/)
+    // No graph lib import either — the spine is plain HTML/CSS, and it must never
+    // reach for the canvas library (@xyflow/react) that lands beside it in 183.
+    expect(src).not.toMatch(/react-flow|reactflow|xyflow|\bd3\b|dagre/)
+  })
+
+  it("the SOURCE declares no second copy of the shared vocabulary (D-183-13, G-6)", () => {
+    // The machine-checkable form of "no third copy exists at phase end". The glyph
+    // map lives in soulData, the on-fail parse and the read shapes in
+    // phaseVocabulary — this file imports all of them and declares none.
+    const src = phaseSpineGraphSource
+    expect(src).not.toMatch(/const PHASE_GLYPHS/)
+    expect(src).not.toMatch(/const PHASE_TYPE_LABELS/)
+    expect(src).not.toMatch(/(function|const)\s+parseSkipTarget/)
+    expect(src).not.toMatch(/interface (PhaseSpecJSON|PhaseConfigJSON|ValidatorJSON)/)
+    // The retired last-colon split is gone with it (correction C-1).
+    expect(src).not.toMatch(/lastIndexOf/)
+    // …and it really does import from the one shared home.
+    expect(src).toMatch(/phaseVocabulary/)
+    expect(src).toMatch(/soulData/)
+  })
+})
+
+/**
+ * Phase 183-04 Task 1 (D-183-06 / D-183-08) — the ⌥ technical names reveal.
+ *
+ * The spine's DEFAULT face is now the plain-language business sentence, so the slug
+ * it used to always show must stay REACHABLE. It is — through the SAME app-wide
+ * `TechnicalNamesProvider` state the canvas reads (183-06), with the same fallback
+ * ordering, so the two views name every phase identically in BOTH modes. That
+ * symmetry is what stops the G-6 tripwire "Spine and Canvas disagree on a step's
+ * icon, title, or order" firing from a one-sided reveal.
+ */
+describe("PhaseSpineGraph — ⌥ technical names reveal (D-183-06 / D-183-08)", () => {
+  /** Two UNNAMED phases — the dominant live shape (only 10 of 119 phases are named),
+   *  and two of them so "flips every node at once" is actually exercised. */
+  const unnamedPhases: PhaseSpecJSON[] = [
+    { slug: "retrieve", phase_index: 0, config: { phase_type: "llm_agent", prompt: "r" } },
+    { slug: "m1", phase_index: 1, config: { phase_type: "llm_emit", prompt: "e" } },
+  ]
+
+  /** The shipped provider-driven harness idiom (lib/__tests__/termMap.test.tsx:138-164):
+   *  a "flip" button calling the context's own toggle — never a second copy of the state. */
+  function Harness() {
+    const { toggle } = useTechnicalNames()
+    return (
+      <div>
+        <PhaseSpineGraph phases={unnamedPhases} selectedSlug={null} onSelectNode={vi.fn()} />
+        <button type="button" onClick={toggle}>
+          flip
+        </button>
+      </div>
+    )
+  }
+
+  function titleOf(slug: string): string {
+    return within(screen.getByTestId(`spine-node-${slug}`))
+      .getByTestId("node-title")
+      .textContent!.trim()
+  }
+
+  beforeEach(() => {
+    // The provider persists to localStorage; start every case from the plain default.
+    window.localStorage.clear()
+  })
+
+  it("with the reveal OFF shows the plain-language sentence — no slug, no · separator", () => {
+    render(
+      <TechnicalNamesProvider>
+        <Harness />
+      </TechnicalNamesProvider>,
+    )
+    expect(titleOf("retrieve")).toBe("Work out how to do it")
+    expect(titleOf("retrieve")).not.toContain("retrieve")
+    expect(titleOf("retrieve")).not.toContain("·")
+    expect(titleOf("m1")).toBe("Produce the deliverable")
+    expect(titleOf("m1")).not.toContain("m1")
+    expect(titleOf("m1")).not.toContain("·")
+  })
+
+  it("flipping the reveal ON shows '<type label> · <slug>' on EVERY node at once", () => {
+    render(
+      <TechnicalNamesProvider>
+        <Harness />
+      </TechnicalNamesProvider>,
+    )
+    act(() => {
+      screen.getByRole("button", { name: "flip" }).click()
+    })
+    expect(titleOf("retrieve")).toBe("AI agent step · retrieve")
+    expect(titleOf("m1")).toBe("Deliverable · m1")
+    // The accessible name tracks the visible one (WCAG 2.5.3 label-in-name).
+    expect(screen.getByTestId("spine-node-m1").getAttribute("aria-label")).toBe(
+      "Phase 2: Deliverable · m1 (llm_emit)",
+    )
+  })
+
+  it("renders plain language and does NOT throw with no provider mounted at all", () => {
+    expect(() =>
+      render(
+        <PhaseSpineGraph phases={unnamedPhases} selectedSlug={null} onSelectNode={vi.fn()} />,
+      ),
+    ).not.toThrow()
+    expect(titleOf("retrieve")).toBe("Work out how to do it")
+    expect(titleOf("retrieve")).not.toContain("·")
   })
 })

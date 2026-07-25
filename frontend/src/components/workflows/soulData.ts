@@ -16,9 +16,16 @@
  */
 import { deriveTier, type CitationPolicy, type ValidatorKind } from "@/components/workflows/deriveTier"
 
-// ── Phase-type glyph vocabulary (the ONE shared copy — previously duplicated by
-//    value in WorkflowsPage.tsx:44-51 and PhaseSpineGraph.tsx:24-31; the 6th ◆
-//    llm_emit "deliverable"). All soul surfaces import THIS map. ──
+// ── Phase-type glyph vocabulary (the ONE shared copy; the 6th llm_emit
+//    "deliverable" entry). All soul surfaces import THIS map. ──
+// Extraction history, stated literally — this header once claimed the
+// PhaseSpineGraph.tsx duplicate had been replaced when it had NOT, which is how
+// that drift survived two phases. The facts: Phase 124-01 removed the
+// WorkflowsPage.tsx:44-51 copy; **Phase 183-04 removed the PhaseSpineGraph.tsx
+// copy**, which now imports this map and renders it through phaseGlyph(). As of
+// that plan there is no other declaration of this vocabulary in frontend/src, and
+// `?raw` source guards in PhaseSpine.test.tsx / PhaseSpineGraph.test.tsx /
+// WorkflowSoul.test.tsx make a reappearance a test failure rather than a comment.
 // Phase 127-01 (WUX-03): upgraded flat unicode → verified fluent-emoji slug strings.
 // phaseGlyph() (src/lib/phaseGlyph.tsx) is the render-time resolver — it returns
 // a bundled 3D SVG component for each slug. This map is the single source of truth
