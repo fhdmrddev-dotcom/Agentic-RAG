@@ -15,6 +15,24 @@
  * its role and kill keyboard reachability, and sketch 134-C's cursor contract is
  * that the PLANE pans while the nodes do not move.
  *
+ * REACHABILITY IS NOT OPERABILITY, AND THE GAP WAS A BROKEN PROMISE. Keeping
+ * `nodesFocusable` at its default gives every node a tab stop and a button role, but
+ * for one shipped revision pressing that button did nothing: the surface's ONLY
+ * affordance was mouse-only, which is WCAG 2.1.1 on the one thing this canvas does.
+ * `activateFromKeyboard` below closes it — Enter and Space run the SAME
+ * `onSelectNode(slug)` contract a click runs (D-183-05), guarded by the SAME
+ * `CANVAS_NODE_TYPES.phase` check, so there is one selection rule with two input
+ * devices rather than two rules that can drift. It reads the memoized projection to
+ * filter and calls nothing else: no write, no fetch, no node mutation.
+ *
+ * THE ANNOUNCED AFFORDANCE MUST BE TRUE. React Flow's default node description
+ * promises two things this surface does not do — that the arrow keys move a node and
+ * that delete removes it — and a screen reader hears it on every node. `ARIA_LABELS`
+ * overrides it with what actually happens. BOTH description keys are overridden
+ * because the library picks between them off its keyboard-a11y opt-out flag, whose
+ * `false` default — the one this canvas keeps — renders the counter-intuitively named
+ * `keyboardDisabled` key rather than the `default` one.
+ *
  * SUPPRESSING THE INTERACTIVITY LOCK ON `<Controls>` IS NOT POLISH. The cluster
  * defaults that prop to true and renders an interactivity padlock whose handler
  * sets `nodesDraggable`, `nodesConnectable` and `elementsSelectable` all to
@@ -57,7 +75,7 @@
  * XSS (T-124-01): every authored string (phase names) is rendered as a plain React
  * text child / `title=` attribute value — never `dangerouslySetInnerHTML`.
  */
-import { useMemo, type CSSProperties } from "react"
+import { useCallback, useMemo, type CSSProperties, type KeyboardEvent } from "react"
 import {
   Background,
   Controls,
@@ -88,6 +106,18 @@ const nodeTypes = {
   [CANVAS_NODE_TYPES.phase]: PhaseNode,
   [CANVAS_NODE_TYPES.unresolvedSkip]: UnresolvedSkipNode,
   [CANVAS_NODE_TYPES.endCap]: EndCapNode,
+}
+
+/**
+ * MODULE SCOPE for the same Pattern-4 reason as `nodeTypes`. The two description
+ * keys are the library's own; both are mapped to one honest sentence, because the
+ * key this canvas actually renders depends on a flag whose naming is inverted (see
+ * the docblock). Static string literals — no definition data is interpolated, so no
+ * authored string can reach an announcement.
+ */
+const ARIA_LABELS = {
+  "node.a11yDescription.default": "Press enter or space to open this step's details.",
+  "node.a11yDescription.keyboardDisabled": "Press enter or space to open this step's details.",
 }
 
 /**
@@ -161,6 +191,35 @@ export function WorkflowCanvas({ phases, selectedSlug, onSelectNode }: WorkflowC
     [projection.edges],
   )
 
+  /**
+   * The keyboard half of D-183-05. The library's own per-node key handler neither
+   * stops propagation nor prevents the default on Enter/Space, so the event reaches
+   * the plane wrapper; `.react-flow__node` carries `data-id`, which for a phase node
+   * IS the slug. The id is checked against the memoized projection rather than
+   * re-derived, so the end cap and the broken-reference stub — neither of which is a
+   * phase — stay exactly as inert here as they are under the mouse.
+   */
+  const activateFromKeyboard = useCallback(
+    (event: KeyboardEvent<HTMLDivElement>) => {
+      if (event.key !== "Enter" && event.key !== " ") return
+
+      const wrapper = (event.target as HTMLElement).closest<HTMLElement>(".react-flow__node")
+      const id = wrapper?.dataset.id
+      if (!id) return
+
+      const isPhase = projection.nodes.some(
+        (node) => node.id === id && node.type === CANVAS_NODE_TYPES.phase,
+      )
+      if (!isPhase) return
+
+      // Space would otherwise scroll the pane (the library also reserves it as the
+      // pan activation key), and selection is the whole intent of the press.
+      event.preventDefault()
+      onSelectNode(id)
+    },
+    [projection.nodes, onSelectNode],
+  )
+
   // The header is shared by both branches — read-only is told as a deliberate MODE
   // in the shipped `👁 View only` vocabulary, never invented a second time.
   const header = (
@@ -231,6 +290,9 @@ export function WorkflowCanvas({ phases, selectedSlug, onSelectNode }: WorkflowC
           onNodeClick={(_, node) => {
             if (node.type === CANVAS_NODE_TYPES.phase) onSelectNode(node.id)
           }}
+          // …and the same contract from the keyboard (CR-01). One rule, two devices.
+          onKeyDown={activateFromKeyboard}
+          ariaLabelConfig={ARIA_LABELS}
         >
           <Background />
           {/* The prop below removes the interactivity padlock — see the docblock;
