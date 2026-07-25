@@ -57,14 +57,52 @@ already-flaky 1877-test baseline.
 
 ## Per-Task Verification Map
 
-> Filled by the planner once task IDs exist. Every task must carry an `<automated>` verify command
-> or an explicit Wave-0 dependency (Dimension 8).
+> **20 tasks across 7 plans** (183-01 ×3, 183-02 ×3, 183-03 ×2, 183-04 ×3, 183-05 ×3, 183-06 ×3,
+> 183-07 ×3). **Every task carries an `<automated>` verify command** — Dimension 8 PASS, and there is
+> no run of 3 consecutive tasks without one. Status flips during execution.
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| _pending planner_ | — | — | CANVAS-01 | — | — | — | — | — | ⬜ pending |
+| 183-01-01 | 01 | 1 | CANVAS-01 | T-183-SC | Audited MIT dep, no postinstall; never the frozen v11 `reactflow` name | build gate | `cd frontend && npx tsc -b && npx vite build` | ✅ (toolchain) | ⬜ pending |
+| 183-01-02 | 01 | 1 | CANVAS-01 | T-183-05 | Third-party CSS imported above `@tailwind base` so app tokens still win the cascade | build + asset grep | `cd frontend && npx vite build && grep -l "react-flow" dist/assets/*.css` | ✅ (toolchain) | ⬜ pending |
+| 183-01-03 | 01 | 1 | CANVAS-01 | — | jsdom mocks stay file-local; `setupTests.ts` untouched (baseline not perturbed) | unit (spike) | `cd frontend && npx vitest run src/test-utils/handleSpike.test.tsx` | ❌ W0 | ⬜ pending |
+| 183-02-01 | 02 | 1 | CANVAS-01 | T-183-01, T-183-06 | Total resolvers over unknown type / policy / kind; no fetch, no markup construction | unit (TDD) | `cd frontend && npx vitest run src/components/workflows/phaseVocabulary.test.ts` | ❌ W0 | ⬜ pending |
+| 183-02-02 | 02 | 1 | CANVAS-01 | T-183-07 | ONE shared case table; client parse ≡ backend prefix-slice semantics (C-1) | unit + type gate | `cd frontend && npx tsc -b && npx vitest run src/components/workflows/phaseVocabulary.test.ts -t "parity"` | ❌ W0 | ⬜ pending |
+| 183-02-03 | 02 | 1 | CANVAS-01 | T-183-07 | The Python half of the parity pin — the control that would have caught C-1 | unit (pytest) | `cd backend && venv/Scripts/python -m pytest tests/unit/test_183_skip_parse_parity.py -q` | ❌ W0 | ⬜ pending |
+| 183-03-01 | 03 | 1 | CANVAS-01 | T-183-03 | Null context is FAIL-CLOSED; provider holds no state and fetches nothing | unit (component) | `cd frontend && npx vitest run src/providers/EffectiveFeaturesProvider.test.tsx` | ❌ W0 | ⬜ pending |
+| 183-03-02 | 03 | 1 | CANVAS-01 | T-183-03, T-183-04 | Exactly one `GET /features`; nav map + D-04 bounce byte-unchanged; 181 gate green **unmodified** | regression | `cd frontend && npx tsc -b && npx vitest run src/components/admin/revertByteIdentical.test.tsx src/providers/EffectiveFeaturesProvider.test.tsx` | ✅ (existing gate) | ⬜ pending |
+| 183-04-01 | 04 | 2 | CANVAS-01 | T-183-01, T-183-08, T-183-09 | Glyph via build-time bundled SVG components; the false parity docblock deleted | regression | `cd frontend && npx tsc -b && npx vitest run src/components/workflows/PhaseSpine.test.tsx` | ✅ (existing) | ⬜ pending |
+| 183-04-02 | 04 | 2 | CANVAS-01 | T-183-09 | All FIVE importers repointed in one commit; no re-export shim | regression | `cd frontend && npx tsc -b && npx vitest run src/components/workflows/PhaseSpineGraph.test.tsx src/components/workflows/PhaseFormPanel.test.tsx` | ⚠ exists — `:94-96` **must be migrated** | ⬜ pending |
+| 183-04-03 | 04 | 2 | CANVAS-01 | T-183-09 | One-home guard extended to the 4th consumer; the pre-existing RED resolved | regression | `cd frontend && npx vitest run src/components/workflows/PhaseSpine.test.tsx src/components/workflows/soulData.test.ts` | ⚠ `soulData.test.ts:121-132` **RED at HEAD** | ⬜ pending |
+| 183-05-01 | 05 | 2 | CANVAS-01 | T-183-04, T-183-06, T-183-07 | Index-lookup adjacency (no phantom edge); honest broken-ref stub; zero network | unit (TDD) | `cd frontend && npx vitest run src/components/workflows/canvasModel.test.ts` | ❌ W0 | ⬜ pending |
+| 183-05-02 | 05 | 2 | CANVAS-01 | T-183-06 | 14-fixture SC#4 sweep; inputs TRANSCRIBED from checked-in migrations, never read live | unit (snapshot) | `cd frontend && npx vitest run src/components/workflows/canvasModel.fixtures.test.ts` | ❌ W0 | ⬜ pending |
+| 183-05-03 | 05 | 2 | CANVAS-01 | T-183-04, T-183-10 | Determinism, non-mutation, no `position`/`x`/`y`/`layout` key in the definition, no DOM read | unit (purity + `?raw`) | `cd frontend && npx vitest run src/components/workflows/canvasModel.purity.test.ts` | ❌ W0 | ⬜ pending |
+| 183-06-01 | 06 | 3 | CANVAS-01 | T-183-01, T-183-08 | Plain React text children only; no new icon slug (D-183-14 fence); no interactive element inside a node | type gate + unit | `cd frontend && npx tsc -b && npx vitest run src/components/workflows/canvasModel.test.ts` | ✅ (from 183-05) | ⬜ pending |
+| 183-06-02 | 06 | 3 | CANVAS-01 | T-183-11, T-183-04 | `showInteractive={false}` + the six read-only flags; empty state mounts NO `<ReactFlow>` | build gate | `cd frontend && npx tsc -b && npx vite build` | ✅ (toolchain) | ⬜ pending |
+| 183-06-03 | 06 | 3 | CANVAS-01 | T-183-11, T-183-06 | Drag-free DOM, no lock button, exactly one tab stop per node, axe clean, broken-ref marker | component (jsdom) | `cd frontend && npx vitest run src/components/workflows/WorkflowCanvas.test.tsx` | ❌ W0 | ⬜ pending |
+| 183-07-01 | 07 | 4 | CANVAS-01 | T-183-03, T-183-12 | Strict `=== true` + `!loading` + null-fail-closed gate; no save/persist path touched | regression | `cd frontend && npx tsc -b && npx vitest run src/pages/WorkflowBuilderPage.test.tsx` | ✅ (existing) | ⬜ pending |
+| 183-07-02 | 07 | 4 | CANVAS-01 | T-183-03, T-183-12 | Flag-off VANISH proven in 5 render variants; looking mints no `workflow_definitions` row | component (jsdom) | `cd frontend && npx vitest run src/pages/WorkflowBuilderPage.canvas.test.tsx` | ❌ W0 | ⬜ pending |
+| 183-07-03 | 07 | 4 | CANVAS-01 | T-183-SC | 181 scope-freeze assertions byte-identical (comments only); lazy chunk measured (A6) | regression + build | `cd frontend && npx vitest run src/components/admin/revertByteIdentical.test.tsx && npx vite build` | ✅ (existing gate) | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky · `nyquist_compliant`/`wave_0_complete` flip during execution once Wave 0 tests exist and pass.*
+
+### Threat reference key (registers live in each PLAN.md `<threat_model>`)
+
+| ID | Category | What it names |
+|----|----------|---------------|
+| T-183-01 | Tampering | XSS via an authored `phase.name` / slug / declared skip target rendered into a node |
+| T-183-02 | Elevation of Privilege | client-side authz bypass — the flag hide is cosmetic; `require_visible` / `require_canvas` are the wall |
+| T-183-03 | Information Disclosure | a governed surface flashing pre-resolve, on a fetch blip, or with no provider mounted |
+| T-183-04 | Tampering / Info Disclosure | canvas layout leaking into `workflow_definitions.definition` (Pitfall 3 / G-6) |
+| T-183-05 | Tampering | third-party CSS entering the app cascade |
+| T-183-06 | Denial of Service | a malformed definition crashing the projection or the render (totality is the control) |
+| T-183-07 | Tampering | the client edge set diverging from `reachability.py`'s adjacency (C-1 / C-2) |
+| T-183-08 | Tampering | SVG injection via a phase-type-derived icon path |
+| T-183-09 | Repudiation | a stale in-code parity / extraction claim misleading a future reader |
+| T-183-10 | Information Disclosure | a client-side call leaking definition content (there is none — zero network) |
+| T-183-11 | Elevation of Privilege | `<Controls>`'s interactivity lock re-enabling dragging in two clicks (Pitfall 1) |
+| T-183-12 | Tampering | opening a view mutating persisted state (D-183-04 / G-6) |
+| T-183-SC | Tampering | supply chain on the one net-new dependency `@xyflow/react@12.11.2` |
 
 ### Research test map (source for the planner)
 
@@ -88,7 +126,7 @@ already-flaky 1877-test baseline.
 | **D-183-15 / C-1** | Client parse ≡ `reachability.parse_skip_target` over the shared case table (**backend semantics authoritative** — operator-approved amendment) | unit ×2 (TS + Python) | `npx vitest run … -t "parity"` **and** `cd backend && venv/Scripts/python -m pytest tests/unit/test_183_skip_parse_parity.py` | ❌ W0 |
 | **C-2** | Non-contiguous `phase_index` ⇒ exactly one sequential edge, matching `reachability.py:164`'s index **lookup** (no phantom `1→3`) | unit | `… -t "non-contiguous"` | ❌ W0 |
 | **Pitfall 1** | No interactivity-lock button in the controls (`showInteractive={false}`) | component | `… -t "showInteractive"` | ❌ W0 |
-| **181 gate** | `revertByteIdentical.test.tsx` scope-freeze assertions still pass **unmodified** | regression | `npx vitest run src/components/admin/revertByteIdentical.test.tsx` | ✅ exists — must stay green untouched |
+| **181 gate** | `revertByteIdentical.test.tsx` scope-freeze assertions still pass **unmodified** | regression | `npx vitest run src/components/admin/revertByteIdentical.test.tsx` | ✅ exists — assertions stay untouched; only stale COMMENTS are corrected (183-07-03) |
 | **a11y** | Rendered canvas has no axe violations; exactly one tab stop per node | component | `… -t "accessib"` | ❌ W0 |
 | **G-6** | No `position` / `x` / `y` / `layout` key reaches a definition object | unit | in `canvasModel.purity.test.ts` | ❌ W0 |
 
@@ -97,34 +135,42 @@ already-flaky 1877-test baseline.
 ## Wave 0 Requirements
 
 - [ ] `npm i @xyflow/react@^12.11.2` in `frontend/` — the ONE net-new dep; then prove the toolchain
-      with `npx tsc -b && npx vite build` **before** any component work (assumption A4: no explicit
-      Vite-8 statement in the official docs)
+      with `npx tsc -b && npx vite build` **before** any component work (assumption A4) → **183-01-01**
 - [ ] **Spike (≈5 min, assumption A1):** does a `<Handle>`-free custom node render edges? Render a
-      2-node fixture with and without handles, count `.react-flow__edge`. This shapes `PhaseNode`.
+      2-node fixture with and without handles, count `.react-flow__edge`. This shapes `PhaseNode`
+      → **183-01-03**
 - [ ] `frontend/src/test-utils/mockReactFlow.ts` — the official four-mock jsdom helper
-      (**file-local import, NOT `setupTests.ts`**)
+      (**file-local import, NOT `setupTests.ts`**) → **183-01-03**
 - [ ] `frontend/src/components/workflows/__fixtures__/canvasFixtures.ts` — the D-183-09 corpus,
       transcribed from migrations **061 / 066 / 094** + `scripts/seed-pm-pack.py`, each entry citing
       its source `file:line`. **Transcribed, never read live** — two live reads on the same day
-      disagreed (C-3).
+      disagreed (C-3) → **183-05-02**
 - [ ] `frontend/src/components/workflows/__fixtures__/skipParseCases.json` — the C-1 parity table,
-      read by BOTH the TS and the Python suite
+      read by BOTH the TS and the Python suite (requires `resolveJsonModule` — F-1) → **183-02-02**
 - [ ] `frontend/src/components/workflows/canvasModel.test.ts` — SC#1 / SC#3b / SC#4, C-2, D-183-10
-- [ ] `frontend/src/components/workflows/canvasModel.purity.test.ts` — SC#2, D-183-12, G-6
-- [ ] `frontend/src/components/workflows/canvasModel.fixtures.test.ts` — the SC#4 snapshot sweep
-- [ ] `frontend/src/components/workflows/phaseVocabulary.test.ts` — D-183-06 / D-183-07, C-1 parity (TS half)
-- [ ] `frontend/src/components/workflows/WorkflowCanvas.test.tsx` — SC#3a, D-183-08 / 10 / 11, Pitfall 1, a11y
-- [ ] `frontend/src/pages/WorkflowBuilderPage.canvas.test.tsx` — D-183-03 (flag off ⇒ vanish), D-183-05
+      → **183-05-01**
+- [ ] `frontend/src/components/workflows/canvasModel.purity.test.ts` — SC#2, D-183-12, G-6 → **183-05-03**
+- [ ] `frontend/src/components/workflows/canvasModel.fixtures.test.ts` — the SC#4 snapshot sweep → **183-05-02**
+- [ ] `frontend/src/components/workflows/phaseVocabulary.test.ts` — D-183-06 / D-183-07, C-1 parity
+      (TS half) → **183-02-01 / 183-02-02**
+- [ ] `frontend/src/components/workflows/WorkflowCanvas.test.tsx` — SC#3a, D-183-08 / 10 / 11,
+      Pitfall 1, a11y → **183-06-03**
+- [ ] `frontend/src/pages/WorkflowBuilderPage.canvas.test.tsx` — D-183-03 (flag off ⇒ vanish),
+      D-183-05 → **183-07-02**
+- [ ] `frontend/src/providers/EffectiveFeaturesProvider.test.tsx` — the null-context fail-closed rule
+      (new plumbing, OP-2) → **183-03-01**
 - [ ] `backend/tests/unit/test_183_skip_parse_parity.py` — the C-1 parity Python half (the control
-      that would have caught C-1 in the first place)
+      that would have caught C-1 in the first place) → **183-02-03**
 - [ ] **Update** `frontend/src/components/workflows/PhaseSpineGraph.test.tsx` — migrate `:94-96` off
       literal `🤖`/`◆` onto `data-phase-type` hooks (pattern: `PhaseSpine.test.tsx:38-39`); extend
       `:158`'s no-graph-lib regex with `|xyflow`; delete the **false** parity comment at `:110-111`
+      → **183-04-02**
 - [ ] **Update** `frontend/src/components/workflows/PhaseSpine.test.tsx:104` — extend the
-      `not.toMatch(/const PHASE_GLYPHS/)` guard to cover `PhaseSpineGraph?raw` (D-183-13)
-- [ ] **Decide + record:** fix or accept `soulData.test.ts:121-132` — **already RED at HEAD**, and in
-      exactly D-183-13's territory (research recommends fix; leaving it makes the suite
-      self-contradictory)
+      `not.toMatch(/const PHASE_GLYPHS/)` guard to cover `PhaseSpineGraph?raw` (D-183-13) → **183-04-03**
+- [x] **Decided:** `soulData.test.ts:121-132` — **already RED at HEAD**, in exactly D-183-13's
+      territory. **Disposition: FIX in-phase** (research recommendation; leaving it makes the suite
+      self-contradictory while declaring `PHASE_GLYPHS` the single source of truth). The failing-name
+      differential must therefore SHRINK by exactly that one name → **183-04-03**
 
 ---
 
@@ -135,6 +181,8 @@ live (Chrome MCP or operator-clicks) at phase verification. Wire format and scre
 explicitly insufficient. Chrome MCP is known to hang (`chrome_mcp_dropdown_wedge`) — the documented
 fallback is operator-driven clicks with named steps.
 
+**These rows are deliberately NOT plan-task assertions.** No plan attempts to automate them away.
+
 | ID | Behaviour | Requirement | Why Manual | Test Instructions |
 |----|-----------|-------------|------------|-------------------|
 | **U-1** | Spine ⇄ Canvas agree | CANVAS-01, D-183-13 | Cross-view agreement of rendered 3D SVG marks — a DOM test can compare slugs but not that they *look* the same | Open a real draft in the Builder, flip `[≣ Spine] ⇄ [⬡ Canvas]` both ways. **Pass:** both views name the same steps, in the same order, with the same icons. No step in one view and not the other. |
@@ -144,15 +192,26 @@ fallback is operator-driven clicks with named steps.
 
 ---
 
+## Forward Flags (recorded, NOT acted on in 183)
+
+| Flag | Finding | Where it bites |
+|------|---------|----------------|
+| **C-5 — `@xyflow/react` bundles its OWN zustand `^4.4.0`** | A SECOND zustand copy enters the tree, contradicting `.planning/research/STACK.md:137`'s "same store" claim. 183 does not care: the canvas is read-only and holds no shared store. | **Phase 184.** `zundo` cannot wrap xyflow's internal store as STACK.md assumes, so 184's undo/redo plan is invalid as written and must be re-scoped at its discuss/sketch step. |
+| **A2 — React Flow attribution** | `proOptions={{ hideAttribution: true }}` is left OFF; the attribution link stays visible. Removal appears to require a Pro subscription under xyflow's terms (MEDIUM confidence — not re-verified this session). | Raise at UAT if the operator objects; it is a licensing decision, not an engineering one. |
+| **D-183-04 — the published-workflow canvas door** | Deferred, not built. Viewing a published definition's canvas requires Tweak, which calls `createWorkflowDraft` (an INSERT) — looking would mint a v(N+1) draft row. | **Phase 184** (if the editable canvas needs a view-only sibling) or **Phase 188** (a run view opening a canvas nobody can edit). |
+| **D-183-14 — the cross-cutting icon slug swaps** | `llm_agent` → `compass` (operator-chosen) and `llm_batch_agents` → `handshake` (still open). One additive `phaseGlyph.tsx` map change, five shipped surfaces. 183 ships only the canvas-local icon-well lightening. | A separate dedicated `/gsd:quick` or `/gsd:fast` commit with its own before/after check, so a canvas rollback cannot silently revert an app-wide icon decision. |
+
+---
+
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all ❌ MISSING references above
-- [ ] No watch-mode flags (`vitest run`, never bare `vitest`)
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies — 20/20 carry an `<automated>` command
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all ❌ MISSING references above
+- [x] No watch-mode flags (`vitest run`, never bare `vitest`)
 - [ ] Full-suite differential green: no new failing test **names**, no test-**count** regression vs. 33/1877
-- [ ] `revertByteIdentical.test.tsx` green and **unmodified**
+- [ ] `revertByteIdentical.test.tsx` green with every **assertion** byte-identical (comment-only correction permitted, 183-07-03)
 - [ ] All four G-4 rows (U-1 … U-4) driven live before `/gsd:verify-work`
 - [ ] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** planner-filled 2026-07-25 — Per-Task Verification Map complete, Dimension 8 PASS.
