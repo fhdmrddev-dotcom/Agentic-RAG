@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
-status: executing
-last_updated: "2026-07-25T23:22:28.470Z"
-last_activity: 2026-07-25 -- Phase 183 planning complete
+status: verifying
+last_updated: "2026-07-25T23:39:41.408Z"
+last_activity: 2026-07-25
 progress:
   total_phases: 18
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 23
-  completed_plans: 22
-  percent: 11
+  completed_plans: 23
+  percent: 17
 ---
 
 # Project State
@@ -44,15 +44,15 @@ Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 op
 
 ## Current Position
 
-Phase: 183 (read-only-canvas) — GAP PLAN READY
-Plan: 8 total — 7 executed, 1 gap-closure plan ready
-Status: Ready to execute `183-08` (gap closure). Plans 183-01…07 SHIPPED, but `183-VERIFICATION.md` = **gaps_found** (3/4 must-haves; SC#3 partial) and `183-REVIEW.md` = **issues_found** (1 Critical / 6 Warning / 7 Info) — the phase is NOT complete. **`183-08-PLAN.md`** (`gap_closure: true`, checker-PASSED after one revision) closes the operator-scoped four: **CR-01** (canvas nodes are keyboard-focusable and advertise `role="button"` but Enter/Space is a no-op — selection wired only through `onNodeClick`, `nodes` controlled with no `onNodesChange`), **WR-06** (the screen-reader description promises node deletion this read-only surface never performs), **WR-01** (`groundingFor` labels `citation_policy: "partial"` "No sources needed" while the shipped `deriveTier` calls the same value MIDDLE tier — two governance surfaces contradicting each other), and **WR-05** (2 new ESLint errors in `PhaseNode.tsx`). **Deliberately deferred as recorded debt:** WR-02 (hardcoded `colorMode="dark"` in a light-theme app), WR-03/WR-04 (duplicate-slug node collapse + colon-bearing-slug id collisions), IN-01…IN-07. **Still outstanding regardless:** the 4 G-4 lived-experience UAT rows U-1…U-4 — the operator must flip `visual_workflow_canvas` **On** in the Control Room to drive them, and U-4 flips it back. Next: `/gsd:execute-phase 183 --gaps-only` → then `/gsd:verify-work 183`.
+Phase: 183 (read-only-canvas) — GAP PLAN EXECUTED, VERIFICATION PENDING
+Plan: 8 of 8 — all executed
+Status: **`183-08` (gap closure) SHIPPED 2026-07-26** — commits `94c9c642` (RED) / `9488bd05` (GREEN) / `bda98813` (WR-01+WR-05) / `c549e0a1` (docs). Closes the four operator-scoped findings: **CR-01** (canvas nodes advertised `role="button"` and stayed focusable but Enter/Space was a no-op — now `activateFromKeyboard` runs the SAME `onSelectNode(slug)` contract as a click, guarded on the memoized projection's `CANVAS_NODE_TYPES.phase` so the end cap and the broken-reference stub stay inert; SC#3's keyboard half is finally kept), **WR-06** (`ariaLabelConfig` overrides BOTH node-description keys — the shipped default promised arrow-key movement and delete-to-remove on a read-only surface), **WR-01** (`groundingFor` now maps `citation_policy: "partial"` to the MIDDLE `flag` face, matching `deriveTier.ts:112-115`, pinned by a cross-module test importing `deriveTier`/`TIERS` so the canvas badge and the workflow-soul badge cannot contradict each other again), and **WR-05** (`PhaseNode.tsx` 2 ESLint errors → **0**, rendered output byte-identical). Gates: phase suite **370 → 376 passed / 0 failed**, superset **408 → 414**, `tsc -b --force` **33 errors held with 0 naming a phase file**, `vite build` exit 0 with `WorkflowCanvas-*.js` still its own ~174 kB lazy chunk (entry 1,726 kB), **no snapshot moved**, backend parity **13/13** with `backend/` untouched (frontend-only, no migration, **no cloud parity owed**). `183-VALIDATION.md` rows `183-08-01/02/03` flipped ✅ green. **Recorded debt deliberately NOT touched:** WR-02 (hardcoded `colorMode="dark"`), WR-03/WR-04 (duplicate-slug node collapse + colon-bearing-slug id collisions), IN-01…IN-07 — all still open in `183-REVIEW.md`. **Still blocking phase completion:** the 4 G-4 lived-experience UAT rows **U-1…U-4** must be driven LIVE by the operator, and `visual_workflow_canvas` cold-defaults to `"off"` so it must be flipped **On** in the Control Room first (U-4 flips it back). Worth adding to that pass now that CR-01 is closed: tab to a step and press Enter/Space with a real screen reader — jsdom proves the callback and the string, only a live pass proves what a user hears. Next: `/gsd:verify-work 183`.
 
 **Phase 183 (read-only-canvas) — CONTEXT GATHERED 2026-07-25** (`865cbde1`; `183-CONTEXT.md` + `183-DISCUSSION-LOG.md`). All 4 gray areas discussed (the two the sketches left with no winner, plus the faithfulness and G-5 calls). **D-183-01..15 locked.** Headlines: the canvas is an **in-Builder `[≣ Spine] [⬡ Canvas]` toggle** (no new ActiveView, **no nav entry** — this formally RELEASES 181's deferred nav-entry promise and `revertByteIdentical.test.tsx`'s scope-freeze assertion keeps holding); **Spine stays the default**; flag-off ⇒ the toggle **VANISHES** (@xyflow out of the render path); click fires the EXISTING `onSelectNode` → shipped `PhaseFormPanel` (zero net-new panel); plain-language step-type fallback titles (only 10/119 phases have a real `phase.name`); 2 badge slots = grounding (derived from `citation_policy` + `citations_required`, NOT 185's authored field) + "Waits for you" on `llm_human_input` only; **layout = a PURE function of the definition** (no DOM measure → SC#4 becomes a snapshot test; clipping solved in CSS); unresolvable `skip_to_phase` renders as a **visibly broken reference** (agrees with the backend's existing `UNSATISFIABLE_SKIP`, `reachability.py:154`); test-only fixture table with ONE synthetic `branching` seed (no DB seed, no new starter); named empty state with ALL canvas chrome suppressed. **G-5: extract one shared vocabulary module AND repoint `PhaseSpineGraph`** — scouting found `soulData.ts`'s header falsely claims the `PhaseSpineGraph.tsx:24-31` duplicate was already replaced; it still renders the flat text glyphs Phase 127 retired (planner note: treat in-code claims of prior extraction as unverified). **The cross-cutting icon slug swaps (`compass` / `handshake`) stay a SEPARATE dedicated task** — 5 shipped surfaces, must not ride a canvas rollback; 183 ships only the canvas-local icon-well lightening. Client parse + a parity test pinned to `reachability.parse_skip_target` (:89); **183 does NOT call `/validate`** (that arrives with 184). D-181-08's freeze on `WorkflowBuilderPage.tsx` was 181-only and does not carry forward. **G-4: 4 operator-named live-UAT scenarios recorded** (Spine⇄Canvas agree · the 5-phase maximum reads without h-overflow · the empty draft doesn't look broken · flag-off = yesterday's Builder incl. operator accounts). Reported-bugs cross-check: 6 open `Agentic-RAG` reports, none folded; BUG-260609-04's re-open trigger repointed 124 → **188**. Next: `/gsd:plan-phase 183`.
 
 **G-2 sketch gate for Phase 183: SATISFIED (2026-07-25).** Sketches 134-137 committed (`01bb4c64`, `7b74d2b5`, `01d50bba`, `86f866c5`, `e35c7489`). Winners: **136-B** (horizontal left->right flow) + **137-D** (frosted-glass step cards, 3D icon floating at the left edge, plain language with technical names behind the Alt reveal, Alive-by-default motion). Locked rules the canvas phases inherit: **colour budget** (step-type colour is a tint behind the icon only — the strong colours belong to Phase 188 run status) and **motion keys off run state, never selection**. New reusable asset `.planning/sketches/themes/phase-icons-3d.js` (verified 3D fluent-emoji marks; NEVER text glyphs). Icon choices: `llm_agent` -> `compass`; `llm_batch_agents` gets a lighter icon well in-scope, with the cross-cutting `handshake` swap left open. **Two findings that must reach the 183 plan: (1) `skip_to_phase` is used ZERO times in all 95 live definitions — SC#1's branch edge needs a fixture; (2) 40 of 95 definitions have zero phases — the empty projection is the most common canvas state.**
 
-Last activity: 2026-07-25 -- Phase 183 planning complete
+Last activity: 2026-07-25
 
 ### Quick Tasks Completed
 
@@ -554,6 +554,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 183 P05 | 20min | 3 tasks | 6 files |
 | Phase 183 P06 | 27min | 3 tasks | 3 files |
 | Phase 183 P07 | 22min | 3 tasks | 3 files |
+| Phase 183 P08 | 25m | 3 tasks | 5 files |
 
 ## Decisions
 
@@ -737,6 +738,9 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase ?]: 183-06: the D-183-08 reveal is threaded DOWN onto each node's data by the canvas shell, so PhaseNode stays a context-free leaf and a second technical-names state is structurally impossible
 - [Phase ?]: D-183-07-A: flag-off renders the Builder graph column with NO wrapper element — the shipped spine is the grid's first child, so D-181-01 byte-identity is structural
 - [Phase ?]: D-183-07-B: the @xyflow lazy split is KEPT on measurement — WorkflowCanvas chunk is 174.16 kB / 55.39 kB gzip, separate from the entry (A6 discharged)
+- [Phase 183]: 183-08: keyboard activation on the read-only canvas reuses the memoized projection + CANVAS_NODE_TYPES.phase guard, so mouse and keyboard share ONE selection rule (D-183-05)
+- [Phase 183]: 183-08: BOTH React Flow node-description keys overridden — the library renders the counter-intuitively named keyboardDisabled key at its keyboard-a11y opt-out false default
+- [Phase 183]: 183-08: citation_policy 'partial' joins 'flag' on the MIDDLE grounding face (matching deriveTier) rather than gaining a fourth face — D-183-07 three-face vocabulary holds
 
 ## Operator Next Steps
 

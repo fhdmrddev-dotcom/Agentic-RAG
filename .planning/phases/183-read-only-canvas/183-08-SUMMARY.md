@@ -251,3 +251,8 @@ None.
 ## Validation map
 
 `183-VALIDATION.md` rows `183-08-01` / `183-08-02` / `183-08-03` flipped ⬜ pending → ✅ green.
+
+## Self-Check: PASSED
+
+All 5 modified source files and this SUMMARY exist on disk; all 4 commits
+(`94c9c642`, `9488bd05`, `bda98813`, `c549e0a1`) resolve in `git log`.
