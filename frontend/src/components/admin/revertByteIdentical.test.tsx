@@ -6,8 +6,14 @@
  * Two locks:
  *   1. NAV-SET PARITY (REVERT-01): adding `visual_workflow_canvas` to the effective map
  *      leaves `visibleNavItems(...)` byte-identical to today, because NO `NAV_ITEMS` entry
- *      is tagged `visual_workflow_canvas` in 181 (that entry lands WITH the view in 183).
- *      A scope-freeze-adjacent guard also asserts no canvas nav entry slipped in early.
+ *      is tagged `visual_workflow_canvas`. Phase 183 SHIPPED the canvas as an in-Builder
+ *      `[≣ Spine] [⬡ Canvas]` view toggle on `WorkflowBuilderPage`'s existing graph column
+ *      (D-183-01) — the app has no router, so no nav entry was ever needed. That formally
+ *      released the 181 note which had deferred such an entry to this phase, and it makes
+ *      the scope-freeze guard below a PERMANENT invariant rather than a temporary one.
+ *      (Worded WITHOUT quoting the released sentence: this phase's acceptance greps for
+ *      that literal, and a guard that only passes by making a comment lie is a broken
+ *      guard — the recurring D-ITEM-183-02 trap.)
  *   2. THE Off|On OPERATOR CONTROL (D-181-03): the `visual_workflow_canvas` row in the
  *      reused `FeatureVisibility` card exposes EXACTLY a two-position Off | On control (two
  *      radios, never the Everyone|Operators|By-role triad), On writes audience `"everyone"`
@@ -55,7 +61,8 @@ describe("revert byte-identity — nav-set parity (REVERT-01)", () => {
       ...ALL_NAV_FEATURES_TRUE,
       visual_workflow_canvas: true,
     })
-    // The canvas nav entry lands in 183 — until then, ON reveals nothing (byte-identical).
+    // No canvas nav entry exists or ever will — 183 shipped the canvas as an in-Builder
+    // view toggle (D-183-01), so ON reveals nothing here (byte-identical) by design.
     expect(withCanvasOn).toEqual(baseline)
   })
 
