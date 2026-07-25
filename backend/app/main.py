@@ -58,6 +58,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
+from app.middleware.canvas_gate import CanvasGateMiddleware
 from app.middleware.maintenance import MaintenanceMiddleware
 from app.middleware.setup import SetupMiddleware
 
@@ -590,6 +591,29 @@ async def lifespan(app_instance):
 
 
 app = FastAPI(title="Agentic RAG API", version="1.0.0", lifespan=lifespan)
+
+# Phase 182 (VALID-01 / D-182-R2-01) — the canvas off-switch's request-path gate. Decides
+# ``visual_workflow_canvas`` BEFORE Starlette routing and before FastAPI decodes any body,
+# so a malformed body can no longer 422 ahead of the gate's 404 and a wrong-method probe can
+# no longer 405 (both leaked that the route exists while off — CR-01).
+#
+# REGISTRATION ORDER IS LOAD-BEARING. Starlette applies add_middleware in REVERSE
+# registration order (the LAST-registered wraps the rest), so registering FIRST makes this
+# the INNERMOST middleware: it runs AFTER SetupMiddleware and MaintenanceMiddleware and
+# immediately BEFORE the router. That is exactly right for byte-identity — on an unfinalized
+# box an unbuilt path returns the setup 503, and under maintenance a mutating request to an
+# unbuilt path returns the maintenance 503; if the canvas gate ran OUTSIDE those, a gated
+# path would answer 404 where an unbuilt path answers 503, which is itself a distinguishing
+# signal. CORS stays outermost, so this 404 still carries CORS headers exactly as the
+# router's own 404 does.
+#
+# Pure-ASGI (NOT BaseHTTPMiddleware) so it never buffers the SSE stream; it reads the flag
+# from the in-memory TTL settings cache (no per-request DB, D-v2.5-01) and fails CLOSED on a
+# cold/blip read (D-181-02 — the deliberate opposite of Maintenance's fail-OPEN).
+# ``Depends(require_canvas())`` REMAINS on both canvas routes as defense in depth (D-182-05):
+# this seam owns only the master off-switch, the dependency still owns caller resolution and
+# the operator/everyone/role audience.
+app.add_middleware(CanvasGateMiddleware)
 
 # Phase 147 (FLAG-01 / D-06) — maintenance/read-only write-block seam. Registered
 # BEFORE CORS so CORS ends up OUTERMOST (Starlette applies add_middleware in reverse
