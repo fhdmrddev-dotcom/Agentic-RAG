@@ -209,15 +209,63 @@ def test_empty_org_set_is_fail_closed_to_system_only():
     assert "in.()" not in (sb.tables["skills"].or_arg or "")
 
 
-def test_read_failure_fails_closed_to_empty():
-    """A read failure yields [] — never a widened scope (the documented posture)."""
+class _Boom(_FakeSupabase):
+    """A client whose every read raises — the PostgREST 5xx / timeout / reset case."""
+
+    def table(self, name):
+        raise RuntimeError("postgrest is down")
+
+
+class _SkillsBoom(_FakeSupabase):
+    """A client whose SKILLS read raises while the rest of the registry is healthy."""
+
+    def table(self, name):
+        if name == "skills":
+            raise RuntimeError("postgrest is down")
+        return super().table(name)
+
+
+def test_read_failure_raises_so_the_caller_can_describe_it():
+    """A read failure RAISES. The fail-closed decision MOVED — it did not disappear (WR-01).
+
+    CONVERTED, not deleted (the Phase-177 coverage-loss lesson). This test used to assert
+    `_skill_registry(...) == []`: the read swallowed its own exception and returned an empty
+    registry. That swallow sat INSIDE `assemble_grounding_bundle`, so a transient skills-read
+    failure produced a bundle that returned SUCCESSFULLY with `skill_ids = set()` — and every
+    consumer then reported EVERY valid phase skill reference as unregistered. The author was
+    told a correct reference does not exist, and (post-182-06) publish blocked on it.
+
+    The fail-closed OUTCOME is unchanged and is still proven — by the sibling below, which
+    drives the real `assemble_grounding_bundle` and asserts the empty skill set. What changed
+    is that the outcome now travels WITH a degradation signal, so the consumer can say "we
+    could not check" instead of making an accusation. Scope is never widened on a failure at
+    either layer.
+    """
     from app.services.harness.grounding import _skill_registry
 
-    class _Boom(_FakeSupabase):
-        def table(self, name):
-            raise RuntimeError("postgrest is down")
+    with pytest.raises(RuntimeError):
+        _skill_registry(_Boom(), _CALLER, {_ORG_MINE})
 
-    assert _skill_registry(_Boom(), _CALLER, {_ORG_MINE}) == []
+
+@pytest.mark.asyncio
+async def test_the_bundle_turns_that_raise_into_a_degraded_empty_skill_set():
+    """The fail-closed OUTCOME, now proven where the decision actually lives (WR-01).
+
+    The raise above must never reach an HTTP handler and must never widen scope: the caller
+    converts it into an empty skill registry PLUS `degraded == {"skills"}`. This is the
+    assertion that keeps the converted test's coverage whole.
+    """
+    from app.services.harness.grounding import assemble_grounding_bundle
+
+    sb = _SkillsBoom(org_members=_org_member_rows(_ORG_MINE), folders=[])
+    bundle = await assemble_grounding_bundle(supabase=sb, user_id=_CALLER)
+
+    assert bundle.skills == []  # fail-closed: no skill grounding, never a widened set
+    assert bundle.skill_ids == set()
+    assert bundle.degraded == frozenset({"skills"}), (
+        "the read failure vanished without trace — the consumer would report every valid "
+        "skill reference as unregistered (WR-01)"
+    )
 
 
 def test_malformed_caller_id_raises_instead_of_breaking_the_dsl():

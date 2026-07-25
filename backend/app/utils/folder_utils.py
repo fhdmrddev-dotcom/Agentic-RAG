@@ -1,13 +1,43 @@
 from __future__ import annotations
+
+import logging
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from supabase import Client
 
+logger = logging.getLogger(__name__)
+
+
+class FolderReadTruncatedError(RuntimeError):
+    """The ``folders`` read came back SHORT of the row count the server reported (WR-07).
+
+    PostgREST caps an unbounded select at ``max-rows`` (Supabase's Data API default is 1000
+    rows) and then silently returns a PREFIX — a partial answer that is indistinguishable, at
+    the call site, from a complete one. For a caller that merely LISTS folders that is a
+    display bug. For a caller that GATES on the folder tree it is an accusation: the grounding
+    palette loses org-shared folders, ``is_in_global_subtree`` starts returning False,
+    ``resolve_project_subtree`` resolves a SHRUNKEN subtree, and
+    ``assert_folder_scopes_subset`` reports a ``folder_scope`` violation against a definition
+    that is actually correct — which, since Phase 182 plan 182-06, BLOCKS publish.
+
+    This project targets org-scale multi-tenant production, where 1000 folders ACROSS ALL
+    TENANTS is not a large deployment, so the cap is reachable in normal operation.
+
+    Deliberately a ``RuntimeError`` and **NOT** a ``ValueError`` (T-182-47). The ⊆ rule in
+    ``harness/grounding.py`` catches bare ``ValueError`` and renders what it catches as a
+    ``folder_scope`` verdict. A truncation caught there would be re-dressed as exactly the
+    false accusation this error exists to prevent, one layer down. It must stay uncatchable by
+    that rule so it reaches the caller that knows how to say "we could not check"
+    (``assemble_grounding_bundle``, which degrades the bundle instead).
+    """
+
 
 async def fetch_all_folders(
     supabase: "Client",
     fields: str = "id, user_id, name, parent_id, is_org_shared, org_id",
+    *,
+    strict: bool = False,
 ) -> list[dict]:
     """Fetch ALL folders using service role key (no RLS). Returns everything.
 
@@ -15,13 +45,45 @@ async def fetch_all_folders(
     D-165-01 semantic split) AND ``org_id`` (D-165-04) so the org-aware visibility predicate can
     scope a shared folder to the caller's org set. Callers passing ``fields="*"`` already receive
     both columns.
+
+    ``strict`` (WR-07, keyword-only, default False) makes the read TRUNCATION-AWARE: it asks
+    PostgREST for an exact count and raises ``FolderReadTruncatedError`` when fewer rows come
+    back than the server says exist. The default is load-bearing, not timidity — with
+    ``strict=False`` this issues the byte-identical query it always has (no ``count``, no extra
+    round trip, same rows). This helper sits on the chat agent-loop path
+    (``agent_loop.py:1209``) and on four ``/folders`` routes; an unconditional ``count="exact"``
+    would add a ``COUNT(*)`` to every one of them (T-182-48). Only the two grounding GATE call
+    sites — the ones that turn this read into a verdict about the author's definition — opt in.
+
+    The ``isinstance(total, int)`` guard is required, not defensive noise: a missing or
+    non-integer count means the server did not honour the header (or the client is a test
+    double — conftest's supabase is a ``MagicMock``), and an unusable count is NEVER evidence
+    of a truncation.
     """
     # Local import avoids any potential cycle: folder_utils is imported by sql_service
     # and threads.py; aexec lives under app.utils as well — keeping the import inside
     # the function follows the PATTERNS.md "Async helper migration" pattern.
     from app.utils.db import aexec  # noqa: PLC0415
-    resp = await aexec(supabase.table("folders").select(fields))
-    return resp.data or []
+    if not strict:
+        resp = await aexec(supabase.table("folders").select(fields))
+        return resp.data or []
+
+    resp = await aexec(supabase.table("folders").select(fields, count="exact"))
+    rows = resp.data or []
+    total = getattr(resp, "count", None)
+    if isinstance(total, int) and total > len(rows):
+        logger.warning(
+            "folders read TRUNCATED: %s rows returned but the server reports %s — a gating "
+            "caller would resolve a shrunken folder subtree and accuse a correct definition "
+            "of a folder_scope violation (WR-07). Failing the read instead.",
+            len(rows),
+            total,
+        )
+        raise FolderReadTruncatedError(
+            f"the folders read returned {len(rows)} of {total} rows (PostgREST max-rows "
+            "truncation) — the folder tree cannot be trusted for a scope decision"
+        )
+    return rows
 
 
 async def _resolve_caller_org_ids(supabase: "Client", user_id: str) -> set[str]:
@@ -116,11 +178,21 @@ def _null_foreign_global_owner(
     return rows
 
 
-async def fetch_visible_folders(supabase: "Client", user_id: str) -> list[dict]:
+async def fetch_visible_folders(
+    supabase: "Client", user_id: str, *, strict: bool = False
+) -> list[dict]:
     """Fetch all folders visible to user: owned by user OR in an org-shared folder's subtree
-    within the caller's org set (D-165-04). Signature unchanged — org resolution happens INSIDE."""
+    within the caller's org set (D-165-04). POSITIONAL signature unchanged — org resolution
+    happens INSIDE, and several suites drive this positionally while ``harness/scope.py``
+    patches it as a module global.
+
+    ``strict`` (WR-07, keyword-only, default False) is threaded straight through to
+    ``fetch_all_folders``: opting in makes a PostgREST ``max-rows`` truncation raise
+    ``FolderReadTruncatedError`` instead of silently shrinking the visible set. Only the
+    grounding GATE call site passes it; every other caller is byte-identical by construction.
+    """
     caller_org_ids = await _resolve_caller_org_ids(supabase, user_id)
-    all_folders = await fetch_all_folders(supabase, fields="*")
+    all_folders = await fetch_all_folders(supabase, fields="*", strict=strict)
     folder_map = {f["id"]: f for f in all_folders}
     cache: dict = {}
     return [

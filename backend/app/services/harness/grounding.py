@@ -102,6 +102,19 @@ class GroundingBundle:
     skills: list[dict] = field(default_factory=list)
     skill_ids: set[str] = field(default_factory=set)  # membership set for fidelity
     placeholders: list[str] = field(default_factory=list)  # template placeholder fields
+    # THE ONE DEGRADATION SIGNAL (round-2 gap closure — WR-01 / WR-02 / WR-07). The set of
+    # registry names that could NOT be resolved for this bundle; currently ``"folders"``
+    # and/or ``"skills"``. Declared last because a dataclass field with a default must follow
+    # the other defaulted fields.
+    #
+    # THE CONTRACT BOTH CONSUMERS RELY ON: when ``degraded`` is non-empty the grounding
+    # FIDELITY rules MUST NOT be run and MUST NOT be reported. An unresolved registry makes
+    # every membership test vacuously false, and a vacuously-false membership test does not
+    # read to the author as "we could not check" — it reads as a specific, factual accusation
+    # against a definition that is actually correct (WR-01: every valid phase skill reference
+    # reported unregistered because a read 5xx'd). Both consumers instead emit the ONE shared
+    # ``grounding_unavailable_finding`` below.
+    degraded: frozenset[str] = frozenset()
 
 
 # ── moved verbatim from workflow_authoring (Phase 103) ────────────────────────
@@ -131,8 +144,22 @@ def _skill_registry(supabase, user_id: str, caller_org_ids: set[str]) -> list[di
 
     ``coerce_uid`` UUID-validates the caller id before it is spliced into the PostgREST
     ``.or_()`` grammar. On the service-role client that predicate IS the only owner gate, so a
-    malformed id must RAISE, never break out of the DSL. It is deliberately outside the
-    ``try`` below: a bad identity is a caller bug to surface, not a read failure to swallow.
+    malformed id must RAISE, never break out of the DSL.
+
+    FAIL-CLOSED, ONE LAYER UP (round-2 gap closure — WR-01). This function used to end its
+    read in ``except Exception: ... return []``. The fail-closed DECISION has not been
+    abandoned; it MOVED to the only caller that can describe it honestly. The service runs as
+    service-role (RLS-bypassing), so there is still no safe fallback read — a bare full-table
+    query would pull EVERY org's skill rows over the wire — and ``assemble_grounding_bundle``
+    still yields NO skill grounding when this read fails. What it additionally does now is
+    RECORD the failure on ``GroundingBundle.degraded``. That difference is the whole finding:
+    a swallow here produced a bundle that looked HEALTHY with an empty registry, so both
+    consumers reported every valid phase skill reference as unregistered — "this skill does
+    not exist" instead of "we could not check". A read failure therefore PROPAGATES from here.
+
+    Same consequence for the identity path, and it is an improvement: a malformed caller id
+    raised by ``coerce_uid`` now also surfaces as a bundle degradation rather than as an
+    unhandled error, which is strictly better on a route documented ALWAYS HTTP 200.
 
     BLOCKING-I/O CONTRACT (IR-01 / D-v2.5-01): this is a plain ``def`` and calls
     synchronous ``supabase-py``. It MUST be invoked via ``run_in_threadpool`` (it is —
@@ -140,28 +167,16 @@ def _skill_registry(supabase, user_id: str, caller_org_ids: set[str]) -> list[di
     or the blocking read lands on the event loop."""
     caller = coerce_uid(user_id)
     org_ids = {coerce_uid(o) for o in (caller_org_ids or set())}
-    try:
-        rows = (
-            supabase.table("skills")
-            # is_system + org_id are selected because the post-filter below needs them to
-            # evaluate the SAME rule the .or_() pushes down (they are projected off the wire
-            # by the route's PaletteSkill model — CR-02).
-            .select("id,name,is_org_shared,is_system,org_id,user_id,is_enabled")
-            .or_(build_skill_visibility_or(caller, org_ids))
-            .execute()
-            .data
-        ) or []
-    except Exception:  # noqa: BLE001 — a gated read miss must FAIL CLOSED, never widen scope.
-        # The service runs as service-role (RLS-bypassing), so there is no safe fallback read:
-        # a bare full-table query would pull EVERY org's skill rows over the wire. Return []
-        # (no skill grounding) rather than a possibly-polluted set. The pre-182 code "retried"
-        # here with a byte-identical query — a duplicated no-op that made any deterministic
-        # failure fail twice, under a comment describing a narrowing that never happened. One
-        # attempt, one honest fail-closed exit.
-        logger.warning(
-            "grounding: org-gated skills read failed; using empty skill set", exc_info=True
-        )
-        return []
+    rows = (
+        supabase.table("skills")
+        # is_system + org_id are selected because the post-filter below needs them to
+        # evaluate the SAME rule the .or_() pushes down (they are projected off the wire
+        # by the route's PaletteSkill model — CR-02).
+        .select("id,name,is_org_shared,is_system,org_id,user_id,is_enabled")
+        .or_(build_skill_visibility_or(caller, org_ids))
+        .execute()
+        .data
+    ) or []
     return [
         r
         for r in rows
@@ -277,6 +292,14 @@ async def assemble_grounding_bundle(
     per-phase ``folder_scope`` ⊆ check and the NL prose line) — it is accepted for
     signature symmetry with ``render_grounding_prompt`` so the GET palette route can omit
     it. ``pool`` is only needed when ``template_asset_id`` must be resolved.
+
+    NEVER RAISES ON A REGISTRY FAILURE (round-2 gap closure — WR-01 / WR-02 / WR-07). Both
+    DB-backed reads are guarded here and their failure is RECORDED on ``bundle.degraded``
+    rather than propagated or swallowed. This is the ONE place the degradation decision is
+    made; ``/validate`` and publish stage 2.6 both branch on the result and both mint the ONE
+    shared ``grounding_unavailable_finding``. NL generation (``workflow_authoring``) is the
+    third consumer and deliberately ignores ``degraded``: its own fidelity check re-reads the
+    folder tree through the ⊆ walk, so its behaviour is unchanged by this guard.
     """
     from app.services.openai_service import get_tools  # function-local
     from app.utils.folder_utils import (  # function-local
@@ -284,16 +307,49 @@ async def assemble_grounding_bundle(
         fetch_visible_folders,
     )
 
-    folders = await fetch_visible_folders(supabase, user_id)
+    degraded: set[str] = set()
+
+    # WHY ``strict=True`` HERE COVERS THE ⊆ WALK TOO (WR-07). This function runs FIRST on BOTH
+    # consumers (``/validate`` and publish stage 2.6), and it performs the SAME
+    # ``fetch_visible_folders`` read that ``scope.resolve_project_subtree`` will later perform
+    # against the SAME table under the SAME PostgREST ``max-rows`` cap. So a truncation is
+    # detected before the ⊆ walk is ever reached, and the consumer skips the fidelity rules
+    # entirely rather than accusing a correct definition of a ``folder_scope`` violation.
+    # BOUNDED RESIDUAL, recorded honestly: the two reads are separate round-trips, so a
+    # truncation that appears ONLY on the second one is not caught by this check.
+    try:
+        folders = await fetch_visible_folders(supabase, user_id, strict=True)
+    except Exception:  # noqa: BLE001 — an unreadable registry is a degradation, not a verdict
+        logger.warning(
+            "grounding: visible-folders read failed or was truncated; folder grounding is "
+            "unavailable for this bundle",
+            exc_info=True,
+        )
+        folders = []
+        degraded.add("folders")
+
     tool_names = {t["function"]["name"] for t in get_tools(None)}
+
     # CR-01 — the caller's org set gates the skill read. Resolved HERE, in the async caller,
     # because ``_skill_registry`` is sync-by-contract (D-v2.5-01) and must not do its own
     # ``org_members`` round-trip; it receives the set and applies the shared rule. This is the
     # same fail-closed resolver the SEED-124 folder fix uses, and it adds no new failure mode:
     # ``fetch_visible_folders`` on the line above already calls it internally (the duplicate
     # round-trip is one small indexed read — folder_utils' signature is contractually fixed).
-    caller_org_ids = await _resolve_caller_org_ids(supabase, user_id)
-    skills = await run_in_threadpool(_skill_registry, supabase, user_id, caller_org_ids)
+    #
+    # WR-01: the guard that used to live INSIDE ``_skill_registry`` lives here now, with the
+    # SAME warning text so the operational signal is unchanged — but it also records the
+    # degradation, which is the half the swallow could not express.
+    try:
+        caller_org_ids = await _resolve_caller_org_ids(supabase, user_id)
+        skills = await run_in_threadpool(_skill_registry, supabase, user_id, caller_org_ids)
+    except Exception:  # noqa: BLE001 — a gated read miss must FAIL CLOSED, never widen scope.
+        logger.warning(
+            "grounding: org-gated skills read failed; using empty skill set", exc_info=True
+        )
+        skills = []
+        degraded.add("skills")
+
     skill_ids = {str(s["id"]) for s in skills}
     placeholders = await _resolve_template_placeholders(
         supabase=supabase,
@@ -309,6 +365,7 @@ async def assemble_grounding_bundle(
         skills=list(skills or []),
         skill_ids=skill_ids,
         placeholders=placeholders,
+        degraded=frozenset(degraded),
     )
 
 
@@ -356,11 +413,13 @@ def render_grounding_prompt(bundle: GroundingBundle, project_folder_id: str | No
 # the SAME commit. ``tests/unit/test_182_severity_codes.py`` scans this file's verdict emit
 # sites and fails when the published set and the real emit sites disagree.
 #
-# DELIBERATELY NOT INCLUDED — ``grounding_unavailable``. That code is minted by
-# ``publish_service``'s fail-closed stage-2.6 wrapper (plan 182-06), never by
-# ``grounding_verdicts``, and it travels on the PUBLISH verdict's ``named_failures``, never
-# through ``/validate``. Its canonical home is ``publish_service.py``; the boundary is
-# pinned by ``test_publish_only_codes_are_an_acknowledged_boundary``.
+# STILL NOT INCLUDED, for a DIFFERENT reason now — the degraded code below. Until the
+# round-2 gap closure it was publish-only ("its canonical home is publish_service.py"); that
+# is no longer true. Both consumers of this module's collector now mint it, from the ONE
+# shared builder ``grounding_unavailable_finding``, and ``/validate`` composes it into its
+# known-code set. It stays OUT of this frozenset because this frozenset means exactly one
+# thing — the codes ``grounding_verdicts`` itself emits — and ``grounding_verdicts`` does not
+# emit it. It is an infrastructure-honesty code, not a rule finding.
 GROUNDING_VERDICT_CODES: frozenset[str] = frozenset(
     {
         "folder_scope",
@@ -368,6 +427,49 @@ GROUNDING_VERDICT_CODES: frozenset[str] = frozenset(
         "unregistered_tool",
     }
 )
+
+
+# ── the ONE honest degraded finding, shared by BOTH consumers (WR-01 / WR-02) ──
+
+# The code string lives HERE so neither consumer carries a literal: ``/validate`` composes it
+# into ``workflows._DEGRADED_CODES`` and publish stage 2.6 returns the builder's dict verbatim.
+GROUNDING_UNAVAILABLE_CODE: str = "grounding_unavailable"
+
+
+def grounding_unavailable_finding(degraded: frozenset[str] | None = None) -> dict:
+    """The ``{code, phase, message}`` finding for "we could not CHECK" — the one copy.
+
+    ``phase`` is ``None``: an unreachable registry is not attributable to a node, and keying
+    it to one would re-create the very confusion this finding exists to remove. When the
+    unresolved registries are known (``bundle.degraded``) the message NAMES them; otherwise it
+    falls back to the exact wording ``publish_service`` has emitted since plan 182-06, so that
+    path's user-visible message is byte-identical to before.
+
+    The message names registry KINDS only — never rows, ids, counts, connection strings or
+    driver text (T-182-49). The underlying exception is logged server-side with ``exc_info``
+    and never serialized to the caller.
+
+    BUILT FROM THE CONSTANT, NEVER FROM A QUOTED LITERAL — and that is load-bearing, not
+    style. ``tests/unit/test_182_severity_codes.py``'s drift scanner matches the token
+    sequence ``"code": "<name>"`` in THIS file's source (docstrings included, since it strips
+    only whole-line comments). A literal here would make the scanner demand this code join
+    ``GROUNDING_VERDICT_CODES``, which would be wrong — ``grounding_verdicts`` does not emit
+    it. The scanner therefore cannot see this code at all, so the link between the published
+    constant and ``/validate``'s classifier is pinned by an explicit assertion instead, in
+    ``tests/unit/test_182_grounding_degradation.py``.
+    """
+    if degraded:
+        message = (
+            "the grounding registry could not be resolved "
+            f"({', '.join(sorted(degraded))}), so grounding fidelity could not be verified — "
+            "this reports what we could not CHECK, not a problem with the definition"
+        )
+    else:
+        message = (
+            "the grounding registry could not be resolved, so grounding fidelity "
+            "could not be verified — publish is blocked"
+        )
+    return {"code": GROUNDING_UNAVAILABLE_CODE, "phase": None, "message": message}
 
 
 # ── the three atomic grounding-fidelity rules (the ONE copy) ──────────────────
