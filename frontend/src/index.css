@@ -1,3 +1,14 @@
+/* Phase 183-01 (Pitfall 2 / F-4) — the MANDATORY React Flow stylesheet, imported
+ * here and NOWHERE else. It must be statement #1 (a CSS @import precedes every
+ * other statement) and above `@tailwind base` so Deep Midnight's `@layer base`
+ * tokens keep winning the cascade. Tradeoff taken deliberately: the small CSS
+ * loads eagerly for everyone INCLUDING flag-off, while 183-07 lazy-splits the
+ * ~59 KB of xyflow JS — deferring the CSS too would make cascade order relative
+ * to Tailwind non-deterministic. Flag-off byte-identity (D-181-07 / D-183-03)
+ * holds: these rules only match `.react-flow*` / `--xy-*`, and with the flag off
+ * no such element ever enters the DOM. */
+@import "@xyflow/react/dist/style.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
