@@ -63,7 +63,7 @@ Committed as gated phases (ship only if CORE lands clean and budget remains; v2.
 ### Phase Checklist
 
 - [ ] **Phase 181: Revert Foundation** — governed `visual_workflow_canvas` flag (default off) + gated nav/routes + `test_revert_byte_identical` CI/live-close gate; flag-off provably byte-identical (REVERT-01, REVERT-02)
-- [ ] **Phase 182: Server Validation Seam** — `POST /workflows/validate` reusing `reachability.lint_workflow` + grounding-fidelity verbatim; single source of validation truth, flag-gated 404 (VALID-01)
+- [x] **Phase 182: Server Validation Seam** — `POST /workflows/validate` reusing `reachability.lint_workflow` + grounding-fidelity verbatim; single source of validation truth, flag-gated 404 (VALID-01) — completed 2026-07-25 (12 plans + a round-3 closure pass; SC#3 404-uniqueness accepted as a documented risk → SEED-134)
 - [ ] **Phase 183: Read-Only Canvas** — view an existing workflow as an `@xyflow/react` node canvas; pure projection (`canvasModel.toCanvas`), node id = phase.slug, layout computed not persisted (CANVAS-01)
 - [ ] **Phase 184: Editable Canvas + Live Structural Validation** — add/move/connect/configure/delete nodes → one-serializer round-trip → existing draft CRUD; live per-node STRUCTURAL validation ("can't draw an invalid workflow") + governance rails (CANVAS-02..04, VALID-02/03)
 - [ ] **Phase 185: Graded Governance — Per-Node Grounding Mode + Action-Risk Dial** — grounding mode (Grounded/strict auto-attaches `citations_required`+confidence gate vs Open/flexible ungated) + action-risk approval checkpoint on `llm_human_input`; strict gate not author-loosenable-away (GOVERN-01, GOVERN-02, GOVERN-03)
@@ -276,7 +276,7 @@ Committed as gated phases (ship only if CORE lands clean and budget remains; v2.
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 181. Revert Foundation | 3/3 | Complete (awaiting verify) | 2026-07-24 |
-| 182. Server Validation Seam | 3/3 | Gaps found (SC#4) | - |
+| 182. Server Validation Seam | 12/12 | Complete (SC#3 accepted risk — SEED-134) | 2026-07-25 |
 | 183. Read-Only Canvas | 0/? | Not started | - |
 | 184. Editable Canvas + Live Structural Validation | 0/? | Not started | - |
 | 185. Graded Governance — Grounding Mode + Action-Risk Dial | 0/? | Not started | - |

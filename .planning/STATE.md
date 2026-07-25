@@ -44,9 +44,9 @@ Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 op
 
 ## Current Position
 
-Phase: 182 (server-validation-seam) — GAPS FOUND (round 3)
-Plan: 12 of 12 executed
-Status: Round-3 verification `gaps_found` (6/9 must-haves). 3 BLOCKERs remain — SC#3 re-opened in a new shape (single-segment 404 uniqueness enumerable by an anonymous PATCH sweep); `GET /workflows/grounding-bundle` ignores `bundle.degraded` (silent-failure regression introduced by 182-11); publish org gate never checks `project_folder_id`. Round-3 code review: 3 BLOCKER + 9 WARNING. Next: `/gsd:plan-phase 182 --gaps`.
+Phase: 182 (server-validation-seam) — COMPLETE (round-3 closure, operator-scoped)
+Plan: 12 of 12 executed + a direct round-3 closure pass (no 4th gap-closure wave)
+Status: Round-3 verification found 3 BLOCKERs; operator scoped the close-out to "fix 2, decide on SC#3" rather than a fourth wave on the same files (G-1/G-5 — the phase had grown 3→12 plans across three rounds, and round 3 itself introduced the palette regression). **FIXED:** the grounding-bundle route now honours `bundle.degraded` (`de0810bd`); the strict folders read paginates past a `max-rows` cap instead of failing permanently (`844b0b40`); publish's org gate checks the definition's own `project_folder_id` (`671d61e6`). **ACCEPTED RISK:** SC#3's uniform-404 uniqueness — two route names leak to an anonymous method sweep, no data/access; goes public in 183/184 anyway → `182-DECISION-NOTES.md` + SEED-134 (4 re-open triggers; rationale does NOT generalize). **CARRIED:** SEED-133 (NL generation still ignores `degraded`). Test state: 385 passed / 12 pre-existing failures, all confirmed against baseline `ed80de3b`. Next: `/gsd:discuss-phase 183`.
 Last activity: 2026-07-25
 
 ### Quick Tasks Completed
