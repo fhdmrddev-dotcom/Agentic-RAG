@@ -142,3 +142,62 @@ This decision is revisited **only** if:
 
 *Phase: 182-server-validation-seam*
 *Recorded: 2026-07-25 (plan 182-05, gap-closure bookkeeping)*
+
+---
+
+## SC#3 (round 3) — the flag-off 404 is uniform, and that uniformity is identifying — **ACCEPTED RISK**
+
+**Source:** `182-VERIFICATION.md` (round 3) Truth 3, and `182-REVIEW.md` CR-01 + WR-07. Both
+reached it independently; the verifier reproduced it live against a fresh, unmocked
+`app.main.app` import with a 5-method sweep.
+
+### The finding
+
+`CanvasGateMiddleware` answers a uniform 404 for every method on the two gated paths. But this
+router also declares `PATCH`/`DELETE /workflows/{definition_id}`, which shadow every OTHER
+single-segment `/workflows/<x>` name — those answer 405/403/422, never 404. So the two paths
+that answer 404 to an anonymous `PATCH` probe are exactly the two gated ones, and one sweep over
+a wordlist enumerates the gated surface with zero credentials.
+
+**The observation is correct.** The gate's own honesty baseline is a two-segment path
+(`/workflows/__nope__/__nope__`), which is the wrong shape to prove byte-identity against, and
+that is why the shipped battery did not catch it.
+
+### Why this is a decision and not a defect to fix now
+
+Operator decision, 2026-07-25, taken with the finding on the table at the end of round 3:
+
+1. **What leaks is two route NAMES** — no data, no access, no credential, no tenant identifier.
+   Every deny path still terminates in the same `_NOT_FOUND`, `require_canvas` remains stacked as
+   defense in depth, and nothing behind the gate is reachable.
+2. **Those names become public in Phase 183/184**, when the flag flips on and both routes are
+   advertised in `/openapi.json` and called by the canvas on every edit.
+3. **Three fix rounds have already landed on these files**, and round 3 itself introduced a
+   defect (the palette route's silent-failure regression). A fourth wave on the same surface is
+   the pattern guardrails G-1/G-5 exist to interrupt. The correct fix is not small — it requires
+   the middleware to answer as the router would for an undeclared path, which it deliberately
+   cannot see today because it runs before routing.
+
+### Residual risk, stated honestly
+
+An unauthenticated attacker can learn that two specific route paths exist while the feature is
+off. They cannot invoke them, and they learn nothing about who uses them or what data they hold.
+The disclosure is one probe away from what `/openapi.json` will publish openly in two phases.
+
+### What was done instead
+
+- Planted **SEED-134** with the full fix sketch and four concrete re-open triggers — the
+  strongest being that this rationale **does not generalize**: it depends on the specific
+  `/workflows/{definition_id}` shadowing, so a future gated route on a differently-shaped
+  router does not inherit this acceptance.
+- Annotated `tests/test_182_canvas_gate.py::test_wrong_method_probe_404s_not_405` in place. The
+  round-3 review (WR-07) correctly flagged that this test PINS the leaking behaviour as
+  required and would reject a correct fix. It is kept — it still guards the strictly worse
+  405-on-a-gated-path form — but its docstring now says plainly that it encodes an accepted
+  risk, and that a correct SC#3 fix should update the expectation rather than be weakened to
+  satisfy it.
+
+### Reopens when
+
+Any SEED-134 trigger fires. Most likely first: a new flag-gated route on a router without
+wildcard shadowing, or a security review that will not accept "it only discloses route names".

@@ -132,6 +132,26 @@ def test_wrong_method_probe_404s_not_405(client, monkeypatch):
     405. A 405 admits that a handler IS declared at exactly that path (just not for this
     method) — an unbuilt path answers identically for every method, so the gate matches on
     PATH ONLY.
+
+    ⚠ THIS ASSERTION ENCODES AN ACCEPTED RISK, NOT A CLOSED ONE — read before "fixing" it.
+
+    The round-3 verification (``182-VERIFICATION.md`` Truth 3 / review CR-01) showed that a
+    uniform 404 does not actually make these paths indistinguishable, because this router
+    declares ``PATCH``/``DELETE /workflows/{definition_id}``: EVERY other single-segment
+    ``/workflows/<x>`` name is shadowed by those and answers 405/403/422, so the two paths that
+    answer 404 are the two gated ones. One anonymous method sweep over a wordlist enumerates
+    them. Closing that properly means deriving the gate's response from what the router WOULD
+    have answered for the path+method shape had the routes never been declared — which is real
+    work and is deliberately deferred, see SEED-134.
+
+    The operator accepted the residual on 2026-07-25: the leak discloses two ROUTE NAMES and
+    no data or access, and the flag flips ON in Phase 183/184, at which point the routes are
+    public by design. That decision is recorded in ``182-DECISION-NOTES.md``.
+
+    So: keep this test (it still guards the 405-on-a-gated-path form, a strictly worse leak
+    that also confirms the handler's METHOD set). But if you are here because a correct SC#3
+    fix made it fail, the FIX is right and this expectation is the thing to update — do not
+    weaken the fix to satisfy this line.
     """
     _cold_off(monkeypatch)
 
