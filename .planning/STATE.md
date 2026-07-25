@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
 status: executing
-last_updated: "2026-07-25T02:00:29.110Z"
-last_activity: 2026-07-25 -- Phase 182 planning complete
+last_updated: "2026-07-25T02:23:41.593Z"
+last_activity: 2026-07-25 -- Completed 182-08-PLAN.md (pre-routing canvas gate + flag-aware OpenAPI filter)
 progress:
   total_phases: 18
   completed_phases: 1
   total_plans: 15
-  completed_plans: 10
+  completed_plans: 11
   percent: 6
 ---
 
@@ -45,9 +45,9 @@ Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 op
 ## Current Position
 
 Phase: 182 (server-validation-seam) — EXECUTING
-Plan: 7 of 7
-Status: Ready to execute
-Last activity: 2026-07-25 -- Phase 182 planning complete
+Plan: 9 of 12
+Status: Executing Phase 182 — round-2 gap closure (plans 01-08 complete; 09-12 remain)
+Last activity: 2026-07-25 -- Completed 182-08-PLAN.md (pre-routing canvas gate + flag-aware OpenAPI filter)
 
 ### Quick Tasks Completed
 
@@ -537,6 +537,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 182 P05 | 10min | 2 tasks | 5 files |
 | Phase 182 P06 | 10min | 3 tasks | 4 files |
 | Phase 182 P07 | 23min | 2 tasks | 4 files |
+| Phase 182 P08 | 20min | 3 tasks | 5 files |
 
 ## Decisions
 
@@ -690,6 +691,9 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase 182]: 182-07 (WR-05): /validate's _severity fails CLOSED — an unrecognised verdict code classifies 'error' and logs a WARNING naming it, never the soft 'incomplete'. A wrongly-red verdict is visible and gets fixed; a wrongly-grey one silently misleads the author into a publish block.
 - [Phase 182]: 182-07: verdict-code vocabularies are OWNED by the emitting module (reachability.LINT_CODES / grounding.GROUNDING_VERDICT_CODES). Downstream classifiers COMPOSE the known set; _ERROR_CODES is derived set arithmetic with no duplicated literal, and paired source-scanning drift detectors (falsified, plus a teeth self-test) enforce the pairing.
 - [Phase 182]: 182-07: grounding_unavailable's canonical home is publish_service.py — publish-only, deliberately NOT composed into /validate's _KNOWN_CODES since /validate calls grounding_verdicts directly. Pinned by a boundary test that fails if publish ever mints a second unowned code.
+- [Phase 182-08]: D-182-R2-01 implemented as a pre-routing pure-ASGI CanvasGateMiddleware (registered FIRST = INNERMOST, inside Setup+Maintenance, under CORS); gates on PATH ONLY and normalizes one trailing slash, so the flag-off canvas is byte-identical to an unbuilt path for every method and for hostile input
+- [Phase 182-08]: D-182-R2-02 hides the canvas from /openapi.json via a request-time app.openapi hook (include_in_schema=False rejected — it would hide the routes from /docs even while ON); the removal set is derived from the ref graph, and the filtered doc is deep-copied per request and NEVER written to FastAPI's schema memo
+- [Phase 182-08]: CANVAS_GATED_PATHS in backend/app/middleware/canvas_gate.py is the ONE registration point for canvas non-discoverability — Phase 183+ adds a route's absolute path there in the SAME commit that mounts it; Depends(require_canvas()) stays on every canvas route as defense in depth (D-182-05)
 
 ## Operator Next Steps
 
