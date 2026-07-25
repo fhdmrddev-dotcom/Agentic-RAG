@@ -1823,7 +1823,7 @@ conclusion is void and `/gsd:secure-phase` applies.
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Does `PhaseSpineGraph` need `<Handle>`-free edges verified before `PhaseNode` is written?**
    - What we know: custom nodes replace the default node including its handles; the docs point to the
@@ -1831,6 +1831,10 @@ conclusion is void and `/gsd:secure-phase` applies.
    - What's unclear: whether an edge to a handle-less node silently renders nothing, renders to the
      node centre, or logs a warning.
    - Recommendation: a Wave-0 spike task, 5 minutes, before `PhaseNode`'s shape is locked (A1).
+   - **RESOLVED — plan `183-01` Task 3.** The spike ships as a committed test,
+     `frontend/src/test-utils/handleSpike.test.tsx`, gated by that task's `<automated>` command; its
+     verdict is recorded in `183-01-SUMMARY.md` and read by plan `183-06` Task 1 before `PhaseNode`'s
+     handles are written.
 
 2. **Which `soulData.test.ts:121` disposition does the operator want?**
    - What we know: the assertion has been RED since Phase 127 and asserts a retired glyph set.
@@ -1838,6 +1842,10 @@ conclusion is void and `/gsd:secure-phase` applies.
    - Recommendation: **fix it.** It is a one-line honest correction in the exact module D-183-13 makes
      canonical, and leaving a RED assertion about `PHASE_GLYPHS` while declaring `PHASE_GLYPHS` the
      single source of truth is self-contradictory. Record it in the plan so it is visible, not silent.
+   - **RESOLVED — plan `183-04` Task 3.** Disposition is an explicit in-phase **FIX**, recorded in
+     `183-VALIDATION.md` §Wave 0 Requirements. The expected mapping is corrected to the six shipped
+     fluent-emoji slugs, the exact 6-key key-set assertion is kept, and the failing-name differential
+     must SHRINK by exactly that one name.
 
 3. **Where does the `○ end` cap live in the model?**
    - What we know: sketch 136 requires *"every flow ends in an explicit `○ end` cap, never a dangling
@@ -1847,6 +1855,10 @@ conclusion is void and `/gsd:secure-phase` applies.
    - Recommendation: a real node with `type: "endCap"`, and make the SC#4 assertion count
      `nodes.filter(n => n.type === "phase")`. It generalises to Phase 188's run-viz, which will want a
      paintable terminal.
+   - **RESOLVED — plan `183-05` Task 1 (model) + plan `183-06` Task 1 (render).** A real node with
+     `type: "endCap"`: the model emits EXACTLY ONE `endCap` node plus one edge from the
+     maximum-`phase_index` phase, SC#4 counts `nodes.filter(n => n.type === "phase")`, and
+     `EndCapNode` renders it.
 
 4. **Does the toggle strip appear or shift layout when `useEffectiveFeatures` resolves?**
    - What we know: `features` is `{}` until the fetch resolves (`useEffectiveFeatures.ts:40,65`), and
@@ -1855,6 +1867,10 @@ conclusion is void and `/gsd:secure-phase` applies.
    - Recommendation: gate on `!loading && features.visual_workflow_canvas === true` and reserve no
      space — a flag-off user must see **byte-identical** output (D-183-03), which forbids a reserved
      placeholder. Confirm at U-4.
+   - **RESOLVED — plan `183-07` Task 1.** The gate is
+     `featuresCtx !== null && !featuresCtx.loading && featuresCtx.features.visual_workflow_canvas === true`
+     with no reserved space, asserted across five render variants (absent / false / operator-like /
+     no provider / loading) in plan `183-07` Task 2.
 
 5. **Should the C-1 parity test have a Python half?**
    - What we know: a TS-only test pins the client against a *table*, not against the backend function.
@@ -1862,6 +1878,9 @@ conclusion is void and `/gsd:secure-phase` applies.
    - Recommendation: **yes** — it is one small pytest reading one JSON file, and C-1 exists precisely
      because a prose parity claim was trusted for three phases. This is the control that would have
      caught it.
+   - **RESOLVED — plan `183-02` Task 3.** `backend/tests/unit/test_183_skip_parse_parity.py` is the
+     ONLY backend file in the phase and is parametrized over the same `skipParseCases.json` table the
+     vitest half reads, so neither language can be weakened alone.
 
 ---
 
