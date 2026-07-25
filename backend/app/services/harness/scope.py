@@ -137,6 +137,25 @@ async def resolve_project_subtree(
     _org_kw = {} if restrict_org_ids is None else {"restrict_org_ids": restrict_org_ids}
     folders = await fetch_visible_folders(supabase, user_id, **_org_kw)  # owner-scoped fetch
 
+    # THE ROOT ITSELF MUST SURVIVE THE RESTRICTION (round-3 verification Truth 9 / review WR-02).
+    # ``_walk`` seeds its result with ``rid`` unconditionally, so before this check a project
+    # root that the restriction FILTERED OUT still came back as an allowed folder. Under
+    # ``restrict_org_ids`` that is the whole cross-org hole 182-12 set out to close, one level
+    # up from where it looked: 182-12 gated the per-phase ``folder_scope`` REFERENCES but not the
+    # definition's PRIMARY binding, so an org-A definition bound directly to an org-B folder
+    # published clean — and at run time an org-A colleague would retrieve from an empty
+    # intersection. Returning ``[]`` (bound, but nothing reachable) rather than ``[root]`` is what
+    # lets ``folder_scope_violations`` tell "unbound" (``None``) apart from "bound out of scope".
+    #
+    # UNRESTRICTED CALLERS ARE UNTOUCHED BY CONSTRUCTION — this branch is reachable only when
+    # ``restrict_org_ids`` is not None, and the ONLY such caller is publish stage 2.6. Run start,
+    # resume, Continue, NL generation, ``/validate`` and the four ``/folders`` routes all pass
+    # ``None`` and keep the unconditional-root behavior they have always had (a root outside the
+    # owner's visible set still resolves to ``[root]`` there — changing that is a separate,
+    # unrelated blast radius and is deliberately NOT done here).
+    if restrict_org_ids is not None and root not in {f["id"] for f in folders}:
+        return []
+
     def _walk(rid: str, seen: set[str] | None = None) -> list[str]:
         # IN-01 (098 secure-phase): cycle/visited guard. A self-parented row
         # (parent_id == id) or any cyclic folder hierarchy (corrupt/legacy data the
@@ -316,6 +335,24 @@ async def folder_scope_violations(
     )
     if subtree is None:
         return []  # unbound → nothing to bound against (structural validator already guards)
+    if not subtree:
+        # BOUND, but the project root itself did not survive the org restriction (round-3
+        # Truth 9 / WR-02). Only reachable under ``restrict_org_ids`` — an unrestricted walk
+        # always returns at least ``[root]`` — so this cannot fire on any pre-existing caller.
+        #
+        # It must be its OWN violation rather than merely an empty ``allowed`` set: a definition
+        # with no per-phase ``folder_scope`` declares nothing for the ⊆ loop below to test, so an
+        # empty allowed-set alone would let the cross-org definition publish CLEAN. That is
+        # exactly the hole the round-3 verification reproduced against the shipped suite's own
+        # fixtures. ``phase_slug`` is None because the offence is the DEFINITION's binding, not
+        # any one node's — consumers already degrade an unkeyed verdict correctly (D-182-06).
+        return [
+            FolderScopeSubsetError(
+                f"project folder {str(definition.project_folder_id)!r} is not a subset of the "
+                "folders this workflow's own organization can reach",
+                phase_slug=None,
+            )
+        ]
     allowed = set(subtree)
     violations: list[FolderScopeSubsetError] = []
     for phase in definition.phases:

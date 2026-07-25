@@ -748,3 +748,151 @@ def test_validate_was_deliberately_not_given_a_restriction():
         "the /validate seam grew an org restriction — if that is intentional it needs its own "
         "decision record; WR-05 is about the PUBLISH gate only"
     )
+
+
+# ═══ Round-3 Truth 9 / WR-02 — the PRIMARY binding, not just the references ═══
+#
+# 182-12 gated the two SECONDARY bindings (a phase's `skill_ref`, a phase's `folder_scope`)
+# and left the PRIMARY one — the definition's own `project_folder_id` — ungated, because
+# `resolve_project_subtree`'s `_walk` seeds its result with the root UNCONDITIONALLY. So an
+# org-A definition bound DIRECTLY to an org-B folder published clean under the org-A
+# restriction. The round-3 verification reproduced it using this very file's fixtures,
+# varying the one input all 16 tests above hold constant.
+#
+# EVERY TEST BELOW FAILS AGAINST THE ROUND-3 CODE.
+
+
+def _rooted_at_org_b(*, folder_scope: list[str]):
+    """The org-A definition whose PROJECT ROOT is itself the org-B folder."""
+    from app.models.harness import WorkflowDefinition
+
+    payload = _bound_payload(folder_scope=folder_scope)
+    payload["project_folder_id"] = _FOLDER_B
+    return WorkflowDefinition.model_validate(payload)
+
+
+@pytest.mark.asyncio
+async def test_a_project_root_outside_the_restriction_is_reported_even_with_no_folder_scope():
+    """THE LOAD-BEARING CASE. No per-phase `folder_scope` at all — nothing for the ⊆ loop.
+
+    This is the shape that made the hole invisible: with no phase declaring a `folder_scope`,
+    the subset loop has nothing to test, so an empty allowed-set alone still reports CLEAN.
+    The root violation has to be raised on its own.
+
+    PRE-FIX OUTCOME: `[]` — the org-B-rooted definition published clean under the org-A
+    restriction, and at run time an org-A colleague resolved an empty folder intersection.
+    """
+    from app.services.harness.grounding import grounding_verdicts
+
+    wd = _rooted_at_org_b(folder_scope=[])
+
+    clean = await grounding_verdicts(
+        wd, supabase=_sb(), user_id=_PUBLISHER, tool_names=set(), skill_ids=set()
+    )
+    assert [v["code"] for v in clean] == [], (
+        "premise broken: unrestricted, the multi-org publisher CAN see the org-B root, so "
+        "this must look clean — otherwise the restricted assertion proves nothing"
+    )
+
+    scoped = await grounding_verdicts(
+        wd,
+        supabase=_sb(),
+        user_id=_PUBLISHER,
+        tool_names=set(),
+        skill_ids=set(),
+        restrict_org_ids={_ORG_A},
+    )
+    assert [v["code"] for v in scoped] == ["folder_scope"], scoped
+    assert _FOLDER_B in scoped[0]["message"]
+
+
+@pytest.mark.asyncio
+async def test_a_project_root_outside_the_restriction_is_reported_when_it_names_itself():
+    """The second shape the verification drove: `folder_scope` naming the bound root.
+
+    PRE-FIX OUTCOME: `[]` here too — the root was unconditionally in `allowed`, so a
+    `folder_scope` naming it was trivially a subset of itself.
+    """
+    from app.services.harness.grounding import grounding_verdicts
+
+    wd = _rooted_at_org_b(folder_scope=[_FOLDER_B])
+
+    scoped = await grounding_verdicts(
+        wd,
+        supabase=_sb(),
+        user_id=_PUBLISHER,
+        tool_names=set(),
+        skill_ids=set(),
+        restrict_org_ids={_ORG_A},
+    )
+    assert [v["code"] for v in scoped] == ["folder_scope"], scoped
+
+
+@pytest.mark.asyncio
+async def test_an_in_org_project_root_still_resolves_its_whole_subtree():
+    """THE POSITIVE CONTROL. The restriction must not break the ordinary case.
+
+    Without this, the two tests above would pass against a `resolve_project_subtree` that
+    simply returned `[]` for every restricted call — which would make EVERY scoped workflow
+    unpublishable.
+    """
+    from app.services.harness.scope import resolve_project_subtree
+
+    subtree = await resolve_project_subtree(
+        _PROJECT_A, supabase=_sb(), user_id=_PUBLISHER, restrict_org_ids={_ORG_A}
+    )
+
+    assert subtree is not None and _PROJECT_A in subtree, (
+        "an in-org root must still resolve — a blanket empty return would make every scoped "
+        "workflow unpublishable"
+    )
+    assert _CHILD_A in subtree, "the in-org descendant must still be walked"
+    assert _FOLDER_B not in subtree, "the org-B child must still be excluded (182-12)"
+
+
+@pytest.mark.asyncio
+async def test_an_unrestricted_out_of_scope_root_is_byte_identical_to_today():
+    """THE BYTE-IDENTITY CONTROL. The root check is restricted-callers-only.
+
+    Run start, resume, Continue, NL generation, /validate and the four /folders routes all
+    pass no restriction. For them a root outside the visible set must STILL resolve to
+    `[root]`, exactly as it always has — this fix must not change one of them.
+    """
+    from app.services.harness.scope import resolve_project_subtree
+
+    unknown_root = "dddddddd-dddd-dddd-dddd-dddddddddddd"  # in no folder row at all
+
+    subtree = await resolve_project_subtree(
+        unknown_root, supabase=_sb(), user_id=_PUBLISHER
+    )
+
+    assert subtree == [unknown_root], (
+        "an UNRESTRICTED caller's out-of-set root must still come back as [root] — the "
+        "round-3 root check leaked into the shared path"
+    )
+
+
+@pytest.mark.asyncio
+async def test_an_unbound_definition_is_still_not_a_violation_under_a_restriction():
+    """`None` (unbound) and `[]` (bound, out of scope) must stay DIFFERENT answers.
+
+    An unbound workflow keeps whole-KB behaviour and is not an org offence; collapsing the
+    two would report a violation on every unbound draft the moment publish gained a
+    restriction.
+    """
+    from app.services.harness.grounding import grounding_verdicts
+    from app.models.harness import WorkflowDefinition
+
+    payload = _bound_payload(folder_scope=[])
+    payload["project_folder_id"] = None
+    wd = WorkflowDefinition.model_validate(payload)
+
+    scoped = await grounding_verdicts(
+        wd,
+        supabase=_sb(),
+        user_id=_PUBLISHER,
+        tool_names=set(),
+        skill_ids=set(),
+        restrict_org_ids={_ORG_A},
+    )
+    assert [v["code"] for v in scoped] == [], scoped
