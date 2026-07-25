@@ -560,6 +560,111 @@ async def test_publish_blocks_with_grounding_unavailable_not_a_false_unregistere
     flip.assert_not_called()  # and certainly never mint a version
 
 
+class _SkillsBoom(_FakeSupabase):
+    """Healthy folders + org_members, a SKILLS read that raises — the WR-01 outage, exactly."""
+
+    def table(self, name):
+        if name == "skills":
+            raise RuntimeError("postgrest 503 on the org-gated skills read")
+        return super().table(name)
+
+
+def _skills_boom_client() -> _SkillsBoom:
+    return _SkillsBoom(
+        folders=_FakeQuery(_folder_rows(2)),
+        org_members=_FakeQuery([{"org_id": _ORG}]),
+    )
+
+
+@pytest.mark.asyncio
+async def test_validate_end_to_end_over_a_raising_skills_read_never_accuses_the_reference():
+    """WR-01 AT `/validate`, END TO END — nothing mocked between the read and the verdict.
+
+    The two tests above inject a synthetic degraded bundle, which isolates the consumer
+    branch but cannot see the swallow that CAUSED the defect. This one drives the REAL
+    `assemble_grounding_bundle` and the REAL `_skill_registry` against a client whose skills
+    read raises, so restoring the swallow re-opens WR-01 and this test fails.
+
+    PRE-FIX OUTCOME (observed by exactly that mutation):
+    `{'code': 'unregistered_skill', 'phase': 'answer', 'message': "phase 'answer' references
+    a non-registered skill_ref '33333333-3333-3333-3333-333333333333'"}` — the author's real,
+    valid id, called non-existent because a read returned 503.
+    """
+    resp = await _validate(
+        _definition([_llm_single("answer", 0, skill_ref=_REAL_SKILL)]),
+        supabase=_skills_boom_client(),
+    )
+
+    codes = _codes(resp)
+    assert "unregistered_skill" not in codes, (
+        "WR-01 REGRESSION (end to end): the skills read failed and the author was told their "
+        f"valid skill reference {_REAL_SKILL} does not exist."
+    )
+    assert "grounding_unavailable" in codes
+    assert _by_code(resp, "grounding_unavailable").severity == "error"
+    assert resp.ok is False
+
+
+@pytest.mark.asyncio
+async def test_publish_end_to_end_over_a_raising_skills_read_never_accuses_the_reference():
+    """WR-01 AT PUBLISH, END TO END — the real assembler, the real registry read.
+
+    Same shape as the sibling above, on the ENFORCING side: `_resolve_publish_supabase` hands
+    stage 2.6 a client whose skills read raises, and nothing else is faked between that read
+    and the block. PRE-FIX OUTCOME: `blocked_stage="grounding_fidelity"` with a named failure
+    accusing the author's valid reference — and no way for them to tell it from a real one.
+    """
+    from contextlib import ExitStack
+    from unittest.mock import AsyncMock, patch
+    from uuid import UUID, uuid4
+
+    from app.services.harness import publish_service
+
+    definition = _definition([_llm_single("answer", 0, skill_ref=_REAL_SKILL)])
+    definition_id = uuid4()
+    row = {
+        "id": definition_id,
+        "slug": definition["slug"],
+        "version": definition["version"],
+        "name": definition["name"],
+        "status": definition["status"],
+        "definition": definition,
+        "created_by": UUID(_CALLER),
+    }
+    drive = AsyncMock(return_value=(uuid4(), {"text": "x"}, "completed"))
+    flip = AsyncMock(return_value=2)
+
+    with ExitStack() as stack:
+        stack.enter_context(patch("app.db.workflows.get_definition", AsyncMock(return_value=row)))
+        stack.enter_context(patch("app.db.workflows.write_audit", AsyncMock()))
+        stack.enter_context(patch("app.db.workflows.publish_definition", flip))
+        stack.enter_context(patch.object(publish_service, "_drive_golden_run", drive))
+        stack.enter_context(patch.object(publish_service, "_judge_golden_output", AsyncMock()))
+        stack.enter_context(
+            patch.object(
+                publish_service,
+                "_resolve_publish_supabase",
+                AsyncMock(return_value=_skills_boom_client()),
+            )
+        )
+        result = await publish_service.publish(
+            definition_id=definition_id,
+            golden_input="a representative kickoff prompt",
+            user={"id": _CALLER},
+            pool=AsyncMock(),
+            redis=AsyncMock(),
+        )
+
+    assert result["blocked_stage"] == "grounding_fidelity"
+    codes = [f.get("code") for f in result["named_failures"] if isinstance(f, dict)]
+    assert "unregistered_skill" not in codes, (
+        f"WR-01 REGRESSION (end to end, publish side): got {codes}"
+    )
+    assert codes == ["grounding_unavailable"]
+    drive.assert_not_called()
+    flip.assert_not_called()
+
+
 # ═══ (D) WR-07 end to end — a truncation is not a scope violation ═════════════
 
 

@@ -13,12 +13,12 @@ related_decisions:
   - "CR-01 (182-REVIEW.md) — `grounding._skill_registry` was deliberately made FAIL-CLOSED on a read miss (`except Exception: return []`) with the reasoning written in-line: on a service-role client there is no safe fallback read, so an empty set beats a possibly-polluted one. That is the model for how a sealed read should behave; it just has not been applied to the sibling reads."
   - "D-182-03 — verdicts already carry a severity taxonomy (`error` / `incomplete`). A degraded-read outcome does not fit either value honestly, so sealing this route probably means the taxonomy gains a third state (or a top-level `degraded` flag on the envelope). That design call is why this is not a mechanical patch."
 confirmed:
-  - "The promise is explicit and in the code. `backend/app/api/workflows.py` (`validate_workflow`, docstring at :383-404 at HEAD — the verification cited the surrounding block as :338-368): `ALWAYS HTTP 200 with the machine-renderable envelope: a dirty definition is not an HTTP error, it is advice.` The handler body the promise covers is :405-456."
-  - "`grounding._skill_registry` DOES fail closed. `backend/app/services/harness/grounding.py:148` — `except Exception:  # noqa: BLE001 — a gated read miss must FAIL CLOSED, never widen scope.` returns `[]`. This one read cannot 500 the route."
-  - "`_resolve_caller_org_ids` (`backend/app/utils/folder_utils.py:27-50`) does NOT fail closed against a raised error. It fails closed against an EMPTY or missing membership row set (returns an empty set — the documented D-165-04 over-restrict posture) and defensively coerces a dict-shaped response, but the `aexec(...)` call itself is unguarded: a postgrest `APIError` propagates."
-  - "`fetch_visible_folders` (`backend/app/utils/folder_utils.py:119-129`) does NOT fail closed. It awaits `_resolve_caller_org_ids` and then `fetch_all_folders(supabase, fields=\"*\")` with no try/except at any level. It is called unconditionally at the top of `assemble_grounding_bundle`, which `/validate` calls FIRST (`workflows.py:410-413`) — so this is the earliest 500 opportunity on the route."
-  - "`resolve_project_subtree` (`backend/app/services/harness/scope.py:79`) does NOT fail closed. It performs its own DB reads with no exception guard, reached from `/validate` via `grounding.grounding_verdicts` -> `_folder_scope_violation` -> `assert_folder_scopes_subset`."
-  - "No test exercises any of these failure paths. `tests/unit/test_182_validate.py` (12 tests) drives definition SHAPES through a mocked/faked supabase; none of them makes a read raise."
+  - "The promise is explicit and in the code. `backend/app/api/workflows.py` (`validate_workflow`, docstring at :383-404 at HEAD — the verification cited the surrounding block as :338-368): `ALWAYS HTTP 200 with the machine-renderable envelope: a dirty definition is not an HTTP error, it is advice.` The handler body the promise covers is :405-456. STILL TRUE as a promise; it is now ENFORCED for the two grounding I/O stages (plan 182-11) and still unenforced elsewhere."
+  - "[SUPERSEDED by plan 182-11] `grounding._skill_registry` DOES fail closed. It did — `except Exception: ... return []` — and that turned out to be the WR-01 defect rather than the model to copy: the swallow was invisible to both consumers, so an empty registry looked healthy and every valid phase skill reference was reported unregistered. The swallow is GONE; the fail-closed decision moved up to `assemble_grounding_bundle`, which records the failure on `GroundingBundle.degraded` instead."
+  - "[PARTIALLY SUPERSEDED by plan 182-11] `_resolve_caller_org_ids` (`backend/app/utils/folder_utils.py`) still has an unguarded `aexec(...)` of its own — a postgrest `APIError` still propagates OUT OF THE HELPER. What changed is that both of its call sites inside `assemble_grounding_bundle` are now wrapped, so on the `/validate` and publish paths that raise degrades the bundle instead of escaping. Other callers are unchanged."
+  - "[SUPERSEDED by plan 182-11] `fetch_visible_folders` (`backend/app/utils/folder_utils.py`) does NOT fail closed. The helper itself still raises by design, but its call inside `assemble_grounding_bundle` is now wrapped AND opts into the new truncation-aware `strict=True` read, so both a raise and a PostgREST `max-rows` truncation degrade the bundle rather than 500ing the route or fabricating a `folder_scope` violation (WR-07)."
+  - "[PARTIALLY SUPERSEDED by plan 182-11] `resolve_project_subtree` (`backend/app/services/harness/scope.py`) does NOT fail closed. Still true of the helper. It is reached from `/validate` via `grounding.grounding_verdicts`, and THAT call is now inside the handler's seal, so a raise from the ⊆ walk returns a structured 200 instead of a 500. Its own reads remain unguarded for every other caller."
+  - "[SUPERSEDED by plan 182-11] No test exercises any of these failure paths. `backend/tests/unit/test_182_grounding_degradation.py` (19 tests) now injects each failure — a raising skills read, a raising folders read, a truncated folders read, a non-`ValueError` `APIError`-shaped raise from both grounding stages — and asserts a 200 with an honest `grounding_unavailable` verdict, never a 500 and never a false `unregistered_skill` / `folder_scope`. All of them were observed FAILING against the pre-fix code."
 needs_confirmation:
   - "There is a SECOND-ORDER hazard that must be examined in the same pass and may be worse than the 500. `_folder_scope_violation` (`grounding.py:352-382`) catches bare `ValueError` — deliberately NOT narrowed to `FolderScopeSubsetError`, with an in-line comment explaining that the test doubles raise plain `ValueError` and that narrowing would risk a 500 on a documented-200 route. That catch is correct for its stated purpose, but it means ANY `ValueError` raised anywhere beneath `assert_folder_scopes_subset` — including one from a malformed DB row rather than a real scope violation — is silently rendered as a `folder_scope` ERROR verdict with `phase: None`. So the route can already paint a HEALTHY workflow red because of an infrastructure problem. Confirm whether any read under `resolve_project_subtree` can raise `ValueError` (as opposed to `APIError`) before deciding how tight the seal should be."
   - "Whether the canvas should be told the difference. A sealed route that returns `ok: false` with a degraded marker is honest; one that returns `ok: true` on a failed read is dangerous; one that returns `ok: false` with a normal-looking verdict is the current folder-scope behavior and is the shape to avoid. This is a small UX/API design call for whoever owns the canvas's error surface."
@@ -32,6 +32,70 @@ suggested_phase: "A dedicated /gsd:quick immediately BEFORE or as the opening wa
 ---
 
 # SEED-131 — the `/validate` ALWAYS-200 invariant is documented but not sealed
+
+## Partially addressed in Phase 182 gap closure, plan 182-11 (2026-07-25)
+
+**The seed is NOT closed.** Round-2 review re-reported this as **WR-02** (escalated: 182-06 had
+built exactly the fail-closed wrapper this route needed, applied it to publish only, and then
+documented the two sides as "the SAME copy" in the seam header — same *rules*, opposite *failure
+postures*, with the unsealed one being the route that fires on every canvas edit). The operator
+selected it as item 5 of the D-182-R2-03 scope, together with WR-01 and WR-07, and plan 182-11
+shipped the following.
+
+**What shipped:**
+
+1. **The two grounding I/O stages of `/validate` are SEALED.** `assemble_grounding_bundle` and
+   `grounding_verdicts` are wrapped in one `try/except` inside `validate_workflow`. A real
+   `postgrest` `APIError` from either the palette read or the ⊆ walk now returns HTTP 200 with a
+   structured verdict instead of escaping as a 500.
+2. **An honest degraded vocabulary exists.** `grounding.GROUNDING_UNAVAILABLE_CODE` +
+   `grounding.grounding_unavailable_finding` are the one code string and the one message builder;
+   `/validate` composes the code into `_KNOWN_CODES` via `_DEGRADED_CODES`, and the DERIVED
+   `_ERROR_CODES` classifies it **`error`** in both `phases_empty` states. `ok` is therefore never
+   `true` when a check did not run — the seed's point 2, answered with a verdict code.
+3. **The pure checks stay outside the seal** (the seed's point 4). `lint_workflow`, the D-13
+   business-requirement invariant and the interactive-phase check keep running and keep
+   contributing verdicts when grounding is unavailable — a registry blip costs the author three
+   rules, not the whole validation. Pinned by a test.
+4. **A degraded read is never dressed up as a violation** (the seed's point 3, and the
+   "related hazard" section below). A degraded bundle SKIPS the fidelity collector entirely rather
+   than running it against an empty registry, which is what produced the false `unregistered_skill`
+   (WR-01) and, via a truncated folder tree, the false `folder_scope` (WR-07).
+5. **The folders read is truncation-aware at the two grounding gate call sites.**
+   `folder_utils.fetch_all_folders` / `fetch_visible_folders` gained a keyword-only
+   `strict=False`; `strict=True` requests an exact count and raises the new
+   `FolderReadTruncatedError` (a `RuntimeError`, deliberately **not** a `ValueError`, so the ⊆
+   rule cannot re-dress it as a `folder_scope` verdict). Every other caller is byte-identical and
+   issues no extra `COUNT(*)`.
+6. **Publish and `/validate` now share one FAILURE posture**, not just one rule set — both branch
+   on `GroundingBundle.degraded` and both mint the same finding from the same builder. The seam
+   header's parity claim was updated to say so.
+
+**Effect on the risk this seed exists to flag:** the acute failure mode — a Phase-184 canvas
+turning one transient Supabase blip into a visible 500 storm mid-authoring — is **closed** for the
+grounding reads, which were the only DB-backed calls on the handler. The seed's `priority: high`
+is left unchanged because the remaining scope below is what Phase 184 must still decide, not
+because the 500 is still live.
+
+**What remains, DEFERRED to Phase 184:**
+
+- **The envelope-level design question this seed actually raises.** 182-11 answered it with a
+  verdict code because that is what the existing `{ok, verdicts}` envelope could carry honestly
+  today. The alternative shapes — a top-level `degraded: [category]` marker, or a third severity
+  alongside `error` / `incomplete` — are still open, and the right call depends on how the canvas
+  renders "we could not check right now" versus "this node is broken". That is a UX/API decision
+  for whoever owns the canvas's error surface (the seed's `needs_confirmation` #2).
+- **The `@model_validator` 422s that bypass the envelope entirely** before the handler is even
+  entered — **SEED-132**, untouched and unchanged.
+- **Any other unguarded read added to this handler later.** The seal covers the grounding stages
+  specifically; nothing structurally prevents a future stage from being added outside it.
+- **A contract test enforcing always-200 across the WHOLE handler**, rather than across the two
+  grounding stages only. `tests/unit/test_182_grounding_degradation.py` proves the sealed stages;
+  it does not prove the invariant for the handler as a unit.
+- **The live check** (the seed's "how we would know this is closed" #5): break the Supabase
+  connection with `visual_workflow_canvas` on and confirm a 200 with the degraded verdict plus a
+  logged underlying error. Not performed in 182-11 — the automated proof is failure injection, not
+  a live outage.
 
 ## The gap
 
@@ -49,15 +113,20 @@ input. Two of the four check categories are DB-backed, and most of their reads a
 
 ## Which reads are sealed and which are not
 
-| Read | Reached from | Fails closed? | Evidence |
-|---|---|---|---|
-| `grounding._skill_registry` | `assemble_grounding_bundle` | **Yes** | `grounding.py:148` — `except Exception: ... return []`, with CR-01's reasoning in-line: on a service-role client there is no safe fallback read |
-| `_resolve_caller_org_ids` | `assemble_grounding_bundle`, `fetch_visible_folders` | **No** (only against an empty result) | `folder_utils.py:27-50` — empty/missing membership degrades to an empty set (D-165-04 over-restrict), but the `aexec(...)` call is unguarded |
-| `fetch_visible_folders` (+ `fetch_all_folders`) | `assemble_grounding_bundle`, called FIRST at `workflows.py:410-413` | **No** | `folder_utils.py:119-129` — no try/except at any level; earliest 500 opportunity on the route |
-| `resolve_project_subtree` | `grounding_verdicts` -> `_folder_scope_violation` -> `assert_folder_scopes_subset` | **No** | `scope.py:79` — own DB reads, no exception guard |
+*(As originally planted. Superseded by plan 182-11 — see the section above; the post-182-11 state
+is in the right-hand column.)*
 
-So the seal already exists for exactly one read, with the right reasoning written next to it. It
-simply has not been extended to its siblings.
+| Read | Reached from | Fails closed? (at planting) | After plan 182-11 |
+|---|---|---|---|
+| `grounding._skill_registry` | `assemble_grounding_bundle` | **Yes** — `except Exception: ... return []` | The swallow is **removed**. It was the WR-01 defect, not the model: an invisible failure produced a healthy-looking empty registry. The read now raises and the caller records `degraded={"skills"}` |
+| `_resolve_caller_org_ids` | `assemble_grounding_bundle`, `fetch_visible_folders` | **No** (only against an empty result) | Helper unchanged; **both grounding call sites wrapped**, so a raise degrades the bundle on those paths |
+| `fetch_visible_folders` (+ `fetch_all_folders`) | `assemble_grounding_bundle`, called FIRST | **No** | Helper still raises by design; the grounding call site is **wrapped AND `strict=True`**, so a raise *or* a `max-rows` truncation degrades the bundle (WR-07) |
+| `resolve_project_subtree` | `grounding_verdicts` -> the ⊆ walk | **No** | Helper unchanged; the `/validate` call into `grounding_verdicts` is **inside the seal** |
+
+At planting, the seal existed for exactly one read, with the right reasoning written next to it —
+and it simply had not been extended to its siblings. Round 2 found the sharper version of that
+observation: the one "sealed" read was sealed in the WRONG PLACE (inside the bundle, invisible to
+both consumers), which is why extending the same pattern would have been the wrong fix.
 
 ## The related hazard worth fixing in the same pass
 
