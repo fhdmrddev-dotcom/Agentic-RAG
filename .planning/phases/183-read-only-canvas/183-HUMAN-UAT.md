@@ -1,14 +1,14 @@
 ---
-status: diagnosed
+status: partial
 phase: 183-read-only-canvas
-source: [183-VERIFICATION.md]
+source: [183-VERIFICATION.md, 183-09-PLAN.md, 183-VALIDATION.md]
 started: 2026-07-26T05:10:00Z
-updated: 2026-07-26T07:20:00Z
+updated: 2026-07-26T16:20:00Z
 ---
 
 ## Current Test
 
-[testing complete]
+[awaiting human testing — U-5 and U-6, the two rows added after `183-09` closed Gap 1]
 
 ## Precondition (do this first)
 
@@ -111,19 +111,48 @@ result: issue
 reported: "on Note if I open the side panel for any node there is no close button to that panel"
 severity: major
 
+### 7. U-5: The close control is FINDABLE on the Canvas view (added after 183-09)
+expected: |
+  Flag ON. Open a real draft, switch to [⬡ Canvas], click a step to open its detail panel.
+  Without being told where to look, close the panel. All three paths work:
+    - the ✕ in the panel header is visible and obvious at a glance
+    - Escape closes the panel
+    - clicking the empty canvas pane clears the selection
+  Nothing else changes: no step is added/removed/reordered, no save fires, no node moves.
+result: [pending]
+note: |
+  jsdom already proves the ✕ EXISTS (423/423 green). Only a live pass proves it is
+  FINDABLE — which was the operator's literal original complaint in Test 6.
+
+### 8. U-6: Same close control on the Spine view, with the flag OFF (added after 183-09)
+expected: |
+  Operator flips `visual_workflow_canvas` to Off and reloads. The [Spine]/[Canvas] toggle
+  is gone and no `.react-flow` subtree mounts (unchanged from U-4). Select a step in the
+  [≣ Spine] view: the panel now has a visible ✕ and Escape closes it.
+result: [pending]
+note: |
+  This row exists because the 183-09 GAP-1 fix is deliberately FLAG-INDEPENDENT — the
+  defect was pre-existing shared-`handleSelectNode` Spine debt the canvas merely inherited
+  and made easier to hit. This row is the check that the flag-OFF surface gained the close
+  control and NOTHING else (D-181-01 revert contract still holds: no nav entry, `"off"`
+  audience byte-identical, `require_canvas` 404 pre-auth).
+  KNOWN LIMITATION (WR-09-01, recorded debt): the Spine has no click-away — that path was
+  deliberately deferred on cost/G-5 grounds. ✕ and Escape are the two supported exits.
+
 ## Summary
 
-total: 6
+total: 8
 passed: 5
 issues: 1
-pending: 0
+pending: 2
 skipped: 0
 blocked: 0
 
 ## Gaps
 
 - truth: "After selecting a node, the opened side panel can be closed/dismissed by the user"
-  status: failed
+  status: closed-in-code-pending-live
+  closed_by: "183-09 (commits 3dc0671e RED, 4e997f03 GAP-1 fix) — required `onClose` prop + ✕ in the PhaseFormPanel header, Escape handler, canvas pane-click deselect; landed for BOTH Spine and Canvas because the defect was shared-`handleSelectNode` debt. Re-verified in code 8/8 by 183-VERIFICATION.md; live confirmation is U-5/U-6 above."
   reason: "User reported: on Note if I open the side panel for any node there is no close button to that panel"
   severity: major
   test: 6

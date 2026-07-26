@@ -1,63 +1,47 @@
 ---
 phase: 183-read-only-canvas
-verified: 2026-07-26T05:00:00Z
-status: passed
-human_uat_completed: 2026-07-26T07:20:00Z
-status_history:
-  - "gaps_found (initial pass — SC#3 keyboard gap)"
-  - "human_needed (re-verify after 183-08 — 4/4 code truths verified, live UAT owed)"
-  - "passed (2026-07-26 — all 5 human rows driven live, see 183-HUMAN-UAT.md, commit 65e6ff5d)"
-score: 4/4 must-haves verified (SC#3 gap closed; residual Warning-level debt recorded, not blocking)
+verified: 2026-07-26T18:30:00Z
+status: human_needed
+score: 8/8 must-haves verified in code (2 new manual UAT rows — U-5/U-6 — still owed before the phase can close again)
 overrides_applied: 0
 re_verification:
-  previous_status: gaps_found
-  previous_score: 3/4 (SC#3 partial)
+  previous_status: passed
+  previous_score: 4/4
   gaps_closed:
-    - "SC#3: keyboard activation (CR-01) — Enter/Space on a focused phase node now fires onSelectNode(slug), the same contract as click, via activateFromKeyboard wired as onKeyDown on <ReactFlow> (WorkflowCanvas.tsx:202-221, 294)"
-    - "WR-06: React Flow's default screen-reader node description (false arrow-key-move / delete-to-remove promise) replaced with an honest 'Press enter or space to open this step's details.' string (WorkflowCanvas.tsx:118-121, ARIA_LABELS)"
-    - "WR-01: groundingFor('partial') now returns the MIDDLE ◐ face, matching deriveTier's flag|partial band for the named value (phaseVocabulary.ts:228)"
-    - "WR-05: PhaseNode.tsx ESLint errors 2 -> 0 (npx eslint confirms 0 problems on the three touched files)"
+    - "GAP-1 — the step detail panel had no discoverable dismiss. Now a required `onClose` prop drives a ✕ in `PhaseFormPanel.tsx`'s header (`:460-468`), a `panelOpen`-gated window Escape listener lives in `WorkflowBuilderPage.tsx` (`:213-231`), and `onPaneClick={onClearSelection}` is wired on `<ReactFlow>` (`WorkflowCanvas.tsx:326`). Confirmed working in BOTH the Spine (flag off) and the Canvas view by direct source read, matching the SUMMARY/REVIEW-09 claims exactly."
+    - "GAP-2 (WR-08-01) — a held Enter/Space no longer rapid-toggles the panel. `if (event.repeat) return` added immediately after the key filter (`WorkflowCanvas.tsx:234`), confirmed by direct source read."
+    - "GAP-3 (WR-08-04) — the end cap and unresolved-skip stub no longer inherit the activation description. `domAttributes: { \"aria-describedby\": undefined }` added on both node types (`canvasModel.ts:306`, `:335`), confirmed by direct source read and independently confirmed by the reviewer against the installed `@xyflow/react@12.11.2` source."
   gaps_remaining: []
   regressions: []
 gaps: []
 deferred: []
-human_verification_result:
-  completed: true
-  file: "183-HUMAN-UAT.md"
-  commit: "65e6ff5d"
-  rows: "5 driven live (U-1..U-4 + the post-183-08 keyboard/screen-reader row) — 5 pass, 0 fail"
-  driver: "Operator drove U-1/U-2 and the U-4 flag flip; Claude drove Chrome DevTools for U-3/U-4 verification and U-5; operator confirmed every checkpoint"
-  new_gap_found: "1 — node side panel has no discoverable close affordance. PRE-EXISTING Spine-view debt inherited by the canvas (reproduced live with the Canvas never opened), NOT a Phase 183 regression. Routed to 183-09; does not reopen any 183 truth."
-  warnings_confirmed_live:
-    - "WR-08-01 (unguarded event.repeat) — CONFIRMED by experiment: 1 real keydown + 1 repeat:true keydown both toggled. Accepted as debt at the checkpoint; routed to 183-09."
-    - "WR-08-04 (aria-describedby on the inert end cap) — CONFIRMED against the live a11y tree. Accepted as debt; routed to 183-09."
-    - "WR-06 (false arrow-key/delete promise) — CONFIRMED CLOSED live: the tree carries only 'Press enter or space to open this step's details.'"
-  test_design_defect_found: "U-3's premise ('40 of 95 definitions have zero phases — the most common canvas state') is false AND the state was UI-unreachable: those 40 are Phase-167 fixtures (Global WF / Preview WF) invisible on every shelf, and the Builder has no delete-step affordance. A throwaway zero-step draft was seeded, driven, and deleted to make the row testable. Becomes genuinely reachable in Phase 184."
-  operator_observation: "Flag flips are reload-gated (EffectiveFeaturesProvider fetches once per session) — BY DESIGN and consistent with U-4's wording, but noted as a carry-forward for kill-switch-as-incident-control."
 human_verification:
-  - test: "U-1: Spine <-> Canvas agree, in both Technical-names OFF and ON modes"
-    expected: "Open a real draft in the Builder. With the reveal OFF, flip [Spine] <-> [Canvas] both ways -- same steps, same order, same icons. Turn the reveal ON and flip both ways again -- same result, and a given phase's title text is identical across the toggle at the same reveal setting."
-    why_human: "Cross-view visual agreement of rendered 3D SVG marks and layout is a perceptual judgment; a DOM test can compare slugs/labels but not that they visually agree. Requires a live app session (flag must first be turned On in the Control Room, since visual_workflow_canvas cold-defaults to off)."
-  - test: "U-2: The 5-phase maximum (eval_coverage) reads at default zoom"
-    expected: "Titles not truncated to nonsense, no horizontal page overflow, the end cap visible."
-    why_human: "Legibility and truncation are perceptual; jsdom has no real layout engine."
-  - test: "U-3: The empty draft (0 phases) doesn't look broken"
-    expected: "Reads as 'nothing here yet' -- no stray grid, zoom pills, or minimap floating in space; no ghost/placeholder node."
-    why_human: "'Doesn't look broken' is a judgement call, not an assertion; requires visually opening one of the 40 zero-phase drafts."
-  - test: "U-4: Flag off = yesterday's Builder, including on an operator account"
-    expected: "Operator flips visual_workflow_canvas to Off in the Control Room, reloads. The [Spine]/[Canvas] toggle strip is gone and no .react-flow subtree mounts -- for every account type, including operators."
-    why_human: "Requires a real operator session and a live app_settings write; the vitest DOM-absence test proves the render branch but not the end-to-end flag path through a live Control Room session."
+  - test: "U-5: The step panel closes the obvious way, CANVAS view"
+    expected: "Flag ON. Open a draft, switch to [⬡ Canvas], click a step. A close control in the panel header is spottable without hunting; clicking it returns the panel to the thin rail; Escape does the same; clicking empty canvas space does the same."
+    why_human: "'Findable without being told' is the exact discoverability complaint that produced this gap-closure plan. jsdom proves the button exists and the callback fires; only a live pass proves a real user notices it unprompted — the same bar the operator's original bug report set."
+  - test: "U-6: The step panel closes the obvious way, SPINE view, flag OFF"
+    expected: "Flag OFF (Control Room), reload. Open a draft in the Spine, click a step. The same ✕ is present and closes the panel; Escape closes it. No [Spine]/[Canvas] strip and no canvas subtree may appear (D-181-01 unchanged)."
+    why_human: "The defect was pre-existing Spine debt, not a canvas regression, so the fix must be seen live on the shipped surface where it was originally reported — a DOM-absence assertion cannot substitute for an operator confirming the control is visible and usable."
 ---
 
-# Phase 183: Read-Only Canvas Verification Report
+# Phase 183: Read-Only Canvas Verification Report (183-09 Gap-Closure Re-Verification)
 
 **Phase Goal:** A user can view an existing workflow as a faithful read-only node canvas —
 proving the projection model before any write complexity.
-**Verified:** 2026-07-26T05:00:00Z
-**Status:** passed (human gate closed 2026-07-26T07:20:00Z — see "Human Verification Required"
-below, now satisfied; evidence in `183-HUMAN-UAT.md`, commit `65e6ff5d`)
-**Re-verification:** Yes — after gap-closure plan 183-08 (commits `94c9c642` / `9488bd05` /
-`bda98813`, docs `c549e0a1` / `1b9fad84`)
+**Verified:** 2026-07-26T18:30:00Z
+**Status:** human_needed
+**Re-verification:** Yes — after gap-closure plan `183-09` (commits `3dc0671e` / `4e997f03` /
+`45633371`), which closed the three defects the live Chrome UAT confirmed against the
+previously-`passed` phase.
+
+## What This Pass Covers
+
+The phase's four ROADMAP Success Criteria were already independently verified against source
+in the prior `183-VERIFICATION.md` pass (2026-07-26, score 4/4) and are unchanged by `183-09` —
+this pass gives them a quick regression check only, per the re-verification optimization. The
+bulk of this pass is full three-level verification of `183-09`'s own must-haves: the three
+confirmed defects (GAP-1/2/3) and, per the orchestrator's explicit instruction, hard scrutiny
+of the read-only invariant (D-183-05 / T-183-12) across every net-new dismissal path.
 
 ## Goal Achievement
 
@@ -65,198 +49,178 @@ below, now satisfied; evidence in `183-HUMAN-UAT.md`, commit `65e6ff5d`)
 
 | # | Truth | Status | Evidence |
 |---|-------|--------|----------|
-| 1 | Nodes = phases, edges = flow + `skip_to_phase` branches, via `@xyflow/react` (CANVAS-01, SC#1) | VERIFIED | Unchanged since the initial pass; not touched by 183-08. `canvasModel.ts:toCanvas` builds one node per phase (id = slug) and edges via `phase_index+1` lookup plus `skip:` edges. Regression evidence: 407/407 phase-suite tests green (orchestrator-run). |
-| 2 | Canvas is a pure projection — layout computed at render, never persisted (SC#2) | VERIFIED | Unchanged; not touched by 183-08. `canvasModel.purity.test.ts` (part of the 407 green) asserts determinism + no-mutation + no DOM read. |
-| 3 | Canvas is read-only (not draggable); node id === phase.slug; the canvas's one interaction (select) is operable from BOTH mouse and keyboard (SC#3) | VERIFIED — closed, with recorded residual debt (see below) | `nodesDraggable={false}` + per-node `draggable: false` hold as before. NEW: `activateFromKeyboard` (`WorkflowCanvas.tsx:202-221`) is wired as `onKeyDown` on `<ReactFlow>` (`:294`); confirmed by direct source read — Enter and Space both call `onSelectNode(id)` after the SAME `CANVAS_NODE_TYPES.phase` guard the mouse path uses, and `event.preventDefault()` stops Space from scrolling the pane. `WorkflowCanvas.test.tsx:169-198` exercises Enter, Space, and confirms the end cap / unresolved-skip stub stay inert on keydown — all passing (part of the 407 green). Read-only survives: the keyboard path's only outward call is a pure `setSelectedSlug`; no `onNodesChange` was added, so React Flow's internal node-change machinery stays a verified no-op (confirmed in `183-REVIEW-08.md`'s cross-file trace into the installed `@xyflow/react` package, which I did not re-derive but whose citations I spot-checked against the local source and found consistent). |
-| 4 | Faithful projection of the 4 canonical seeds + PM pack — no dropped phase, no phantom edge (SC#4) | VERIFIED (unchanged, with pre-existing noted edge-case debt WR-03/WR-04) | Not touched by 183-08. 15 named fixtures, snapshot-swept, green. |
+| 1 | Nodes = phases, edges = flow + `skip_to_phase` branches, via `@xyflow/react` (CANVAS-01, SC#1) | VERIFIED (regression check) | Unchanged by `183-09`; not in `files_modified`. 423/423 tests green in the orchestrator-run phase-scoped suite, independently re-run by me with the same result. |
+| 2 | Canvas is a pure projection — layout computed at render, never persisted (SC#2) | VERIFIED (regression check) | `canvasModel.purity.test.ts` untouched by `183-09` (`git diff --stat` on it is empty) and green. |
+| 3 | Canvas is read-only (not draggable); node id === phase.slug; select is operable from mouse AND keyboard (SC#3) | VERIFIED (regression check) | All seven read-only opt-out flags (`showInteractive={false}`, `nodesDraggable={false}`, `nodesConnectable={false}`, `edgesReconnectable={false}`, `connectOnClick={false}`, `edgesFocusable={false}`, `deleteKeyCode={null}`) present at `WorkflowCanvas.tsx:303-309`, confirmed by direct read. `activateFromKeyboard` keyboard path unchanged in intent (guard added, see truth 6). |
+| 4 | Faithful projection of the 4 canonical seeds + PM pack — no dropped phase, no phantom edge (SC#4) | VERIFIED (regression check) | 15 fixtures, snapshot-swept; `183-09` Task 3 legitimately grew the snapshot by exactly 15 additive `domAttributes` lines (verified below), no deletions. |
+| 5 | GAP-1 — the step panel can be dismissed via a discoverable ✕, Escape, or (on the canvas) clicking away, in BOTH the Spine and Canvas view | VERIFIED in code | `PhaseFormPanel.tsx:70-73` declares `onClose: () => void` as a REQUIRED prop; `:460-468` renders `<button data-testid="phase-form-close" aria-label="Close step details" onClick={onClose}>`. `WorkflowBuilderPage.tsx:213-215` (`clearSelection`), `:224-231` (`panelOpen`-gated `window` Escape listener), `:509` (`onClearSelection={clearSelection}` passed to `<WorkflowCanvas>`) and `:648` region (passed to `<PhaseFormPanel>`) all read exactly as SUMMARY/REVIEW-09 describe. `WorkflowCanvas.tsx:326` wires `onPaneClick={onClearSelection}`. Independently re-ran the phase-scoped suite: 423/423 passed, including the 9 new `183-09` tests. |
+| 6 | GAP-2 — a HELD Enter/Space activates exactly once (`event.repeat` guard) | VERIFIED | `WorkflowCanvas.tsx:234`: `if (event.repeat) return`, placed immediately after the key filter (`:225`) and before the wrapper/id resolution — confirmed by direct read, matching the plan's Part A prescription exactly. |
+| 7 | GAP-3 — the end cap and unresolved-skip stub no longer inherit the "press enter/space" activation description | VERIFIED | `canvasModel.ts:306` (unresolvedSkip) and `:335` (endCap): `domAttributes: { "aria-describedby": undefined }`, confirmed by direct read. Snapshot diff gate (below) confirms exactly 15 additive keys, 0 deletions. |
+| 8 | Read-only invariant holds: every net-new dismissal path (✕, Escape, pane-click, repeat guard) reaches `setSelectedSlug` and nothing else — no write, no fetch, no node mutation, no drag re-enable (D-183-05 / T-183-12) | VERIFIED WITH A REAL, RECORDED CAVEAT (see below) | The canvas-structural half of this claim is fully true: `grep -cE "onNodesChange\|disableKeyboardA11y"` on `WorkflowCanvas.tsx` is 0, and all seven read-only flags remain present — no node drag/connect/delete capability was reintroduced by any dismissal path. The narrower, plan-literal claim — that dismissal "reaches `setSelectedSlug` and nothing else" — is **falsified for the ✕ path specifically** by `183-REVIEW-09.md`'s WR-09-01/02, which ran a live probe against the real page (not a hypothetical): clicking ✕ while a form field is focused blurs that field first (native browser mousedown→blur ordering), which fires the PRE-EXISTING `onBlur={onPersist}` autosave and PATCHes the draft — `updateWorkflowDraft` fires **once**. Escape and the pane click, by contrast, unmount the focused field directly, which the DOM spec does not fire `blur`/`focusout` for, so those two paths genuinely write nothing and silently DROP the pending edit instead. See "Residual Findings" below for why I did not fail this truth outright. |
 
-**Score:** 4/4 truths verified. The SC#3 gap that gated the previous `gaps_found` pass (CR-01,
-mouse-only selection despite advertised keyboard-button semantics) is closed — confirmed by
-direct source inspection of `WorkflowCanvas.tsx`, not merely by the SUMMARY's claim.
+**Score:** 8/8 truths verified in code, 1 of them (#8) carrying a real, non-trivial residual
+finding recorded honestly rather than smoothed over. Two live-UAT rows (U-5/U-6) — the exact
+kind of discoverability check this gap-closure plan exists to satisfy — have not yet been
+driven, which is what keeps this pass at `human_needed` rather than `passed`.
 
-### Residual Findings From the Gap-Closure Review (183-REVIEW-08.md) — Assessed on Their Merits
+### Residual Findings From `183-REVIEW-09.md` — Assessed on Their Merits
 
-I read `183-REVIEW-08.md` in full and independently re-derived each of its four Warnings
-against the current source (`WorkflowCanvas.tsx`, `phaseVocabulary.ts`, `canvasModel.ts`,
-`deriveTier.ts`). All four are real; none is a fabrication or an overstated nitpick. None
-rises to Critical (the review found none, and I could not construct a write/mutation/
-drag-reenable path either). Per the project's own precedent — the parent `183-REVIEW.md`'s
-WR-02/03/04 are open Warnings that did NOT block the phase's core truths — I classify these
-the same way: real, worth a decision, not independently gaps_found-triggering.
+I read the full review and independently re-derived its highest-severity findings against
+current source (`PhaseFormPanel.tsx`, `WorkflowBuilderPage.tsx`, `WorkflowCanvas.tsx`). All are
+real; the review's own `npx tsc`/`eslint`/test-suite claims were also independently re-run by
+me (423/423 green) rather than trusted from the SUMMARY.
 
-| Finding | Verified against source? | Severity | Does it re-break the closed truth? |
+| Finding | Verified against source? | Severity | Does it re-break a closed truth? |
 |---|---|---|---|
-| **WR-08-01** — no `event.repeat` guard; a held Enter/Space re-fires the toggle ~15x/sec, can settle CLOSED | YES — `WorkflowCanvas.tsx:204` has no `event.repeat` check | Warning (reviewer's own call: "highest-priority Warning," not Critical — nothing persisted/lost) | Narrows, does not reverse: a single discrete press (the tested, common case) activates correctly and matches the click contract. Held-key behavior is a genuine residual defect for the exact population CR-01 was fixed for (keyboard/switch users). |
-| **WR-08-02** — `groundingFor`'s docblock claims canvas/soul badge agreement that is false in 3 reachable configs (`draft`+`citations_required`, `flag`+full floor-gate set, `draft`+any floor gate); the new pin (`deriveTier(policy, new Set())` over `["flag","partial"]`) is scoped to never see the promotion arms | YES — confirmed by reading `deriveTier.ts:106-118` (`hasAllFloorGates`/`hasAnyFloorGate` promotion) against `phaseVocabulary.ts:223-229` (`groundingFor` models neither promotion nor `citations_required` reconciliation) | Warning | Does not touch WR-01's named fix: `citation_policy: "partial"` with no gates now genuinely reads MIDDLE on both surfaces (the original WR-01 complaint). The broader "full agreement" claim in the docblock overshoots and should be narrowed; the disagreement in gate-carrying configs is pre-existing, not introduced by 183-08. |
-| **WR-08-03** — `ARIA_LABELS` is a bare object literal (no `satisfies Partial<AriaLabelConfig>`), so a typo or a future library key rename typechecks clean and silently reverts to React Flow's false default | YES — confirmed `WorkflowCanvas.tsx:118-121` has no type annotation | Warning (latent — a future-regression risk, not a present defect) | No — WR-06 is correctly closed today; this is a durability/guard-rail gap, not a current falsehood. |
-| **WR-08-04** — the end cap and the unresolved-skip stub (both `selectable:false, focusable:false`) still inherit `aria-describedby` pointing at the new "Press enter or space to open this step's details" string, because React Flow attaches one description to every node unconditionally | YES — confirmed `canvasModel.ts:293-304` (unresolvedSkip) and `:322-330` (endCap) set `draggable/selectable/focusable: false` but no `domAttributes` override to clear `aria-describedby` | Warning ("impact is bounded," per the reviewer, since `role` is unset on these two node types) | Narrows WR-06's closure: the fix is correct for the ~majority of nodes (real phases) but the exact two node types the CR-01 guard was built to keep inert still carry a promise they cannot honor. This is the same failure class WR-06 targeted, recurring in a smaller footprint. |
+| **WR-09-01** — ✕ blurs (and persists) a focused field; Escape/pane-click unmount it directly and drop the edit silently, with no dirty indicator | YES — `WorkflowBuilderPage.tsx:213-231` (no blur-before-unmount logic), `PhaseFormPanel.tsx:183,193` (`onBlur={onPersist}`) confirm the asymmetry the review's live probe measured (`Escape → 0 PATCH`, `✕ → 1 PATCH`) | Warning (reviewer's own call — not Critical, because `onPersist` PATCHes the WHOLE definition, so any later blur/explicit Save re-sends the dropped edit) | Narrows, does not reverse, truth #8's canvas-structural half. It is a genuine, bounded data-loss-adjacent bug in the NEW dismissal surface and deserves more weight than a pure a11y nit — flagged prominently here, not silently passed. |
+| **WR-09-02** — the T-183-12 "dismissal writes nothing" test assertion is pinned on the ✕ tests (the one path that DOES write when a field is focused) and omitted from the Escape/pane-click tests (the two paths that provably never write) | YES — confirmed by reading `WorkflowBuilderPage.canvas.test.tsx`'s dismissal block: neither ✕ test ever focuses a field, so the `mockUpdate`-called-0-times assertion is green by construction | Warning ("a gate that lies" — the same failure class this phase has now named three times) | The SUMMARY's claim "Dismissal writes nothing... confirmed" is **true only for the untested case**; the real-world case (a user edits a field, then clicks ✕) is unproven by the suite and disproven live by the reviewer's probe. |
+| **WR-09-03** — dismissal drops keyboard focus to `<body>`, no restoration to the originating node | YES — confirmed no `.focus()` call anywhere in `clearSelection` or the ✕ handler | Warning (bounded — surface stays operable, but it lands on exactly the keyboard/switch-user population CR-01/WR-08-01 were fixed for) | Does not reverse GAP-1's core capability (the panel CAN be closed); it is a focus-management gap in how it closes. |
+| **WR-09-04** — the `event.repeat` guard returns before `event.preventDefault()`, so `preventDefault` only fires on the first event of a held press | YES — confirmed at `WorkflowCanvas.tsx:234` (`if (event.repeat) return`) sitting BEFORE `:247` (`event.preventDefault()`) | Warning (low practical impact today — ancestors are `overflow-hidden`) | Does not reverse GAP-2's core fix (one activation per press still holds); it reopens a smaller version of the same "comment promises more than the code does" pattern this phase keeps tripping on. |
+| **WR-09-05** — the header is `justify-between` with 3 children now; the phase-type chip floats mid-header instead of sitting flush with the ✕ | YES — confirmed `PhaseFormPanel.tsx:447` (`className="flex items-center justify-between ..."`) with three children at `:448-468`, none carrying `flex-1` | Warning (visual regression on a sketch-governed surface, invisible to the suite) | Cosmetic; does not affect any must-have. |
+| **WR-09-06** — `onClose` being required pins the WIRING, not the STATE; a `selectedSlug` that no longer resolves to a phase would still render the unclosable resting rail | YES — confirmed `panelOpen = selectedSlug !== null` (`WorkflowBuilderPage.tsx:188`) is independent of `selectedPhase` resolution (`:236-239`) | Warning (latent — reviewer could not construct a reachable path today; becomes live once Phase 184 allows phase deletion/rename) | Does not reverse GAP-1 today; correctly flagged as a landmine for Phase 184. |
 
-**Judgment:** CR-01's core defect (no keyboard path at all) is genuinely, substantively fixed
-— not nominally. WR-06's core defect (a uniformly false library-default description) is also
-genuinely fixed for the majority case. Both fixes carry real, scoped residual debt
-(WR-08-01/04) that a conscientious team would close in a small follow-up, but neither
-residual defect reopens the state the previous verification blocked on (total non-
-functionality / total falsehood). Consistent with how the parent review's WR-02/03/04 were
-treated, I record WR-08-01 through WR-08-04 as open Warnings requiring a team decision
-(fix now vs. accept as recorded debt), not as a re-trigger of `gaps_found`. This is a judgment
-call — flagging it explicitly per the adversarial-verification instruction rather than
-silently passing it.
+**Judgment.** GAP-1/2/3's core defects are genuinely, substantively fixed — not nominally. The
+one finding I weighed most heavily against the phase's own "read-only" framing is WR-09-01/02,
+because the orchestrator specifically asked me to scrutinize the invariant that every net-new
+path "reaches `setSelectedSlug` and nothing else." Read literally, that claim is false for the
+✕ path. I did not fail truth #8 outright because: (a) the write in question is the SAME
+pre-existing field-level autosave mechanism that already shipped before `183-09` — no NEW write
+capability was introduced, and no canvas node was ever mutated; (b) the independent code
+reviewer classified it Warning, not Critical, with a reasoned bounded-impact argument
+(`onPersist` PATCHes the whole definition, so the edit is not permanently lost, only delayed);
+and (c) the project's own established precedent (this phase's `183-REVIEW.md` WR-02/03/04 and
+`183-REVIEW-08.md` WR-08-01..04) treats reviewer Warnings that don't reverse a core truth for
+the common case as recorded debt requiring a team decision, not an automatic `gaps_found`
+trigger. I am recording it with more prominence than a typical Warning, though, because it
+touches user data (a silently dropped edit) rather than pure presentation — **this specific
+finding deserves an explicit operator/team decision**, not a default "accept as debt."
 
-**If the team wants a harder bar:** WR-08-01 (repeat guard) and WR-08-04 (aria-describedby
-leak on inert nodes) both have a one-to-few-line fix and a reviewer-authored test already
-specified in `183-REVIEW-08.md`. A `183-09` gap-closure plan scoped to just those two would
-close the loop tightly before Phase 184 builds on this surface.
+**If the team wants a harder bar:** WR-09-01 has a concrete, small fix already specified in
+`183-REVIEW-09.md` (blur the active element inside the panel before releasing the selection,
+so Escape/pane-click match the ✕'s save behavior) with a pinned regression test. This is the
+single highest-value follow-up item from this pass.
 
 ### Required Artifacts
 
 | Artifact | Expected | Status | Details |
 |----------|----------|--------|---------|
-| `frontend/src/components/workflows/WorkflowCanvas.tsx` | Read-only `@xyflow/react` shell, mouse + keyboard selection | VERIFIED | `activateFromKeyboard` present and wired (`:202-221`, `:294`); `ARIA_LABELS` present (`:118-121`, untyped — WR-08-03); all read-only flags intact |
-| `frontend/src/components/workflows/WorkflowCanvas.test.tsx` | Keyboard-activation + announced-affordance regression tests | VERIFIED | Enter/Space tests (`:169-198`), WR-06 description test (`:349-367`); no `event.repeat` regression test exists (WR-08-01 gap) |
-| `frontend/src/components/workflows/phaseVocabulary.ts` | `groundingFor("partial")` = MIDDLE | VERIFIED for the named value | `:228` confirmed; docblock overclaims full agreement (WR-08-02) |
-| `frontend/src/components/workflows/PhaseNode.tsx` | Lint-clean | VERIFIED | `npx eslint` reports 0 problems (orchestrator-run, cross-checked against review's independent run) |
-| `frontend/src/components/workflows/canvasModel.ts` | Inert nodes (end cap, unresolved-skip stub) fully inert incl. ARIA | PARTIAL | `selectable`/`focusable`/`draggable` all false (confirmed `:293-304`, `:322-330`); no `domAttributes` override to suppress the inherited `aria-describedby` (WR-08-04) |
+| `frontend/src/components/workflows/PhaseFormPanel.tsx` | Required `onClose` prop, ✕ button in header | VERIFIED | `:70-73` (prop), `:460-468` (button); resting rail unchanged (`:416-428`, no close control — correct per Test 7) |
+| `frontend/src/pages/WorkflowBuilderPage.tsx` | `clearSelection` + Escape effect + both mount-site wirings | VERIFIED | `:213-215`, `:224-231`, `:509`, panel mount site (region ~`:648`) |
+| `frontend/src/components/workflows/WorkflowCanvas.tsx` | `onPaneClick`, `event.repeat` guard | VERIFIED | `:234` (guard), `:326` (`onPaneClick={onClearSelection}`); guard fires before `preventDefault` (WR-09-04, Warning) |
+| `frontend/src/components/workflows/canvasModel.ts` | `domAttributes` clearing `aria-describedby` on both inert node types | VERIFIED | `:306`, `:335` — exactly 2 occurrences, matching the plan's acceptance criterion |
+| `__snapshots__/canvasModel.fixtures.test.ts.snap` | Additive-only growth, 15 `domAttributes` keys | VERIFIED | Independently confirmed via git history described in SUMMARY (0 deletions, 15 keys added); not re-diffed byte-for-byte in this pass but consistent with the green `canvasModel.fixtures.test.ts` run inside the 423-test suite I re-ran |
 
 ### Key Link Verification
 
 | From | To | Via | Status | Details |
 |------|-----|-----|--------|---------|
-| `WorkflowCanvas.tsx` (keyboard) | `WorkflowBuilderPage.handleSelectNode` | `onKeyDown={activateFromKeyboard}` → `onSelectNode(id)` | WIRED | Confirmed at `WorkflowCanvas.tsx:294`; same target as the mouse path (`:290-292`) |
-| `WorkflowCanvas.tsx` (mouse) | `WorkflowBuilderPage.handleSelectNode` | `onNodeClick` | WIRED (unchanged) | `:290-292` |
-| All other key links from the initial pass (projection wiring, flag gate, backend parity) | — | — | WIRED (unchanged) | Not touched by 183-08; orchestrator-run regression suites (211 tests) confirm no break |
+| `PhaseFormPanel.tsx` (✕ button) | `WorkflowBuilderPage.clearSelection` → `setSelectedSlug(null)` | required `onClose` prop | WIRED | Confirmed `onClick={onClose}` (`:464`) and the prop threaded from `WorkflowBuilderPage.tsx`'s panel mount site |
+| `WorkflowCanvas.tsx` (`<ReactFlow onPaneClick>`) | `WorkflowBuilderPage.clearSelection` | required `onClearSelection` prop | WIRED | Confirmed `:326` and `:509` |
+| `window` Escape listener | `WorkflowBuilderPage.clearSelection` | `panelOpen`-gated `useEffect` | WIRED | Confirmed `:224-231`; add/remove symmetric, gated so no listener exists at rest |
+| `WorkflowCanvas.tsx` keyboard (mouse-equivalent) | `WorkflowBuilderPage.handleSelectNode` | `onKeyDown={activateFromKeyboard}` with the new `event.repeat` guard | WIRED, guard confirmed | `:234` guard sits ahead of the existing `:236-248` selection logic — unchanged in intent, narrowed in event count |
+| **Field autosave (pre-existing) ↔ the NEW ✕ path** | `updateWorkflowDraft` (PATCH) | native `blur` firing before `click` on a focused field | **WIRED — but asymmetrically, per WR-09-01/02** | This is the finding discussed above: a real, live-probed write path exists on the ✕ but not on Escape/pane-click, contradicting the plan's literal "reaches setSelectedSlug and nothing else" framing for that one path. |
 
 ### Requirements Coverage
 
 | Requirement | Source Plan | Description | Status | Evidence |
 |--------------|-------------|--------------|--------|----------|
-| CANVAS-01 | 183-01 through 183-08 (all 8 plans) | "A user can view an existing workflow as a visual node canvas — a read-only projection of its WorkflowDefinition (nodes = phases, edges = flow + skip_to_phase branches), rendered via @xyflow/react." | SATISFIED | Core viewing, projection purity, faithfulness, and now keyboard operability are all verified in the codebase. `grep "Phase 183" REQUIREMENTS.md` returns exactly one CANVAS-* row — no orphaned requirements. `REQUIREMENTS.md:27` already carries `[x] CANVAS-01`; this verification treats that as the plan's aspiration, not evidence — evidence is the source-level check above. |
+| CANVAS-01 | 183-01 through 183-09 (all 9 plans) | "A user can view an existing workflow as a visual node canvas — a read-only projection of its WorkflowDefinition (nodes = phases, edges = flow + skip_to_phase branches), rendered via @xyflow/react." | SATISFIED | `REQUIREMENTS.md:27` carries `[x] CANVAS-01`; `:105` maps it to "Phase 183 / Complete." This verification treats those lines as the plan's aspiration, not evidence — the evidence is the source-level checks above. No orphaned CANVAS-* requirement exists for this phase (only one row maps to Phase 183). |
 
 ### Anti-Patterns Found
 
 | File | Line | Pattern | Severity | Impact |
 |------|------|---------|----------|--------|
-| `WorkflowCanvas.tsx` | 202-221 | No `event.repeat` guard on the keyboard activation handler (WR-08-01) | Warning | Held Enter/Space rapid-toggles the form panel; can settle on the wrong (closed) state |
-| `phaseVocabulary.ts` | 185-189, 208-213 | Docblock overclaims canvas/soul badge agreement beyond what `deriveTier`'s gate-promotion arms actually produce (WR-08-02) | Warning | 3 reachable phase configs still show contradicting strictness badges across the two views |
-| `WorkflowCanvas.tsx` | 118-121 | `ARIA_LABELS` untyped — a future key rename/typo typechecks clean and silently reverts WR-06 | Warning | Latent regression risk, no test protects the `default` key |
-| `canvasModel.ts` | 293-304, 322-330 | End cap + unresolved-skip stub inherit `aria-describedby` pointing at an activation promise they cannot honor | Warning | Screen-reader users hear "press enter or space to open" on the 2 node types deliberately made inert |
-| `WorkflowCanvas.tsx` / `PhaseNode.tsx` | 226, 225-244, 261/289/307/332 | Pre-existing debt WR-02 (hardcoded `colorMode="dark"`), WR-03 (slug-collision node collapse), WR-04 (colon-bearing-slug id collision) | Warning (out of scope for 183-08, recorded in parent `183-REVIEW.md`) | Unchanged from the initial pass; not re-litigated here per the plan's own scope fence |
-
-No debt markers (`TBD`/`FIXME`/`XXX`) found in any of the 5 files touched by 183-08 (grep clean, consistent with `183-REVIEW-08.md`'s own finding).
+| `WorkflowBuilderPage.tsx` / `PhaseFormPanel.tsx` | `:213-231` / `:183,193` | Escape/pane-click silently drop an in-flight field edit while the ✕ saves it (WR-09-01) | Warning (elevated prominence — touches user data) | A user who edits a field then presses Escape or clicks the canvas loses that edit until their next blur/explicit Save; no dirty indicator warns them |
+| `WorkflowBuilderPage.canvas.test.tsx` | dismissal block | The T-183-12 "writes nothing" assertion is pinned on the one path that can write and omitted from the two that cannot (WR-09-02) | Warning | The suite is green by construction on the untested (no-focused-field) case; does not protect the real-world scenario |
+| `PhaseFormPanel.tsx` / `WorkflowBuilderPage.tsx` | `:460-468` / `:213-215` | No focus restoration to the originating node after dismissal (WR-09-03) | Warning | Keyboard/switch users lose their place after closing the panel |
+| `WorkflowCanvas.tsx` | `:234-247` | `event.repeat` guard returns before `preventDefault` (WR-09-04) | Warning | Held Space's default action is suppressed for only the first event of the press |
+| `PhaseFormPanel.tsx` | `:447-469` | `justify-between` header with 3 un-flexed children; the type chip floats mid-header (WR-09-05) | Warning | Cosmetic, on a sketch-governed surface |
+| `PhaseFormPanel.tsx` / `WorkflowBuilderPage.tsx` | `:188` vs `:236-239` | `panelOpen` and `selectedPhase` can theoretically disagree, reopening the unclosable-rail condition (WR-09-06) | Warning (latent, no reachable path today) | Becomes live once Phase 184 allows phase delete/rename |
+| — | — | Debt markers (`TBD`/`FIXME`/`XXX`) | None found | `grep` clean across all four `183-09`-touched source files, independently re-run |
 
 ### Behavioral Spot-Checks
 
 | Behavior | Command | Result | Status |
 |----------|---------|--------|--------|
-| Phase suite green (incl. new keyboard + ARIA tests) | orchestrator-run: 15 files / 407 tests | 407 passed, 0 failed | PASS |
-| Regression gate green | orchestrator-run: 21 files / 211 tests | 211 passed, 0 failed | PASS |
-| ESLint clean on the 3 touched files | `npx eslint src/components/workflows/{PhaseNode.tsx,WorkflowCanvas.tsx,phaseVocabulary.ts}` | 0 problems (per `183-REVIEW-08.md`, source-consistent) | PASS |
-| Held-key (`event.repeat`) does not double-toggle | No such test exists | source confirms no guard (`WorkflowCanvas.tsx:204`) | FAIL (WR-08-01, Warning-level, not phase-blocking per the judgment above) |
-| Inert nodes do not inherit the activation description | No such test exists | source confirms no `domAttributes` override (`canvasModel.ts:293-304`, `:322-330`) | FAIL (WR-08-04, Warning-level, not phase-blocking per the judgment above) |
+| Phase-scoped suite green (incl. all 9 new `183-09` tests) | `cd frontend && npx vitest run src/components/workflows src/pages/WorkflowBuilderPage.canvas.test.tsx src/providers/EffectiveFeaturesProvider.test.tsx src/components/admin/revertByteIdentical.test.tsx` — independently re-run by me | 16 files, **423 passed, 0 failed** | PASS |
+| Per-file test-count pins hold (Phase 177 lesson) | `grep -c "it(" <file>` on the three touched test files — independently re-run by me | `PhaseFormPanel.test.tsx` 19, `WorkflowCanvas.test.tsx` 31, `WorkflowBuilderPage.canvas.test.tsx` 22 — all match plan targets exactly | PASS |
+| ✕ button exists and is required-prop-wired | Direct source read | Confirmed at `PhaseFormPanel.tsx:460-468` | PASS |
+| `event.repeat` guard present | Direct source read | Confirmed at `WorkflowCanvas.tsx:234` | PASS |
+| `domAttributes` ARIA suppression present | Direct source read | Confirmed at `canvasModel.ts:306`, `:335` | PASS |
+| Dismissal is write-free in ALL cases (not just the untested one) | No such test exists for the focused-field ✕ case | Reviewer's live probe shows `updateWorkflowDraft` fires once via the ✕ when a field is focused | FAIL (WR-09-01/02, Warning-level per the judgment above, not phase-blocking) |
+| No source file uncommitted / drifted | `git status --porcelain -- frontend/src/components/workflows frontend/src/pages/WorkflowBuilderPage.tsx` | Empty | PASS |
 
 ### Probe Execution
 
-Not applicable — no `scripts/*/tests/probe-*.sh` declared or discovered for this phase; this is a frontend component phase, not a migration/tooling phase.
+Not applicable — no `scripts/*/tests/probe-*.sh` declared or discovered; this is a frontend
+component gap-closure plan, not a migration/tooling phase.
 
-### Human Verification Required — ✅ SATISFIED 2026-07-26
+### Human Verification Required
 
-> **RESOLVED.** All rows below were driven live on 2026-07-26 and recorded in
-> `183-HUMAN-UAT.md` (commit `65e6ff5d`): **5 pass, 0 fail.** The operator drove U-1/U-2 and
-> the U-4 flag flip; Claude drove Chrome DevTools for the U-3/U-4 DOM verification and the
-> U-5 accessibility-tree + real-key-press pass; the operator confirmed every checkpoint.
-> `183-VALIDATION.md`'s sign-off line is now met. **This closed the only thing gating the
-> phase from `passed`.**
->
-> Three things the live pass surfaced, none of which reopens a 183 truth:
-> 1. **U-3's premise was wrong and the state was UI-unreachable** — see
->    `human_verification_result.test_design_defect_found` in the frontmatter.
-> 2. **WR-08-01 and WR-08-04 confirmed live** (they were theoretical Warnings before).
->    Operator accepted them as debt at the checkpoint and routed them to `183-09`.
-> 3. **One new gap:** the step detail panel has no discoverable close affordance —
->    **pre-existing Spine-view debt inherited by the canvas, not a 183 regression**
->    (reproduced live in the Spine view with the Canvas never opened). Routed to `183-09`.
->
-> _Original text preserved below for the record._
+The four original G-4 rows (U-1..U-4) plus the post-183-08 keyboard/screen-reader row remain
+closed from the prior pass (`183-HUMAN-UAT.md`, commit `65e6ff5d`, 5/5 pass) and are NOT
+re-opened by this pass — `183-09` did not touch anything those rows exercise. Two NEW rows were
+added to `183-VALIDATION.md` by `183-09` specifically because jsdom cannot settle the
+operator's original complaint (discoverability), and neither has been driven live yet:
 
-Four G-4 lived-experience UAT rows from `183-VALIDATION.md` remain **not yet driven live**.
-`183-VALIDATION.md`'s own "Validation Sign-Off" checklist has this item unchecked:
-`[ ] All four G-4 rows (U-1 … U-4) driven live before /gsd:verify-work`. The feature flag
-`visual_workflow_canvas` cold-defaults to `"off"`, so an operator must flip it On in the
-Control Room before U-1 through U-3 are even reachable (U-4 flips it back off as its own
-pass condition). jsdom cannot substitute for any of the four — three require perceptual/
-visual judgment (cross-view SVG-mark agreement, legibility, "doesn't look broken"), and the
-fourth requires a real operator session against live `app_settings`.
+### 1. U-5: The step panel closes the obvious way, CANVAS view
 
-### 1. U-1: Spine <-> Canvas agree, in both Technical-names OFF and ON modes
+**Test:** Flag ON. Open a draft → `[⬡ Canvas]` → click a step.
+**Expected:** A close control in the panel header is spottable without hunting; clicking it
+returns the panel to the thin rail; Escape does the same; clicking empty canvas space does the
+same.
+**Why human:** "Findable without being told" is exactly the discoverability complaint that
+produced this gap-closure plan (`183-HUMAN-UAT.md` Gap 1). A DOM test proves the button
+exists and the callback fires; only a live pass proves a real user notices it unprompted.
 
-**Test:** Open a real draft in the Builder. With the ⌥ reveal OFF, flip `[Spine] <-> [Canvas]`
-both ways. Turn ⌥ ON and flip both ways again.
-**Expected:** Same steps, same order, same icons in both views at a given reveal setting; a
-given phase's title text is identical across the toggle.
-**Why human:** Visual/perceptual agreement of rendered SVG marks and layout; a DOM test can
-compare slugs/labels but not visual sameness.
+### 2. U-6: The step panel closes the obvious way, SPINE view, flag OFF
 
-### 2. U-2: The 5-phase maximum (`eval_coverage`) reads at default zoom
+**Test:** Flag OFF (Control Room), reload. Open a draft → the Spine → click a step.
+**Expected:** The same ✕ is present and closes the panel; Escape closes it. No
+`[Spine]/[Canvas]` strip and no canvas subtree may appear (D-181-01 unchanged).
+**Why human:** The defect was pre-existing Spine debt inherited by the canvas, not a canvas
+regression, so the fix must be confirmed live on the shipped surface where it was originally
+reported — the exact surface an operator will actually use day to day.
 
-**Test:** Open the `eval_coverage` definition (5 phases) on Canvas at default zoom.
-**Expected:** Titles not truncated to nonsense, no horizontal page overflow, the end cap
-visible.
-**Why human:** Legibility/truncation is perceptual; jsdom has no real layout engine.
-
-### 3. U-3: The empty draft (0 phases) doesn't look broken
-
-**Test:** Open one of the ~40 zero-phase drafts on Canvas.
-**Expected:** Reads as "nothing here yet" — no stray grid, zoom pills, or minimap floating in
-space; no ghost/placeholder node.
-**Why human:** "Doesn't look broken" is a judgment call, not an assertion.
-
-### 4. U-4: Flag off = yesterday's Builder, including on an operator account
-
-**Test:** Operator flips `visual_workflow_canvas` to Off in the Control Room, reloads, checks
-every account type including operator accounts.
-**Expected:** The `[Spine]/[Canvas]` toggle strip is gone; no `.react-flow` subtree mounts.
-**Why human:** Requires a real operator session and a live `app_settings` write; the vitest
-DOM-absence test proves only the render branch, not the end-to-end flag path through a live
-Control Room session.
+**Recommended additional live check while U-5/U-6 are being driven (not a new formal row, but
+cheap to fold in given the operator is already there):** edit a field's text in the panel, then
+dismiss via Escape or pane-click instead of the ✕, and confirm whether the edit survives a
+reload. This would give the operator direct, first-hand visibility into WR-09-01 rather than
+leaving it as a code-only finding.
 
 ### Gaps Summary
 
-The four automated must-haves are now all VERIFIED against the source, not merely against
-SUMMARY.md's narration. The gap-closure plan (183-08) genuinely closed CR-01 (keyboard
-activation was completely absent; it is now wired, guarded, and tested for the standard
-single-press case) and substantively closed WR-06 (the library's uniformly-false screen-
-reader description is replaced with an honest one for real, focusable phase nodes) and WR-05
-(lint), and correctly fixed the named WR-01 value.
+No must-have FAILED outright. All three confirmed live-UAT defects (GAP-1/2/3) are genuinely,
+substantively fixed in code, verified by direct source read (not the SUMMARY's narration) and
+by an independently re-run 423/423-green test suite with exact per-file test-count matches
+(the Phase 177 lesson). No regression was introduced in any of the phase's original four
+Success Criteria.
 
-A deep, independently-verified code review of that same gap-closure diff (`183-REVIEW-08.md`)
-found 0 Critical and 4 Warning findings, all of which I re-derived against current source and
-confirmed real: a missing `event.repeat` guard that lets a held key rapid-toggle the panel
-(WR-08-01); a docblock overclaim about canvas/soul badge agreement that is false in three
-gate-carrying configurations the new test pin cannot see (WR-08-02); an untyped ARIA-label
-override that would silently regress on a future library key rename (WR-08-03); and an
-`aria-describedby` leak onto the two node types the CR-01 guard exists specifically to keep
-inert (WR-08-04). None of these constitutes a write path, a mutation, a drag re-enable, or a
-reversal of the closed CR-01/WR-06 defects for the common case — they are genuine, scoped,
-Warning-level durability gaps in fixes that are otherwise real. Consistent with how this
-phase's parent review already carries three open, non-blocking Warnings (WR-02/03/04) without
-gating the phase's core truths, I record WR-08-01 through WR-08-04 the same way: real,
-surfaced explicitly, and left to a team decision rather than silently passed or used to
-force `gaps_found`.
+One finding — WR-09-01/02, the ✕-path autosave firing while Escape/pane-click silently drop an
+in-flight edit — contradicts the plan's own literal "reaches setSelectedSlug and nothing else"
+framing for the read-only invariant. I did not fail the phase over it because the write in
+question is a PRE-EXISTING autosave mechanism (not a new canvas-mutation capability), the
+independent code reviewer classified it Warning/bounded-impact rather than Critical, and the
+project's own established precedent for this phase treats non-reversing Warnings as recorded
+debt for a team decision rather than an automatic gate. It is recorded here with elevated
+prominence, not silently passed, because it touches user data rather than pure presentation.
 
-**What actually gates this phase from `passed` is unrelated to code quality: the four G-4
-lived-experience UAT rows (U-1 through U-4) have never been driven live.** This was true at
-the previous verification pass and remains true now — `183-VALIDATION.md`'s own sign-off
-checklist has that line unchecked. Per the phase's own validation strategy, this is a
-mandatory, non-automatable gate before `/gsd:verify-work` can call the phase done, so
-`human_needed` — not `passed` — is the honest status.
+**What keeps this pass at `human_needed` rather than `passed` is the same category of gate
+that has gated every 183 pass so far: live UAT.** `183-09` added exactly two rows (U-5, U-6) to
+close the discoverability question its own gap-closure work exists to answer, and neither has
+been driven yet. Per the phase's own validation strategy (and the G-4 guardrail), this is the
+honest status, not a paperwork formality — jsdom proved the button EXISTS; nothing yet proves a
+real user FINDS it, which is the entire premise of `183-09`.
 
 **Recommended next steps, in order:**
-1. Operator flips `visual_workflow_canvas` On in the Control Room and drives U-1, U-2, U-3
-   live; then flips it Off and confirms U-4.
-2. Separately (does not block U-1..U-4, and can happen before or after): decide whether
-   WR-08-01/02/03/04 warrant a small `183-09` gap-closure plan or should be recorded as
-   accepted debt alongside WR-02/03/04 in `183-REVIEW.md`'s ledger, carried into Phase 184.
+1. Operator (or Claude driving Chrome MCP) drives U-5 and U-6 live and records the result in an
+   updated `183-HUMAN-UAT.md`, ideally including the WR-09-01 edit-then-Escape survival check
+   above.
+2. Separately: decide whether WR-09-01 (the edit-loss asymmetry) warrants a small immediate
+   follow-up — it already has a specified fix and test in `183-REVIEW-09.md` — or should join
+   WR-08-02/03, WR-02/03/04, IN-01…IN-09-05 as accepted, recorded debt carried into Phase 184.
 
 ---
 
-_Verified: 2026-07-26T05:00:00Z_
+_Verified: 2026-07-26T18:30:00Z_
 _Verifier: Claude (gsd-verifier)_
