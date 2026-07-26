@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
-status: ready_to_plan
-last_updated: 2026-07-26T13:13:46.022Z
+status: planning
+last_updated: "2026-07-26T17:01:29.926Z"
 last_activity: 2026-07-26
 progress:
   total_phases: 18
@@ -11,7 +11,6 @@ progress:
   total_plans: 24
   completed_plans: 24
   percent: 17
-stopped_at: Phase 183 complete (9/9) — ready to discuss Phase 184
 ---
 
 # Project State
