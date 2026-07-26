@@ -286,7 +286,7 @@ Committed as gated phases (ship only if CORE lands clean and budget remains; v2.
 |-------|----------------|--------|-----------|
 | 181. Revert Foundation | 3/3 | Complete (awaiting verify) | 2026-07-24 |
 | 182. Server Validation Seam | 12/12 | Complete (SC#3 accepted risk — SEED-134) | 2026-07-25 |
-| 183. Read-Only Canvas | 8/8 | **PASSED** — live UAT 5/5 green; `183-09` planned for 3 confirmed non-blocking defects | 2026-07-26 |
+| 183. Read-Only Canvas | 9/9 | **PASSED** — live UAT 5/5 green; `183-09` gap closure EXECUTED (3 live-confirmed defects closed) — re-verify pending | 2026-07-26 |
 | 184. Editable Canvas + Live Structural Validation | 0/? | Not started | - |
 | 185. Graded Governance — Grounding Mode + Action-Risk Dial | 0/? | Not started | - |
 | 186. Concurrency & Autosave | 0/? | Not started | - |
