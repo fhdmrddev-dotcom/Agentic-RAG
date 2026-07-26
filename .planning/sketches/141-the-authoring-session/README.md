@@ -2,7 +2,7 @@
 sketch: 141
 name: the-authoring-session
 question: "Do 138 + 139 + 140 compose into a session a person can sit inside — empty draft → first step → a mistake → undo → autosave → publish?"
-winner: null
+winner: "B — Canvas toolbar + page header"
 tags: [phase-184, composition, consistency, undo-redo, zundo, autosave-honesty, saved-not-published, publish-handoff, empty-state, viewport, g2-sketch-gate]
 ---
 
@@ -73,7 +73,7 @@ These outlive the layout question, so they matter more than which variant wins.
 
 ## Grounding
 
-Node visuals are the locked 137-D language via `themes/canvas-184.css`; icons from
+Node visuals are the locked canvas language via `themes/canvas-184.css`; icons from
 `themes/phase-icons-3d.js`. The undo stack is `zundo`'s shape — snapshots of the definition slice, which
 is why a cosmetic-only change has to be tagged or it becomes indistinguishable from a structural one. The
 seed workflow is the real `risk-register` starter. The verdicts that gate publish are the same
@@ -85,3 +85,23 @@ Driven in Chrome DevTools at 1440×900 and at the 900px constraint across all th
 first step → second step → delete → undo → redo, autosave dirty/saving/saved transitions, the history
 rail's undone marking and "now" pointer, the disabled publish with its named reason, C's terminal publish
 card, and the keyboard `⌘Z` / `⇧⌘Z` path. No console errors; inline JS passes `node --check`.
+
+
+## Decision (operator, 2026-07-26) — with one correction to what the sketch drew
+
+**B — canvas toolbar + page header.** Editing controls (undo/redo, save state) float on the canvas where
+editing happens; the way out lives where leaving happens.
+
+**Correction the build must apply:** the sketch rendered B's publish control as a *bottom bar*, which is
+the weaker reading of B. The intent is the **page header** — and the Builder already has one (the
+`← Workflows` breadcrumb). Put the workflow name, the `draft` chip and Publish there, so B reuses shipped
+chrome instead of adding a band.
+
+**Composition note (with 139-A).** 139-A's problems tray also lives at the bottom, so a naive build lands
+two bottom bands. Fold the tray's **summary line** into the bottom edge beside Publish
+("1 problem · 2 to finish") and let the tray expand upward from it — one region, two rows maximum.
+
+**One dependency resolved by 138.** The `· only the picture` history marker was conditional on 138
+allowing cosmetic moves. Under the chosen **C-local**, a nudge never reaches the server and never enters
+the definition — so it should **not** appear in the undo history at all. Every history entry stays
+structural, and undo can never silently revert something the person did not think they had changed.

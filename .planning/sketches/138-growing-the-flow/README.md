@@ -2,11 +2,16 @@
 sketch: 138
 name: growing-the-flow
 question: "How do you add, move and delete a step — and how much wiring freedom is right for a canvas the linear harness engine has to run?"
-winner: null
+winner: "C — Hybrid: spine + free nudge, in its C-local form (browser-persisted, ZERO migration)"
 tags: [phase-184, canvas-02, editing-model, insert-between, reorder, free-wire, workflow-layouts, migration-114, open-05, d-14, g2-sketch-gate]
 ---
 
 # Sketch 138: Growing the flow
+
+> **Winner: C — Hybrid spine + free nudge, in its "C-local" form** (operator, 2026-07-26).
+> Order stays the spine and cannot be rewired; the nudge is kept as a **per-user browser preference,
+> not a `workflow_layouts` row**. That is **A's data model + C's interaction + ZERO migration**.
+> **OPEN-05 resolves to: no migration in Phase 184. Slot 114 stays RESERVED, not spent.**
 
 ## Design Question
 
@@ -73,14 +78,14 @@ sketch makes visible:
 
 Both workflows are real, read from the local Supabase on 2026-07-25 (same corpus as sketch 137):
 `risk-register` (the PM-pack starter, the modal 2-step shape) and `eval_coverage` (the only 5-phase
-definition in the system, covering all five step types). Node visuals are the locked **137-D** language,
-via `themes/canvas-184.css` and the 3D marks in `themes/phase-icons-3d.js` — never text glyphs.
+definition in the system, covering all five step types). Node visuals are the locked canvas language via `themes/canvas-184.css` and the 3D marks in `themes/phase-icons-3d.js` — never text glyphs.
 
 Schema facts checked against the live DB: `workflow_definitions` has columns
 `id · slug · version · name · description · status · definition · created_by · is_system_global · org_id ·
 created_at · updated_at · skill_snapshots`. There is **no layout column**, and `WorkflowDefinition` is
-`extra="forbid"` at the Pydantic layer — so positions genuinely cannot ride along in the JSONB, and B/C
-are honestly costed at a new table rather than a free field.
+`extra="forbid"` at the Pydantic layer — so positions genuinely cannot ride along in the JSONB. B is
+therefore honestly costed at a new table rather than a free field; C, in the chosen C-local form, is
+costed at nothing at all (see the decision below).
 
 ## Competitor evidence (from the milestone-kickoff crawl, `.planning/research/deep-dive/`)
 
@@ -95,3 +100,31 @@ Driven in Chrome DevTools at 1440×900 across all three variants: insert-with-re
 re-stitch, reorder, free-node drag, drag-to-connect (including the two-outgoing-edges case), delete-with-
 severed-wires, auto-arrange, nudge + tidy, and the empty state. No console errors; inline JS passes
 `node --check`; no page overflow.
+
+
+## Decision (operator, 2026-07-26) — and why it is not quite C as sketched
+
+C was picked for forward flexibility. The advisory concern was that C-as-sketched pays a real price for
+a feature with near-zero present value: at the live scale (**2 steps modal, 5 max, across all 95
+definitions**) there is nothing a vertical nudge disambiguates, while the table costs a migration, a
+second store that can go stale against the definition, and — most importantly — it *manufactures* the
+exact case **Phase 186 / CONCUR-01** has to defend against ("a cosmetic drag never mints a version").
+Under a computed layout that requirement is true by construction; under a persisted one it becomes a
+live code path. It also raises an unanswered question on org-shared workflows: if one editor nudges,
+does the other see it?
+
+**Resolution — "C-local":** keep the interaction, move the storage. `dy` is a **view preference**, held
+per-user in the browser, never sent to the server.
+
+| | C as sketched | **C-local (chosen)** |
+|---|---|---|
+| Migration | 114 spent | **none** — 114 stays reserved |
+| Sync burden | a second store vs the definition | none |
+| Stale row on a deleted step | possible | not representable |
+| Shared-workflow question | unanswered | not raised |
+| CONCUR-01 | a code path to defend | true by construction |
+| Free placement later | table already there | **one migration, when earned** |
+
+**The written promotion trigger** (so the door is provably open, not just claimed): promote `dy` into
+`workflow_layouts` — nullable, cosmetic-only, keyed by `phase_slug`, slot 114 — when *either* a nudge
+must survive across devices, *or* a layout is deliberately shared between editors. Neither is true today.

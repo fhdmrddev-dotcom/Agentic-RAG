@@ -97,9 +97,9 @@
 
 <nav class="variant-nav">
   <span class="label">Sketch 138</span>
-  <button class="variant-tab active" data-v="a" type="button">A: Spine — insert between</button>
+  <button class="variant-tab" data-v="a" type="button">A: Spine — insert between</button>
   <button class="variant-tab" data-v="b" type="button">B: Free-wire canvas</button>
-  <button class="variant-tab" data-v="c" type="button">C: Hybrid — spine + free nudge</button>
+  <button class="variant-tab active" data-v="c" type="button">C: Hybrid — spine + free nudge <span class="star">★</span></button>
 </nav>
 
 <p class="lead" id="lead"></p>
@@ -240,13 +240,14 @@ var LEAD = {
      'position must now be <b>persisted</b> (a new <code>workflow_layouts</code> table, migration 114), and because you ' +
      'can draw a shape the linear engine cannot run, validity becomes something you are <i>told about afterwards</i> ' +
      'rather than something the canvas guarantees. Try deleting a middle step, or wiring two edges out of one node.',
-  c: '<b>C — Hybrid: spine + free nudge.</b> The order is still the spine — you cannot rewire it — but you may nudge a ' +
-     'card off the lane to make a long flow readable, and that nudge is remembered. Structure stays computed; only the ' +
-     '<i>cosmetic</i> offset is stored. Still costs the migration, but layout is never authoritative, so a lost layout ' +
-     'row degrades to "tidy" rather than to a broken picture.'
+  c: '<b>C — Hybrid: spine + free nudge. ★ CHOSEN (operator, 2026-07-26), in its “C-local” form.</b> The order is still ' +
+     'the spine — you cannot rewire it — but you may nudge a card off the lane to make a long flow readable, and that ' +
+     'nudge is remembered. Structure stays computed; the <i>cosmetic</i> offset is a <b>per-user browser preference, ' +
+     'not a table</b> — so this is A\'s data model with C\'s interaction and <b>no migration</b>. Migration 114 stays ' +
+     'reserved for the day free placement is actually earned.'
 };
 
-var variant = 'a';
+var variant = 'c';
 var wfKey = 'risk-register';
 var steps = [];
 var sel = -1;
@@ -462,7 +463,10 @@ function renderDef() {
           ? '<span class="k">"dy"</span>: <span class="n">' + y + '</span> }'
           : '<span class="k">"x"</span>: <span class="n">' + p.x + '</span>, <span class="k">"y"</span>: <span class="n">' + p.y + '</span> }');
     }).join(',\n');
-    body += '<h4 style="margin:16px 0 8px">workflow_layouts &nbsp;<span style="color:hsl(258 90% 78%)">— NET-NEW TABLE</span></h4>' +
+    body += (variant === 'c'
+        ? '<h4 style="margin:16px 0 8px">localStorage · canvasNudge:{draft_id} &nbsp;' +
+          '<span style="color:hsl(142 71% 62%)">— NOT a table</span></h4>'
+        : '<h4 style="margin:16px 0 8px">workflow_layouts &nbsp;<span style="color:hsl(258 90% 78%)">— NET-NEW TABLE</span></h4>') +
       '<p class="readout">[\n' + (rows || '  ') + '\n]</p>';
     if (variant === 'b') {
       var edges = wires.map(function (w) {
@@ -474,9 +478,16 @@ function renderDef() {
         '<code>phase_index</code> order, full stop. So a second edge out of one node is a picture of something that ' +
         'will not happen, and the canvas has to explain that <i>after</i> you drew it.</div>';
     } else {
-      body += '<div class="cost mig"><b>Cosmetic only.</b> <code>dy</code> never changes what runs. Losing the row ' +
-        'degrades to “tidy”, never to a wrong picture — but it is still a migration (slot 114) and a second thing ' +
-        'to keep in sync with the definition.</div>';
+      body += '<div class="cost free"><b>A view preference, not shared data</b> — “C-local”, operator decision ' +
+        '2026-07-26. <code>dy</code> never changes what runs, so it is kept per-user in the browser rather than in ' +
+        'Postgres: <b>zero migration</b>, nothing to keep in sync with the definition, no stale row pointing at a ' +
+        'deleted step, and no question about whether a colleague sees your nudge on an org-shared workflow.</div>' +
+        '<p class="note"><b>The door stays open.</b> Migration slot <b>114 is RESERVED, not spent</b> — nullable, ' +
+        'cosmetic-only, keyed by <code>phase_slug</code>. Promote the nudge into it on a real trigger: a nudge that ' +
+        'must survive across devices, or one that is deliberately shared. Until then it is not earned.</p>' +
+        '<p class="note">It also keeps Phase 186 honest by construction. CONCUR-01 says a cosmetic drag must never ' +
+        'mint a version or re-arm the gauntlet — nothing here ever reaches the server, so there is no code path that ' +
+        'could get it wrong.</p>';
     }
   }
   out.innerHTML = body;
@@ -491,8 +502,9 @@ function renderFoot() {
     bits.push('<span class="pill good">✓ No migration</span>');
     bits.push('<span class="pill">Order is the only structure</span>');
   } else if (variant === 'c') {
-    bits.push('<span class="pill net">＋ workflow_layouts (migration 114) — cosmetic offsets</span>');
+    bits.push('<span class="pill good">✓ No migration — the nudge is a browser-local view preference</span>');
     bits.push('<span class="pill good">✓ Order still computed</span>');
+    bits.push('<span class="pill">Migration 114 reserved, not spent</span>');
     bits.push('<button class="btn" id="tidy" type="button" style="padding:3px 10px;font-size:11px">Tidy up</button>');
   } else {
     var forks = 0, orphans = 0;

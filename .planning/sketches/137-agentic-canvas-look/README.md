@@ -2,15 +2,31 @@
 sketch: 137
 name: agentic-canvas-look
 question: "What should the canvas actually LOOK like — modern, 3D, alive and agentic, while staying calm and non-technical?"
-winner: "D"
+winner: "B"  # changed D -> B by operator 2026-07-26; see the note below
 tags: [phase-183, canvas-01, visual-direction, 3d-icons, icon-convention, energy-language, plain-language, connectors-preview, g2-sketch-gate]
 ---
 
 # Sketch 137: How the canvas should look
 
-> **Winner: D — Synthesis** (operator, 2026-07-25). B's floating 3D icon + frosted depth, C's left-aligned
-> readability, per-step-type colour reduced to a tint behind the icon so the strong colours stay free for run
-> status. This is the canvas visual language Phases 183–188 build on.
+> **Winner: B — Glass Depth** (operator, **2026-07-26** — changed from D).
+> The 3D mark floats above a narrower, centre-aligned frosted panel with its own contact shadow, and there is
+> **no per-step-type colour at all**. This is the canvas visual language Phases 183–188 build on.
+>
+> **Why the change is not a reversal of D's reasoning — it is the complete form of it.** D was chosen to
+> protect the colour budget Phase 188 needs for run status, by reducing type colour to a tint behind the
+> icon. B spends **none**: verified, variant B has no `data-type` colour rule anywhere. Phase 188 therefore
+> gets 100% of the budget rather than most of it.
+>
+> **What that costs, carried into Phase 184.** (1) Step type is now carried by the 3D mark **alone**, so the
+> two cross-cutting icon swaps below (`handshake`, `compass`) become **required before 184 builds**, not
+> optional. (2) The card's top edge belongs to the floating icon, so the Phase-184 editing chrome had to be
+> re-homed — per-node actions to the bottom edge, the verdict mark to the right, the step number inside the
+> card (`themes/canvas-184.css`, `body.card-b`; verified in Chrome). (3) Unexpected gain: B is **tighter**
+> than D — 248px cards + 66px connectors vs 300 + 96 — so a 5-step flow is ~250px narrower, which matters
+> once the 400px inspector shares the width.
+>
+> **D remains on file** as the documented alternative, and sketches 138–141 carry a live **Card** toggle so
+> the two stay comparable.
 
 ## Why this sketch exists
 

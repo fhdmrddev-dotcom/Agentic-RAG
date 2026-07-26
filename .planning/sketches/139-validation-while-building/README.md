@@ -2,7 +2,7 @@
 sketch: 139
 name: validation-while-building
 question: "How do server verdicts read on the canvas while the flow is half-built — so 'you cannot draw an invalid workflow' holds without punishing someone for not being finished?"
-winner: null
+winner: "A — Mark on the node + problems tray"
 tags: [phase-184, valid-02, valid-03, severity-split, incomplete-vs-error, problems-tray, prevent-at-source, grounding-unavailable, g2-sketch-gate]
 ---
 
@@ -90,3 +90,22 @@ Driven in Chrome DevTools at 1440×900 across 3 variants × 5 scenarios: mark re
 row-focus, the workflow-wide row that has no node to point at, inline card verdicts, C's disabled picker
 options and refused delete, the debounced "checking…" beat, and the degraded honesty block. No console
 errors; inline JS passes `node --check`.
+
+
+## Decision (operator, 2026-07-26)
+
+**A — mark on the node + problems tray.** Two reasons it is the right call beyond preference:
+
+1. **It is the only variant with a home for a workflow-wide verdict.** "The workflow still needs a
+   one-line description" (`business_requirement`) belongs to no node. B loses it from the canvas
+   entirely; C's backstop strip can only summarise it.
+2. **The tray's two-word count is what keeps `incomplete` from reading as failure** — *"1 problem ·
+   2 things to finish"* separates the severities in the resting state, before anything is opened.
+
+**C is folded in, not discarded.** Its finding stands and is recorded as a rule for the build: prevention
+covers anything decidable from the *shape* of the flow (do not offer a step that would strand the
+deliverable; refuse a delete that would orphan its successor), and everything else — an unavailable tool,
+an out-of-scope folder, a missing description — can only be **reported**. So the build is **A plus C's
+gate where the gate is cheap**, and the gate must never become the thing that stops someone building.
+
+B's inline-on-card treatment is the documented fallback if the tray proves too far from the step in use.

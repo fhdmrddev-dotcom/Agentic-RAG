@@ -581,6 +581,26 @@ G-2 sketch, BEFORE spec/discuss-phase. First sketch batch of **v3.6 Visual / No-
 |---|------|----------------|--------|------|
 | 137 | agentic-canvas-look | What should the canvas actually LOOK like — modern, 3D, alive and agentic, while staying calm and non-technical? | **D — Synthesis (B’s depth + C’s warmth, colour budget reserved)** ★ | phase-183, canvas-01, visual-direction, 3d-icons, icon-convention, energy-language, plain-language, connectors-preview, g2-sketch-gate |
 
+**⚠ 137's winner CHANGED D → B (operator, 2026-07-26).** The locked card is now **137-B — Glass Depth**:
+the 3D mark floats ABOVE a narrower centre-aligned frosted panel with its own contact shadow, and there
+is **no per-step-type colour anywhere** (verified — variant B has no `data-type` rule at all). This is
+not a reversal of D's reasoning but the complete form of it: D was chosen to protect the colour budget
+for Phase 188 run status, and B protects **all** of it rather than most. Three consequences carried
+forward:
+
+1. **Step type is now carried by the 3D mark ALONE**, which promotes the two pending cross-cutting icon
+   swaps from optional to **required before Phase 184 builds**: `llm_batch_agents`
+   `busts-in-silhouette` (luminance 34.5, ~4× dimmer than the other five — it disappears on Deep
+   Midnight) → `handshake` (182.6), and `llm_agent` `robot` → `compass` (157.4). Still one additive
+   `PHASE_GLYPHS` map swap across five shipped surfaces — a small dedicated task, never a side effect.
+2. **The card's top edge belongs to the floating icon**, so the Phase-184 editing chrome had to be
+   re-homed: per-node actions to the bottom edge, the verdict mark to the right edge, the step number
+   inside the card. Done in `themes/canvas-184.css` (`body.card-b`) and verified.
+3. **B is tighter than D** — 248px cards + 66px connectors vs 300 + 96, so the 5-step flow is ~250px
+   narrower. That headroom matters once the 400px inspector shares the width.
+
+Sketches 138–141 carry a live **Card** toggle so B and D remain comparable.
+
 **Session decision (2026-07-25) — the v3.6 canvas visual language is LOCKED.**
 
 **136-B + 137-D.** The canvas is a **horizontal left→right flow** of **frosted-glass step cards** with a **3D
@@ -678,10 +698,10 @@ tool chip in 140 is the real registry (`get_tools`, `openai_service.py`) as serv
 
 | # | Name | Design Question | Winner | Tags |
 |---|------|----------------|--------|------|
-| 138 | growing-the-flow | How do you add, move and delete a step — and how much wiring freedom is right for a canvas the linear harness engine has to run? | *pending* | phase-184, canvas-02, editing-model, insert-between, reorder, free-wire, workflow-layouts, migration-114, open-05, d-14, g2-sketch-gate |
-| 139 | validation-while-building | How do server verdicts read on the canvas while the flow is half-built — so "you cannot draw an invalid workflow" holds without punishing someone for not being finished? | *pending* | phase-184, valid-02, valid-03, severity-split, incomplete-vs-error, problems-tray, prevent-at-source, grounding-unavailable, g2-sketch-gate |
-| 140 | step-inspector-and-rails | How do you configure a selected step, and where does governance become visible as rails you can see but cannot wire around? | *pending* | phase-184, canvas-03, canvas-04, phaseformpanel, node-config, governance-rails, tool-whitelist, grounding-bundle, locked-gates, phase-185-graded, g2-sketch-gate |
-| 141 | the-authoring-session | Do 138 + 139 + 140 compose into a session a person can sit inside — empty draft → first step → a mistake → undo → autosave → publish? | *pending* | phase-184, composition, consistency, undo-redo, zundo, autosave-honesty, saved-not-published, publish-handoff, empty-state, viewport, g2-sketch-gate |
+| 138 | growing-the-flow | How do you add, move and delete a step — and how much wiring freedom is right for a canvas the linear harness engine has to run? | **C — Hybrid spine + free nudge, in its "C-local" form** ★ | phase-184, canvas-02, editing-model, insert-between, reorder, free-wire, workflow-layouts, migration-114, open-05, d-14, g2-sketch-gate |
+| 139 | validation-while-building | How do server verdicts read on the canvas while the flow is half-built — so "you cannot draw an invalid workflow" holds without punishing someone for not being finished? | **A — Mark + problems tray** ★ | phase-184, valid-02, valid-03, severity-split, incomplete-vs-error, problems-tray, prevent-at-source, grounding-unavailable, g2-sketch-gate |
+| 140 | step-inspector-and-rails | How do you configure a selected step, and where does governance become visible as rails you can see but cannot wire around? | **A — Extend the shipped 400px panel** ★ | phase-184, canvas-03, canvas-04, phaseformpanel, node-config, governance-rails, tool-whitelist, grounding-bundle, locked-gates, phase-185-graded, g2-sketch-gate |
+| 141 | the-authoring-session | Do 138 + 139 + 140 compose into a session a person can sit inside — empty draft → first step → a mistake → undo → autosave → publish? | **B — Canvas toolbar + page header** ★ | phase-184, composition, consistency, undo-redo, zundo, autosave-honesty, saved-not-published, publish-handoff, empty-state, viewport, g2-sketch-gate |
 
 **The load-bearing rule the batch is built around (all four sketches make it visible).** The shipped
 projection draws a sequential edge to the phase whose `phase_index` is **exactly +1, found by LOOKUP**
@@ -713,3 +733,62 @@ gauntlet) is chosen here but **mechanised by Phase 186 / CONCUR-01**; the two-ed
 out of scope and said so in-surface.
 
 **Feeds `/gsd:spec-phase 184` / `/gsd:discuss-phase 184`.**
+
+**Session decision (2026-07-26) — the Phase 184 authoring surface is LOCKED.**
+
+**137-B card · 138-C-local · 139-A · 140-A · 141-B.** Operator selections, with one advisory refinement
+accepted (138) and one build correction recorded (141).
+
+| # | Winner | The reason that decided it |
+|---|---|---|
+| 138 | **C-local** — spine + free nudge, browser-persisted | **OPEN-05 resolves to ZERO migration; slot 114 stays RESERVED, not spent.** Order is the spine and cannot be rewired; the nudge is a **per-user view preference**, never sent to the server. A's data model + C's interaction + no migration. |
+| 139 | **A** — mark on the node + problems tray | The **only** variant with a home for a workflow-wide verdict (`business_requirement` belongs to no node — B loses it from the canvas entirely), and its two-word count ("1 problem · 2 things to finish") is what stops `incomplete` reading as failure. |
+| 140 | **A** — extend the shipped `PhaseFormPanel` | Lowest net-new, and the only option that does not create a second form surface to keep in step with the Builder's. The canvas becomes a third way IN to one form. |
+| 141 | **B** — canvas toolbar + page header | Editing controls where editing happens, the way out where leaving happens. **Correction:** the sketch drew publish as a bottom bar; the intent is the **page header**, and the Builder already has one (the `← Workflows` breadcrumb) — reuse it rather than add a band. |
+
+**The 138 refinement, recorded because the reasoning generalises.** C was picked for forward flexibility.
+The advisory finding: at the live scale (**2 steps modal, 5 max, across all 95 definitions**) a vertical
+nudge disambiguates nothing, while a `workflow_layouts` row costs a migration, a second store that can go
+stale against the definition, an unanswered "does my colleague see my nudge?" on org-shared workflows,
+and — the decisive one — it **manufactures the exact case Phase 186 / CONCUR-01 must defend against**
+("a cosmetic drag never mints a version or re-arms the gauntlet"). Under a computed layout that
+requirement is true by construction; under a persisted one it becomes a live code path. **C-local keeps
+the interaction and moves the storage.** The door stays provably open via a written promotion trigger:
+promote `dy` into `workflow_layouts` (nullable, cosmetic-only, keyed by `phase_slug`, slot 114) when
+*either* a nudge must survive across devices *or* a layout is deliberately shared. Neither is true today.
+
+**139-C is folded in, not discarded.** Its finding is a build rule: prevention covers anything decidable
+from the *shape* of the flow (do not offer a step that would strand the deliverable; refuse a delete that
+would orphan its successor); an unavailable tool, an out-of-scope folder or a missing description can
+only be **reported**. So the build is **A plus C's gate where the gate is cheap** — and the gate must
+never become the thing that stops someone building.
+
+**Three composition risks the five picks create together** (no single sketch shows these):
+
+1. **Two bottom bands** — 139-A's tray and 141-B's bar. Fold the tray's summary line into the bar and
+   expand the tray upward from it: one region, two rows max.
+2. **Width budget** — a 400px panel beside 248px cards leaves ~2 steps visible at 900px. The shipped
+   panel already collapses to a 44px rail and to a bottom sheet under 768px; **keep both, do not rebuild**.
+3. **Four chrome regions** (header/publish · floating canvas bar · right panel · bottom tray). Fine at
+   1440, crowded below — name the composition in the spec so it cannot drift during build.
+
+**Four extensibility seams to write into the spec now** (the operator's explicit "do not stop here" ask):
+
+1. **A node-slots contract.** `PhaseNode` takes data-driven slots (icon · title · subtitle · badges ≤2 ·
+   status · verdict) so Phase 185 (grounding mode + action-risk), 188 (run state) and 189 (connectors)
+   add **data, not layout**. The neutral 137-B card has the room a coloured one would not.
+2. **The badge budget will be contested — settle it now.** 137 allows ≤2 word-badges on the face; 185
+   wants two more and 188 wants status. Rule: **the face keeps 2, everything else moves to selection or
+   the panel**, or 185 spends its first week fighting the card.
+3. **Connector nodes cost nothing extra under 137-B** — no new colour slot is needed, and the `e-mail` /
+   `ticket` / `electric-plug` / `link` marks are already extracted and luminance-verified in
+   `themes/phase-icons-3d.js`. The 189/190 door is genuinely open.
+4. **The validate seam is the extension point, not the canvas.** New governance ships as new verdict
+   codes in the owning module; the canvas renders whatever comes back, keyed by `verdict.phase`. That is
+   why VALID-03's "never a client guess" is a **flexibility** rule as much as a correctness one — future
+   rules need no canvas change at all.
+
+**Carried into the plan as a pre-req:** the two cross-cutting `PHASE_GLYPHS` swaps (`handshake`,
+`compass`) are now REQUIRED before 184 builds, because 137-B makes the icon the sole carrier of step type.
+
+**Feeds `/gsd:spec-phase 184` / `/gsd:discuss-phase 184`** — acceptance bar = these four winners as marked.

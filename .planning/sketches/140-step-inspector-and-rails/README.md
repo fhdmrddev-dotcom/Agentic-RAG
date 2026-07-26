@@ -2,7 +2,7 @@
 sketch: 140
 name: step-inspector-and-rails
 question: "How do you configure a selected step, and where does governance become visible as rails you can see but cannot wire around?"
-winner: null
+winner: "A — Extend the shipped 400px PhaseFormPanel"
 tags: [phase-184, canvas-03, canvas-04, phaseformpanel, node-config, governance-rails, tool-whitelist, grounding-bundle, locked-gates, phase-185-graded, g2-sketch-gate]
 ---
 
@@ -95,3 +95,22 @@ Driven in Chrome DevTools at 1440×900 across 3 variants × 3 steps: field condi
 toggling, the struck-through unregistered tool, locked vs optional gate removal, rails on/off, the dock's
 edge clamping, and inline title/prompt editing with blur-persist. No console errors; inline JS passes
 `node --check`.
+
+
+## Decision (operator, 2026-07-26)
+
+**A — extend the shipped 400px `PhaseFormPanel`.** The lowest-net-new option and the only one that does
+not create a second form surface to keep in step with the Builder's. The canvas becomes a third *way in*
+to one form, not a second form.
+
+Two things the build must preserve rather than rebuild, both already shipped:
+
+- the panel **collapses to a 44px resting rail** and becomes a **bottom sheet under 768px** — needed,
+  because a 400px panel beside 248px cards leaves room for roughly two steps at a 900px width;
+- `onClose` stays a **required** prop, so "a panel you cannot close" remains un-representable rather than
+  merely tested for.
+
+B's node-anchored dock is the documented fallback if the panel proves too far from the step in use; C's
+inline title edit is a possible later graft (rename is the single most common edit), but its full form —
+prompt on the card — measured 248px tall in the sketch and stopped being scannable, which is exactly what
+the card language was chosen to avoid.
