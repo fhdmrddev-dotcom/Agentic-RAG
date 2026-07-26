@@ -44,6 +44,7 @@ describe("PhaseFormPanel — 6 phase_type-conditioned forms (friendly labels)", 
         open
         onChange={noop}
         onPersist={noop}
+        onClose={noop}
       />,
     )
     expect(screen.getByLabelText(/^function/i)).toBeInTheDocument()
@@ -63,6 +64,7 @@ describe("PhaseFormPanel — 6 phase_type-conditioned forms (friendly labels)", 
         open
         onChange={noop}
         onPersist={noop}
+        onClose={noop}
       />,
     )
     expect(screen.getByLabelText(/^instructions/i)).toBeInTheDocument()
@@ -81,6 +83,7 @@ describe("PhaseFormPanel — 6 phase_type-conditioned forms (friendly labels)", 
         open
         onChange={noop}
         onPersist={noop}
+        onClose={noop}
       />,
     )
     expect(screen.getByLabelText(/^instructions/i)).toBeInTheDocument()
@@ -99,6 +102,7 @@ describe("PhaseFormPanel — 6 phase_type-conditioned forms (friendly labels)", 
         open
         onChange={noop}
         onPersist={noop}
+        onClose={noop}
       />,
     )
     const chips = screen.getByTestId("tools-chips")
@@ -116,6 +120,7 @@ describe("PhaseFormPanel — 6 phase_type-conditioned forms (friendly labels)", 
         open
         onChange={noop}
         onPersist={noop}
+        onClose={noop}
       />,
     )
     const maxParallel = screen.getByLabelText(/parallel workers/i) as HTMLInputElement
@@ -131,6 +136,7 @@ describe("PhaseFormPanel — 6 phase_type-conditioned forms (friendly labels)", 
         open
         onChange={noop}
         onPersist={noop}
+        onClose={noop}
       />,
     )
     expect(screen.getByLabelText(/^instructions/i)).toBeInTheDocument()
@@ -156,6 +162,7 @@ describe("PhaseFormPanel — 6 phase_type-conditioned forms (friendly labels)", 
         open
         onChange={noop}
         onPersist={noop}
+        onClose={noop}
       />,
     )
     expect(screen.getByLabelText(/^instructions/i)).toBeInTheDocument()
@@ -175,6 +182,7 @@ describe("PhaseFormPanel — 6 phase_type-conditioned forms (friendly labels)", 
         open
         onChange={noop}
         onPersist={noop}
+        onClose={noop}
       />,
     )
     // The "strict" caption is shown plainly (no enum jargon required to understand it).
@@ -188,6 +196,7 @@ describe("PhaseFormPanel — 6 phase_type-conditioned forms (friendly labels)", 
         open
         onChange={noop}
         onPersist={noop}
+        onClose={noop}
       />,
     )
     // The helper sentences are rendered as plain VISIBLE text (queryable via getByText),
@@ -215,7 +224,7 @@ describe("PhaseFormPanel — 6 phase_type-conditioned forms (friendly labels)", 
     ]
     for (const [config, helper] of cases) {
       const { unmount } = render(
-        <PhaseFormPanel phase={phaseOf(config)} open onChange={noop} onPersist={noop} />,
+        <PhaseFormPanel phase={phaseOf(config)} open onChange={noop} onPersist={noop} onClose={noop} />,
       )
       expect(screen.getByText(helper)).toBeInTheDocument()
       unmount()
@@ -230,7 +239,7 @@ describe("PhaseFormPanel — 6 phase_type-conditioned forms (friendly labels)", 
       if (pt === "programmatic") config.fn = "f"
       if (pt === "llm_agent" || pt === "llm_batch_agents") config.available_tools = []
       const { unmount } = render(
-        <PhaseFormPanel phase={phaseOf(config)} open onChange={noop} onPersist={noop} />,
+        <PhaseFormPanel phase={phaseOf(config)} open onChange={noop} onPersist={noop} onClose={noop} />,
       )
       expect(screen.queryByLabelText(/file check/i)).not.toBeInTheDocument()
       expect(screen.queryByLabelText(/sourcing strictness/i)).not.toBeInTheDocument()
@@ -247,6 +256,7 @@ describe("PhaseFormPanel — 6 phase_type-conditioned forms (friendly labels)", 
         folderNames={{ [uuid]: "Vendors — 2025 Assessments" }}
         onChange={noop}
         onPersist={noop}
+        onClose={noop}
       />,
     )
     const scope = screen.getByTestId("folder-scope-display")
@@ -268,6 +278,7 @@ describe("PhaseFormPanel — 6 phase_type-conditioned forms (friendly labels)", 
         skillNames={{ [skillId]: "Risk Scoring Rubric" }}
         onChange={noop}
         onPersist={noop}
+        onClose={noop}
       />,
     )
     expect(screen.getByTestId("skill-name").textContent).toContain("Risk Scoring Rubric")
@@ -284,6 +295,7 @@ describe("PhaseFormPanel — 6 phase_type-conditioned forms (friendly labels)", 
         open
         onChange={onChange}
         onPersist={onPersist}
+        onClose={noop}
       />,
     )
     const prompt = screen.getByLabelText(/^instructions/i)
@@ -301,6 +313,7 @@ describe("PhaseFormPanel — 6 phase_type-conditioned forms (friendly labels)", 
         open
         onChange={noop}
         onPersist={noop}
+        onClose={noop}
       />,
     )
     const root = container.firstElementChild as HTMLElement
@@ -316,6 +329,7 @@ describe("PhaseFormPanel — 6 phase_type-conditioned forms (friendly labels)", 
         open={false}
         onChange={noop}
         onPersist={noop}
+        onClose={noop}
       />,
     )
     expect(screen.getByTestId("phase-form-rail")).toBeInTheDocument()

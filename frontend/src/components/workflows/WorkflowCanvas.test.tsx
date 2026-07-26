@@ -52,7 +52,12 @@ beforeEach(() => {
 /** The canvas needs a sized parent or the plane measures to nothing. */
 function renderCanvas(
   phases: Parameters<typeof toCanvas>[0],
-  opts: { selectedSlug?: string | null; onSelectNode?: (slug: string) => void; provider?: boolean } = {},
+  opts: {
+    selectedSlug?: string | null
+    onSelectNode?: (slug: string) => void
+    onClearSelection?: () => void
+    provider?: boolean
+  } = {},
 ) {
   const ui = (
     <div style={{ width: 1200, height: 800 }}>
@@ -60,6 +65,7 @@ function renderCanvas(
         phases={phases}
         selectedSlug={opts.selectedSlug ?? null}
         onSelectNode={opts.onSelectNode ?? vi.fn()}
+        onClearSelection={opts.onClearSelection ?? vi.fn()}
       />
     </div>
   )

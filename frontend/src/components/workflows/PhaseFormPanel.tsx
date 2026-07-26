@@ -34,6 +34,12 @@
  *
  * A field edit calls `onChange(patch)`; a blur/save calls `onPersist()` (the page
  * wires it to `updateWorkflowDraft` PATCH after the first `createWorkflowDraft`).
+ *
+ * THE PANEL IS DISMISSED FROM ITS OWN HEADER, and `onClose` is REQUIRED so it can
+ * never mount unclosable. For one shipped revision the only exit was re-activating the
+ * same node — a move a user has no way to discover — so the panel could be entered and
+ * not left. Making the handler required puts that state outside the type system rather
+ * than outside the tests: the parent owns the selection, this header owns the ask.
  */
 import { useId } from "react"
 import type { PhaseSpecJSON } from "./phaseVocabulary"
@@ -61,6 +67,10 @@ export interface PhaseFormPanelProps {
   onChange: (patch: PhaseConfigPatch) => void
   /** A blur/save — the parent persists via PATCH (after the first create). */
   onPersist: () => void
+  /** Dismiss the panel; the parent owns the selection state. REQUIRED — not optional
+   *  — so "a panel the user cannot close" is not a representable state and a dropped
+   *  wiring is a typecheck error rather than a silent UX regression. */
+  onClose: () => void
 }
 
 const CITATION_POLICIES = ["strict", "flag", "partial", "draft"] as const
@@ -400,6 +410,7 @@ export function PhaseFormPanel({
   skillNames,
   onChange,
   onPersist,
+  onClose,
 }: PhaseFormPanelProps) {
   // RESTING rail — the parent grid collapses this column to 44px; show a thin hint.
   if (!open || !phase) {
@@ -443,6 +454,18 @@ export function PhaseFormPanel({
         >
           {friendlyType}
         </span>
+        {/* The discoverable exit — a normal flex child of the header, never an
+            absolutely-positioned overlay (the panel is a grid track). The glyph is
+            hidden from the a11y tree so the announcement is the label, not "✕". */}
+        <button
+          type="button"
+          data-testid="phase-form-close"
+          aria-label="Close step details"
+          onClick={onClose}
+          className="ml-1.5 inline-grid h-5 w-5 shrink-0 place-items-center rounded text-[11px] text-muted-foreground hover:bg-accent/40 hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+        >
+          <span aria-hidden="true">✕</span>
+        </button>
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">

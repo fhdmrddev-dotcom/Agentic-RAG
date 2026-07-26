@@ -206,6 +206,30 @@ export function WorkflowBuilderPage({ renderPublish, initial, initialDescribe, a
     setSelectedSlug((cur) => (cur === slug ? null : slug))
   }, [])
 
+  // The view-agnostic DISMISSAL half of that same contract: `handleSelectNode`
+  // anchors the panel, `clearSelection` releases it. Both live on the page because
+  // both views share ONE panel — a canvas-only close would leave the shipped Spine
+  // surface, where this defect was actually reported, still unable to be left.
+  const clearSelection = useCallback(() => {
+    setSelectedSlug(null)
+  }, [])
+
+  // Escape releases the panel, in BOTH views. GATED on `panelOpen`: no listener
+  // exists while the panel is closed, so this costs nothing at rest and cannot
+  // accumulate across renders. One accepted interaction, recorded rather than
+  // engineered around: if a modal sits above the Builder, Escape dismisses the modal
+  // AND releases the selection. That is harmless — deselection is non-destructive and
+  // persistence happens on field blur, not on selection — and it is preferable to a
+  // fragile is-a-modal-open probe.
+  useEffect(() => {
+    if (!panelOpen) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") clearSelection()
+    }
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [panelOpen, clearSelection])
+
   // The current working definition (drafted state only).
   const definition = state.phase === "drafted" ? state.definition : null
 
@@ -482,6 +506,7 @@ export function WorkflowBuilderPage({ renderPublish, initial, initialDescribe, a
           phases={state.definition.phases}
           selectedSlug={selectedSlug}
           onSelectNode={handleSelectNode}
+          onClearSelection={clearSelection}
         />
       </Suspense>
     ) : (
@@ -620,6 +645,7 @@ export function WorkflowBuilderPage({ renderPublish, initial, initialDescribe, a
           skillNames={skillNames}
           onChange={onPhaseChange}
           onPersist={onPersist}
+          onClose={clearSelection}
         />
       </div>
     </div>

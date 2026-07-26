@@ -147,9 +147,19 @@ const EDGE_STYLE: Record<string, CSSProperties> = {
 }
 
 /**
- * IDENTICAL to `PhaseSpineGraphProps` (`PhaseSpineGraph.tsx:55-61`) so the canvas is
- * a drop-in peer at the Builder's mount site and the page keeps owning the
- * toggle-off-on-reclick selection semantics.
+ * `phases` / `selectedSlug` / `onSelectNode` are shared VERBATIM with
+ * `PhaseSpineGraphProps` (`PhaseSpineGraph.tsx:55-61`), so the D-183-05 selection
+ * contract is genuinely one rule for both views and the page keeps owning the
+ * toggle-off-on-reclick semantics.
+ *
+ * `onClearSelection` is the ONE divergence, and it exists only here: React Flow
+ * exposes a distinct pane element, so "the user clicked empty space" is unambiguous
+ * and free. The Spine has no pane — a correct click-outside there would have to
+ * positively EXCLUDE every interactive child of its scroll list plus the page
+ * header's Save/Publish controls, which is ref + containment logic landing in a
+ * hot-file the next authoring phase is about to reopen. Deferred on cost and blast
+ * radius, NOT because it is impossible. The Spine's dismissal paths are therefore the
+ * shared header ✕ and Escape, both of which work identically in both views.
  */
 export interface WorkflowCanvasProps {
   phases: PhaseSpecJSON[]
@@ -157,9 +167,17 @@ export interface WorkflowCanvasProps {
   selectedSlug: string | null
   /** Selection only — NEVER reorders, NEVER moves a node. Fires the clicked slug. */
   onSelectNode: (slug: string) => void
+  /** Release the selection (a click on empty space). REQUIRED — the deselect half of
+   *  the same contract; a canvas that can only select is a panel with no way out. */
+  onClearSelection: () => void
 }
 
-export function WorkflowCanvas({ phases, selectedSlug, onSelectNode }: WorkflowCanvasProps) {
+export function WorkflowCanvas({
+  phases,
+  selectedSlug,
+  onSelectNode,
+  onClearSelection,
+}: WorkflowCanvasProps) {
   // The app-wide reveal, READ (never owned) here. Null outside a provider.
   const technicalNames = useTechnicalNamesOptional()
   const showTechnical = technicalNames?.showTechnical ?? false
@@ -290,6 +308,10 @@ export function WorkflowCanvas({ phases, selectedSlug, onSelectNode }: WorkflowC
           onNodeClick={(_, node) => {
             if (node.type === CANVAS_NODE_TYPES.phase) onSelectNode(node.id)
           }}
+          // …and the deselect half, read straight off the library's own pane element.
+          // A first-class prop on an already-interactive plane — not a DOM handler
+          // bolted onto a non-interactive element — so the a11y gate stays clean.
+          onPaneClick={onClearSelection}
           // …and the same contract from the keyboard (CR-01). One rule, two devices.
           onKeyDown={activateFromKeyboard}
           ariaLabelConfig={ARIA_LABELS}
