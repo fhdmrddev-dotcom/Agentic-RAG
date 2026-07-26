@@ -1,7 +1,12 @@
 ---
 phase: 183-read-only-canvas
 verified: 2026-07-26T05:00:00Z
-status: human_needed
+status: passed
+human_uat_completed: 2026-07-26T07:20:00Z
+status_history:
+  - "gaps_found (initial pass — SC#3 keyboard gap)"
+  - "human_needed (re-verify after 183-08 — 4/4 code truths verified, live UAT owed)"
+  - "passed (2026-07-26 — all 5 human rows driven live, see 183-HUMAN-UAT.md, commit 65e6ff5d)"
 score: 4/4 must-haves verified (SC#3 gap closed; residual Warning-level debt recorded, not blocking)
 overrides_applied: 0
 re_verification:
@@ -16,6 +21,19 @@ re_verification:
   regressions: []
 gaps: []
 deferred: []
+human_verification_result:
+  completed: true
+  file: "183-HUMAN-UAT.md"
+  commit: "65e6ff5d"
+  rows: "5 driven live (U-1..U-4 + the post-183-08 keyboard/screen-reader row) — 5 pass, 0 fail"
+  driver: "Operator drove U-1/U-2 and the U-4 flag flip; Claude drove Chrome DevTools for U-3/U-4 verification and U-5; operator confirmed every checkpoint"
+  new_gap_found: "1 — node side panel has no discoverable close affordance. PRE-EXISTING Spine-view debt inherited by the canvas (reproduced live with the Canvas never opened), NOT a Phase 183 regression. Routed to 183-09; does not reopen any 183 truth."
+  warnings_confirmed_live:
+    - "WR-08-01 (unguarded event.repeat) — CONFIRMED by experiment: 1 real keydown + 1 repeat:true keydown both toggled. Accepted as debt at the checkpoint; routed to 183-09."
+    - "WR-08-04 (aria-describedby on the inert end cap) — CONFIRMED against the live a11y tree. Accepted as debt; routed to 183-09."
+    - "WR-06 (false arrow-key/delete promise) — CONFIRMED CLOSED live: the tree carries only 'Press enter or space to open this step's details.'"
+  test_design_defect_found: "U-3's premise ('40 of 95 definitions have zero phases — the most common canvas state') is false AND the state was UI-unreachable: those 40 are Phase-167 fixtures (Global WF / Preview WF) invisible on every shelf, and the Builder has no delete-step affordance. A throwaway zero-step draft was seeded, driven, and deleted to make the row testable. Becomes genuinely reachable in Phase 184."
+  operator_observation: "Flag flips are reload-gated (EffectiveFeaturesProvider fetches once per session) — BY DESIGN and consistent with U-4's wording, but noted as a carry-forward for kill-switch-as-incident-control."
 human_verification:
   - test: "U-1: Spine <-> Canvas agree, in both Technical-names OFF and ON modes"
     expected: "Open a real draft in the Builder. With the reveal OFF, flip [Spine] <-> [Canvas] both ways -- same steps, same order, same icons. Turn the reveal ON and flip both ways again -- same result, and a given phase's title text is identical across the toggle at the same reveal setting."
@@ -36,7 +54,8 @@ human_verification:
 **Phase Goal:** A user can view an existing workflow as a faithful read-only node canvas —
 proving the projection model before any write complexity.
 **Verified:** 2026-07-26T05:00:00Z
-**Status:** human_needed
+**Status:** passed (human gate closed 2026-07-26T07:20:00Z — see "Human Verification Required"
+below, now satisfied; evidence in `183-HUMAN-UAT.md`, commit `65e6ff5d`)
 **Re-verification:** Yes — after gap-closure plan 183-08 (commits `94c9c642` / `9488bd05` /
 `bda98813`, docs `c549e0a1` / `1b9fad84`)
 
@@ -138,7 +157,25 @@ No debt markers (`TBD`/`FIXME`/`XXX`) found in any of the 5 files touched by 183
 
 Not applicable — no `scripts/*/tests/probe-*.sh` declared or discovered for this phase; this is a frontend component phase, not a migration/tooling phase.
 
-### Human Verification Required
+### Human Verification Required — ✅ SATISFIED 2026-07-26
+
+> **RESOLVED.** All rows below were driven live on 2026-07-26 and recorded in
+> `183-HUMAN-UAT.md` (commit `65e6ff5d`): **5 pass, 0 fail.** The operator drove U-1/U-2 and
+> the U-4 flag flip; Claude drove Chrome DevTools for the U-3/U-4 DOM verification and the
+> U-5 accessibility-tree + real-key-press pass; the operator confirmed every checkpoint.
+> `183-VALIDATION.md`'s sign-off line is now met. **This closed the only thing gating the
+> phase from `passed`.**
+>
+> Three things the live pass surfaced, none of which reopens a 183 truth:
+> 1. **U-3's premise was wrong and the state was UI-unreachable** — see
+>    `human_verification_result.test_design_defect_found` in the frontmatter.
+> 2. **WR-08-01 and WR-08-04 confirmed live** (they were theoretical Warnings before).
+>    Operator accepted them as debt at the checkpoint and routed them to `183-09`.
+> 3. **One new gap:** the step detail panel has no discoverable close affordance —
+>    **pre-existing Spine-view debt inherited by the canvas, not a 183 regression**
+>    (reproduced live in the Spine view with the Canvas never opened). Routed to `183-09`.
+>
+> _Original text preserved below for the record._
 
 Four G-4 lived-experience UAT rows from `183-VALIDATION.md` remain **not yet driven live**.
 `183-VALIDATION.md`'s own "Validation Sign-Off" checklist has this item unchecked:

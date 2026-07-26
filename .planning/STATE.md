@@ -22,7 +22,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-20 — Phase 163 THE ATOMIC CRUX complete; membership RLS enforced)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 183 — read-only-canvas
+**Current focus:** Phase 183 — read-only-canvas (**verified `passed` 2026-07-26**; `183-09` gap closure in progress, then Phase 184)
 
 ## Deferred Items
 
@@ -44,8 +44,38 @@ Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 op
 
 ## Current Position
 
-Phase: 183 (read-only-canvas) — RE-VERIFIED `human_needed`, AWAITING OPERATOR LIVE UAT
-Plan: 8 of 8 — all executed
+Phase: 183 (read-only-canvas) — **VERIFIED `passed` 2026-07-26** (live UAT 5/5 green)
+Plan: 8 of 8 executed + `183-09` gap-closure plan in progress
+
+**Live UAT closed the human gate (`65e6ff5d`, `183-HUMAN-UAT.md` — 5 pass / 0 fail).** All four
+G-4 rows U-1…U-4 plus the post-183-08 keyboard/screen-reader row were driven live; operator
+drove U-1/U-2 + the U-4 flag flip, Claude drove Chrome DevTools for the U-3/U-4 DOM checks and
+the U-5 accessibility-tree + real-key-press pass, operator confirmed each checkpoint.
+`183-VERIFICATION.md` flipped `human_needed` → `passed`.
+
+**Three findings the live pass produced — none reopens a 183 truth, ALL routed to `183-09`:**
+1. **NEW GAP — the step detail panel has no discoverable close.** Its only exit is
+   re-activating the SAME node (`WorkflowBuilderPage.tsx:206` toggle); zero buttons in the
+   panel subtree, Escape does nothing, `onPaneClick` is unwired. **Explicitly NOT a 183
+   regression** — reproduced live in the `[≣ Spine]` view with the Canvas never opened, so it
+   is pre-existing debt the canvas inherited via the shared `handleSelectNode`.
+2. **WR-08-01 CONFIRMED LIVE** (was theoretical): 1 real keydown + 1 `repeat:true` keydown
+   both toggled ⇒ no `event.repeat` guard ⇒ a held Enter/Space rapid-toggles the panel for
+   exactly the keyboard/switch users CR-01 was fixed for.
+3. **WR-08-04 CONFIRMED LIVE**: the inert `__canvas__end` cap (role=null, non-focusable) still
+   carries `aria-describedby` → "Press enter or space to open this step's details."
+   **WR-06 CONFIRMED CLOSED live** — no arrow-key/delete text anywhere in the a11y tree.
+
+**Two records to carry forward (not defects):**
+- **U-3 was testing an unreachable state.** Its premise "40 of 95 definitions have zero phases
+  — the most common canvas state" is FALSE: those 40 are Phase-167 fixtures (`Global WF` /
+  `Preview WF`) invisible on every shelf (Published fetches `scope:"mine"`, Starters is curated,
+  Drafts is drafts-only), and the Builder has no delete-step affordance. A throwaway zero-step
+  draft was seeded, driven, and deleted. **Becomes genuinely reachable in Phase 184** once
+  step deletion lands — re-point this row then.
+- **Flag propagation is reload-gated by design** (`EffectiveFeaturesProvider` fetches once per
+  session). Fine for a planned rollback; worth a decision if `visual_workflow_canvas` is ever
+  needed as an INCIDENT kill switch, since open tabs keep the canvas until they reload.
 
 **Re-verification 2026-07-26 (`096a9e58`): `gaps_found` → `human_needed`, 4/4 must-haves verified.** The SC#3 blocker is closed for real (verifier read `WorkflowCanvas.tsx` directly, did not trust the SUMMARY). **Nothing code-side blocks the phase; the only thing between 183 and `passed` is operator-driven live UAT** — the four G-4 rows **U-1…U-4** plus a real-screen-reader pass on the newly-added keyboard path, persisted as `183-HUMAN-UAT.md` (5 items, all pending). `visual_workflow_canvas` cold-defaults to `"off"` — flip it **On in the Control Room first**; U-4 flips it back. **New Warning-level debt from the scoped gap-closure review `183-REVIEW-08.md` (0 Critical / 4 Warning / 4 Info), independently re-derived by the verifier and NOT auto-folded:** **WR-08-01** no `event.repeat` guard — a held Enter rapid-toggles the panel and can settle CLOSED, contradicting the ARIA promise (the new test can't see it: synthetic `fireEvent.keyDown` never sets `repeat`); **WR-08-02** the grounding/tier agreement docblock overclaims — three gate-carrying configs still disagree and the new pin (`deriveTier(policy, new Set())`) is scoped to hide them, so WR-01's contradiction stays reachable; **WR-08-03** `ARIA_LABELS` is untyped so a library key rename silently reverts WR-06 with a green build; **WR-08-04** the end cap + unresolved-skip stub — the two nodes the CR-01 guard keeps inert — still announce "Press enter or space to open this step's details". **Operator decision owed:** fold these into a `183-09` gap plan, or accept as debt alongside WR-02/03/04 and carry into Phase 184. Orchestrator note: `state.advance-plan` bumped `completed_phases` 2→3 in `1b9fad84`, falsely marking 183 complete — reverted in `b6ae96f7`.
 
