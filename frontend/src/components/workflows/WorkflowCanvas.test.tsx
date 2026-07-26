@@ -195,6 +195,24 @@ describe("WorkflowCanvas — keyboard activation (CR-01, SC#3)", () => {
     fireEvent.keyDown(screen.getByTestId("canvas-unresolved-skip"), { key: "Enter" })
     expect(onSelectNode).not.toHaveBeenCalled()
   })
+
+  it("a HELD Enter activates exactly once — auto-repeat cannot rapid-toggle (WR-08-01)", () => {
+    // `repeat: true` is the entire point: synthetic events never set it implicitly,
+    // which is exactly why the shipped 183-08 keyboard tests could not see this defect.
+    // The consumer is a TOGGLE, so an unguarded repeat leaves the panel's terminal
+    // state decided by the parity of the repeat count.
+    const onSelectNode = vi.fn()
+    const { container } = renderCanvas(researchSummarize, { onSelectNode })
+    const node = container.querySelector('.react-flow__node[data-id="summarize"]')
+    expect(node).not.toBeNull()
+
+    fireEvent.keyDown(node!, { key: "Enter" })
+    fireEvent.keyDown(node!, { key: "Enter", repeat: true })
+    fireEvent.keyDown(node!, { key: "Enter", repeat: true })
+
+    expect(onSelectNode).toHaveBeenCalledTimes(1)
+    expect(onSelectNode).toHaveBeenCalledWith("summarize")
+  })
 })
 
 describe("WorkflowCanvas — one tab stop per node (Pattern 3 Option A)", () => {
@@ -363,6 +381,28 @@ describe("WorkflowCanvas — the announced affordance (WR-06)", () => {
       `.react-flow__node[aria-describedby="${desc!.id}"]`,
     )
     expect(described).not.toBeNull()
+  })
+
+  it("the two INERT nodes do not inherit the activation description (WR-08-04)", () => {
+    // The library points EVERY node at its single description element unconditionally
+    // on focusability. The end cap and the broken-reference stub are the two nodes the
+    // CR-01 guard keeps inert, so the promise is one they provably cannot honour.
+    const { container } = renderCanvas(unresolvableSkip)
+    const desc = container.querySelector('[id^="react-flow__node-desc"]')
+    expect(desc).not.toBeNull()
+
+    // POSITIVE CONTROL FIRST — a real phase node still carries the description, so a
+    // blanket suppression (or a mis-resolved selector) cannot make this vacuously green.
+    const phaseWrapper = container.querySelector('.react-flow__node[data-id="start"]')
+    expect(phaseWrapper).not.toBeNull()
+    expect(phaseWrapper!.getAttribute("aria-describedby")).toBe(desc!.id)
+
+    for (const testId of ["canvas-end-cap", "canvas-unresolved-skip"]) {
+      const wrapper = screen.getByTestId(testId).closest(".react-flow__node")
+      // A null `closest` must FAIL, never silently satisfy the negative assertion.
+      expect(wrapper).not.toBeNull()
+      expect(wrapper!.getAttribute("aria-describedby")).not.toBe(desc!.id)
+    }
   })
 })
 

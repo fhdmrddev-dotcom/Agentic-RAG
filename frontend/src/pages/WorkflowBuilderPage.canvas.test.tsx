@@ -28,6 +28,16 @@
  * WAITFOR IS MANDATORY ON THE CANVAS BRANCH — the component is `React.lazy`, so the
  * chunk resolves on a microtask after the click, and the jsdom `ResizeObserver` mock
  * fires its callback on a `setTimeout(…, 0)`.
+ *
+ * Phase 183-09 gap closure (GAP-1) added the dismissal block below. The scope fact
+ * that shapes it: the step detail panel had NO discoverable close, and that is NOT a
+ * Phase 183 regression — it was reproduced live in the `[≣ Spine]` view with the
+ * Canvas never opened. `handleSelectNode` + `PhaseFormPanel` are the shipped Spine
+ * pair; 183 wired the canvas to the SAME page-level callback and inherited the defect.
+ * The fix is therefore view-agnostic and flag-INDEPENDENT, so the block asserts every
+ * dismissal path in BOTH views, and runs its Spine half with `visual_workflow_canvas`
+ * OFF — on the shipped surface where the defect actually lives. Asserting in only one
+ * view is how this stayed invisible through eight plans of gates.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
@@ -273,6 +283,107 @@ describe("WorkflowBuilderPage canvas door — one selection contract (D-183-05)"
     await waitFor(() => expect(screen.getByTestId("spine-node-summarize")).toBeInTheDocument(), LAZY)
     // One `selectedSlug` for both views — the panel never re-anchors on a view swap.
     expect(screen.getByLabelText("Refine step: summarize")).toBeInTheDocument()
+  })
+})
+
+// ── DISMISSAL (GAP-1, BOTH VIEWS) ────────────────────────────────────────────────
+
+/**
+ * This block lives in the file named for the canvas but is deliberately about BOTH
+ * views, because the defect is in the SHARED page-level selection contract: the panel's
+ * open state has exactly one input (`selectedSlug !== null`) and its only exit was
+ * re-activating the same node. A ✕ that only works on the canvas would leave the
+ * shipped Spine surface — where the operator actually hit this — still broken.
+ */
+describe("WorkflowBuilderPage — the step panel can be dismissed (GAP-1, both views)", () => {
+  const on = { features: { visual_workflow_canvas: true }, loading: false }
+  const off = { features: {}, loading: false }
+
+  /** Canvas view, panel OPEN on `research`. */
+  async function openOnCanvas() {
+    await screen.findByTestId("builder-view-toggle")
+    fireEvent.click(screen.getByTestId("builder-view-canvas"))
+    await waitFor(() => expect(screen.getByTestId("canvas-node-research")).toBeInTheDocument(), LAZY)
+    fireEvent.click(screen.getByTestId("canvas-node-research"))
+    await waitFor(
+      () => expect(screen.getByLabelText("Refine step: research")).toBeInTheDocument(),
+      LAZY,
+    )
+    expect(screen.queryByTestId("phase-form-rail")).toBeNull()
+  }
+
+  /** Spine view with the canvas flag OFF, panel OPEN on `research`. */
+  async function openOnSpine(container: HTMLElement) {
+    await waitFor(() => expect(screen.getByTestId("spine-node-research")).toBeInTheDocument())
+    // The flag-off half must be provably canvas-free — D-181-01 is untouched here.
+    expect(container.querySelector(".react-flow")).toBeNull()
+    fireEvent.click(screen.getByTestId("spine-node-research"))
+    await waitFor(() => expect(screen.getByLabelText("Refine step: research")).toBeInTheDocument())
+    expect(screen.queryByTestId("phase-form-rail")).toBeNull()
+  }
+
+  /** The panel is back at its resting rail. The DEFAULT wait budget on purpose: by the
+   *  time a dismissal is driven the tree is already mounted, so this is a synchronous
+   *  state update — borrowing LAZY's 10 s here would outlive the 5 s test timeout and
+   *  report a timeout instead of the DOM expectation that actually went unmet. */
+  async function expectDismissed() {
+    await waitFor(() => expect(screen.getByTestId("phase-form-rail")).toBeInTheDocument())
+    expect(screen.queryByLabelText("Refine step: research")).toBeNull()
+  }
+
+  it("the header ✕ closes the panel — CANVAS view", async () => {
+    renderBuilder(on)
+    await openOnCanvas()
+
+    fireEvent.click(screen.getByTestId("phase-form-close"))
+    await expectDismissed()
+
+    // T-183-12 — a dismissal must not mint a draft row or PATCH a version.
+    expect(mockCreate).toHaveBeenCalledTimes(0)
+    expect(mockUpdate).toHaveBeenCalledTimes(0)
+    expect(mockGenerate).toHaveBeenCalledTimes(0)
+  })
+
+  it("the header ✕ closes the panel — SPINE view with the canvas flag OFF", async () => {
+    // THE load-bearing test: it proves the fix lands on the pre-183 shipped surface
+    // where the defect lives, with no canvas mounted anywhere.
+    const { container } = renderBuilder(off)
+    await openOnSpine(container)
+
+    fireEvent.click(screen.getByTestId("phase-form-close"))
+    await expectDismissed()
+
+    expect(mockCreate).toHaveBeenCalledTimes(0)
+    expect(mockUpdate).toHaveBeenCalledTimes(0)
+    expect(mockGenerate).toHaveBeenCalledTimes(0)
+  })
+
+  it("Escape closes the panel — CANVAS view", async () => {
+    renderBuilder(on)
+    await openOnCanvas()
+
+    fireEvent.keyDown(window, { key: "Escape" })
+    await expectDismissed()
+  })
+
+  it("Escape closes the panel — SPINE view with the canvas flag OFF", async () => {
+    const { container } = renderBuilder(off)
+    await openOnSpine(container)
+
+    fireEvent.keyDown(window, { key: "Escape" })
+    await expectDismissed()
+  })
+
+  it("clicking the empty canvas pane clears the selection", async () => {
+    // `fireEvent`, never `user-event` — a real mousedown inside the plane reaches
+    // d3-zoom, whose d3-drag dereferences a null `event.view` under jsdom.
+    const { container } = renderBuilder(on)
+    await openOnCanvas()
+
+    const pane = container.querySelector(".react-flow__pane")
+    expect(pane).not.toBeNull()
+    fireEvent.click(pane!)
+    await expectDismissed()
   })
 })
 

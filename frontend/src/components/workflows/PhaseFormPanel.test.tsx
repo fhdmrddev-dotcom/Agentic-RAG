@@ -18,7 +18,7 @@
  *  - a field change calls onChange; a blur/save calls onPersist.
  */
 import { describe, it, expect, vi } from "vitest"
-import { render, screen } from "@testing-library/react"
+import { fireEvent, render, screen } from "@testing-library/react"
 // Read the component SOURCE via Vite's ?raw loader (typechecks under `vite/client`).
 import phaseFormPanelSource from "./PhaseFormPanel?raw"
 import { PhaseFormPanel } from "./PhaseFormPanel"
@@ -326,5 +326,54 @@ describe("PhaseFormPanel — 6 phase_type-conditioned forms (friendly labels)", 
     const src = phaseFormPanelSource
     expect(src).not.toMatch(/position:\s*(absolute|fixed)/)
     expect(src).not.toMatch(/fixed inset|absolute inset/)
+  })
+})
+
+/**
+ * Phase 183-09 (GAP-1). The panel shipped with NO discoverable close: its only exit was
+ * re-activating the same node, which a user has no way to know. The close handler is a
+ * REQUIRED prop so "a panel the user cannot dismiss" is not a representable state.
+ *
+ * NOTE for a future reader: during the RED window of 183-09 these two tests passed
+ * `onClose` to a component whose props did not declare it yet, so `tsc` reported a
+ * phase-file error until Task 2 landed the prop. That was expected and is not a defect
+ * to "fix" by deleting the prop.
+ */
+describe("PhaseFormPanel — dismissal (183-09 / GAP-1)", () => {
+  it("the open panel header carries exactly one announced close control", () => {
+    const onClose = vi.fn()
+    render(
+      <PhaseFormPanel
+        phase={phaseOf({ phase_type: "llm_single", prompt: "x" })}
+        open
+        onChange={noop}
+        onPersist={noop}
+        onClose={onClose}
+      />,
+    )
+    // Positive control: this render really IS the open branch, not the rail.
+    expect(screen.queryByTestId("phase-form-rail")).not.toBeInTheDocument()
+
+    const close = screen.getByTestId("phase-form-close")
+    expect(close.tagName).toBe("BUTTON")
+    expect(close.getAttribute("type")).toBe("button")
+    // Announced as a sentence — the glyph alone is not an accessible name.
+    expect(screen.getByRole("button", { name: /close/i })).toBe(close)
+
+    // `fireEvent` — one click driver across every suite this plan touches (the
+    // d3-drag landmine bans `user-event` inside the canvas plane, and a second driver
+    // here would invite it back by example).
+    fireEvent.click(close)
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it("the resting rail renders NO close control", () => {
+    // Expected to pass at RED — this is a guard against the fix over-reaching into the
+    // collapsed rail, not a GAP-1 reproduction.
+    render(
+      <PhaseFormPanel phase={null} open={false} onChange={noop} onPersist={noop} onClose={noop} />,
+    )
+    expect(screen.getByTestId("phase-form-rail")).toBeInTheDocument()
+    expect(screen.queryByTestId("phase-form-close")).not.toBeInTheDocument()
   })
 })
