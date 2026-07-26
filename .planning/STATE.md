@@ -2,7 +2,7 @@
 gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
-status: executing
+status: verifying
 last_updated: "2026-07-26T11:35:52.888Z"
 last_activity: 2026-07-26
 progress:
@@ -22,7 +22,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-20 — Phase 163 THE ATOMIC CRUX complete; membership RLS enforced)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 183 — read-only-canvas (**verified `passed` 2026-07-26**; `183-09` gap closure EXECUTED — re-verify, then Phase 184)
+**Current focus:** Phase 183 — read-only-canvas (`183-09` gap closure executed + re-verified **`human_needed`** — drive U-5/U-6 live via `/gsd:verify-work 183`, then Phase 184)
 
 ## Deferred Items
 
@@ -44,8 +44,24 @@ Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 op
 
 ## Current Position
 
-Phase: 183 (read-only-canvas) — **VERIFIED `passed` 2026-07-26** (live UAT 5/5 green); `183-09` gap closure EXECUTED 2026-07-26
+Phase: 183 (read-only-canvas) — `183-09` gap closure EXECUTED + re-verified 2026-07-26: **`human_needed`** (8/8 must-haves verified in code; 2 live rows outstanding)
 Plan: 9 of 9 executed — all three live-UAT defects closed
+
+**RE-VERIFICATION GATE (2026-07-26, post-`183-09`): `human_needed`, not `passed`.** All 8
+must-haves verified in code by direct source read; phase-scoped suite re-run independently at
+423/423 with the per-file count pins (19/31/22) intact — no coverage loss. Regression gate clean:
+the 9 repo-wide failing files return **identical** results (21 failed / 112 passed) at both the
+pre-`183-09` baseline and HEAD → pre-existing SEED-056 rot, not regressions. Schema drift none;
+codebase drift `warn` only. What blocks `passed` is **U-5 / U-6** in `183-HUMAN-UAT.md`: jsdom
+proves the ✕ EXISTS, but only a live pass proves it is **FINDABLE** — which was the operator's
+literal original complaint. Code review `183-REVIEW-09.md`: 0 Critical / 6 Warning / 5 Info; the
+reviewer confirmed all three defects closed by reading the installed `@xyflow/react@12.11.2`
+source rather than trusting the SUMMARY. **Open warning worth a decision before Phase 184 —
+WR-09-01:** Escape and pane-click silently drop a focused field's pending autosave while the ✕
+does not (no `blur` fires when a focused input is unmounted), an edit-loss asymmetry between the
+three dismissal paths. Bounded (a later save recovers it) but real. Its sibling WR-09-02: the
+"a dismissal must not PATCH a version" assertion sits on the ✕ tests — the one path that DOES
+write — while the Escape/pane-click tests carry no write assertion at all.
 
 **`183-09` gap closure SHIPPED (`3dc0671e` RED → `4e997f03` GAP-1 → `45633371` GAP-2/3).** All
 three defects the live UAT confirmed are paid down, TDD, on the still-read-only surface rather
