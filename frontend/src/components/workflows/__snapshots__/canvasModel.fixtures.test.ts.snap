@@ -147,6 +147,9 @@ exports[`toCanvas sweep — 'branching (synthetic skip_to_phase)' > matches its 
     },
     {
       "data": {},
+      "domAttributes": {
+        "aria-describedby": undefined,
+      },
       "draggable": false,
       "focusable": false,
       "id": "__canvas__end",
@@ -234,6 +237,9 @@ exports[`toCanvas sweep — 'compliance-gap-report (Starter Librar…' > matches
     },
     {
       "data": {},
+      "domAttributes": {
+        "aria-describedby": undefined,
+      },
       "draggable": false,
       "focusable": false,
       "id": "__canvas__end",
@@ -354,6 +360,9 @@ exports[`toCanvas sweep — 'doc_qa_human (canonical seed 4)' > matches its comm
     },
     {
       "data": {},
+      "domAttributes": {
+        "aria-describedby": undefined,
+      },
       "draggable": false,
       "focusable": false,
       "id": "__canvas__end",
@@ -547,6 +556,9 @@ exports[`toCanvas sweep — 'eval_coverage (the 5-phase maximum)' > matches its 
     },
     {
       "data": {},
+      "domAttributes": {
+        "aria-describedby": undefined,
+      },
       "draggable": false,
       "focusable": false,
       "id": "__canvas__end",
@@ -667,6 +679,9 @@ exports[`toCanvas sweep — 'literature_review (canonical seed 3)' > matches its
     },
     {
       "data": {},
+      "domAttributes": {
+        "aria-describedby": undefined,
+      },
       "draggable": false,
       "focusable": false,
       "id": "__canvas__end",
@@ -779,6 +794,9 @@ exports[`toCanvas sweep — 'non-contiguous phase_index [0,1,3]' > matches its c
     },
     {
       "data": {},
+      "domAttributes": {
+        "aria-describedby": undefined,
+      },
       "draggable": false,
       "focusable": false,
       "id": "__canvas__end",
@@ -899,6 +917,9 @@ exports[`toCanvas sweep — 'plan_execute_verify (canonical seed 2)' > matches i
     },
     {
       "data": {},
+      "domAttributes": {
+        "aria-describedby": undefined,
+      },
       "draggable": false,
       "focusable": false,
       "id": "__canvas__end",
@@ -986,6 +1007,9 @@ exports[`toCanvas sweep — 'pm-risk-register (PM pack 2)' > matches its committ
     },
     {
       "data": {},
+      "domAttributes": {
+        "aria-describedby": undefined,
+      },
       "draggable": false,
       "focusable": false,
       "id": "__canvas__end",
@@ -1073,6 +1097,9 @@ exports[`toCanvas sweep — 'pm-weekly-status-report (PM pack 1)' > matches its 
     },
     {
       "data": {},
+      "domAttributes": {
+        "aria-describedby": undefined,
+      },
       "draggable": false,
       "focusable": false,
       "id": "__canvas__end",
@@ -1160,6 +1187,9 @@ exports[`toCanvas sweep — 'research_summarize (canonical seed 1)' > matches it
     },
     {
       "data": {},
+      "domAttributes": {
+        "aria-describedby": undefined,
+      },
       "draggable": false,
       "focusable": false,
       "id": "__canvas__end",
@@ -1247,6 +1277,9 @@ exports[`toCanvas sweep — 'risk-register (Starter Library 1)' > matches its co
     },
     {
       "data": {},
+      "domAttributes": {
+        "aria-describedby": undefined,
+      },
       "draggable": false,
       "focusable": false,
       "id": "__canvas__end",
@@ -1301,6 +1334,9 @@ exports[`toCanvas sweep — 'single phase (1 phase)' > matches its committed sna
     },
     {
       "data": {},
+      "domAttributes": {
+        "aria-describedby": undefined,
+      },
       "draggable": false,
       "focusable": false,
       "id": "__canvas__end",
@@ -1399,6 +1435,9 @@ exports[`toCanvas sweep — 'unresolvable skip (broken reference)' > matches its
         "declaredTarget": "nonexistent",
         "fromSlug": "check",
       },
+      "domAttributes": {
+        "aria-describedby": undefined,
+      },
       "draggable": false,
       "focusable": false,
       "id": "__canvas__unresolved:check:nonexistent",
@@ -1411,6 +1450,9 @@ exports[`toCanvas sweep — 'unresolvable skip (broken reference)' > matches its
     },
     {
       "data": {},
+      "domAttributes": {
+        "aria-describedby": undefined,
+      },
       "draggable": false,
       "focusable": false,
       "id": "__canvas__end",
@@ -1498,6 +1540,9 @@ exports[`toCanvas sweep — 'weekly-status-report (Starter Library…' > matches
     },
     {
       "data": {},
+      "domAttributes": {
+        "aria-describedby": undefined,
+      },
       "draggable": false,
       "focusable": false,
       "id": "__canvas__end",

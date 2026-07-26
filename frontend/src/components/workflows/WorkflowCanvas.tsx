@@ -210,7 +210,10 @@ export function WorkflowCanvas({
   )
 
   /**
-   * The keyboard half of D-183-05. The library's own per-node key handler neither
+   * The keyboard half of D-183-05 — the rule IS shared with the mouse, and the
+   * keyboard device additionally carries auto-repeat semantics the mouse does not,
+   * which the guard below normalises so both devices deliver one activation per
+   * intent. The library's own per-node key handler neither
    * stops propagation nor prevents the default on Enter/Space, so the event reaches
    * the plane wrapper; `.react-flow__node` carries `data-id`, which for a phase node
    * IS the slug. The id is checked against the memoized projection rather than
@@ -220,6 +223,15 @@ export function WorkflowCanvas({
   const activateFromKeyboard = useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {
       if (event.key !== "Enter" && event.key !== " ") return
+
+      // ONE PRESS IS ONE ACTIVATION. `keydown` auto-repeats while a key is held
+      // (Windows default ≈ 500 ms, then up to ~31 events/sec) and the consumer is a
+      // TOGGLE, so an unguarded repeat turns one intentional press into ~15 open/close
+      // flips whose terminal state is decided by the parity of the repeat count — the
+      // panel can settle CLOSED on a press that promised to open it. The mouse path is
+      // structurally immune (a held button produces one click), so this is the keyboard
+      // device's own repeat semantics being normalised, not a shared-rule bug.
+      if (event.repeat) return
 
       const wrapper = (event.target as HTMLElement).closest<HTMLElement>(".react-flow__node")
       const id = wrapper?.dataset.id

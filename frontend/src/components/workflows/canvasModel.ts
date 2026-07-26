@@ -301,6 +301,9 @@ export function toCanvas(phases: PhaseSpecJSON[]): CanvasProjection {
           draggable: false,
           selectable: false,
           focusable: false,
+          // …and not activatable, so it must not inherit the "press enter to open this
+          // step's details" description the library attaches to every node.
+          domAttributes: { "aria-describedby": undefined },
         })
       }
       pushEdge({
@@ -327,6 +330,9 @@ export function toCanvas(phases: PhaseSpecJSON[]): CanvasProjection {
     draggable: false,
     selectable: false,
     focusable: false,
+    // …and not activatable, so it must not inherit the "press enter to open this
+    // step's details" description the library attaches to every node.
+    domAttributes: { "aria-describedby": undefined },
   })
   pushEdge({
     id: `end:${terminal.slug}->${capId}`,
