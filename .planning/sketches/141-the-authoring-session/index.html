@@ -101,7 +101,7 @@
   }
 </style>
 </head>
-<body class="alive va showhist">
+<body class="alive card-b va showhist">
 
 <nav class="variant-nav">
   <span class="label">Sketch 141</span>
@@ -119,6 +119,11 @@
     <button type="button" data-start="two">Risk Register · 2 steps</button>
   </div>
   <div class="spacer"></div>
+  <span class="lbl">Card</span>
+  <div class="seg" id="cardseg">
+    <button type="button" data-card="b" class="on">137-B floating icon</button>
+    <button type="button" data-card="d">137-D left icon</button>
+  </div>
   <span class="lbl">Width</span>
   <div class="seg" id="vpseg">
     <button type="button" data-vp="wide" class="on">Desktop</button>
@@ -526,6 +531,7 @@ document.querySelector('.bar').addEventListener('click', function (e) {
   if (b.hasAttribute('data-start')) reset(b.getAttribute('data-start'));
   if (b.hasAttribute('data-vp')) document.body.classList.toggle('narrow', b.getAttribute('data-vp') === 'narrow');
   if (b.hasAttribute('data-hist')) document.body.classList.toggle('showhist', b.getAttribute('data-hist') === 'on');
+  if (b.hasAttribute('data-card')) document.body.classList.toggle('card-b', b.getAttribute('data-card') === 'b');
   if (b.hasAttribute('data-tech')) document.body.classList.toggle('tech', b.getAttribute('data-tech') === 'on');
   render();
 });

@@ -103,7 +103,7 @@
   body.vb .side { display: none !important; }
 </style>
 </head>
-<body class="alive va">
+<body class="alive card-b va">
 
 <nav class="variant-nav">
   <span class="label">Sketch 140</span>
@@ -118,6 +118,11 @@
   <span class="lbl">Selected step</span>
   <div class="seg" id="stepseg"></div>
   <div class="spacer"></div>
+  <span class="lbl">Card</span>
+  <div class="seg" id="cardseg">
+    <button type="button" data-card="b" class="on">137-B floating icon</button>
+    <button type="button" data-card="d">137-D left icon</button>
+  </div>
   <span class="lbl">Rails</span>
   <div class="seg" id="railseg">
     <button type="button" data-rail="on" class="on">Show governance</button>
@@ -497,6 +502,7 @@ document.querySelector('.bar').addEventListener('click', function (e) {
   b.classList.add('on');
   if (b.hasAttribute('data-step')) selIdx = parseInt(b.getAttribute('data-step'), 10);
   if (b.hasAttribute('data-rail')) document.body.classList.toggle('norails', b.getAttribute('data-rail') === 'off');
+  if (b.hasAttribute('data-card')) document.body.classList.toggle('card-b', b.getAttribute('data-card') === 'b');
   if (b.hasAttribute('data-tech')) document.body.classList.toggle('tech', b.getAttribute('data-tech') === 'on');
   render();
 });

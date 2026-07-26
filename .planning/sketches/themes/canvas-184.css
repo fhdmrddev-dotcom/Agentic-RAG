@@ -167,6 +167,46 @@ body.tech .techline { display: block; }
 }
 .endpin .dot { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid var(--color-text-dim); }
 
+/* ════════════════════════ CARD SHAPE — 137-D vs 137-B ═══════════════════
+   The operator moved the locked card from 137-D to 137-B on 2026-07-26. B was
+   only ever drawn READ-ONLY, so this block re-homes the Phase-184 editing
+   chrome onto B's shape rather than assuming it transfers. Toggle live in every
+   184 sketch via the `Card` control.
+
+   What B changes: the icon floats ABOVE a narrower, centre-aligned card, and
+   there is NO per-step-type colour anywhere — the colour budget Phase 188 needs
+   is preserved in full, which is a stronger version of the rule D was chosen for.
+   What that costs: step type is now carried by the 3D mark ALONE, and the top
+   edge of the card is occupied, so per-node actions cannot live there.
+   ───────────────────────────────────────────────────────────────────────── */
+body.card-b .node {
+  display: block; text-align: center; width: 248px;
+  padding: 34px 20px 20px; margin-left: 0; margin-top: 30px; border-radius: 22px;
+}
+body.card-b .node .icowrap {
+  left: 50%; top: -26px; transform: translateX(-50%); width: 62px; height: 62px;
+}
+body.card-b .node:hover .icowrap,
+body.card-b .node.sel .icowrap { transform: translateX(-50%); }
+/* B's neutral halo — deliberately the SAME for every step type. */
+body.card-b .node .icowrap::before {
+  inset: -4px; background: radial-gradient(circle, hsl(220 30% 100% / .16), transparent 66%);
+}
+body.card-b .node .icowrap::after { bottom: -6px; width: 42px; height: 9px; background: rgba(0,0,0,.55); }
+body.card-b .node .body { flex: none; }
+body.card-b .badges { justify-content: center; }
+body.card-b .sub { margin-top: 6px; }
+/* the step number moves inside — the top edge belongs to the floating icon now */
+body.card-b .stepn { top: 12px; left: 12px; right: auto; }
+/* per-node actions move to the BOTTOM edge; the top is taken. */
+body.card-b .acts { top: auto; bottom: -12px; left: 50%; transform: translateX(-50%); }
+/* the verdict mark moves off the icon's corner so the two never overlap */
+body.card-b .vmark { left: auto; right: -8px; top: 6px; }
+body.card-b .conn { width: 66px; }
+body.card-b .conn .line { width: 54px; }
+body.card-b .conn .tip { right: 6px; }
+body.card-b .endpin { margin-left: 10px; }
+
 /* ════════════════════════ EDITING CHROME (net-new, Phase 184) ═══════════ */
 
 /* the insert affordance that lives on a connector */

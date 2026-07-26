@@ -107,7 +107,7 @@
   .checking { opacity: .55; }
 </style>
 </head>
-<body class="alive va showsrv">
+<body class="alive card-b va showsrv">
 
 <nav class="variant-nav">
   <span class="label">Sketch 139</span>
@@ -122,6 +122,11 @@
   <span class="lbl">State of the draft</span>
   <div class="seg" id="scenseg"></div>
   <div class="spacer"></div>
+  <span class="lbl">Card</span>
+  <div class="seg" id="cardseg">
+    <button type="button" data-card="b" class="on">137-B floating icon</button>
+    <button type="button" data-card="d">137-D left icon</button>
+  </div>
   <div class="seg" id="techseg">
     <button type="button" data-tech="off" class="on">Plain language</button>
     <button type="button" data-tech="on">⌥ Technical names</button>
@@ -533,6 +538,7 @@ document.querySelector('.bar').addEventListener('click', function (e) {
   seg.querySelectorAll('button').forEach(function (x) { x.classList.remove('on'); });
   b.classList.add('on');
   if (b.hasAttribute('data-scen')) { scen = b.getAttribute('data-scen'); sel = null; fireValidate(''); }
+  if (b.hasAttribute('data-card')) document.body.classList.toggle('card-b', b.getAttribute('data-card') === 'b');
   if (b.hasAttribute('data-tech')) document.body.classList.toggle('tech', b.getAttribute('data-tech') === 'on');
   if (b.hasAttribute('data-srv')) document.body.classList.toggle('showsrv', b.getAttribute('data-srv') === 'on');
   render();

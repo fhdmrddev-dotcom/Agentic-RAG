@@ -93,7 +93,7 @@
   .ghost { opacity: .35; filter: grayscale(.5); }
 </style>
 </head>
-<body class="alive va showdef">
+<body class="alive card-b va showdef">
 
 <nav class="variant-nav">
   <span class="label">Sketch 138</span>
@@ -112,6 +112,11 @@
     <button type="button" data-wf="empty">Empty · 40 of 95 real ones</button>
   </div>
   <div class="spacer"></div>
+  <span class="lbl">Card</span>
+  <div class="seg" id="cardseg">
+    <button type="button" data-card="b" class="on">137-B floating icon</button>
+    <button type="button" data-card="d">137-D left icon</button>
+  </div>
   <span class="lbl">Motion</span>
   <div class="seg energy" id="feelseg">
     <button type="button" data-feel="calm">Calm</button>
@@ -558,6 +563,7 @@ document.querySelector('.bar').addEventListener('click', function (e) {
   b.classList.add('on');
   if (b.hasAttribute('data-wf')) { wfKey = b.getAttribute('data-wf'); load(); }
   if (b.hasAttribute('data-feel')) document.body.classList.toggle('alive', b.getAttribute('data-feel') === 'alive');
+  if (b.hasAttribute('data-card')) document.body.classList.toggle('card-b', b.getAttribute('data-card') === 'b');
   if (b.hasAttribute('data-tech')) document.body.classList.toggle('tech', b.getAttribute('data-tech') === 'on');
   if (b.hasAttribute('data-def')) document.body.classList.toggle('showdef', b.getAttribute('data-def') === 'on');
 });
