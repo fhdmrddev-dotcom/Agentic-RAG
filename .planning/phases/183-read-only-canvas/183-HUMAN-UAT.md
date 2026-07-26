@@ -1,14 +1,14 @@
 ---
-status: partial
+status: complete
 phase: 183-read-only-canvas
 source: [183-VERIFICATION.md, 183-09-PLAN.md, 183-VALIDATION.md]
 started: 2026-07-26T05:10:00Z
-updated: 2026-07-26T16:20:00Z
+updated: 2026-07-26T16:45:00Z
 ---
 
 ## Current Test
 
-[awaiting human testing — U-5 and U-6, the two rows added after `183-09` closed Gap 1]
+[testing complete]
 
 ## Precondition (do this first)
 
@@ -107,9 +107,11 @@ note: |
 
 ### 6. Node side panel can be dismissed (observed during U-2)
 expected: After selecting a node and opening its side panel, the user can close/dismiss the panel and return to the full canvas.
-result: issue
+result: resolved
+originally: issue
 reported: "on Note if I open the side panel for any node there is no close button to that panel"
 severity: major
+resolved_by: "183-09 (3dc0671e RED → 4e997f03 GAP-1 fix); live-confirmed 2026-07-26 by U-5 (Canvas, flag ON) and U-6 (Spine, flag OFF) below"
 
 ### 7. U-5: The close control is FINDABLE on the Canvas view (added after 183-09)
 expected: |
@@ -119,17 +121,31 @@ expected: |
     - Escape closes the panel
     - clicking the empty canvas pane clears the selection
   Nothing else changes: no step is added/removed/reordered, no save fires, no node moves.
-result: [pending]
+result: pass
+evidence: |
+  Driven live by the operator on the flag-ON Builder Canvas (`visual_workflow_canvas`
+  confirmed `audience: everyone` in `app_settings.feature_visibility` at test time;
+  frontend :5173 and backend :8000 both responding). All three dismissal paths worked —
+  the ✕, Escape, and click-away on the empty pane — and the operator confirmed the ✕ was
+  obvious at a glance rather than something to hunt for. That findability judgment is the
+  one thing jsdom could not establish, and it is the exact complaint Test 6 raised.
 note: |
-  jsdom already proves the ✕ EXISTS (423/423 green). Only a live pass proves it is
-  FINDABLE — which was the operator's literal original complaint in Test 6.
+  This row closes the live half of Gap 1. jsdom (423/423) already proved the ✕ EXISTS;
+  this proves it is FINDABLE.
 
 ### 8. U-6: Same close control on the Spine view, with the flag OFF (added after 183-09)
 expected: |
   Operator flips `visual_workflow_canvas` to Off and reloads. The [Spine]/[Canvas] toggle
   is gone and no `.react-flow` subtree mounts (unchanged from U-4). Select a step in the
   [≣ Spine] view: the panel now has a visible ✕ and Escape closes it.
-result: [pending]
+result: pass
+evidence: |
+  Driven live by the operator. Flag flipped to Off in the Control Room + page reloaded
+  (propagation is reload-gated by design — U-4's recorded note). Confirmed: the
+  [Spine]/[Canvas] toggle is gone and no canvas mounts, unchanged from U-4 — the D-181-01
+  revert contract still holds. Selecting a step in the [≣ Spine] view now yields a panel
+  with a visible ✕, and Escape closes it. The flag-OFF surface gained the close control
+  and nothing else.
 note: |
   This row exists because the 183-09 GAP-1 fix is deliberately FLAG-INDEPENDENT — the
   defect was pre-existing shared-`handleSelectNode` Spine debt the canvas merely inherited
@@ -142,16 +158,17 @@ note: |
 ## Summary
 
 total: 8
-passed: 5
-issues: 1
-pending: 2
+passed: 7
+issues: 0
+resolved: 1
+pending: 0
 skipped: 0
 blocked: 0
 
 ## Gaps
 
 - truth: "After selecting a node, the opened side panel can be closed/dismissed by the user"
-  status: closed-in-code-pending-live
+  status: resolved
   closed_by: "183-09 (commits 3dc0671e RED, 4e997f03 GAP-1 fix) — required `onClose` prop + ✕ in the PhaseFormPanel header, Escape handler, canvas pane-click deselect; landed for BOTH Spine and Canvas because the defect was shared-`handleSelectNode` debt. Re-verified in code 8/8 by 183-VERIFICATION.md; live confirmation is U-5/U-6 above."
   reason: "User reported: on Note if I open the side panel for any node there is no close button to that panel"
   severity: major
