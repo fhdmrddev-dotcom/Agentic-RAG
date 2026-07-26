@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sketch 138 — Growing the flow (Phase 184)</title>
+<link rel="stylesheet" href="../themes/default.css">
+<link rel="stylesheet" href="../themes/canvas-184.css">
+<style>
+  /* ── B: the free-wire world ───────────────────────────────────────────── */
+  .freeplane { position: relative; flex: 1; min-width: 0; overflow: auto; }
+  .freecanvas {
+    position: relative; width: 1500px; height: 780px;
+    background-image: radial-gradient(hsl(220 20% 26% / .55) 1px, transparent 1px);
+    background-size: 26px 26px;
+  }
+  .freecanvas .node { position: absolute; margin-left: 30px; cursor: grab; }
+  .freecanvas .node.dragging { cursor: grabbing; z-index: 40; transform: none; }
+  .freecanvas svg.wires { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
+  .freecanvas .node { z-index: 5; }
+
+  .hnd {
+    position: absolute; top: 50%; width: 15px; height: 15px; border-radius: 50%;
+    background: var(--color-bg-elev1); border: 2px solid var(--color-primary);
+    transform: translateY(-50%); cursor: crosshair; z-index: 9;
+    transition: all var(--dur-fast) var(--ease-out);
+  }
+  .hnd:hover { background: var(--color-primary); box-shadow: 0 0 14px -2px var(--color-primary-glow); }
+  .hnd.out { right: -8px; }
+  .hnd.in  { left: -8px; border-color: var(--color-text-dim); }
+  .freecanvas.wiring .hnd.in { border-color: var(--color-primary); animation: haloPulse 1.1s ease-in-out infinite; }
+  @keyframes haloPulse { 0%,100% { transform: translateY(-50%) scale(1) } 50% { transform: translateY(-50%) scale(1.28) } }
+
+  .palette {
+    flex-shrink: 0; width: 196px; border-right: 1px solid var(--color-border);
+    background: var(--color-bg-elev1); padding: 14px 12px; overflow: auto;
+  }
+  .palette h4 { margin: 0 0 10px; font-size: 10px; font-family: var(--font-mono);
+                letter-spacing: .09em; text-transform: uppercase; color: var(--color-text-dim); font-weight: 500; }
+  .ptile {
+    display: flex; align-items: center; gap: 9px; width: 100%; text-align: left;
+    padding: 8px 9px; margin-bottom: 6px; border-radius: 12px; cursor: pointer;
+    background: var(--color-surface); border: 1px solid var(--color-border); color: var(--color-text);
+    font-family: inherit; font-size: 12px; transition: all var(--dur-fast) var(--ease-out);
+  }
+  .ptile:hover { border-color: var(--color-primary); background: var(--color-accent); }
+  .ptile .ico3d { filter: none; }
+
+  /* ── the step-type picker popover (A / C) ─────────────────────────────── */
+  .picker {
+    position: fixed; z-index: 60; width: 268px; padding: 7px;
+    background: var(--color-surface-hi); border: 1px solid var(--color-border);
+    border-radius: 14px; box-shadow: var(--shadow-lg); display: none;
+  }
+  .picker.show { display: block; animation: fadeSlideUp var(--dur-base) var(--ease-out); }
+  .picker .phdr { font-size: 10px; font-family: var(--font-mono); text-transform: uppercase;
+                  letter-spacing: .09em; color: var(--color-text-dim); padding: 5px 8px 7px; }
+  .picker button {
+    display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+    padding: 7px 8px; border-radius: 9px; cursor: pointer; border: 0; background: transparent;
+    color: var(--color-text); font-family: inherit; font-size: 12.5px;
+  }
+  .picker button:hover { background: var(--color-accent); }
+  .picker button small { display: block; color: var(--color-text-dim); font-size: 10.5px; }
+
+  /* ── the definition readout rail ──────────────────────────────────────── */
+  .defrail {
+    flex-shrink: 0; width: 340px; border-left: 1px solid var(--color-border);
+    background: var(--color-bg-elev1); display: flex; flex-direction: column; overflow: hidden;
+  }
+  .defrail header { flex-shrink: 0; padding: 11px 14px; border-bottom: 1px solid var(--color-border);
+                    font-size: var(--text-sm); display: flex; align-items: center; gap: 8px; }
+  .defrail .scroll { flex: 1; min-height: 0; overflow: auto; padding: 12px 14px 20px; }
+  .defrail .note { font-size: 11px; color: var(--color-text-dim); line-height: 1.6; margin: 10px 0 0; }
+  body:not(.showdef) .defrail { display: none; }
+
+  .cost {
+    margin-top: 14px; padding: 11px 12px; border-radius: 12px; font-size: 11.5px; line-height: 1.65;
+    border: 1px solid var(--color-border); background: var(--color-surface);
+  }
+  .cost b { color: var(--color-text); }
+  .cost.mig { border-color: hsl(258 90% 66% / .45); background: hsl(258 90% 66% / .09); }
+  .cost.free { border-color: hsl(142 71% 45% / .4); background: hsl(142 71% 45% / .08); }
+
+  .lane {
+    position: absolute; left: 0; right: 0; top: 50%; height: 1px;
+    background: repeating-linear-gradient(90deg, hsl(220 20% 30% / .5) 0 8px, transparent 8px 18px);
+    z-index: 0; pointer-events: none;
+  }
+  body:not(.vc) .lane { display: none; }
+  .flow { position: relative; z-index: 2; }
+
+  .ghost { opacity: .35; filter: grayscale(.5); }
+</style>
+</head>
+<body class="alive va showdef">
+
+<nav class="variant-nav">
+  <span class="label">Sketch 138</span>
+  <button class="variant-tab active" data-v="a" type="button">A: Spine — insert between</button>
+  <button class="variant-tab" data-v="b" type="button">B: Free-wire canvas</button>
+  <button class="variant-tab" data-v="c" type="button">C: Hybrid — spine + free nudge</button>
+</nav>
+
+<p class="lead" id="lead"></p>
+
+<div class="bar">
+  <span class="lbl">Workflow</span>
+  <div class="seg" id="wfseg">
+    <button type="button" data-wf="risk-register" class="on">Risk Register · 2 steps</button>
+    <button type="button" data-wf="eval_coverage">Full flow · 5 steps</button>
+    <button type="button" data-wf="empty">Empty · 40 of 95 real ones</button>
+  </div>
+  <div class="spacer"></div>
+  <span class="lbl">Motion</span>
+  <div class="seg energy" id="feelseg">
+    <button type="button" data-feel="calm">Calm</button>
+    <button type="button" data-feel="alive" class="on">Alive</button>
+  </div>
+  <div class="seg" id="techseg">
+    <button type="button" data-tech="off" class="on">Plain language</button>
+    <button type="button" data-tech="on">⌥ Technical names</button>
+  </div>
+  <div class="seg" id="defseg">
+    <button type="button" data-def="on" class="on">Show what gets saved</button>
+    <button type="button" data-def="off">Hide</button>
+  </div>
+  <button class="btn" id="resetbtn" type="button">Reset</button>
+</div>
+
+<div class="stage" id="stage">
+  <div class="palette" id="palette" style="display:none">
+    <h4>Drag in a step</h4>
+    <div id="ptiles"></div>
+    <p class="note" style="font-size:11px;color:var(--color-text-dim);line-height:1.6;margin-top:14px">
+      A palette only makes sense when a node can be <i>placed</i>. On a spine there is nowhere to place it —
+      the ＋ on the line already says where it goes.
+    </p>
+  </div>
+
+  <div class="plane scrollbar-thin" id="plane">
+    <div class="amb"></div>
+    <div class="lane"></div>
+    <div class="flow" id="flow"></div>
+  </div>
+
+  <div class="freeplane scrollbar-thin" id="freeplane" style="display:none">
+    <div class="amb"></div>
+    <div class="freecanvas" id="freecanvas">
+      <svg class="wires" id="wires" aria-hidden="true"></svg>
+    </div>
+  </div>
+
+  <aside class="defrail">
+    <header>
+      <b style="font-family:var(--font-headline)">What actually gets saved</b>
+    </header>
+    <div class="scroll" id="defout"></div>
+  </aside>
+</div>
+
+<div class="foot" id="foot"></div>
+
+<div class="picker" id="picker" role="menu" aria-label="Add a step"></div>
+<div class="toast" id="toast" role="status"></div>
+
+<div class="sketch-toolbar">
+  <span>138</span>
+  <select id="themesel" aria-label="Theme">
+    <option value="default">Deep Midnight</option>
+  </select>
+</div>
+
+<script src="../themes/phase-icons-3d.js"></script>
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   Sketch 138 — Growing the flow.  Phase 184 / CANVAS-02.
+
+   Grounded in the shipped projection (`canvasModel.ts`) and the live DB read
+   of 2026-07-25: phase count maxes at 5 (modal 2), and 40 of 95 definitions
+   have zero phases — so "empty" is a first-class starting screen, not an edge
+   case.
+
+   The rule every variant here is really arguing about:
+
+     an edge is the phase whose `phase_index` is EXACTLY +1, found by LOOKUP
+     (canvasModel.ts:258, mirroring reachability.py:164).
+
+   A gap therefore draws NO bridging edge and the phase after it is honestly
+   orphaned. That is why "insert a step" is not a cosmetic act: it either
+   renumbers, or it silently breaks the flow.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+var TYPES = [
+  { t: 'llm_agent',        icon: 'llm_agent_compass', plain: 'Work out how to do it',   sub: 'Searches and decides its own next move' },
+  { t: 'llm_single',       icon: 'llm_single',        plain: 'Write it up',             sub: 'Writes one piece in one pass' },
+  { t: 'llm_human_input',  icon: 'llm_human_input',   plain: 'Check with you',          sub: 'Pauses here until you answer' },
+  { t: 'llm_emit',         icon: 'llm_emit',          plain: 'Produce the deliverable', sub: 'Fills your template and produces the file' },
+  { t: 'programmatic',     icon: 'programmatic',      plain: 'Prepare the inputs',      sub: 'A fixed step the server runs' },
+  { t: 'llm_batch_agents', icon: 'llm_batch_agents_alt', plain: 'Work on the parts together', sub: 'Several assistants work in parallel' }
+];
+var TYPE_LABEL = {
+  llm_agent: 'AI agent step', llm_single: 'AI write step', llm_human_input: 'Needs you',
+  llm_emit: 'Deliverable', programmatic: 'Server step', llm_batch_agents: 'Parallel agents'
+};
+
+/* Real definitions, read from the local Supabase 2026-07-25 (same corpus as sketch 137). */
+var SEED = {
+  'risk-register': [
+    { slug: 'retrieve', t: 'llm_agent', plain: 'Search the knowledge base',
+      sub: 'Finds every risk it can support with a source', badges: [['cited', '⛨ Must cite its sources']] },
+    { slug: 'emit', t: 'llm_emit', plain: 'Produce the risk register',
+      sub: 'Fills your Word template, one row per risk',
+      badges: [['cited', '⛨ Every cell cited'], ['file', '▤ risk-register.docx']] }
+  ],
+  'eval_coverage': [
+    { slug: 'split',     t: 'programmatic',     plain: 'Break up the request', sub: 'Splits the topic into parts to work through' },
+    { slug: 'fanout',    t: 'llm_batch_agents', plain: 'Work on the parts together', sub: 'Five assistants review in parallel' },
+    { slug: 'deep_dive', t: 'llm_agent',        plain: 'Dig deeper', sub: 'Searches the knowledge base and the web' },
+    { slug: 'confirm',   t: 'llm_human_input',  plain: 'Check with you', sub: 'Pauses here until you answer',
+      badges: [['you', '✋ Waits for you']] },
+    { slug: 'summarize', t: 'llm_single',       plain: 'Write it up', sub: 'Brings everything into one answer' }
+  ],
+  'empty': []
+};
+
+var LEAD = {
+  a: '<b>A — Spine, insert between.</b> Order is the only structure you draw. Hover the line between two steps and a ' +
+     '<code>＋</code> appears exactly where the new step will land; drag a card sideways to reorder; ✕ removes it and the ' +
+     'line re-stitches. <b>Positions are computed, never stored</b> — so there is nothing to migrate, and the ' +
+     '<code>phase_index + 1</code> lookup can never be left with a gap because inserting <i>is</i> renumbering. ' +
+     'This is the Glean model: reorderable spine, not open wiring.',
+  b: '<b>B — Free-wire canvas.</b> The n8n world. Drag a step in from the palette, put it anywhere, and drag from one ' +
+     'handle to another to connect. Genuinely more expressive — and the price is visible in the right-hand rail: every ' +
+     'position must now be <b>persisted</b> (a new <code>workflow_layouts</code> table, migration 114), and because you ' +
+     'can draw a shape the linear engine cannot run, validity becomes something you are <i>told about afterwards</i> ' +
+     'rather than something the canvas guarantees. Try deleting a middle step, or wiring two edges out of one node.',
+  c: '<b>C — Hybrid: spine + free nudge.</b> The order is still the spine — you cannot rewire it — but you may nudge a ' +
+     'card off the lane to make a long flow readable, and that nudge is remembered. Structure stays computed; only the ' +
+     '<i>cosmetic</i> offset is stored. Still costs the migration, but layout is never authoritative, so a lost layout ' +
+     'row degrades to "tidy" rather than to a broken picture.'
+};
+
+var variant = 'a';
+var wfKey = 'risk-register';
+var steps = [];
+var sel = -1;
+var pickAt = -1;
+var wires = [];           /* B only: [fromIdx, toIdx] pairs by slug */
+var pos = {};             /* B/C only: slug -> {x,y} */
+var nudged = {};          /* C only: slug -> dy */
+var toastT = null;
+
+function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'); }
+function typeOf(t) { for (var i = 0; i < TYPES.length; i++) if (TYPES[i].t === t) return TYPES[i]; return TYPES[0]; }
+function iconFor(t) { return typeOf(t).icon; }
+
+function load() {
+  steps = SEED[wfKey].map(function (s, i) {
+    return { slug: s.slug, t: s.t, plain: s.plain, sub: s.sub, badges: s.badges || [], idx: i };
+  });
+  sel = -1; nudged = {};
+  wires = [];
+  pos = {};
+  steps.forEach(function (s, i) {
+    pos[s.slug] = { x: 60 + i * 330, y: 90 + (i % 2) * 150 };
+    if (i > 0) wires.push([steps[i - 1].slug, s.slug]);
+  });
+  render();
+}
+
+function toast(msg) {
+  var el = document.getElementById('toast');
+  el.innerHTML = msg;
+  el.classList.add('show');
+  if (toastT) clearTimeout(toastT);
+  toastT = setTimeout(function () { el.classList.remove('show'); }, 3400);
+}
+
+/* ── renumbering: the whole point of variant A ───────────────────────────── */
+function renumber() { steps.forEach(function (s, i) { s.idx = i; }); }
+
+function uniqueSlug(base) {
+  var n = 1, cand = base;
+  var taken = {};
+  steps.forEach(function (s) { taken[s.slug] = 1; });
+  while (taken[cand]) { n++; cand = base + '_' + n; }
+  return cand;
+}
+
+function addStep(t, at) {
+  var d = typeOf(t);
+  var s = { slug: uniqueSlug(t.replace('llm_', '')), t: t, plain: d.plain, sub: d.sub, badges: [] };
+  if (t === 'llm_human_input') s.badges = [['you', '✋ Waits for you']];
+  if (t === 'llm_emit') s.badges = [['cited', '⛨ Must cite its sources'], ['file', '▤ your-template.docx']];
+  var i = (at === undefined || at < 0) ? steps.length : at;
+  steps.splice(i, 0, s);
+  var moved = steps.length - i - 1;
+  renumber();
+  if (variant === 'b') {
+    pos[s.slug] = { x: 60 + i * 330, y: 300 };
+    if (i > 0) wires.push([steps[i - 1].slug, s.slug]);
+  }
+  sel = i;
+  render();
+  if (variant === 'a' || variant === 'c') {
+    toast(moved > 0
+      ? 'Added at step ' + (i + 1) + ' — <b>' + moved + ' step' + (moved > 1 ? 's' : '') +
+        ' renumbered</b> so the flow stays unbroken.'
+      : 'Added as step ' + (i + 1) + '.');
+  } else {
+    toast('Placed on the canvas. It is <b>not connected to anything yet</b> — nothing will run it.');
+  }
+}
+
+function removeStep(i) {
+  var gone = steps[i];
+  if (variant === 'b') {
+    steps.splice(i, 1);
+    renumber();
+    var orphaned = wires.filter(function (w) { return w[0] === gone.slug || w[1] === gone.slug; }).length;
+    wires = wires.filter(function (w) { return w[0] !== gone.slug && w[1] !== gone.slug; });
+    delete pos[gone.slug];
+    sel = -1; render();
+    toast('Removed “' + esc(gone.plain) + '”. <b>' + orphaned + ' connection' + (orphaned === 1 ? '' : 's') +
+          ' disappeared with it</b> — the steps either side are no longer joined.');
+    return;
+  }
+  steps.splice(i, 1);
+  var after = steps.length - i;
+  renumber();
+  sel = -1; render();
+  toast('Removed “' + esc(gone.plain) + '” — the line re-stitched and <b>' + after + ' step' +
+        (after === 1 ? '' : 's') + ' renumbered</b>. No gap left behind.');
+}
+
+function moveStep(i, dir) {
+  var j = i + dir;
+  if (j < 0 || j >= steps.length) return;
+  var tmp = steps[i]; steps[i] = steps[j]; steps[j] = tmp;
+  renumber(); sel = j; render();
+  toast('Moved to step ' + (j + 1) + '. Order <i>is</i> the structure — renumbering is the edit.');
+}
+
+/* ── rendering ───────────────────────────────────────────────────────────── */
+function nodeHTML(s, i, free) {
+  var badges = (s.badges || []).map(function (b) {
+    return '<span class="badge ' + b[0] + '">' + esc(b[1]) + '</span>';
+  }).join('');
+  var handles = free
+    ? '<span class="hnd in" data-hin="' + esc(s.slug) + '" title="incoming"></span>' +
+      '<span class="hnd out" data-hout="' + esc(s.slug) + '" title="drag to connect"></span>'
+    : '';
+  var acts =
+    '<div class="acts">' +
+      (free ? '' :
+        '<button type="button" data-move="' + i + '" data-dir="-1" title="Move earlier" aria-label="Move earlier">◀</button>' +
+        '<button type="button" data-move="' + i + '" data-dir="1" title="Move later" aria-label="Move later">▶</button>') +
+      '<button type="button" class="danger" data-del="' + i + '" title="Remove this step" aria-label="Remove this step">✕</button>' +
+    '</div>';
+  var nudge = (variant === 'c' && nudged[s.slug]) ? 'transform:translateY(' + nudged[s.slug] + 'px);' : '';
+  var style = free
+    ? 'left:' + pos[s.slug].x + 'px; top:' + pos[s.slug].y + 'px;'
+    : nudge;
+  return '<div class="node' + (sel === i ? ' sel' : '') + '" data-i="' + i + '" data-slug="' + esc(s.slug) + '"' +
+      ' data-type="' + s.t + '" tabindex="0" role="button"' +
+      ' aria-label="Step ' + (i + 1) + ': ' + esc(s.plain) + ' (' + s.t + ')"' +
+      (style ? ' style="' + style + '"' : '') + '>' +
+    '<span class="stepn">' + (i + 1) + '</span>' + acts + handles +
+    '<div class="icowrap">' + icon3d(iconFor(s.t), 52) + '</div>' +
+    '<div class="body">' +
+      '<div class="ttl">' + esc(s.plain) + '</div>' +
+      '<div class="sub">' + esc(s.sub) + '</div>' +
+      (badges ? '<div class="badges">' + badges + '</div>' : '') +
+      '<div class="techline">' + esc(TYPE_LABEL[s.t] || s.t) + ' · ' + esc(s.slug) +
+        ' · phase_index ' + i + '</div>' +
+    '</div>' +
+  '</div>';
+}
+
+function renderSpine() {
+  var flow = document.getElementById('flow');
+  if (steps.length === 0) {
+    flow.innerHTML =
+      '<div class="empty">' +
+        '<h3>Nothing here yet</h3>' +
+        '<p>This is the most common state in the real system — <b>40 of 95</b> saved workflows have no steps at all. ' +
+           'An empty plane with a grid would look broken; a first move looks like an invitation.</p>' +
+        '<button class="btn primary" id="firstadd" type="button">＋ Add the first step</button>' +
+      '</div>';
+    return;
+  }
+  var html = '';
+  html += '<div class="conn" data-at="0"><div class="ins" role="button" tabindex="0" ' +
+          'aria-label="Insert a step at the beginning" data-ins="0">＋</div></div>';
+  steps.forEach(function (s, i) {
+    html += nodeHTML(s, i, false);
+    html += '<div class="conn" data-at="' + (i + 1) + '">' +
+              '<div class="line"></div><div class="tip"></div>' +
+              '<div class="ins" role="button" tabindex="0" aria-label="Insert a step after step ' + (i + 1) + '" ' +
+                'data-ins="' + (i + 1) + '">＋</div>' +
+            '</div>';
+  });
+  html += '<div class="endpin"><span class="dot"></span> ends here</div>';
+  flow.innerHTML = html;
+}
+
+function renderFree() {
+  var cv = document.getElementById('freecanvas');
+  var svg = document.getElementById('wires');
+  Array.prototype.slice.call(cv.querySelectorAll('.node')).forEach(function (n) { n.remove(); });
+  var html = '';
+  steps.forEach(function (s, i) { html += nodeHTML(s, i, true); });
+  cv.insertAdjacentHTML('beforeend', html);
+  var seg = '';
+  wires.forEach(function (w, wi) {
+    var a = pos[w[0]], b = pos[w[1]];
+    if (!a || !b) return;
+    var x1 = a.x + 30 + 300, y1 = a.y + 46, x2 = b.x + 30, y2 = b.y + 46;
+    var mx = (x1 + x2) / 2;
+    seg += '<path d="M' + x1 + ',' + y1 + ' C' + mx + ',' + y1 + ' ' + mx + ',' + y2 + ' ' + x2 + ',' + y2 + '" ' +
+           'fill="none" stroke="hsl(220 20% 40%)" stroke-width="2" />' +
+           '<circle cx="' + x2 + '" cy="' + y2 + '" r="3.5" fill="hsl(220 20% 46%)" />';
+  });
+  svg.innerHTML = seg;
+}
+
+function outDegree(slug) {
+  var n = 0; wires.forEach(function (w) { if (w[0] === slug) n++; }); return n;
+}
+function inDegree(slug) {
+  var n = 0; wires.forEach(function (w) { if (w[1] === slug) n++; }); return n;
+}
+
+function renderDef() {
+  var out = document.getElementById('defout');
+  var lines = steps.map(function (s, i) {
+    return '  { <span class="k">"slug"</span>: <span class="s">"' + esc(s.slug) + '"</span>, ' +
+           '<span class="k">"phase_index"</span>: <span class="n">' + i + '</span>, ' +
+           '<span class="k">"config"</span>: { <span class="k">"phase_type"</span>: <span class="s">"' + s.t + '"</span> } }';
+  }).join(',\n');
+  var body = '<h4 style="margin:0 0 8px">definition.phases[] &nbsp;<span style="color:var(--color-text-dim)">— PATCHed to the existing draft</span></h4>' +
+    '<p class="readout">[\n' + (lines || '  ') + '\n]</p>';
+
+  if (variant === 'a') {
+    body += '<div class="cost free"><b>Nothing else is saved.</b> Every position on screen is recomputed from ' +
+      '<code>phase_index</code> at render time — the shipped <code>canvasModel.toCanvas</code> already does exactly this. ' +
+      'No layout column, no side table, <b>no migration</b>.</div>' +
+      '<p class="note">This is also why the gap rule can never bite: an insert renumbers, so <code>phase_index + 1</code> ' +
+      'always resolves. There is no way to hand-author a hole.</p>';
+  } else {
+    var rows = steps.map(function (s) {
+      var p = pos[s.slug] || { x: 0, y: 0 };
+      var y = variant === 'c' ? (nudged[s.slug] || 0) : p.y;
+      return '  { <span class="k">"phase_slug"</span>: <span class="s">"' + esc(s.slug) + '"</span>, ' +
+        (variant === 'c'
+          ? '<span class="k">"dy"</span>: <span class="n">' + y + '</span> }'
+          : '<span class="k">"x"</span>: <span class="n">' + p.x + '</span>, <span class="k">"y"</span>: <span class="n">' + p.y + '</span> }');
+    }).join(',\n');
+    body += '<h4 style="margin:16px 0 8px">workflow_layouts &nbsp;<span style="color:hsl(258 90% 78%)">— NET-NEW TABLE</span></h4>' +
+      '<p class="readout">[\n' + (rows || '  ') + '\n]</p>';
+    if (variant === 'b') {
+      var edges = wires.map(function (w) {
+        return '  [ <span class="s">"' + esc(w[0]) + '"</span> → <span class="s">"' + esc(w[1]) + '"</span> ]';
+      }).join(',\n');
+      body += '<h4 style="margin:16px 0 8px">edges you drew</h4><p class="readout">[\n' + (edges || '  ') + '\n]</p>';
+      body += '<div class="cost mig"><b>The engine has no field for these.</b> <code>PhaseSpec</code> is ' +
+        '<code>extra="forbid"</code> and carries no <code>depends_on</code> — the executor runs ' +
+        '<code>phase_index</code> order, full stop. So a second edge out of one node is a picture of something that ' +
+        'will not happen, and the canvas has to explain that <i>after</i> you drew it.</div>';
+    } else {
+      body += '<div class="cost mig"><b>Cosmetic only.</b> <code>dy</code> never changes what runs. Losing the row ' +
+        'degrades to “tidy”, never to a wrong picture — but it is still a migration (slot 114) and a second thing ' +
+        'to keep in sync with the definition.</div>';
+    }
+  }
+  out.innerHTML = body;
+}
+
+function renderFoot() {
+  var f = document.getElementById('foot');
+  var bits = [];
+  bits.push('<span class="pill">' + steps.length + ' step' + (steps.length === 1 ? '' : 's') + '</span>');
+  if (variant === 'a') {
+    bits.push('<span class="pill good">✓ Layout computed — nothing to store</span>');
+    bits.push('<span class="pill good">✓ No migration</span>');
+    bits.push('<span class="pill">Order is the only structure</span>');
+  } else if (variant === 'c') {
+    bits.push('<span class="pill net">＋ workflow_layouts (migration 114) — cosmetic offsets</span>');
+    bits.push('<span class="pill good">✓ Order still computed</span>');
+    bits.push('<button class="btn" id="tidy" type="button" style="padding:3px 10px;font-size:11px">Tidy up</button>');
+  } else {
+    var forks = 0, orphans = 0;
+    steps.forEach(function (s, i) {
+      if (outDegree(s.slug) > 1) forks++;
+      if (i > 0 && inDegree(s.slug) === 0) orphans++;
+    });
+    bits.push('<span class="pill net">＋ workflow_layouts (migration 114) — x / y per node</span>');
+    if (forks) bits.push('<span class="pill bad">' + forks + ' node' + (forks === 1 ? '' : 's') +
+      ' with two outgoing paths — the engine runs only one</span>');
+    if (orphans) bits.push('<span class="pill bad">' + orphans + ' unreachable step' + (orphans === 1 ? '' : 's') +
+      ' — <code>orphan_phase</code></span>');
+    if (!forks && !orphans) bits.push('<span class="pill">Valid right now — but nothing stopped you drawing otherwise</span>');
+    bits.push('<button class="btn" id="arrange" type="button" style="padding:3px 10px;font-size:11px">Auto-arrange</button>');
+  }
+  f.innerHTML = bits.join('');
+}
+
+function render() {
+  document.body.classList.toggle('vc', variant === 'c');
+  document.getElementById('plane').style.display = (variant === 'b') ? 'none' : '';
+  document.getElementById('freeplane').style.display = (variant === 'b') ? '' : 'none';
+  document.getElementById('palette').style.display = (variant === 'b') ? '' : 'none';
+  document.getElementById('lead').innerHTML = LEAD[variant];
+  if (variant === 'b') renderFree(); else renderSpine();
+  renderDef();
+  renderFoot();
+}
+
+/* ── the insert picker ───────────────────────────────────────────────────── */
+function openPicker(anchorEl, at) {
+  pickAt = at;
+  var p = document.getElementById('picker');
+  p.innerHTML = '<div class="phdr">Add a step ' +
+    (at >= steps.length ? 'at the end' : 'before step ' + (at + 1)) + '</div>' +
+    TYPES.map(function (d) {
+      return '<button type="button" data-t="' + d.t + '">' + icon3d(d.icon, 26) +
+        '<span>' + esc(d.plain) + '<small>' + esc(d.sub) + '</small></span></button>';
+    }).join('');
+  var r = anchorEl.getBoundingClientRect();
+  p.classList.add('show');
+  var top = Math.min(r.bottom + 8, window.innerHeight - p.offsetHeight - 12);
+  p.style.top = Math.max(8, top) + 'px';
+  p.style.left = Math.max(8, Math.min(r.left - 120, window.innerWidth - 288)) + 'px';
+}
+function closePicker() {
+  document.getElementById('picker').classList.remove('show');
+  pickAt = -1;
+}
+
+/* ── events ──────────────────────────────────────────────────────────────── */
+document.querySelector('.variant-nav').addEventListener('click', function (e) {
+  var b = e.target.closest('.variant-tab'); if (!b) return;
+  document.querySelectorAll('.variant-tab').forEach(function (t) { t.classList.remove('active'); });
+  b.classList.add('active');
+  document.body.classList.remove('va', 'vb', 'vc');
+  variant = b.getAttribute('data-v');
+  document.body.classList.add('v' + variant);
+  closePicker();
+  load();
+});
+
+document.querySelector('.bar').addEventListener('click', function (e) {
+  var b = e.target.closest('button'); if (!b) return;
+  if (b.id === 'resetbtn') { load(); toast('Back to the saved definition.'); return; }
+  var seg = b.closest('.seg'); if (!seg) return;
+  seg.querySelectorAll('button').forEach(function (x) { x.classList.remove('on'); });
+  b.classList.add('on');
+  if (b.hasAttribute('data-wf')) { wfKey = b.getAttribute('data-wf'); load(); }
+  if (b.hasAttribute('data-feel')) document.body.classList.toggle('alive', b.getAttribute('data-feel') === 'alive');
+  if (b.hasAttribute('data-tech')) document.body.classList.toggle('tech', b.getAttribute('data-tech') === 'on');
+  if (b.hasAttribute('data-def')) document.body.classList.toggle('showdef', b.getAttribute('data-def') === 'on');
+});
+
+document.getElementById('picker').addEventListener('click', function (e) {
+  var b = e.target.closest('button[data-t]'); if (!b) return;
+  var at = pickAt; closePicker();
+  addStep(b.getAttribute('data-t'), at);
+});
+
+document.addEventListener('click', function (e) {
+  if (!e.target.closest('#picker') && !e.target.closest('.ins') && !e.target.closest('#firstadd')) closePicker();
+});
+
+document.getElementById('stage').addEventListener('click', function (e) {
+  var ins = e.target.closest('.ins');
+  if (ins) { openPicker(ins, parseInt(ins.getAttribute('data-ins'), 10)); return; }
+  if (e.target.closest('#firstadd')) { openPicker(e.target.closest('#firstadd'), 0); return; }
+  var del = e.target.closest('button[data-del]');
+  if (del) { e.stopPropagation(); removeStep(parseInt(del.getAttribute('data-del'), 10)); return; }
+  var mv = e.target.closest('button[data-move]');
+  if (mv) { e.stopPropagation(); moveStep(parseInt(mv.getAttribute('data-move'), 10), parseInt(mv.getAttribute('data-dir'), 10)); return; }
+  var p = e.target.closest('.ptile');
+  if (p) { addStep(p.getAttribute('data-t'), steps.length); return; }
+  var n = e.target.closest('.node');
+  if (n) { sel = parseInt(n.getAttribute('data-i'), 10); render(); return; }
+});
+
+document.getElementById('stage').addEventListener('keydown', function (e) {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  if (e.repeat) return;
+  var ins = e.target.closest('.ins');
+  if (ins) { e.preventDefault(); openPicker(ins, parseInt(ins.getAttribute('data-ins'), 10)); return; }
+  var n = e.target.closest('.node');
+  if (n) { e.preventDefault(); sel = parseInt(n.getAttribute('data-i'), 10); render(); }
+});
+
+document.getElementById('foot').addEventListener('click', function (e) {
+  if (e.target.id === 'tidy') { nudged = {}; render(); toast('Snapped back to the lane. The order never changed — only the picture did.'); }
+  if (e.target.id === 'arrange') {
+    steps.forEach(function (s, i) { pos[s.slug] = { x: 60 + i * 330, y: 240 }; });
+    render();
+    toast('Auto-arranged. Note what this proves: <b>if a machine can always lay it out, the stored positions were never load-bearing.</b>');
+  }
+});
+
+/* ── B: drag a node, drag a wire ─────────────────────────────────────────── */
+(function () {
+  var cv = document.getElementById('freecanvas');
+  var drag = null, wire = null;
+
+  cv.addEventListener('pointerdown', function (e) {
+    var h = e.target.closest('.hnd.out');
+    if (h) {
+      e.preventDefault();
+      wire = { from: h.getAttribute('data-hout') };
+      cv.classList.add('wiring');
+      return;
+    }
+    var n = e.target.closest('.node');
+    if (!n || e.target.closest('.acts') || e.target.closest('.hnd')) return;
+    var p = pos[n.getAttribute('data-slug')];
+    var r = cv.getBoundingClientRect();
+    drag = {
+      slug: n.getAttribute('data-slug'), el: n,
+      ox: (e.clientX - r.left) - p.x, oy: (e.clientY - r.top) - p.y
+    };
+    n.classList.add('dragging');
+  });
+
+  cv.addEventListener('pointermove', function (e) {
+    if (!drag) return;
+    var p = pos[drag.slug];
+    var r = cv.getBoundingClientRect();
+    p.x = Math.max(0, (e.clientX - r.left) - drag.ox);
+    p.y = Math.max(0, (e.clientY - r.top) - drag.oy);
+    drag.el.style.left = p.x + 'px';
+    drag.el.style.top = p.y + 'px';
+    renderFree();
+    drag.el = cv.querySelector('.node[data-slug="' + drag.slug + '"]');
+    if (drag.el) drag.el.classList.add('dragging');
+  });
+
+  cv.addEventListener('pointerup', function (e) {
+    if (wire) {
+      var target = e.target.closest('.node');
+      cv.classList.remove('wiring');
+      if (target) {
+        var to = target.getAttribute('data-slug');
+        if (to !== wire.from) {
+          var dup = wires.some(function (w) { return w[0] === wire.from && w[1] === to; });
+          if (!dup) {
+            wires.push([wire.from, to]);
+            var fanout = outDegree(wire.from);
+            render();
+            toast(fanout > 1
+              ? 'Connected. <b>“' + esc(wire.from) + '” now has two outgoing paths</b> — the harness engine runs ' +
+                '<code>phase_index</code> order and will only ever take one. The picture and the run now disagree.'
+              : 'Connected.');
+          }
+        }
+      }
+      wire = null;
+      return;
+    }
+    if (drag) {
+      var el = cv.querySelector('.node[data-slug="' + drag.slug + '"]');
+      if (el) el.classList.remove('dragging');
+      drag = null;
+      renderDef();
+      toast('Moved. That position is now <b>state you have to store</b> — it is not derivable from the definition.');
+    }
+  });
+
+  cv.addEventListener('pointercancel', function () {
+    if (drag) { var el = cv.querySelector('.node[data-slug="' + drag.slug + '"]'); if (el) el.classList.remove('dragging'); }
+    drag = null; wire = null; cv.classList.remove('wiring');
+  });
+})();
+
+/* ── A / C: drag a card sideways to reorder ──────────────────────────────── */
+(function () {
+  var plane = document.getElementById('plane');
+  var d = null;
+  plane.addEventListener('pointerdown', function (e) {
+    if (variant === 'b') return;
+    var n = e.target.closest('.node');
+    if (!n || e.target.closest('.acts')) return;
+    d = { i: parseInt(n.getAttribute('data-i'), 10), x0: e.clientX, y0: e.clientY, el: n, moved: false };
+  });
+  plane.addEventListener('pointermove', function (e) {
+    if (!d) return;
+    var dx = e.clientX - d.x0, dy = e.clientY - d.y0;
+    if (Math.abs(dx) > 6 || Math.abs(dy) > 6) d.moved = true;
+    if (!d.moved) return;
+    if (variant === 'c' && Math.abs(dy) > Math.abs(dx)) {
+      d.el.style.transform = 'translateY(' + dy + 'px)';
+      d.vert = dy;
+    } else {
+      d.el.style.transform = 'translateX(' + dx + 'px) scale(1.02)';
+      d.el.style.zIndex = '30';
+      d.vert = null;
+    }
+  });
+  plane.addEventListener('pointerup', function (e) {
+    if (!d) return;
+    var dx = e.clientX - d.x0;
+    var el = d.el, i = d.i, vert = d.vert, moved = d.moved;
+    d = null;
+    el.style.transform = ''; el.style.zIndex = '';
+    if (!moved) return;
+    if (variant === 'c' && vert !== null && vert !== undefined) {
+      nudged[steps[i].slug] = Math.max(-120, Math.min(120, Math.round(vert / 10) * 10));
+      render();
+      toast('Nudged off the lane. <b>The order did not change</b> — this is a picture preference, stored separately from what runs.');
+      return;
+    }
+    var shift = Math.round(dx / 396);
+    if (shift !== 0) moveStep(i, shift > 0 ? 1 : -1);
+    else render();
+  });
+})();
+
+/* ── palette (B) ─────────────────────────────────────────────────────────── */
+document.getElementById('ptiles').innerHTML = TYPES.map(function (d) {
+  return '<button class="ptile" type="button" data-t="' + d.t + '">' + icon3d(d.icon, 24) +
+         '<span>' + esc(d.plain) + '</span></button>';
+}).join('');
+
+document.getElementById('themesel').addEventListener('change', function () {
+  document.querySelector('link[href*="themes/default"]').href = '../themes/' + this.value + '.css';
+});
+
+load();
+</script>
+</body>
+</html>

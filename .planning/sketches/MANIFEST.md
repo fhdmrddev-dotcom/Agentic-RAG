@@ -637,3 +637,79 @@ side effect of the canvas phase.**
    demonstrated from the existing corpus. **The phase needs a fixture** (sketch 136 proposes the shape).
 2. **40 of 95 definitions have zero phases** — the empty projection is the single most common canvas state and needs
    an honest empty state, not a blank plane.
+
+### Phase 184 session — v3.6 Editable Canvas + Live Structural Validation (2026-07-26)
+
+G-2 sketch, BEFORE spec/discuss-phase. Phase 184 is the milestone's **CORE deliverable** — CANVAS-02
+(add / move / connect / delete, lossless round-trip through the EXISTING draft CRUD, layout OUT of the
+immutable definition JSONB), CANVAS-03 (side-panel config over the `PhaseConfig` discriminated union,
+Pydantic authoritative), CANVAS-04 (governance as visible rails), VALID-02 (author-time STRUCTURAL
+validation — "you cannot draw an invalid workflow") and VALID-03 (per-node status from the SERVER
+verdict, never a client guess). Red line D-14; no SC#10 (authoring, no run stream); **migration
+SKETCH-CONDITIONAL** — slot 114 reserved ONLY IF `workflow_layouts` is confirmed here (OPEN-05), else
+ZERO. Sessions: 138–141.
+
+**Intake decisions (operator, 2026-07-26):** (1) **Core action = "grow a flow step-by-step"** — so the
+*add* affordance is the hero and the empty canvas (40 of 95 real definitions) is a first-class screen,
+not an edge case. (2) **Explore BOTH spine and free-wire** — the constrained spine must *win an
+argument* rather than be assumed, which is what makes migration 114 a real decision instead of a
+foregone one.
+
+**Inherited and NOT re-opened:** the 137-D visual language is locked (horizontal left→right frosted step
+cards, floating 3D `fluent-emoji` mark, plain title + one line + ≤2 word-badges, ⌥ Technical names,
+motion keys off RUN STATE not selection, and the **colour budget** — per-type colour is a tint behind
+the icon only, because Phase 188 needs the strong colours for run status). Extracted into a new shared
+asset so the four sketches cannot drift from it or from each other.
+
+**New reusable asset:** `themes/canvas-184.css` — the 137-D node atoms plus the net-new Phase-184
+editing chrome (insert affordance, per-node actions, verdict marks, the mono round-trip readout, the
+400px inspector rail). It exists for the same reason `PhaseNode.tsx` does: **there is one node.** A
+sketch that needs a different card is making a design argument, not a copy-paste.
+
+**Live grounding read for this batch (schema, 2026-07-26).** `workflow_definitions` carries no layout
+column (`id · slug · version · name · description · status · definition · created_by · is_system_global ·
+org_id · created_at · updated_at · skill_snapshots`) and `WorkflowDefinition` is `extra="forbid"` at the
+Pydantic layer — so node positions genuinely cannot ride along in the JSONB, and any free-placement
+variant is honestly costed at a **new table**, not a free field. Every verdict rendered in 139 is a real
+code from its owning module (`reachability.LINT_CODES` · `grounding.GROUNDING_VERDICT_CODES` · the two
+`/validate` mints itself · `grounding_unavailable`) with the VERBATIM server message behind ⌥. Every
+tool chip in 140 is the real registry (`get_tools`, `openai_service.py`) as served by
+`GET /workflows/grounding-bundle`.
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 138 | growing-the-flow | How do you add, move and delete a step — and how much wiring freedom is right for a canvas the linear harness engine has to run? | *pending* | phase-184, canvas-02, editing-model, insert-between, reorder, free-wire, workflow-layouts, migration-114, open-05, d-14, g2-sketch-gate |
+| 139 | validation-while-building | How do server verdicts read on the canvas while the flow is half-built — so "you cannot draw an invalid workflow" holds without punishing someone for not being finished? | *pending* | phase-184, valid-02, valid-03, severity-split, incomplete-vs-error, problems-tray, prevent-at-source, grounding-unavailable, g2-sketch-gate |
+| 140 | step-inspector-and-rails | How do you configure a selected step, and where does governance become visible as rails you can see but cannot wire around? | *pending* | phase-184, canvas-03, canvas-04, phaseformpanel, node-config, governance-rails, tool-whitelist, grounding-bundle, locked-gates, phase-185-graded, g2-sketch-gate |
+| 141 | the-authoring-session | Do 138 + 139 + 140 compose into a session a person can sit inside — empty draft → first step → a mistake → undo → autosave → publish? | *pending* | phase-184, composition, consistency, undo-redo, zundo, autosave-honesty, saved-not-published, publish-handoff, empty-state, viewport, g2-sketch-gate |
+
+**The load-bearing rule the batch is built around (all four sketches make it visible).** The shipped
+projection draws a sequential edge to the phase whose `phase_index` is **exactly +1, found by LOOKUP**
+(`canvasModel.ts:258`, mirroring `reachability.py:164` line for line). Two consequences: a gap draws NO
+bridging edge and the phase after it is honestly orphaned; and therefore **"insert a step" is never
+cosmetic** — on a spine it renumbers, which is precisely why a hole cannot be hand-authored there.
+
+**Three decisions these sketches are staged to settle at discuss-phase:**
+
+1. **OPEN-05 / migration 114** — 138-A stores nothing (positions recomputed from `phase_index`, the
+   shipped `toCanvas` behaviour) → ZERO migration. 138-B and 138-C both require `workflow_layouts`. The
+   sketch's own tell: **"Auto-arrange" in B** — if a machine can always lay the graph out, the stored
+   positions were never load-bearing.
+2. **Whether "you cannot draw an invalid workflow" means prevented or reported.** 139-C shows prevention
+   at its strongest and then admits its ceiling in-surface: prevention can decide anything about the
+   *shape* of the flow, but an unavailable tool, an out-of-scope folder or a missing description can only
+   be **reported**. So C is not a third alternative — it is **A or B plus a gate**, and the question is
+   whether the gate earns its cost.
+3. **The `incomplete` ≠ `error` split is a product decision, not a colour choice.** Both severities set
+   `ok: false` and both block publish, but `incomplete` is the state a canvas spends most of its life in.
+   Any variant that reads as alarming on the "Mid-build" scenario is wrong.
+
+**Two seams deliberately left to their owning phases.** The gate rail in 140 is where **Phase 185's
+graded governance** plugs in (today's lock is *derived* from `citation_policy` + a `citations_required`
+validator via the shipped `groundingFor()`; 185 replaces the derivation with an authored per-node
+grounding mode — Grounded keeps the lock, Open does not get one). 184 must **not** invent that field.
+And 141's autosave vocabulary ("Saved · still a draft" — never mints a version, never re-arms the
+gauntlet) is chosen here but **mechanised by Phase 186 / CONCUR-01**; the two-editor case is explicitly
+out of scope and said so in-surface.
+
+**Feeds `/gsd:spec-phase 184` / `/gsd:discuss-phase 184`.**
