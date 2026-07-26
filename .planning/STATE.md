@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
-status: verifying
-last_updated: "2026-07-26T11:35:52.888Z"
+status: ready_to_plan
+last_updated: 2026-07-26T13:13:46.022Z
 last_activity: 2026-07-26
 progress:
   total_phases: 18
@@ -11,6 +11,7 @@ progress:
   total_plans: 24
   completed_plans: 24
   percent: 17
+stopped_at: Phase 183 complete (9/9) — ready to discuss Phase 184
 ---
 
 # Project State
@@ -22,7 +23,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-20 — Phase 163 THE ATOMIC CRUX complete; membership RLS enforced)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 183 — read-only-canvas (`183-09` gap closure executed + re-verified **`human_needed`** — drive U-5/U-6 live via `/gsd:verify-work 183`, then Phase 184)
+**Current focus:** Phase 184 — editable canvas + live structural validation (round trip)
 
 ## Deferred Items
 
@@ -44,8 +45,8 @@ Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 op
 
 ## Current Position
 
-Phase: 183 (read-only-canvas) — `183-09` gap closure EXECUTED + re-verified 2026-07-26: **`human_needed`** (8/8 must-haves verified in code; 2 live rows outstanding)
-Plan: 9 of 9 executed — all three live-UAT defects closed
+Phase: 184
+Plan: Not started
 
 **RE-VERIFICATION GATE (2026-07-26, post-`183-09`): `human_needed`, not `passed`.** All 8
 must-haves verified in code by direct source read; phase-scoped suite re-run independently at
@@ -125,7 +126,7 @@ the U-5 accessibility-tree + real-key-press pass, operator confirmed each checkp
 
 **Re-verification 2026-07-26 (`096a9e58`): `gaps_found` → `human_needed`, 4/4 must-haves verified.** The SC#3 blocker is closed for real (verifier read `WorkflowCanvas.tsx` directly, did not trust the SUMMARY). **Nothing code-side blocks the phase; the only thing between 183 and `passed` is operator-driven live UAT** — the four G-4 rows **U-1…U-4** plus a real-screen-reader pass on the newly-added keyboard path, persisted as `183-HUMAN-UAT.md` (5 items, all pending). `visual_workflow_canvas` cold-defaults to `"off"` — flip it **On in the Control Room first**; U-4 flips it back. **New Warning-level debt from the scoped gap-closure review `183-REVIEW-08.md` (0 Critical / 4 Warning / 4 Info), independently re-derived by the verifier and NOT auto-folded:** **WR-08-01** no `event.repeat` guard — a held Enter rapid-toggles the panel and can settle CLOSED, contradicting the ARIA promise (the new test can't see it: synthetic `fireEvent.keyDown` never sets `repeat`); **WR-08-02** the grounding/tier agreement docblock overclaims — three gate-carrying configs still disagree and the new pin (`deriveTier(policy, new Set())`) is scoped to hide them, so WR-01's contradiction stays reachable; **WR-08-03** `ARIA_LABELS` is untyped so a library key rename silently reverts WR-06 with a green build; **WR-08-04** the end cap + unresolved-skip stub — the two nodes the CR-01 guard keeps inert — still announce "Press enter or space to open this step's details". **Operator decision owed:** fold these into a `183-09` gap plan, or accept as debt alongside WR-02/03/04 and carry into Phase 184. Orchestrator note: `state.advance-plan` bumped `completed_phases` 2→3 in `1b9fad84`, falsely marking 183 complete — reverted in `b6ae96f7`.
 
-Status: Ready to execute
+Status: Ready to plan
 
 **Phase 183 (read-only-canvas) — CONTEXT GATHERED 2026-07-25** (`865cbde1`; `183-CONTEXT.md` + `183-DISCUSSION-LOG.md`). All 4 gray areas discussed (the two the sketches left with no winner, plus the faithfulness and G-5 calls). **D-183-01..15 locked.** Headlines: the canvas is an **in-Builder `[≣ Spine] [⬡ Canvas]` toggle** (no new ActiveView, **no nav entry** — this formally RELEASES 181's deferred nav-entry promise and `revertByteIdentical.test.tsx`'s scope-freeze assertion keeps holding); **Spine stays the default**; flag-off ⇒ the toggle **VANISHES** (@xyflow out of the render path); click fires the EXISTING `onSelectNode` → shipped `PhaseFormPanel` (zero net-new panel); plain-language step-type fallback titles (only 10/119 phases have a real `phase.name`); 2 badge slots = grounding (derived from `citation_policy` + `citations_required`, NOT 185's authored field) + "Waits for you" on `llm_human_input` only; **layout = a PURE function of the definition** (no DOM measure → SC#4 becomes a snapshot test; clipping solved in CSS); unresolvable `skip_to_phase` renders as a **visibly broken reference** (agrees with the backend's existing `UNSATISFIABLE_SKIP`, `reachability.py:154`); test-only fixture table with ONE synthetic `branching` seed (no DB seed, no new starter); named empty state with ALL canvas chrome suppressed. **G-5: extract one shared vocabulary module AND repoint `PhaseSpineGraph`** — scouting found `soulData.ts`'s header falsely claims the `PhaseSpineGraph.tsx:24-31` duplicate was already replaced; it still renders the flat text glyphs Phase 127 retired (planner note: treat in-code claims of prior extraction as unverified). **The cross-cutting icon slug swaps (`compass` / `handshake`) stay a SEPARATE dedicated task** — 5 shipped surfaces, must not ride a canvas rollback; 183 ships only the canvas-local icon-well lightening. Client parse + a parity test pinned to `reachability.parse_skip_target` (:89); **183 does NOT call `/validate`** (that arrives with 184). D-181-08's freeze on `WorkflowBuilderPage.tsx` was 181-only and does not carry forward. **G-4: 4 operator-named live-UAT scenarios recorded** (Spine⇄Canvas agree · the 5-phase maximum reads without h-overflow · the empty draft doesn't look broken · flag-off = yesterday's Builder incl. operator accounts). Reported-bugs cross-check: 6 open `Agentic-RAG` reports, none folded; BUG-260609-04's re-open trigger repointed 124 → **188**. Next: `/gsd:plan-phase 183`.
 

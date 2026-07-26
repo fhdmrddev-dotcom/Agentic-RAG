@@ -1,8 +1,8 @@
 ---
 phase: 183-read-only-canvas
 verified: 2026-07-26T18:30:00Z
-status: human_needed
-score: 8/8 must-haves verified in code (2 new manual UAT rows — U-5/U-6 — still owed before the phase can close again)
+status: passed
+score: 8/8 must-haves verified in code; both owed live rows (U-5/U-6) driven and PASSED 2026-07-26
 overrides_applied: 0
 re_verification:
   previous_status: passed
@@ -15,11 +15,14 @@ re_verification:
   regressions: []
 gaps: []
 deferred: []
+human_verification_status: driven-and-passed 2026-07-26 (see 183-HUMAN-UAT.md tests 7 and 8)
 human_verification:
-  - test: "U-5: The step panel closes the obvious way, CANVAS view"
+  - result: pass
+    test: "U-5: The step panel closes the obvious way, CANVAS view"
     expected: "Flag ON. Open a draft, switch to [⬡ Canvas], click a step. A close control in the panel header is spottable without hunting; clicking it returns the panel to the thin rail; Escape does the same; clicking empty canvas space does the same."
     why_human: "'Findable without being told' is the exact discoverability complaint that produced this gap-closure plan. jsdom proves the button exists and the callback fires; only a live pass proves a real user notices it unprompted — the same bar the operator's original bug report set."
-  - test: "U-6: The step panel closes the obvious way, SPINE view, flag OFF"
+  - result: pass
+    test: "U-6: The step panel closes the obvious way, SPINE view, flag OFF"
     expected: "Flag OFF (Control Room), reload. Open a draft in the Spine, click a step. The same ✕ is present and closes the panel; Escape closes it. No [Spine]/[Canvas] strip and no canvas subtree may appear (D-181-01 unchanged)."
     why_human: "The defect was pre-existing Spine debt, not a canvas regression, so the fix must be seen live on the shipped surface where it was originally reported — a DOM-absence assertion cannot substitute for an operator confirming the control is visible and usable."
 ---
@@ -29,7 +32,7 @@ human_verification:
 **Phase Goal:** A user can view an existing workflow as a faithful read-only node canvas —
 proving the projection model before any write complexity.
 **Verified:** 2026-07-26T18:30:00Z
-**Status:** human_needed
+**Status:** passed (live gate closed 2026-07-26)
 **Re-verification:** Yes — after gap-closure plan `183-09` (commits `3dc0671e` / `4e997f03` /
 `45633371`), which closed the three defects the live Chrome UAT confirmed against the
 previously-`passed` phase.
@@ -205,18 +208,32 @@ project's own established precedent for this phase treats non-reversing Warnings
 debt for a team decision rather than an automatic gate. It is recorded here with elevated
 prominence, not silently passed, because it touches user data rather than pure presentation.
 
-**What keeps this pass at `human_needed` rather than `passed` is the same category of gate
-that has gated every 183 pass so far: live UAT.** `183-09` added exactly two rows (U-5, U-6) to
-close the discoverability question its own gap-closure work exists to answer, and neither has
-been driven yet. Per the phase's own validation strategy (and the G-4 guardrail), this is the
-honest status, not a paperwork formality — jsdom proved the button EXISTS; nothing yet proves a
-real user FINDS it, which is the entire premise of `183-09`.
+**LIVE GATE CLOSED 2026-07-26 — status raised `human_needed` → `passed`.** Both owed rows were
+driven by the operator and passed, and are recorded with evidence in `183-HUMAN-UAT.md`:
 
-**Recommended next steps, in order:**
-1. Operator (or Claude driving Chrome MCP) drives U-5 and U-6 live and records the result in an
-   updated `183-HUMAN-UAT.md`, ideally including the WR-09-01 edit-then-Escape survival check
-   above.
-2. Separately: decide whether WR-09-01 (the edit-loss asymmetry) warrants a small immediate
+- **U-5 (Canvas, flag ON)** — all three dismissal paths worked (✕, Escape, click-away on the
+  empty pane), and the operator confirmed the ✕ was **obvious at a glance rather than something
+  to hunt for**. That findability judgment was the entire premise of `183-09` and the one thing
+  jsdom could not establish.
+- **U-6 (Spine, flag OFF)** — flag flipped Off in the Control Room + reload: the
+  [Spine]/[Canvas] strip and the canvas subtree are both absent (D-181-01 revert contract
+  intact, unchanged from U-4), while the Spine panel now carries the same visible ✕ with Escape
+  working. The flag-OFF surface gained the close control and nothing else.
+
+Test 6 — the operator's original "there is no close button" report — is therefore marked
+`resolved` in `183-HUMAN-UAT.md`, closed by `183-09` and confirmed live in both views and both
+flag states.
+
+**Scope caveat, recorded honestly:** the live pass exercised the dismissal paths as written; it
+did NOT include the recommended edit-then-Escape survival check. **WR-09-01 (the edit-loss
+asymmetry — Escape and pane-click silently drop a focused field's pending autosave while the ✕
+does not) therefore remains unverified live and stays open as recorded debt**, alongside its
+sibling WR-09-02 (the "must not PATCH" assertion sitting on the ✕ tests rather than on the two
+paths that genuinely never write). Both carry a specified fix and test in `183-REVIEW-09.md`.
+
+**Remaining decision (does NOT gate this phase):**
+1. ~~Drive U-5 and U-6 live~~ — DONE 2026-07-26, both passed.
+2. Decide whether WR-09-01 (the edit-loss asymmetry) warrants a small immediate
    follow-up — it already has a specified fix and test in `183-REVIEW-09.md` — or should join
    WR-08-02/03, WR-02/03/04, IN-01…IN-09-05 as accepted, recorded debt carried into Phase 184.
 
