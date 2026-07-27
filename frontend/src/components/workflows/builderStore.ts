@@ -54,6 +54,7 @@
 import { createStore, type StoreApi } from "zustand/vanilla"
 import { temporal, type TemporalState } from "zundo"
 
+import { fromCanvas, type CanvasNode } from "@/components/workflows/canvasModel"
 import {
   addPhase,
   insertPhaseAt,
@@ -61,6 +62,7 @@ import {
   movePhase,
   patchPhaseConfig,
   removePhase,
+  renumber,
   slugForType,
   type PhaseTypeId,
 } from "@/components/workflows/definitionOps"
@@ -188,6 +190,10 @@ export interface BuilderStoreState extends TrackedSlice {
   insertPhaseOfTypeAt: (index: number, type: PhaseTypeId) => void
   /** Move the step carrying `slug` to render position `toIndex` (structural). */
   reorderPhase: (slug: string, toIndex: number) => void
+  /** Commit an order that ORIGINATED in canvas node space (structural). Reads the new
+   *  order through `fromCanvas` and ends in `reorderPhase` — see the implementation's
+   *  docblock for why the two modules are not redundant. */
+  commitCanvasNodes: (nodes: readonly CanvasNode[]) => void
   /** Remove the step carrying `slug` (structural). */
   removePhaseBySlug: (slug: string) => void
   /** Merge a phase-form patch into one step's config (config — coalesces). */
@@ -365,6 +371,72 @@ export function createBuilderStore(initial: BuilderDefinition | null): BuilderSt
             lastEditKind: "structural",
             editSeq: s.editSeq + 1,
           })
+        },
+
+        /**
+         * Plan 184-10 Task 1 (R2 · D-184-09 · D-184-10) — the CANVAS-ORIGINATED order
+         * commit. Both gesture paths end here, and this ends in `reorderPhase`.
+         *
+         * WHY THIS IS NOT A THIRD COPY OF THE REORDER RULE. Two modules own two halves
+         * and neither may grow the other's: `canvasModel.fromCanvas` is the sole
+         * CANVAS→DEFINITION serializer, and `definitionOps` is the sole
+         * DEFINITION→DEFINITION mutation home. This action is the seam where a commit
+         * ORIGINATES in canvas node space, so it reads the new order through
+         * `fromCanvas(nodes, phases)` — which never renumbers, deliberately — derives the
+         * moved slug and its target render index from that order, and then DELEGATES to
+         * `reorderPhase`, i.e. `renumber(movePhase(...))`. That is what keeps D-184-09's
+         * "one op behind both paths" literally true rather than merely intended: the
+         * pointer drag and the `⌥←` / `⌥→` press both land on `reorderPhase`, and there
+         * is exactly one place in the app where a phase array is spliced.
+         *
+         * IT IS A NO-OP UNLESS SOMETHING ACTUALLY MOVED. Four bail-outs, each of which
+         * must leave `pastStates` and `dirty` untouched:
+         *  1. DUPLICATE SLUGS — `fromCanvas`'s fail-safe hands the source back untouched
+         *     (losing a step on save is the worst failure available), so its output
+         *     carries no order information at all. The predicate below is that same
+         *     condition, read off the source, so the two agree by definition.
+         *  2. A NODE ARRAY THAT DOES NOT COVER EVERY PHASE — a partial array cannot be a
+         *     reorder, only a loss.
+         *  3. THE ORDER IS UNCHANGED — a drag that lands back in its own lane, and every
+         *     purely vertical drag by construction (D-184-10).
+         *  4. AN ORDER NO SINGLE MOVE EXPLAINS — unreachable from either shipped gesture
+         *     (each moves exactly one card), and refusing is the honest answer rather
+         *     than picking an arbitrary op that was never performed.
+         *
+         * `lastEditKind` is `"structural"` (inherited from `reorderPhase`), so the entry
+         * pushes IMMEDIATELY rather than coalescing — a reorder is one atomic act
+         * (D-184-02). And this action performs NO network call of any kind: the
+         * definition moves, the server is told nothing until the page saves (D-184-03).
+         *
+         * The current render order is read as `renumber(phases).map(…slug)` rather than
+         * by re-sorting here, so the load-bearing `(phase_index, slug)` comparator stays
+         * in the one module that owns it.
+         */
+        commitCanvasNodes: (nodes) => {
+          const s = get()
+
+          const current = renumber(s.phases).map((p) => p.slug)
+          // (1) The `fromCanvas` fail-safe condition, read off the source itself.
+          if (new Set(current).size !== current.length) return
+
+          const next = fromCanvas(nodes, s.phases).map((p) => p.slug)
+          // (2) Every phase must be accounted for, or this is not a reorder.
+          if (next.length !== current.length) return
+          // (3) Nothing moved.
+          if (next.every((slug, i) => slug === current[i])) return
+
+          // (4) Which ONE card moved? The slug whose removal makes the two orders
+          // identical is exactly the slug `movePhase` would splice out and re-insert,
+          // so the derivation and the op agree by construction rather than by arithmetic
+          // that could drift from it.
+          const moved = current.find((slug) => {
+            const withoutCurrent = current.filter((other) => other !== slug)
+            const withoutNext = next.filter((other) => other !== slug)
+            return withoutCurrent.every((other, i) => other === withoutNext[i])
+          })
+          if (moved === undefined) return
+
+          get().reorderPhase(moved, next.indexOf(moved))
         },
 
         removePhaseBySlug: (slug) => {

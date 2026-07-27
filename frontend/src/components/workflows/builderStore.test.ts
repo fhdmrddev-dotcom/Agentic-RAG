@@ -26,6 +26,10 @@ import {
   type BuilderStore,
 } from "./builderStore"
 import type { PhaseSpecJSON } from "./phaseVocabulary"
+// Plan 184-10, as SEPARATE statements — the 184-04 import lines above are untouched,
+// so `git diff` on this file shows added lines only.
+import { toCanvas } from "./canvasModel"
+import { CANVAS_NODE_TYPES } from "./canvasModel"
 
 /**
  * The whole-suite network tripwire. D-184-03 says an undo NEVER writes to the server, so
@@ -444,6 +448,128 @@ describe("builderStore — two mounts, two independent histories", () => {
     expect(past(a)).toHaveLength(1)
     expect(past(b)).toHaveLength(0)
     expect(b.getState().phases).toHaveLength(3)
+  })
+})
+
+// ── 11. The canvas-originated order commit (plan 184-10, R2 · D-184-09) ─────────
+//
+// APPENDED, never edited: every assertion above this line is 184-04's and is
+// untouched. This block is deliberately placed BEFORE the whole-suite network
+// tripwire below, so the spy's "exactly 0 calls" claim still covers it.
+//
+// The node arrays are built with the REAL `toCanvas` projection rather than
+// hand-rolled, which is what makes the end-cap / stub filtering a genuine test of
+// `fromCanvas`'s behaviour instead of a test of a fixture I shaped to pass.
+
+/** The phase nodes of `phases`, in render order, reordered by `slugs`, with the
+ *  non-phase nodes (the ○ end cap, an unresolved-skip stub) left in place. */
+function nodesInOrder(phases: PhaseSpecJSON[], slugs: string[]) {
+  const projection = toCanvas(phases)
+  const byId = new Map(projection.nodes.map((n) => [n.id, n]))
+  const phaseNodes = slugs.map((slug) => byId.get(slug)!)
+  const others = projection.nodes.filter((n) => n.type !== CANVAS_NODE_TYPES.phase)
+  return [...phaseNodes, ...others]
+}
+
+describe("builderStore — commitCanvasNodes runs through fromCanvas into the ONE reorder op", () => {
+  it("a reordered node array produces that phases order, renumbered [0..n-1]", () => {
+    const store = createBuilderStore(draft())
+
+    store.getState().commitCanvasNodes(nodesInOrder(draft().phases, ["write", "search", "deliver"]))
+
+    expect(store.getState().phases.map((p) => p.slug)).toEqual(["write", "search", "deliver"])
+    expect(store.getState().phases.map((p) => p.phase_index)).toEqual([0, 1, 2])
+  })
+
+  it("moves a card FORWARD as well as backward (the derivation is not one-directional)", () => {
+    const store = createBuilderStore(draft())
+
+    store.getState().commitCanvasNodes(nodesInOrder(draft().phases, ["write", "deliver", "search"]))
+
+    expect(store.getState().phases.map((p) => p.slug)).toEqual(["write", "deliver", "search"])
+    expect(store.getState().phases.map((p) => p.phase_index)).toEqual([0, 1, 2])
+  })
+
+  it("raises pastStates by EXACTLY ONE, synchronously — a reorder is one atomic act", () => {
+    const store = createBuilderStore(draft())
+    expect(past(store)).toHaveLength(0)
+
+    store.getState().commitCanvasNodes(nodesInOrder(draft().phases, ["deliver", "search", "write"]))
+
+    // No timer advance: `lastEditKind` is "structural", so it does not coalesce.
+    expect(past(store)).toHaveLength(1)
+  })
+
+  it("a node array in the CURRENT order is a NO-OP: no history entry, no dirty flag", () => {
+    const store = createBuilderStore(draft())
+
+    store.getState().commitCanvasNodes(nodesInOrder(draft().phases, ["search", "write", "deliver"]))
+
+    expect(past(store)).toHaveLength(0)
+    expect(store.getState().dirty).toBe(false)
+    expect(store.getState().phases.map((p) => p.slug)).toEqual(["search", "write", "deliver"])
+  })
+
+  it("a source carrying DUPLICATE slugs is a no-op (the fromCanvas fail-safe propagates)", () => {
+    // THE ARRAY ORDER IS DELIBERATELY NOT THE RENDER ORDER. `fromCanvas`'s fail-safe
+    // hands back `[...source]` — the source's own array order — while the "nothing
+    // moved" comparison is against the RENDER order. On a source that happens to be
+    // stored in render order the two coincide and the later bail-out would mask this
+    // one. Falsified: commenting out the duplicate-slug bail with THIS fixture turns
+    // the test red (`movePhase` picks the first `dup` and commits a reorder nobody
+    // performed); with a render-ordered fixture it stays green for the wrong reason.
+    const store = createBuilderStore({
+      ...draft(),
+      phases: [phase("other", 2), phase("dup", 0), phase("dup", 1)],
+    })
+
+    store
+      .getState()
+      .commitCanvasNodes(nodesInOrder([phase("dup", 0), phase("other", 1)], ["other", "dup"]))
+
+    expect(past(store)).toHaveLength(0)
+    expect(store.getState().dirty).toBe(false)
+    expect(store.getState().phases.map((p) => p.slug)).toEqual(["other", "dup", "dup"])
+  })
+
+  it("the end cap and an unresolved-skip stub in the array become no phases at all", () => {
+    const withBrokenSkip: PhaseSpecJSON[] = [
+      { slug: "start", phase_index: 0, config: { phase_type: "llm_single" } },
+      {
+        slug: "check",
+        phase_index: 1,
+        config: { phase_type: "llm_single" },
+        validators: [{ on_failure: "skip_to_phase:nonexistent" }],
+      },
+    ]
+    const store = createBuilderStore({ ...draft(), phases: withBrokenSkip })
+
+    const projection = toCanvas(withBrokenSkip)
+    // Positive control: the array really does carry both reserved-id node kinds.
+    expect(projection.nodes.filter((n) => n.type !== CANVAS_NODE_TYPES.phase)).toHaveLength(2)
+
+    store.getState().commitCanvasNodes(nodesInOrder(withBrokenSkip, ["check", "start"]))
+
+    expect(store.getState().phases.map((p) => p.slug)).toEqual(["check", "start"])
+    expect(store.getState().phases).toHaveLength(2)
+  })
+
+  it("a partial node array (a phase missing) is a no-op — a reorder never loses a step", () => {
+    const store = createBuilderStore(draft())
+
+    store.getState().commitCanvasNodes(nodesInOrder(draft().phases, ["write", "search"]))
+
+    expect(past(store)).toHaveLength(0)
+    expect(store.getState().phases.map((p) => p.slug)).toEqual(["search", "write", "deliver"])
+  })
+
+  it("marks the draft dirty on a real reorder (the D-184-03 subscription still fires)", () => {
+    const store = createBuilderStore(draft())
+    expect(store.getState().dirty).toBe(false)
+
+    store.getState().commitCanvasNodes(nodesInOrder(draft().phases, ["deliver", "search", "write"]))
+
+    expect(store.getState().dirty).toBe(true)
   })
 })
 
