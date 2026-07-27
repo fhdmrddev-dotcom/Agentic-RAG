@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
 status: executing
-last_updated: "2026-07-27T06:52:26.153Z"
+last_updated: "2026-07-27T07:22:10.991Z"
 last_activity: 2026-07-27
 progress:
   total_phases: 18
   completed_phases: 3
   total_plans: 37
-  completed_plans: 31
+  completed_plans: 32
   percent: 17
 ---
 
@@ -45,7 +45,7 @@ Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 op
 ## Current Position
 
 Phase: 184 (Editable Canvas + Live Structural Validation (Round-Trip)) — EXECUTING
-Plan: 8 of 13
+Plan: 9 of 13
 
 **Plan 184-01 COMPLETE (`4a019bd8` gate → `ffb3e9cf` icon swap → `854ec42b` SUMMARY).** Wave 0's
 measuring stick landed FIRST as its own single-file commit: `scripts/vitest-count-gate.cjs` pins
@@ -768,6 +768,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 184 P05 | 33min | 3 tasks | 6 files |
 | Phase 184 P06 | 20min | 3 tasks | 3 files |
 | Phase 184 P07 | 35min | 3 tasks | 4 files |
+| Phase 184 P08 | 17min | 3 tasks | 7 files |
 
 ## Decisions
 
@@ -974,6 +975,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase ?]: 184-07: the cosmetic nudge key is agentic-rag.canvas-nudge.v1.<user_id>.<draft_id> — one flat key per user per draft; zero migrations, slot 114 stays RESERVED
 - [Phase ?]: 184-07: a session with no resolvable user id takes the same in-memory path as an unsaved draft — an unscoped key would be the very leak per-user scoping prevents
 - [Phase ?]: 184-07: StepTypePicker renders its refusal CHARACTER-IDENTICAL to definitionOps.STRANDING_REASON, proving it authored none of its own
+- [Phase ?]: 184-08: the verdict-mark table lives in nodePresentation and the degraded copy in verdictModel — react-refresh/only-export-components forbids either from a component module; two Wave-0 seam assertions in PhaseNodeCard.test.tsx were narrowed and enumerated
 
 ## Operator Next Steps
 
