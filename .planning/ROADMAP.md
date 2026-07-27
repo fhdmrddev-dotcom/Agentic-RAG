@@ -175,7 +175,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 184-02-PLAN.md — Wave 0: the D-184-08 count gate + pure `definitionOps` (ops, both refusals, slug, drag resolver)
+- [x] 184-02-PLAN.md — Wave 0: the D-184-08 count gate + pure `definitionOps` (ops, both refusals, slug, drag resolver)
 - [ ] 184-03-PLAN.md — Wave 0: `PhaseNode` splits into `nodePresentation` + zero-@xyflow `PhaseNodeCard` + adapter
 
 **Wave 3** *(blocked on Wave 2 completion)*

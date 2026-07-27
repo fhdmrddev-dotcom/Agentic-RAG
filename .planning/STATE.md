@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
 status: executing
-last_updated: "2026-07-27T04:21:02.717Z"
-last_activity: 2026-07-27 -- Phase 184 plan 01 complete (Wave-0 count gate + glyph swap)
+last_updated: "2026-07-27T04:38:44.076Z"
+last_activity: 2026-07-27 -- Phase 184 plan 02 complete (pure definitionOps + both shape refusals)
 progress:
   total_phases: 18
   completed_phases: 3
   total_plans: 37
-  completed_plans: 25
+  completed_plans: 26
   percent: 17
 ---
 
@@ -45,7 +45,7 @@ Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 op
 ## Current Position
 
 Phase: 184 (Editable Canvas + Live Structural Validation (Round-Trip)) — EXECUTING
-Plan: 2 of 13
+Plan: 3 of 13
 
 **Plan 184-01 COMPLETE (`4a019bd8` gate → `ffb3e9cf` icon swap → `854ec42b` SUMMARY).** Wave 0's
 measuring stick landed FIRST as its own single-file commit: `scripts/vitest-count-gate.cjs` pins
@@ -68,6 +68,29 @@ Desktop was down, so the operator substituted stronger mechanical evidence (meas
 the installed icon set independently reproducing the sketch claim — `busts-in-silhouette` **33.3** vs
 `handshake` **181.4**, against a 144–172 band for every other mark — plus both marks rendered against
 the real Deep Midnight tokens: old mark near-invisible, both new marks legible and in-band).
+
+**Plan 184-02 COMPLETE (`f6ac55f7` six pure ops → `d3d21abd` refusals/slug/drag → `8e549d68`
+SUMMARY).** `definitionOps.ts` (461 L) is now the ONE mutation home for `WorkflowDefinition.phases`
+— zero React, zero store, zero API-client, zero canvas import. R1's contiguous-`phase_index` proof
+is a plain unit test swept over all 15 shipped fixtures, behind a **falsified** planted-gap control
+(flattening `[0,1,3]`→`[0,1,2]` turned it red: *expected [] to include 3*; restored → green). Both
+cheap refusals landed as pure predicates — `canRemovePhase` grounded on the shipped
+`parseSkipTarget` (RESEARCH A4: the real orphan is a dangling `skip_to_phase`, not index
+arithmetic) and `allowedTypesAt` returning **six** choices always, a stranding one disabled with
+its reason. Network-freedom proved twice and both falsified: a `?raw` source fence plus a
+whole-suite `fetch` spy at **0** calls. **Zero assertions edited in any pre-existing test file and
+zero import-path-only changes** — the only test file in the plan's diff is net-new (795 insertions
+/ 0 deletions), so the D-184-08 carve-out stays spent. Gates: count gate exit 0 on both commits
+(551 then 595, 0 failing, every one of the 16 pinned files at delta **0**), tsc **33** (= baseline),
+`vite build` exit 0, canvas snapshot byte-unchanged, 0 migration files. **No production caller is
+wired** — `WorkflowBuilderPage.tsx` is untouched and is repointed in 184-04, so nothing shipped can
+regress from this plan. **Deviation worth carrying (D-184-02-A):** the plan's stranding boundary
+("at or after" the deliverable) is off by one — inserting AT the emit's position puts the new step
+BEFORE it, so that boundary would refuse "add a step just before the deliverable" while stating a
+reason that is factually false. Implemented strictly-after; `StepTypePicker` (184-04) inherits it.
+**CANVAS-02 deliberately left `Pending`** in REQUIREMENTS.md: this plan ships the substrate, not a
+user-visible capability, and marking it Complete at plan 2 of 13 would make the traceability table
+lie for the rest of the phase.
 
 **RE-VERIFICATION GATE (2026-07-26, post-`183-09`): `human_needed`, not `passed`.** All 8
 must-haves verified in code by direct source read; phase-scoped suite re-run independently at
@@ -657,6 +680,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 183 P06 | 27min | 3 tasks | 3 files |
 | Phase 183 P07 | 22min | 3 tasks | 3 files |
 | Phase 183 P08 | 25m | 3 tasks | 5 files |
+| Phase 184 P02 | 22min | 2 tasks | 2 files |
 
 ## Decisions
 
@@ -851,6 +875,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase 183]: D-183-09-01: GAP-1 fixed in BOTH views and flag-independently — the panel-dismissal defect lives on the shipped Spine surface, not the canvas (D-183-13 precedent); D-181-01 frozen surfaces untouched
 - [Phase 183]: D-183-09-02: PhaseFormPanel.onClose and WorkflowCanvas.onClearSelection are REQUIRED props — an unclosable panel is a typecheck error, not a silent UX regression
 - [Phase 183]: D-183-09-03: the Spine's empty-area click-away deferred on implementation cost + G-5 blast radius, explicitly NOT the jsx-a11y gate — overturnable on operator call
+- [Phase 184]: D-184-02-A: allowedTypesAt's stranding boundary is strictly-AFTER the deliverable — inserting AT the emit's position puts the new step BEFORE it, so an at-or-after boundary would refuse the most natural authoring act with a reason that is false about the edit refused
 
 ## Operator Next Steps
 
