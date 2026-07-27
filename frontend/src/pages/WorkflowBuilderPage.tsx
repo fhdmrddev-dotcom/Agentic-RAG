@@ -119,6 +119,20 @@
  * WHAT IS STILL NOT AUTOSAVE. `onPersist` / `onSaveDraft` below are untouched in
  * their create-once-then-PATCH shape: a session issues exactly ONE create and then
  * PATCHes. Phase 186 owns autosave and this plan deliberately does not pre-empt it.
+ *
+ * ── Phase 184-13 (D-184-04 / R12) — the keys, and the one bottom region ─────────
+ *
+ * THIS PAGE NOW REGISTERS TWO GATED WINDOW KEY LISTENERS, not one. Escape (gated on
+ * `panelOpen`, since 183) releases the panel in both views; `⌘Z` / `Ctrl+Z` /
+ * `⇧⌘Z` / `Ctrl+Y` (gated on `canvasEnabled && activeGraphView === "canvas"`) step
+ * through the undo history. Both follow the same shape and both YIELD to text fields.
+ * The count is written out because it used to be one.
+ *
+ * THE BOTTOM REGION IS COMPOSED IN `WorkflowCanvas`, NOT HERE. R12 allows ONE
+ * bottom-edge region with two rows at most — the toolbar and the problems-tray summary
+ * — and the tray expands UPWARD from its own row. Publish stays in the header it
+ * already had (141-B's operator correction), so this plan adds NO band anywhere: what
+ * the page adds is the props those two rows render from.
  */
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useStore } from "zustand"
@@ -471,6 +485,63 @@ export function WorkflowBuilderPage({
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
   }, [panelOpen, clearSelection])
+
+  /**
+   * D-184-04 — `⌘Z` / `Ctrl+Z` undo, `⇧⌘Z` / `Ctrl+Y` redo. ONE listener, and it YIELDS.
+   *
+   * GATED EXACTLY LIKE THE ESCAPE LISTENER ABOVE, and for the same three reasons: it
+   * exists only while the flagged canvas view is the one on screen, so no listener is
+   * registered on the Spine or with the flag off (a flag-off surface must not grow a
+   * global key binding — D-14 / D-181-01), it costs nothing at rest, and the effect
+   * removes exactly the handler it added so it cannot accumulate across renders.
+   *
+   * IT YIELDS TO TEXT FIELDS, and that is the difference between undo being usable and
+   * being a trap. A person fixing a typo in a step's description presses `⌘Z` expecting
+   * the browser's own field-level undo; if this listener swallowed it, one keystroke
+   * would silently revert a STRUCTURAL edit they had not thought about in ten minutes.
+   * So the handler bails the moment the event's target is an `input`, a `textarea` or a
+   * `contenteditable` — the same yield `WorkflowCanvas`'s `⌥←` / `⌥→` handler makes, for
+   * the same reason.
+   *
+   * ONE PRESS IS ONE STEP. `keydown` auto-repeats while a key is held (~31/sec after the
+   * initial delay), and a held `⌘Z` would walk the whole history stack in under two
+   * seconds. The guard is `WorkflowCanvas.tsx`'s.
+   *
+   * THE TOOLBAR IS THE DISCOVERABLE PATH; these are the accelerator. Both end in the same
+   * temporal actions, reached here through `getState()` — a SIDE-EFFECT call inside a
+   * handler, which is exactly where `getState()` is correct (the rendered enabled state is
+   * a selector read, in `CanvasToolbar`).
+   *
+   * AND IT NEVER WRITES (D-184-03). Only store actions are called. Stepping back past a
+   * save point re-marks the draft dirty through the store's own subscription, which is
+   * honest: the in-memory definition now differs from what was PATCHed.
+   */
+  useEffect(() => {
+    if (!canvasEnabled || activeGraphView !== "canvas") return
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!event.metaKey && !event.ctrlKey) return
+      if (event.repeat) return
+
+      const key = event.key.toLowerCase()
+      const isUndo = key === "z" && !event.shiftKey
+      const isRedo = (key === "z" && event.shiftKey) || key === "y"
+      if (!isUndo && !isRedo) return
+
+      // The yield. Native field-level undo keeps working inside every text control.
+      const target = event.target as HTMLElement | null
+      const tag = target?.tagName
+      if (tag === "INPUT" || tag === "TEXTAREA" || target?.isContentEditable === true) return
+
+      event.preventDefault()
+      const temporal = store.temporal.getState()
+      if (isUndo) temporal.undo()
+      else temporal.redo()
+    }
+
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [canvasEnabled, activeGraphView, store])
 
   // The current working definition (drafted state only). `selectDefinition` is the ONE
   // place the store's two halves recombine into a definition — fed here from the two

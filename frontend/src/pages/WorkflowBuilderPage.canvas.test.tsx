@@ -1033,3 +1033,193 @@ describe("WorkflowBuilderPage 184-12 — growing the flow, and the two refusals"
     expect(screen.queryByTestId("canvas-notice-refusal")).toBeNull()
   })
 })
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Plan 184-13 — D-184-04's FOUR KEY BINDINGS, behind ONE gated listener.
+//
+// Appended; nothing above this line was edited.
+//
+// WHY THESE LIVE HERE. The listener is a behaviour of THIS PAGE: it is mounted by this
+// page's effect, gated on this page's flag + view state, and it moves this page's store.
+// `CanvasToolbar` owns the buttons and its own suite owns their proof; nothing about a
+// window listener is observable from inside that component. This is the same
+// where-the-behaviour-lives split 184-12 recorded as its Deviation 3.
+//
+// HOW "UNDONE" IS OBSERVED. Through the same `renderPublish` seam the 184-12 block uses
+// — the page's live `BuilderDefinition`, a genuine observable, never a private field.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe("WorkflowBuilderPage 184-13 — the undo/redo keys (D-184-04)", () => {
+  const FLAG_ON_184_13 = { features: { visual_workflow_canvas: true }, loading: false }
+
+  let seen: BuilderDefinition[]
+
+  function renderKeyBuilder(features: { features: EffectiveFeatures; loading: boolean }) {
+    seen = []
+    return render(
+      <EffectiveFeaturesProvider value={{ ...features, refetch: vi.fn() }}>
+        <div style={{ width: 1200, height: 800 }}>
+          <WorkflowBuilderPage
+            initial={{ definition: { ...definition, phases: evalCoverage }, draftId: "draft-1" }}
+            renderPublish={(d) => {
+              seen.push(d as BuilderDefinition)
+              return null
+            }}
+          />
+        </div>
+      </EffectiveFeaturesProvider>,
+    )
+  }
+
+  const latestPhases = () => seen[seen.length - 1].phases
+
+  /** Open the canvas and make ONE structural edit, so there is a history to step through.
+   *  The edit is a delete, which is the shortest path to a changed `phases` array. */
+  async function canvasWithOneEdit() {
+    renderKeyBuilder(FLAG_ON_184_13)
+    await screen.findByTestId("builder-view-toggle")
+    fireEvent.click(screen.getByTestId("builder-view-canvas"))
+    await waitFor(() => expect(screen.getByTestId("canvas-node-split")).toBeInTheDocument(), LAZY)
+    expect(latestPhases()).toHaveLength(5)
+
+    fireEvent.click(screen.getByTestId("canvas-remove-deep_dive"))
+    await waitFor(() => expect(latestPhases()).toHaveLength(4))
+  }
+
+  it("Ctrl+Z steps the last structural edit back", async () => {
+    await canvasWithOneEdit()
+
+    fireEvent.keyDown(window, { key: "z", ctrlKey: true })
+
+    await waitFor(() => expect(latestPhases()).toHaveLength(5))
+    expect(latestPhases().map((p) => p.slug)).toContain("deep_dive")
+  })
+
+  it("Meta+Z works too — the binding is not Windows-only", async () => {
+    await canvasWithOneEdit()
+
+    fireEvent.keyDown(window, { key: "z", metaKey: true })
+
+    await waitFor(() => expect(latestPhases()).toHaveLength(5))
+  })
+
+  it("Ctrl+Y and Shift+Meta+Z BOTH redo", async () => {
+    await canvasWithOneEdit()
+
+    fireEvent.keyDown(window, { key: "z", ctrlKey: true })
+    await waitFor(() => expect(latestPhases()).toHaveLength(5))
+
+    fireEvent.keyDown(window, { key: "y", ctrlKey: true })
+    await waitFor(() => expect(latestPhases()).toHaveLength(4))
+
+    // …and the other spelling of the same act, from the same state.
+    fireEvent.keyDown(window, { key: "z", ctrlKey: true })
+    await waitFor(() => expect(latestPhases()).toHaveLength(5))
+
+    fireEvent.keyDown(window, { key: "Z", metaKey: true, shiftKey: true })
+    await waitFor(() => expect(latestPhases()).toHaveLength(4))
+  })
+
+  it("it YIELDS to a text field — an undo press inside an input reverts nothing", async () => {
+    await canvasWithOneEdit()
+    const before = latestPhases().map((p) => p.slug)
+
+    // Attached to the document so the event really bubbles to the window listener; the
+    // TARGET is what the handler must read, and it must bail on it.
+    const input = document.createElement("input")
+    document.body.appendChild(input)
+    fireEvent.keyDown(input, { key: "z", ctrlKey: true })
+
+    const textarea = document.createElement("textarea")
+    document.body.appendChild(textarea)
+    fireEvent.keyDown(textarea, { key: "z", metaKey: true })
+
+    const rich = document.createElement("div")
+    Object.defineProperty(rich, "isContentEditable", { value: true })
+    document.body.appendChild(rich)
+    fireEvent.keyDown(rich, { key: "z", ctrlKey: true })
+
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(latestPhases().map((p) => p.slug)).toEqual(before)
+
+    input.remove()
+    textarea.remove()
+    rich.remove()
+
+    // POSITIVE CONTROL — the very same press outside a field DOES undo, so the three
+    // rows above measure the YIELD rather than a listener that never fires at all.
+    fireEvent.keyDown(window, { key: "z", ctrlKey: true })
+    await waitFor(() => expect(latestPhases()).toHaveLength(5))
+  })
+
+  it("an auto-REPEAT press is one step, not thirty", async () => {
+    await canvasWithOneEdit()
+    const before = latestPhases().map((p) => p.slug)
+
+    fireEvent.keyDown(window, { key: "z", ctrlKey: true, repeat: true })
+
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(latestPhases().map((p) => p.slug)).toEqual(before)
+  })
+
+  it("an UNMODIFIED z does nothing — the modifier is part of the binding", async () => {
+    await canvasWithOneEdit()
+    const before = latestPhases().map((p) => p.slug)
+
+    fireEvent.keyDown(window, { key: "z" })
+
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(latestPhases().map((p) => p.slug)).toEqual(before)
+  })
+
+  it("with the flag OFF no keydown listener is registered from this path, and the keys revert nothing", async () => {
+    const addSpy = vi.spyOn(window, "addEventListener")
+    renderKeyBuilder({ features: {}, loading: false })
+    await screen.findByTestId("builder-grid")
+
+    expect(addSpy.mock.calls.filter(([type]) => type === "keydown")).toHaveLength(0)
+
+    const before = latestPhases().map((p) => p.slug)
+    fireEvent.keyDown(window, { key: "z", ctrlKey: true })
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(latestPhases().map((p) => p.slug)).toEqual(before)
+
+    addSpy.mockRestore()
+  })
+
+  it("on the SPINE view — flag on — no keydown listener is registered either", async () => {
+    const addSpy = vi.spyOn(window, "addEventListener")
+    renderKeyBuilder(FLAG_ON_184_13)
+    await screen.findByTestId("builder-view-toggle")
+    // The Builder cold-starts on the Spine (D-183-02), so nothing has been switched.
+    expect(addSpy.mock.calls.filter(([type]) => type === "keydown")).toHaveLength(0)
+
+    // POSITIVE CONTROL — switching to the canvas registers one, so the two assertions
+    // above measure the GATE rather than a spy that never sees anything.
+    fireEvent.click(screen.getByTestId("builder-view-canvas"))
+    await waitFor(() => expect(screen.getByTestId("canvas-node-split")).toBeInTheDocument(), LAZY)
+    expect(addSpy.mock.calls.filter(([type]) => type === "keydown").length).toBeGreaterThanOrEqual(1)
+
+    addSpy.mockRestore()
+  })
+
+  it("an undo NEVER writes to the server (D-184-03)", async () => {
+    await canvasWithOneEdit()
+    mockCreate.mockClear()
+    mockUpdate.mockClear()
+
+    fireEvent.keyDown(window, { key: "z", ctrlKey: true })
+    await waitFor(() => expect(latestPhases()).toHaveLength(5))
+    // Well past the coalescing window, so "zero" is not "not yet".
+    await new Promise((resolve) => setTimeout(resolve, 700))
+
+    expect(mockCreate).toHaveBeenCalledTimes(0)
+    expect(mockUpdate).toHaveBeenCalledTimes(0)
+    // ⚠ `validateWorkflow` is deliberately NOT pinned at zero here, and the reason is
+    // worth stating: an undo genuinely CHANGES the definition, so the live loop
+    // re-checking it is the loop doing its job (D-184-15), not the listener reaching for
+    // the network. Pinning it at zero would be asserting the loop OFF, and would go red
+    // the first time somebody fixed a bug in it. What must be zero is the WRITE — which
+    // is exactly what the two lines above measure.
+  })
+})
