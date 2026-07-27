@@ -3369,6 +3369,156 @@ export async function deleteWorkflowDraft(id: string, signal?: AbortSignal): Pro
   if (!res.ok) throw new Error(`Failed to delete workflow draft (status ${res.status})`)
 }
 
+// ── Phase 184-06 (VALID-02 / VALID-03 · D-184-13 / D-184-14) — the FIRST clients of
+//    the two canvas routes Phase 182 shipped and nothing called. Both are consumed
+//    EXACTLY as shipped: this plan changes no backend file. ─────────────────────────
+
+/**
+ * One finding from `POST /workflows/validate`, exactly as the wire carries it.
+ *
+ * `code` IS DECLARED AS `string`, DELIBERATELY, AND MUST STAY THAT WAY (VALID-03 /
+ * D-182-06). The SERVER owns the whole verdict vocabulary — reachability's lint codes,
+ * grounding's fidelity codes, the two the route mints itself, and the degraded marker —
+ * and the route's own classifier FAILS CLOSED, meaning a code nobody has classified yet
+ * comes back at the hard severity rather than the soft one. The client's job is to render
+ * whatever arrives, including codes it has never seen; Phase 185 adds more of them and
+ * this file must need no edit for that. Narrowing this to a union of literals would make
+ * the client a second, drifting copy of a vocabulary that has exactly one owner — which is
+ * the red line the whole server-validation seam exists to hold. Do not "helpfully" narrow it.
+ *
+ * `phase` is the phase SLUG (== the canvas node id), or `null` for a workflow-wide
+ * finding, which therefore needs a home in the problems tray rather than on a node.
+ *
+ * ONE SHAPE, TWO DECLARATIONS, AND A COMPILE-TIME BRIDGE. `builderStore.ts` declares the
+ * structurally identical `ServerVerdict`, because it landed first and because the two
+ * modules cannot import each other: the store carries a source fence forbidding it from
+ * naming this API client at all (an undo must never be able to write to the server), and
+ * this client must not import a store that type-imports `WorkflowBuilderPage`. So instead
+ * of a silent second copy, `useLiveValidation.ts` — the one module that legitimately sees
+ * both — carries a mutual-assignability assertion, making any drift a typecheck error.
+ */
+export interface Verdict {
+  code: string
+  phase: string | null
+  message: string
+  severity: "error" | "incomplete"
+}
+
+/**
+ * The always-200 envelope of `POST /workflows/validate`, returned UNTOUCHED.
+ *
+ * `ok === (verdicts.length === 0)` is the server's invariant, not a client derivation —
+ * an `incomplete`-only verdict set still reports not-ok, because an unfinished draft
+ * cannot publish either. Nothing here interprets, filters, re-orders or re-classifies
+ * the array.
+ */
+export interface ValidateResponse {
+  ok: boolean
+  verdicts: Verdict[]
+}
+
+/**
+ * `GET /workflows/grounding-bundle` — the server-sourced palette of valid building
+ * blocks (the CANVAS-04 tool whitelist, the KB folder tree, the enabled skills).
+ *
+ * `degraded` IS THE HONESTY FIELD AND IT IS NOT OPTIONAL READING. It names the registries
+ * whose read FAILED, sorted. An EMPTY array is the ONLY value that means "this palette is
+ * complete" — because a registry blip serves `{folders: [], skills: []}` at HTTP 200,
+ * which is byte-indistinguishable from an author who genuinely owns nothing. A picker
+ * that renders an empty-but-normal dropdown on a failed read is telling the user
+ * something false, so a caller MUST branch on this rather than on emptiness.
+ */
+export interface GroundingBundle {
+  tools: string[]
+  folders: { id: string; name: string; parent_id: string | null }[]
+  skills: { id: string; name: string | null }[]
+  template_placeholders: string[]
+  degraded: string[]
+}
+
+/**
+ * `POST /workflows/validate` answered HTTP 422 — the definition's SHAPE was rejected
+ * before the handler ran (the model's forbid-extra-keys tier, or one of the two
+ * cross-field model validators), so the always-200 envelope was bypassed entirely.
+ *
+ * THE RAW BODY IS LOGGED HERE AND CARRIED NO FURTHER (D-184-14 / T-184-06-01). The
+ * constructor writes it to the console once, at this boundary, and the error's `message`
+ * is a FIXED business-plain sentence with nothing interpolated into it. A validation
+ * error body is a list of internal field paths and framework phrasing; pretty-printing it
+ * onto an authoring surface aimed at business users would leak implementation detail and
+ * still not tell them what to do. Turning those bodies into something a person can act on
+ * is a server-side envelope change that is deliberately deferred — it is not a job for a
+ * client-side formatter, and this class exists so the hook can branch on `name` rather
+ * than parse a string.
+ */
+export class WorkflowValidateUnreadableError extends Error {
+  constructor(rawBody?: unknown) {
+    super("the workflow's shape could not be read by the validator")
+    this.name = "WorkflowValidateUnreadableError"
+    // Logged, never shown. One line, at the boundary that received it.
+    console.warn("POST /workflows/validate → 422 (shape rejected before the handler):", rawBody)
+  }
+}
+
+/**
+ * POST /workflows/validate — the live structural check (VALID-02).
+ *
+ * Takes a RAW definition, never a draft id, so an UNSAVED draft validates with no save
+ * and no row. Returns the `{ok, verdicts}` envelope verbatim: no severity classifier, no
+ * code allow-list, no friendly-message map. The 422 branch is typed and comes BEFORE the
+ * generic not-ok throw, because a shape rejection and an unreachable server are different
+ * things the caller must be able to word differently (D-184-14).
+ *
+ * `signal` is the house signature and is what makes the live loop's abort-on-new-edit
+ * possible; an abort surfaces as the usual DOM abort error and is the caller's to ignore.
+ */
+export async function validateWorkflow(
+  def: WorkflowDefinitionJSON,
+  signal?: AbortSignal,
+): Promise<ValidateResponse> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/workflows/validate`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(def),
+    signal,
+  })
+  if (res.status === 422) {
+    // Read the body for the LOG only; a body that will not parse must not mask the 422.
+    let body: unknown = null
+    try {
+      body = await res.json()
+    } catch {
+      body = null
+    }
+    throw new WorkflowValidateUnreadableError(body)
+  }
+  if (!res.ok) throw new Error(`Failed to validate workflow (status ${res.status})`)
+  return (await res.json()) as ValidateResponse
+}
+
+/**
+ * GET /workflows/grounding-bundle — the palette (CANVAS-04).
+ *
+ * `templateAssetId` is appended only when supplied; the base palette returns an empty
+ * placeholder list. The response is returned untouched, `degraded` included — see the
+ * `GroundingBundle` docblock for why that field, and not emptiness, is what a caller
+ * must branch on.
+ */
+export async function getGroundingBundle(
+  templateAssetId?: string,
+  signal?: AbortSignal,
+): Promise<GroundingBundle> {
+  const headers = await getAuthHeaders()
+  const query =
+    templateAssetId !== undefined && templateAssetId !== null && templateAssetId !== ""
+      ? `?template_asset_id=${encodeURIComponent(templateAssetId)}`
+      : ""
+  const res = await fetch(`${API_BASE}/workflows/grounding-bundle${query}`, { headers, signal })
+  if (!res.ok) throw new Error(`Failed to load the grounding bundle (status ${res.status})`)
+  return (await res.json()) as GroundingBundle
+}
+
 // ── Phase 152-04 (WFIN-03 / D-LOCK-03/04/05) — the published-workflow safe DELETE
 //    cascade + its server-sourced victim-naming counts. These hit DISTINCT routes on
 //    api/workflows.py (Plan 02, D-08) — NEVER the draft `DELETE /workflows/{id}` above
