@@ -187,10 +187,15 @@ export interface BuilderStoreState extends TrackedSlice {
   /** The in-memory definition differs from what was last PATCHed. Untracked, and
    *  re-armed by an undo (D-184-03) via the subscription in the factory below. */
   dirty: boolean
-  /** Transient save feedback for the canvas toolbar (141-B). Untracked.
-   *  NOT wired in plan 184-04 — the page keeps its own shipped `saveState` for the
-   *  header's Save-draft button, because D-184-05 leaves persistence untouched here.
-   *  This slot is the toolbar's home and is deliberately unread today. */
+  /** Transient save feedback. Untracked, and STILL UNREAD by anything in the app.
+   *
+   *  ⚠ 184-04 reserved this slot "for the canvas toolbar (141-B)". 184-13 built that
+   *  toolbar and did NOT use it, so the reservation is retired rather than left standing
+   *  as a promise nothing keeps. The toolbar's reading is joined on the page from the
+   *  page's own `saveState` and this store's `dirty` — because persistence lives on the
+   *  page (D-184-05) and mirroring it here would be a second copy of a state whose one
+   *  writer is `onSaveDraft`. Phase 186, which rewrites that seam for autosave, is the
+   *  plan that gets to decide whether this slot earns its keep. */
   saveState: SaveState
 
   // ── Actions. Every one is immutable and every structural one delegates to a pure
