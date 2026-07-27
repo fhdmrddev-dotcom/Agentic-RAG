@@ -136,7 +136,11 @@ import {
   type PhaseFormRails,
   type PhaseGateRow,
 } from "@/components/workflows/PhaseFormPanel"
-import { createBuilderStore, selectDefinition } from "@/components/workflows/builderStore"
+import {
+  createBuilderStore,
+  selectDefinition,
+  SAVED_STILL_A_DRAFT,
+} from "@/components/workflows/builderStore"
 import { BuilderStoreProvider } from "@/components/workflows/BuilderStoreProvider"
 import { useEffectiveFeaturesOptional } from "@/providers/EffectiveFeaturesProvider"
 import { cn } from "@/lib/utils"
@@ -165,8 +169,15 @@ const WorkflowCanvas = lazy(() => import("@/components/workflows/WorkflowCanvas"
  * SAVED and, in the same breath, that it is still a draft. No word in it may imply
  * published — publishing is a separate act behind the gauntlet, and a save that reads
  * like a release is the single most expensive lie this header can tell.
+ *
+ * ⚠ 184-13 MOVED THE DECLARATION, not the name or the value. Two surfaces now say it —
+ * this header and the canvas toolbar — and the toolbar lives on the code-split canvas
+ * chunk, so it cannot reach back into this page module to read a string without dragging
+ * the whole page in with it. The literal therefore lives beside the `SaveState` type in
+ * `builderStore.ts`, and this line re-exports it so every existing caller (and every
+ * existing grep) still finds it here.
  */
-export const SAVED_STILL_A_DRAFT = "Saved · still a draft"
+export { SAVED_STILL_A_DRAFT }
 
 /**
  * The 409 sentence (D-184-16 debt 3). `updateWorkflowDraft` already throws a typed

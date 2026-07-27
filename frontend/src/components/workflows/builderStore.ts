@@ -130,6 +130,26 @@ export type BuilderPhase = "empty" | "composing" | "drafted" | "error"
 export type SaveState = "idle" | "saving" | "saved" | "error"
 
 /**
+ * THE LOCKED SAVE WORDING (184-CONTEXT `<specifics>`), and why it lives in this module
+ * rather than in the page that first declared it.
+ *
+ * Plan 184-11 put it on `WorkflowBuilderPage`, which was the only surface that said
+ * anything about a save. Plan 184-13 adds a SECOND — the canvas toolbar — and a leaf on
+ * the code-split canvas chunk must not reach back into a page module to read a string
+ * (that would pull the whole page into the canvas chunk and undo D-183-03). Re-typing the
+ * literal in the toolbar was the other option, and *"two spellings of a locked string is
+ * how a locked string stops being locked"* (184-11's own words). So it moves HERE, next to
+ * the `SaveState` type and the untracked `saveState` slot this store already reserves for
+ * the toolbar, and the page RE-EXPORTS it under the same name for every existing caller.
+ *
+ * The sentence itself: the surface says the draft is SAVED and, in the same breath, that
+ * it is still a draft. No word in it may imply published — publishing is a separate act
+ * behind the gauntlet, and a save that reads like a release is a lie shown a hundred times
+ * a session.
+ */
+export const SAVED_STILL_A_DRAFT = "Saved · still a draft"
+
+/**
  * The working definition MINUS its phases.
  *
  * Spelled as a key-remapped mapped type rather than `Omit<BuilderDefinition, "phases">`:
