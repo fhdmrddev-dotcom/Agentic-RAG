@@ -1,0 +1,455 @@
+/**
+ * Phase 184 Wave 0 (R4 · D-184-01 · D-184-02 · D-184-03) — the builder-store proofs.
+ *
+ * WHY THIS FILE EXISTS BEFORE THE TOOLBAR. 184-RESEARCH.md's assumptions log records A3
+ * at MEDIUM confidence: zundo's `handleSet` CALL SIGNATURE is verified from upstream
+ * source, but the debounce-with-flush composition built on top of it is NOT copied from
+ * any shipped example. A3's own discharge instruction is "prove it with a small unit test
+ * on the store BEFORE building the toolbar on it". These are that test. The falsification
+ * that makes them evidence rather than decoration is recorded in 184-04-SUMMARY.md.
+ *
+ * NO DOM, NO REACT RENDER. The store is driven directly, in the shipped
+ * `__tests__/integration/streamsStore_per_thread.test.ts` shape — except that that suite
+ * needs a `beforeEach` global reset because `streamsStore` is a module SINGLETON.
+ * `createBuilderStore` is a per-mount FACTORY, so every test below constructs its own
+ * store and no reset exists to forget. That is the concrete reason the factory shape is
+ * better, and it is why history cannot leak between two Builder sessions.
+ */
+import { describe, it, expect, beforeAll, afterAll, afterEach, vi, type MockInstance } from "vitest"
+
+import builderStoreSource from "./builderStore?raw"
+import {
+  createBuilderStore,
+  selectDefinition,
+  CONFIG_COALESCE_MS,
+  HISTORY_LIMIT,
+  type BuilderStore,
+} from "./builderStore"
+import type { PhaseSpecJSON } from "./phaseVocabulary"
+
+/**
+ * The whole-suite network tripwire. D-184-03 says an undo NEVER writes to the server, so
+ * the strongest available statement is that nothing this suite drives — including every
+ * undo and redo — reaches the network at all. Falsified before it was trusted (see the
+ * SUMMARY): a planted call turns it red.
+ */
+let fetchSpy: MockInstance
+
+beforeAll(() => {
+  fetchSpy = vi.spyOn(globalThis, "fetch")
+})
+
+afterAll(() => {
+  fetchSpy.mockRestore()
+})
+
+afterEach(() => {
+  vi.useRealTimers()
+})
+
+// ── Fixtures, hand-authored inline (the shipped corpus stays untouched, D-184-17) ──
+
+function phase(slug: string, index: number, type = "llm_single"): PhaseSpecJSON {
+  return { slug, phase_index: index, config: { phase_type: type } }
+}
+
+/** A three-step draft ending in a deliverable — the Starter-Library shape. */
+function draft() {
+  return {
+    slug: "risk-register",
+    version: 1,
+    business_requirement: "Summarise the week's risks.",
+    project_folder_id: null,
+    phases: [phase("search", 0, "llm_agent"), phase("write", 1), phase("deliver", 2, "llm_emit")],
+  }
+}
+
+const past = (store: BuilderStore) => store.temporal.getState().pastStates
+const future = (store: BuilderStore) => store.temporal.getState().futureStates
+
+// ── 1. Structural edits push a history entry IMMEDIATELY (D-184-02) ─────────────
+
+describe("builderStore — a structural edit is one undo, recorded synchronously", () => {
+  it("addPhaseOfType pushes exactly one entry with no timer advance", () => {
+    const store = createBuilderStore(draft())
+    expect(past(store)).toHaveLength(0)
+
+    store.getState().addPhaseOfType("llm_single")
+
+    expect(past(store)).toHaveLength(1)
+    expect(store.getState().phases).toHaveLength(4)
+  })
+
+  it("insertPhaseOfTypeAt pushes exactly one entry with no timer advance", () => {
+    const store = createBuilderStore(draft())
+    store.getState().insertPhaseOfTypeAt(1, "llm_human_input")
+
+    expect(past(store)).toHaveLength(1)
+    expect(store.getState().phases[1].config.phase_type).toBe("llm_human_input")
+  })
+
+  it("reorderPhase pushes exactly one entry with no timer advance", () => {
+    const store = createBuilderStore(draft())
+    store.getState().reorderPhase("deliver", 0)
+
+    expect(past(store)).toHaveLength(1)
+    expect(store.getState().phases.map((p) => p.slug)).toEqual(["deliver", "search", "write"])
+  })
+
+  it("removePhaseBySlug pushes exactly one entry with no timer advance", () => {
+    const store = createBuilderStore(draft())
+    store.getState().removePhaseBySlug("write")
+
+    expect(past(store)).toHaveLength(1)
+    expect(store.getState().phases.map((p) => p.slug)).toEqual(["search", "deliver"])
+  })
+
+  it("four structural edits are four separate undos", () => {
+    const store = createBuilderStore(draft())
+    const s = store.getState()
+    s.addPhaseOfType("llm_single")
+    s.insertPhaseOfTypeAt(0, "programmatic")
+    s.reorderPhase("search", 0)
+    s.removePhaseBySlug("write")
+
+    expect(past(store)).toHaveLength(4)
+  })
+
+  it("an unknown slug is a no-op and pushes NOTHING (no phantom entry)", () => {
+    const store = createBuilderStore(draft())
+    store.getState().reorderPhase("does-not-exist", 0)
+    store.getState().removePhaseBySlug("does-not-exist")
+
+    expect(past(store)).toHaveLength(0)
+  })
+})
+
+// ── 2. Config edits coalesce over CONFIG_COALESCE_MS (D-184-02) ─────────────────
+
+describe("builderStore — a run of config edits is ONE undo, not forty", () => {
+  it("two patchConfig calls inside 500 ms produce ONE entry, and none before the flush", async () => {
+    vi.useFakeTimers()
+    const store = createBuilderStore(draft())
+
+    store.getState().patchConfig("write", { prompt: "Sum" })
+    store.getState().patchConfig("write", { prompt: "Summarise" })
+
+    // Nothing yet — the run is still coalescing.
+    expect(past(store)).toHaveLength(0)
+
+    await vi.advanceTimersByTimeAsync(CONFIG_COALESCE_MS)
+
+    expect(past(store)).toHaveLength(1)
+  })
+
+  it("a third patchConfig AFTER the flush starts a new run and produces a second entry", async () => {
+    vi.useFakeTimers()
+    const store = createBuilderStore(draft())
+
+    store.getState().patchConfig("write", { prompt: "a" })
+    store.getState().patchConfig("write", { prompt: "ab" })
+    await vi.advanceTimersByTimeAsync(CONFIG_COALESCE_MS)
+    expect(past(store)).toHaveLength(1)
+
+    store.getState().patchConfig("write", { prompt: "abc" })
+    await vi.advanceTimersByTimeAsync(CONFIG_COALESCE_MS)
+
+    expect(past(store)).toHaveLength(2)
+  })
+
+  it("the entry a coalesced run records is the state BEFORE the run began", async () => {
+    vi.useFakeTimers()
+    const store = createBuilderStore(draft())
+    const before = store.getState().phases
+
+    store.getState().patchConfig("write", { prompt: "a" })
+    store.getState().patchConfig("write", { prompt: "ab" })
+    await vi.advanceTimersByTimeAsync(CONFIG_COALESCE_MS)
+
+    expect(past(store)[0]?.phases).toBe(before)
+
+    store.getState().flushHistory()
+    store.temporal.getState().undo()
+    expect(store.getState().phases).toBe(before)
+  })
+
+  it("flushHistory() commits a coalescing run early — the field-blur path", () => {
+    vi.useFakeTimers()
+    const store = createBuilderStore(draft())
+
+    store.getState().patchConfig("write", { prompt: "a" })
+    expect(past(store)).toHaveLength(0)
+
+    store.getState().flushHistory()
+
+    expect(past(store)).toHaveLength(1)
+  })
+})
+
+// ── 3. A structural edit interleaved into a coalescing run flushes it FIRST ──────
+
+describe("builderStore — an atomic act never swallows the config run it interrupted", () => {
+  it("records [config-run, structural] in that order", async () => {
+    vi.useFakeTimers()
+    const store = createBuilderStore(draft())
+
+    const beforeConfig = store.getState().phases
+    store.getState().patchConfig("write", { prompt: "a" })
+    store.getState().patchConfig("write", { prompt: "ab" })
+    const afterConfig = store.getState().phases
+
+    store.getState().addPhaseOfType("llm_single")
+
+    expect(past(store)).toHaveLength(2)
+    expect(past(store)[0]?.phases).toBe(beforeConfig)
+    expect(past(store)[1]?.phases).toBe(afterConfig)
+
+    // …and the pending timer, already flushed, adds nothing when it expires.
+    await vi.advanceTimersByTimeAsync(CONFIG_COALESCE_MS)
+    expect(past(store)).toHaveLength(2)
+  })
+
+  it("undoing twice steps back through the structural act and then the whole sentence", () => {
+    vi.useFakeTimers()
+    const store = createBuilderStore(draft())
+    const beforeConfig = store.getState().phases
+
+    store.getState().patchConfig("write", { prompt: "a" })
+    store.getState().patchConfig("write", { prompt: "ab" })
+    store.getState().addPhaseOfType("llm_single")
+
+    store.temporal.getState().undo()
+    expect(store.getState().phases).toHaveLength(3)
+    expect(store.getState().phases[1].config.prompt).toBe("ab")
+
+    store.temporal.getState().undo()
+    expect(store.getState().phases).toBe(beforeConfig)
+  })
+})
+
+// ── 4. partialize holds the definition slice ONLY (R4 / Pitfall 8) ───────────────
+
+describe("builderStore — a server verdict is not undoable", () => {
+  it("setVerdicts leaves the undo stack untouched", () => {
+    const store = createBuilderStore(draft())
+    store.getState().setVerdicts([
+      { code: "no_terminal", phase: null, message: "No deliverable.", severity: "error" },
+    ])
+
+    expect(past(store)).toHaveLength(0)
+    expect(store.getState().verdicts).toHaveLength(1)
+  })
+
+  it("setChecking leaves the undo stack untouched", () => {
+    const store = createBuilderStore(draft())
+    store.getState().setChecking(true)
+
+    expect(past(store)).toHaveLength(0)
+    expect(store.getState().checking).toBe(true)
+  })
+
+  it("setDegraded leaves the undo stack untouched", () => {
+    const store = createBuilderStore(draft())
+    store.getState().setDegraded({ kind: "network" })
+
+    expect(past(store)).toHaveLength(0)
+    expect(store.getState().degraded).toEqual({ kind: "network" })
+  })
+
+  it("setSaveState and markSaved leave the undo stack untouched", () => {
+    const store = createBuilderStore(draft())
+    store.getState().setSaveState("saving")
+    store.getState().markSaved()
+
+    expect(past(store)).toHaveLength(0)
+  })
+
+  it("the snapshotted keys are exactly phases + lastEditKind + editSeq", () => {
+    const store = createBuilderStore(draft())
+    store.getState().addPhaseOfType("llm_single")
+
+    expect(Object.keys(past(store)[0] ?? {}).sort()).toEqual([
+      "editSeq",
+      "lastEditKind",
+      "phases",
+    ])
+  })
+})
+
+// ── 5. The cosmetic nudge is STRUCTURALLY absent (D-184-02) ─────────────────────
+
+describe("builderStore — a nudge adds no history entry BY CONSTRUCTION", () => {
+  it("the store carries no positional / offset field of any kind", () => {
+    const store = createBuilderStore(draft())
+    const offending = Object.keys(store.getState()).filter((k) => /dy|nudge|offset|position/i.test(k))
+
+    expect(offending).toEqual([])
+  })
+
+  it("the walk is a real control — it FINDS a planted positional key", () => {
+    const planted = { phases: [], dy: 12, verdicts: [] }
+    const offending = Object.keys(planted).filter((k) => /dy|nudge|offset|position/i.test(k))
+
+    expect(offending).toEqual(["dy"])
+  })
+})
+
+// ── 6. Undo / redo semantics (verified zundo internals) ─────────────────────────
+
+describe("builderStore — undo / redo", () => {
+  it("undo restores the previous phases and moves one entry into the future", () => {
+    const store = createBuilderStore(draft())
+    store.getState().addPhaseOfType("llm_single")
+    const afterFirst = store.getState().phases
+    store.getState().addPhaseOfType("llm_single")
+    store.getState().addPhaseOfType("llm_single")
+
+    expect(past(store)).toHaveLength(3)
+
+    store.temporal.getState().undo()
+
+    expect(store.getState().phases).toHaveLength(5)
+    store.temporal.getState().undo()
+    expect(store.getState().phases).toBe(afterFirst)
+    expect(future(store)).toHaveLength(2)
+  })
+
+  it("redo re-applies what undo stepped back over", () => {
+    const store = createBuilderStore(draft())
+    store.getState().addPhaseOfType("llm_single")
+    const afterEdit = store.getState().phases
+
+    store.temporal.getState().undo()
+    expect(store.getState().phases).toHaveLength(3)
+
+    store.temporal.getState().redo()
+    expect(store.getState().phases).toEqual(afterEdit)
+  })
+
+  it("a NEW edit after an undo clears the redo stack (zundo sets futureStates: [])", () => {
+    const store = createBuilderStore(draft())
+    store.getState().addPhaseOfType("llm_single")
+    store.getState().addPhaseOfType("llm_single")
+
+    store.temporal.getState().undo()
+    expect(future(store)).toHaveLength(1)
+
+    store.getState().addPhaseOfType("programmatic")
+
+    expect(future(store)).toHaveLength(0)
+  })
+})
+
+// ── 7. D-184-03 — undo crosses the save boundary and NEVER writes ────────────────
+
+describe("builderStore — undo re-arms dirty and writes nothing", () => {
+  it("markSaved clears dirty; a later undo flips it back to true", () => {
+    const store = createBuilderStore(draft())
+
+    store.getState().addPhaseOfType("llm_single")
+    expect(store.getState().dirty).toBe(true)
+
+    store.getState().markSaved()
+    expect(store.getState().dirty).toBe(false)
+
+    store.temporal.getState().undo()
+
+    expect(store.getState().dirty).toBe(true)
+  })
+
+  it("opening a definition does NOT mark the draft dirty", () => {
+    const store = createBuilderStore(null)
+    expect(store.getState().dirty).toBe(false)
+
+    store.getState().setDrafted(draft())
+
+    expect(store.getState().dirty).toBe(false)
+    expect(store.getState().builderPhase).toBe("drafted")
+  })
+
+  it("a replaced DOCUMENT is not undoable back into the previous one", () => {
+    const store = createBuilderStore(draft())
+    store.getState().addPhaseOfType("llm_single")
+    expect(past(store)).toHaveLength(1)
+
+    store.getState().setDrafted({ slug: "other", phases: [phase("only", 0)] })
+
+    expect(past(store)).toHaveLength(0)
+    expect(future(store)).toHaveLength(0)
+  })
+
+  it("the store source names no network seam (the belt to the spy's braces)", () => {
+    expect(builderStoreSource).not.toMatch(/fetch\(/)
+    expect(builderStoreSource).not.toMatch(/from\s+["']@\/lib\/api["']/)
+    expect(builderStoreSource).not.toMatch(/XMLHttpRequest|EventSource|sendBeacon/)
+  })
+
+  it("those fences are real — each regex matches its planted literal", () => {
+    expect('const r = await fetch("/x")').toMatch(/fetch\(/)
+    expect('import { x } from "@/lib/api"').toMatch(/from\s+["']@\/lib\/api["']/)
+    expect("new EventSource(url)").toMatch(/XMLHttpRequest|EventSource|sendBeacon/)
+  })
+})
+
+// ── 8. limit eviction (verified: one entry per push at a >= boundary) ────────────
+
+describe("builderStore — the history depth cap", () => {
+  it(`holds at exactly HISTORY_LIMIT (${HISTORY_LIMIT}) after HISTORY_LIMIT + 5 edits`, () => {
+    const store = createBuilderStore(draft())
+    for (let i = 0; i < HISTORY_LIMIT + 5; i += 1) store.getState().addPhaseOfType("llm_single")
+
+    expect(past(store)).toHaveLength(HISTORY_LIMIT)
+  })
+})
+
+// ── 9. selectDefinition — the ONE recombination point ────────────────────────────
+
+describe("builderStore — selectDefinition", () => {
+  it("returns the input definition's KEY SET (never asserted on key ORDER)", () => {
+    const source = draft()
+    const store = createBuilderStore(source)
+
+    const out = selectDefinition(store.getState())
+
+    expect(Object.keys(out).sort()).toEqual(Object.keys(source).sort())
+  })
+
+  it("carries the store's CURRENT phases array, not the loaded one", () => {
+    const store = createBuilderStore(draft())
+    store.getState().addPhaseOfType("llm_single")
+
+    const out = selectDefinition(store.getState())
+
+    expect(out.phases).toBe(store.getState().phases)
+    expect(out.phases).toHaveLength(4)
+  })
+
+  it("adds no key of its own — no positional field can reach the payload (R3)", () => {
+    const store = createBuilderStore(draft())
+    const out = selectDefinition(store.getState())
+
+    expect(Object.keys(out).filter((k) => /^(x|y|position|layout|dy)$/i.test(k))).toEqual([])
+  })
+})
+
+// ── The per-mount property, and the network tripwire's verdict ───────────────────
+
+describe("builderStore — two mounts, two independent histories", () => {
+  it("an edit in one store leaves the other's history empty", () => {
+    const a = createBuilderStore(draft())
+    const b = createBuilderStore(draft())
+
+    a.getState().addPhaseOfType("llm_single")
+
+    expect(past(a)).toHaveLength(1)
+    expect(past(b)).toHaveLength(0)
+    expect(b.getState().phases).toHaveLength(3)
+  })
+})
+
+describe("builderStore — zero network calls across the entire suite (D-184-03)", () => {
+  it("the fetch spy recorded exactly 0 calls", () => {
+    expect(fetchSpy).not.toHaveBeenCalled()
+    expect(fetchSpy.mock.calls).toHaveLength(0)
+  })
+})
