@@ -180,7 +180,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 184-04-PLAN.md — Wave 0: `zundo` per-mount builder store + Builder page rewire (persistence untouched)
+- [x] 184-04-PLAN.md — Wave 0: `zundo` per-mount builder store + Builder page rewire (persistence untouched)
 
 **Wave 4** *(blocked on Wave 3 completion)*
 

@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
 status: executing
-last_updated: "2026-07-27T04:59:02.271Z"
+last_updated: "2026-07-27T05:44:15.912Z"
 last_activity: 2026-07-27
 progress:
   total_phases: 18
   completed_phases: 3
   total_plans: 37
-  completed_plans: 26
+  completed_plans: 28
   percent: 17
 ---
 
@@ -45,7 +45,7 @@ Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 op
 ## Current Position
 
 Phase: 184 (Editable Canvas + Live Structural Validation (Round-Trip)) — EXECUTING
-Plan: 4 of 13
+Plan: 5 of 13
 
 **Plan 184-01 COMPLETE (`4a019bd8` gate → `ffb3e9cf` icon swap → `854ec42b` SUMMARY).** Wave 0's
 measuring stick landed FIRST as its own single-file commit: `scripts/vitest-count-gate.cjs` pins
@@ -684,6 +684,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 183 P08 | 25m | 3 tasks | 5 files |
 | Phase 184 P02 | 22min | 2 tasks | 2 files |
 | Phase 184 P03 | 38min | 3 tasks | 4 files |
+| Phase 184 P04 | 40min | 3 tasks | 6 files |
 
 ## Decisions
 
@@ -880,6 +881,9 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase 183]: D-183-09-03: the Spine's empty-area click-away deferred on implementation cost + G-5 blast radius, explicitly NOT the jsx-a11y gate — overturnable on operator call
 - [Phase 184]: D-184-02-A: allowedTypesAt's stranding boundary is strictly-AFTER the deliverable — inserting AT the emit's position puts the new step BEFORE it, so an at-or-after boundary would refuse the most natural authoring act with a reason that is false about the edit refused
 - [Phase ?]: D-184-06 landed: PhaseNodeCard is presentational with zero graph-library import; the badge slot is a max-2 tuple whose violation is TS2322
+- [Phase ?]: D-184-04-A: a coalescing run keeps the FIRST pending handleSet args, not the last — undo must restore the state before the sentence began; a length-only assertion cannot see the difference
+- [Phase ?]: D-184-04-B: setDrafted/setComposing clear the temporal history and do not mark the draft dirty — a generate is a document boundary, not a save boundary
+- [Phase ?]: D-184-04-C: Omit against BuilderDefinition's index signature collapses to {} — DefinitionMeta is a key-remapped mapped type so the definition shape stays declared once
 
 ## Operator Next Steps
 
