@@ -195,7 +195,7 @@ Plans:
 
 **Wave 6** *(blocked on Wave 5 completion)*
 
-- [ ] 184-10-PLAN.md — canvas editing gestures: drag axis split, cosmetic nudge, ⌥←/⌥→ reorder, verdict marks
+- [x] 184-10-PLAN.md — canvas editing gestures: drag axis split, cosmetic nudge, ⌥←/⌥→ reorder, verdict marks
 
 **Wave 7** *(blocked on Wave 6 completion)*
 

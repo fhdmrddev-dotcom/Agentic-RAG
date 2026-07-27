@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
 status: executing
-last_updated: "2026-07-27T07:44:17.507Z"
+last_updated: "2026-07-27T08:11:26.295Z"
 last_activity: 2026-07-27
 progress:
   total_phases: 18
   completed_phases: 3
   total_plans: 37
-  completed_plans: 33
+  completed_plans: 34
   percent: 17
 ---
 
@@ -45,7 +45,7 @@ Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 op
 ## Current Position
 
 Phase: 184 (Editable Canvas + Live Structural Validation (Round-Trip)) — EXECUTING
-Plan: 10 of 13
+Plan: 11 of 13
 
 **Plan 184-01 COMPLETE (`4a019bd8` gate → `ffb3e9cf` icon swap → `854ec42b` SUMMARY).** Wave 0's
 measuring stick landed FIRST as its own single-file commit: `scripts/vitest-count-gate.cjs` pins
@@ -770,6 +770,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 184 P07 | 35min | 3 tasks | 4 files |
 | Phase 184 P08 | 17min | 3 tasks | 7 files |
 | Phase 184 P09 | 22min | 3 tasks | 4 files |
+| Phase 184 P10 | 40min | 3 tasks | 5 files |
 
 ## Decisions
 
@@ -980,6 +981,8 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase 184]: 184-09: the governance rails ride an OPTIONAL PhaseFormPanel prop whose absence renders today's panel byte-for-byte (D-14); the guard lives in a NEW PhaseFormPanel.rails.test.tsx because revertByteIdentical.test.tsx never renders that panel
 - [Phase 184]: 184-09: PhaseGateRow is a discriminated union carrying onRemove on the unlocked branch ONLY, so 'a locked gate with a remove button' and 'a removable gate with nothing to press' are both un-representable; a locked row's DOM subtree holds zero button/[role=button]/input
 - [Phase 184]: 184-09: useGroundingBundle is the app's only caller of GET /workflows/grounding-bundle; a non-empty degraded array resolves to unavailable and the ready member types degraded as the EMPTY TUPLE, so a degraded palette shown as complete is a typecheck error. idle/loading are DERIVED (react-hooks/set-state-in-effect), which also lets a read palette survive a transient disable
+- [Phase ?]: 184-10: ARIA_LABELS unchanged — a SECOND editable-only node-description table keeps the announced affordance true in both modes, so no pinned assertion was edited
+- [Phase ?]: 184-10: onNudge hands over the RESULTING offset, not the drag delta — passing the delta makes every second nudge discard the first
 
 ## Operator Next Steps
 
