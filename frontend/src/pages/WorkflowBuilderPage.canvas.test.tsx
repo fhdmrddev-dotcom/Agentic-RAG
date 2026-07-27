@@ -87,6 +87,12 @@ import type { EffectiveFeatures } from "@/lib/api"
 import { researchSummarize } from "@/components/workflows/__fixtures__/canvasFixtures"
 // Phase 184-11 Task 2: the R12 publish-handoff block mounts the real gauntlet.
 import { PublishGauntlet } from "@/components/workflows/PublishGauntlet"
+// Phase 184-12, on their own lines so this file's diff stays 0-deletion: a five-step
+// shape (so "the middle" is unambiguous), the branching shape whose `skip_to_phase`
+// makes R10a's orphaning case reachable, and the plain-language title accessor, read
+// rather than hardcoded so an assertion cannot drift from the card's own vocabulary.
+import { branching, evalCoverage } from "@/components/workflows/__fixtures__/canvasFixtures"
+import { nodeTitle } from "@/components/workflows/phaseVocabulary"
 
 mockReactFlow()
 
@@ -740,5 +746,290 @@ describe("WorkflowBuilderPage 184-11 — the page source fences hold with the lo
 
   it("passes rails SPREAD-CONDITIONALLY so the flag-off prop is absent by construction", () => {
     expect(builderSource).toMatch(/canvasEnabled \? \{ rails \}/)
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Plan 184-12 — R1's INSERT AND DELETE, R10a's REFUSAL, AND THE INLINE UNDO.
+//
+// Appended; nothing above this line was edited.
+//
+// WHY THESE LIVE HERE RATHER THAN IN THE CANVAS SUITE. The plan assigns the index-by-
+// index insert proof, the moved count, the orphaning refusal and the Undo restore to
+// `WorkflowCanvas.editing.test.tsx`. None of them is a behaviour of that component:
+// `WorkflowCanvas` holds no store, evaluates no predicate and computes no message — it
+// reports a gesture and renders what the page hands back. Asserting them there would
+// mean re-implementing this page's two handlers inside a test file and then measuring
+// the copy, which is the "a gate that lies" failure this phase has now named in five
+// plans. They are asserted here instead, against the REAL store, the REAL
+// `definitionOps` predicates and the REAL canvas, driven through the actual DOM.
+//
+// HOW THE DEFINITION IS READ. Through the shipped `renderPublish` seam, which the page
+// calls on every render with its live `BuilderDefinition`. That is a genuine observable
+// of the page's state — no private field is reached into, and the same seam the
+// Workflows shell uses in production is the one the assertions read.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** Five phases, so "the middle" is unambiguous and four steps can move. */
+const fiveStep: BuilderDefinition = { ...definition, phases: evalCoverage }
+
+/** `assess` sends its failures to `escalate` — so removing `escalate` is R10a's
+ *  orphaning case, and removing `draft` is the control that proceeds. */
+const withFallback: BuilderDefinition = { ...definition, phases: branching }
+
+describe("WorkflowBuilderPage 184-12 — growing the flow, and the two refusals", () => {
+  const FLAG_ON_184_12 = { features: { visual_workflow_canvas: true }, loading: false }
+
+  /** Every definition the page has rendered, newest last. */
+  let seen: BuilderDefinition[]
+
+  function renderCanvasBuilder(def: BuilderDefinition) {
+    seen = []
+    return render(
+      <EffectiveFeaturesProvider value={{ ...FLAG_ON_184_12, refetch: vi.fn() }}>
+        <div style={{ width: 1200, height: 800 }}>
+          <WorkflowBuilderPage
+            initial={{ definition: def, draftId: "draft-1" }}
+            renderPublish={(d) => {
+              seen.push(d as BuilderDefinition)
+              return null
+            }}
+          />
+        </div>
+      </EffectiveFeaturesProvider>,
+    )
+  }
+
+  /** The page's CURRENT working definition. */
+  const latest = () => seen[seen.length - 1]
+  /** `phase_index` in render order — the array R1 is a statement about. */
+  const indices = () => latest().phases.map((p) => p.phase_index)
+  const slugs = () => latest().phases.map((p) => p.slug)
+
+  async function openCanvasOn(def: BuilderDefinition) {
+    renderCanvasBuilder(def)
+    await screen.findByTestId("builder-view-toggle")
+    fireEvent.click(screen.getByTestId("builder-view-canvas"))
+    await waitFor(
+      () => expect(screen.getByTestId(`canvas-node-${def.phases[0].slug}`)).toBeInTheDocument(),
+      LAZY,
+    )
+  }
+
+  // ── R1 — the insert renumbers, and every downstream index moves by exactly one ──
+
+  it("R1 — inserting in the middle leaves phase_index exactly [0..n-1]", async () => {
+    await openCanvasOn(fiveStep)
+    expect(indices()).toEqual([0, 1, 2, 3, 4])
+
+    fireEvent.click(screen.getByTestId("canvas-insert-2"))
+    fireEvent.click(screen.getByTestId("step-type-choice-llm_single"))
+
+    await waitFor(() => expect(latest().phases).toHaveLength(6))
+    expect(indices()).toEqual([0, 1, 2, 3, 4, 5])
+  })
+
+  it("R1 — every DOWNSTREAM step incremented by exactly 1, asserted index by index", async () => {
+    await openCanvasOn(fiveStep)
+    const before = new Map(latest().phases.map((p) => [p.slug, p.phase_index]))
+
+    fireEvent.click(screen.getByTestId("canvas-insert-2"))
+    fireEvent.click(screen.getByTestId("step-type-choice-llm_single"))
+    await waitFor(() => expect(latest().phases).toHaveLength(6))
+
+    for (const phase of latest().phases) {
+      const was = before.get(phase.slug)
+      if (was === undefined) {
+        // The new step took the slot that was asked for, and only that slot.
+        expect(phase.phase_index).toBe(2)
+        continue
+      }
+      // Aggregate arithmetic would hide an off-by-one that cancels out; each step is
+      // named and checked on its own.
+      expect(phase.phase_index).toBe(was < 2 ? was : was + 1)
+    }
+  })
+
+  it("D-184-11 — the new step is SELECTED and the form panel opens on it", async () => {
+    await openCanvasOn(fiveStep)
+
+    fireEvent.click(screen.getByTestId("canvas-insert-2"))
+    fireEvent.click(screen.getByTestId("step-type-choice-llm_single"))
+
+    // `slugForType` derives `write` for `llm_single` on this shape, and the panel is
+    // anchored on it — the type is chosen at add time precisely because the panel
+    // conditions on `phase.config.phase_type` and offers no control that writes it.
+    await waitFor(() => expect(screen.getByLabelText("Refine step: write")).toBeInTheDocument(), LAZY)
+    expect(slugs()).toContain("write")
+  })
+
+  it("the surface says how many steps moved, in the delete message's vocabulary", async () => {
+    await openCanvasOn(fiveStep)
+
+    fireEvent.click(screen.getByTestId("canvas-insert-2"))
+    fireEvent.click(screen.getByTestId("step-type-choice-llm_single"))
+
+    const message = await screen.findByTestId("canvas-notice-action")
+    // split(0) and fanout(1) stay put; deep_dive, confirm and summarize each move one.
+    expect(message.textContent).toContain("3 steps renumbered")
+  })
+
+  // ── R1 — the delete re-stitches, and the message counts what actually moved ─────
+
+  it("R1 — deleting a middle step leaves [0..n-1] with no hole and no duplicate", async () => {
+    await openCanvasOn(fiveStep)
+
+    fireEvent.click(screen.getByTestId("canvas-remove-deep_dive"))
+
+    await waitFor(() => expect(latest().phases).toHaveLength(4))
+    expect(indices()).toEqual([0, 1, 2, 3])
+    expect(new Set(indices()).size).toBe(4)
+    expect(slugs()).not.toContain("deep_dive")
+  })
+
+  it("the delete message names the step and the CORRECT moved count", async () => {
+    await openCanvasOn(fiveStep)
+
+    fireEvent.click(screen.getByTestId("canvas-remove-deep_dive"))
+
+    const message = await screen.findByTestId("canvas-notice-action")
+    // The title is the plain-language one, never the slug — the slug lives behind the
+    // ⌥ Technical-names reveal. Read through `nodeTitle` so the assertion cannot drift
+    // from the vocabulary the card itself renders.
+    expect(message.textContent).toContain(`Removed ${nodeTitle(evalCoverage[2])}`)
+    // confirm 3→2 and summarize 4→3. Counted from the before/after comparison, not
+    // assumed from "everything downstream".
+    expect(message.textContent).toContain("2 steps renumbered")
+  })
+
+  it("deleting the LAST step moves nothing, and says so rather than reporting a zero", async () => {
+    await openCanvasOn(fiveStep)
+
+    fireEvent.click(screen.getByTestId("canvas-remove-summarize"))
+
+    const message = await screen.findByTestId("canvas-notice-action")
+    expect(message.textContent).toContain("nothing else moved")
+    expect(indices()).toEqual([0, 1, 2, 3])
+  })
+
+  it("NO confirm dialog is rendered at any point of a successful delete (D-184-12)", async () => {
+    await openCanvasOn(fiveStep)
+
+    expect(screen.queryByRole("dialog")).toBeNull()
+    fireEvent.click(screen.getByTestId("canvas-remove-deep_dive"))
+    expect(screen.queryByRole("dialog")).toBeNull()
+    expect(screen.queryByRole("alertdialog")).toBeNull()
+    await waitFor(() => expect(latest().phases).toHaveLength(4))
+    expect(screen.queryByRole("dialog")).toBeNull()
+  })
+
+  it("selection moves to the FOLLOWING step after a delete", async () => {
+    await openCanvasOn(fiveStep)
+
+    fireEvent.click(screen.getByTestId("canvas-remove-deep_dive"))
+
+    await waitFor(() => expect(screen.getByLabelText("Refine step: confirm")).toBeInTheDocument(), LAZY)
+  })
+
+  it("…and to the PRECEDING one when the deleted step was last", async () => {
+    await openCanvasOn(fiveStep)
+
+    fireEvent.click(screen.getByTestId("canvas-remove-summarize"))
+
+    await waitFor(() => expect(screen.getByLabelText("Refine step: confirm")).toBeInTheDocument(), LAZY)
+  })
+
+  // ── D-184-12 — the inline Undo, and it writes nothing ──────────────────────────
+
+  it("Undo restores the pre-delete phases EXACTLY", async () => {
+    await openCanvasOn(fiveStep)
+    const beforeDelete = structuredClone(latest().phases)
+
+    fireEvent.click(screen.getByTestId("canvas-remove-deep_dive"))
+    await waitFor(() => expect(latest().phases).toHaveLength(4))
+
+    fireEvent.click(screen.getByTestId("canvas-notice-undo"))
+
+    await waitFor(() => expect(latest().phases).toHaveLength(5))
+    expect(latest().phases).toStrictEqual(beforeDelete)
+  })
+
+  it("Undo dismisses the message it was attached to", async () => {
+    await openCanvasOn(fiveStep)
+
+    fireEvent.click(screen.getByTestId("canvas-remove-deep_dive"))
+    fireEvent.click(await screen.findByTestId("canvas-notice-undo"))
+
+    await waitFor(() => expect(screen.queryByTestId("canvas-notice-action")).toBeNull())
+  })
+
+  it("D-184-03 — neither the delete nor the Undo writes to the server", async () => {
+    await openCanvasOn(fiveStep)
+
+    fireEvent.click(screen.getByTestId("canvas-remove-deep_dive"))
+    fireEvent.click(await screen.findByTestId("canvas-notice-undo"))
+    await waitFor(() => expect(latest().phases).toHaveLength(5))
+
+    expect(mockCreate).toHaveBeenCalledTimes(0)
+    expect(mockUpdate).toHaveBeenCalledTimes(0)
+  })
+
+  // ── R10a — the orphaning delete is REFUSED, and it is not a confirm ────────────
+
+  it("R10a — an orphaning delete does NOT delete, and the phases are unchanged", async () => {
+    await openCanvasOn(withFallback)
+    const before = structuredClone(latest().phases)
+
+    // `assess`'s validator sends failures to `escalate`; removing it would leave a
+    // `skip_to_phase` naming a slug no phase provides — the backend's unsatisfiable_skip.
+    fireEvent.click(screen.getByTestId("canvas-remove-escalate"))
+
+    expect(await screen.findByTestId("canvas-notice-refusal")).toBeInTheDocument()
+    expect(latest().phases).toStrictEqual(before)
+    expect(screen.getByTestId("canvas-node-escalate")).toBeInTheDocument()
+  })
+
+  it("R10a — the refusal STATES its reason and offers no delete-anyway", async () => {
+    await openCanvasOn(withFallback)
+
+    fireEvent.click(screen.getByTestId("canvas-remove-escalate"))
+
+    const refusal = await screen.findByTestId("canvas-notice-refusal")
+    // The sentence is `canRemovePhase`'s own — the page authors none of it — and it
+    // names the REFERRING step by its plain title so the author knows what to fix.
+    expect(refusal.textContent).toContain("Remove that fallback first.")
+    expect(refusal.textContent).toContain(nodeTitle(branching[1]))
+    // A refusal is a different act from a confirm: nothing here proceeds.
+    expect(refusal.querySelectorAll("button")).toHaveLength(0)
+    expect(screen.queryByTestId("canvas-notice-undo")).toBeNull()
+    expect(screen.queryByRole("dialog")).toBeNull()
+    expect(screen.queryByRole("alertdialog")).toBeNull()
+  })
+
+  it("R10 — the refusal consults the server ZERO times", async () => {
+    await openCanvasOn(withFallback)
+    const validateCallsBefore = mockValidate.mock.calls.length
+
+    fireEvent.click(screen.getByTestId("canvas-remove-escalate"))
+    await screen.findByTestId("canvas-notice-refusal")
+    // Well past the live loop's debounce, so "zero" is not "not yet".
+    await new Promise((resolve) => setTimeout(resolve, 700))
+
+    expect(mockValidate.mock.calls.length).toBe(validateCallsBefore)
+    expect(mockValidate).toHaveBeenCalledTimes(0)
+    expect(mockUpdate).toHaveBeenCalledTimes(0)
+  })
+
+  it("the CONTRAST — a non-orphaning delete on the very same definition proceeds", async () => {
+    // Asserted in the same block on purpose: a refusal test that never shows the
+    // allowed case is compatible with a surface that refuses everything.
+    await openCanvasOn(withFallback)
+
+    fireEvent.click(screen.getByTestId("canvas-remove-draft"))
+
+    await waitFor(() => expect(latest().phases).toHaveLength(3))
+    expect(slugs()).not.toContain("draft")
+    expect(screen.getByTestId("canvas-notice-action")).toBeInTheDocument()
+    expect(screen.queryByTestId("canvas-notice-refusal")).toBeNull()
   })
 })
