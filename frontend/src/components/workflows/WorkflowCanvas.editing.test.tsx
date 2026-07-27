@@ -47,6 +47,11 @@ import { act, fireEvent, render, screen } from "@testing-library/react"
 import { mockReactFlow } from "@/test-utils/mockReactFlow"
 import { WorkflowCanvas } from "./WorkflowCanvas"
 import type { CanvasNode } from "./canvasModel"
+// Plan 184-12, on their OWN lines so this file's diff stays 0-deletion: the notice
+// union the appended block renders, and the ONE stranding sentence, so the R10b
+// assertion is character-identical to the pure module's constant rather than a copy.
+import type { CanvasNotice } from "./WorkflowCanvas"
+import { STRANDING_REASON, type PhaseTypeId } from "./definitionOps"
 import { VERDICT_DESTRUCTIVE_TOKEN, VERDICT_MARK } from "./nodePresentation"
 import { evalCoverage, unresolvableSkip } from "./__fixtures__/canvasFixtures"
 
@@ -502,5 +507,414 @@ describe("WorkflowCanvas — the cosmetic dy moves the card without touching the
       const offending = Object.keys(node.data ?? {}).filter((k) => /dy|nudge|offset/i.test(k))
       expect(offending).toEqual([])
     }
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Plan 184-12 — THE `＋` AND THE `✕`. Appended; nothing above this line was edited.
+//
+// WHAT THIS BLOCK MEASURES, AND WHAT IT DELIBERATELY DOES NOT.
+//
+// It measures the AFFORDANCES: where they live in the DOM, when they exist, what they
+// open, which choices the menu declines and with what sentence, what the two notice
+// treatments look like, and that the empty draft invites rather than showing a bare
+// control. All of that is this component's own job and is decidable here.
+//
+// It does NOT measure what a delete does to `phase_index`, what the message's moved
+// count is, or whether Undo restores. Those are not this component's behaviours —
+// `WorkflowCanvas` holds no store, runs no predicate and computes no message; it asks
+// the page and renders what comes back. Asserting them here would mean re-implementing
+// the page's handlers inside a test and then measuring the copy, which is the "a gate
+// that lies" failure this phase keeps naming. They are asserted where they actually
+// live, in `WorkflowBuilderPage.canvas.test.tsx`, against the real store.
+//
+// The driver rule from the top of this file still applies: `fireEvent` only.
+//
+// ⚠ ONE STALE TITLE ABOVE, LEFT DELIBERATELY. The 184-10 block is named "editable is
+// the switch, and it flips exactly one thing", and as of this plan that count is FOUR
+// (per-node drag, this ＋/✕ layer, the notice region, the empty-draft invitation — the
+// component's own docblock enumerates them). Its ASSERTIONS are all still exactly true
+// and still measure what they were written to measure, so rewording it would spend an
+// edit on a pre-existing file for a comment rather than a behaviour. Recorded here so
+// the next reader is not misled by it, and so nobody "discovers" the drift and quietly
+// widens that block instead of appending to this one.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** A definition that ENDS with a deliverable — R10b needs one, and no shipped fixture
+ *  carries an `llm_emit` (`__fixtures__/canvasFixtures.ts` stays untouched, D-184-17).
+ *  The emit sits at render position 2, so 184-02's corrected STRICTLY-AFTER boundary is
+ *  observable on both sides: index 2 is offered, index 3 is refused. */
+const withDeliverable = [
+  { slug: "zx-gather", phase_index: 0, config: { phase_type: "llm_agent" } },
+  { slug: "zx-review", phase_index: 1, config: { phase_type: "llm_human_input" } },
+  { slug: "zx-emit", phase_index: 2, config: { phase_type: "llm_emit" } },
+] as unknown as typeof evalCoverage
+
+/** The empty draft, hand-authored here for the same reason. */
+const noPhases = [] as unknown as typeof evalCoverage
+
+/** A SECOND render helper rather than widening the 184-10 one: this block needs three
+ *  props that one does not take, and growing a shared helper is how a file's older
+ *  assertions quietly start exercising a different component than they were written
+ *  for. Purely additive. */
+function renderEditable(
+  phases: typeof evalCoverage,
+  opts: {
+    editable?: boolean
+    onInsertAt?: (index: number, type: PhaseTypeId) => void
+    onRequestRemove?: (slug: string) => void
+    notice?: CanvasNotice | null
+    width?: number
+  } = {},
+) {
+  return render(
+    <div style={{ width: opts.width ?? 1200, height: 800 }}>
+      <WorkflowCanvas
+        phases={phases}
+        selectedSlug={null}
+        onSelectNode={vi.fn()}
+        onClearSelection={vi.fn()}
+        editable={opts.editable ?? true}
+        onInsertAt={opts.onInsertAt}
+        onRequestRemove={opts.onRequestRemove}
+        notice={opts.notice}
+      />
+    </div>,
+  )
+}
+
+// ── 12. The affordances exist only when editable, and live OUTSIDE the node DOM ──
+
+describe("WorkflowCanvas 184-12 — the ＋ / ✕ layer is on the plane, never in a node", () => {
+  it("editable=false renders NEITHER affordance and no notice region", () => {
+    const { container } = renderEditable(evalCoverage, {
+      editable: false,
+      // Supplied on purpose: a read-only canvas that rendered this would be a surface
+      // change on the flag-off path, which D-181-01 forbids outright.
+      notice: {
+        kind: "action",
+        lead: "Removed",
+        subject: "Write it up",
+        detail: "1 step renumbered",
+      },
+    })
+
+    expect(container.querySelectorAll('[data-canvas-affordance="insert"]')).toHaveLength(0)
+    expect(container.querySelectorAll('[data-canvas-affordance="remove"]')).toHaveLength(0)
+    expect(screen.queryByTestId("canvas-notice-action")).toBeNull()
+    expect(screen.queryByTestId("canvas-notice-refusal")).toBeNull()
+    // …and the shipped read-only promise is still the one on screen.
+    expect(screen.getByText(/view only/i)).toBeInTheDocument()
+  })
+
+  it("editable=true renders one ＋ per boundary and one ✕ per phase", () => {
+    const { container } = renderEditable(evalCoverage)
+
+    // Five phases ⇒ six boundaries: before the first, four connectors, after the last.
+    expect(container.querySelectorAll('[data-canvas-affordance="insert"]')).toHaveLength(
+      evalCoverage.length + 1,
+    )
+    expect(container.querySelectorAll('[data-canvas-affordance="remove"]')).toHaveLength(
+      evalCoverage.length,
+    )
+    for (const phase of evalCoverage) {
+      expect(screen.getByTestId(`canvas-remove-${phase.slug}`)).toBeInTheDocument()
+    }
+  })
+
+  it("every ＋ and every ✕ has a NULL `.react-flow__node` ancestor", () => {
+    renderEditable(evalCoverage)
+
+    for (let index = 0; index <= evalCoverage.length; index += 1) {
+      const insert = screen.getByTestId(`canvas-insert-${index}`)
+      expect(insert.closest(".react-flow__node")).toBeNull()
+    }
+    for (const phase of evalCoverage) {
+      const remove = screen.getByTestId(`canvas-remove-${phase.slug}`)
+      expect(remove.closest(".react-flow__node")).toBeNull()
+    }
+    // POSITIVE CONTROL for the query itself. `closest` returning null is the assertion,
+    // and it would also return null if the selector were misspelled or if the library
+    // stopped emitting that class — in which case every line above would pass while
+    // measuring nothing. Something in this render MUST report a non-null ancestor.
+    expect(screen.getByTestId("canvas-node-split").closest(".react-flow__node")).not.toBeNull()
+  })
+
+  it("the shipped no-focusable-control-inside-a-node invariant holds WITH both affordances mounted", () => {
+    // `WorkflowCanvas.test.tsx:231-238`, re-asserted here because that suite never
+    // renders the editable surface — the invariant it pins is exactly the constraint
+    // that decides where this plan's controls had to go.
+    const { container } = renderEditable(evalCoverage)
+
+    const nodes = Array.from(container.querySelectorAll(".react-flow__node"))
+    expect(nodes.length).toBeGreaterThan(0)
+    for (const node of nodes) {
+      expect(node.querySelectorAll("button, a, [tabindex]")).toHaveLength(0)
+    }
+    // POSITIVE CONTROL: the buttons DO exist — the loop above is not passing because
+    // nothing was rendered.
+    expect(container.querySelectorAll("[data-canvas-affordance]").length).toBeGreaterThan(0)
+  })
+
+  it("the ✕ is the delete path — Backspace still is not", () => {
+    renderEditable(evalCoverage)
+    expect(flow.props?.deleteKeyCode).toBeNull()
+  })
+
+  it("the ＋ is present WITHOUT a hover event and is not hidden behind a bare hover class", () => {
+    // Narrow / touch (Claude's discretion, recorded in CONTEXT): a hover-only affordance
+    // on a device that cannot hover is an affordance that does not exist. The renderer
+    // applies no CSS, so the claim is made against the class list: the VISIBLE state is
+    // the base one and every hiding class is scoped under a min-width breakpoint.
+    renderEditable(evalCoverage, { width: 720 })
+
+    const insert = screen.getByTestId("canvas-insert-1")
+    const classes = insert.className.split(/\s+/)
+    expect(classes).toContain("opacity-100")
+    expect(classes).not.toContain("opacity-0")
+    expect(classes).toContain("lg:opacity-0")
+    expect(classes).toContain("[@media(hover:none)]:opacity-100")
+  })
+})
+
+// ── 13. The ＋ opens the plain-language menu AT the insertion point ─────────────
+
+describe("WorkflowCanvas 184-12 — the ＋ opens the step-type menu where the step will land", () => {
+  it("no menu is open at rest", () => {
+    renderEditable(evalCoverage)
+    expect(screen.queryByTestId("step-type-picker")).toBeNull()
+    expect(screen.getByTestId("canvas-insert-2")).toHaveAttribute("aria-expanded", "false")
+  })
+
+  it("activating a ＋ opens the menu AT that boundary and says so in words", () => {
+    renderEditable(evalCoverage)
+
+    fireEvent.click(screen.getByTestId("canvas-insert-2"))
+
+    const picker = screen.getByTestId("step-type-picker")
+    expect(picker).toBeInTheDocument()
+    // The menu names the slot the way a person reads the flow — 1-based.
+    expect(picker.textContent).toContain("Add a step before step 3")
+    expect(screen.getByTestId("canvas-insert-2")).toHaveAttribute("aria-expanded", "true")
+  })
+
+  it("the LAST ＋ opens the menu as an append", () => {
+    renderEditable(evalCoverage)
+    fireEvent.click(screen.getByTestId(`canvas-insert-${evalCoverage.length}`))
+    expect(screen.getByTestId("step-type-picker").textContent).toContain("Add a step at the end")
+  })
+
+  it("choosing a type calls onInsertAt with THAT index and THAT type, and closes the menu", () => {
+    const onInsertAt = vi.fn()
+    renderEditable(evalCoverage, { onInsertAt })
+
+    fireEvent.click(screen.getByTestId("canvas-insert-2"))
+    fireEvent.click(screen.getByTestId("step-type-choice-llm_single"))
+
+    expect(onInsertAt).toHaveBeenCalledTimes(1)
+    expect(onInsertAt).toHaveBeenCalledWith(2, "llm_single")
+    expect(screen.queryByTestId("step-type-picker")).toBeNull()
+  })
+
+  it("the canvas creates no phase and invents no slug — it only reports the choice", () => {
+    const before = structuredClone(evalCoverage)
+    const onInsertAt = vi.fn()
+    renderEditable(evalCoverage, { onInsertAt })
+
+    fireEvent.click(screen.getByTestId("canvas-insert-0"))
+    fireEvent.click(screen.getByTestId("step-type-choice-llm_agent"))
+
+    expect(onInsertAt).toHaveBeenCalledWith(0, "llm_agent")
+    expect(evalCoverage).toStrictEqual(before)
+  })
+})
+
+// ── 14. R10b in the UI — refused, visibly, with a reason this file did not write ──
+
+describe("WorkflowCanvas 184-12 — R10b: a stranding choice is offered DISABLED with its reason", () => {
+  it("AT the deliverable's own position every choice is still offered (the strictly-after boundary)", () => {
+    // 184-02 Deviation 1: inserting AT the emit's position puts the new step BEFORE it,
+    // so the deliverable shifts down one and stays terminal. Refusing this slot would
+    // decline the most natural authoring act while stating a reason that is false about
+    // the edit refused.
+    renderEditable(withDeliverable)
+
+    fireEvent.click(screen.getByTestId("canvas-insert-2"))
+
+    const rows = screen.getAllByRole("menuitem")
+    expect(rows).toHaveLength(6)
+    for (const row of rows) expect(row).not.toBeDisabled()
+    expect(screen.queryAllByTestId(/^step-type-reason-/)).toHaveLength(0)
+  })
+
+  it("PAST the deliverable every choice is disabled and its reason is real DOM text", () => {
+    renderEditable(withDeliverable)
+
+    fireEvent.click(screen.getByTestId("canvas-insert-3"))
+
+    const rows = screen.getAllByRole("menuitem")
+    // Never fewer than six: a refusal that hides the option teaches nothing (139-C).
+    expect(rows).toHaveLength(6)
+    for (const row of rows) {
+      expect(row).toBeDisabled()
+      expect(row).toHaveAttribute("aria-disabled", "true")
+    }
+    // CHARACTER-IDENTICAL to the pure module's constant — which is what proves the
+    // canvas authored no reason of its own.
+    const reasons = screen.getAllByTestId(/^step-type-reason-/)
+    expect(reasons).toHaveLength(6)
+    for (const reason of reasons) expect(reason.textContent).toBe(STRANDING_REASON)
+  })
+
+  it("activating a refused row inserts NOTHING", () => {
+    const onInsertAt = vi.fn()
+    renderEditable(withDeliverable, { onInsertAt })
+
+    fireEvent.click(screen.getByTestId("canvas-insert-3"))
+    fireEvent.click(screen.getByTestId("step-type-choice-llm_single"))
+
+    expect(onInsertAt).not.toHaveBeenCalled()
+    // The menu stays open, so the person can read why and pick a different slot.
+    expect(screen.getByTestId("step-type-picker")).toBeInTheDocument()
+  })
+
+  it("the refusal reaches the network ZERO times", () => {
+    // R10: both refusals are SHAPE rules, decidable from the phases in hand. A verdict
+    // is a server judgement; the two must stay separately sourced.
+    renderEditable(withDeliverable, { onInsertAt: vi.fn() })
+
+    fireEvent.click(screen.getByTestId("canvas-insert-3"))
+    fireEvent.click(screen.getByTestId("step-type-choice-programmatic"))
+    fireEvent.click(screen.getByTestId("step-type-choice-llm_emit"))
+
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+})
+
+// ── 15. The ✕ asks; it never decides ───────────────────────────────────────────
+
+describe("WorkflowCanvas 184-12 — the ✕ requests a removal and opens no dialog", () => {
+  it("activating a ✕ calls onRequestRemove with THAT slug", () => {
+    const onRequestRemove = vi.fn()
+    renderEditable(evalCoverage, { onRequestRemove })
+
+    fireEvent.click(screen.getByTestId("canvas-remove-deep_dive"))
+
+    expect(onRequestRemove).toHaveBeenCalledTimes(1)
+    expect(onRequestRemove).toHaveBeenCalledWith("deep_dive")
+  })
+
+  it("NO confirm dialog is rendered at any point (D-184-12)", () => {
+    renderEditable(evalCoverage, { onRequestRemove: vi.fn() })
+
+    expect(screen.queryByRole("dialog")).toBeNull()
+    fireEvent.click(screen.getByTestId("canvas-remove-deep_dive"))
+    expect(screen.queryByRole("dialog")).toBeNull()
+    expect(screen.queryByRole("alertdialog")).toBeNull()
+  })
+
+  it("the ✕ reaches the network ZERO times", () => {
+    renderEditable(evalCoverage, { onRequestRemove: vi.fn() })
+    fireEvent.click(screen.getByTestId("canvas-remove-split"))
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+})
+
+// ── 16. The two notices are two DIFFERENT acts ─────────────────────────────────
+
+describe("WorkflowCanvas 184-12 — the delete message and the refusal read differently", () => {
+  const removed = {
+    kind: "action",
+    lead: "Removed",
+    subject: "Write a section",
+    detail: "2 steps renumbered",
+  } as const
+
+  it("the delete message names the step and the renumber count, with Undo inline", () => {
+    const onUndo = vi.fn()
+    renderEditable(evalCoverage, { notice: { ...removed, onUndo } })
+
+    const message = screen.getByTestId("canvas-notice-action")
+    expect(message).toHaveAttribute("role", "status")
+    expect(message).toHaveAttribute("aria-live", "polite")
+    // The locked sentence, as a person reads it.
+    expect(message.textContent).toContain("Removed Write a section · 2 steps renumbered")
+
+    const undo = screen.getByTestId("canvas-notice-undo")
+    expect(undo).toBeInTheDocument()
+    fireEvent.click(undo)
+    expect(onUndo).toHaveBeenCalledTimes(1)
+  })
+
+  it("the refusal states its reason and offers NO way to proceed", () => {
+    renderEditable(evalCoverage, {
+      notice: {
+        kind: "refusal",
+        text: '"Write it up" sends failures to this step. Remove that fallback first.',
+      },
+    })
+
+    const refusal = screen.getByTestId("canvas-notice-refusal")
+    expect(refusal).toHaveAttribute("role", "alert")
+    expect(refusal.textContent).toContain("Remove that fallback first.")
+    // A refusal is not a confirm: there is no delete-anyway control, and no Undo either
+    // (nothing happened to undo).
+    expect(refusal.querySelectorAll("button")).toHaveLength(0)
+    expect(screen.queryByTestId("canvas-notice-undo")).toBeNull()
+    expect(screen.queryByRole("dialog")).toBeNull()
+  })
+
+  it("the two use DIFFERENT testids and DIFFERENT roles — they can never be conflated", () => {
+    const { unmount } = renderEditable(evalCoverage, { notice: removed })
+    const actionRole = screen.getByTestId("canvas-notice-action").getAttribute("role")
+    expect(screen.queryByTestId("canvas-notice-refusal")).toBeNull()
+    unmount()
+
+    renderEditable(evalCoverage, { notice: { kind: "refusal", text: "no" } })
+    const refusal = screen.getByTestId("canvas-notice-refusal")
+    expect(screen.queryByTestId("canvas-notice-action")).toBeNull()
+    expect(refusal.getAttribute("role")).not.toBe(actionRole)
+  })
+})
+
+// ── 17. U-1 — the empty draft invites, it does not look broken ─────────────────
+
+describe("WorkflowCanvas 184-12 — the empty draft is a first-class screen", () => {
+  it("an EDITABLE empty draft offers the invitation BY NAME, not a bare ＋", () => {
+    renderEditable(noPhases)
+
+    const invitation = screen.getByTestId("canvas-add-first-step")
+    expect(invitation).toBeInTheDocument()
+    expect(invitation.textContent).toContain("Add your first step")
+    // Not the read-only "nothing here" line.
+    expect(screen.queryByText(/no steps yet/i)).toBeNull()
+  })
+
+  it("activating it opens the menu at index 0", () => {
+    const onInsertAt = vi.fn()
+    renderEditable(noPhases, { onInsertAt })
+
+    fireEvent.click(screen.getByTestId("canvas-add-first-step"))
+    expect(screen.getByTestId("step-type-picker")).toBeInTheDocument()
+
+    fireEvent.click(screen.getByTestId("step-type-choice-llm_agent"))
+    expect(onInsertAt).toHaveBeenCalledWith(0, "llm_agent")
+  })
+
+  it("a READ-ONLY empty draft renders the shipped state and no invitation (D-183-11)", () => {
+    const { container } = renderEditable(noPhases, { editable: false })
+
+    expect(screen.getByTestId("canvas-empty")).toBeInTheDocument()
+    expect(screen.getByText(/no steps yet/i)).toBeInTheDocument()
+    expect(screen.queryByTestId("canvas-add-first-step")).toBeNull()
+    // …and still no plane, no controls, no ghost node.
+    expect(container.querySelector(".react-flow")).toBeNull()
+    expect(screen.queryAllByTestId(/^canvas-node-/)).toHaveLength(0)
+  })
+
+  it("the empty draft asks the server nothing either", () => {
+    renderEditable(noPhases, { onInsertAt: vi.fn() })
+    fireEvent.click(screen.getByTestId("canvas-add-first-step"))
+    expect(fetchSpy).not.toHaveBeenCalled()
   })
 })
