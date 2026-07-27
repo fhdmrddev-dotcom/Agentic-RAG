@@ -160,7 +160,22 @@ Committed as gated phases (ship only if CORE lands clean and budget remains; v2.
   4. Each node shows a per-node validation status (badge / inline error) derived from the server verdict, never a client-side guess (VALID-03).
   5. Governance is rendered as visible rails — locked phase order, per-phase tool whitelists, and validation gates the user cannot wire around; the rails are **graded** per GOVERN (185 — strict on grounded nodes, flexible on open) (CANVAS-04).
 
-**Plans**: TBD
+**Plans**: 13 plans in 9 waves
+
+Plans:
+- [ ] 184-01-PLAN.md — D-184-07 icon swap (compass + handshake), own atomic commit at the head of Wave 0
+- [ ] 184-02-PLAN.md — Wave 0: the D-184-08 count gate + pure `definitionOps` (ops, both refusals, slug, drag resolver)
+- [ ] 184-03-PLAN.md — Wave 0: `PhaseNode` splits into `nodePresentation` + zero-@xyflow `PhaseNodeCard` + adapter
+- [ ] 184-04-PLAN.md — Wave 0: `zundo` per-mount builder store + Builder page rewire (persistence untouched)
+- [ ] 184-05-PLAN.md — `fromCanvas` carry-through serializer + corpus dump + shape generator + the R2 round-trip property
+- [ ] 184-06-PLAN.md — `/validate` + `/grounding-bundle` clients + `useLiveValidation` (debounce, abort, sequence, degraded)
+- [ ] 184-07-PLAN.md — browser-local `canvasNudge` (zero migration) + the plain-language `StepTypePicker`
+- [ ] 184-08-PLAN.md — `verdictModel` + the two node marks + the problems tray (server-only verdicts)
+- [ ] 184-09-PLAN.md — `useGroundingBundle` + `PhaseFormPanel`'s optional governance rails (absent = today)
+- [ ] 184-10-PLAN.md — canvas editing gestures: drag axis split, cosmetic nudge, ⌥←/⌥→ reorder, verdict marks
+- [ ] 184-11-PLAN.md — session composition: live loop + rails wiring, publish handoff, leave guard, 409, WR-09
+- [ ] 184-12-PLAN.md — the ＋ insert / ✕ delete affordances, both refusals in the UI, empty-draft invitation
+- [ ] 184-13-PLAN.md — the one bottom region: canvas toolbar + tray composition + the D-184-04 key bindings
 **UI hint**: yes
 **Flags**: CORE deliverable (VALID-02 author-time STRUCTURAL validation); G-2 sketch (editable canvas + node config + the `workflow_layouts`-vs-auto-layout UX call); stack — `zundo` undo/redo; one-serializer round-trip → existing draft CRUD, layout OUT of JSONB (Pitfall 3 — tested byte-identical across the 4 canonical seeds + PM pack); server-authoritative per-node badges (VALID-03, never client-guess); CANVAS-04 rails graded per GOVERN (185); G-5 ledger (`WorkflowBuilderPage.tsx` = the 3rd authoring door; `PhaseNode.tsx` 2nd touch on the glyph/parse logic); migration SKETCH-CONDITIONAL — slot 114 reserved ONLY IF the nullable `workflow_layouts` side table is confirmed at sketch (OPEN-05), else ZERO migration; red line D-14; no SC#10 (authoring, no run stream); no threat model unless discuss surfaces one.
 
@@ -287,7 +302,7 @@ Committed as gated phases (ship only if CORE lands clean and budget remains; v2.
 | 181. Revert Foundation | 3/3 | Complete (awaiting verify) | 2026-07-24 |
 | 182. Server Validation Seam | 12/12 | Complete (SC#3 accepted risk — SEED-134) | 2026-07-25 |
 | 183. Read-Only Canvas | 9/9 | **COMPLETE** — verify `passed`; `183-09` closed all 3 live-confirmed defects, live gate closed 7/7 (U-5 canvas findability + U-6 spine flag-off) | 2026-07-26 |
-| 184. Editable Canvas + Live Structural Validation | 0/? | Not started | - |
+| 184. Editable Canvas + Live Structural Validation | 0/13 | Planned | - |
 | 185. Graded Governance — Grounding Mode + Action-Risk Dial | 0/? | Not started | - |
 | 186. Concurrency & Autosave | 0/? | Not started | - |
 | 187. Business Vocabulary + AI-Seeded Canvas | 0/? | Not started | - |
