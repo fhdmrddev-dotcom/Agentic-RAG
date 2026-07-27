@@ -249,6 +249,28 @@ const ARIA_LABELS_EDITABLE = {
     "Press enter or space to open this step's details. Hold alt and press the left or right arrow key to move this step one position.",
   "node.a11yDescription.keyboardDisabled":
     "Press enter or space to open this step's details. Hold alt and press the left or right arrow key to move this step one position.",
+  /**
+   * SILENCED, and the silence is the point.
+   *
+   * The library's default here is `Moved selected node ${direction}. New position,
+   * x: ${x}, y: ${y}` and it renders into the library's own **assertive** live region
+   * (`#react-flow__aria-live-1`). This canvas already announces the move itself, in the
+   * only vocabulary that means anything here — "Step moved to position 2 of 5" — from a
+   * POLITE `sr-only` region. Leaving both in place made a screen reader hear the two
+   * back to back, with the assertive one interrupting and therefore WINNING.
+   *
+   * Raw x/y is not merely redundant on this surface, it is misleading: x snaps to a
+   * computed lane slot and y is the browser-local `dy` nudge that is never serialized
+   * (D-184-10), so neither coordinate is a fact the author can act on. Reporting them as
+   * "the new position" describes a position the definition does not have.
+   *
+   * Returns a constant empty string — it interpolates nothing, so the module keeps the
+   * property its siblings above are documented for: no authored string can reach an
+   * announcement. Found by live screen-reader-region inspection during phase-184
+   * verification; a jsdom test sees both regions but cannot model which one a screen
+   * reader speaks.
+   */
+  "node.a11yDescription.ariaLiveMessage": () => "",
 }
 
 /**
