@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
 status: executing
-last_updated: "2026-07-27T06:33:02.397Z"
+last_updated: "2026-07-27T06:52:26.153Z"
 last_activity: 2026-07-27
 progress:
   total_phases: 18
   completed_phases: 3
   total_plans: 37
-  completed_plans: 30
+  completed_plans: 31
   percent: 17
 ---
 
@@ -45,7 +45,7 @@ Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 op
 ## Current Position
 
 Phase: 184 (Editable Canvas + Live Structural Validation (Round-Trip)) — EXECUTING
-Plan: 7 of 13
+Plan: 8 of 13
 
 **Plan 184-01 COMPLETE (`4a019bd8` gate → `ffb3e9cf` icon swap → `854ec42b` SUMMARY).** Wave 0's
 measuring stick landed FIRST as its own single-file commit: `scripts/vitest-count-gate.cjs` pins
@@ -144,6 +144,35 @@ explicitly, count gate exit 0 (752 total, 0 failing, 16/16 at delta 0), tsc **33
 build` exit 0, snapshot byte-unchanged, eslint clean, **zero assertion edits**, 0 backend + 0
 migration files. **VALID-02 / VALID-03 deliberately left `Pending`** — the loop exists and is
 proven, but no surface renders a verdict yet (184-08 / 184-13).
+
+**Plan 184-07 COMPLETE (`2128dda3` canvasNudge → `782c4de9` StepTypePicker → `51e8bdca` its
+suite → SUMMARY).** The two leaf modules the editing surface will consume. **The cosmetic `dy`
+now lives in ONE browser-local module** keyed `agentic-rag.canvas-nudge.v1.<user_id>.<draft_id>`
+— 138 C-local's "keep the interaction, move the storage" — so `git diff -- supabase/migrations`
+is **0 lines** and slot 114 stays RESERVED, with the written promotion trigger recorded verbatim
+in the docblock. The module imports neither the builder store, the canvas model nor the API
+client (a `?raw` fence with planted controls) and a whole-suite spy recorded **0** calls, so
+Phase 186's *"a cosmetic drag never mints a version"* is true by construction, not by a code path
+someone has to defend. **An unsaved draft persists literally nothing** — `localStorage.length`
+unchanged, 0 keys under the prefix — and a session with **no resolvable user id** takes the same
+in-memory path, because an unscoped key is exactly the leak the per-user scoping prevents.
+**Falsified:** removing the user segment from the key turned 5 isolation assertions red (user B
+read user A's layout; Tidy-up wiped the neighbour). The `＋` menu (`StepTypePicker`) lists all
+six types in the D-183-06 plain-language sentences with the shared 3D marks, and renders a
+refused choice **disabled with its reason as real DOM text** wired by `aria-describedby` — never
+a `title`, never omitted. **The picker authors no reason of its own:** the rendered sentence is
+asserted character-identical to `definitionOps.STRANDING_REASON`, and `grep -cE 'would
+(strand|come after)'` on the component returns 0. **Falsified:** filtering the refused rows out
+turned 6 assertions red. **The plan text carried the SUPERSEDED at-or-after boundary** — 184-02
+Deviation 1 corrected it to strictly-after, so the suite asserts BOTH sides (index 2 offers all
+six enabled, index 3 refuses all six); **184-12 consumes the same function and must not
+re-introduce the old rule.** One fence was deliberately NOT written (a blanket grep for the
+auth-token key name) because it would have forced the docblock to omit the very read it explains
+reusing — the D-ITEM-183-02 trap avoided at authoring time rather than after. Gates: 31/31 +
+34/34 new, the full plan set 817/817 exit 0, count gate exit 0 on all three commits (16/16 at
+delta 0), tsc **33**, `npx vite build` exit 0, snapshot byte-unchanged, eslint clean, **zero
+assertion edits**, 0 backend + 0 migration files, 0 deletions. **Neither module is mounted** —
+184-12 wires them — so **CANVAS-02 / VALID-02 deliberately left `Pending`**.
 
 **RE-VERIFICATION GATE (2026-07-26, post-`183-09`): `human_needed`, not `passed`.** All 8
 must-haves verified in code by direct source read; phase-scoped suite re-run independently at
@@ -738,6 +767,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 184 P04 | 40min | 3 tasks | 6 files |
 | Phase 184 P05 | 33min | 3 tasks | 6 files |
 | Phase 184 P06 | 20min | 3 tasks | 3 files |
+| Phase 184 P07 | 35min | 3 tasks | 4 files |
 
 ## Decisions
 
@@ -941,6 +971,9 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase ?]: 184-05: fromCanvas takes no edges argument and NEVER renumbers — renumbering lives only in definitionOps.renumber; duplicate slugs fail SAFE by returning the source untouched
 - [Phase ?]: 184-06: the /validate success path checks the monotonic sequence and NOTHING else — an aborted-signal check there would make R7's out-of-order proof pass on abort instead of on the guard
 - [Phase ?]: 184-06: the degraded validation state carries no ok field at all, so a failed check rendering as clean is unrepresentable rather than merely tested-for
+- [Phase ?]: 184-07: the cosmetic nudge key is agentic-rag.canvas-nudge.v1.<user_id>.<draft_id> — one flat key per user per draft; zero migrations, slot 114 stays RESERVED
+- [Phase ?]: 184-07: a session with no resolvable user id takes the same in-memory path as an unsaved draft — an unscoped key would be the very leak per-user scoping prevents
+- [Phase ?]: 184-07: StepTypePicker renders its refusal CHARACTER-IDENTICAL to definitionOps.STRANDING_REASON, proving it authored none of its own
 
 ## Operator Next Steps
 
