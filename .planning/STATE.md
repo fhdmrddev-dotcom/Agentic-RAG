@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
 status: executing
-last_updated: "2026-07-27T04:38:44.076Z"
-last_activity: 2026-07-27 -- Phase 184 plan 02 complete (pure definitionOps + both shape refusals)
+last_updated: "2026-07-27T04:59:02.271Z"
+last_activity: 2026-07-27
 progress:
   total_phases: 18
   completed_phases: 3
@@ -45,7 +45,7 @@ Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 op
 ## Current Position
 
 Phase: 184 (Editable Canvas + Live Structural Validation (Round-Trip)) — EXECUTING
-Plan: 3 of 13
+Plan: 4 of 13
 
 **Plan 184-01 COMPLETE (`4a019bd8` gate → `ffb3e9cf` icon swap → `854ec42b` SUMMARY).** Wave 0's
 measuring stick landed FIRST as its own single-file commit: `scripts/vitest-count-gate.cjs` pins
@@ -56,7 +56,9 @@ a failures-only differential cannot see a *deleted* test. **Falsified before tru
 script hard-refuses any path inside `frontend/`/`backend/` (T-184-01-03). Then the D-184-07 icon swap
 as a **standalone three-file revert unit** (gate script NOT in it): `llm_agent`→`compass`,
 `llm_batch_agents`→`handshake` across BOTH maps + both `~icons` imports + the verified-slugs docblock
+
 + one assertion. Gates: 424/424 all deltas 0, tsc **33** (= baseline, 0 phase-file names), `vite
+
 build` exit 0, canvas snapshot byte-unchanged. **The D-184-08 carve-out is now SPENT** —
 `soulData.test.ts:132-133` was the ONE permitted assertion edit in phase 184; 184-02/184-03 are under
 a zero-assertion-edit gate, and any assertion edit there means the extraction was not
@@ -681,6 +683,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 183 P07 | 22min | 3 tasks | 3 files |
 | Phase 183 P08 | 25m | 3 tasks | 5 files |
 | Phase 184 P02 | 22min | 2 tasks | 2 files |
+| Phase 184 P03 | 38min | 3 tasks | 4 files |
 
 ## Decisions
 
@@ -876,6 +879,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase 183]: D-183-09-02: PhaseFormPanel.onClose and WorkflowCanvas.onClearSelection are REQUIRED props — an unclosable panel is a typecheck error, not a silent UX regression
 - [Phase 183]: D-183-09-03: the Spine's empty-area click-away deferred on implementation cost + G-5 blast radius, explicitly NOT the jsx-a11y gate — overturnable on operator call
 - [Phase 184]: D-184-02-A: allowedTypesAt's stranding boundary is strictly-AFTER the deliverable — inserting AT the emit's position puts the new step BEFORE it, so an at-or-after boundary would refuse the most natural authoring act with a reason that is false about the edit refused
+- [Phase ?]: D-184-06 landed: PhaseNodeCard is presentational with zero graph-library import; the badge slot is a max-2 tuple whose violation is TS2322
 
 ## Operator Next Steps
 
