@@ -401,17 +401,28 @@ function FolderScopeField({
 
 /** Render available_tools as friendly chips (the raw tool ids reachable via ⓘ).
  *  Editing stays a comma field below the chips (so the field is still editable +
- *  testable via the label), and the chips are a read-friendly preview above it. */
+ *  testable via the label), and the chips are a read-friendly preview above it.
+ *
+ *  Phase 184-09: `options` is the CANVAS-04 whitelist rail. `undefined` — the only value a
+ *  flag-off render can produce, because it is `rails?.toolOptions` — keeps the free-text
+ *  comma field below byte-for-byte. Anything else replaces it with a set the author chooses
+ *  FROM, and R11 forbids a free-text box in that variant: a box a user can type any string
+ *  into is not a whitelist, it is a suggestion. */
 function ToolsField({
   tools,
+  options,
   onChange,
   onPersist,
 }: {
   tools: string[]
+  options?: string[] | "degraded"
   onChange: (v: string) => void
   onPersist: () => void
 }) {
   const id = useId()
+  if (options !== undefined) {
+    return <ToolWhitelistRail tools={tools} options={options} onChange={onChange} onPersist={onPersist} />
+  }
   return (
     <div className="col-span-2">
       <FieldLabel
@@ -445,6 +456,129 @@ function ToolsField({
         placeholder="search_documents, execute_code"
         className="w-full rounded border border-border bg-card px-2 py-1.5 text-[12px] text-foreground focus:border-primary focus:outline-none"
       />
+    </div>
+  )
+}
+
+const TOOL_CHIP_BASE =
+  "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10.5px] focus:outline-none focus:ring-1 focus:ring-primary"
+
+/**
+ * The tool-whitelist rail (140-A) — a set the author chooses FROM, and nothing to type into.
+ *
+ * THE OPTION SET IS THE SERVER'S. It arrives as `rails.toolOptions`, which `useGroundingBundle`
+ * fills from `GET /workflows/grounding-bundle` and from nothing else. There is no frontend
+ * list of tool ids here or anywhere upstream of here — a client-assembled whitelist would let
+ * knowledge-base content whitelist itself, which is the elevation of privilege the
+ * server-owned registry exists to prevent. `friendlyToolName` still LABELS the chips; a
+ * display-label map is not an options source and the two must not be confused.
+ *
+ * A TOOL THE DEFINITION NAMES THAT THE REGISTRY DOES NOT HAVE IS SHOWN, STRUCK THROUGH — never
+ * dropped. The server already answers `unregistered_tool` for it, and hiding it here would put
+ * the finding somewhere the author cannot act on it while quietly editing their stored value
+ * out of sight. Struck through and still pressable is the fixable form.
+ *
+ * A DEGRADED READ SAYS SO. `"degraded"` renders a plain sentence and ZERO options, because an
+ * empty-but-normal picker is byte-indistinguishable from a registry that genuinely offers
+ * nothing — it would tell the user "there are no tools" when the truth is "we could not ask".
+ * What the step already names is still printed, so a failed read never looks like a wipe.
+ */
+function ToolWhitelistRail({
+  tools,
+  options,
+  onChange,
+  onPersist,
+}: {
+  tools: string[]
+  options: string[] | "degraded"
+  onChange: (v: string) => void
+  onPersist: () => void
+}) {
+  // The comma string is the shipped call-site contract (`v.split(",")`), so a click commits
+  // through exactly the same seam a keystroke used to — one parser, not two.
+  const commit = (next: string[]) => {
+    onChange(next.join(", "))
+    onPersist()
+  }
+
+  return (
+    <div className="col-span-2">
+      <FieldLabel
+        text="What this step can do"
+        hint="available_tools — the tools the AI may use in this step (e.g. search_documents, execute_code)."
+        help="Pick from the tools this workspace allows — you cannot add one by typing."
+      />
+      {options === "degraded" ? (
+        <div data-rail="tools" data-testid="tools-degraded">
+          <p className="text-[11px] leading-snug text-muted-foreground">
+            We couldn&rsquo;t load the tools this step is allowed to use. Nothing is offered here
+            rather than a list that would be wrong.
+          </p>
+          {tools.length > 0 && (
+            <p data-testid="tools-degraded-current" className="mt-1 text-[11px] leading-snug text-muted-foreground">
+              This step currently names: {tools.map((t) => friendlyToolName(t)).join(", ")}.
+            </p>
+          )}
+        </div>
+      ) : (
+        <ToolOptionSet tools={tools} options={options} commit={commit} />
+      )}
+    </div>
+  )
+}
+
+/** The chip set itself — split out so the degraded branch above reads as one sentence. */
+function ToolOptionSet({
+  tools,
+  options,
+  commit,
+}: {
+  tools: string[]
+  options: string[]
+  commit: (next: string[]) => void
+}) {
+  const selected = new Set(tools)
+  // Registry order first (the server's own ordering), then anything the definition names
+  // that the registry lacks — appended rather than hidden.
+  const offered = [...options, ...tools.filter((t) => !options.includes(t))]
+
+  return (
+    <div
+      data-rail="tools"
+      data-testid="tools-rail"
+      role="group"
+      aria-label="What this step can do"
+      className="flex flex-wrap gap-1.5"
+    >
+      {offered.length === 0 ? (
+        <p data-testid="tools-empty" className="text-[11px] leading-snug text-muted-foreground">
+          This workspace offers no tools for this step.
+        </p>
+      ) : (
+        offered.map((t) => {
+          const on = selected.has(t)
+          const unregistered = !options.includes(t)
+          return (
+            <button
+              key={t}
+              type="button"
+              data-testid="tool-option"
+              data-tool={t}
+              data-unregistered={unregistered ? "true" : "false"}
+              aria-pressed={on}
+              title={unregistered ? `${t} — not in this workspace's tool registry` : t}
+              onClick={() => commit(on ? tools.filter((x) => x !== t) : [...tools, t])}
+              className={[
+                TOOL_CHIP_BASE,
+                on ? "border-primary bg-primary/10 text-foreground" : "border-border bg-card text-muted-foreground",
+                unregistered ? "line-through" : "",
+              ].join(" ")}
+            >
+              {friendlyToolName(t)}
+            </button>
+          )
+        })
+      )}
     </div>
   )
 }
@@ -711,6 +845,7 @@ export function PhaseFormPanel({
               />
               <ToolsField
                 tools={asList(cfg.available_tools)}
+                options={rails?.toolOptions}
                 onChange={(v) => onChange({ available_tools: v.split(",").map((s) => s.trim()).filter(Boolean) })}
                 onPersist={onPersist}
               />
@@ -762,6 +897,7 @@ export function PhaseFormPanel({
               />
               <ToolsField
                 tools={asList(cfg.available_tools)}
+                options={rails?.toolOptions}
                 onChange={(v) => onChange({ available_tools: v.split(",").map((s) => s.trim()).filter(Boolean) })}
                 onPersist={onPersist}
               />
