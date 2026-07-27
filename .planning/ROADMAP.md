@@ -207,7 +207,7 @@ Plans:
 
 **Wave 9** *(blocked on Wave 8 completion)*
 
-- [ ] 184-13-PLAN.md — the one bottom region: canvas toolbar + tray composition + the D-184-04 key bindings
+- [x] 184-13-PLAN.md — the one bottom region: canvas toolbar + tray composition + the D-184-04 key bindings
 
 **UI hint**: yes
 **Flags**: CORE deliverable (VALID-02 author-time STRUCTURAL validation); G-2 sketch (editable canvas + node config + the `workflow_layouts`-vs-auto-layout UX call); stack — `zundo` undo/redo; one-serializer round-trip → existing draft CRUD, layout OUT of JSONB (Pitfall 3 — tested byte-identical across the 4 canonical seeds + PM pack); server-authoritative per-node badges (VALID-03, never client-guess); CANVAS-04 rails graded per GOVERN (185); G-5 ledger (`WorkflowBuilderPage.tsx` = the 3rd authoring door; `PhaseNode.tsx` 2nd touch on the glyph/parse logic); migration SKETCH-CONDITIONAL — slot 114 reserved ONLY IF the nullable `workflow_layouts` side table is confirmed at sketch (OPEN-05), else ZERO migration; red line D-14; no SC#10 (authoring, no run stream); no threat model unless discuss surfaces one.
