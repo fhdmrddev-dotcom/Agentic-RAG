@@ -3,8 +3,14 @@
  *
  * THE CANVAS NODE PRESENTATION TABLES, in one copy. The per-step-type icon tint,
  * the grounding tone mapping for the shared `StatusChip`, and the module-scope 3D
- * mark resolver — the three things a canvas node face needs that are neither layout
+ * mark resolver — the things a canvas node face needs that are neither layout
  * (`canvasModel.CANVAS_LAYOUT`) nor vocabulary (`phaseVocabulary`).
+ *
+ * Phase 184-08 added a fourth table at the foot of this file: the two verdict marks
+ * plus the degraded one, and the single named destructive-token literal the R9 colour
+ * scan searches for. It lives here rather than beside the card because a component
+ * module may not export shared constants (`react-refresh/only-export-components`), and
+ * because the problems tray renders the same two marks — one table, two surfaces.
  *
  * Structural template: `components/org/StatusChip.tsx` (Phase 177 D-08). Its
  * docblock draws exactly the boundary this module sits on — the shared COMPONENT is
@@ -108,3 +114,88 @@ export function renderPhaseMark(phaseType: string): ReactNode {
   const mark = phaseGlyph(phaseType)
   return mark ? createElement(mark, { className: "h-8 w-8" }) : (PHASE_GLYPHS[phaseType] ?? "•")
 }
+
+// ── Phase 184-08 (VALID-03 · R9) — the verdict marks ────────────────────────────
+//
+// Added here, and not beside the card that renders them, for a mechanical reason:
+// `react-refresh/only-export-components` forbids a component module from exporting
+// shared constants. It is also the right home — this file is the canvas node's
+// presentation tables in ONE copy, and the tray renders the same two marks.
+
+/**
+ * The three states a node's corner mark can be in.
+ *
+ * Two of them are SERVER SEVERITIES read verbatim; the third is a state of the CHECK
+ * rather than of any finding. `PhaseNodeCard.NodeVerdictMark` is an alias of this type,
+ * kept so every existing caller's name still resolves.
+ */
+export type VerdictMarkKind = "error" | "incomplete" | "unknown"
+
+/**
+ * The CSS token family the `error` mark — and ONLY the `error` mark — may spend.
+ *
+ * Exported as a single named literal SO THAT R9 CAN BE SCANNED RATHER THAN EYEBALLED.
+ * `PhaseNodeCard.test.tsx` and `ProblemsTray.test.tsx` each render a draft that is all
+ * "not finished yet" and assert this string appears in the emitted HTML exactly ZERO
+ * times, each with a positive control proving that one `error` puts it back. A colour
+ * heuristic could not do that; one named literal can.
+ */
+export const VERDICT_DESTRUCTIVE_TOKEN = "destructive"
+
+/** One verdict mark's whole rendering: a decorative glyph, the words that carry its
+ *  meaning, and the classes that colour it. */
+export interface VerdictMarkPresentation {
+  /** Rendered `aria-hidden` — the SHAPE is the non-colour visual carrier. */
+  glyph: string
+  /** The accessible name. Never empty, and never a colour word. */
+  label: string
+  /** The mark's own classes. `error` is the ONLY entry naming the destructive token. */
+  className: string
+}
+
+/**
+ * THE VERDICT MARKS, AND THE COLOUR BUDGET THEY SPEND (sketch 137-D / 139-A · R9).
+ *
+ *  - `error` → a red `✕`, on the app's destructive token. This is bad news and it
+ *    reads like it.
+ *  - `incomplete` → a **dashed grey `○`**, on neutral tokens only, carrying no
+ *    destructive token and no alarm colour at all. **This is the load-bearing half of
+ *    R9.** Both severities set `ok:false` and both block a publish, but only one of
+ *    them is a mistake: "not finished yet" is the state a canvas spends most of its
+ *    life in, and painting it in alarm colours tells a person they have done something
+ *    wrong every time they pause halfway. A three-`incomplete` / zero-`error` draft
+ *    therefore emits the destructive token zero times, and that is asserted rather
+ *    than trusted.
+ *  - `unknown` → the degraded mark: neutral, and deliberately NOT clean. "We could not
+ *    check" must never render as "fine" — a registry blip that reads as a green light
+ *    is the worst outcome this surface can produce (sketch 139, What to Look For 3).
+ *
+ * Strong colour otherwise stays RESERVED for Phase 188's run status, which paints
+ * running / done / waiting-for-you / failed onto these same nodes. Spending it here
+ * would take the vocabulary 188 needs and leave 188 nothing louder to say.
+ *
+ * NEVER COLOUR ALONE (WCAG 1.4.1, the `panel/PhaseCard.tsx:17-20` rule): each mark is
+ * an aria-hidden glyph whose SHAPE and BORDER STYLE already differ from the others (a
+ * solid ✕ ring vs a dashed ○ ring), plus a real accessible label naming the state in
+ * words on a contrast-AA token — never the dimmed muted variant.
+ *
+ * MOTION: none, anywhere in this table. Motion keys off RUN STATE and never off
+ * selection, and 184 has no run state, so a selected node is not the thing that moves.
+ */
+export const VERDICT_MARK = {
+  error: {
+    glyph: "✕",
+    label: "Has a problem",
+    className: "border border-destructive/70 bg-destructive/15 text-destructive",
+  },
+  incomplete: {
+    glyph: "○",
+    label: "Not finished yet",
+    className: "border border-dashed border-border bg-muted text-muted-foreground",
+  },
+  unknown: {
+    glyph: "?",
+    label: "Could not be checked",
+    className: "border border-dashed border-border bg-muted text-muted-foreground",
+  },
+} as const satisfies Record<VerdictMarkKind, VerdictMarkPresentation>

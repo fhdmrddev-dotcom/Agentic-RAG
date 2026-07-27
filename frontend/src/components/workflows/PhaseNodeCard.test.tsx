@@ -14,8 +14,10 @@
  *     canvas-level walk at `WorkflowCanvas.test.tsx:231-238`, so the one-tab-stop-per-
  *     node invariant is now guarded at BOTH levels;
  *  3. the badge row honours the 137-D two-badge budget at 0, 1 and 2;
- *  4. the slots Phase 185 / 184-08 / Phase 188 will fill render NOTHING today —
+ *  4. the slots Phase 185 / Phase 188 will fill render NOTHING today —
  *     the assertion that proves Wave 0 added the seam without adding behaviour.
+ *     (184-08 filled the `verdict` slot, so that one now has its own describe block at
+ *     the foot of this file rather than living inside the byte-identical proof.)
  *
  * Plus the `?raw` source fences, in the `canvasModel.purity.test.ts:14-17` house
  * idiom, each with a POSITIVE CONTROL so a broken guard is visible rather than
@@ -39,6 +41,10 @@ import phaseNodeSource from "./PhaseNode?raw"
 import nodePresentationSource from "./nodePresentation?raw"
 import { PhaseNodeCard, type BadgeSlot, type BadgeSlots } from "./PhaseNodeCard"
 import { DEFAULT_TINT, ICON_TINT } from "./nodePresentation"
+// 184-08's additions land as a SEPARATE import statement rather than by widening the
+// line above, so this file's whole 184-08 diff reads as added lines plus the two
+// narrowed assertions whose reasons are written at the assertions themselves (D-184-08).
+import { VERDICT_DESTRUCTIVE_TOKEN, VERDICT_MARK } from "./nodePresentation"
 
 /** The minimal slot set — everything else on the contract is optional by design. */
 function renderCard(overrides: Partial<React.ComponentProps<typeof PhaseNodeCard>> = {}) {
@@ -213,16 +219,25 @@ describe("PhaseNodeCard — the absent slots render NOTHING (Wave 0 adds the sea
     expect(testIds.some((id) => id?.includes("status"))).toBe(false)
   })
 
-  it("renders BYTE-IDENTICAL DOM whether verdict / status / stepNumber are passed or not", () => {
+  it("renders BYTE-IDENTICAL DOM whether status / stepNumber are passed or not", () => {
     // This is the assertion that proves the extraction is behaviour-preserving:
-    // 184-08 and Phase 188 add DATA to a declared slot, not layout to the card.
+    // Phase 188 adds DATA to a declared slot, not layout to the card.
+    //
+    // 184-08 NARROWED THIS ASSERTION, and the narrowing is the point rather than an
+    // erosion of it. As written in 184-03 it also passed `verdict: "error"`, because
+    // in Wave 0 that slot was declared and unrendered. 184-08 is the plan chartered to
+    // FILL it, so the sentence "passing a verdict changes nothing" is exactly what
+    // this plan had to make false — keeping it green would have required 184-08 not to
+    // exist. The two slots still unrendered are still guarded here, and the `verdict`
+    // slot's two remaining contracts are guarded below, more strongly than before:
+    // absent still renders nothing, and present renders a mark that CHANGES when only
+    // the server-derived value does (VALID-03's headline proof).
     const without = renderCard({ badges: [groundingBadge] })
     const before = without.container.innerHTML
     without.unmount()
 
     const withSlots = renderCard({
       badges: [groundingBadge],
-      verdict: "error",
       status: "running",
       stepNumber: 3,
     })
@@ -270,17 +285,31 @@ describe("PhaseNodeCard — forward-compat on an unrecognised phase type", () =>
     // A known type paints a DIFFERENT well from the default — so the prop is really
     // reaching the DOM and the previous test is not passing vacuously.
     expect(wellBackground(ICON_TINT.llm_emit)).not.toBe(wellBackground(DEFAULT_TINT))
-    // The card performs NO tint lookup: it neither imports the table nor indexes it.
-    // Anchored on the import + index forms, not the bare identifiers — the card's
+    // The card performs NO tint lookup: it neither imports the tint tables nor indexes
+    // them. Anchored on the import + index forms, not the bare identifiers — the card's
     // docblock has to be free to name `nodePresentation.DEFAULT_TINT` when explaining
     // who resolves the tint (D-ITEM-183-02, as above).
+    //
+    // 184-08 NARROWED THIS FENCE from a blanket ban on the module PATH to a ban on the
+    // two TINT identifiers, which is what its own name ("never one it looked up") was
+    // always about. The card now imports the verdict-mark table from the same module,
+    // and it had to: `react-refresh/only-export-components` forbids a component file
+    // from exporting the shared constant, so the table has exactly one legal home and
+    // the card has exactly one legal way to read it. The property under guard is
+    // unchanged and is asserted twice below — the card looks up no tint, and paints
+    // only the resolved string it is handed.
     expect(phaseNodeCardSource).not.toMatch(
-      /from\s+["']@\/components\/workflows\/nodePresentation["']/,
+      /import[^;]*\b(ICON_TINT|DEFAULT_TINT)\b[^;]*from\s+["'][^"']*nodePresentation["']/,
     )
     expect(phaseNodeCardSource).not.toMatch(/ICON_TINT\[/)
-    // Positive control: the ADAPTER is where both forms live.
-    expect(phaseNodeSource).toMatch(/from "@\/components\/workflows\/nodePresentation"/)
+    expect(phaseNodeCardSource).not.toMatch(/DEFAULT_TINT\s*[,)\]]/)
+    // Positive controls: the ADAPTER is where all three forms live, so none of the
+    // three regexes above can be silently vacuous.
+    expect(phaseNodeSource).toMatch(
+      /import[^;]*\b(ICON_TINT|DEFAULT_TINT)\b[^;]*from\s+["'][^"']*nodePresentation["']/,
+    )
     expect(phaseNodeSource).toMatch(/ICON_TINT\[/)
+    expect(phaseNodeSource).toMatch(/DEFAULT_TINT\s*[,)\]]/)
   })
 })
 
@@ -362,5 +391,174 @@ describe("nodePresentation — the 184-03 hard cut (source guard)", () => {
     expect(ICON_TINT.llm_batch_agents).toBe("hsl(170 80% 55% / 0.34)")
     expect(DEFAULT_TINT).toBe("hsl(220 30% 100% / 0.18)")
     expect(Object.keys(ICON_TINT)).toHaveLength(6)
+  })
+})
+
+/**
+ * ── 184-08 (VALID-03 · R8 · R9) — the server's verdict mark ──────────────────────
+ *
+ * APPENDED, not woven in: everything above this line is Wave 0's and stays Wave 0's.
+ * Exactly one assertion above was narrowed — the byte-identical proof no longer passes
+ * `verdict`, because this plan renders it — and the reason is written at that
+ * assertion rather than here, where a later reader would not find it.
+ */
+describe("PhaseNodeCard — the verdict mark comes from the SERVER (VALID-03)", () => {
+  it('verdict="error" renders the ✕ mark with its accessible label', () => {
+    renderCard({ verdict: "error" })
+    const mark = screen.getByTestId("canvas-node-verdict")
+    expect(mark.getAttribute("data-verdict")).toBe("error")
+    expect(mark.textContent).toContain(VERDICT_MARK.error.glyph)
+    expect(mark.textContent).toContain(VERDICT_MARK.error.label)
+    expect(VERDICT_MARK.error.glyph).toBe("✕")
+    expect(VERDICT_MARK.error.label.length).toBeGreaterThan(0)
+  })
+
+  it('verdict="incomplete" renders the DASHED ○ with its own label', () => {
+    renderCard({ verdict: "incomplete" })
+    const mark = screen.getByTestId("canvas-node-verdict")
+    expect(mark.getAttribute("data-verdict")).toBe("incomplete")
+    expect(mark.textContent).toContain("○")
+    expect(mark.textContent).toContain(VERDICT_MARK.incomplete.label)
+    // The dashed border is the non-colour visual carrier that separates it from ✕.
+    expect(mark.className).toContain("border-dashed")
+  })
+
+  it('verdict="unknown" renders a degraded mark whose words do NOT read as clean', () => {
+    renderCard({ verdict: "unknown" })
+    const mark = screen.getByTestId("canvas-node-verdict")
+    expect(mark.getAttribute("data-verdict")).toBe("unknown")
+    expect(mark.textContent).toContain(VERDICT_MARK.unknown.label)
+    // "We could not check" must never render as "fine" (sketch 139, What to Look For 3).
+    expect(mark.textContent).not.toMatch(/\bok\b|clean|fine|pass(ed|es)?\b|all good|✓/i)
+    // …and it is not silently absent either, which would read as clean by omission.
+    expect((mark.textContent ?? "").trim().length).toBeGreaterThan(0)
+  })
+
+  it("every mark is an aria-hidden glyph PLUS a real accessible label (never colour alone)", () => {
+    for (const kind of ["error", "incomplete", "unknown"] as const) {
+      const { container, unmount } = renderCard({ verdict: kind })
+      const mark = container.querySelector('[data-testid="canvas-node-verdict"]')
+      const glyph = mark?.querySelector('[aria-hidden="true"]')
+      const label = mark?.querySelector(".sr-only")
+      expect(glyph?.textContent).toBe(VERDICT_MARK[kind].glyph)
+      expect(label?.textContent).toBe(VERDICT_MARK[kind].label)
+      expect(VERDICT_MARK[kind].label.trim().length).toBeGreaterThan(0)
+      // Never the dimmed muted variant for meaningful text (PhaseCard.tsx:17-20).
+      expect(VERDICT_MARK[kind].className).not.toContain("muted-foreground-dim")
+      unmount()
+    }
+  })
+
+  it("VALID-03's headline proof: identical props except the verdict produce DIFFERENT marks", () => {
+    // Nothing local differs — same slug, same type, same title, same tint, same badges.
+    // The ONLY input that changed is the value the server derived.
+    const shared = { badges: [groundingBadge] as BadgeSlots, slug: "draft" }
+
+    const a = renderCard({ ...shared, verdict: "incomplete" })
+    const incompleteHtml = a.container.innerHTML
+    const incompleteMark = a.container
+      .querySelector('[data-testid="canvas-node-verdict"]')
+      ?.getAttribute("data-verdict")
+    a.unmount()
+
+    const b = renderCard({ ...shared, verdict: "error" })
+    const errorHtml = b.container.innerHTML
+    const errorMark = b.container
+      .querySelector('[data-testid="canvas-node-verdict"]')
+      ?.getAttribute("data-verdict")
+
+    expect(incompleteMark).toBe("incomplete")
+    expect(errorMark).toBe("error")
+    expect(errorHtml).not.toBe(incompleteHtml)
+  })
+
+  it("the verdict slot ABSENT still renders no verdict element (the Wave-0 half that survives)", () => {
+    const { container } = renderCard({ badges: [groundingBadge], status: "running" })
+    expect(container.querySelector('[data-testid="canvas-node-verdict"]')).toBeNull()
+    const testIds = Array.from(container.querySelectorAll("[data-testid]")).map((el) =>
+      el.getAttribute("data-testid"),
+    )
+    expect(testIds.some((id) => id?.includes("verdict"))).toBe(false)
+  })
+
+  it("a card carrying a verdict mark still contains NO focusable control", () => {
+    // One tab stop per node. A pressable mark would make it two, and the shipped
+    // canvas-level walk (WorkflowCanvas.test.tsx:231-238) would go red.
+    for (const kind of ["error", "incomplete", "unknown"] as const) {
+      const { container, unmount } = renderCard({
+        verdict: kind,
+        badges: [groundingBadge, waitsBadge],
+        selected: true,
+      })
+      expect(container.querySelectorAll("button, a, [tabindex]")).toHaveLength(0)
+      unmount()
+    }
+  })
+
+  it("the mark does not animate — motion keys off run state, never selection", () => {
+    const { container } = renderCard({ verdict: "error", selected: true })
+    const mark = container.querySelector('[data-testid="canvas-node-verdict"]')
+    expect(mark?.className ?? "").not.toMatch(/animate-|transition-|motion-safe:/)
+  })
+})
+
+describe("PhaseNodeCard — R9: the colour budget, scanned rather than eyeballed", () => {
+  it("3 incomplete cards and 0 error cards emit the destructive token ZERO times", () => {
+    // The exact state sketch 139 calls "Mid-build": three things not finished, nothing
+    // broken, ok:false. If this reads as alarming, the surface is wrong — that is the
+    // state a canvas spends most of its life in.
+    const { container } = render(
+      <>
+        <PhaseNodeCard
+          slug="gather"
+          phaseType="programmatic"
+          icon={null}
+          title="Gather the inputs"
+          tint={ICON_TINT.programmatic}
+          verdict="incomplete"
+        />
+        <PhaseNodeCard
+          slug="draft"
+          phaseType="llm_single"
+          icon={null}
+          title="Draft the section"
+          tint={ICON_TINT.llm_single}
+          verdict="incomplete"
+        />
+        <PhaseNodeCard
+          slug="emit"
+          phaseType="llm_emit"
+          icon={null}
+          title="Write the deliverable"
+          tint={ICON_TINT.llm_emit}
+          verdict="incomplete"
+        />
+      </>,
+    )
+
+    expect(container.querySelectorAll('[data-testid="canvas-node-verdict"]')).toHaveLength(3)
+    const occurrences = container.innerHTML.split(VERDICT_DESTRUCTIVE_TOKEN).length - 1
+    expect(occurrences).toBe(0)
+  })
+
+  it("the POSITIVE CONTROL: one error card DOES emit it", () => {
+    // Without this, the scan above would pass just as happily on a typo'd token, on an
+    // empty render, or on a mark that stopped rendering at all.
+    const { container } = renderCard({ verdict: "error" })
+    const occurrences = container.innerHTML.split(VERDICT_DESTRUCTIVE_TOKEN).length - 1
+    expect(occurrences).toBeGreaterThanOrEqual(1)
+  })
+
+  it("the token literal is REAL — it is the one the error mark's classes actually name", () => {
+    expect(VERDICT_MARK.error.className).toContain(VERDICT_DESTRUCTIVE_TOKEN)
+    expect(VERDICT_MARK.incomplete.className).not.toContain(VERDICT_DESTRUCTIVE_TOKEN)
+    expect(VERDICT_MARK.unknown.className).not.toContain(VERDICT_DESTRUCTIVE_TOKEN)
+  })
+
+  it("no card body, badge or icon well spends the destructive token either", () => {
+    // The scan is only meaningful if the rest of the card is neutral to begin with —
+    // otherwise a stray destructive class elsewhere would mask a regression in the mark.
+    const { container } = renderCard({ badges: [groundingBadge, waitsBadge], selected: true })
+    expect(container.innerHTML).not.toContain(VERDICT_DESTRUCTIVE_TOKEN)
   })
 })

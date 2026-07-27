@@ -21,6 +21,14 @@
  * NOTHING when absent, which is what keeps this extraction behaviour-preserving
  * (D-184-08) while still adding the seam.
  *
+ * WHAT 184-08 CHANGED, stated literally so this docblock does not drift: the `verdict`
+ * slot is now RENDERED — a corner mark on the card's right edge — while `status` and
+ * `stepNumber` are still declared and still render nothing. The seam worked exactly as
+ * D-184-06 intended: filling it was a change to this component's body and to nobody
+ * else's contract. The card is still the wrong place to ask what a verdict MEANS: the
+ * value arrives already reduced to one of three states by `verdictModel.markFor`, which
+ * reads the server's `severity` and derives none of it (VALID-03 / D-182-06).
+ *
  * THE TWO-BADGE BUDGET IS ENFORCED BY THE TYPE SYSTEM (137-D / D-183-07). `BadgeSlots`
  * is a max-2 TUPLE union, so a third badge is a typecheck error rather than a review
  * comment. Phase 185's graded-governance dial therefore physically cannot spend a
@@ -66,6 +74,11 @@ import type { ReactNode } from "react"
 
 import { StatusChip, type ChipTone } from "@/components/org/StatusChip"
 import { CANVAS_LAYOUT } from "@/components/workflows/canvasModel"
+// 184-08: the verdict-mark table and its key type. This is the ONLY thing this card
+// takes from the presentation module — the TINT is still resolved by the adapter and
+// handed over as a plain string, and the fence in `PhaseNodeCard.test.tsx` still says
+// so, anchored on the tint identifiers rather than on the module path.
+import { VERDICT_MARK, type VerdictMarkKind } from "@/components/workflows/nodePresentation"
 import { cn } from "@/lib/utils"
 
 // ── The slot contract ───────────────────────────────────────────────────────────
@@ -108,16 +121,22 @@ export type BadgeSlots = readonly [] | readonly [BadgeSlot] | BadgeSlot2Tuple
  * The per-node validation mark (VALID-03). **Declared in 184-03, rendered by 184-08.**
  *
  * The slot exists here so the marks land as DATA on an existing card rather than as a
- * layout change to it. In this plan the card renders NOTHING for it and the adapter
- * never passes it — that absence is asserted, and it is what makes this extraction
- * behaviour-preserving.
+ * layout change to it — and that is exactly how it played out: 184-08 filled it by
+ * changing this component's body and nobody else's contract. The adapter still does
+ * not pass it in 184; 184-13 is where a canvas node first carries one.
  *
  * Every value is a SERVER verdict (D-182-06 / VALID-03 — the client never guesses a
  * severity). The colour budget stays with Phase 188: 184's marks are a red ✕ for
  * `error` and a dashed grey ○ for `incomplete`, so a 3-`incomplete` / 0-`error` draft
  * renders with zero destructive-token elements.
+ *
+ * The literal union itself lives in `nodePresentation` beside the table that renders
+ * it, because a component module may not export shared constants (`react-refresh/
+ * only-export-components` says so, and it is right — a const re-created on every hot
+ * reload is a stale-identity bug waiting to happen). This alias keeps the name every
+ * caller already knows.
  */
-export type NodeVerdictMark = "error" | "incomplete" | "unknown"
+export type NodeVerdictMark = VerdictMarkKind
 
 /**
  * The live run-state slot. **Declared in 184-03, owned by Phase 188.**
@@ -153,7 +172,11 @@ export interface PhaseNodeCardProps {
   badges?: BadgeSlots
   /** Phase 188's run state. Declared, rendered as nothing in 184. */
   status?: NodeRunStatus
-  /** 184-08's server verdict mark. Declared, rendered as nothing in 184-03. */
+  /** The server's verdict mark (VALID-03), rendered on the card's RIGHT edge by
+   *  184-08. **Every value here is SERVER-DERIVED** — the caller reads it off
+   *  `verdictModel.markFor(slug)`, which reads `verdict.severity` and derives nothing.
+   *  Absent ⇒ the card renders no verdict element at all, which is the state a draft
+   *  is in before its first check has answered (D-184-15). */
   verdict?: NodeVerdictMark
   /** The 137-B step number. Declared, rendered as nothing in 184-03 — D-183-07 keeps
    *  `phase_index` off the face today, and putting it on is a sketch decision with its
@@ -177,11 +200,28 @@ export interface PhaseNodeCardProps {
  * server's adjacency.
  */
 export function PhaseNodeCard(props: PhaseNodeCardProps) {
-  // Only the slots this plan RENDERS are destructured. `status`, `verdict` and
-  // `stepNumber` are declared on the interface above and deliberately unread here —
-  // Wave 0 adds the seam, 184-08 / Phase 188 add the behaviour.
-  const { slug, phaseType, icon, title, subtitle, technicalLine, tint, badges, selected, anchors } =
-    props
+  // `status` and `stepNumber` are declared on the interface above and deliberately
+  // unread here — Wave 0 added the seam, Phase 188 adds the behaviour. `verdict`
+  // joined the rendered set in 184-08 and is the ONE slot whose value comes from the
+  // server rather than from a local derivation.
+  const {
+    slug,
+    phaseType,
+    icon,
+    title,
+    subtitle,
+    technicalLine,
+    tint,
+    badges,
+    verdict,
+    selected,
+    anchors,
+  } = props
+
+  // Total by construction: the slot is typed, but a forward-compat value arriving from
+  // a caller falls back to the degraded mark rather than to nothing. Falling back to
+  // NOTHING would render an unchecked node as a checked-and-clean one.
+  const mark = verdict ? (VERDICT_MARK[verdict] ?? VERDICT_MARK.unknown) : null
 
   return (
     <div
@@ -242,6 +282,28 @@ export function PhaseNodeCard(props: PhaseNodeCardProps) {
           </div>
         ) : null}
       </div>
+
+      {/* The server's verdict mark, on the RIGHT edge (`themes/canvas-184.css`
+          `body.card-b .vmark`). Under 137-B the TOP edge belongs to the floating 3D
+          icon and the BOTTOM edge is reserved for the per-node actions 184-12 adds, so
+          right is the only edge left — and it is also the one that never overlaps the
+          icon. It is `pointer-events-none` and carries no control of any kind: one tab
+          stop per node is a canvas-level invariant, and a pressable mark would make it
+          two. */}
+      {mark ? (
+        <span
+          data-testid="canvas-node-verdict"
+          data-verdict={verdict}
+          className={cn(
+            "pointer-events-none absolute -right-2 top-1.5 z-[8] grid h-[22px] w-[22px]",
+            "place-items-center rounded-full text-[11px] font-bold leading-none",
+            mark.className,
+          )}
+        >
+          <span aria-hidden="true">{mark.glyph}</span>
+          <span className="sr-only">{mark.label}</span>
+        </span>
+      ) : null}
 
       {/* The 3D mark floating at the LEFT edge: a soft light disc behind it (the
           D-183-14 canvas-local icon-well lightening, applied uniformly), the
