@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
 status: executing
-last_updated: "2026-07-27T06:13:53.107Z"
+last_updated: "2026-07-27T06:33:02.397Z"
 last_activity: 2026-07-27
 progress:
   total_phases: 18
   completed_phases: 3
   total_plans: 37
-  completed_plans: 29
+  completed_plans: 30
   percent: 17
 ---
 
@@ -45,7 +45,7 @@ Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 op
 ## Current Position
 
 Phase: 184 (Editable Canvas + Live Structural Validation (Round-Trip)) — EXECUTING
-Plan: 6 of 13
+Plan: 7 of 13
 
 **Plan 184-01 COMPLETE (`4a019bd8` gate → `ffb3e9cf` icon swap → `854ec42b` SUMMARY).** Wave 0's
 measuring stick landed FIRST as its own single-file commit: `scripts/vitest-count-gate.cjs` pins
@@ -106,7 +106,7 @@ one-line shallow rebuild (`out.push({...phase})`) turned **13 `toBe` assertions 
 shows a deep-equality-only suite would have passed a serializer that had just copied every phase.
 Coverage: 15 hand-authored generator shapes (one per config-union member with EVERY optional field
 populated, both branch outcomes, gate-heavy, 12-deep, index gap, duplicate index, duplicate slug)
-+ whatever the committed dump holds. Gates: count gate exit 0 (**752** total, 0 failing, all 16
+plus whatever the committed dump holds. Gates: count gate exit 0 (**752** total, 0 failing, all 16
 pinned at delta 0; `canvasModel.purity.test.ts` 69→79 is an ALLOWED increase), tsc **33**, `npx
 vite build` exit 0, canvas snapshot byte-unchanged, 0 migration + 0 backend files,
 `__fixtures__/canvasFixtures.ts` untouched, **zero assertion edits** (both test files in the diff
@@ -121,6 +121,29 @@ icon sweep, which needs Docker too. **Three self-matching-guard traps hit and fi
 (a docstring quoting its own read-only grep, a docblock naming the serializer it forbids, and a
 `.source` regex firing on the spread `[...source]`) — when authoring a "grep for token X, expect 0"
 criterion, name the CONCEPT in prose and put the literal where the grep does not look.
+
+**Plan 184-06 COMPLETE (`7f71d6d5` api clients → `06b9a41f` the hook → `84d48049` R7's proofs →
+SUMMARY).** The two canvas routes Phase 182 shipped and nothing ever called now have typed clients,
+and `useLiveValidation.ts` owns the app's ONLY call to the validation seam — which is what the
+shipped `WorkflowCanvas.test.tsx` scope fence forces, so the canvas takes `verdicts` as a prop and
+Phase 188 can reuse the shape. **Last-write-wins is enforced twice on purpose** (D-184-13): an
+`AbortController` cancels the in-flight call and a monotonic sequence drops a reply already sitting
+in the network buffer. **The success path checks the sequence and NOTHING else** — a
+`signal.aborted` check there (which looks like good hygiene, and `usePanelReconcile` has one) would
+have made R7's out-of-order test pass on ABORT, voiding the proof. Falsified: deleting the sequence
+check turned **exactly 1 of 20 red**, naming the older verdict rendering over the newer, while the
+in-order sibling AND the abort-silent test both stayed green — which is what shows the red one is
+about ordering and not about abort. **Every non-200 is fail-closed BY SHAPE** (D-184-14): the
+`degraded` state carries no `ok` field at all, so "a blip rendered as a green light" is
+unrepresentable; the 422 gets `cause: "unreadable"` and everything else `"unreachable"`, so a
+reproducible shape rejection is never worded as "try again". **The 422 body is logged, never
+shown** — asserted over EVERY string reachable from the state at any depth, with a positive
+control. **No call fires before the first edit** (D-184-15) and the client classifies nothing
+(unknown codes pass through verbatim). Gates: the new suite 20/20 with **exit 0** checked
+explicitly, count gate exit 0 (752 total, 0 failing, 16/16 at delta 0), tsc **33**, `npx vite
+build` exit 0, snapshot byte-unchanged, eslint clean, **zero assertion edits**, 0 backend + 0
+migration files. **VALID-02 / VALID-03 deliberately left `Pending`** — the loop exists and is
+proven, but no surface renders a verdict yet (184-08 / 184-13).
 
 **RE-VERIFICATION GATE (2026-07-26, post-`183-09`): `human_needed`, not `passed`.** All 8
 must-haves verified in code by direct source read; phase-scoped suite re-run independently at
@@ -714,6 +737,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 184 P03 | 38min | 3 tasks | 4 files |
 | Phase 184 P04 | 40min | 3 tasks | 6 files |
 | Phase 184 P05 | 33min | 3 tasks | 6 files |
+| Phase 184 P06 | 20min | 3 tasks | 3 files |
 
 ## Decisions
 
@@ -915,6 +939,8 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase ?]: D-184-04-C: Omit against BuilderDefinition's index signature collapses to {} — DefinitionMeta is a key-remapped mapped type so the definition shape stays declared once
 - [Phase ?]: 184-05: fromCanvas carries phases through BY REFERENCE — reference identity, not deep equality, is the R2 proof (a rebuild fails 13 toBe assertions while every toStrictEqual stays green)
 - [Phase ?]: 184-05: fromCanvas takes no edges argument and NEVER renumbers — renumbering lives only in definitionOps.renumber; duplicate slugs fail SAFE by returning the source untouched
+- [Phase ?]: 184-06: the /validate success path checks the monotonic sequence and NOTHING else — an aborted-signal check there would make R7's out-of-order proof pass on abort instead of on the guard
+- [Phase ?]: 184-06: the degraded validation state carries no ok field at all, so a failed check rendering as clean is unrepresentable rather than merely tested-for
 
 ## Operator Next Steps
 
