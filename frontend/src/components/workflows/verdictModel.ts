@@ -51,6 +51,9 @@
  * not the fix.
  */
 import type { Verdict } from "@/lib/api"
+// Type-only, and therefore erased: the live loop owns the cause union, and keying the
+// sentences off it is what stops a second spelling of the same two words appearing here.
+import type { DegradedValidationCause } from "@/hooks/useLiveValidation"
 
 /**
  * The mark a node carries. Two values, because the canvas paints two: a red ✕ and a
@@ -72,6 +75,27 @@ const SOFT_SEVERITY = "incomplete"
  *  what it can: the STATIC half. A publish still has to run its golden run and its
  *  judge, and this line must never be mistaken for that. */
 export const NOTHING_OUTSTANDING = "Nothing to fix — the static checks pass"
+
+/**
+ * The two sentences a surface says when the check did not run at all (D-184-14).
+ *
+ * SAME BEHAVIOUR, DIFFERENT WORDS, ON PURPOSE. A shape rejection is reproducible: an
+ * author who hits one and is told "try again" will try forever. An unreachable server
+ * usually is worth retrying. Neither sentence renders the rejected body — that is
+ * logged at the transport boundary and carried no further — and neither of them may
+ * ever be swapped for silence or for the clean line above, because "we could not
+ * check" rendering as "fine" is the single worst thing this surface can do.
+ *
+ * They live in this module, and not beside the component that says them, for a
+ * mechanical reason worth writing down: a component file may not export shared
+ * constants (`react-refresh/only-export-components`). It is also the right home —
+ * every word a surface says ABOUT a check now sits in one pure module, next to the
+ * resting-state line it has to be chosen against.
+ */
+export const DEGRADED_SENTENCE: Record<DegradedValidationCause, string> = {
+  unreadable: "We couldn't check this — the workflow's shape isn't something we can read yet.",
+  unreachable: "We couldn't reach the check.",
+}
 
 /** The grouped, counted view of one server response. */
 export interface VerdictGroups {
