@@ -62,18 +62,20 @@
  * clause itself must be quoted verbatim in this docblock, exactly as it is in
  * `PhaseSpine.tsx`, `WorkflowSoul.tsx` and `WorkflowDoorSwitch.tsx`.)
  */
-import { createElement, type ReactNode } from "react"
 import { Handle, Position, type NodeProps } from "@xyflow/react"
 
-import { StatusChip, type ChipTone } from "@/components/org/StatusChip"
-import { PHASE_GLYPHS } from "@/components/workflows/soulData"
+import { StatusChip } from "@/components/org/StatusChip"
 import {
   CANVAS_LAYOUT,
   type PhaseCanvasNode,
   type UnresolvedSkipCanvasNode,
 } from "@/components/workflows/canvasModel"
-import type { Grounding } from "@/components/workflows/phaseVocabulary"
-import { phaseGlyph } from "@/lib/phaseGlyph"
+import {
+  DEFAULT_TINT,
+  GROUNDING_TONE,
+  ICON_TINT,
+  renderPhaseMark,
+} from "@/components/workflows/nodePresentation"
 import { cn } from "@/lib/utils"
 
 // ── Shared atoms ────────────────────────────────────────────────────────────────
@@ -105,62 +107,6 @@ function EdgeAnchors() {
   )
 }
 
-/**
- * The per-step-type tint that sits BEHIND the floating mark — the whole of this
- * surface's type-colour budget (137-D). Values are the sketch's, expressed against
- * the same hue family the app already ships; every card body stays neutral.
- */
-const ICON_TINT: Record<string, string> = {
-  programmatic: "hsl(200 85% 62% / 0.36)",
-  llm_single: "hsl(220 30% 100% / 0.22)",
-  llm_agent: "hsl(239 90% 70% / 0.40)",
-  llm_batch_agents: "hsl(170 80% 55% / 0.34)",
-  llm_human_input: "hsl(38 92% 62% / 0.38)",
-  llm_emit: "hsl(258 90% 70% / 0.40)",
-}
-
-const DEFAULT_TINT = "hsl(220 30% 100% / 0.18)"
-
-/**
- * The canvas-domain tone mapping for the shared `StatusChip` (D-183-07 slot 1).
- *
- * This is the documented reuse shape, not a fork: `StatusChip`'s own docblock
- * separates the shared COMPONENT (the cohesion win) from the tone MAPPING (always
- * domain-specific — `statusChipMeta` maps the invitation/SSO lifecycle,
- * `adoptionChip` maps the roster's adoption state, and this maps grounding). A
- * third inline pill is exactly the fork Phase 177 retired.
- *
- * `strict` reads as a satisfied constraint (green), `flag` as a live/attention
- * state (indigo), `open` as calm. The WORD carries the meaning either way — the
- * glyph beside it is decorative and aria-hidden (WCAG 1.4.1, never colour alone).
- */
-const GROUNDING_TONE: Record<Grounding["mode"], ChipTone> = {
-  strict: "success",
-  flag: "primary",
-  open: "muted",
-}
-
-/**
- * The 3D mark, resolved at MODULE scope and returned as a `ReactNode`.
- *
- * Since Phase 127 the soulData value is a fluent-emoji SLUG string rather than a
- * glyph, so `"•"` is the real visual fallback for an unmapped type (the canonical
- * `PhaseSpine.tsx:87-89` render). The resolution deliberately does NOT happen inside
- * a component body: `phaseGlyph()` returns a COMPONENT, and binding a component to a
- * local during render is what `react-hooks/static-components` correctly flags —
- * React cannot preserve state across renders for a type that is recreated. Hoisting
- * the JSX call site into a leaf component does not clear it either (the rule fires in
- * any component body); returning the element from a plain module-scope helper does,
- * and it is also the honest shape — this is a lookup, not a component.
- *
- * The rendered output is byte-identical to the previous inline ternary: the same
- * bundled SVG, the same `h-8 w-8`, the same `"•"` fallback.
- */
-function renderPhaseMark(phaseType: string): ReactNode {
-  const mark = phaseGlyph(phaseType)
-  return mark ? createElement(mark, { className: "h-8 w-8" }) : (PHASE_GLYPHS[phaseType] ?? "•")
-}
-
 // ── PhaseNode — the phase card ──────────────────────────────────────────────────
 
 /**
@@ -174,8 +120,9 @@ export function PhaseNode({ data, selected }: NodeProps<PhaseCanvasNode>) {
   const technical = data.technical === true
   const title = technical ? data.technicalTitle : data.title
 
-  // The 3D mark is resolved by the module-scope helper above — see its docblock for
-  // why the lookup does not live in this body.
+  // The 3D mark is resolved by `nodePresentation.renderPhaseMark`, a module-scope
+  // helper in another file since the 184-03 split — see its docblock for why the
+  // lookup does not live in this body.
   const tint = ICON_TINT[data.phaseType] ?? DEFAULT_TINT
 
   return (
