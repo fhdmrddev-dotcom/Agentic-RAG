@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
 status: executing
-last_updated: "2026-07-27T07:22:10.991Z"
+last_updated: "2026-07-27T07:44:17.507Z"
 last_activity: 2026-07-27
 progress:
   total_phases: 18
   completed_phases: 3
   total_plans: 37
-  completed_plans: 32
+  completed_plans: 33
   percent: 17
 ---
 
@@ -45,7 +45,7 @@ Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 op
 ## Current Position
 
 Phase: 184 (Editable Canvas + Live Structural Validation (Round-Trip)) — EXECUTING
-Plan: 9 of 13
+Plan: 10 of 13
 
 **Plan 184-01 COMPLETE (`4a019bd8` gate → `ffb3e9cf` icon swap → `854ec42b` SUMMARY).** Wave 0's
 measuring stick landed FIRST as its own single-file commit: `scripts/vitest-count-gate.cjs` pins
@@ -769,6 +769,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 184 P06 | 20min | 3 tasks | 3 files |
 | Phase 184 P07 | 35min | 3 tasks | 4 files |
 | Phase 184 P08 | 17min | 3 tasks | 7 files |
+| Phase 184 P09 | 22min | 3 tasks | 4 files |
 
 ## Decisions
 
@@ -976,6 +977,9 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase ?]: 184-07: a session with no resolvable user id takes the same in-memory path as an unsaved draft — an unscoped key would be the very leak per-user scoping prevents
 - [Phase ?]: 184-07: StepTypePicker renders its refusal CHARACTER-IDENTICAL to definitionOps.STRANDING_REASON, proving it authored none of its own
 - [Phase ?]: 184-08: the verdict-mark table lives in nodePresentation and the degraded copy in verdictModel — react-refresh/only-export-components forbids either from a component module; two Wave-0 seam assertions in PhaseNodeCard.test.tsx were narrowed and enumerated
+- [Phase 184]: 184-09: the governance rails ride an OPTIONAL PhaseFormPanel prop whose absence renders today's panel byte-for-byte (D-14); the guard lives in a NEW PhaseFormPanel.rails.test.tsx because revertByteIdentical.test.tsx never renders that panel
+- [Phase 184]: 184-09: PhaseGateRow is a discriminated union carrying onRemove on the unlocked branch ONLY, so 'a locked gate with a remove button' and 'a removable gate with nothing to press' are both un-representable; a locked row's DOM subtree holds zero button/[role=button]/input
+- [Phase 184]: 184-09: useGroundingBundle is the app's only caller of GET /workflows/grounding-bundle; a non-empty degraded array resolves to unavailable and the ready member types degraded as the EMPTY TUPLE, so a degraded palette shown as complete is a typecheck error. idle/loading are DERIVED (react-hooks/set-state-in-effect), which also lets a read palette survive a transient disable
 
 ## Operator Next Steps
 

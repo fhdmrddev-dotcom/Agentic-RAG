@@ -191,7 +191,7 @@ Plans:
 **Wave 5** *(blocked on Wave 4 completion)*
 
 - [x] 184-08-PLAN.md — `verdictModel` + the two node marks + the problems tray (server-only verdicts)
-- [ ] 184-09-PLAN.md — `useGroundingBundle` + `PhaseFormPanel`'s optional governance rails (absent = today)
+- [x] 184-09-PLAN.md — `useGroundingBundle` + `PhaseFormPanel`'s optional governance rails (absent = today)
 
 **Wave 6** *(blocked on Wave 5 completion)*
 
