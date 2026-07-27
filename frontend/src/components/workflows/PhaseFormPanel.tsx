@@ -35,6 +35,18 @@
  * A field edit calls `onChange(patch)`; a blur/save calls `onPersist()` (the page
  * wires it to `updateWorkflowDraft` PATCH after the first `createWorkflowDraft`).
  *
+ * Phase 184-09 (CANVAS-04 / R11, sketch 140-A): the panel is now ALSO the canvas's step
+ * inspector — a third way IN to this one form, never a second form. Governance arrives as
+ * three RAILS on the optional `rails` prop: locked order, a tool whitelist sourced live
+ * from `GET /workflows/grounding-bundle`, and the checks that cannot be detached. The prop
+ * is optional for a load-bearing reason: this component is rendered ONCE, by the page, and
+ * serves BOTH the shipped Spine view and the flagged Canvas view, so `rails` ABSENT must
+ * render today's panel byte-for-byte or a flag-off user's surface drifts (D-14 /
+ * D-181-01). Every rail branch in this file is therefore gated on `rails` being present.
+ * Phase 184 does NOT invent an authored grounding field — the gates are DERIVED by the
+ * caller exactly as `groundingFor()` derives grounding today; Phase 185 is what replaces
+ * that derivation, and it plugs into `rails.gates` rather than into new layout.
+ *
  * THE PANEL IS DISMISSED FROM ITS OWN HEADER, and `onClose` is REQUIRED so it can
  * never mount unclosable. For one shipped revision the only exit was re-activating the
  * same node — a move a user has no way to discover — so the panel could be entered and
@@ -49,6 +61,49 @@ export type PhaseConfigPatch = Record<string, unknown>
 
 /** A simple id→name lookup (folders / skills). Missing ids fall back to the id. */
 export type IdNameMap = Record<string, string>
+
+/**
+ * One row of the gates rail (Phase 184-09 / CANVAS-04, sketch 140-A).
+ *
+ * A DISCRIMINATED UNION, not a `locked: boolean` flag with an optional handler beside it,
+ * because the two states differ in what they OWE the user. A locked gate came WITH a choice
+ * above it — remove what made it apply and it goes; there is no switch, so a `🔒` row must
+ * carry no removal control at all (not a disabled one: "cannot be wired around" is a
+ * structural claim, and a disabled control is still a control that a later edit can
+ * re-enable). An `○` row can be detached, and a row that says so while offering nothing to
+ * press is the same lie in the other direction. Modelled this way, "a locked gate with a
+ * remove button" and "a removable gate with no way to remove it" are both un-representable —
+ * the idiom this file's own required `onClose` established.
+ *
+ * `onRemove` belongs to the CALLER because a gate is a `validators` entry, and this panel's
+ * only write seam (`onChange`) patches `config`. The panel renders the rail; the page owns
+ * the definition.
+ */
+export type PhaseGateRow =
+  | { label: string; locked: true }
+  | { label: string; locked: false; onRemove: () => void }
+
+/**
+ * The three governance rails (CANVAS-04). Every value here is DERIVED or SERVER-SOURCED by
+ * the caller; the panel computes none of it and fetches none of it.
+ *
+ * - `order` — informational only. `phase_index` IS the order and there is no `depends_on`,
+ *   so moving is allowed and rewiring is not representable. The rail carries no control.
+ * - `toolOptions` — the set the author chooses FROM, straight off
+ *   `GET /workflows/grounding-bundle` (`useGroundingBundle`). The literal `"degraded"`
+ *   means the palette read FAILED and the surface must say so; an empty array would be
+ *   byte-indistinguishable from an author who owns no tools, which is the lie R11 exists
+ *   to prevent.
+ * - `gates` — derived exactly as the shipped `groundingFor()` derives grounding today
+ *   (`citation_policy` plus the presence of a `citations_required` validator). Phase 185
+ *   replaces that derivation with an authored per-node grounding mode and plugs into THIS
+ *   array; designing the container for it now is the point, inventing the field is not.
+ */
+export interface PhaseFormRails {
+  order: { index: number; total: number }
+  toolOptions: string[] | "degraded"
+  gates: PhaseGateRow[]
+}
 
 export interface PhaseFormPanelProps {
   /** The selected phase to edit, or null at rest. */
@@ -71,6 +126,17 @@ export interface PhaseFormPanelProps {
    *  — so "a panel the user cannot close" is not a representable state and a dropped
    *  wiring is a typecheck error rather than a silent UX regression. */
   onClose: () => void
+  /** Phase 184-09 (CANVAS-04 / R11, sketch 140-A): the governance rails — locked order,
+   *  the server-sourced tool whitelist, and the gates that cannot be wired around.
+   *
+   *  ABSENT ⇒ THIS PANEL RENDERS EXACTLY AS IT DOES TODAY, BYTE-FOR-BYTE. That is not a
+   *  nicety, it is the D-14 / D-181-01 mechanism: `PhaseFormPanel` is ONE instance serving
+   *  BOTH the shipped Spine view and the flagged Canvas view, so any change to its rendered
+   *  controls would change what a flag-off user sees — including an operator. Riding the
+   *  rails on an optional prop makes the flag-off surface identical by construction rather
+   *  than by review. `revertByteIdentical.test.tsx` never renders this component, so the
+   *  guard lives in `PhaseFormPanel.rails.test.tsx` instead. */
+  rails?: PhaseFormRails
 }
 
 const CITATION_POLICIES = ["strict", "flag", "partial", "draft"] as const
@@ -383,6 +449,79 @@ function ToolsField({
   )
 }
 
+/**
+ * The order rail (140-A) — informational, and deliberately control-free.
+ *
+ * `phase_index` IS the order: there is no `depends_on`, and branching is not representable
+ * in the definition at all. Moving a step is allowed (on the canvas, where the steps are);
+ * rewiring one is not a thing this product can express, so the rail states the rule rather
+ * than offering a switch that would have to be refused.
+ */
+function OrderRail({ index, total }: { index: number; total: number }) {
+  return (
+    <section data-rail="order" data-testid="rail-order" className="mb-3 rounded border border-border bg-muted/40 px-2.5 py-2">
+      <h3 className="text-[11px] font-medium text-foreground">Order is locked</h3>
+      <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+        Runs as step {index} of {total} — steps run in order, one after another.
+      </p>
+    </section>
+  )
+}
+
+/**
+ * The gates rail (140-A) — 🔒 rows that cannot be detached beside `○` rows that can.
+ *
+ * A locked row's subtree contains NO `button`, no `[role="button"]` and no `input`. Not a
+ * disabled one — none. That is what makes "governance you cannot wire around" a structural
+ * property rather than a styling choice, and it is why the ⓘ `InfoHint` (which is
+ * `role="button"` for a11y reasons) is deliberately not used inside a row.
+ *
+ * The glyph is `aria-hidden` and the meaning is carried by a real visible WORD on both
+ * branches (the never-colour-alone / never-glyph-alone rule the canvas cards already
+ * follow), so the distinction survives a screen-reader read and a colour-blind read alike.
+ */
+function GatesRail({ gates }: { gates: PhaseGateRow[] }) {
+  return (
+    <section data-rail="gates" data-testid="rail-gates" className="mt-3 rounded border border-border bg-muted/40 px-2.5 py-2">
+      <h3 className="text-[11px] font-medium text-foreground">Checks that run on this step</h3>
+      {gates.length === 0 ? (
+        <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+          No checks apply to this step yet.
+        </p>
+      ) : (
+        <ul className="mt-1 flex flex-col gap-1">
+          {gates.map((gate) => (
+            <li
+              key={gate.label}
+              data-testid="gate-row"
+              data-locked={gate.locked ? "true" : "false"}
+              className="flex items-center gap-1.5 text-[11px] text-foreground"
+            >
+              <span aria-hidden="true">{gate.locked ? "🔒" : "○"}</span>
+              <span className="min-w-0 flex-1 truncate">{gate.label}</span>
+              {gate.locked ? (
+                <span className="shrink-0 text-[10.5px] text-muted-foreground">Cannot be removed</span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={gate.onRemove}
+                  className="shrink-0 rounded border border-border px-1.5 py-0.5 text-[10.5px] text-muted-foreground hover:bg-accent/40 hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                >
+                  Remove
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="mt-1.5 text-[10.5px] leading-snug text-muted-foreground">
+        A locked check came with a choice above it — change what made it apply and it goes.
+        There is no switch.
+      </p>
+    </section>
+  )
+}
+
 /** Map a raw tool id to a friendlier reading (best-effort; falls back to the id). */
 function friendlyToolName(id: string): string {
   const map: Record<string, string> = {
@@ -411,6 +550,7 @@ export function PhaseFormPanel({
   onChange,
   onPersist,
   onClose,
+  rails,
 }: PhaseFormPanelProps) {
   // RESTING rail — the parent grid collapses this column to 44px; show a thin hint.
   if (!open || !phase) {
@@ -472,6 +612,9 @@ export function PhaseFormPanel({
         <p className="mb-3 text-[11px] text-muted-foreground">
           Refine this step — adjust what it does, then move on.
         </p>
+
+        {/* The rails render ONLY when the caller supplies them. Absent ⇒ today's panel. */}
+        {rails && <OrderRail index={rails.order.index} total={rails.order.total} />}
 
         <div className="grid grid-cols-2 gap-3">
           {/* ── programmatic: fn + input_keys (a deterministic server step — no LLM fields) ── */}
@@ -738,6 +881,8 @@ export function PhaseFormPanel({
             </>
           )}
         </div>
+
+        {rails && <GatesRail gates={rails.gates} />}
       </div>
     </aside>
   )
