@@ -82,6 +82,7 @@ import {
   GROUNDING_TONE,
   ICON_TINT,
   renderPhaseMark,
+  type VerdictMarkKind,
 } from "@/components/workflows/nodePresentation"
 import {
   PhaseNodeCard,
@@ -146,6 +147,15 @@ export function PhaseNode({ data, selected }: NodeProps<PhaseCanvasNode>) {
   // lookup does not live in this body.
   const tint = ICON_TINT[data.phaseType] ?? DEFAULT_TINT
 
+  // VALID-03 (184-10): the server's verdict mark, threaded down on `data` by the shell
+  // exactly as the ⌥ reveal is. The value was already reduced to one of three states by
+  // `verdictModel.markFor`, which reads `verdict.severity` and derives NONE of it — so
+  // this adapter neither classifies nor asks, and a provider-less node still renders.
+  // The cast is the price of `PhaseNodeData`'s `[k: string]: unknown` index signature,
+  // which @xyflow/react requires on every node-data shape; the value's own type is
+  // guaranteed at the shell's `marks` prop, which is typed to this exact union.
+  const verdict = data.verdict as VerdictMarkKind | undefined
+
   // Badge slot 1 is always present; slot 2 only on `llm_human_input` (D-183-07). The
   // tuple type caps the row at two, so a third badge is a typecheck error.
   const grounding: BadgeSlot = {
@@ -163,8 +173,10 @@ export function PhaseNode({ data, selected }: NodeProps<PhaseCanvasNode>) {
   }
   const badges: BadgeSlots = data.waitsForYou ? [grounding, waitsForYou] : [grounding]
 
-  // `status`, `verdict`, `technicalLine` and `stepNumber` are deliberately NOT passed:
-  // Wave 0 lands the seam, 184-08 / Phase 185 / Phase 188 land the data.
+  // `status`, `technicalLine` and `stepNumber` are still deliberately NOT passed: Wave 0
+  // landed the seam and Phase 185 / Phase 188 land those. `verdict` WAS in that list
+  // until 184-10 — the line is corrected here rather than left, because a comment that
+  // still names a slot the component now fills is the same defect as a false docblock.
   return (
     <PhaseNodeCard
       slug={data.slug}
@@ -174,6 +186,7 @@ export function PhaseNode({ data, selected }: NodeProps<PhaseCanvasNode>) {
       subtitle={data.subtitle}
       tint={tint}
       badges={badges}
+      verdict={verdict}
       selected={selected}
       anchors={<EdgeAnchors />}
     />

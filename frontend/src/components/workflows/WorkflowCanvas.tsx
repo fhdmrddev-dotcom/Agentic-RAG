@@ -2,9 +2,54 @@
  * Phase 183-06 Task 2 (CANVAS-01, D-183-05 / D-183-08 / D-183-11, sketch 134/137-D) —
  * WorkflowCanvas.
  *
- * THE READ-ONLY SHELL. It mounts `canvasModel.toCanvas`'s projection inside
- * `@xyflow/react`, and its whole job beyond that is to make read-only TRUE rather
- * than assumed.
+ * THE SHELL. It mounts `canvasModel.toCanvas`'s projection inside `@xyflow/react`.
+ *
+ * ⚠ WHAT PLAN 184-10 CHANGED, stated first so this docblock cannot drift (the
+ * D-ITEM-183-02 trap). Until 184-10 this file was the READ-ONLY shell and its whole
+ * job beyond mounting the projection was to make read-only TRUE rather than assumed.
+ * It now has TWO modes, and `editable` is the switch. `editable={false}` — the
+ * default, and what every shipped caller passes today — renders exactly the surface
+ * described below, unchanged. `editable` flips ONE thing and only one: per-node
+ * `draggable`, on phase nodes. Everything in the opt-out block stays off in both
+ * modes.
+ *
+ * ── D-184-10 — ONE FREE DRAG, THE AXES CARRY TWO DIFFERENT MEANINGS ───────────────
+ *
+ * On drop, `definitionOps.resolveDrop` reads the gesture twice. The X component
+ * resolves to a lane slot and is a REAL DEFINITION EDIT — undoable, validated, marks
+ * the draft dirty — and the card then snaps to its computed lane x because positions
+ * re-derive from the projection. The Y component is kept verbatim as the cosmetic,
+ * browser-local `dy`: no history entry, no network call, never serialized.
+ *
+ * THERE IS NO MODIFIER TO LEARN, AND THE SEPARATION IS STRUCTURAL. Which op runs is
+ * decided by WHICH COMPONENT CHANGED, not by a flag a caller could misconfigure:
+ * `resolveDrop` computes `reorderTo` from the x inputs alone and returns `null` for a
+ * drag that never crossed half a pitch, so the definition branch of `onNodeDragStop`
+ * is unreachable for a purely vertical drag. A conditional could be got wrong; an
+ * argument that is never supplied cannot be.
+ *
+ * ── D-184-09 — TWO GESTURE PATHS, ONE OP BEHIND BOTH ─────────────────────────────
+ *
+ * The pointer drags along the lane; the keyboard presses `⌥←` / `⌥→` on the selected
+ * node. Both build the reordered node array and call the SAME `onCommitNodes`, which
+ * the page routes into `builderStore.commitCanvasNodes` → `reorderPhase`. The
+ * keyboard path is not a grudging fallback: 183 made every node keyboard-activatable
+ * and shipped a real screen-reader pass, so a drag-only reorder would REGRESS a
+ * shipped promise, and at the five-step maximum it is genuinely competitive. Alt is
+ * required so the binding cannot collide with the library's own arrow-key node
+ * navigation or with field navigation in the panel one toggle away.
+ *
+ * VERDICT MARKS ARRIVE AS DATA, AND THIS FILE STILL FETCHES NOTHING (VALID-03). The
+ * `marks` lookup is a PROP, supplied by the page from `verdictModel.markFor`, and its
+ * result is merged onto the node's data copy exactly as the ⌥ reveal already is
+ * (D-183-08). `PhaseNode` therefore stays a context-free leaf and a second source of
+ * truth for a verdict is structurally impossible. This file's own suite forbids the
+ * string that names the server validation seam, which is what keeps that boundary
+ * honest rather than merely intended.
+ *
+ * THE COSMETIC `dy` IS READ AND WRITTEN THROUGH PROPS, NOT THROUGH STORAGE. Browser
+ * storage for the nudge lives in `canvasNudge.ts` and nowhere else — this file names
+ * no storage API at all, and its suite asserts that.
  *
  * READ-ONLY IS OPT-OUT, NOT OPT-IN. Every interaction flag the library ships
  * defaults to `true`: `nodesDraggable`, `nodesConnectable`, `edgesReconnectable`,
@@ -32,6 +77,13 @@
  * because the library picks between them off its keyboard-a11y opt-out flag, whose
  * `false` default — the one this canvas keeps — renders the counter-intuitively named
  * `keyboardDisabled` key rather than the `default` one.
+ *
+ * …AND IT MUST STAY TRUE IN BOTH MODES (184-10). An editable canvas DOES move a node
+ * from the keyboard, so a single table would have to either omit the binding a screen
+ * reader user needs or promise it on a surface that does not have it. There are
+ * therefore two tables, chosen by `editable`. The read-only one is byte-unchanged, so
+ * the shipped WR-06 assertion still measures exactly what it was written to measure —
+ * which is why 184-10 edited NO pinned assertion here.
  *
  * SUPPRESSING THE INTERACTIVITY LOCK ON `<Controls>` IS NOT POLISH. The cluster
  * defaults that prop to true and renders an interactivity padlock whose handler
@@ -62,26 +114,42 @@
  * D-183-03 flag-off assertion: no `.react-flow` element in the container.
  *
  * SELECTION IS APPLIED IN THE VIEW, NEVER IN THE MODEL (T-183-04). The memoized
- * projection is mapped to a COPY carrying `selected` and the ⌥ boolean; nothing is
- * ever written back onto `phases` or onto any definition object, so no layout key
- * can leak into `workflow_definitions.definition`.
+ * projection is mapped to a COPY carrying `selected` and the ⌥ boolean — and, since
+ * 184-10, the cosmetic `dy`, the per-node `draggable` flag and the server verdict
+ * mark. Nothing is ever written back onto `phases` or onto any definition object, so
+ * no layout key can leak into `workflow_definitions.definition`. That is why the
+ * nudge is safe to merge here and would not be safe anywhere else.
  *
- * SCOPE FENCES, all machine-checked by the source guard in this file's suite: 183
- * calls no validation endpoint and no other endpoint, renders no per-node server
- * verdict badge, imports no undo/redo or auto-layout library, reads and writes no
- * authored grounding field, adds no run state and no run colour, and persists no
- * view preference. Those are Phases 184, 185, 186 and 188.
+ * SCOPE FENCES, all machine-checked by the source guard in this file's suite: this
+ * canvas calls no validation endpoint and no other endpoint (the verdict arrives as a
+ * PROP, already derived by the server), imports no undo/redo or auto-layout library,
+ * reads and writes no authored grounding field, adds no run state and no run colour,
+ * and persists no view preference of its own. Those are Phases 185, 186 and 188. What
+ * 184 added on this surface is listed at the top of this docblock.
+ *
+ * MOTION KEYS OFF RUN STATE, NEVER OFF SELECTION — and 184 has no run state, so
+ * neither the selected node nor the dragged one is the thing that animates.
  *
  * XSS (T-124-01): every authored string (phase names) is rendered as a plain React
  * text child / `title=` attribute value — never `dangerouslySetInnerHTML`.
  */
-import { useCallback, useMemo, type CSSProperties, type KeyboardEvent } from "react"
+import {
+  useCallback,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent,
+} from "react"
 import {
   Background,
   Controls,
   MarkerType,
   ReactFlow,
   type DefaultEdgeOptions,
+  type NodeChange,
+  type OnNodeDrag,
+  type XYPosition,
 } from "@xyflow/react"
 
 import { TechnicalNamesToggle } from "@/components/admin/TechnicalNamesToggle"
@@ -92,6 +160,8 @@ import {
   type CanvasEdge,
   type CanvasNode,
 } from "@/components/workflows/canvasModel"
+import { resolveDrop } from "@/components/workflows/definitionOps"
+import type { VerdictMarkKind } from "@/components/workflows/nodePresentation"
 import { EndCapNode, PhaseNode, UnresolvedSkipNode } from "@/components/workflows/PhaseNode"
 import type { PhaseSpecJSON } from "@/components/workflows/phaseVocabulary"
 import { useTechnicalNamesOptional } from "@/providers/TechnicalNamesProvider"
@@ -118,6 +188,28 @@ const nodeTypes = {
 const ARIA_LABELS = {
   "node.a11yDescription.default": "Press enter or space to open this step's details.",
   "node.a11yDescription.keyboardDisabled": "Press enter or space to open this step's details.",
+}
+
+/**
+ * The SAME override for the editing mode (184-10 / D-184-09), and the reason there are
+ * two tables rather than one edited one.
+ *
+ * The table above is a promise, and on the read-only surface it is complete: enter or
+ * space opens the details and nothing else happens. On the editable surface that
+ * sentence alone would be TRUE BUT INCOMPLETE — the node really does move under
+ * `⌥←` / `⌥→`, and a screen-reader user who is never told the binding cannot reach the
+ * only structural affordance this canvas has. Widening the one table instead would have
+ * announced a movement affordance on a surface that provably does not have it, which is
+ * the WR-06 defect in reverse.
+ *
+ * Alt is named in WORDS ("hold alt"), not as a glyph, because a screen reader reads this
+ * aloud. Both description keys are overridden for the same inverted-flag reason as above.
+ */
+const ARIA_LABELS_EDITABLE = {
+  "node.a11yDescription.default":
+    "Press enter or space to open this step's details. Hold alt and press the left or right arrow key to move this step one position.",
+  "node.a11yDescription.keyboardDisabled":
+    "Press enter or space to open this step's details. Hold alt and press the left or right arrow key to move this step one position.",
 }
 
 /**
@@ -165,11 +257,66 @@ export interface WorkflowCanvasProps {
   phases: PhaseSpecJSON[]
   /** The currently-selected phase slug (the open form anchor), or null at rest. */
   selectedSlug: string | null
-  /** Selection only — NEVER reorders, NEVER moves a node. Fires the clicked slug. */
+  /**
+   * Selection, and ONLY selection. Fires the clicked (or activated) slug.
+   *
+   * ⚠ 184-10 rewrote this line rather than leaving it. Until this plan it denied, in
+   * capitals, that this surface could re-order or move a node at all — a claim about the
+   * whole SURFACE, which became false the moment the canvas learned to do both. (The
+   * superseded wording is described here rather than quoted, so the acceptance grep that
+   * proves it is gone can return zero without this paragraph having to omit its own
+   * subject — the same self-match trap this phase has now hit half a dozen times.) What
+   * is still true, and is the part worth promising, is narrower and about this
+   * CALLBACK: reordering travels on
+   * `onCommitNodes` and the cosmetic offset on `onNudge`, never on this one — so a page
+   * that wires only selection cannot be surprised by a structural edit arriving through
+   * it.
+   */
   onSelectNode: (slug: string) => void
   /** Release the selection (a click on empty space). REQUIRED — the deselect half of
    *  the same contract; a canvas that can only select is a panel with no way out. */
   onClearSelection: () => void
+
+  // ── 184-10, the editing half. Every one of these is OPTIONAL and every one is
+  //    inert while `editable` is false, so the shipped read-only callers compile and
+  //    render exactly as they did before this plan. ──
+
+  /**
+   * The editing switch. `false` (the default) renders the pre-184-10 read-only canvas
+   * exactly: no per-node drag, no keyboard reorder, no editing copy in the header. The
+   * page passes the canvas feature flag, so a flag-off surface is byte-identical.
+   *
+   * It is OPTIONAL rather than required on purpose: the shipped page and the shipped
+   * 31-assertion suite both render this component without it, and making it required
+   * would have forced an edit to both to land a prop that defaults to "behave as before".
+   */
+  editable?: boolean
+  /**
+   * The server-derived verdict mark for one node, or `undefined` when the server said
+   * nothing about it. Supplied by the page from `verdictModel.markFor` — **this canvas
+   * derives no severity and asks no server for one**; its own suite forbids the string
+   * that names the validation seam, which is what keeps that boundary structural.
+   */
+  marks?: (slug: string) => VerdictMarkKind | undefined
+  /**
+   * slug → the cosmetic vertical offset, in canvas pixels. Read from `canvasNudge.ts`
+   * by the PAGE and handed down; browser storage never appears in this file, so the
+   * `dy` has exactly one home and cannot acquire a second.
+   */
+  nudges?: Record<string, number>
+  /**
+   * A drag's y-component landed. `dy` is the RESULTING offset for that slug (the
+   * previous offset plus this drag's vertical delta), so the handler is a plain write
+   * rather than an accumulation the page has to get right. Cosmetic: no history entry,
+   * no network call, never serialized into the definition.
+   */
+  onNudge?: (slug: string, dy: number) => void
+  /**
+   * A drag's x-component, or a `⌥←` / `⌥→` press, resolved to a new ORDER. The page
+   * routes this into `builderStore.commitCanvasNodes`, which is the one op both gesture
+   * paths end in (D-184-09). A real definition edit: undoable, validated, marks dirty.
+   */
+  onCommitNodes?: (nodes: readonly CanvasNode[]) => void
 }
 
 export function WorkflowCanvas({
@@ -177,6 +324,11 @@ export function WorkflowCanvas({
   selectedSlug,
   onSelectNode,
   onClearSelection,
+  editable = false,
+  marks,
+  nudges,
+  onNudge,
+  onCommitNodes,
 }: WorkflowCanvasProps) {
   // The app-wide reveal, READ (never owned) here. Null outside a provider.
   const technicalNames = useTechnicalNamesOptional()
@@ -184,20 +336,93 @@ export function WorkflowCanvas({
 
   const projection = useMemo(() => toCanvas(phases), [phases])
 
-  // A COPY. Selection and the ⌥ boolean are view state; the model output and the
-  // definition behind it are never touched.
+  /**
+   * The IN-FLIGHT drag position, per node id — pure view state that exists for exactly
+   * as long as a finger is down.
+   *
+   * It is REQUIRED, not an optimisation. With the controlled `nodes` prop the library's
+   * `hasDefaultNodes` is false, so it computes position changes and then DISCARDS them:
+   * without applying them here a drag would not move the card at all. On drop the entry
+   * is cleared and the position re-derives from the projection, which is what makes the
+   * card "snap to its computed lane x" fall out of the data flow rather than out of an
+   * animation.
+   */
+  const [dragOverlay, setDragOverlay] = useState<Record<string, XYPosition>>({})
+
+  /** Where the dragged card started. Captured on drag start; the axis split is read
+   *  against it, never against the lane it happens to be nearest. */
+  const dragOriginRef = useRef<XYPosition | null>(null)
+
+  // A COPY. Selection, the ⌥ boolean, the cosmetic `dy`, the per-node drag flag and the
+  // server verdict mark are all view state; the model output and the definition behind
+  // it are never touched, which is why no layout key can reach the payload.
   const nodes = useMemo<CanvasNode[]>(
     () =>
-      projection.nodes.map((node) =>
-        node.type === CANVAS_NODE_TYPES.phase
-          ? {
-              ...node,
-              selected: node.id === selectedSlug,
-              data: { ...node.data, technical: showTechnical },
-            }
-          : node,
-      ),
-    [projection.nodes, selectedSlug, showTechnical],
+      projection.nodes.map((node) => {
+        if (node.type !== CANVAS_NODE_TYPES.phase) return node
+
+        // The cosmetic offset is merged into a COPY of the position. A zero offset with
+        // no drag in flight reuses the model's own object, so an idle canvas hands the
+        // library a stable reference and does not re-measure on every parent render.
+        const dy = nudges?.[node.id] ?? 0
+        const overlay = dragOverlay[node.id]
+        const position =
+          overlay ?? (dy === 0 ? node.position : { x: node.position.x, y: node.position.y + dy })
+
+        return {
+          ...node,
+          position,
+          // THE ONE READ-ONLY OPT-OUT THAT FLIPS, and it flips PER NODE: the end cap and
+          // the broken-reference stub keep the `false` the model gave them.
+          draggable: editable,
+          selected: node.id === selectedSlug,
+          // The verdict is threaded exactly as the ⌥ reveal is (D-183-08 / D-184-06), so
+          // `PhaseNode` stays a context-free leaf and cannot grow a second source of
+          // truth for a value only the server owns.
+          data: { ...node.data, technical: showTechnical, verdict: marks?.(node.id) },
+        }
+      }),
+    [projection.nodes, selectedSlug, showTechnical, editable, marks, nudges, dragOverlay],
+  )
+
+  /**
+   * The lane centres, in render order — the x-coordinate of every phase column, read
+   * off the projection rather than recomputed from `CANVAS_LAYOUT`. `resolveDrop` reads
+   * the pitch out of this array, which is how a pure module with no canvas import still
+   * agrees with the drawn layout exactly.
+   */
+  const lanes = useMemo(
+    () =>
+      projection.nodes
+        .filter((node) => node.type === CANVAS_NODE_TYPES.phase)
+        .map((node) => node.position.x),
+    [projection.nodes],
+  )
+
+  /**
+   * Build the node array for a reorder: the phase node carrying `slug` moved to render
+   * position `toIndex`, the non-phase nodes carried along untouched.
+   *
+   * Splice-out-then-insert, in that order — the same shape `definitionOps.movePhase`
+   * uses — so the index the canvas means and the index the op applies cannot disagree.
+   * BOTH gesture paths call this; there is one array-building rule, not two.
+   */
+  const nodesWithMove = useCallback(
+    (slug: string, toIndex: number): CanvasNode[] => {
+      const phaseNodes = nodes.filter((node) => node.type === CANVAS_NODE_TYPES.phase)
+      const moved = phaseNodes.find((node) => node.id === slug)
+      if (moved === undefined) return nodes
+
+      const without = phaseNodes.filter((node) => node.id !== slug)
+      const at = Math.max(0, Math.min(toIndex, without.length))
+      return [
+        ...without.slice(0, at),
+        moved,
+        ...without.slice(at),
+        ...nodes.filter((node) => node.type !== CANVAS_NODE_TYPES.phase),
+      ]
+    },
+    [nodes],
   )
 
   const edges = useMemo<CanvasEdge[]>(
@@ -207,6 +432,74 @@ export function WorkflowCanvas({
         style: EDGE_STYLE[edge.data?.kind ?? CANVAS_EDGE_KINDS.flow],
       })),
     [projection.edges],
+  )
+
+  /**
+   * REQUIRED with a controlled `nodes` prop — see `dragOverlay`. Only `position`
+   * changes are applied.
+   *
+   * Everything else the library computes is deliberately DROPPED: `dimensions` is
+   * measured into its internal lookup and needs no echo (183 proved that empirically by
+   * painting every edge with no handler at all), `select` belongs to the page's
+   * `selectedSlug`, and `remove` / `add` / `replace` belong to `definitionOps`. Applying
+   * them here would put a second, silent editing path beside the one this plan is
+   * chartered to build.
+   */
+  const handleNodesChange = useCallback((changes: NodeChange<CanvasNode>[]) => {
+    setDragOverlay((previous) => {
+      let next = previous
+      for (const change of changes) {
+        if (change.type !== "position" || change.position === undefined) continue
+        if (next === previous) next = { ...previous }
+        next[change.id] = change.position
+      }
+      return next
+    })
+  }, [])
+
+  /** The origin of the axis split. Captured here rather than derived on drop, because
+   *  after the drop the only thing that knows where the card started is this ref. */
+  const handleNodeDragStart = useCallback<OnNodeDrag<CanvasNode>>((_event, node) => {
+    dragOriginRef.current = { ...node.position }
+  }, [])
+
+  /**
+   * D-184-10, the whole decision, in one place.
+   *
+   * `resolveDrop` reads the gesture; this handler routes each axis to its own home and
+   * never mixes them. The x branch is entered only when `reorderTo` is non-null, which
+   * `resolveDrop` computes from the x inputs ALONE — so the definition edit is
+   * unreachable for a purely vertical drag by construction, not by the condition below
+   * being written correctly.
+   */
+  const handleNodeDragStop = useCallback<OnNodeDrag<CanvasNode>>(
+    (_event, node) => {
+      const origin = dragOriginRef.current
+      dragOriginRef.current = null
+
+      // Clear the in-flight overlay whatever happened, so the card's position goes back
+      // to being a function of the projection plus the cosmetic offset.
+      setDragOverlay((previous) => {
+        if (previous[node.id] === undefined) return previous
+        const next = { ...previous }
+        delete next[node.id]
+        return next
+      })
+
+      if (origin === null || node.type !== CANVAS_NODE_TYPES.phase) return
+
+      const { reorderTo, dy } = resolveDrop(origin, node.position, lanes)
+
+      // X — a definition edit. Undoable, validated, marks the draft dirty.
+      if (reorderTo !== null) onCommitNodes?.(nodesWithMove(node.id, reorderTo))
+
+      // Y — cosmetic, always, and independent of whether the card also moved lane. The
+      // RESULTING offset is handed over rather than this drag's delta, so a second nudge
+      // does not silently discard the first (the previous offset is already inside
+      // `origin.y`, which is why the two are added rather than one replacing the other).
+      if (dy !== 0) onNudge?.(node.id, (nudges?.[node.id] ?? 0) + dy)
+    },
+    [lanes, nudges, onCommitNodes, onNudge, nodesWithMove],
   )
 
   /**
@@ -250,14 +543,35 @@ export function WorkflowCanvas({
     [projection.nodes, onSelectNode],
   )
 
-  // The header is shared by both branches — read-only is told as a deliberate MODE
-  // in the shipped `👁 View only` vocabulary, never invented a second time.
+  // The header is shared by both branches. Read-only is told as a deliberate MODE in
+  // the shipped `👁 View only` vocabulary, never invented a second time.
+  //
+  // ⚠ AND IT IS SWAPPED WHEN EDITING, because "the plane pans · steps stay put" is a
+  // PROMISE TO THE USER, not decoration — leaving it up on a canvas whose steps now move
+  // is the same defect as a docblock that lies, in the one place a person actually reads.
+  // The editing line names both gesture paths, so the keyboard one is discoverable
+  // without a tooltip.
   const header = (
     <div className="flex flex-wrap items-center gap-2 border-b border-border/60 px-4 py-2">
-      <span className="rounded bg-muted px-2 py-0.5 font-mono text-[11px] font-medium text-muted-foreground">
-        👁 View only
-      </span>
-      <span className="text-[11px] text-muted-foreground">the plane pans · steps stay put</span>
+      {editable ? (
+        <>
+          <span className="rounded bg-muted px-2 py-0.5 font-mono text-[11px] font-medium text-muted-foreground">
+            ✎ Editing
+          </span>
+          <span className="text-[11px] text-muted-foreground">
+            drag a step along the lane to reorder · or select one and press ⌥← / ⌥→
+          </span>
+        </>
+      ) : (
+        <>
+          <span className="rounded bg-muted px-2 py-0.5 font-mono text-[11px] font-medium text-muted-foreground">
+            👁 View only
+          </span>
+          <span className="text-[11px] text-muted-foreground">
+            the plane pans · steps stay put
+          </span>
+        </>
+      )}
       <span className="flex-1" />
       {technicalNames ? (
         <TechnicalNamesToggle enabled={showTechnical} onToggle={technicalNames.toggle} />
@@ -265,13 +579,14 @@ export function WorkflowCanvas({
     </div>
   )
 
+  /** The section's accessible name has to move with the mode for the same reason the
+   *  badge does — it is the first thing a screen reader hears about this surface. */
+  const sectionLabel = editable ? "Workflow canvas" : "Workflow canvas (read-only)"
+
   // D-183-11 — EARLY RETURN. Nothing below this line mounts on an empty definition.
   if (nodes.length === 0) {
     return (
-      <section
-        aria-label="Workflow canvas (read-only)"
-        className="flex h-full min-w-0 flex-col bg-background"
-      >
+      <section aria-label={sectionLabel} className="flex h-full min-w-0 flex-col bg-background">
         {header}
         <div
           data-testid="canvas-empty"
@@ -287,10 +602,7 @@ export function WorkflowCanvas({
   }
 
   return (
-    <section
-      aria-label="Workflow canvas (read-only)"
-      className="flex h-full min-w-0 flex-col bg-background"
-    >
+    <section aria-label={sectionLabel} className="flex h-full min-w-0 flex-col bg-background">
       {header}
       {/* The parent MUST have a width and a height or the plane measures to zero. */}
       <div className="h-full w-full min-w-0 flex-1">
@@ -299,7 +611,16 @@ export function WorkflowCanvas({
           edges={edges}
           nodeTypes={nodeTypes}
           defaultEdgeOptions={DEFAULT_EDGE_OPTIONS}
+          // 184-10 — REQUIRED with a controlled `nodes` prop, and deliberately narrow:
+          // only `position` changes are applied (see `handleNodesChange`).
+          onNodesChange={handleNodesChange}
+          onNodeDragStart={handleNodeDragStart}
+          onNodeDragStop={handleNodeDragStop}
           // ── read-only, stated explicitly (every one of these defaults to true) ──
+          // 184-10 flips exactly ONE of these, and it flips it PER NODE on the node
+          // objects above rather than here: the shell default stays `false`, so a node
+          // that does not opt in cannot be dragged. Every other line below stays off in
+          // BOTH modes — they are what make "no free wiring" true rather than assumed.
           nodesDraggable={false}
           nodesConnectable={false}
           edgesReconnectable={false}
@@ -326,7 +647,9 @@ export function WorkflowCanvas({
           onPaneClick={onClearSelection}
           // …and the same contract from the keyboard (CR-01). One rule, two devices.
           onKeyDown={activateFromKeyboard}
-          ariaLabelConfig={ARIA_LABELS}
+          // …and the announced affordance, which has to match the MODE (see the two
+          // tables at module scope). The read-only table is byte-unchanged.
+          ariaLabelConfig={editable ? ARIA_LABELS_EDITABLE : ARIA_LABELS}
         >
           <Background />
           {/* The prop below removes the interactivity padlock — see the docblock;
