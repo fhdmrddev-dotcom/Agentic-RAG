@@ -1,0 +1,16 @@
+{
+  "_provenance": {
+    "dumped_at": "2026-07-27T06:01:44+00:00",
+    "source": "postgresql://postgres:postgres@127.0.0.1:54322/postgres · public.workflow_definitions",
+    "query": "SELECT id::text, slug, version, status, definition->'phases' AS phases FROM public.workflow_definitions ORDER BY slug, version",
+    "row_count": 0,
+    "note": "EMPTY BY HONESTY, NOT BY FACT. The local database was unreachable when this artifact was written, so NO shapes were read and none were invented. An empty definitions array here means 'not dumped', never 'the corpus is empty'. The hand-rolled shapeGenerator.ts carries the real coverage, so the round-trip property is meaningful without this file. Regenerate before phase verification: start the local stack, then run scripts/dump-workflow-corpus.py with the backend venv interpreter. Reason recorded in _provenance.unreachable_reason.",
+    "rows_with_zero_phases": 0,
+    "rows_with_duplicate_slugs": 0,
+    "rows_with_index_gaps": 0,
+    "max_phase_count": 0,
+    "skip_to_phase_uses": 0,
+    "unreachable_reason": "OperationalError: connection to server at \"127.0.0.1\", port 54322 failed: Connection refused (0x0000274D/10061)\n\tIs the server running on that host and accepting TCP/IP connections?"
+  },
+  "definitions": []
+}
