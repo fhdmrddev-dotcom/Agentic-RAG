@@ -135,6 +135,7 @@
  */
 import {
   useCallback,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -399,6 +400,17 @@ export function WorkflowCanvas({
     [projection.nodes],
   )
 
+  /** The phase slugs in render order — the keyboard path's index space, and the same
+   *  order the lanes above are drawn in, read from the one projection so the two
+   *  cannot disagree about which step is third. */
+  const phaseOrder = useMemo(
+    () =>
+      projection.nodes
+        .filter((node) => node.type === CANVAS_NODE_TYPES.phase)
+        .map((node) => node.id),
+    [projection.nodes],
+  )
+
   /**
    * Build the node array for a reorder: the phase node carrying `slug` moved to render
    * position `toIndex`, the non-phase nodes carried along untouched.
@@ -503,6 +515,63 @@ export function WorkflowCanvas({
   )
 
   /**
+   * D-184-09 — THE KEYBOARD REORDER, and the sentence a screen reader hears.
+   *
+   * WHY THERE IS A KEYBOARD PATH AT ALL. Phase 183 made every node keyboard-activatable
+   * and shipped a real screen-reader pass; a drag-only reorder would have handed the
+   * canvas's ONE structural affordance to the mouse and regressed that. At the five-step
+   * maximum this is not a grudging fallback — it is arguably the faster path.
+   *
+   * `⌥` IS PART OF THE BINDING, NOT DECORATION. Bare arrow keys are the library's own
+   * node-navigation binding and are also how a person moves through the fields of the
+   * panel one toggle away. An unmodified ArrowRight therefore has to keep doing what it
+   * already does, or this plan would break two shipped behaviours to add one.
+   *
+   * THE LISTENER IS GATED, so it costs nothing at rest: none exists unless the canvas is
+   * editable AND a node is selected. It cannot accumulate across renders either — the
+   * effect removes exactly the handler it added.
+   *
+   * ONE PRESS IS ONE MOVE. The same auto-repeat guard as `activateFromKeyboard`, for a
+   * sharper reason: a held key would walk a card across the whole spine at ~31 moves a
+   * second and push one undo entry per move.
+   *
+   * IT ENDS IN THE SAME OP AS THE DRAG. `nodesWithMove` + `onCommitNodes` — there is one
+   * reorder rule with two input devices, which is the whole of D-184-09.
+   */
+  const [announcement, setAnnouncement] = useState("")
+
+  useEffect(() => {
+    if (!editable || selectedSlug === null) return
+
+    const handler = (event: globalThis.KeyboardEvent) => {
+      if (!event.altKey) return
+      if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return
+      if (event.repeat) return
+
+      // Native field editing is untouched: a person typing into a text box owns their
+      // own arrow keys, alt or no alt.
+      const target = event.target as HTMLElement | null
+      const tag = target?.tagName
+      if (tag === "INPUT" || tag === "TEXTAREA" || target?.isContentEditable === true) return
+
+      const from = phaseOrder.indexOf(selectedSlug)
+      if (from === -1) return
+
+      const to = from + (event.key === "ArrowLeft" ? -1 : 1)
+      // At either end there is nowhere to go. Nothing is committed and nothing new is
+      // said — a live region that repeats itself on a no-op teaches the user to ignore it.
+      if (to < 0 || to >= phaseOrder.length) return
+
+      event.preventDefault()
+      onCommitNodes?.(nodesWithMove(selectedSlug, to))
+      setAnnouncement(`Step moved to position ${to + 1} of ${phaseOrder.length}.`)
+    }
+
+    window.addEventListener("keydown", handler)
+    return () => window.removeEventListener("keydown", handler)
+  }, [editable, selectedSlug, phaseOrder, nodesWithMove, onCommitNodes])
+
+  /**
    * The keyboard half of D-183-05 — the rule IS shared with the mouse, and the
    * keyboard device additionally carries auto-repeat semantics the mouse does not,
    * which the guard below normalises so both devices deliver one activation per
@@ -604,6 +673,15 @@ export function WorkflowCanvas({
   return (
     <section aria-label={sectionLabel} className="flex h-full min-w-0 flex-col bg-background">
       {header}
+      {/* The polite announcer, in the shipped `PhaseTimeline.tsx:172` shape: PRESENT at
+          load (empty) so the assistive tech has already picked the region up, written
+          only on a real move. Editing-only — a read-only canvas has nothing to announce
+          and dead chrome is its own kind of lie. */}
+      {editable ? (
+        <div data-testid="canvas-announcer" role="status" aria-live="polite" className="sr-only">
+          {announcement}
+        </div>
+      ) : null}
       {/* The parent MUST have a width and a height or the plane measures to zero. */}
       <div className="h-full w-full min-w-0 flex-1">
         <ReactFlow
