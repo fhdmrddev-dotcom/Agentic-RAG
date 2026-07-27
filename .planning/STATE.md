@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
 status: executing
-last_updated: "2026-07-27T05:44:15.912Z"
+last_updated: "2026-07-27T06:13:53.107Z"
 last_activity: 2026-07-27
 progress:
   total_phases: 18
   completed_phases: 3
   total_plans: 37
-  completed_plans: 28
+  completed_plans: 29
   percent: 17
 ---
 
@@ -45,7 +45,7 @@ Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 op
 ## Current Position
 
 Phase: 184 (Editable Canvas + Live Structural Validation (Round-Trip)) — EXECUTING
-Plan: 5 of 13
+Plan: 6 of 13
 
 **Plan 184-01 COMPLETE (`4a019bd8` gate → `ffb3e9cf` icon swap → `854ec42b` SUMMARY).** Wave 0's
 measuring stick landed FIRST as its own single-file commit: `scripts/vitest-count-gate.cjs` pins
@@ -93,6 +93,34 @@ reason that is factually false. Implemented strictly-after; `StepTypePicker` (18
 **CANVAS-02 deliberately left `Pending`** in REQUIREMENTS.md: this plan ships the substrate, not a
 user-visible capability, and marking it Complete at plan 2 of 13 would make the traceability table
 lie for the rest of the phase.
+
+**Plan 184-05 COMPLETE (`1a12a72d` fromCanvas + guards → `91614f4e` dump + generator → `685d4e7f`
+the R2 property).** `canvasModel.fromCanvas` is the ONE client serializer and carries phases through
+**BY REFERENCE** — so every field `toCanvas` drops (~20 config, 3 validator, 13 workflow-level)
+survives a save by construction, not by diligence. It takes **no `edges` argument** (RESEARCH Q1),
+reads only `node.id` + node ORDER, **never renumbers** (that stays `definitionOps.renumber`, so the
+shipped `indexGap` `[0,1,3]` round-trips as an identity), and **fails SAFE on duplicate slugs** by
+handing the source back untouched. Proof is **reference identity**, and it was falsified: a
+one-line shallow rebuild (`out.push({...phase})`) turned **13 `toBe` assertions red** with
+`Object.is equality` while **every `toStrictEqual` backstop stayed green** — the observation that
+shows a deep-equality-only suite would have passed a serializer that had just copied every phase.
+Coverage: 15 hand-authored generator shapes (one per config-union member with EVERY optional field
+populated, both branch outcomes, gate-heavy, 12-deep, index gap, duplicate index, duplicate slug)
++ whatever the committed dump holds. Gates: count gate exit 0 (**752** total, 0 failing, all 16
+pinned at delta 0; `canvasModel.purity.test.ts` 69→79 is an ALLOWED increase), tsc **33**, `npx
+vite build` exit 0, canvas snapshot byte-unchanged, 0 migration + 0 backend files,
+`__fixtures__/canvasFixtures.ts` untouched, **zero assertion edits** (both test files in the diff
+are 379 insertions / 0 deletions). **CANVAS-02 deliberately left `Pending`** — this ships the save
+path, not an affordance. **⚠ VERIFICATION BLOCKER — regenerate the corpus dump.**
+`__fixtures__/corpusDump.json` is honestly EMPTY (`row_count: 0`) because local Supabase at
+`127.0.0.1:54322` refused the connection (Docker down); the refusal reason is recorded in-band and
+**no corpus data was invented**. Before `/gsd:verify-work`: `supabase start`, then
+`backend/venv/Scripts/python.exe scripts/dump-workflow-corpus.py`, then commit the artifact — the
+suite unions it in with no code change. Pairs naturally with 184-01's still-open live five-surface
+icon sweep, which needs Docker too. **Three self-matching-guard traps hit and fixed in one plan**
+(a docstring quoting its own read-only grep, a docblock naming the serializer it forbids, and a
+`.source` regex firing on the spread `[...source]`) — when authoring a "grep for token X, expect 0"
+criterion, name the CONCEPT in prose and put the literal where the grep does not look.
 
 **RE-VERIFICATION GATE (2026-07-26, post-`183-09`): `human_needed`, not `passed`.** All 8
 must-haves verified in code by direct source read; phase-scoped suite re-run independently at
@@ -685,6 +713,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 184 P02 | 22min | 2 tasks | 2 files |
 | Phase 184 P03 | 38min | 3 tasks | 4 files |
 | Phase 184 P04 | 40min | 3 tasks | 6 files |
+| Phase 184 P05 | 33min | 3 tasks | 6 files |
 
 ## Decisions
 
@@ -884,6 +913,8 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase ?]: D-184-04-A: a coalescing run keeps the FIRST pending handleSet args, not the last — undo must restore the state before the sentence began; a length-only assertion cannot see the difference
 - [Phase ?]: D-184-04-B: setDrafted/setComposing clear the temporal history and do not mark the draft dirty — a generate is a document boundary, not a save boundary
 - [Phase ?]: D-184-04-C: Omit against BuilderDefinition's index signature collapses to {} — DefinitionMeta is a key-remapped mapped type so the definition shape stays declared once
+- [Phase ?]: 184-05: fromCanvas carries phases through BY REFERENCE — reference identity, not deep equality, is the R2 proof (a rebuild fails 13 toBe assertions while every toStrictEqual stays green)
+- [Phase ?]: 184-05: fromCanvas takes no edges argument and NEVER renumbers — renumbering lives only in definitionOps.renumber; duplicate slugs fail SAFE by returning the source untouched
 
 ## Operator Next Steps
 

@@ -184,7 +184,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 184-05-PLAN.md — `fromCanvas` carry-through serializer + corpus dump + shape generator + the R2 round-trip property
+- [x] 184-05-PLAN.md — `fromCanvas` carry-through serializer + corpus dump + shape generator + the R2 round-trip property
 - [ ] 184-06-PLAN.md — `/validate` + `/grounding-bundle` clients + `useLiveValidation` (debounce, abort, sequence, degraded)
 - [ ] 184-07-PLAN.md — browser-local `canvasNudge` (zero migration) + the plain-language `StepTypePicker`
 
