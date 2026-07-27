@@ -46,7 +46,40 @@
  *    `WorkflowDefinition` is `extra="forbid"` — which is why `minimalPhaseFor` emits
  *    only the keys its union member REQUIRES.
  */
-import { type PhaseSpecJSON } from "@/components/workflows/phaseVocabulary"
+import {
+  nodeTitle,
+  parseSkipTarget,
+  type PhaseSpecJSON,
+} from "@/components/workflows/phaseVocabulary"
+
+// ── The closed phase-type set ──────────────────────────────────────────────────
+
+/**
+ * The 6 members of the backend's `PhaseConfig` discriminated union
+ * (`harness.py:157-167`). CLOSED: a slug and a minimal phase are only ever derived
+ * from this set, never from user text.
+ */
+export type PhaseTypeId =
+  | "programmatic"
+  | "llm_single"
+  | "llm_agent"
+  | "llm_batch_agents"
+  | "llm_human_input"
+  | "llm_emit"
+
+/**
+ * The FIXED presentation order of the step-type picker (D-184-11). It is a `readonly`
+ * tuple, not a set, because "the picker's third option moved" is a UX regression a
+ * test should catch.
+ */
+export const PHASE_TYPE_ORDER = [
+  "programmatic",
+  "llm_single",
+  "llm_agent",
+  "llm_batch_agents",
+  "llm_human_input",
+  "llm_emit",
+] as const satisfies readonly PhaseTypeId[]
 
 // ── Internal ordering primitives (both pure, both non-mutating) ─────────────────
 
@@ -174,4 +207,255 @@ export function patchPhaseConfig(
   return phases.map((p) =>
     p.slug === slug ? { ...p, config: { ...p.config, ...patch } } : p,
   )
+}
+
+// ── R10a — the orphaning-delete refusal ────────────────────────────────────────
+
+/**
+ * The outcome of asking whether a step may be removed, in the discriminated-outcome
+ * idiom of `api.ts:3286-3293`'s `PublishOutcome`. A bare boolean is FORBIDDEN: R10
+ * says no refusal is silent, so the refusing branch physically carries the sentence
+ * the surface renders.
+ */
+export type RemovalOutcome = { ok: true } | { ok: false; reason: string }
+
+/**
+ * R10a — may this step be removed?
+ *
+ * Grounded on the `skip_to_phase` graph, NOT on index arithmetic (RESEARCH assumption
+ * A4). `removePhase` renumbers immediately, so index contiguity self-heals and a
+ * "successor left without a predecessor" case cannot survive the delete. The genuine
+ * orphan is a SURVIVING `validators[].on_failure` naming the slug being deleted — the
+ * backend's `unsatisfiable_skip`. The parse is the shipped `parseSkipTarget`, imported
+ * rather than re-declared: a second copy of it is exactly the G-5 drift
+ * `canvasModel.purity.test.ts:116-118` forbids next door.
+ *
+ * A self-reference does not refuse: a step whose own fallback points at itself takes
+ * that reference with it when it goes.
+ *
+ * This is a SHAPE predicate. It consults no server, produces no severity and no code.
+ */
+export function canRemovePhase(
+  phases: readonly PhaseSpecJSON[],
+  slug: string,
+): RemovalOutcome {
+  const referrers = orderPhases(phases).filter(
+    (phase) =>
+      phase.slug !== slug &&
+      (phase.validators ?? []).some((v) => parseSkipTarget(v?.on_failure) === slug),
+  )
+  if (referrers.length === 0) return { ok: true }
+
+  const lead = `"${nodeTitle(referrers[0])}"`
+  const others = referrers.length - 1
+  const subject =
+    others === 0 ? `${lead} sends` : `${lead} and ${others} other step${others > 1 ? "s" : ""} send`
+  return { ok: false, reason: `${subject} failures to this step. Remove that fallback first.` }
+}
+
+// ── R10b — the stranding-add refusal ───────────────────────────────────────────
+
+/** One row of the step-type picker. `disabledReason` absent = the choice is offered. */
+export interface TypeChoice {
+  type: PhaseTypeId
+  /** Non-empty whenever the choice is offered disabled. Never a bare flag — 139-C's
+   *  finding is that an option which vanishes, or greys out mutely, teaches nothing. */
+  disabledReason?: string
+}
+
+/** The one stranding sentence, in the plain language the picker speaks (D-183-06). */
+export const STRANDING_REASON =
+  "This would come after the deliverable, so the workflow would no longer end with it."
+
+/**
+ * R10b — the six choices offered at render position `index`, in the fixed
+ * `PHASE_TYPE_ORDER`. **Never fewer than six**: a stranding choice is returned
+ * DISABLED WITH ITS REASON, never omitted.
+ *
+ * The rule: when the definition already carries an `llm_emit` and `index` lands
+ * strictly AFTER the last one's render position, the new step would follow the
+ * deliverable and the workflow would stop ending with it.
+ *
+ * ⚠ BOUNDARY, recorded deliberately (plan 184-02 Task 2 wrote "at or after"). `index`
+ * is `insertPhaseAt`'s position, and inserting AT the deliverable's position puts the
+ * new step BEFORE it — the deliverable simply shifts down one and stays terminal.
+ * Disabling that slot would refuse the single most natural authoring act ("add a step
+ * just before the deliverable") while stating a reason that is factually false about
+ * the edit it refused. A refusal whose stated reason lies is worse than a silent one,
+ * so the boundary here is strictly-after. See 184-02-SUMMARY.md, Deviation 1.
+ *
+ * Like `canRemovePhase`, this is a SHAPE predicate and consults no server.
+ */
+export function allowedTypesAt(
+  phases: readonly PhaseSpecJSON[],
+  index: number,
+): TypeChoice[] {
+  const ordered = orderPhases(phases)
+  let lastEmit = -1
+  for (let position = 0; position < ordered.length; position += 1) {
+    if (ordered[position].config.phase_type === "llm_emit") lastEmit = position
+  }
+  const at = clampPosition(index, ordered.length)
+  const strands = lastEmit !== -1 && at > lastEmit
+
+  return PHASE_TYPE_ORDER.map((type) =>
+    strands ? { type, disabledReason: STRANDING_REASON } : { type },
+  )
+}
+
+// ── D-184-11 — slug generation and the minimal valid phase ─────────────────────
+
+/**
+ * The base slug token per phase type. Derived from the CLOSED set above and from
+ * nothing else — ASVS V5: the auto-generated slug is this phase's one client-side
+ * input into the definition JSONB, and the slug is node identity (`node.id ===
+ * phase.slug`) plus a `skip_to_phase` target. It is NOT user-editable in this phase;
+ * the plain-language TITLE is what the user names.
+ */
+const SLUG_BASE = {
+  programmatic: "prepare",
+  llm_single: "write",
+  llm_agent: "search",
+  llm_batch_agents: "parallel",
+  llm_human_input: "ask",
+  llm_emit: "deliver",
+} as const satisfies Record<PhaseTypeId, string>
+
+/** The base used for a type outside the closed set (TOTALITY — never user text). */
+const FALLBACK_SLUG_BASE = "step"
+
+/**
+ * D-184-11 — a unique, type-derived slug: the base token, then `-2`, `-3`, … until it
+ * is free. Output always matches `/^[a-z0-9-]+$/` because every candidate is a closed
+ * constant plus a decimal suffix.
+ */
+export function slugForType(
+  phases: readonly PhaseSpecJSON[],
+  type: PhaseTypeId,
+): string {
+  const base = SLUG_BASE[type] ?? FALLBACK_SLUG_BASE
+  const taken = new Set(phases.map((p) => p.slug))
+  if (!taken.has(base)) return base
+  let suffix = 2
+  while (taken.has(`${base}-${suffix}`)) suffix += 1
+  return `${base}-${suffix}`
+}
+
+/**
+ * The keys the discriminated union REQUIRES for a member, and not one key more.
+ *
+ * `WorkflowDefinition` is `extra="forbid"`, and a re-materialised default is exactly
+ * the drift class R2's round-trip property exists to catch — so an optional field with
+ * a backend default (`max_steps`, `emitter`, `citation_policy`, `timeout_seconds`, …)
+ * is deliberately ABSENT here. The empty strings are honest placeholders the author
+ * fills in the inspector; whether an empty `prompt` is publishable is a VERDICT, and
+ * verdicts belong to the server.
+ *
+ * The `default` arm is the `deriveTier.ts:119-127` runtime-safe exhaustiveness guard:
+ * a 7th union member must be handled here, and at runtime an unmodelled type yields
+ * the bare discriminator rather than throwing.
+ */
+function requiredConfigFor(type: PhaseTypeId): Record<string, unknown> {
+  switch (type) {
+    case "programmatic":
+      return { fn: "" }
+    case "llm_single":
+      return { prompt: "" }
+    case "llm_agent":
+      return { prompt: "", available_tools: [] }
+    case "llm_batch_agents":
+      return { prompt: "", available_tools: [] }
+    case "llm_human_input":
+      return { prompt: "" }
+    case "llm_emit":
+      return { prompt: "" }
+    default: {
+      const _never: never = type
+      void _never
+      return {}
+    }
+  }
+}
+
+/**
+ * D-184-11 — the smallest phase object that satisfies the backend union for `type`.
+ * A fresh object graph on every call (no shared array reference between two created
+ * steps), so two inserts can never alias one another's `available_tools`.
+ */
+export function minimalPhaseFor(
+  type: PhaseTypeId,
+  slug: string,
+  index: number,
+): PhaseSpecJSON {
+  return {
+    slug,
+    phase_index: index,
+    config: { phase_type: type, ...requiredConfigFor(type) },
+  }
+}
+
+// ── D-184-10 — the drag axis split ─────────────────────────────────────────────
+
+/** A point on the canvas plane. Plain numbers — no DOM node, no event. */
+export interface DropPoint {
+  x: number
+  y: number
+}
+
+/** The two independent readings of one drag. */
+export interface DropResolution {
+  /** The lane the card should reorder INTO, or `null` when the drag did not cross
+   *  half a pitch. `null` means: no definition edit, no history entry, no validation. */
+  reorderTo: number | null
+  /** The vertical component, verbatim. Cosmetic, browser-local, never serialized. */
+  dy: number
+}
+
+/** The lane nearest `x`; ties resolve to the LOWER index (deterministic, no clock). */
+function nearestLaneIndex(x: number, lanes: readonly number[]): number {
+  let best = 0
+  let bestDistance = Math.abs(x - lanes[0])
+  for (let i = 1; i < lanes.length; i += 1) {
+    const distance = Math.abs(x - lanes[i])
+    if (distance < bestDistance) {
+      best = i
+      bestDistance = distance
+    }
+  }
+  return best
+}
+
+/**
+ * D-184-10 — read ONE free drag as TWO independent things.
+ *
+ * The x-component resolves to a lane slot (a definition edit — undoable, validated,
+ * marks the draft dirty). The y-component is kept verbatim as the browser-local
+ * cosmetic nudge. **No modifier to learn.**
+ *
+ * SEPARATION BY CONSTRUCTION: `dy` is computed from the y inputs only and `reorderTo`
+ * from the x inputs only, so a purely vertical drag can never produce a definition
+ * edit. That is not a comment — `definitionOps.test.ts` asserts it across a sweep of
+ * vertical distances.
+ *
+ * Pure: no DOM, no clock, no measurement. `lanes` is the ordered array of lane centre
+ * x-coordinates, supplied by the view from its layout table; the pitch is READ from
+ * that array rather than imported, which is why this module still needs nothing from
+ * the canvas model.
+ */
+export function resolveDrop(
+  origin: DropPoint,
+  dropped: DropPoint,
+  lanes: readonly number[],
+): DropResolution {
+  const dy = dropped.y - origin.y
+
+  // Fewer than two lanes: there is nowhere to reorder to. `dy` still stands.
+  if (lanes.length < 2) return { reorderTo: null, dy }
+
+  const pitch = Math.abs(lanes[1] - lanes[0])
+  const currentIndex = nearestLaneIndex(origin.x, lanes)
+  const dx = dropped.x - lanes[currentIndex]
+
+  if (pitch <= 0 || Math.abs(dx) < pitch / 2) return { reorderTo: null, dy }
+  return { reorderTo: nearestLaneIndex(dropped.x, lanes), dy }
 }

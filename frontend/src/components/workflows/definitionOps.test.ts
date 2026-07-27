@@ -14,19 +14,43 @@
  *
  * No canvas, no store, no React, no network — that is the whole point of D-184-05.
  */
-import { describe, it, expect } from "vitest"
+import { describe, it, expect, beforeAll, afterAll, vi, type MockInstance } from "vitest"
 
 import definitionOpsSource from "./definitionOps?raw"
 import {
   addPhase,
+  allowedTypesAt,
+  canRemovePhase,
   insertPhaseAt,
+  minimalPhaseFor,
   movePhase,
   patchPhaseConfig,
+  PHASE_TYPE_ORDER,
   removePhase,
   renumber,
+  resolveDrop,
+  slugForType,
+  STRANDING_REASON,
+  type PhaseTypeId,
 } from "./definitionOps"
 import { ALL_FIXTURES } from "./__fixtures__/canvasFixtures"
 import type { PhaseSpecJSON } from "./phaseVocabulary"
+
+/**
+ * The whole-suite network tripwire. R10 forbids either refusal from consulting the
+ * server, so the spy is installed for the ENTIRE file and the final test asserts it
+ * recorded exactly zero calls. It is a belt to the `?raw` source grep's braces: the
+ * grep proves the module cannot name the seam, the spy proves nothing it calls does.
+ */
+let fetchSpy: MockInstance
+
+beforeAll(() => {
+  fetchSpy = vi.spyOn(globalThis, "fetch")
+})
+
+afterAll(() => {
+  fetchSpy.mockRestore()
+})
 
 /** A JSON deep clone — every fixture is JSON-safe by construction. */
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T
@@ -393,5 +417,379 @@ describe("definitionOps — source purity (the ?raw grep, the shipped house idio
 
   it("imports the shared vocabulary rather than re-deriving it", () => {
     expect(definitionOpsSource).toMatch(/from "@\/components\/workflows\/phaseVocabulary"/)
+  })
+
+  it("declares no second copy of the on-fail parse (G-5)", () => {
+    expect(definitionOpsSource).not.toMatch(/function parseSkipTarget/)
+    expect(definitionOpsSource).toMatch(/parseSkipTarget/)
+  })
+
+  it("never names the server validation seam and never opens a network call", () => {
+    expect(definitionOpsSource).not.toMatch(/fetch\(/)
+    expect(definitionOpsSource).not.toMatch(/workflows\/validate/)
+    expect(definitionOpsSource).not.toMatch(/XMLHttpRequest|EventSource|navigator\.sendBeacon/)
+  })
+})
+
+// ── R10a — the orphaning-delete refusal ───────────────────────────────────────
+
+describe("definitionOps — canRemovePhase (R10a: a refusal, with its reason)", () => {
+  it("refuses a delete that would leave a dangling skip_to_phase target", () => {
+    // `branching`: assess ⇢(on fail) escalate. Deleting `escalate` orphans that branch.
+    const outcome = canRemovePhase(fixture("branching"), "escalate")
+    expect(outcome.ok).toBe(false)
+    if (outcome.ok) throw new Error("expected a refusal")
+    expect(outcome.reason.length).toBeGreaterThan(0)
+    // The reason names the REFERRING step by its plain-language title, never its slug.
+    expect(outcome.reason).toContain("Write it up")
+    expect(outcome.reason).not.toContain("assess")
+    expect(outcome.reason).toContain("Remove that fallback first.")
+  })
+
+  it("allows a delete on the 5-phase shape that breaks nothing", () => {
+    for (const slug of ["split", "fanout", "deep_dive", "confirm", "summarize"]) {
+      expect(canRemovePhase(fixture("eval_coverage"), slug)).toEqual({ ok: true })
+    }
+  })
+
+  it("allows deleting a slug nothing references, even on a branching definition", () => {
+    expect(canRemovePhase(fixture("branching"), "draft")).toEqual({ ok: true })
+    expect(canRemovePhase(fixture("branching"), "gather")).toEqual({ ok: true })
+  })
+
+  it("allows deleting the REFERRER itself (it takes its own fallback with it)", () => {
+    expect(canRemovePhase(fixture("branching"), "assess")).toEqual({ ok: true })
+  })
+
+  it("does not refuse on a self-reference", () => {
+    const selfRef: PhaseSpecJSON[] = [
+      {
+        slug: "loop",
+        phase_index: 0,
+        config: { phase_type: "llm_single" },
+        validators: [{ kind: "structure_check", on_failure: "skip_to_phase:loop" }],
+      },
+    ]
+    expect(canRemovePhase(selfRef, "loop")).toEqual({ ok: true })
+  })
+
+  it("names the count when more than one step refers to the target", () => {
+    const many: PhaseSpecJSON[] = [
+      {
+        slug: "one",
+        phase_index: 0,
+        name: "First check",
+        config: { phase_type: "llm_single" },
+        validators: [{ kind: "structure_check", on_failure: "skip_to_phase:rescue" }],
+      },
+      {
+        slug: "two",
+        phase_index: 1,
+        name: "Second check",
+        config: { phase_type: "llm_single" },
+        validators: [{ kind: "structure_check", on_failure: "skip_to_phase:rescue" }],
+      },
+      { slug: "rescue", phase_index: 2, config: { phase_type: "llm_human_input" } },
+    ]
+    const outcome = canRemovePhase(many, "rescue")
+    expect(outcome.ok).toBe(false)
+    if (outcome.ok) throw new Error("expected a refusal")
+    expect(outcome.reason).toContain("First check")
+    expect(outcome.reason).toContain("1 other step")
+  })
+
+  it("is TOTAL — a missing validators array, a malformed on_failure and an unknown slug", () => {
+    const odd: PhaseSpecJSON[] = [
+      { slug: "a", phase_index: 0, config: { phase_type: "llm_single" } },
+      {
+        slug: "b",
+        phase_index: 1,
+        config: { phase_type: "llm_single" },
+        validators: [{ kind: "structure_check", on_failure: "skip_to_phase:" }],
+      },
+      {
+        slug: "c",
+        phase_index: 2,
+        config: { phase_type: "llm_single" },
+        validators: [{ kind: "structure_check", on_failure: "retry" }],
+      },
+    ]
+    expect(canRemovePhase(odd, "a")).toEqual({ ok: true })
+    expect(canRemovePhase(odd, "no-such-step")).toEqual({ ok: true })
+    expect(canRemovePhase([], "anything")).toEqual({ ok: true })
+  })
+})
+
+// ── R10b — the stranding-add refusal ──────────────────────────────────────────
+
+describe("definitionOps — allowedTypesAt (R10b: disabled with its reason, never omitted)", () => {
+  /** A deliverable-terminated definition: the `llm_emit` sits at render position 2. */
+  const withEmit: PhaseSpecJSON[] = [
+    { slug: "retrieve", phase_index: 0, config: { phase_type: "llm_agent" } },
+    { slug: "draft", phase_index: 1, config: { phase_type: "llm_single" } },
+    { slug: "emit", phase_index: 2, config: { phase_type: "llm_emit" } },
+  ]
+
+  it("returns exactly 6 entries, in the fixed order, at EVERY index", () => {
+    for (const index of [-5, 0, 1, 2, 3, 4, 99]) {
+      const choices = allowedTypesAt(withEmit, index)
+      expect(choices).toHaveLength(6)
+      expect(choices.map((c) => c.type)).toEqual([...PHASE_TYPE_ORDER])
+    }
+  })
+
+  it("offers every type where the deliverable stays terminal (indices 0, 1 and 2)", () => {
+    // Index 2 is the slot immediately BEFORE the deliverable: inserting there pushes
+    // the emit to position 3 and it is still last. See the boundary note in
+    // definitionOps.ts and Deviation 1 in 184-02-SUMMARY.md.
+    for (const index of [0, 1, 2]) {
+      const choices = allowedTypesAt(withEmit, index)
+      expect(choices.filter((c) => c.disabledReason !== undefined)).toEqual([])
+    }
+  })
+
+  it("marks every choice disabled, with a non-empty reason, AFTER the deliverable", () => {
+    for (const index of [3, 4, 99]) {
+      const choices = allowedTypesAt(withEmit, index)
+      expect(choices).toHaveLength(6)
+      for (const choice of choices) {
+        expect(choice.disabledReason).toBe(STRANDING_REASON)
+        expect(choice.disabledReason?.length).toBeGreaterThan(0)
+      }
+    }
+  })
+
+  it("disables nothing when the definition carries no deliverable", () => {
+    for (const index of [0, 1, 2, 3, 4, 5]) {
+      const choices = allowedTypesAt(fixture("eval_coverage"), index)
+      expect(choices).toHaveLength(6)
+      expect(choices.filter((c) => c.disabledReason !== undefined)).toEqual([])
+    }
+    const empty = allowedTypesAt([], 0)
+    expect(empty).toHaveLength(6)
+    expect(empty.filter((c) => c.disabledReason !== undefined)).toEqual([])
+  })
+
+  it("measures from the LAST deliverable when a definition carries two", () => {
+    const twoEmits: PhaseSpecJSON[] = [
+      { slug: "first-emit", phase_index: 0, config: { phase_type: "llm_emit" } },
+      { slug: "middle", phase_index: 1, config: { phase_type: "llm_single" } },
+      { slug: "last-emit", phase_index: 2, config: { phase_type: "llm_emit" } },
+    ]
+    expect(allowedTypesAt(twoEmits, 1).filter((c) => c.disabledReason)).toEqual([])
+    expect(allowedTypesAt(twoEmits, 2).filter((c) => c.disabledReason)).toEqual([])
+    expect(allowedTypesAt(twoEmits, 3)).toHaveLength(6)
+    expect(allowedTypesAt(twoEmits, 3).every((c) => c.disabledReason)).toBe(true)
+  })
+
+  it("offers the real Starter Library shape correctly (emit terminal at position 1)", () => {
+    const starter = fixture("risk-register")
+    expect(allowedTypesAt(starter, 1).filter((c) => c.disabledReason)).toEqual([])
+    expect(allowedTypesAt(starter, 2).every((c) => c.disabledReason)).toBe(true)
+  })
+})
+
+// ── D-184-11 — slug generation and the minimal phase ──────────────────────────
+
+describe("definitionOps — slugForType (D-184-11: derived from the closed set, never user text)", () => {
+  it("yields six distinct base slugs, all matching /^[a-z0-9-]+$/", () => {
+    const slugs = PHASE_TYPE_ORDER.map((type) => slugForType([], type))
+    expect(new Set(slugs).size).toBe(6)
+    for (const slug of slugs) expect(slug).toMatch(/^[a-z0-9-]+$/)
+  })
+
+  it("appends -2 on the first collision and -3 on the second", () => {
+    const base = slugForType([], "llm_single")
+    const once: PhaseSpecJSON[] = [
+      { slug: base, phase_index: 0, config: { phase_type: "llm_single" } },
+    ]
+    const second = slugForType(once, "llm_single")
+    expect(second).toBe(`${base}-2`)
+    expect(second).toMatch(/^[a-z0-9-]+$/)
+
+    const twice: PhaseSpecJSON[] = [
+      ...once,
+      { slug: second, phase_index: 1, config: { phase_type: "llm_single" } },
+    ]
+    const third = slugForType(twice, "llm_single")
+    expect(third).toBe(`${base}-3`)
+    expect(third).toMatch(/^[a-z0-9-]+$/)
+  })
+
+  it("never reads a phase name or any other author-supplied text", () => {
+    const named: PhaseSpecJSON[] = [
+      {
+        slug: "existing",
+        phase_index: 0,
+        name: "<script>alert(1)</script>",
+        config: { phase_type: "llm_single", prompt: "'; DROP TABLE phases; --" },
+      },
+    ]
+    for (const type of PHASE_TYPE_ORDER) {
+      expect(slugForType(named, type)).toMatch(/^[a-z0-9-]+$/)
+    }
+  })
+
+  it("stays unique against a definition that already holds every base plus -2", () => {
+    const crowded: PhaseSpecJSON[] = PHASE_TYPE_ORDER.flatMap((type, i) => [
+      { slug: slugForType([], type), phase_index: i * 2, config: { phase_type: type } },
+      { slug: `${slugForType([], type)}-2`, phase_index: i * 2 + 1, config: { phase_type: type } },
+    ])
+    for (const type of PHASE_TYPE_ORDER) {
+      const next = slugForType(crowded, type)
+      expect(next).toBe(`${slugForType([], type)}-3`)
+      expect(crowded.some((p) => p.slug === next)).toBe(false)
+    }
+  })
+})
+
+describe("definitionOps — minimalPhaseFor (extra=\"forbid\": required keys and nothing more)", () => {
+  const REQUIRED_CONFIG_KEYS: Record<PhaseTypeId, string[]> = {
+    programmatic: ["phase_type", "fn"],
+    llm_single: ["phase_type", "prompt"],
+    llm_agent: ["phase_type", "prompt", "available_tools"],
+    llm_batch_agents: ["phase_type", "prompt", "available_tools"],
+    llm_human_input: ["phase_type", "prompt"],
+    llm_emit: ["phase_type", "prompt"],
+  }
+
+  it.each(PHASE_TYPE_ORDER)("%s emits exactly the union-required config keys", (type) => {
+    const phase = minimalPhaseFor(type, "some-slug", 3)
+    expect(Object.keys(phase.config).sort()).toEqual([...REQUIRED_CONFIG_KEYS[type]].sort())
+    expect(phase.config.phase_type).toBe(type)
+  })
+
+  it.each(PHASE_TYPE_ORDER)("%s emits no optional key with a backend default", (type) => {
+    const phase = minimalPhaseFor(type, "some-slug", 0)
+    for (const defaulted of [
+      "max_steps",
+      "max_parallel_agents",
+      "merge_strategy",
+      "emitter",
+      "citation_policy",
+      "integrity_policy",
+      "timeout_seconds",
+      "options",
+      "input_keys",
+      "model",
+      "temperature",
+      "folder_scope",
+      "skill_ref",
+      "skill_snapshot",
+      "wall_clock_seconds",
+    ]) {
+      expect(phase.config).not.toHaveProperty(defaulted)
+    }
+  })
+
+  it("emits only slug / phase_index / config at the phase level", () => {
+    const phase = minimalPhaseFor("llm_single", "write", 2)
+    expect(Object.keys(phase).sort()).toEqual(["config", "phase_index", "slug"])
+    expect(phase.slug).toBe("write")
+    expect(phase.phase_index).toBe(2)
+    expect(phase).not.toHaveProperty("validators")
+    expect(phase).not.toHaveProperty("name")
+  })
+
+  it("returns a FRESH object graph — two created steps never alias each other", () => {
+    const a = minimalPhaseFor("llm_agent", "search", 0)
+    const b = minimalPhaseFor("llm_agent", "search-2", 1)
+    expect(a.config).not.toBe(b.config)
+    expect(a.config.available_tools).not.toBe(b.config.available_tools)
+    ;(a.config.available_tools as string[]).push("search_documents")
+    expect(b.config.available_tools).toEqual([])
+  })
+
+  it("composes with insertPhaseAt to keep the spine contiguous", () => {
+    const before = fixture("eval_coverage")
+    const slug = slugForType(before, "llm_emit")
+    const out = insertPhaseAt(before, 5, minimalPhaseFor("llm_emit", slug, 5))
+    expect(out).toHaveLength(6)
+    expect(indicesOf(out)).toEqual([0, 1, 2, 3, 4, 5])
+    expect(out[5].slug).toBe(slug)
+  })
+})
+
+// ── D-184-10 — the drag axis split ────────────────────────────────────────────
+
+describe("definitionOps — resolveDrop (D-184-10: the axes split the two meanings)", () => {
+  /** Four lanes at a 320 px pitch — the shipped CANVAS_LAYOUT.PITCH_X, passed IN
+   *  rather than imported, because a pure axis resolver reads no layout table. */
+  const lanes = [100, 420, 740, 1060]
+
+  it("a purely VERTICAL drag never produces a definition edit", () => {
+    const out = resolveDrop({ x: 100, y: 0 }, { x: 100, y: 64 }, lanes)
+    expect(out.reorderTo).toBeNull()
+    expect(out.dy).toBe(64)
+  })
+
+  it("separation by construction: reorderTo is independent of ANY dy", () => {
+    for (const dy of [-4000, -321, -1, 0, 1, 321, 4000]) {
+      const out = resolveDrop({ x: 740, y: 12 }, { x: 740, y: 12 + dy }, lanes)
+      expect(out.reorderTo).toBeNull()
+      expect(out.dy).toBe(dy)
+    }
+  })
+
+  it("a HORIZONTAL drag past half a pitch resolves the target lane, with dy 0", () => {
+    const out = resolveDrop({ x: 100, y: 0 }, { x: 420, y: 0 }, lanes)
+    expect(out.reorderTo).toBe(1)
+    expect(out.dy).toBe(0)
+  })
+
+  it("a HORIZONTAL drag under half a pitch produces no definition edit", () => {
+    const out = resolveDrop({ x: 100, y: 0 }, { x: 240, y: 0 }, lanes)
+    expect(out.reorderTo).toBeNull()
+    expect(out.dy).toBe(0)
+  })
+
+  it("a DIAGONAL drag returns BOTH readings", () => {
+    const out = resolveDrop({ x: 100, y: 0 }, { x: 420, y: 80 }, lanes)
+    expect(out.reorderTo).toBe(1)
+    expect(out.dy).toBe(80)
+  })
+
+  it("resolves the NEAREST lane, not merely the next one", () => {
+    expect(resolveDrop({ x: 100, y: 0 }, { x: 1060, y: 0 }, lanes).reorderTo).toBe(3)
+    expect(resolveDrop({ x: 1060, y: 0 }, { x: 100, y: 0 }, lanes).reorderTo).toBe(0)
+    expect(resolveDrop({ x: 100, y: 0 }, { x: 700, y: 0 }, lanes).reorderTo).toBe(2)
+  })
+
+  it("crossing the half-pitch threshold is what flips the reading", () => {
+    // 159 px of travel: under half a pitch (160) — cosmetic only.
+    expect(resolveDrop({ x: 100, y: 0 }, { x: 259, y: 0 }, lanes).reorderTo).toBeNull()
+    // 165 px of travel: past it — a real lane change.
+    expect(resolveDrop({ x: 100, y: 0 }, { x: 265, y: 0 }, lanes).reorderTo).toBe(1)
+  })
+
+  it("is TOTAL — a single lane, an empty lane list and a zero pitch all resolve", () => {
+    expect(resolveDrop({ x: 0, y: 0 }, { x: 900, y: 7 }, [100])).toEqual({
+      reorderTo: null,
+      dy: 7,
+    })
+    expect(resolveDrop({ x: 0, y: 0 }, { x: 900, y: 7 }, [])).toEqual({
+      reorderTo: null,
+      dy: 7,
+    })
+    expect(resolveDrop({ x: 0, y: 0 }, { x: 900, y: 7 }, [100, 100])).toEqual({
+      reorderTo: null,
+      dy: 7,
+    })
+  })
+
+  it("is pure — the same drag resolves identically every time", () => {
+    const once = resolveDrop({ x: 420, y: 40 }, { x: 740, y: 90 }, lanes)
+    const twice = resolveDrop({ x: 420, y: 40 }, { x: 740, y: 90 }, lanes)
+    expect(once).toEqual(twice)
+    expect(once).toEqual({ reorderTo: 2, dy: 50 })
+  })
+})
+
+// ── The whole-suite network tripwire (must run LAST) ──────────────────────────
+
+describe("definitionOps — zero network calls across the entire suite", () => {
+  it("the fetch spy recorded exactly 0 calls", () => {
+    expect(fetchSpy).not.toHaveBeenCalled()
+    expect(fetchSpy.mock.calls).toHaveLength(0)
   })
 })
