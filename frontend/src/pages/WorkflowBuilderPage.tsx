@@ -124,7 +124,11 @@ import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } fro
 import { useStore } from "zustand"
 import { generateWorkflow, createWorkflowDraft, updateWorkflowDraft, listFolders, listSkills } from "@/lib/api"
 import { PhaseSpineGraph } from "@/components/workflows/PhaseSpineGraph"
-import { groundingFor, type PhaseSpecJSON } from "@/components/workflows/phaseVocabulary"
+import {
+  groundingFor,
+  nodeTitle,
+  type PhaseSpecJSON,
+} from "@/components/workflows/phaseVocabulary"
 import {
   PhaseFormPanel,
   type PhaseConfigPatch,
@@ -142,8 +146,12 @@ import { useLiveValidation } from "@/hooks/useLiveValidation"
 import { useGroundingBundle } from "@/hooks/useGroundingBundle"
 import { DEGRADED_SENTENCE, groupVerdicts } from "@/components/workflows/verdictModel"
 import { readNudges, writeNudge } from "@/components/workflows/canvasNudge"
-import { renumber } from "@/components/workflows/definitionOps"
+import { canRemovePhase, renumber, type PhaseTypeId } from "@/components/workflows/definitionOps"
 import type { CanvasNode } from "@/components/workflows/canvasModel"
+// TYPE-ONLY, and that is load-bearing: `WorkflowCanvas` is `React.lazy` so the chunk is
+// never requested with the flag off, and a value import of anything from that module
+// here would pull it into the main bundle and undo D-183-03's whole point.
+import type { CanvasNotice } from "@/components/workflows/WorkflowCanvas"
 import type { WorkflowDefinitionJSON } from "@/lib/api"
 
 /** The read-only canvas, code-split behind the toggle (see the docblock). The module
@@ -187,6 +195,39 @@ export const EMPTY_DRAFT_INVITATION = "Add a step to get started"
  *  structural edits deep with no autosave until Phase 186. */
 export const UNSAVED_LEAVE_PROMPT =
   "This draft has unsaved changes. Leave without saving?"
+
+/**
+ * R1 / D-184-12 — HOW MANY STEPS ACTUALLY MOVED, said in words.
+ *
+ * The number is COUNTED, never assumed. "Everything downstream" is the intuitive answer
+ * and it is wrong at both ends: deleting the last step moves nothing at all, and a
+ * definition whose `phase_index` values arrived non-contiguous (the shipped `indexGap`
+ * shape) can have a step move without being downstream of the edit. So the caller
+ * compares the before and after render orders index by index and hands the count here.
+ *
+ * The zero case gets its own sentence rather than "0 steps renumbered": the message
+ * exists to tell an author what the edit did to the rest of their flow, and "0 steps
+ * renumbered" makes a person stop and parse a number to learn that nothing happened.
+ */
+function renumberedPhrase(moved: number): string {
+  if (moved === 0) return "nothing else moved"
+  return `${moved} step${moved === 1 ? "" : "s"} renumbered`
+}
+
+/** How many phases present in BOTH orders changed `phase_index`. Slugs that exist on
+ *  only one side are the edit itself, not something the edit moved. */
+function countMoved(
+  before: readonly PhaseSpecJSON[],
+  after: readonly PhaseSpecJSON[],
+): number {
+  const afterIndex = new Map(after.map((p) => [p.slug, p.phase_index]))
+  let moved = 0
+  for (const phase of before) {
+    const now = afterIndex.get(phase.slug)
+    if (now !== undefined && now !== phase.phase_index) moved += 1
+  }
+  return moved
+}
 
 /**
  * The gates rail, DERIVED exactly as the shipped `groundingFor()` derives grounding
@@ -565,6 +606,114 @@ export function WorkflowBuilderPage({
     [store],
   )
 
+  // ── Phase 184-12: growing the flow, and the two refusals ───────────────────────
+
+  /**
+   * What the canvas says about the last structural act. Replaced by the next act, and
+   * cleared by an Undo — a message about an edit that has been taken back is a message
+   * that has started lying.
+   */
+  const [canvasNotice, setCanvasNotice] = useState<CanvasNotice | null>(null)
+
+  /**
+   * D-184-11 — a `＋` on the line, a type chosen there, a step that exists immediately.
+   *
+   * The new slug is READ BACK from the store rather than re-derived here. `slugForType`
+   * is pure, so calling it a second time on the same phases would give the same answer
+   * today — and would be a second copy of the slug rule, which is exactly how the two
+   * silently disagree the first time either side grows a condition. The store owns slug
+   * generation; this reads which phase appeared.
+   *
+   * Then three things, in this order and for stated reasons:
+   *  1. the phase is SELECTED and the panel opens on it — the type is chosen at add time
+   *     because `PhaseFormPanel` conditions on `phase.config.phase_type` and offers no
+   *     control that writes it, so the very next thing an author needs is the inspector;
+   *  2. the surface says how many steps moved, in the same vocabulary the delete message
+   *     uses, because an insert is never cosmetic: the projection draws its sequential
+   *     edge by a `phase_index + 1` LOOKUP, so a step landing in the middle renumbers
+   *     every step after it;
+   *  3. nothing is written to the server. R6's explicit-save contract is untouched.
+   */
+  const onInsertAt = useCallback(
+    (index: number, type: PhaseTypeId) => {
+      const actions = store.getState()
+      const before = renumber(actions.phases)
+      const known = new Set(before.map((p) => p.slug))
+
+      actions.insertPhaseOfTypeAt(index, type)
+
+      const after = renumber(store.getState().phases)
+      const added = after.find((p) => !known.has(p.slug))
+      // The store declines an insert outside the drafted view; saying nothing happened
+      // is honest, and inventing a message about a phase that was not created is not.
+      if (added === undefined) return
+
+      setSelectedSlug(added.slug)
+      setCanvasNotice({
+        kind: "action",
+        lead: "Added",
+        subject: nodeTitle(added),
+        detail: renumberedPhrase(countMoved(before, after)),
+      })
+    },
+    [store],
+  )
+
+  /**
+   * D-184-12 — the `✕`. IMMEDIATE, with Undo, and no confirm dialog anywhere.
+   *
+   * R10a IS CHECKED FIRST, AND ITS ANSWER IS A REFUSAL RATHER THAN A CONFIRM. A step
+   * another step's `on_failure` still points at cannot simply go: the surviving
+   * `skip_to_phase` would name a slug no phase provides, which is the backend's
+   * `unsatisfiable_skip`. So the edit is DECLINED with `canRemovePhase`'s own sentence
+   * — no "delete anyway", because offering one would trade a broken definition for a
+   * click. The predicate is a SHAPE rule read off the phases in hand; nothing here asks
+   * the server anything, and a client refusal must never be mistakable for a verdict.
+   *
+   * WHEN IT IS ALLOWED, IT HAPPENS AT ONCE. `removePhaseBySlug` removes and renumbers,
+   * so the spine re-stitches to `[0..n-1]` in the same tick, and the message carries the
+   * inline Undo that makes that affordable — one temporal step back restores the exact
+   * previous `phases` array and writes nothing (D-184-03).
+   *
+   * SELECTION MOVES TO THE FOLLOWING STEP, or to the preceding one when the deleted step
+   * was last, so the author's place in the flow survives the edit. Deleting the only
+   * step clears the selection and the canvas falls to its named invitation.
+   */
+  const onRequestRemove = useCallback(
+    (slug: string) => {
+      const actions = store.getState()
+      const before = renumber(actions.phases)
+      const at = before.findIndex((p) => p.slug === slug)
+      if (at === -1) return
+
+      const outcome = canRemovePhase(before, slug)
+      if (!outcome.ok) {
+        setCanvasNotice({ kind: "refusal", text: outcome.reason })
+        return
+      }
+
+      const subject = nodeTitle(before[at])
+      actions.removePhaseBySlug(slug)
+      const after = renumber(store.getState().phases)
+
+      setSelectedSlug(before[at + 1]?.slug ?? before[at - 1]?.slug ?? null)
+      setCanvasNotice({
+        kind: "action",
+        lead: "Removed",
+        subject,
+        detail: renumberedPhrase(countMoved(before, after)),
+        onUndo: () => {
+          // The temporal store is reached through `getState()` on purpose: this is a
+          // side-effect call inside a callback, not a rendered value.
+          store.temporal.getState().undo()
+          setCanvasNotice(null)
+          setSelectedSlug(slug)
+        },
+      })
+    },
+    [store],
+  )
+
   /**
    * R12 / D-184-15 — WHY publish is blocked, in the author's words, or `null` when it is
    * not blocked at all.
@@ -928,6 +1077,11 @@ export function WorkflowBuilderPage({
           nudges={nudges}
           onNudge={onNudge}
           onCommitNodes={onCommitNodes}
+          // Phase 184-12 — the grow-the-flow half. Both refusals are decided HERE, from
+          // `definitionOps`' shape predicates, and the canvas renders what it is told.
+          onInsertAt={onInsertAt}
+          onRequestRemove={onRequestRemove}
+          notice={canvasNotice}
         />
       </Suspense>
     ) : (

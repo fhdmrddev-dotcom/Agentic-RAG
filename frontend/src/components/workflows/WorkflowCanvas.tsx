@@ -4,14 +4,39 @@
  *
  * THE SHELL. It mounts `canvasModel.toCanvas`'s projection inside `@xyflow/react`.
  *
- * ⚠ WHAT PLAN 184-10 CHANGED, stated first so this docblock cannot drift (the
- * D-ITEM-183-02 trap). Until 184-10 this file was the READ-ONLY shell and its whole
- * job beyond mounting the projection was to make read-only TRUE rather than assumed.
- * It now has TWO modes, and `editable` is the switch. `editable={false}` — the
- * default, and what every shipped caller passes today — renders exactly the surface
- * described below, unchanged. `editable` flips ONE thing and only one: per-node
- * `draggable`, on phase nodes. Everything in the opt-out block stays off in both
- * modes.
+ * ⚠ WHAT PLANS 184-10 AND 184-12 CHANGED, stated first so this docblock cannot drift
+ * (the D-ITEM-183-02 trap). Until 184-10 this file was the READ-ONLY shell and its
+ * whole job beyond mounting the projection was to make read-only TRUE rather than
+ * assumed. It now has TWO modes, and `editable` is the switch. `editable={false}` —
+ * the default, and what every shipped read-only caller passes — renders exactly the
+ * surface described below, unchanged, down to the empty state.
+ *
+ * `editable` flips FOUR things, and the count is written out because it used to be one
+ * and a stale "exactly one" here would be the lie this phase keeps catching:
+ *   1. per-node `draggable`, on phase nodes only (184-10);
+ *   2. the `＋` / `✕` plane layer and the step-type menu it opens (184-12);
+ *   3. the structural-notice region — the delete message with its inline Undo, and
+ *      R10a's refusal (184-12);
+ *   4. the empty draft's named "Add your first step" invitation, in place of the
+ *      read-only "No steps yet" state (184-12).
+ * Everything in the read-only opt-out block stays off in BOTH modes.
+ *
+ * ── D-184-12 — DELETE IS IMMEDIATE, AND THE REFUSAL IS NOT A CONFIRM ──────────────
+ *
+ * The `✕` does not open a modal. It asks the page, the page asks
+ * `definitionOps.canRemovePhase`, and the answer is one of two DIFFERENT acts: the
+ * step goes and the message says what moved with an inline Undo behind it, or the edit
+ * is declined with the reason stated and no way to proceed. A modal on the most-used
+ * destructive act on this surface would cost every author a click on every delete to
+ * protect the rare one, and the sketch build rule is that the gate must never become
+ * the thing that stops someone building. Undo is the safety net that makes that
+ * affordable, so it is on the message rather than one keystroke away.
+ *
+ * NEITHER REFUSAL CONSULTS THE SERVER, and that is a boundary rather than an
+ * optimisation. Both are decidable from the phases already in hand — a shape rule. A
+ * verdict is a server judgement (VALID-03), and the two must stay separately sourced or
+ * the client grows a second opinion about validity. This file names the validation seam
+ * nowhere and its suite greps for that.
  *
  * ── D-184-10 — ONE FREE DRAG, THE AXES CARRY TWO DIFFERENT MEANINGS ───────────────
  *
@@ -147,6 +172,8 @@ import {
   Controls,
   MarkerType,
   ReactFlow,
+  ViewportPortal,
+  useStore as useFlowStore,
   type DefaultEdgeOptions,
   type NodeChange,
   type OnNodeDrag,
@@ -156,15 +183,17 @@ import {
 import { TechnicalNamesToggle } from "@/components/admin/TechnicalNamesToggle"
 import {
   CANVAS_EDGE_KINDS,
+  CANVAS_LAYOUT,
   CANVAS_NODE_TYPES,
   toCanvas,
   type CanvasEdge,
   type CanvasNode,
 } from "@/components/workflows/canvasModel"
-import { resolveDrop } from "@/components/workflows/definitionOps"
+import { resolveDrop, type PhaseTypeId } from "@/components/workflows/definitionOps"
 import type { VerdictMarkKind } from "@/components/workflows/nodePresentation"
 import { EndCapNode, PhaseNode, UnresolvedSkipNode } from "@/components/workflows/PhaseNode"
 import type { PhaseSpecJSON } from "@/components/workflows/phaseVocabulary"
+import { StepTypePicker } from "@/components/workflows/StepTypePicker"
 import { useTechnicalNamesOptional } from "@/providers/TechnicalNamesProvider"
 
 /**
@@ -240,6 +269,244 @@ const EDGE_STYLE: Record<string, CSSProperties> = {
 }
 
 /**
+ * MODULE SCOPE for the same Pattern-4 reason as `nodeTypes` (`:99-104`) — every
+ * placement number the editing affordances use, derived from `CANVAS_LAYOUT` and from
+ * nothing else, so a stray literal cannot creep in beside the table the projection and
+ * the CSS both already read.
+ *
+ * `GAP` is the empty space between one card's right edge and the next card's left edge
+ * (`PITCH_X - NODE_WIDTH`), which is exactly where the connector — and therefore the
+ * `＋` — lives. `INSERT_Y` is the connector's own height: `canvasModel` anchors every
+ * edge at `EDGE_ANCHOR_Y` from the node top (never 50%), so the `＋` sits ON the drawn
+ * line rather than merely near it, which is sketch 138-A's whole finding.
+ */
+const EDIT_AFFORDANCE = {
+  /** The `＋` circle, `canvas-184.css` `.conn .ins`. */
+  INSERT_SIZE: 26,
+  /** The `✕` square, `canvas-184.css` `.acts button`. */
+  REMOVE_SIZE: 24,
+  /** Horizontal room between two cards — the connector's span. */
+  GAP: CANVAS_LAYOUT.PITCH_X - CANVAS_LAYOUT.NODE_WIDTH,
+  /** The line's height off the node top, so the `＋` lands on it. */
+  INSERT_Y: CANVAS_LAYOUT.LANE_Y + CANVAS_LAYOUT.EDGE_ANCHOR_Y,
+  /** How far below the `＋` the menu's top edge opens. */
+  PICKER_DROP: 22,
+  /** The picker's own width (`StepTypePicker.tsx` `w-[300px]`), halved to centre it. */
+  PICKER_WIDTH: 300,
+} as const
+
+/**
+ * VISIBILITY, and why it is spelled as two states rather than one hover rule.
+ *
+ * Above 1024px the `＋` is hover-revealed, so a canvas at rest is the flow and not a
+ * row of controls. At or below 1024px — and on ANY device whose pointer cannot hover,
+ * at any width — it is permanently visible, because a hover-only affordance on a touch
+ * device is an affordance that does not exist. The base class is the VISIBLE one and
+ * the hiding is scoped under `lg:`, which is what makes "present without a hover event"
+ * assertable from the class list alone in a renderer that applies no CSS.
+ */
+const REVEAL_ON_HOVER =
+  "opacity-100 lg:opacity-0 lg:hover:opacity-100 lg:focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
+
+/**
+ * WHAT THE SURFACE SAYS AFTER A STRUCTURAL EDIT — and the two acts are DIFFERENT acts,
+ * so they are different members of a union rather than one string with a flag.
+ *
+ * `action` is something that HAPPENED: the step is gone (or the new one is in), and the
+ * message names it, says how many steps were renumbered, and carries the inline Undo
+ * that makes an immediate delete safe without a modal (D-184-12).
+ *
+ * `refusal` is something that DID NOT happen and will not: R10a's orphaning delete. It
+ * offers no way to proceed, because it is not a confirm — a confirm asks, a refusal
+ * states. Both render in the same region and both are announced, but they must never
+ * read alike, so they carry different testids and different roles.
+ *
+ * The sentence is authored by the CALLER, from `definitionOps`' own predicates. This
+ * component composes no reason of its own and asks no server for one.
+ */
+export type CanvasNotice =
+  | { kind: "action"; lead: string; subject: string; detail: string; onUndo?: () => void }
+  | { kind: "refusal"; text: string }
+
+/** The flow x of insertion boundary `index`: 0 = before the first card, `lanes.length`
+ *  = after the last one, anything between = the midpoint of that connector. */
+function insertPointX(lanes: readonly number[], index: number): number {
+  if (lanes.length === 0) return 0
+  const half = EDIT_AFFORDANCE.GAP / 2
+  if (index <= 0) return lanes[0] - half
+  if (index >= lanes.length) return lanes[lanes.length - 1] + CANVAS_LAYOUT.NODE_WIDTH + half
+  return (lanes[index - 1] + CANVAS_LAYOUT.NODE_WIDTH + lanes[index]) / 2
+}
+
+interface PlaneEditingLayerProps {
+  phases: PhaseSpecJSON[]
+  /** Lane centres in render order — the x of every phase column. */
+  lanes: readonly number[]
+  /** Phase slugs in render order, the same array the keyboard reorder indexes. */
+  phaseOrder: readonly string[]
+  /** Which insertion boundary the picker is open at, or null. */
+  pickerAt: number | null
+  onOpenPicker: (index: number) => void
+  onDismissPicker: () => void
+  onChooseType: (index: number, type: PhaseTypeId) => void
+  onRequestRemove?: (slug: string) => void
+}
+
+/**
+ * The `＋` / `✕` layer, and the one structural reason it looks the way it does.
+ *
+ * `WorkflowCanvas.test.tsx:231-238` asserts that for EVERY `.react-flow__node`,
+ * `querySelectorAll("button, a, [tabindex]")` is empty — one tab stop per node, no
+ * double stop. So a per-node action cannot be a child of the node, and this layer is
+ * not a workaround for that: the affordances are positioned against the LANE, in flow
+ * coordinates, through the library's own `<ViewportPortal>`, so they pan and zoom with
+ * the cards they belong to while living outside every node's DOM subtree.
+ *
+ * Under 137-B (`themes/canvas-184.css` `body.card-b`) the card's TOP edge belongs to
+ * the floating icon and its RIGHT edge carries the verdict mark (184-08), so the `✕`
+ * sits on the BOTTOM edge — `body.card-b .acts { bottom: -12px }`, i.e. straddling the
+ * card's lower border. The card's height is READ from the library's measurement rather
+ * than assumed, because a card grows downward from `NODE_MIN_HEIGHT` and a fixed offset
+ * would drift up into the body of a two-line title.
+ *
+ * IT AUTHORS NO REFUSAL AND CONSULTS NO SERVER. Every disabled row and every reason in
+ * the menu comes from `definitionOps.allowedTypesAt` by way of `StepTypePicker`; the
+ * removal predicate is the caller's `canRemovePhase`. A refusal is a SHAPE rule decided
+ * from the phases already in hand, a verdict is a server judgement, and this file names
+ * the validation seam nowhere (its suite greps for that).
+ */
+function PlaneEditingLayer({
+  phases,
+  lanes,
+  phaseOrder,
+  pickerAt,
+  onOpenPicker,
+  onDismissPicker,
+  onChooseType,
+  onRequestRemove,
+}: PlaneEditingLayerProps) {
+  // The live viewport zoom. The menu is COUNTER-SCALED by it so a person reading six
+  // sentences at 0.3× is not handed 4px type; the ＋ and ✕ deliberately do scale, since
+  // they are glued to the cards and read as part of the drawing.
+  const zoom = useFlowStore((state) => state.transform[2])
+
+  // Measured card heights, joined into ONE primitive so the selector's result is
+  // reference-stable and zustand does not re-render on every unrelated store write. A
+  // node the library has not measured yet (and every node under jsdom) reports 0 and
+  // falls back to the layout table's floor.
+  const heightKey = useFlowStore((state) =>
+    phaseOrder
+      .map((id) => Math.round(state.nodeLookup.get(id)?.measured?.height ?? 0))
+      .join(","),
+  )
+  const heights = heightKey.split(",")
+  const heightAt = (position: number) => {
+    const measured = Number(heights[position])
+    return Number.isFinite(measured) && measured > 0 ? measured : CANVAS_LAYOUT.NODE_MIN_HEIGHT
+  }
+
+  const boundaries = lanes.length + 1
+
+  return (
+    <ViewportPortal>
+      {Array.from({ length: boundaries }, (_, index) => (
+        <button
+          key={`canvas-insert-${index}`}
+          type="button"
+          data-testid={`canvas-insert-${index}`}
+          data-canvas-affordance="insert"
+          aria-haspopup="menu"
+          aria-expanded={pickerAt === index}
+          aria-label={
+            index >= lanes.length ? "Add a step at the end" : `Add a step before step ${index + 1}`
+          }
+          onClick={() => onOpenPicker(index)}
+          className={[
+            "absolute grid place-items-center rounded-full border border-dashed border-border",
+            "bg-card text-[15px] leading-none text-muted-foreground transition-opacity",
+            "hover:border-solid hover:border-primary hover:text-primary",
+            "motion-reduce:transition-none",
+            REVEAL_ON_HOVER,
+          ].join(" ")}
+          style={{
+            left: 0,
+            top: 0,
+            width: EDIT_AFFORDANCE.INSERT_SIZE,
+            height: EDIT_AFFORDANCE.INSERT_SIZE,
+            transform: `translate(${insertPointX(lanes, index) - EDIT_AFFORDANCE.INSERT_SIZE / 2}px, ${
+              EDIT_AFFORDANCE.INSERT_Y - EDIT_AFFORDANCE.INSERT_SIZE / 2
+            }px)`,
+          }}
+        >
+          <span aria-hidden="true">＋</span>
+        </button>
+      ))}
+
+      {phaseOrder.map((slug, position) => (
+        <button
+          key={`canvas-remove-${slug}`}
+          type="button"
+          data-testid={`canvas-remove-${slug}`}
+          data-canvas-affordance="remove"
+          aria-label={`Remove step ${position + 1}`}
+          onClick={() => onRequestRemove?.(slug)}
+          className={[
+            "absolute grid place-items-center rounded-[7px] border border-border",
+            "bg-card text-[11px] leading-none text-muted-foreground transition-opacity",
+            // ⚠ THE HOVER RED IS A RAW LITERAL, NOT THE `destructive` DESIGN TOKEN, and
+            // that is deliberate. R9 reserves that token for the `error` verdict mark and
+            // proves it by SCANNING the emitted HTML for the token's name: a draft that
+            // is all "not finished yet" must spend it zero times. Dressing this button in
+            // it would make that shipped scan report a colour it was never written to
+            // measure — a guard passing (or failing) for the wrong reason. The values are
+            // `canvas-184.css`'s own `.acts button.danger:hover`.
+            "hover:border-[hsl(0_72%_51%/0.6)] hover:text-[hsl(0_85%_74%)]",
+            "motion-reduce:transition-none",
+            REVEAL_ON_HOVER,
+          ].join(" ")}
+          style={{
+            left: 0,
+            top: 0,
+            width: EDIT_AFFORDANCE.REMOVE_SIZE,
+            height: EDIT_AFFORDANCE.REMOVE_SIZE,
+            transform: `translate(${
+              lanes[position] + CANVAS_LAYOUT.NODE_WIDTH / 2 - EDIT_AFFORDANCE.REMOVE_SIZE / 2
+            }px, ${heightAt(position) - EDIT_AFFORDANCE.REMOVE_SIZE / 2}px)`,
+          }}
+        >
+          <span aria-hidden="true">✕</span>
+        </button>
+      ))}
+
+      {pickerAt !== null ? (
+        <div
+          data-testid="canvas-insert-picker"
+          className="absolute"
+          style={{
+            left: 0,
+            top: 0,
+            transformOrigin: "top left",
+            transform: `translate(${
+              insertPointX(lanes, pickerAt) - EDIT_AFFORDANCE.PICKER_WIDTH / 2
+            }px, ${EDIT_AFFORDANCE.INSERT_Y + EDIT_AFFORDANCE.PICKER_DROP}px) scale(${
+              1 / (zoom || 1)
+            })`,
+          }}
+        >
+          <StepTypePicker
+            phases={phases}
+            index={pickerAt}
+            open
+            onChoose={(type) => onChooseType(pickerAt, type)}
+            onDismiss={onDismissPicker}
+          />
+        </div>
+      ) : null}
+    </ViewportPortal>
+  )
+}
+
+/**
  * `phases` / `selectedSlug` / `onSelectNode` are shared VERBATIM with
  * `PhaseSpineGraphProps` (`PhaseSpineGraph.tsx:55-61`), so the D-183-05 selection
  * contract is genuinely one rule for both views and the page keeps owning the
@@ -283,8 +550,9 @@ export interface WorkflowCanvasProps {
   //    render exactly as they did before this plan. ──
 
   /**
-   * The editing switch. `false` (the default) renders the pre-184-10 read-only canvas
-   * exactly: no per-node drag, no keyboard reorder, no editing copy in the header. The
+   * The editing switch. `false` (the default) renders the pre-184 read-only canvas
+   * exactly: no per-node drag, no keyboard reorder, no editing copy in the header, no
+   * `＋` / `✕` layer, no notice region, and the shipped "No steps yet" empty state. The
    * page passes the canvas feature flag, so a flag-off surface is byte-identical.
    *
    * It is OPTIONAL rather than required on purpose: the shipped page and the shipped
@@ -318,6 +586,33 @@ export interface WorkflowCanvasProps {
    * paths end in (D-184-09). A real definition edit: undoable, validated, marks dirty.
    */
   onCommitNodes?: (nodes: readonly CanvasNode[]) => void
+
+  // ── 184-12, the grow-the-flow half. Optional and inert while `editable` is false,
+  //    for the same reason the 184-10 block above is. ──
+
+  /**
+   * A `＋` on the line was activated and a type was chosen there. `index` is
+   * `insertPhaseAt`'s render position, so `0` prepends and `phases.length` appends.
+   *
+   * The page routes this into `builderStore.insertPhaseOfTypeAt`, which derives the
+   * slug (`slugForType`), builds the phase (`minimalPhaseFor`) and renumbers — so
+   * `phase_index` is contiguous `[0..n-1]` the instant the handler returns, and the
+   * insert is never cosmetic. **This canvas creates no phase and invents no slug.**
+   */
+  onInsertAt?: (index: number, type: PhaseTypeId) => void
+  /**
+   * The `✕` on a card's bottom edge was activated. A REQUEST, not a command: the page
+   * asks `definitionOps.canRemovePhase` first, and R10a's orphaning case comes back as
+   * a refusal rather than a deletion. Everything this canvas knows is that the user
+   * pressed the control.
+   */
+  onRequestRemove?: (slug: string) => void
+  /**
+   * What to say about the last structural act — or the reason the last one did not
+   * happen. Supplied by the page, which is where both predicates live; rendered here,
+   * where the act took place. `null` at rest.
+   */
+  notice?: CanvasNotice | null
 }
 
 export function WorkflowCanvas({
@@ -330,6 +625,9 @@ export function WorkflowCanvas({
   nudges,
   onNudge,
   onCommitNodes,
+  onInsertAt,
+  onRequestRemove,
+  notice,
 }: WorkflowCanvasProps) {
   // The app-wide reveal, READ (never owned) here. Null outside a provider.
   const technicalNames = useTechnicalNamesOptional()
@@ -409,6 +707,28 @@ export function WorkflowCanvas({
         .filter((node) => node.type === CANVAS_NODE_TYPES.phase)
         .map((node) => node.id),
     [projection.nodes],
+  )
+
+  /**
+   * WHICH insertion boundary the step-type menu is open at, or `null` for closed.
+   *
+   * It lives on the component rather than inside the plane layer because the EMPTY
+   * draft has no plane at all (D-183-11 returns early, above the canvas) and still
+   * needs the same menu at index 0. One state, one menu, two places it can be drawn —
+   * rather than two states that could both be open at once.
+   */
+  const [pickerAt, setPickerAt] = useState<number | null>(null)
+
+  const dismissPicker = useCallback(() => setPickerAt(null), [])
+
+  /** Choosing a type closes the menu and hands the decision up. The canvas performs
+   *  no insert of its own — `onInsertAt`'s owner does, through the one store op. */
+  const chooseType = useCallback(
+    (index: number, type: PhaseTypeId) => {
+      setPickerAt(null)
+      onInsertAt?.(index, type)
+    },
+    [onInsertAt],
   )
 
   /**
@@ -652,19 +972,113 @@ export function WorkflowCanvas({
    *  badge does — it is the first thing a screen reader hears about this surface. */
   const sectionLabel = editable ? "Workflow canvas" : "Workflow canvas (read-only)"
 
+  /**
+   * The one region both structural messages render in — shared, so a person learns
+   * where to look once, and EDITING-ONLY, because a read-only canvas can produce
+   * neither act and reserved space for a message that cannot arrive is dead chrome.
+   *
+   * The two treatments are deliberately not interchangeable. The `action` line is a
+   * `status` — something happened, here is the way back. The `refusal` is an `alert`
+   * with no way forward at all, because R10a declines an edit rather than asking about
+   * one, and a refusal that looks like a confirm invites a person to hunt for the
+   * button that says "do it anyway". There isn't one.
+   */
+  const noticeRegion =
+    editable && notice ? (
+      notice.kind === "refusal" ? (
+        <div
+          data-testid="canvas-notice-refusal"
+          role="alert"
+          className="flex items-start gap-2 border-b border-border/60 bg-[hsl(38_92%_60%/0.08)] px-4 py-2 text-[12px] text-foreground"
+        >
+          <span aria-hidden="true" className="text-[hsl(38_92%_66%)]">
+            ⚠
+          </span>
+          <span>{notice.text}</span>
+        </div>
+      ) : (
+        <div
+          data-testid="canvas-notice-action"
+          role="status"
+          aria-live="polite"
+          className="flex flex-wrap items-center gap-2 border-b border-border/60 bg-muted/40 px-4 py-2 text-[12px] text-muted-foreground"
+        >
+          <span>
+            {notice.lead} <strong className="font-medium text-foreground">{notice.subject}</strong>{" "}
+            · {notice.detail}
+          </span>
+          {notice.onUndo ? (
+            <button
+              type="button"
+              data-testid="canvas-notice-undo"
+              onClick={notice.onUndo}
+              className="rounded px-1.5 py-0.5 font-medium text-primary underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+            >
+              Undo
+            </button>
+          ) : null}
+        </div>
+      )
+    ) : null
+
   // D-183-11 — EARLY RETURN. Nothing below this line mounts on an empty definition.
   if (nodes.length === 0) {
     return (
       <section aria-label={sectionLabel} className="flex h-full min-w-0 flex-col bg-background">
         {header}
+        {noticeRegion}
+        {/*
+          U-1 — THE EMPTY DRAFT IS A FIRST-CLASS SCREEN, NOT AN EDGE CASE. 40 of 95 live
+          definitions have zero phases, so this is the single most common canvas state,
+          and sketch 141's first question is whether the first move reads as an
+          invitation or as a broken screen. An editable draft therefore opens with a
+          NAMED invitation rather than a bare `＋`: the control says what pressing it
+          will do. Read-only keeps the shipped state byte-for-byte — there is nothing to
+          invite there, and a ghost affordance on a surface that cannot act is the
+          D-183-11 rule in miniature.
+        */}
         <div
           data-testid="canvas-empty"
-          className="flex flex-1 flex-col items-center justify-center gap-1 px-6 text-center"
+          className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center"
         >
-          <p className="text-sm font-medium text-foreground">No steps yet</p>
-          <p className="text-[12px] text-muted-foreground">
-            Add a step to this workflow and it will appear here.
-          </p>
+          {editable ? (
+            <>
+              <button
+                type="button"
+                data-testid="canvas-add-first-step"
+                aria-haspopup="menu"
+                aria-expanded={pickerAt !== null}
+                onClick={() => setPickerAt(0)}
+                className="rounded-[10px] border border-dashed border-border bg-card px-4 py-2 text-sm font-medium text-foreground transition-colors hover:border-primary hover:text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+              >
+                <span aria-hidden="true" className="mr-1.5">
+                  ＋
+                </span>
+                Add your first step
+              </button>
+              <p className="text-[12px] text-muted-foreground">
+                Pick what it should do — you can change the details afterwards.
+              </p>
+              {pickerAt !== null ? (
+                <div data-testid="canvas-empty-picker" className="mt-1">
+                  <StepTypePicker
+                    phases={phases}
+                    index={0}
+                    open
+                    onChoose={(type) => chooseType(0, type)}
+                    onDismiss={dismissPicker}
+                  />
+                </div>
+              ) : null}
+            </>
+          ) : (
+            <>
+              <p className="text-sm font-medium text-foreground">No steps yet</p>
+              <p className="text-[12px] text-muted-foreground">
+                Add a step to this workflow and it will appear here.
+              </p>
+            </>
+          )}
         </div>
       </section>
     )
@@ -673,6 +1087,7 @@ export function WorkflowCanvas({
   return (
     <section aria-label={sectionLabel} className="flex h-full min-w-0 flex-col bg-background">
       {header}
+      {noticeRegion}
       {/* The polite announcer, in the shipped `PhaseTimeline.tsx:172` shape: PRESENT at
           load (empty) so the assistive tech has already picked the region up, written
           only on a real move. Editing-only — a read-only canvas has nothing to announce
@@ -733,6 +1148,21 @@ export function WorkflowCanvas({
           {/* The prop below removes the interactivity padlock — see the docblock;
               without it read-only is two clicks deep. */}
           <Controls showInteractive={false} />
+          {/* 184-12 — the `＋` / `✕` layer. A CHILD of `<ReactFlow>` so it can read the
+              viewport, and drawn through `<ViewportPortal>` so it lives on the plane
+              beside the nodes rather than inside any of them. Editing-only. */}
+          {editable ? (
+            <PlaneEditingLayer
+              phases={phases}
+              lanes={lanes}
+              phaseOrder={phaseOrder}
+              pickerAt={pickerAt}
+              onOpenPicker={setPickerAt}
+              onDismissPicker={dismissPicker}
+              onChooseType={chooseType}
+              onRequestRemove={onRequestRemove}
+            />
+          ) : null}
         </ReactFlow>
       </div>
     </section>
