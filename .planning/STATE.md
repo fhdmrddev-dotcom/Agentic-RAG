@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
 status: executing
-last_updated: "2026-07-27T04:04:09.961Z"
-last_activity: 2026-07-27 -- Phase 184 planning complete
+last_updated: "2026-07-27T04:21:02.717Z"
+last_activity: 2026-07-27 -- Phase 184 plan 01 complete (Wave-0 count gate + glyph swap)
 progress:
   total_phases: 18
   completed_phases: 3
   total_plans: 37
-  completed_plans: 24
+  completed_plans: 25
   percent: 17
 ---
 
@@ -22,7 +22,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-20 — Phase 163 THE ATOMIC CRUX complete; membership RLS enforced)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 184 — editable canvas + live structural validation (round trip)
+**Current focus:** Phase 184 — Editable Canvas + Live Structural Validation (Round-Trip)
 
 ## Deferred Items
 
@@ -44,8 +44,30 @@ Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 op
 
 ## Current Position
 
-Phase: 184
-Plan: Not started
+Phase: 184 (Editable Canvas + Live Structural Validation (Round-Trip)) — EXECUTING
+Plan: 2 of 13
+
+**Plan 184-01 COMPLETE (`4a019bd8` gate → `ffb3e9cf` icon swap → `854ec42b` SUMMARY).** Wave 0's
+measuring stick landed FIRST as its own single-file commit: `scripts/vitest-count-gate.cjs` pins
+**per-FILE** counts (16 files / 424 tests / 0 failing), not just failures — the Phase-177 lesson that
+a failures-only differential cannot see a *deleted* test. **Falsified before trusted:** deleting one
+`deriveTier.test.ts` case produced `[count-decrease] deriveTier.test.ts — pinned 9, ran 8 (-1)` +
+`[total-below-baseline] 423 < 424`, exit 1; restored → exit 0. Report writes to `os.tmpdir()` and the
+script hard-refuses any path inside `frontend/`/`backend/` (T-184-01-03). Then the D-184-07 icon swap
+as a **standalone three-file revert unit** (gate script NOT in it): `llm_agent`→`compass`,
+`llm_batch_agents`→`handshake` across BOTH maps + both `~icons` imports + the verified-slugs docblock
++ one assertion. Gates: 424/424 all deltas 0, tsc **33** (= baseline, 0 phase-file names), `vite
+build` exit 0, canvas snapshot byte-unchanged. **The D-184-08 carve-out is now SPENT** —
+`soulData.test.ts:132-133` was the ONE permitted assertion edit in phase 184; 184-02/184-03 are under
+a zero-assertion-edit gate, and any assertion edit there means the extraction was not
+behaviour-preserving. **Deviation accepted by operator:** the plan's `npm run build` exit-0 criterion
+was unsatisfiable on an untouched checkout (`tsc -b && vite build`, 33 pre-existing errors) → split
+into a DIFFERENTIAL tsc count + `npx vite build` exit 0, per D-ITEM-183-01. **Deferred to phase
+verification (G-4 row, not a gate on these commits):** the live in-app five-surface sweep — Docker
+Desktop was down, so the operator substituted stronger mechanical evidence (measured luminance from
+the installed icon set independently reproducing the sketch claim — `busts-in-silhouette` **33.3** vs
+`handshake` **181.4**, against a 144–172 band for every other mark — plus both marks rendered against
+the real Deep Midnight tokens: old mark near-invisible, both new marks legible and in-band).
 
 **RE-VERIFICATION GATE (2026-07-26, post-`183-09`): `human_needed`, not `passed`.** All 8
 must-haves verified in code by direct source read; phase-scoped suite re-run independently at
@@ -131,7 +153,7 @@ Status: Ready to execute
 
 **G-2 sketch gate for Phase 183: SATISFIED (2026-07-25).** Sketches 134-137 committed (`01bb4c64`, `7b74d2b5`, `01d50bba`, `86f866c5`, `e35c7489`). Winners: **136-B** (horizontal left->right flow) + **137-D** (frosted-glass step cards, 3D icon floating at the left edge, plain language with technical names behind the Alt reveal, Alive-by-default motion). Locked rules the canvas phases inherit: **colour budget** (step-type colour is a tint behind the icon only — the strong colours belong to Phase 188 run status) and **motion keys off run state, never selection**. New reusable asset `.planning/sketches/themes/phase-icons-3d.js` (verified 3D fluent-emoji marks; NEVER text glyphs). Icon choices: `llm_agent` -> `compass`; `llm_batch_agents` gets a lighter icon well in-scope, with the cross-cutting `handshake` swap left open. **Two findings that must reach the 183 plan: (1) `skip_to_phase` is used ZERO times in all 95 live definitions — SC#1's branch edge needs a fixture; (2) 40 of 95 definitions have zero phases — the empty projection is the most common canvas state.**
 
-Last activity: 2026-07-27 -- Phase 184 planning complete
+Last activity: 2026-07-27
 
 ### Quick Tasks Completed
 
@@ -616,6 +638,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 176 P04 | 35 | 2 tasks | 6 files |
 | Phase 182 P01 | 24min | 3 tasks | 5 files |
 | Phase 182 P02 | 22min | 2 tasks | 3 files |
+| Phase 184 P01 | 51min | 3 tasks (1 checkpoint) | 4 files |
 | Phase 182 P03 | 11min | 2 tasks | 4 files |
 | Phase 182 P04 | 47min | 2 tasks | 4 files |
 | Phase 182 P05 | 10min | 2 tasks | 5 files |
@@ -637,6 +660,11 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 
 ## Decisions
 
+- [Phase 184]: 184-01 (D-184-08): the count gate ships as its OWN single-file commit BEFORE any Wave-0 source change, so the icon swap it carves out is itself measured by it. `scripts/vitest-count-gate.cjs` pins per-FILE counts keyed by bare filename with named failure reasons (`[failing-tests]` / `[total-below-baseline]` / `[missing-file]` / `[count-decrease]`); INCREASES are allowed and printed as `+N` (feature waves add tests), only decreases fail. A gate is falsified before it is trusted — delete a test, observe the named failure, restore, observe green, record both.
+- [Phase 184]: 184-01 (D-184-07): the icon swap touches FIVE places in ONE commit — both maps, both `~icons` imports, the verified-slugs docblock, and the one pinned assertion. Swapping `soulData.PHASE_GLYPHS` alone leaves `phaseGlyph()` returning the old 3D component while the string fallback changed (a silent split-brain). The commit contains exactly the three icon files, so `git revert ffb3e9cf` undoes the icon decision alone and leaves the gate standing.
+- [Phase 184]: 184-01 (D-184-08 carve-out — SPENT): `soulData.test.ts:132-133` (`"robot"`→`"compass"`, `"busts-in-silhouette"`→`"handshake"`) is the ONE permitted assertion edit in phase 184. Every other plan is under a zero-assertion-edit gate: an assertion that HAS to change means the extraction was not behaviour-preserving — that is the signal, not an inconvenience.
+- [Phase 184]: 184-01 (D-ITEM-183-01): the plan's `npm run build` exit-0 criterion was unsatisfiable on an untouched checkout (`"build": "tsc -b && vite build"` with 33 pre-existing `develop` errors) → split into a DIFFERENTIAL `tsc` count (≤ 33) plus `npx vite build` exit 0, which is the real `~icons` presence proof and the path Vercel uses. Operator-accepted. Every `tsc` gate in this phase is differential, never "must be zero".
+- [Phase 184]: 184-01 (D-ITEM-183-02): stale docblocks naming the retired slugs were reworded to name them as HISTORY, not current truth. The acceptance grep is deliberately scoped to map entries and imports precisely so a corrected docblock stays legal — a guard that only passes by making a comment lie is a broken guard.
 - [Phase 175]: 175-04 (XPROV-03 D-03/D-04): title-gen + suggestion route their `sub_agent_model` override through `provider_safe_utility_model` — a cross-provider/unrecognised id is dropped BEFORE the call so no wrong-provider 404 → no `fallback_model` emit → no misleading banner (suppress-when-fine is automatic, no new branch). The 404 fallback branch + the `fallback_model`→`title` ordering invariant are untouched, so a genuine same-provider 404 still emits `fallback_model` honestly.
 - [Phase 175]: 175-04 (XPROV-04 D-05): the title call injects a per-MODEL reasoning-off param driven generically off `get_model_capability(model).get("reasoning_off")` — `thinking_disabled` → `extra_body={"thinking":{"type":"disabled"}}` (DISABLE mirror of the DeepSeek ENABLE block), `effort_none` → `reasoning_effort="none"`; the full Plan-01 SAFE set (11+2) injects with NO hardcoded id list, UNSAFE rows inject an empty dict. Budget (30/160) + inline-await ordering byte-identical (D-14); empty/refusal on a SAFE provider still derives a real title.
 - [Phase ?]: 118-02: classification-rules routes return RuleResponse(**row) so live CRUD tests can call coroutines directly (read .is_global/.id/.enabled); service imported as a module to avoid create_rule shadowing

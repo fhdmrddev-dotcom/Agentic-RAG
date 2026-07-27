@@ -171,7 +171,7 @@ Committed as gated phases (ship only if CORE lands clean and budget remains; v2.
 Plans:
 **Wave 1**
 
-- [ ] 184-01-PLAN.md — D-184-07 icon swap (compass + handshake), own atomic commit at the head of Wave 0
+- [x] 184-01-PLAN.md — D-184-07 icon swap (compass + handshake), own atomic commit at the head of Wave 0
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -335,7 +335,7 @@ Plans:
 | 181. Revert Foundation | 3/3 | Complete (awaiting verify) | 2026-07-24 |
 | 182. Server Validation Seam | 12/12 | Complete (SC#3 accepted risk — SEED-134) | 2026-07-25 |
 | 183. Read-Only Canvas | 9/9 | **COMPLETE** — verify `passed`; `183-09` closed all 3 live-confirmed defects, live gate closed 7/7 (U-5 canvas findability + U-6 spine flag-off) | 2026-07-26 |
-| 184. Editable Canvas + Live Structural Validation | 0/13 | Planned | - |
+| 184. Editable Canvas + Live Structural Validation | 1/13 | In Progress — Wave 0: count gate + D-184-07 glyph swap shipped (`4a019bd8`, `ffb3e9cf`) | - |
 | 185. Graded Governance — Grounding Mode + Action-Risk Dial | 0/? | Not started | - |
 | 186. Concurrency & Autosave | 0/? | Not started | - |
 | 187. Business Vocabulary + AI-Seeded Canvas | 0/? | Not started | - |

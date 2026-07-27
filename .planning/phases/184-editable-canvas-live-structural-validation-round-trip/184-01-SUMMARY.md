@@ -43,7 +43,7 @@ patterns-established:
   - "Count-gate shape: module-level BASELINE keyed by bare filename, named failure reasons in brackets, exit 0/1/2, pinned/actual/delta table, increases allowed and printed as +N"
   - "A gate must be falsified before it is trusted — delete a test, observe the named failure, restore, observe green, record both observations"
 
-requirements-completed: [CANVAS-02]
+requirements-completed: []  # CANVAS-02 is this plan's named requirement but is NOT complete — see Deviation 3. This plan contributes Wave-0 infrastructure toward it; zero canvas editing code exists yet. REQUIREMENTS.md deliberately left Pending.
 
 # Metrics
 duration: 51min
@@ -203,8 +203,18 @@ This **independently reproduces the sketch's claim** — the sketch recorded 34.
 
 ---
 
-**Total deviations:** 2 auto-fixed (1 blocking, 1 missing-critical)
-**Impact on plan:** Neither expands scope. Deviation 1 replaces an impossible gate with the two measurable gates it stood for — and is stricter in the direction that matters, since it forbids any tsc *increase*. Deviation 2 is required by a locked project rule that the plan itself anticipated. No scope creep; still exactly 1 created file + 3 modified files across two commits.
+**3. [Rule 1 - Bug] Reverted a premature `CANVAS-02 = Complete` marking in REQUIREMENTS.md**
+- **Found during:** Post-plan state updates
+- **Issue:** `gsd-sdk query requirements.mark-complete CANVAS-02` (driven by this plan's `requirements:` frontmatter) flipped CANVAS-02 to `[x]` and its traceability row to **Complete**. CANVAS-02 is *"a user can add, move, connect, and delete phase-nodes; edits round-trip losslessly back to `WorkflowDefinition`…"* — **this plan delivered none of that.** It shipped a test-count gate and an icon swap; zero canvas editing code exists yet, and CANVAS-02 spans 13 plans of which this is the first. A verifier reading REQUIREMENTS.md would have believed the phase's core deliverable had shipped.
+- **Fix:** `git checkout -- .planning/REQUIREMENTS.md`. CANVAS-02 stays `[ ]` / **Pending** until the plans that actually implement it land. The plan's `requirements:` frontmatter names the requirement this plan *contributes to*, not one it completes.
+- **Files modified:** none (revert)
+- **Verification:** `grep CANVAS-02 .planning/REQUIREMENTS.md` → `- [ ]` and `| CANVAS-02 | Phase 184 | Pending |`
+- **Rationale:** the same honesty discipline as D-ITEM-183-02 — a planning artifact that lies is a defect, and this one would have lied about the milestone's headline deliverable. Flagged here so a later plan re-marks it deliberately rather than by accident.
+
+---
+
+**Total deviations:** 3 auto-fixed (1 blocking, 1 missing-critical, 1 bug)
+**Impact on plan:** None expands scope. Deviation 1 replaces an impossible gate with the two measurable gates it stood for — and is stricter in the direction that matters, since it forbids any tsc *increase*. Deviation 2 is required by a locked project rule that the plan itself anticipated. Deviation 3 prevents a false completion claim in a planning artifact. No scope creep; still exactly 1 created file + 3 modified files across two code commits.
 
 ## Issues Encountered
 
