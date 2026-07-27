@@ -72,7 +72,11 @@ vi.mock("@/lib/api", () => ({
   listSkills: mockListSkills,
   validateWorkflow: mockValidate,
   getGroundingBundle: mockBundle,
+  publishWorkflow: mockPublish,
 }))
+// The R12 publish-handoff block below mounts the real gauntlet, whose own module reaches
+// one more api symbol. Declared as its own hoisted block so the diff stays additive.
+const { mockPublish } = vi.hoisted(() => ({ mockPublish: vi.fn() }))
 
 // The component SOURCE via Vite's ?raw loader — the idiomatic way to make a scope
 // fence machine-checkable (the `PhaseSpineGraph.test.tsx:20-22` precedent).
@@ -81,6 +85,8 @@ import { WorkflowBuilderPage, type BuilderDefinition } from "./WorkflowBuilderPa
 import { EffectiveFeaturesProvider } from "@/providers/EffectiveFeaturesProvider"
 import type { EffectiveFeatures } from "@/lib/api"
 import { researchSummarize } from "@/components/workflows/__fixtures__/canvasFixtures"
+// Phase 184-11 Task 2: the R12 publish-handoff block mounts the real gauntlet.
+import { PublishGauntlet } from "@/components/workflows/PublishGauntlet"
 
 mockReactFlow()
 
@@ -607,6 +613,117 @@ describe("WorkflowBuilderPage 184-11 — with the flag OFF the panel receives NO
     expect(screen.queryByTestId("canvas-announcer")).toBeNull()
     expect(screen.queryByTestId("publish-blocked-reason")).toBeNull()
     expect(container.querySelector(".react-flow")).toBeNull()
+  })
+})
+
+// ── Task 2 — R12: publish blocks in the header that ALREADY EXISTS ────────────────
+
+describe("WorkflowBuilderPage 184-11 — a blocked publish NAMES its reason (R12)", () => {
+  /** The real gauntlet, mounted through the shipped `renderPublish` seam exactly as
+   *  `WorkflowsPage` mounts it — so this measures the composed surface, not a stub. */
+  function renderWithPublish(
+    features: { features: EffectiveFeatures; loading: boolean },
+    def: BuilderDefinition = definition,
+  ) {
+    return render(
+      <EffectiveFeaturesProvider value={{ ...features, refetch: vi.fn() }}>
+        <div style={{ width: 1200, height: 800 }}>
+          <WorkflowBuilderPage
+            initial={{ definition: def, draftId: "draft-1" }}
+            renderPublish={(d, id, blockedReason) => (
+              <PublishGauntlet
+                definitionId={id ?? "draft-1"}
+                definition={d as never}
+                blockedReason={blockedReason}
+              />
+            )}
+          />
+        </div>
+      </EffectiveFeaturesProvider>,
+    )
+  }
+
+  const emptyDraft: BuilderDefinition = { ...definition, phases: [] }
+
+  /** Make one edit so the loop runs, and wait for the server's answer to land. */
+  async function editAndSettle() {
+    fireEvent.click(await screen.findByTestId("spine-node-research"))
+    const field = await screen.findByLabelText(/instructions/i)
+    fireEvent.change(field, { target: { value: "search the vendor corpus" } })
+    await waitFor(() => expect(mockValidate).toHaveBeenCalled(), { timeout: 3000 })
+  }
+
+  it("an EMPTY draft reads as an invitation, not a verdict (D-184-15)", async () => {
+    renderWithPublish(FLAG_ON, emptyDraft)
+    const trigger = await screen.findByTestId("publish-trigger")
+    expect(trigger).toBeDisabled()
+    const reason = screen.getByTestId("publish-blocked-reason")
+    expect(reason.textContent).toBe("Add a step to get started")
+    // R12: greying alone is not enough — the reason must be REACHABLE from the control.
+    expect(trigger.getAttribute("aria-describedby")).toBe(reason.getAttribute("id"))
+    // …and no server was asked about a workflow with no steps.
+    expect(mockValidate).toHaveBeenCalledTimes(0)
+  })
+
+  it("with the flag OFF the very same empty draft keeps today's enabled trigger (D-14)", async () => {
+    renderWithPublish(FLAG_OFF, emptyDraft)
+    const trigger = await screen.findByTestId("publish-trigger")
+    expect(trigger).not.toBeDisabled()
+    expect(trigger.getAttribute("aria-describedby")).toBeNull()
+    expect(screen.queryByTestId("publish-blocked-reason")).toBeNull()
+  })
+
+  it("the reason is the FIRST verdict's message VERBATIM, with error ordered before incomplete", async () => {
+    mockValidate.mockResolvedValue({
+      ok: false,
+      verdicts: [
+        { code: "missing_prompt", phase: "research", message: "This step still needs instructions.", severity: "incomplete" },
+        { code: "no_terminal", phase: null, message: "Nothing in this workflow produces a deliverable.", severity: "error" },
+      ],
+    })
+    renderWithPublish(FLAG_ON)
+    await editAndSettle()
+
+    const reason = await screen.findByTestId("publish-blocked-reason")
+    // The ERROR wins even though the server listed the incomplete one first, and the
+    // message is byte-identical to what the server sent — never rewritten or mapped.
+    expect(reason.textContent).toBe("Nothing in this workflow produces a deliverable.")
+    expect(screen.getByTestId("publish-trigger")).toBeDisabled()
+  })
+
+  it("a DEGRADED check keeps publish blocked and says which kind of failure it was (D-184-14)", async () => {
+    mockValidate.mockRejectedValue(
+      Object.assign(new Error("422"), { name: "WorkflowValidateUnreadableError" }),
+    )
+    renderWithPublish(FLAG_ON)
+    await editAndSettle()
+
+    const reason = await screen.findByTestId("publish-blocked-reason")
+    expect(reason.textContent).toBe(
+      "We couldn't check this — the workflow's shape isn't something we can read yet.",
+    )
+    // A check that did NOT RUN must never unblock a publish.
+    expect(screen.getByTestId("publish-trigger")).toBeDisabled()
+  })
+
+  it("an ok:true answer leaves publish exactly as it is today", async () => {
+    mockValidate.mockResolvedValue({ ok: true, verdicts: [] })
+    renderWithPublish(FLAG_ON)
+    await editAndSettle()
+
+    await waitFor(() => expect(screen.getByTestId("publish-trigger")).not.toBeDisabled())
+    expect(screen.queryByTestId("publish-blocked-reason")).toBeNull()
+  })
+
+  it("publish is in the EXISTING header — the same one that carries the save state, no new band", async () => {
+    renderWithPublish(FLAG_ON, emptyDraft)
+    const trigger = await screen.findByTestId("publish-trigger")
+    const header = trigger.closest("header")
+    expect(header).not.toBeNull()
+    // 141-B's operator correction: one header, both controls. A net-new band would put
+    // these two in different ancestors.
+    expect(header!.contains(screen.getByTestId("builder-save-state"))).toBe(true)
+    expect(screen.getAllByRole("banner")).toHaveLength(1)
   })
 })
 
