@@ -335,9 +335,31 @@ const EDIT_AFFORDANCE = {
  * device is an affordance that does not exist. The base class is the VISIBLE one and
  * the hiding is scoped under `lg:`, which is what makes "present without a hover event"
  * assertable from the class list alone in a renderer that applies no CSS.
+ *
+ * ⚠ TWO CORRECTIONS, both found in live UAT and neither visible to a class-list assertion.
+ *
+ * 1. `pointer-events-auto` is REQUIRED, not decoration. These buttons render through
+ *    `<ViewportPortal>`, and the library sets `pointer-events: none` on BOTH
+ *    `.react-flow__viewport-portal` and `.react-flow__viewport` so the pane underneath
+ *    stays draggable. Without re-enabling it here the buttons are not hit-testable:
+ *    `document.elementFromPoint` at a button's own centre returns the CARD, so the
+ *    affordance can be neither clicked nor hovered.
+ *
+ * 2. The reveal hangs off `group-hover/canvas`, NOT the button's own `:hover`. The
+ *    original `lg:hover:opacity-100` was self-defeating twice over — an element at
+ *    `pointer-events: none` can never receive the hover that is supposed to reveal it,
+ *    and even once hit-testable, an `opacity: 0` control that only appears when the
+ *    pointer is already on top of it has to be found blind. Hovering anywhere on the
+ *    plane now reveals the whole affordance set, which is what "a canvas at rest is the
+ *    flow" was always describing.
+ *
+ * Net effect of the bug: at >=1024px with a mouse, add-step and delete-step were
+ * unreachable — CANVAS-02 was false for the primary desktop path while every unit test
+ * passed, because jsdom applies no CSS and the suite asserted the CLASS LIST, which
+ * cannot see a `pointer-events: none` inherited from a library ancestor.
  */
 const REVEAL_ON_HOVER =
-  "opacity-100 lg:opacity-0 lg:hover:opacity-100 lg:focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
+  "pointer-events-auto opacity-100 lg:opacity-0 lg:group-hover/canvas:opacity-100 lg:focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
 
 /**
  * WHAT THE SURFACE SAYS AFTER A STRUCTURAL EDIT — and the two acts are DIFFERENT acts,
@@ -1232,8 +1254,11 @@ export function WorkflowCanvas({
           {announcement}
         </div>
       ) : null}
-      {/* The parent MUST have a width and a height or the plane measures to zero. */}
-      <div className="h-full w-full min-w-0 flex-1">
+      {/* The parent MUST have a width and a height or the plane measures to zero.
+          `group/canvas` is the hover root the edit affordances reveal from — see
+          REVEAL_ON_HOVER. It is named rather than bare so a future nested `group`
+          cannot capture it by accident. */}
+      <div className="group/canvas h-full w-full min-w-0 flex-1">
         <ReactFlow
           nodes={nodes}
           edges={edges}

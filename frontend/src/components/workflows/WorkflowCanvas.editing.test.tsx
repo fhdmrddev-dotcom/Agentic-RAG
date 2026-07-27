@@ -918,3 +918,50 @@ describe("WorkflowCanvas 184-12 — the empty draft is a first-class screen", ()
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 })
+
+// ── 13. The affordances are REACHABLE, not merely present ────────────────────────
+//
+// Added after live UAT found both `＋` and `✕` unclickable at >=1024px with a mouse:
+// they render through `<ViewportPortal>`, whose ancestors the library sets to
+// `pointer-events: none`, and the class list alone could not see it. Every assertion
+// in section 12 above passed while CANVAS-02 was false for the primary desktop path.
+//
+// jsdom applies no stylesheet, so these cannot test COMPUTED reachability. They pin the
+// two class-level facts that were missing instead, each one falsifiable by deleting the
+// token it names — which is exactly what the previous suite could not do, because it
+// never asserted these tokens at all.
+describe("WorkflowCanvas 184-12 — the ＋ / ✕ layer is hit-testable and reveals from the plane", () => {
+  it("every edit affordance re-enables pointer events, which ViewportPortal's ancestors disable", () => {
+    const { container } = renderEditable(evalCoverage, { onInsertAt: vi.fn(), onRequestRemove: vi.fn() })
+    const affordances = [...container.querySelectorAll("[data-canvas-affordance]")]
+    expect(affordances.length).toBeGreaterThan(0)
+    for (const el of affordances) {
+      expect(el.className).toMatch(/\bpointer-events-auto\b/)
+    }
+  })
+
+  it("the reveal hangs off the canvas group, never the affordance's own :hover", () => {
+    const { container } = renderEditable(evalCoverage, { onInsertAt: vi.fn(), onRequestRemove: vi.fn() })
+    const affordances = [...container.querySelectorAll("[data-canvas-affordance]")]
+    for (const el of affordances) {
+      // The reveal must come from an ancestor's hover...
+      expect(el.className).toMatch(/\blg:group-hover\/canvas:opacity-100\b/)
+      // ...and never from the element's own, which a pointer-events:none element
+      // can never receive, and which would otherwise have to be found blind.
+      expect(el.className).not.toMatch(/\blg:hover:opacity-100\b/)
+    }
+  })
+
+  it("the group root the reveal names actually exists in the rendered tree", () => {
+    const { container } = renderEditable(evalCoverage, { onInsertAt: vi.fn() })
+    // Attribute-matched, not an escaped class selector — jsdom's selector engine
+    // rejects `.group\/canvas` outright ("Invalid selector"). A jsdom limit, not a
+    // bug in the class itself.
+    const root = container.querySelector('[class~="group/canvas"]')
+    expect(root).not.toBeNull()
+    // and it must be an ANCESTOR of the affordances, or group-hover cannot reach them
+    const affordance = container.querySelector("[data-canvas-affordance]")
+    expect(affordance).not.toBeNull()
+    expect(root!.contains(affordance!)).toBe(true)
+  })
+})
