@@ -199,7 +199,7 @@ Plans:
 
 **Wave 7** *(blocked on Wave 6 completion)*
 
-- [ ] 184-11-PLAN.md — session composition: live loop + rails wiring, publish handoff, leave guard, 409, WR-09
+- [x] 184-11-PLAN.md — session composition: live loop + rails wiring, publish handoff, leave guard, 409, WR-09
 
 **Wave 8** *(blocked on Wave 7 completion)*
 
