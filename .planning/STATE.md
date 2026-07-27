@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
 status: executing
-last_updated: "2026-07-27T08:56:29.051Z"
+last_updated: "2026-07-27T09:28:54.423Z"
 last_activity: 2026-07-27
 progress:
   total_phases: 18
   completed_phases: 3
   total_plans: 37
-  completed_plans: 35
+  completed_plans: 36
   percent: 17
 ---
 
@@ -45,7 +45,7 @@ Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 op
 ## Current Position
 
 Phase: 184 (Editable Canvas + Live Structural Validation (Round-Trip)) — EXECUTING
-Plan: 12 of 13
+Plan: 13 of 13
 
 **Plan 184-01 COMPLETE (`4a019bd8` gate → `ffb3e9cf` icon swap → `854ec42b` SUMMARY).** Wave 0's
 measuring stick landed FIRST as its own single-file commit: `scripts/vitest-count-gate.cjs` pins
@@ -772,6 +772,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 184 P09 | 22min | 3 tasks | 4 files |
 | Phase 184 P10 | 40min | 3 tasks | 5 files |
 | Phase 184 P11 | 55min | 3 tasks | 8 files |
+| Phase 184 P12 | 21min | 3 tasks | 4 files |
 
 ## Decisions
 
@@ -986,6 +987,8 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase ?]: 184-10: onNudge hands over the RESULTING offset, not the drag delta — passing the delta makes every second nudge discard the first
 - [Phase 184]: D-184-11-01: a dismissal COMMITS to the definition and writes nothing on all three paths — the 183 review's blur-based fix is deliberately NOT taken, because Phase 184 has an explicit-save contract plus a leave guard
 - [Phase 184]: D-184-11-02: blockedReason and the rails prop are both gated on the canvas flag, and rails is passed SPREAD-CONDITIONALLY so a flag-off panel receives no key at all (D-14)
+- [Phase 184]: 184-12: delete is immediate with inline Undo and NO confirm dialog; R10a's orphaning case is a REFUSAL with a stated reason (different testid, different role), and neither refusal consults /validate
+- [Phase 184]: 184-12: the canvas + / x affordances are plane-level overlays drawn through @xyflow ViewportPortal — they share the nodes' coordinate system while reporting a null .react-flow__node ancestor, so the one-tab-stop-per-node invariant holds by construction
 
 ## Operator Next Steps
 

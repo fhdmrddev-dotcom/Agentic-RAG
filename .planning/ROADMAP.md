@@ -203,7 +203,7 @@ Plans:
 
 **Wave 8** *(blocked on Wave 7 completion)*
 
-- [ ] 184-12-PLAN.md — the ＋ insert / ✕ delete affordances, both refusals in the UI, empty-draft invitation
+- [x] 184-12-PLAN.md — the ＋ insert / ✕ delete affordances, both refusals in the UI, empty-draft invitation
 
 **Wave 9** *(blocked on Wave 8 completion)*
 
