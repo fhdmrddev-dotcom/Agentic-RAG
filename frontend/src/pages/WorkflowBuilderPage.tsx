@@ -89,23 +89,126 @@
  * Escape release) also stays here: it is the D-183-05 one-selection contract, not
  * definition state. This was a STATE-HOME refactor, gated on every shipped
  * assertion passing unmodified (D-184-08).
+ *
+ * ── Phase 184-11 (CANVAS-02 / CANVAS-03 · D-184-15 / D-184-16) — the session ────
+ *
+ * THIS PAGE IS THE COMPOSITION POINT, AND IT IS THE ONLY ONE. The live validation
+ * loop, the governance rails, the cosmetic nudge and the verdict marks all arrive
+ * here as hooks and leave as PROPS: `WorkflowCanvas` fetches nothing, and
+ * `PhaseFormPanel` derives nothing. That is what keeps VALID-03 ("every verdict
+ * comes from the server") and R11 ("no frontend tool whitelist") structural rather
+ * than merely intended.
+ *
+ * NOTHING VALIDATES BEFORE THE AUTHOR'S FIRST EDIT (D-184-15). `hasEdited` starts
+ * false and is flipped by the first real EDIT — not by mount, and not by a document
+ * transition such as generate/open, which replace the whole definition without the
+ * author having changed anything. A zero-step draft is therefore never greeted with
+ * `ok:false` + a full problems tray; its Publish carries a plain INVITATION instead,
+ * which is not a claimed verdict and therefore not client-side validation.
+ *
+ * THE THREE SESSION-EDGE DEBTS (D-184-16) ALL LAND HERE:
+ *  1. The unsaved-work leave guard — a `canLeave()` callback registered with the
+ *     host (there is no router; the breadcrumb lives in `WorkflowsPage`) plus a
+ *     `beforeunload` listener mounted ONLY while the draft is dirty.
+ *  2. WR-09-01 / WR-09-02 — every dismissal path converges on `clearSelection`,
+ *     which COMMITS (the coalescing config run is flushed into the undo stack) and
+ *     WRITES NOTHING. A dismissal must not PATCH a version.
+ *  3. The 409 — a published row's conflict gets its own honest sentence instead of
+ *     the generic "Couldn't save".
+ *
+ * WHAT IS STILL NOT AUTOSAVE. `onPersist` / `onSaveDraft` below are untouched in
+ * their create-once-then-PATCH shape: a session issues exactly ONE create and then
+ * PATCHes. Phase 186 owns autosave and this plan deliberately does not pre-empt it.
  */
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useStore } from "zustand"
 import { generateWorkflow, createWorkflowDraft, updateWorkflowDraft, listFolders, listSkills } from "@/lib/api"
 import { PhaseSpineGraph } from "@/components/workflows/PhaseSpineGraph"
-import type { PhaseSpecJSON } from "@/components/workflows/phaseVocabulary"
-import { PhaseFormPanel, type PhaseConfigPatch, type IdNameMap } from "@/components/workflows/PhaseFormPanel"
+import { groundingFor, type PhaseSpecJSON } from "@/components/workflows/phaseVocabulary"
+import {
+  PhaseFormPanel,
+  type PhaseConfigPatch,
+  type IdNameMap,
+  type PhaseFormRails,
+  type PhaseGateRow,
+} from "@/components/workflows/PhaseFormPanel"
 import { createBuilderStore, selectDefinition } from "@/components/workflows/builderStore"
 import { BuilderStoreProvider } from "@/components/workflows/BuilderStoreProvider"
 import { useEffectiveFeaturesOptional } from "@/providers/EffectiveFeaturesProvider"
 import { cn } from "@/lib/utils"
+// ── Phase 184-11: the composition seams. Every one of these is a HOOK or a PURE
+//    module; none of them is reachable from the canvas or the panel themselves. ──
+import { useLiveValidation } from "@/hooks/useLiveValidation"
+import { useGroundingBundle } from "@/hooks/useGroundingBundle"
+import { DEGRADED_SENTENCE, groupVerdicts } from "@/components/workflows/verdictModel"
+import { readNudges, writeNudge } from "@/components/workflows/canvasNudge"
+import { renumber } from "@/components/workflows/definitionOps"
+import type { CanvasNode } from "@/components/workflows/canvasModel"
+import type { WorkflowDefinitionJSON } from "@/lib/api"
 
 /** The read-only canvas, code-split behind the toggle (see the docblock). The module
  *  also exports a `default`, so the `.then(...)` shim below is belt-and-braces — it
  *  mirrors the app's ONE shipped code-split (`KnowledgeHealthPage.tsx:32`) so both
  *  lazy boundaries read the same way. */
 const WorkflowCanvas = lazy(() => import("@/components/workflows/WorkflowCanvas").then((m) => ({ default: m.WorkflowCanvas })))
+
+/**
+ * The locked save wording (184-CONTEXT `<specifics>`): the surface says the draft is
+ * SAVED and, in the same breath, that it is still a draft. No word in it may imply
+ * published — publishing is a separate act behind the gauntlet, and a save that reads
+ * like a release is the single most expensive lie this header can tell.
+ */
+export const SAVED_STILL_A_DRAFT = "Saved · still a draft"
+
+/**
+ * The 409 sentence (D-184-16 debt 3). `updateWorkflowDraft` already throws a typed
+ * `WorkflowConflictError` when the row is published/frozen; until this plan the page
+ * flattened it into the generic error. It is business-plain and it names the WAY OUT
+ * (Tweak), because "couldn't save" on a published row sends a person back to press the
+ * same button again.
+ */
+export const PUBLISHED_CONFLICT_MESSAGE =
+  "This version is published and can't be edited — use Tweak to start a new draft"
+
+/** The generic failure line, unchanged: a 404 / network failure is still never
+ *  swallowed as a success and still reads as itself. */
+export const GENERIC_SAVE_ERROR = "Couldn't save"
+
+/**
+ * The empty draft's publish reason (D-184-15). An INVITATION, not a claimed verdict:
+ * the client is not validating anything here, it is saying what to do next on a
+ * workflow that has no steps yet. D-182-06 stays intact precisely because no severity,
+ * no code and no lint rule is being computed — a zero-length phases array is not a
+ * finding, and the moment a step exists the server owns every verdict.
+ */
+export const EMPTY_DRAFT_INVITATION = "Add a step to get started"
+
+/** The unsaved-work prompt (D-184-16 debt 1). Named, because a session can now be five
+ *  structural edits deep with no autosave until Phase 186. */
+export const UNSAVED_LEAVE_PROMPT =
+  "This draft has unsaved changes. Leave without saving?"
+
+/**
+ * The gates rail, DERIVED exactly as the shipped `groundingFor()` derives grounding
+ * today — `citation_policy` plus the presence of a `citations_required` validator, and
+ * nothing else. **Phase 184 invents no authored grounding field**; Phase 185 replaces
+ * this derivation and plugs into the same `rails.gates` array (D-183-07 / the panel's
+ * own rails docblock).
+ *
+ * Every row is LOCKED, and that is the honest reading rather than a shortcut: both
+ * causes are structural from this panel's point of view. A `strict` / `flag` policy came
+ * with the Sourcing-strictness dial rendered a few rows above — change it and the gate
+ * goes, which is exactly what the rail's own footnote promises — and a `citations_required`
+ * validator is a `validators` entry, which this form has no write seam for at all
+ * (`onChange` patches `config`). Offering a Remove button that could not remove anything
+ * would be the "a removable gate with no way to remove it" lie the row union exists to
+ * make un-representable.
+ */
+function gatesFor(phase: PhaseSpecJSON | null): PhaseGateRow[] {
+  if (phase === null) return []
+  const grounding = groundingFor(phase)
+  return grounding.mode === "open" ? [] : [{ label: grounding.words, locked: true }]
+}
 
 /** The Builder's working definition shape (a refinement of the opaque
  *  `WorkflowDefinitionJSON` the api layer returns). */
@@ -137,8 +240,19 @@ export interface WorkflowBuilderPageProps {
    *  purpose / tier / spine / needs / output. `BuilderDefinition` already carries
    *  the soul-readable fields (business_requirement / project_folder_id / phases),
    *  so this seam is additive — the describe/draft/publish flow is unchanged; the
-   *  call site (WorkflowsPage) just passes the supplied `def` through as `definition`. */
-  renderPublish?: (def: BuilderDefinition, draftId: string | null) => React.ReactNode
+   *  call site (WorkflowsPage) just passes the supplied `def` through as `definition`.
+   *
+   *  Phase 184-11 (R12): a THIRD argument carries the publish-blocking reason, or `null`
+   *  when publish is not blocked. Optional and additive — a two-parameter implementation
+   *  is still assignable and still behaves exactly as it did, which is what keeps the
+   *  flag-off surface unchanged (this page passes `null` whenever the canvas flag is off).
+   *  It rides the EXISTING seam on purpose: 141-B's operator correction is that publish
+   *  stays in the header it already has, so the mount does not move and no band is added. */
+  renderPublish?: (
+    def: BuilderDefinition,
+    draftId: string | null,
+    blockedReason?: string | null,
+  ) => React.ReactNode
   /** Phase 103-ux OPEN/TWEAK: when present, the Builder starts DIRECTLY in the
    *  "drafted" editing view on this existing definition — it SKIPS the
    *  describe/composing screen entirely. `draftId` seeds both state + the
@@ -157,9 +271,30 @@ export interface WorkflowBuilderPageProps {
    *  the EXISTING generate→draft flow ONCE on mount using the seeded `initialDescribe`,
    *  so the fast path actually drafts instead of dead-ending on an empty screen. */
   autoDraft?: boolean
+  /**
+   * Phase 184-11 (D-184-16 debt 1) — the unsaved-work leave guard's registration seam.
+   *
+   * THERE IS NO ROUTER. Navigation in this app is a `useState<ActiveView>` switch, so
+   * there is no route-change hook and no router blocker to hang a guard off. The
+   * `← Workflows` breadcrumb lives in `WorkflowsPage`, and the dirty state lives in this
+   * page's store — so the Builder hands the host a predicate and the host consults it
+   * before it switches view. `true` means "leaving is fine"; `false` means the user said
+   * no and the host must stay put.
+   *
+   * OPTIONAL, and an ABSENT registration must leave the host behaving exactly as it does
+   * today. Every other mount of this page (the tests, the door shell's fresh-build path
+   * before a Builder exists) supplies nothing and is unaffected.
+   */
+  registerCanLeave?: (canLeave: (() => boolean) | null) => void
 }
 
-export function WorkflowBuilderPage({ renderPublish, initial, initialDescribe, autoDraft }: WorkflowBuilderPageProps) {
+export function WorkflowBuilderPage({
+  renderPublish,
+  initial,
+  initialDescribe,
+  autoDraft,
+  registerCanLeave,
+}: WorkflowBuilderPageProps) {
   const [describe, setDescribe] = useState(initialDescribe ?? "")
   // Phase 184-04 (D-184-01): the definition's home. Created LAZILY so the factory
   // runs exactly once per mount, and never at module scope — a singleton would carry
@@ -207,6 +342,9 @@ export function WorkflowBuilderPage({ renderPublish, initial, initialDescribe, a
   // affordance ("idle" → "saving" → "saved" | "error"). Belt-and-suspenders over
   // the implicit on-blur autosave (onPersist) — the user gets a visible "Saved ✓".
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle")
+  // Phase 184-11 (D-184-16 debt 3): WHICH failure the error state is reporting. `null`
+  // keeps today's generic line; a 409 replaces it with the published-row sentence.
+  const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null)
   const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const canDraft = describe.trim().length > 0 && builderPhase !== "composing"
@@ -235,9 +373,36 @@ export function WorkflowBuilderPage({ renderPublish, initial, initialDescribe, a
   // anchors the panel, `clearSelection` releases it. Both live on the page because
   // both views share ONE panel — a canvas-only close would leave the shipped Spine
   // surface, where this defect was actually reported, still unable to be left.
+  //
+  // ── WR-09-01 / WR-09-02 (D-184-16 debt 2) — ALL THREE dismissal paths end HERE ──
+  //
+  // The ✕ (`PhaseFormPanel`'s header button), Escape (the gated window listener below)
+  // and a click on the empty canvas pane (`WorkflowCanvas`'s `onPaneClick`) all call
+  // this one callback, so the three cannot drift apart. What a dismissal does is now
+  // stated in one place, and it is exactly two things:
+  //
+  //  1. COMMIT. `flushHistory()` ends the coalescing config run immediately, so the
+  //     sentence the author just typed is ONE undo entry that exists at dismissal time
+  //     rather than one that lands up to `CONFIG_COALESCE_MS` later. The VALUE itself is
+  //     already in the definition — every panel field is CONTROLLED and its `onChange`
+  //     reaches `store.patchConfig` on the keystroke, never on the blur — so what a
+  //     dismissal used to drop was the history entry, not the text.
+  //  2. RELEASE the selection. That is all.
+  //
+  // WHAT IT DELIBERATELY DOES NOT DO IS WRITE. The 183 review's recommended fix was to
+  // BLUR the focused field before unmount so the three paths converged on the ✕'s
+  // incidental PATCH. Phase 184 converges them the other way, because this phase has an
+  // explicit-save contract (R6) and, from this plan on, a dirty-state leave guard plus a
+  // dirty indicator that close the loss window that made a silent PATCH look attractive.
+  // A dismissal that mints a version is exactly the surprise a no-autosave phase exists
+  // to prevent — so the panel's ✕ also suppresses the focus transfer that used to cause
+  // one (see its `onMouseDown`), and the assertion "a dismissal must not PATCH a version"
+  // is now true on all three paths in a real browser, not only under a test driver that
+  // never moves focus.
   const clearSelection = useCallback(() => {
+    store.getState().flushHistory()
     setSelectedSlug(null)
-  }, [])
+  }, [store])
 
   // Escape releases the panel, in BOTH views. GATED on `panelOpen`: no listener
   // exists while the panel is closed, so this costs nothing at rest and cannot
@@ -267,6 +432,168 @@ export function WorkflowBuilderPage({ renderPublish, initial, initialDescribe, a
     if (builderPhase !== "drafted" || selectedSlug === null) return null
     return phases.find((p) => p.slug === selectedSlug) ?? null
   }, [builderPhase, phases, selectedSlug])
+
+  // ── Phase 184-11: the live loop, the rails, the marks and the nudge ─────────────
+
+  /**
+   * D-184-15 — has the AUTHOR edited in this session? False until the first real edit,
+   * and false FOREVER on a draft nobody touches, which is what keeps `/validate` silent
+   * on mount.
+   *
+   * It is driven by the STORE rather than by the page's own callbacks on purpose: a
+   * structural edit can originate at the canvas, at the panel, or (in 184-12) at a `＋`
+   * that dispatches straight to a store action, and a flag wired per call site would
+   * miss whichever one is added last. The subscription reads the ONE thing every edit
+   * has in common — a new `phases` reference — and excludes DOCUMENT transitions, which
+   * always replace `meta` (a fresh object) and usually `builderPhase` too. Generating or
+   * opening a workflow is not something the author edited, so it must not start the loop.
+   *
+   * Deliberately NOT reused: the store's `dirty`, which `markSaved()` clears — a save
+   * would then switch validation back off.
+   */
+  const [hasEdited, setHasEdited] = useState(false)
+  useEffect(
+    () =>
+      store.subscribe((state, prev) => {
+        if (state.phases === prev.phases) return
+        if (state.builderPhase !== prev.builderPhase || state.meta !== prev.meta) return
+        setHasEdited(true)
+      }),
+    [store],
+  )
+
+  /**
+   * The loop itself. `definition` is a `useMemo` over the store's two halves, so its
+   * identity changes once per EDIT and not once per render — which is the caller
+   * contract `useLiveValidation`'s docblock states, and the difference between a
+   * debounced request per edit and one per keystroke of React re-render.
+   */
+  const validation = useLiveValidation(definition as WorkflowDefinitionJSON | null, hasEdited)
+
+  /**
+   * Mirror the loop's answer into the store's UNTRACKED half, so the marks (canvas) and
+   * the tray (184-13) read ONE source instead of two subscriptions that can disagree.
+   * `partialize` keeps all three keys out of the undo stack, so an arriving response can
+   * never push a history entry and `⌘Z` can never undo a server verdict (VALID-03).
+   */
+  useEffect(() => {
+    const actions = store.getState()
+    switch (validation.kind) {
+      case "idle":
+        actions.setChecking(false)
+        break
+      case "checking":
+        actions.setChecking(true)
+        break
+      case "verdicts":
+        actions.setVerdicts(validation.verdicts)
+        actions.setChecking(validation.checking)
+        actions.setDegraded(null)
+        break
+      case "degraded":
+        // Held stale, dimmed — never cleared, or every mark flickers on every keystroke.
+        actions.setVerdicts(validation.verdicts)
+        actions.setChecking(validation.checking)
+        actions.setDegraded({ kind: validation.cause === "unreadable" ? "422" : "network" })
+        break
+    }
+  }, [validation, store])
+
+  const verdicts = useStore(store, (s) => s.verdicts)
+  const verdictGroups = useMemo(() => groupVerdicts(verdicts), [verdicts])
+  /** The per-node mark, handed to the canvas as DATA. The canvas fetches nothing and
+   *  derives no severity — `verdictModel` groups and counts, and classifies nothing. */
+  const marks = useMemo(() => (slug: string) => verdictGroups.markFor(slug), [verdictGroups])
+
+  /**
+   * The CANVAS-04 palette. Fetched once, when the canvas is enabled, and read ONLY here —
+   * the panel is handed the answer.
+   *
+   * Anything that is not a complete `ready` read resolves to the literal `"degraded"`,
+   * which is the fail-closed side of the only choice available. An empty array would say
+   * "this workspace offers no tools" (a claim we cannot make while the read is in flight
+   * or has failed), and omitting the rail entirely would put the shipped free-text box
+   * back on screen — and a box a user can type any string into is not a whitelist, which
+   * is precisely what R11 forbids.
+   */
+  const bundle = useGroundingBundle(canvasEnabled)
+  const toolOptions: string[] | "degraded" = bundle.kind === "ready" ? bundle.tools : "degraded"
+
+  /** The three governance rails for the SELECTED step. Every value is derived or
+   *  server-sourced HERE; the panel computes none of it. */
+  const rails = useMemo<PhaseFormRails>(() => {
+    const order = renumber(phases).map((p) => p.slug)
+    const at = selectedSlug === null ? -1 : order.indexOf(selectedSlug)
+    return {
+      order: { index: at + 1, total: order.length },
+      toolOptions,
+      gates: gatesFor(selectedPhase),
+    }
+  }, [phases, selectedSlug, selectedPhase, toolOptions])
+
+  /**
+   * The cosmetic vertical nudge. `canvasNudge.ts` owns every read and every write —
+   * this page names no browser-storage API at all, which its own shipped source guard
+   * enforces. Re-read through a version counter rather than an effect, so a write and
+   * the render that shows it stay in one pass and no `setState`-in-effect cascade is
+   * introduced.
+   */
+  const [nudgeVersion, setNudgeVersion] = useState(0)
+  // `nudgeVersion` is an INVALIDATION KEY, not a value this read consumes: the write goes
+  // to `canvasNudge.ts` (the one storage home) and the counter is how the page asks for a
+  // re-read. The rule cannot see that a bumped counter means the storage behind
+  // `readNudges` changed; keeping the map in page state instead would put a SECOND copy of
+  // it here, which is the thing the module boundary exists to prevent.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const nudges = useMemo(() => readNudges(draftId), [draftId, nudgeVersion])
+  const onNudge = useCallback(
+    (slug: string, dy: number) => {
+      // `dy` is the RESULTING offset, not this drag's delta — the canvas composes it, so
+      // this handler stays a plain write (`WorkflowCanvasProps.onNudge`).
+      writeNudge(draftId, slug, dy)
+      setNudgeVersion((v) => v + 1)
+    },
+    [draftId],
+  )
+
+  /** A canvas-originated reorder. Both gesture paths (drag along the lane, `⌥←`/`⌥→`)
+   *  arrive here and end in the ONE store op — no second reorder rule exists. */
+  const onCommitNodes = useCallback(
+    (nodes: readonly CanvasNode[]) => {
+      store.getState().commitCanvasNodes(nodes)
+    },
+    [store],
+  )
+
+  /**
+   * R12 / D-184-15 — WHY publish is blocked, in the author's words, or `null` when it is
+   * not blocked at all.
+   *
+   * GATED ON THE FLAG, and that is load-bearing (D-14 / D-181-01): with
+   * `visual_workflow_canvas` off the publish trigger must be the control that shipped,
+   * for everyone including operators. A flag-off empty draft therefore still gets today's
+   * enabled `◆ Publish…`, exactly as before this plan.
+   *
+   * The reason is chosen honestly, and only one of the four branches is authored here:
+   *  - EMPTY DRAFT → the INVITATION. Not a verdict, not a lint code, not a severity —
+   *    just what to do next. The server is never asked about a workflow with no steps.
+   *  - DEGRADED → the loop's own sentence for that cause. A check that did NOT RUN must
+   *    never unblock a publish (D-184-14, fail-closed).
+   *  - `ok: false` → the FIRST verdict's `message`, VERBATIM, with `error` findings
+   *    ordered ahead of `incomplete` ones so the thing that needs attention now is the
+   *    thing that gets named. The message is never rewritten and never mapped.
+   *  - anything else (`ok: true`, or nothing asked yet) → `null`, and publish behaves
+   *    exactly as it does today.
+   */
+  const blockedReason = useMemo<string | null>(() => {
+    if (!canvasEnabled || builderPhase !== "drafted") return null
+    if (phases.length === 0) return EMPTY_DRAFT_INVITATION
+    if (validation.kind === "degraded") return DEGRADED_SENTENCE[validation.cause]
+    if (validation.kind !== "verdicts" || validation.ok) return null
+    const first =
+      validation.verdicts.find((v) => v.severity !== "incomplete") ?? validation.verdicts[0]
+    return first?.message ?? null
+  }, [canvasEnabled, builderPhase, phases, validation])
 
   // Phase 103-ux: fetch folders + skills ONCE on mount → id→name maps for the form
   // panel + the project picker. Best-effort; a failure leaves the maps empty (the
@@ -401,6 +728,13 @@ export function WorkflowBuilderPage({ renderPublish, initial, initialDescribe, a
     } else {
       await updateWorkflowDraft(draftIdRef.current, def)
     }
+    // Phase 184-11: a CONFIRMED write is the only thing that clears `dirty` — the store's
+    // `markSaved()` is its one setter and it writes nothing itself. Without this the
+    // leave guard would prompt after every successful save, which is how a guard teaches
+    // a person to click through it. Undo re-arms `dirty` immediately afterwards
+    // (D-184-03), because stepping back past a save point really does make the in-memory
+    // definition differ from what was PATCHed.
+    store.getState().markSaved()
     return true
   }, [store])
 
@@ -414,17 +748,61 @@ export function WorkflowBuilderPage({ renderPublish, initial, initialDescribe, a
       savedTimerRef.current = null
     }
     setSaveState("saving")
+    setSaveErrorMessage(null)
     try {
       const ok = await onPersist()
       setSaveState(ok ? "saved" : "error")
-    } catch {
+    } catch (err) {
       // A 409 (published/frozen) / 404 / network failure is surfaced honestly —
       // never silently swallowed as a success.
+      //
+      // Phase 184-11 (D-184-16 debt 3): the 409 gets its OWN sentence. The branch reads
+      // the error's NAME rather than using `instanceof WorkflowConflictError`, which is
+      // the idiom `useLiveValidation.causeOf` already shipped and states its reason for:
+      // a rejection that crossed a module or realm boundary still classifies, and the
+      // page needs no value import from the API client to recognise it. Everything else
+      // keeps today's generic state — a 404 or a network failure is a different thing
+      // and must not be told the workflow is published.
+      const name = err && typeof err === "object" && "name" in err ? (err as { name: string }).name : ""
+      setSaveErrorMessage(name === "WorkflowConflictError" ? PUBLISHED_CONFLICT_MESSAGE : null)
       setSaveState("error")
     }
     if (savedTimerRef.current) clearTimeout(savedTimerRef.current)
     savedTimerRef.current = setTimeout(() => setSaveState("idle"), 2500)
   }, [onPersist])
+
+  // ── D-184-16 debt 1 — the unsaved-work leave guard, both halves ────────────────
+
+  const dirty = useStore(store, (s) => s.dirty)
+
+  /**
+   * The in-app half. `WorkflowsPage` owns the `← Workflows` breadcrumb and this page
+   * owns the dirty state, and there is no router between them — so the Builder hands the
+   * host a predicate and the host asks before it switches view. Re-registered whenever
+   * `dirty` changes so the closure is never stale, and UNREGISTERED on unmount so a
+   * Builder that is gone cannot keep refusing to be left.
+   */
+  useEffect(() => {
+    if (!registerCanLeave) return
+    registerCanLeave(() => (dirty ? window.confirm(UNSAVED_LEAVE_PROMPT) : true))
+    return () => registerCanLeave(null)
+  }, [registerCanLeave, dirty])
+
+  /**
+   * The tab-close half. GATED on `dirty` in the shipped Escape-listener shape: no
+   * listener exists while the draft is clean, so it costs nothing at rest and a saved
+   * session never gets the browser's "leave site?" dialog. `preventDefault()` plus the
+   * legacy `returnValue` assignment is what every engine still requires to show it.
+   */
+  useEffect(() => {
+    if (!dirty) return
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault()
+      event.returnValue = ""
+    }
+    window.addEventListener("beforeunload", onBeforeUnload)
+    return () => window.removeEventListener("beforeunload", onBeforeUnload)
+  }, [dirty])
 
   // Clean up the transient-confirmation timer on unmount.
   useEffect(() => {
@@ -542,6 +920,14 @@ export function WorkflowBuilderPage({ renderPublish, initial, initialDescribe, a
           selectedSlug={selectedSlug}
           onSelectNode={handleSelectNode}
           onClearSelection={clearSelection}
+          // Phase 184-11 — the editing half, composed HERE and nowhere else. This branch
+          // is unreachable unless `canvasEnabled` is true (`activeGraphView` pins to
+          // "spine" otherwise), so the flag is passed explicitly rather than assumed.
+          editable={canvasEnabled}
+          marks={marks}
+          nudges={nudges}
+          onNudge={onNudge}
+          onCommitNodes={onCommitNodes}
         />
       </Suspense>
     ) : (
@@ -631,8 +1017,10 @@ export function WorkflowBuilderPage({ renderPublish, initial, initialDescribe, a
           )}
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          {/* Phase 103-ux: explicit Save draft + transient confirmation. */}
-          <div className="flex items-center gap-2">
+          {/* Phase 103-ux: explicit Save draft + transient confirmation.
+              Phase 184-11 (R6): this region is the ONLY place the page says anything
+              about the save, and what it says is `Saved · still a draft`. */}
+          <div data-testid="builder-save-state" className="flex items-center gap-2">
             <button
               type="button"
               data-testid="builder-save-draft"
@@ -654,16 +1042,19 @@ export function WorkflowBuilderPage({ renderPublish, initial, initialDescribe, a
             </button>
             {saveState === "saved" && (
               <span data-testid="builder-save-confirm" role="status" className="text-[13px] font-medium text-success">
-                Saved ✓
+                {SAVED_STILL_A_DRAFT}
               </span>
             )}
             {saveState === "error" && (
               <span data-testid="builder-save-error" role="alert" className="text-[13px] font-medium text-destructive">
-                Couldn't save
+                {saveErrorMessage ?? GENERIC_SAVE_ERROR}
               </span>
             )}
           </div>
-          {renderPublish && definition && <div>{renderPublish(definition, draftId)}</div>}
+          {/* R12 — publish lives in the header that ALREADY EXISTS (sketch 141-B, the
+              operator's correction). No net-new band: the reason travels through the
+              shipped `renderPublish` seam as a third argument so the mount does not move. */}
+          {renderPublish && definition && <div>{renderPublish(definition, draftId, blockedReason)}</div>}
         </div>
       </header>
 
@@ -682,6 +1073,13 @@ export function WorkflowBuilderPage({ renderPublish, initial, initialDescribe, a
           onChange={onPhaseChange}
           onPersist={onPersist}
           onClose={clearSelection}
+          // D-14 — SPREAD-CONDITIONAL, never `rails={canvasEnabled ? rails : undefined}`.
+          // With the flag off the prop must be genuinely ABSENT from the element, not
+          // present-and-undefined: this panel is ONE instance serving both the shipped
+          // Spine view and the flagged Canvas view, and "absent renders today's panel" is
+          // the mechanism that keeps a flag-off surface byte-identical for everyone
+          // including operators.
+          {...(canvasEnabled ? { rails } : {})}
         />
       </div>
     </div>

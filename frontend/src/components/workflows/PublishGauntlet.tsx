@@ -38,7 +38,7 @@
  * The run link gates strictly on `golden_run_id != null` (stage 3+ reached);
  * otherwise an explicit no-run note. Lint codes render the LOWERCASE literals.
  */
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useId, useRef, useState } from "react"
 import type { ComponentType, SVGProps } from "react"
 import { publishWorkflow, type PublishOutcome, type PublishVerdict } from "@/lib/api"
 // Phase 124-03 Task 2 (WUX-01, D-06, sketch 046-A ③) — the publish-summary soul
@@ -78,6 +78,28 @@ export interface PublishGauntletProps {
   definition?: DefShape | null
   /** Fired on a PASS so the parent (Plan 06) can auto-return to the Workflows page. */
   onPublished?: (version: number) => void
+  /**
+   * Phase 184-11 (R12, sketch 141-B) — WHY publish cannot be attempted yet, in the
+   * author's own words, or absent/null when it can.
+   *
+   * ABSENT ⇒ TODAY'S BEHAVIOUR, BYTE-FOR-BYTE. This component is rendered by every
+   * publish call site in the app, and only the flagged canvas Builder has a live
+   * structural verdict to hand it — so a missing prop must leave the trigger exactly as
+   * it shipped, enabled and unadorned. The 24 shipped assertions in
+   * `PublishGauntlet.test.tsx` render without it and are the guard on that.
+   *
+   * A NON-EMPTY STRING DISABLES THE TRIGGER **AND NAMES THE REASON**. Greying alone is
+   * not enough: a disabled control with no stated reason is the exit hidden, and R12 is
+   * explicit that the author must be told what to fix. The sentence is rendered visibly
+   * beside the control and tied to it with `aria-describedby`, so it reaches a screen
+   * reader too — a disabled button is skipped by some reading modes, and the reason is
+   * the part that matters.
+   *
+   * THE WORDING IS THE CALLER'S. This component neither derives it nor rewrites it: the
+   * page passes the server's own first message verbatim (or the plain invitation on an
+   * empty draft). There is no severity, code or lint table anywhere in this file.
+   */
+  blockedReason?: string | null
 }
 
 /**
@@ -672,8 +694,19 @@ function GauntletContent({
  * modal is `position:fixed`, it escapes the header's overflow/shrink-0 context
  * and never clips or crams into the layout.
  */
-export function PublishGauntlet({ definitionId, definition, onPublished }: PublishGauntletProps) {
+export function PublishGauntlet({
+  definitionId,
+  definition,
+  onPublished,
+  blockedReason,
+}: PublishGauntletProps) {
   const [open, setOpen] = useState(false)
+  // Phase 184-11 (R12): the reason's id, so `aria-describedby` can point at it. `useId`
+  // keeps two gauntlets on one page from colliding.
+  const blockedReasonId = useId()
+  // An empty string is NOT a reason, so it does not block — a caller that has nothing to
+  // say must not be able to disable the control by accident.
+  const blocked = typeof blockedReason === "string" && blockedReason.trim().length > 0
   // `loading` lives on the wrapper so close affordances (✕ / backdrop / Escape)
   // can be BLOCKED while a publish is in flight (the gauntlet runs synchronously).
   const [loading, setLoading] = useState(false)
@@ -727,15 +760,35 @@ export function PublishGauntlet({ definitionId, definition, onPublished }: Publi
 
   return (
     <>
-      {/* The resting trigger — compact, fits the Builder header's shrink-0 slot. */}
+      {/* The resting trigger — compact, fits the Builder header's shrink-0 slot.
+          Phase 184-11 (R12): while a reason is supplied it is DISABLED and the reason is
+          named right beside it — never greyed in silence. With no reason supplied both
+          the `disabled` and the `aria-describedby` attributes are absent, so the rendered
+          control is the one that shipped. */}
       <button
         type="button"
         data-testid="publish-trigger"
         onClick={() => setOpen(true)}
-        className="rounded-md bg-primary px-3 py-1.5 text-[13px] font-semibold text-primary-foreground hover:opacity-90"
+        disabled={blocked}
+        aria-describedby={blocked ? blockedReasonId : undefined}
+        // The blocked styling is APPENDED rather than expressed as `disabled:` variants,
+        // so the unblocked class string is the shipped one character for character.
+        className={
+          "rounded-md bg-primary px-3 py-1.5 text-[13px] font-semibold text-primary-foreground hover:opacity-90" +
+          (blocked ? " cursor-not-allowed opacity-50" : "")
+        }
       >
         ◆ Publish…
       </button>
+      {blocked && (
+        <span
+          id={blockedReasonId}
+          data-testid="publish-blocked-reason"
+          className="ml-2 text-[12px] leading-snug text-muted-foreground"
+        >
+          {blockedReason}
+        </span>
+      )}
 
       {open && (
         <div

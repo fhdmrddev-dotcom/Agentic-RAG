@@ -285,9 +285,31 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
     setPageView("builder")
   }, [])
 
+  /**
+   * Phase 184-11 (D-184-16 debt 1) — the unsaved-work leave guard's host half.
+   *
+   * THERE IS NO ROUTER HERE (the three-homes contract: navigation is a `useState`
+   * switch), so there is no route-change hook and no router blocker. The Builder knows
+   * whether its draft is dirty; this page owns the `← Workflows` breadcrumb. So the
+   * Builder REGISTERS a predicate and the breadcrumb asks it before switching view.
+   *
+   * A REF, not state: registering must not re-render this page, and the breadcrumb reads
+   * the latest predicate at click time rather than through a closure that could be stale.
+   * When no Builder is mounted — the fresh-build chooser, the describe door, the library
+   * itself — the ref is null and `backToLibrary` behaves exactly as it did before this
+   * plan.
+   */
+  const canLeaveBuilderRef = useRef<(() => boolean) | null>(null)
+  const registerCanLeave = useCallback((canLeave: (() => boolean) | null) => {
+    canLeaveBuilderRef.current = canLeave
+  }, [])
+
   // ── Back to the library: refresh both shelves so a newly-created/edited draft
   //    (or a tweaked fork) appears WITHOUT a manual browser refresh. ──
   const backToLibrary = useCallback(() => {
+    // The guard runs FIRST and its refusal is total: nothing is refetched, no view
+    // changes, and the author is left exactly where they were with their work intact.
+    if (canLeaveBuilderRef.current !== null && !canLeaveBuilderRef.current()) return
     setPageView("library")
     refetchDrafts().catch(console.error)
     refetchPublished().catch(console.error)
@@ -340,10 +362,17 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
                 ? ({ definition: builderInitial.definition, draftId: builderInitial.draftId } as BuilderInitial)
                 : undefined
             }
-            renderPublish={(_def, draftId) =>
+            // Phase 184-11 (D-184-16 debt 1): the Builder registers its unsaved-work
+            // predicate here; the breadcrumb above consults it.
+            registerCanLeave={registerCanLeave}
+            renderPublish={(_def, draftId, blockedReason) =>
               draftId ? (
                 <PublishGauntlet
                   definitionId={draftId}
+                  // Phase 184-11 (R12): the reason publish is blocked, straight from the
+                  // Builder's live verdict. `undefined` on every other call site, which is
+                  // what keeps their trigger byte-identical.
+                  blockedReason={blockedReason}
                   // Phase 124-03 Task 2 (WUX-01, D-06): thread the authored definition
                   // (already supplied by the Builder's renderPublish) into the prepended
                   // pub-scale soul block. Additive only — zero change to the publish flow.

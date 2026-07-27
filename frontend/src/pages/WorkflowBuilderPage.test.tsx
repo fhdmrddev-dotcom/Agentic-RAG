@@ -227,13 +227,32 @@ describe("WorkflowBuilderPage — OPEN existing (initial) boots into the editing
     expect(mockCreate).not.toHaveBeenCalled()
   })
 
-  it("Save draft shows a transient 'Saved ✓' confirmation on success", async () => {
+  /**
+   * Phase 184-11 (R6) — THE ONE FORCED ASSERTION EDIT OF THIS PLAN, recorded here as
+   * well as in the SUMMARY so a reader of the test does not have to go looking.
+   *
+   * The expected LITERAL moved from `Saved ✓` to `Saved · still a draft`, and nothing
+   * else did. The wording is operator-locked in 184-CONTEXT `<specifics>` — *"the save
+   * state says 'Saved · still a draft' — no word implying published, ever"* — because
+   * Phase 184 makes this header the place an author decides whether their work is safe,
+   * and a bare "Saved ✓" beside a `◆ Publish…` button is exactly the ambiguity the
+   * locked wording exists to remove. The assertion's PURPOSE is unchanged and still
+   * measured: an explicit save produces a transient, visible, honest confirmation.
+   *
+   * The alternatives were considered and rejected. `Saved ✓ · still a draft` would have
+   * kept this literal green as a substring (`toHaveTextContent` matches substrings) and
+   * would have shipped a wording nobody locked; asserting only the qualifier would have
+   * stopped pinning the confirmation itself.
+   */
+  it("Save draft shows a transient 'Saved · still a draft' confirmation on success", async () => {
     mockUpdate.mockResolvedValue({})
     const { default: userEvent } = await import("@testing-library/user-event")
     const user = userEvent.setup()
     render(<WorkflowBuilderPage initial={{ definition: draft3, draftId: "draft-77" }} />)
     await user.click(screen.getByTestId("builder-save-draft"))
-    expect(await screen.findByTestId("builder-save-confirm")).toHaveTextContent("Saved ✓")
+    expect(await screen.findByTestId("builder-save-confirm")).toHaveTextContent(
+      "Saved · still a draft",
+    )
   })
 
   it("Save draft shows an honest error state when the persist fails", async () => {

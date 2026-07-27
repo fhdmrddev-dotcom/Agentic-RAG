@@ -48,6 +48,9 @@ export interface WorkflowDoorSwitchProps {
   renderPublish?: (
     def: import("@/pages/WorkflowBuilderPage").BuilderDefinition,
     draftId: string | null,
+    /** Phase 184-11 (R12): the publish-blocking reason, or null. Passed straight
+     *  through — this shell neither derives it nor reads it. */
+    blockedReason?: string | null,
   ) => React.ReactNode
   /** The describe-CTA handler — the loose door forwards the describe text to the
    *  EXISTING draft/generate path (the shell adds no new sink; D-01/T-124-08). */
@@ -55,6 +58,12 @@ export interface WorkflowDoorSwitchProps {
   /** Which door to open initially (default "both"). Open/Tweak land in "govern"
    *  (the fork is the Studio authoring entry — D-01/D-05). */
   initialDoor?: DoorState
+  /** Phase 184-11 (D-184-16 debt 1) — the Builder's leave-guard registration seam,
+   *  passed straight through to the govern door's `WorkflowBuilderPage`. This shell
+   *  owns no dirty state and consults nothing; it is a wire, not a participant. While
+   *  the chooser or the describe door is showing, NO Builder is mounted and nothing is
+   *  registered, so the host's breadcrumb behaves exactly as it does today. */
+  registerCanLeave?: (canLeave: (() => boolean) | null) => void
 }
 
 export function WorkflowDoorSwitch({
@@ -63,6 +72,7 @@ export function WorkflowDoorSwitch({
   renderPublish,
   onDescribeDraft,
   initialDoor = "both",
+  registerCanLeave,
 }: WorkflowDoorSwitchProps) {
   const [door, setDoor] = useState<DoorState>(initialDoor)
   const [describe, setDescribe] = useState("")
@@ -122,6 +132,7 @@ export function WorkflowDoorSwitch({
             renderPublish={renderPublish}
             initialDescribe={describe}
             autoDraft={handoffDraft}
+            registerCanLeave={registerCanLeave}
           />
         </div>
       </div>

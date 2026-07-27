@@ -736,6 +736,17 @@ export function PhaseFormPanel({
           data-testid="phase-form-close"
           aria-label="Close step details"
           onClick={onClose}
+          // Phase 184-11 (WR-09-02 / D-184-16 debt 2) — SUPPRESS THE FOCUS TRANSFER.
+          // A press on this button moves focus off whatever field was focused, the field
+          // fires `onBlur`, and `onBlur` is the panel's persist seam — so until this line
+          // the ✕ silently PATCHed a version while Escape and a pane click did not. The
+          // three dismissal paths looked interchangeable and were not. Preventing the
+          // mousedown default keeps focus where it is, so no dismissal writes, on any
+          // path, in a real browser as well as under a test driver. Nothing is lost: every
+          // field is CONTROLLED, so the typed value reached the definition on the
+          // keystroke, and the page flushes the coalescing undo entry as it releases.
+          // Keyboard activation never fires `mousedown`, so Enter/Space are untouched.
+          onMouseDown={(event) => event.preventDefault()}
           className="ml-1.5 inline-grid h-5 w-5 shrink-0 place-items-center rounded text-[11px] text-muted-foreground hover:bg-accent/40 hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
         >
           <span aria-hidden="true">✕</span>
