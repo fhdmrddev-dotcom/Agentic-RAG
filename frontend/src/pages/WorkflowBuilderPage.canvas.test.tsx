@@ -56,12 +56,22 @@ const { mockGenerate, mockCreate, mockUpdate, mockListFolders, mockListSkills } 
   mockListFolders: vi.fn(),
   mockListSkills: vi.fn(),
 }))
+// Phase 184-11: the page now composes two MORE api seams — the live validation loop
+// (`useLiveValidation`) and the CANVAS-04 palette (`useGroundingBundle`). A whole-module
+// factory mock must enumerate every symbol the render path reaches or the hook calls
+// `undefined`, so these two are ADDED to the same factory. No assertion below moves.
+const { mockValidate, mockBundle } = vi.hoisted(() => ({
+  mockValidate: vi.fn(),
+  mockBundle: vi.fn(),
+}))
 vi.mock("@/lib/api", () => ({
   generateWorkflow: mockGenerate,
   createWorkflowDraft: mockCreate,
   updateWorkflowDraft: mockUpdate,
   listFolders: mockListFolders,
   listSkills: mockListSkills,
+  validateWorkflow: mockValidate,
+  getGroundingBundle: mockBundle,
 }))
 
 // The component SOURCE via Vite's ?raw loader — the idiomatic way to make a scope
@@ -88,6 +98,11 @@ beforeEach(() => {
   vi.clearAllMocks()
   mockListFolders.mockResolvedValue([])
   mockListSkills.mockResolvedValue([])
+  // Phase 184-11 defaults: a complete, empty palette and a clean verdict. Neither is
+  // REACHED by any assertion above — the loop stays silent until the first edit
+  // (D-184-15) — but a factory-mocked module must still hand back a thenable.
+  mockBundle.mockResolvedValue({ tools: [], folders: [], skills: [], degraded: [] })
+  mockValidate.mockResolvedValue({ ok: true, verdicts: [] })
   // The ⌥ reveal persists; a leaked value would change the node titles under us.
   window.localStorage.clear()
 })
@@ -436,5 +451,177 @@ describe("WorkflowBuilderPage canvas door — source guards", () => {
     expect(builderSource).toMatch(
       /const WorkflowCanvas = lazy\(\(\) => import\("@\/components\/workflows\/WorkflowCanvas"\)/,
     )
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════════════
+// Phase 184-11 Task 1 — the composed session: R3, D-184-15 and D-14
+//
+// APPENDED, never interleaved. Everything above this line is the 183 canvas door and
+// its 22 assertions, all of which pass unmodified; the only edits this plan made to the
+// file above are two ADDED mock symbols and their two default resolutions, because a
+// whole-module factory mock has to enumerate what the render path reaches.
+// ══════════════════════════════════════════════════════════════════════════════════
+
+const FLAG_ON = { features: { visual_workflow_canvas: true }, loading: false } as const
+const FLAG_OFF = { features: {}, loading: false } as const
+
+/**
+ * The R3 walk, in the shape `canvasModel.purity.test.ts` shipped it.
+ *
+ * It is COPIED rather than imported, and that is deliberate: importing another test
+ * module would register its ~79 `it(...)` blocks into this file as well, doubling the
+ * per-file counts `scripts/vitest-count-gate.cjs` exists to pin. A copy plus a POSITIVE
+ * CONTROL (below) is the honest way to reuse a walk across suites — the control is what
+ * makes "zero forbidden keys" evidence instead of a typo.
+ */
+const FORBIDDEN_DEFINITION_KEYS = ["position", "x", "y", "layout"]
+const forbiddenKeysIn = (value: unknown, found: string[] = []): string[] => {
+  if (Array.isArray(value)) {
+    for (const item of value) forbiddenKeysIn(item, found)
+  } else if (value && typeof value === "object") {
+    for (const [k, v] of Object.entries(value)) {
+      if (FORBIDDEN_DEFINITION_KEYS.includes(k)) found.push(k)
+      forbiddenKeysIn(v, found)
+    }
+  }
+  return found
+}
+
+describe("WorkflowBuilderPage 184-11 — no positional key can reach a draft payload (R3)", () => {
+  it("the serialized create AND patch bodies carry zero position / x / y / layout keys", async () => {
+    mockCreate.mockResolvedValue({ id: "created-1", version: 1 })
+    mockUpdate.mockResolvedValue({})
+    renderBuilder(FLAG_ON)
+    await screen.findByTestId("builder-view-toggle")
+
+    // An edit, then two saves: the first PATCHes the pre-seeded row, and a second one
+    // proves the body shape holds across repeats rather than only on the first write.
+    fireEvent.click(screen.getByTestId("spine-node-research"))
+    const field = await screen.findByLabelText(/instructions/i)
+    fireEvent.change(field, { target: { value: "a nudged, reordered, still-flat draft" } })
+    fireEvent.click(screen.getByTestId("builder-save-draft"))
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1))
+    fireEvent.click(screen.getByTestId("builder-save-draft"))
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(2))
+
+    const bodies = [
+      ...mockCreate.mock.calls.map((c) => c[0]),
+      ...mockUpdate.mock.calls.map((c) => c[1]),
+    ]
+    expect(bodies.length).toBeGreaterThan(0)
+    for (const body of bodies) expect(forbiddenKeysIn(body)).toEqual([])
+  })
+
+  it("POSITIVE CONTROL — the walk really does find a planted positional key", () => {
+    const planted = { phases: [{ slug: "a", config: { phase_type: "llm_single" }, position: { x: 1, y: 2 } }] }
+    expect(forbiddenKeysIn(planted).sort()).toEqual(["position", "x", "y"])
+  })
+})
+
+describe("WorkflowBuilderPage 184-11 — nothing validates before the first edit (D-184-15)", () => {
+  it("mounting a draft calls validateWorkflow ZERO times and renders no verdict mark", async () => {
+    renderBuilder(FLAG_ON)
+    await screen.findByTestId("builder-view-toggle")
+    fireEvent.click(screen.getByTestId("builder-view-canvas"))
+    await waitFor(() => expect(screen.getByTestId("canvas-node-research")).toBeInTheDocument(), LAZY)
+
+    // Long enough to clear the loop's own 500 ms debounce — an assertion taken before it
+    // would be green on a loop that simply had not fired YET.
+    await new Promise((resolve) => setTimeout(resolve, 700))
+    expect(mockValidate).toHaveBeenCalledTimes(0)
+    expect(screen.queryAllByTestId("phase-node-verdict")).toHaveLength(0)
+  })
+
+  it("the FIRST edit starts the loop — one call, after the debounce", async () => {
+    renderBuilder(FLAG_ON)
+    await screen.findByTestId("builder-view-toggle")
+
+    fireEvent.click(screen.getByTestId("spine-node-research"))
+    const field = await screen.findByLabelText(/instructions/i)
+    fireEvent.change(field, { target: { value: "search the vendor corpus" } })
+
+    await waitFor(() => expect(mockValidate).toHaveBeenCalledTimes(1), { timeout: 3000 })
+  })
+})
+
+describe("WorkflowBuilderPage 184-11 — with the flag OFF the panel receives NO rails key (D-14)", () => {
+  /** Reach the panel's OUTGOING props by wrapping one export of the mocked module and
+   *  rendering the real component — the 184-10 idiom, so every other assertion in this
+   *  file still runs against a genuinely-rendered tree. */
+  async function railsPropOf(features: { features: EffectiveFeatures; loading: boolean }) {
+    vi.resetModules()
+    const seen: Array<Record<string, unknown>> = []
+    vi.doMock("@/components/workflows/PhaseFormPanel", async () => {
+      const actual = await vi.importActual<typeof import("@/components/workflows/PhaseFormPanel")>(
+        "@/components/workflows/PhaseFormPanel",
+      )
+      return {
+        ...actual,
+        PhaseFormPanel: (props: Record<string, unknown>) => {
+          seen.push(props)
+          return actual.PhaseFormPanel(props as never)
+        },
+      }
+    })
+    const { WorkflowBuilderPage: Page } = await import("./WorkflowBuilderPage")
+    // The provider MUST come from the same post-reset module graph as the page. Importing
+    // it from this file's top-level binding hands the page a DIFFERENT React context
+    // object, `useEffectiveFeaturesOptional()` reads null, and both assertions below then
+    // pass for the wrong reason — the flag-off one vacuously, the positive control not at
+    // all. That is exactly how the control earned its place: it caught this on the first
+    // run rather than letting a green guard ship.
+    const { EffectiveFeaturesProvider: Provider } = await import(
+      "@/providers/EffectiveFeaturesProvider"
+    )
+    render(
+      <Provider value={{ ...features, refetch: vi.fn() }}>
+        <div style={{ width: 1200, height: 800 }}>
+          <Page initial={{ definition, draftId: "draft-1" }} />
+        </div>
+      </Provider>,
+    )
+    await waitFor(() => expect(seen.length).toBeGreaterThan(0))
+    vi.doUnmock("@/components/workflows/PhaseFormPanel")
+    return seen[seen.length - 1]
+  }
+
+  it("the rails prop is ABSENT — not present-and-undefined — on the flag-off path", async () => {
+    const props = await railsPropOf(FLAG_OFF)
+    // `in` distinguishes the two: a spread-conditional omits the key entirely, while
+    // `rails={cond ? r : undefined}` would leave it present with an undefined value.
+    expect("rails" in props).toBe(false)
+    expect(Object.keys(props)).not.toContain("rails")
+  })
+
+  it("POSITIVE CONTROL — with the flag ON the very same read finds the key", async () => {
+    const props = await railsPropOf(FLAG_ON)
+    expect("rails" in props).toBe(true)
+    expect(props.rails).toMatchObject({ order: { total: definition.phases.length } })
+  })
+
+  it("no editing affordance is anywhere in the flag-off DOM", async () => {
+    const { container } = renderBuilder(FLAG_OFF)
+    await waitFor(() => expect(screen.getByTestId("builder-grid")).toBeInTheDocument())
+    expect(container.querySelector("[data-rail]")).toBeNull()
+    expect(screen.queryByTestId("canvas-announcer")).toBeNull()
+    expect(screen.queryByTestId("publish-blocked-reason")).toBeNull()
+    expect(container.querySelector(".react-flow")).toBeNull()
+  })
+})
+
+describe("WorkflowBuilderPage 184-11 — the page source fences hold with the loop composed", () => {
+  it("still names no browser storage, no aria-pressed, no v11 package and no authored grounding field", () => {
+    // The nudge's storage lives in `canvasNudge.ts` and the page only calls its two
+    // functions; Phase 185's authored field is not invented here.
+    expect(builderSource).not.toMatch(/localStorage/)
+    expect(builderSource).not.toMatch(/sessionStorage/)
+    expect(builderSource).not.toMatch(/aria-pressed/)
+    expect(builderSource).not.toMatch(/reactflow/)
+    expect(builderSource).not.toMatch(/grounding_mode/)
+  })
+
+  it("passes rails SPREAD-CONDITIONALLY so the flag-off prop is absent by construction", () => {
+    expect(builderSource).toMatch(/canvasEnabled \? \{ rails \}/)
   })
 })
