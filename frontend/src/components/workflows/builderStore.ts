@@ -127,13 +127,28 @@ export type BuilderPhase = "empty" | "composing" | "drafted" | "error"
 /** The explicit-save affordance's transient feedback state. */
 export type SaveState = "idle" | "saving" | "saved" | "error"
 
+/**
+ * The working definition MINUS its phases.
+ *
+ * Spelled as a key-remapped mapped type rather than `Omit<BuilderDefinition, "phases">`:
+ * `BuilderDefinition` carries an index signature, and `Omit` collapses such a type to
+ * `{}` (its `Exclude<keyof T, "phases">` cannot subtract a literal from `string`), which
+ * would silently lose `slug` / `project_folder_id` and every other declared field. The
+ * remap subtracts the literal key while keeping both the declared fields and the index
+ * signature, so the shape is DECLARED in exactly one place — `WorkflowBuilderPage`'s
+ * `BuilderDefinition` — and a second hand-copied field list cannot drift from it.
+ */
+export type DefinitionMeta = {
+  [K in keyof BuilderDefinition as K extends "phases" ? never : K]: BuilderDefinition[K]
+}
+
 export interface BuilderStoreState extends TrackedSlice {
   /**
    * The working definition MINUS `phases` — slug, version, business_requirement,
    * project_folder_id and whatever else the row carries. Untracked: an undo restores
    * steps, never the workflow's identity.
    */
-  meta: Omit<BuilderDefinition, "phases">
+  meta: DefinitionMeta
   /** empty → composing → drafted | error. Untracked (a document transition, not an edit). */
   builderPhase: BuilderPhase
   /** The honest generate-failure message. Untracked. */
@@ -200,8 +215,14 @@ export type BuilderStore = StoreApi<BuilderStoreState> & {
  * The outgoing JSON key ORDER may differ from the loaded row's (spread order, not
  * insertion order). That is deliberate and not observable: the backend is Pydantic and
  * order-insensitive, and R3's guard asserts on the key SET, never on key order.
+ *
+ * The parameter is narrowed to the two halves it actually reads rather than the whole
+ * state, so a React caller can hand it exactly the two selector values it already has
+ * (`selectDefinition({ meta, phases })`) instead of reaching for `getState()` in a
+ * rendered value — while a full `BuilderStoreState` still satisfies it structurally for
+ * the side-effect callers.
  */
-export function selectDefinition(state: BuilderStoreState): BuilderDefinition {
+export function selectDefinition(state: Pick<BuilderStoreState, "meta" | "phases">): BuilderDefinition {
   return { ...state.meta, phases: state.phases }
 }
 
@@ -252,7 +273,7 @@ export function createBuilderStore(initial: BuilderDefinition | null): BuilderSt
         editSeq: 0,
 
         // ── untracked ──
-        meta: initialMeta as Omit<BuilderDefinition, "phases">,
+        meta: initialMeta as DefinitionMeta,
         builderPhase: (initial ? "drafted" : "empty") as BuilderPhase,
         errorMessage: null,
         errorDetail: null,
@@ -268,7 +289,7 @@ export function createBuilderStore(initial: BuilderDefinition | null): BuilderSt
           suppressDirty = true
           set({
             phases,
-            meta: meta as Omit<BuilderDefinition, "phases">,
+            meta: meta as DefinitionMeta,
             builderPhase: "drafted",
             errorMessage: null,
             errorDetail: null,

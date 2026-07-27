@@ -70,12 +70,34 @@
  * landmark element, because this file's own suite greps the source for them and a
  * guard that only passes by making a comment lie is a broken guard — the fifth
  * instance of that trap in this phase, logged as D-ITEM-183-02.)
+ *
+ * ── Phase 184-04 (D-184-01 / D-184-05) — where the definition lives now ────────
+ *
+ * THIS PAGE NO LONGER OWNS THE WORKING DEFINITION. It lived here, in a
+ * `useState` union, from Phase 103 until Wave 0 of Phase 184. It now lives in ONE
+ * per-mount `zustand` + `zundo` temporal store (`builderStore.ts`), created once
+ * per Builder mount and carried to the subtree by `BuilderStoreProvider`. The
+ * reason is undo: `PhaseFormPanel` is shared by BOTH views, so a config edit made
+ * from the Spine flows through the same `onChange`, and a canvas-scoped store
+ * would leave those edits outside the history. The undo/redo AFFORDANCES stay
+ * canvas-only and flag-gated; the HISTORY is complete.
+ *
+ * WHAT DELIBERATELY DID NOT MOVE (D-184-05): persistence. `draftIdRef`,
+ * `creatingRef`, `onPersist` and `onSaveDraft` are unchanged and stay on this
+ * page, because Phase 186 rewrites exactly that seam for autosave — extracting it
+ * now would be churn against a seam about to move. Selection (`selectedSlug`, the
+ * Escape release) also stays here: it is the D-183-05 one-selection contract, not
+ * definition state. This was a STATE-HOME refactor, gated on every shipped
+ * assertion passing unmodified (D-184-08).
  */
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useStore } from "zustand"
 import { generateWorkflow, createWorkflowDraft, updateWorkflowDraft, listFolders, listSkills } from "@/lib/api"
 import { PhaseSpineGraph } from "@/components/workflows/PhaseSpineGraph"
 import type { PhaseSpecJSON } from "@/components/workflows/phaseVocabulary"
 import { PhaseFormPanel, type PhaseConfigPatch, type IdNameMap } from "@/components/workflows/PhaseFormPanel"
+import { createBuilderStore, selectDefinition } from "@/components/workflows/builderStore"
+import { BuilderStoreProvider } from "@/components/workflows/BuilderStoreProvider"
 import { useEffectiveFeaturesOptional } from "@/providers/EffectiveFeaturesProvider"
 import { cn } from "@/lib/utils"
 
@@ -103,12 +125,6 @@ export interface BuilderInitial {
   definition: BuilderDefinition
   draftId: string
 }
-
-type BuilderState =
-  | { phase: "empty" }
-  | { phase: "composing" }
-  | { phase: "drafted"; definition: BuilderDefinition }
-  | { phase: "error"; message: string; detail?: string }
 
 export interface WorkflowBuilderPageProps {
   /** Optional Plan-05 publish-gauntlet seam — the page composes it when present
@@ -145,12 +161,21 @@ export interface WorkflowBuilderPageProps {
 
 export function WorkflowBuilderPage({ renderPublish, initial, initialDescribe, autoDraft }: WorkflowBuilderPageProps) {
   const [describe, setDescribe] = useState(initialDescribe ?? "")
-  // OPEN/TWEAK: when `initial` is provided, boot straight into the drafted editing
-  // view on the loaded definition (the describe/composing screen is skipped). A
-  // fresh build (no `initial`) starts "empty" exactly as before.
-  const [state, setState] = useState<BuilderState>(
-    initial ? { phase: "drafted", definition: initial.definition } : { phase: "empty" },
-  )
+  // Phase 184-04 (D-184-01): the definition's home. Created LAZILY so the factory
+  // runs exactly once per mount, and never at module scope — a singleton would carry
+  // one workflow's undo history into the next workflow opened in the same tab.
+  // OPEN/TWEAK: when `initial` is provided the store boots straight into the drafted
+  // editing view on the loaded definition (the describe/composing screen is skipped);
+  // a fresh build (no `initial`) starts "empty" exactly as before.
+  const [store] = useState(() => createBuilderStore(initial ? initial.definition : null))
+  // Read through SELECTORS, never `getState()` in a rendered value — the shipped
+  // `usePanelReconcile.ts:58-60` discipline. Side-effect reads inside callbacks may
+  // use `getState()`, because those are not rendered values.
+  const builderPhase = useStore(store, (s) => s.builderPhase)
+  const phases = useStore(store, (s) => s.phases)
+  const meta = useStore(store, (s) => s.meta)
+  const errorMessage = useStore(store, (s) => s.errorMessage)
+  const errorDetail = useStore(store, (s) => s.errorDetail)
   const [selectedSlug, setSelectedSlug] = useState<string | null>(null)
   // Phase 183-07 (D-183-02): which graph the column shows. SESSION state only — it
   // cold-starts on "spine" on every mount and is persisted nowhere.
@@ -184,7 +209,7 @@ export function WorkflowBuilderPage({ renderPublish, initial, initialDescribe, a
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle")
   const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const canDraft = describe.trim().length > 0 && state.phase !== "composing"
+  const canDraft = describe.trim().length > 0 && builderPhase !== "composing"
   const panelOpen = selectedSlug !== null
 
   // Phase 183-07 (D-183-03) — the three-part fail-closed gate. The OPTIONAL accessor
@@ -230,13 +255,18 @@ export function WorkflowBuilderPage({ renderPublish, initial, initialDescribe, a
     return () => window.removeEventListener("keydown", onKeyDown)
   }, [panelOpen, clearSelection])
 
-  // The current working definition (drafted state only).
-  const definition = state.phase === "drafted" ? state.definition : null
+  // The current working definition (drafted state only). `selectDefinition` is the ONE
+  // place the store's two halves recombine into a definition — fed here from the two
+  // SELECTOR values, never from `getState()`, because this one IS a rendered value.
+  const definition = useMemo<BuilderDefinition | null>(
+    () => (builderPhase === "drafted" ? selectDefinition({ meta, phases }) : null),
+    [builderPhase, meta, phases],
+  )
 
   const selectedPhase = useMemo<PhaseSpecJSON | null>(() => {
-    if (!definition || selectedSlug === null) return null
-    return definition.phases.find((p) => p.slug === selectedSlug) ?? null
-  }, [definition, selectedSlug])
+    if (builderPhase !== "drafted" || selectedSlug === null) return null
+    return phases.find((p) => p.slug === selectedSlug) ?? null
+  }, [builderPhase, phases, selectedSlug])
 
   // Phase 103-ux: fetch folders + skills ONCE on mount → id→name maps for the form
   // panel + the project picker. Best-effort; a failure leaves the maps empty (the
@@ -273,14 +303,14 @@ export function WorkflowBuilderPage({ renderPublish, initial, initialDescribe, a
   // or the definition's own project_folder_id if the AI bound one).
   const boundFolderName = useMemo<string | null>(() => {
     const id =
-      (state.phase === "drafted" ? state.definition.project_folder_id : null) || projectFolderId || null
+      (builderPhase === "drafted" ? meta.project_folder_id : null) || projectFolderId || null
     return id ? (folderNames[id] ?? null) : null
-  }, [state, projectFolderId, folderNames])
+  }, [builderPhase, meta, projectFolderId, folderNames])
 
   const onDraft = useCallback(async () => {
     const text = describe.trim()
     if (text.length === 0) return
-    setState({ phase: "composing" })
+    store.getState().setComposing()
     setSelectedSlug(null)
     setDraftId(null)
     draftIdRef.current = null
@@ -294,24 +324,23 @@ export function WorkflowBuilderPage({ renderPublish, initial, initialDescribe, a
       })
       if (result.ok) {
         // SINGLE STATE TRANSITION: commit the complete definition + "drafted" in
-        // ONE setState. The graph renders whole, in one DOM batch (no timed reveal).
+        // ONE store set. The graph renders whole, in one DOM batch (no timed reveal).
         // Stamp the chosen project_folder_id onto the definition if the generator
         // didn't already bind one (so the draft + later publish carry the binding).
         const def = result.definition as unknown as BuilderDefinition
         if (projectFolderId && !def.project_folder_id) def.project_folder_id = projectFolderId
-        setState({ phase: "drafted", definition: def })
+        store.getState().setDrafted(def)
       } else {
         // ok:false is an HONEST failure — never a renderable broken draft.
-        setState({ phase: "error", message: result.error, detail: result.detail })
+        store.getState().setErrorState(result.error, result.detail)
       }
     } catch (e) {
-      setState({
-        phase: "error",
-        message: "Couldn't generate the workflow.",
-        detail: e instanceof Error ? e.message : undefined,
-      })
+      store.getState().setErrorState(
+        "Couldn't generate the workflow.",
+        e instanceof Error ? e.message : undefined,
+      )
     }
-  }, [describe, projectFolderId])
+  }, [describe, projectFolderId, store])
 
   // Phase 124 CR-01 fix: when handed off from the loose "Describe & run" door's
   // "Draft the workflow" CTA (autoDraft), run the EXISTING generate→draft flow ONCE
@@ -323,25 +352,23 @@ export function WorkflowBuilderPage({ renderPublish, initial, initialDescribe, a
       autoDraft &&
       !autoDraftFiredRef.current &&
       (initialDescribe ?? "").trim().length > 0 &&
-      state.phase === "empty"
+      builderPhase === "empty"
     ) {
       autoDraftFiredRef.current = true
       void onDraft()
     }
-  }, [autoDraft, initialDescribe, state.phase, onDraft])
+  }, [autoDraft, initialDescribe, builderPhase, onDraft])
 
-  // Merge a phase-form patch into the selected phase's config (immutable).
+  // Merge a phase-form patch into the selected phase's config. The immutable merge
+  // itself now lives in `definitionOps.patchPhaseConfig`, reached through the store's
+  // `patchConfig` action — D-184-05 leaves exactly ONE mutation home, shared by both
+  // views, so this page no longer declares its own copy of it.
   const onPhaseChange = useCallback(
     (patch: PhaseConfigPatch) => {
-      setState((prev) => {
-        if (prev.phase !== "drafted" || selectedSlug === null) return prev
-        const phases = prev.definition.phases.map((p) =>
-          p.slug === selectedSlug ? { ...p, config: { ...p.config, ...patch } } : p,
-        )
-        return { phase: "drafted", definition: { ...prev.definition, phases } }
-      })
+      if (selectedSlug === null) return
+      store.getState().patchConfig(selectedSlug, patch)
     },
-    [selectedSlug],
+    [selectedSlug, store],
   )
 
   // Persist the working draft. First save → createWorkflowDraft (then keep the id);
@@ -350,9 +377,15 @@ export function WorkflowBuilderPage({ renderPublish, initial, initialDescribe, a
   // Returns true on a confirmed write so the explicit Save button can show "Saved ✓"
   // (and false / throw so it can show an honest error). The implicit on-blur
   // autosave still calls this and ignores the result (belt-and-suspenders).
+  //
+  // Phase 184-04 (D-184-05): the create-once-then-PATCH guard below is UNCHANGED.
+  // The only edit is where the definition comes from — a side-effect `getState()`
+  // read of the store instead of a closure over component state, which is what
+  // keeps this callback referentially stable across every edit.
   const onPersist = useCallback(async (): Promise<boolean> => {
-    if (state.phase !== "drafted") return false
-    const def = state.definition as unknown as Record<string, unknown>
+    const snapshot = store.getState()
+    if (snapshot.builderPhase !== "drafted") return false
+    const def = selectDefinition(snapshot) as unknown as Record<string, unknown>
     if (draftIdRef.current === null) {
       // First save: create EXACTLY ONCE. If a create is already in flight,
       // skip — re-running it would collide on UNIQUE(slug, version) → 500.
@@ -369,7 +402,7 @@ export function WorkflowBuilderPage({ renderPublish, initial, initialDescribe, a
       await updateWorkflowDraft(draftIdRef.current, def)
     }
     return true
-  }, [state])
+  }, [store])
 
   // Phase 103-ux SAVE button: an EXPLICIT, obvious save with visible feedback.
   // Drives the persist path (create-once-then-PATCH) and surfaces "Saved ✓" on
@@ -401,8 +434,9 @@ export function WorkflowBuilderPage({ renderPublish, initial, initialDescribe, a
   }, [])
 
   // ── EMPTY: just the describe box — a 3-second read, nothing else. ──
-  if (state.phase === "empty" || state.phase === "composing" || state.phase === "error") {
+  if (builderPhase === "empty" || builderPhase === "composing" || builderPhase === "error") {
     return (
+      <BuilderStoreProvider store={store}>
       <div className="flex h-full flex-col items-center justify-center bg-background px-6 py-8">
         <div className="flex w-full max-w-[640px] flex-col gap-4">
           <div className="flex flex-col items-center gap-2 text-center">
@@ -420,7 +454,7 @@ export function WorkflowBuilderPage({ renderPublish, initial, initialDescribe, a
             onChange={(e) => setDescribe(e.target.value)}
             placeholder="Describe the goal in plain language…"
             rows={5}
-            disabled={state.phase === "composing"}
+            disabled={builderPhase === "composing"}
             className="w-full resize-none rounded-lg border border-border bg-card px-4 py-4 text-[15px] leading-relaxed text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
           />
 
@@ -435,7 +469,7 @@ export function WorkflowBuilderPage({ renderPublish, initial, initialDescribe, a
                 aria-label="Which knowledge base should this use?"
                 value={projectFolderId}
                 onChange={(e) => setProjectFolderId(e.target.value)}
-                disabled={state.phase === "composing"}
+                disabled={builderPhase === "composing"}
                 className="w-full rounded-lg border border-border bg-card px-3 py-2.5 text-[14px] text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
               >
                 <option value="">No specific knowledge base</option>
@@ -455,7 +489,7 @@ export function WorkflowBuilderPage({ renderPublish, initial, initialDescribe, a
               onClick={onDraft}
               className="rounded-md bg-primary px-5 py-2 text-[14px] font-medium text-primary-foreground transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
             >
-              {state.phase === "composing" ? "Composing…" : "Draft the workflow"}
+              {builderPhase === "composing" ? "Composing…" : "Draft the workflow"}
             </button>
 
             <p data-testid="describe-hint" className="text-center text-[13px] text-muted-foreground">
@@ -466,14 +500,14 @@ export function WorkflowBuilderPage({ renderPublish, initial, initialDescribe, a
           </div>
 
           {/* HONEST FAILURE — never a renderable broken draft (T-103-04-01). */}
-          {state.phase === "error" && (
+          {builderPhase === "error" && (
             <div
               data-testid="generate-error"
               role="alert"
               className="rounded-md border border-destructive/40 bg-destructive/5 px-4 py-3 text-[13px] text-foreground"
             >
-              <p className="font-medium">Couldn't generate — {state.message}</p>
-              {state.detail && <p className="mt-1 text-[12px] text-muted-foreground">{state.detail}</p>}
+              <p className="font-medium">Couldn't generate — {errorMessage}</p>
+              {errorDetail && <p className="mt-1 text-[12px] text-muted-foreground">{errorDetail}</p>}
               <p className="mt-1 text-[12px] text-muted-foreground">
                 Nothing was saved. Adjust your description and try again.
               </p>
@@ -481,6 +515,7 @@ export function WorkflowBuilderPage({ renderPublish, initial, initialDescribe, a
           )}
         </div>
       </div>
+      </BuilderStoreProvider>
     )
   }
 
@@ -503,7 +538,7 @@ export function WorkflowBuilderPage({ renderPublish, initial, initialDescribe, a
         }
       >
         <WorkflowCanvas
-          phases={state.definition.phases}
+          phases={phases}
           selectedSlug={selectedSlug}
           onSelectNode={handleSelectNode}
           onClearSelection={clearSelection}
@@ -511,7 +546,7 @@ export function WorkflowBuilderPage({ renderPublish, initial, initialDescribe, a
       </Suspense>
     ) : (
       <PhaseSpineGraph
-        phases={state.definition.phases}
+        phases={phases}
         selectedSlug={selectedSlug}
         onSelectNode={handleSelectNode}
       />
@@ -575,11 +610,12 @@ export function WorkflowBuilderPage({ renderPublish, initial, initialDescribe, a
   )
 
   return (
+    <BuilderStoreProvider store={store}>
     <div className="flex h-full flex-col bg-background">
       <header className="flex items-center justify-between border-b border-border px-4 py-2.5">
         <div className="flex min-w-0 items-center gap-2">
           <span className="min-w-0 truncate text-[14px] font-semibold text-foreground">
-            {state.definition.slug ?? "Untitled workflow"}
+            {meta.slug ?? "Untitled workflow"}
           </span>
           <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
             draft
@@ -627,7 +663,7 @@ export function WorkflowBuilderPage({ renderPublish, initial, initialDescribe, a
               </span>
             )}
           </div>
-          {renderPublish && <div>{renderPublish(state.definition, draftId)}</div>}
+          {renderPublish && definition && <div>{renderPublish(definition, draftId)}</div>}
         </div>
       </header>
 
@@ -649,6 +685,7 @@ export function WorkflowBuilderPage({ renderPublish, initial, initialDescribe, a
         />
       </div>
     </div>
+    </BuilderStoreProvider>
   )
 }
 
