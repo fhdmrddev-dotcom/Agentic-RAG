@@ -1223,3 +1223,134 @@ describe("WorkflowBuilderPage 184-13 — the undo/redo keys (D-184-04)", () => {
     // is exactly what the two lines above measure.
   })
 })
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Plan 184-13 — R12's OTHER half: no net-new header band, and the bottom region is
+// somewhere else entirely.
+//
+// Appended; nothing above this line was edited.
+//
+// WHY HERE AND NOT IN `WorkflowCanvas.composition.test.tsx`. "No net-new band" is a
+// statement about the PAGE's chrome — the header the Builder already had, and where the
+// bottom region did NOT land. `WorkflowCanvas` cannot see either. The composition suite
+// owns the region's own structure; this owns the page's. Same where-the-behaviour-lives
+// split 184-12 recorded as its Deviation 3.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe("WorkflowBuilderPage 184-13 — R12: the bottom region adds no band to the page", () => {
+  const FLAG_ON_R12 = { features: { visual_workflow_canvas: true }, loading: false }
+
+  function renderR12() {
+    return render(
+      <EffectiveFeaturesProvider value={{ ...FLAG_ON_R12, refetch: vi.fn() }}>
+        <div style={{ width: 900, height: 700 }}>
+          <WorkflowBuilderPage
+            initial={{ definition: { ...definition, phases: evalCoverage }, draftId: "draft-1" }}
+            renderPublish={() => <button data-testid="publish-trigger-r12">Publish</button>}
+          />
+        </div>
+      </EffectiveFeaturesProvider>,
+    )
+  }
+
+  async function openCanvas() {
+    renderR12()
+    await screen.findByTestId("builder-view-toggle")
+    fireEvent.click(screen.getByTestId("builder-view-canvas"))
+    await waitFor(() => expect(screen.getByTestId("canvas-bottom-region")).toBeInTheDocument(), LAZY)
+  }
+
+  it("the page still has exactly ONE banner, with the same TWO direct children it shipped with", async () => {
+    await openCanvas()
+
+    // The pre-plan baseline: one `<header>`, and inside it exactly two groups — the
+    // identity cluster on the left and the save/publish cluster on the right. A net-new
+    // band would show up either as a second banner or as a third child here.
+    const banners = screen.getAllByRole("banner")
+    expect(banners).toHaveLength(1)
+    expect(banners[0].children).toHaveLength(2)
+
+    // Publish is INSIDE it — 141-B's operator correction, still true with the bottom
+    // region mounted.
+    expect(banners[0].contains(screen.getByTestId("publish-trigger-r12"))).toBe(true)
+    expect(banners[0].contains(screen.getByTestId("builder-save-state"))).toBe(true)
+  })
+
+  it("the bottom region lives on the CANVAS, not in the header", async () => {
+    await openCanvas()
+
+    const region = screen.getByTestId("canvas-bottom-region")
+    expect(region.closest("header")).toBeNull()
+    // POSITIVE CONTROL — `closest("header")` really does resolve on this page, so the
+    // null above is a real absence rather than a query that finds nothing anywhere.
+    expect(screen.getByTestId("builder-save-state").closest("header")).not.toBeNull()
+
+    // …and it is inside the canvas section, which is where editing happens (141-B).
+    expect(region.closest('section[aria-label="Workflow canvas"]')).not.toBeNull()
+  })
+
+  it("switching back to the Spine takes the whole region with it", async () => {
+    await openCanvas()
+
+    fireEvent.click(screen.getByTestId("builder-view-spine"))
+    await waitFor(() => expect(screen.queryByTestId("canvas-bottom-region")).toBeNull())
+    expect(screen.queryByTestId("canvas-toolbar")).toBeNull()
+    expect(screen.queryByTestId("problems-tray")).toBeNull()
+    // The header is untouched by the swap.
+    expect(screen.getAllByRole("banner")).toHaveLength(1)
+    expect(screen.getByTestId("builder-save-state")).toBeInTheDocument()
+  })
+
+  it("a tray row jumps to that step — the panel opens on it", async () => {
+    mockValidate.mockResolvedValue({
+      ok: false,
+      verdicts: [
+        {
+          code: "missing_instructions",
+          phase: "deep_dive",
+          message: "This step still needs instructions.",
+          severity: "incomplete",
+        },
+      ],
+    })
+    await openCanvas()
+
+    // D-184-15: nothing is checked until the author edits. Make one.
+    fireEvent.click(screen.getByTestId("canvas-remove-confirm"))
+    await waitFor(
+      () => expect(screen.getByTestId("problems-tray-counts").textContent).toContain("1 thing"),
+      { timeout: 5000 },
+    )
+
+    fireEvent.click(screen.getByTestId("problems-tray-summary"))
+    fireEvent.click(await screen.findByTestId("problems-tray-row-deep_dive-0"))
+
+    await waitFor(() =>
+      expect(screen.getByLabelText("Refine step: deep_dive")).toBeInTheDocument(),
+    )
+  })
+
+  it("the toolbar's save reading follows the page's own save state", async () => {
+    mockUpdate.mockResolvedValue({})
+    await openCanvas()
+
+    // A clean, untouched draft says nothing at all — there is no true sentence about a
+    // save that has not happened.
+    expect(screen.queryByTestId("canvas-toolbar-save-chip")).toBeNull()
+
+    fireEvent.click(screen.getByTestId("canvas-remove-confirm"))
+    await waitFor(() =>
+      expect(screen.getByTestId("canvas-toolbar-save-chip").textContent).toBe("Not saved yet"),
+    )
+
+    fireEvent.click(screen.getByTestId("canvas-toolbar-save"))
+    await waitFor(() =>
+      expect(screen.getByTestId("canvas-toolbar-save-chip").textContent).toBe(
+        "Saved · still a draft",
+      ),
+    )
+    // ONE save path, two entry points: the toolbar's trigger and the header's shipped one
+    // both call `onSaveDraft`, so the row was PATCHed exactly once.
+    expect(mockUpdate).toHaveBeenCalledTimes(1)
+  })
+})

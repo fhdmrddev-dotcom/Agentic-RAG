@@ -4,21 +4,23 @@
  *
  * THE SHELL. It mounts `canvasModel.toCanvas`'s projection inside `@xyflow/react`.
  *
- * ⚠ WHAT PLANS 184-10 AND 184-12 CHANGED, stated first so this docblock cannot drift
- * (the D-ITEM-183-02 trap). Until 184-10 this file was the READ-ONLY shell and its
+ * ⚠ WHAT PLANS 184-10, 184-12 AND 184-13 CHANGED, stated first so this docblock cannot
+ * drift (the D-ITEM-183-02 trap). Until 184-10 this file was the READ-ONLY shell and its
  * whole job beyond mounting the projection was to make read-only TRUE rather than
  * assumed. It now has TWO modes, and `editable` is the switch. `editable={false}` —
  * the default, and what every shipped read-only caller passes — renders exactly the
  * surface described below, unchanged, down to the empty state.
  *
- * `editable` flips FOUR things, and the count is written out because it used to be one
- * and a stale "exactly one" here would be the lie this phase keeps catching:
+ * `editable` flips FIVE things, and the count is written out because it used to be one,
+ * then four, and a stale count here would be the lie this phase keeps catching:
  *   1. per-node `draggable`, on phase nodes only (184-10);
  *   2. the `＋` / `✕` plane layer and the step-type menu it opens (184-12);
  *   3. the structural-notice region — the delete message with its inline Undo, and
  *      R10a's refusal (184-12);
  *   4. the empty draft's named "Add your first step" invitation, in place of the
- *      read-only "No steps yet" state (184-12).
+ *      read-only "No steps yet" state (184-12);
+ *   5. the ONE bottom-edge region — the toolbar row and the problems-tray row — which
+ *      additionally requires the caller to supply a `session` (184-13, see R12 below).
  * Everything in the read-only opt-out block stays off in BOTH modes.
  *
  * ── D-184-12 — DELETE IS IMMEDIATE, AND THE REFUSAL IS NOT A CONFIRM ──────────────
@@ -189,12 +191,19 @@ import {
   type CanvasEdge,
   type CanvasNode,
 } from "@/components/workflows/canvasModel"
+import { CanvasToolbar, type ToolbarSaveState } from "@/components/workflows/CanvasToolbar"
 import { resolveDrop, type PhaseTypeId } from "@/components/workflows/definitionOps"
 import type { VerdictMarkKind } from "@/components/workflows/nodePresentation"
 import { EndCapNode, PhaseNode, UnresolvedSkipNode } from "@/components/workflows/PhaseNode"
 import type { PhaseSpecJSON } from "@/components/workflows/phaseVocabulary"
+import { ProblemsTray } from "@/components/workflows/ProblemsTray"
 import { StepTypePicker } from "@/components/workflows/StepTypePicker"
+import type { VerdictGroups } from "@/components/workflows/verdictModel"
 import { useTechnicalNamesOptional } from "@/providers/TechnicalNamesProvider"
+// Type-only: the live loop owns the degraded-cause union and this file declares no
+// second spelling of it, so a rename there is a typecheck error here rather than a
+// branch that quietly stops matching. Erased at build — no runtime edge to the hook.
+import type { DegradedValidationCause } from "@/hooks/useLiveValidation"
 
 /**
  * MODULE SCOPE, never inside the component (Pattern 4). Declared in the render body
@@ -327,6 +336,49 @@ const REVEAL_ON_HOVER =
 export type CanvasNotice =
   | { kind: "action"; lead: string; subject: string; detail: string; onUndo?: () => void }
   | { kind: "refusal"; text: string }
+
+/**
+ * 184-13 / R12 — EVERYTHING THE ONE BOTTOM REGION NEEDS, as a single optional prop.
+ *
+ * It is one object rather than nine loose props for a structural reason, not a tidiness
+ * one: the region is *"one region, TWO rows maximum"*, and both rows are always present
+ * together or not at all. A shape where each row appeared independently could render a
+ * region with one row, or three, and R12 would then be a thing tests check rather than a
+ * thing the type system makes true.
+ *
+ * ABSENT is the shipped read-only/unit-test surface. `WorkflowCanvas.test.tsx` (31) and
+ * `WorkflowCanvas.editing.test.tsx` (49) render this component with no
+ * `BuilderStoreProvider` above it, and `CanvasToolbar` legitimately THROWS outside one —
+ * so the region must be genuinely absent there rather than half-rendered. The page is the
+ * one caller that supplies it, and the page is the one place a store exists.
+ *
+ * EVERY FIELD IS THE CALLER'S ANSWER, NEVER THIS FILE'S OPINION. The verdict groups are
+ * the server's, grouped by the pure module; `degraded` and `checking` are the live loop's;
+ * the save reading is the page's persistence state. This canvas still derives no severity
+ * and opens no request.
+ */
+export interface CanvasSession {
+  /** What the toolbar may say about the save right now (R6). */
+  saveState: ToolbarSaveState
+  /** The caller's failure sentence for `saveState: "error"`, or null. */
+  saveErrorMessage?: string | null
+  /** The explicit save. There is no autosave in this phase. */
+  onSaveDraft: () => void
+  /** Clear this draft's cosmetic nudges — the current workflow's key ONLY. */
+  onTidyUp: () => void
+  /** The server's findings, grouped by `verdictModel`. Nothing is classified here. */
+  groups: VerdictGroups
+  /** Why the last check produced no verdict, or null when it answered. */
+  degraded: DegradedValidationCause | null
+  /** A check is in flight: the tray dims its rows, it never clears them. */
+  checking: boolean
+  /** The tray's disclosure state — owned by the CALLER, which is what makes
+   *  "it never auto-opens on a new error" true by construction (184-08). */
+  trayOpen: boolean
+  onToggleTray: () => void
+  /** A tray row was activated: take the author to that step. */
+  onJumpToStep: (slug: string) => void
+}
 
 /** The flow x of insertion boundary `index`: 0 = before the first card, `lanes.length`
  *  = after the last one, anything between = the midpoint of that connector. */
@@ -552,8 +604,9 @@ export interface WorkflowCanvasProps {
   /**
    * The editing switch. `false` (the default) renders the pre-184 read-only canvas
    * exactly: no per-node drag, no keyboard reorder, no editing copy in the header, no
-   * `＋` / `✕` layer, no notice region, and the shipped "No steps yet" empty state. The
-   * page passes the canvas feature flag, so a flag-off surface is byte-identical.
+   * `＋` / `✕` layer, no notice region, no bottom-edge region (even when a `session` is
+   * supplied), and the shipped "No steps yet" empty state. The page passes the canvas
+   * feature flag, so a flag-off surface is byte-identical.
    *
    * It is OPTIONAL rather than required on purpose: the shipped page and the shipped
    * 31-assertion suite both render this component without it, and making it required
@@ -613,6 +666,15 @@ export interface WorkflowCanvasProps {
    * where the act took place. `null` at rest.
    */
   notice?: CanvasNotice | null
+
+  // ── 184-13, the session half. Optional and inert while `editable` is false. ──
+
+  /**
+   * The ONE bottom-edge region's contents — the toolbar row and the problems-tray row.
+   * Absent (the shipped read-only callers and both existing canvas suites) means no
+   * region at all. See `CanvasSession`.
+   */
+  session?: CanvasSession
 }
 
 export function WorkflowCanvas({
@@ -628,6 +690,7 @@ export function WorkflowCanvas({
   onInsertAt,
   onRequestRemove,
   notice,
+  session,
 }: WorkflowCanvasProps) {
   // The app-wide reveal, READ (never owned) here. Null outside a provider.
   const technicalNames = useTechnicalNamesOptional()
@@ -1021,6 +1084,56 @@ export function WorkflowCanvas({
       )
     ) : null
 
+  /**
+   * R12 — ONE BOTTOM-EDGE REGION, TWO ROWS MAXIMUM. This is the whole rule.
+   *
+   * THE COMPOSITION RISK THIS RESOLVES. Sketch 141-B put the editing controls on the
+   * canvas; sketch 139-A put the problems tray at the bottom. Built naively that is TWO
+   * bottom bands stacked on each other, on a column that at 900px already has a 400px
+   * panel beside 248px cards. The recorded fix is this: fold the tray's SUMMARY LINE into
+   * the same bottom edge and let the tray expand upward from it. Publish stays in the page
+   * header it already had (141-B's operator correction), so this plan adds no band at all.
+   *
+   * WHY THE REGION IS `flex-col-reverse`. Source order is [toolbar, tray] — row 1 and row
+   * 2 as the plan numbers them — but the REVERSED main axis puts the toolbar at the very
+   * bottom, where the hands are, with the tray's summary line directly above it and the
+   * tray's list expanding upward from there. That is what makes "expands upward" and "does
+   * not push the toolbar" both literally true: opening the tray grows the region upward
+   * into the canvas and the toolbar does not move.
+   *
+   * TWO ROWS, ALWAYS, AND STRUCTURALLY. The region has exactly two direct children, open
+   * or closed, because both rows come from ONE optional prop object (`session`) — there is
+   * no state in which one row exists without the other, and none in which a third appears.
+   *
+   * IT DOES NOT AUTO-OPEN. `trayOpen` belongs to the caller (184-08), so a new `error`
+   * arriving mid-build updates the summary line and nothing else. A tray that springs open
+   * while a person is placing a step fights the person using it.
+   */
+  const bottomRegion =
+    editable && session ? (
+      <div
+        data-testid="canvas-bottom-region"
+        className="flex flex-col-reverse"
+        aria-label="Canvas controls and problems"
+      >
+        <CanvasToolbar
+          saveState={session.saveState}
+          errorMessage={session.saveErrorMessage}
+          onSave={session.onSaveDraft}
+          onTidyUp={session.onTidyUp}
+        />
+        <ProblemsTray
+          groups={session.groups}
+          phases={phases}
+          degraded={session.degraded}
+          checking={session.checking}
+          open={session.trayOpen}
+          onToggle={session.onToggleTray}
+          onJumpToStep={session.onJumpToStep}
+        />
+      </div>
+    ) : null
+
   // D-183-11 — EARLY RETURN. Nothing below this line mounts on an empty definition.
   if (nodes.length === 0) {
     return (
@@ -1165,6 +1278,12 @@ export function WorkflowCanvas({
           ) : null}
         </ReactFlow>
       </div>
+      {/* R12 — the ONE bottom-edge region: the toolbar row and the problems-tray row,
+          in that source order, reversed so the toolbar owns the actual bottom edge.
+          Deliberately NOT rendered on the empty draft above: U-1's first screen is an
+          invitation, and a save state plus a problems tray on a workflow with no steps
+          is chrome about nothing (D-184-15 — the server has not been asked either). */}
+      {bottomRegion}
     </section>
   )
 }

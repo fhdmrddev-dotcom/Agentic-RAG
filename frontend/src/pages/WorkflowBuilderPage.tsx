@@ -163,13 +163,13 @@ import { cn } from "@/lib/utils"
 import { useLiveValidation } from "@/hooks/useLiveValidation"
 import { useGroundingBundle } from "@/hooks/useGroundingBundle"
 import { DEGRADED_SENTENCE, groupVerdicts } from "@/components/workflows/verdictModel"
-import { readNudges, writeNudge } from "@/components/workflows/canvasNudge"
+import { clearNudges, readNudges, writeNudge } from "@/components/workflows/canvasNudge"
 import { canRemovePhase, renumber, type PhaseTypeId } from "@/components/workflows/definitionOps"
 import type { CanvasNode } from "@/components/workflows/canvasModel"
 // TYPE-ONLY, and that is load-bearing: `WorkflowCanvas` is `React.lazy` so the chunk is
 // never requested with the flag off, and a value import of anything from that module
 // here would pull it into the main bundle and undo D-183-03's whole point.
-import type { CanvasNotice } from "@/components/workflows/WorkflowCanvas"
+import type { CanvasNotice, CanvasSession } from "@/components/workflows/WorkflowCanvas"
 import type { WorkflowDefinitionJSON } from "@/lib/api"
 
 /** The read-only canvas, code-split behind the toggle (see the docblock). The module
@@ -1006,6 +1006,81 @@ export function WorkflowBuilderPage({
 
   const dirty = useStore(store, (s) => s.dirty)
 
+  // ── Phase 184-13: the one bottom region's contents ─────────────────────────────
+
+  /**
+   * The problems tray's disclosure state. It lives HERE, not inside the tray, which is
+   * what makes *"it never auto-opens on a new error"* true by construction rather than by
+   * an effect somebody carefully did not write (184-08). Nothing in this file opens it
+   * either: the only writer is the summary line the author presses.
+   */
+  const [trayOpen, setTrayOpen] = useState(false)
+  const toggleTray = useCallback(() => setTrayOpen((open) => !open), [])
+
+  /** A tray row was activated — anchor the panel on that step. Selection only; this is
+   *  the D-183-05 contract's one callback, not a second way to open the panel. */
+  const jumpToStep = useCallback((slug: string) => setSelectedSlug(slug), [])
+
+  /** "Tidy up" — the CURRENT workflow's nudge key only, never the whole namespace. The
+   *  arrangement is browser-local (D-184-02), so this writes nothing to the server and
+   *  pushes no undo entry; the re-read goes through the same invalidation counter a nudge
+   *  write uses. */
+  const onTidyUp = useCallback(() => {
+    clearNudges(draftId)
+    setNudgeVersion((v) => v + 1)
+  }, [draftId])
+
+  const checking = useStore(store, (s) => s.checking)
+  const storeDegraded = useStore(store, (s) => s.degraded)
+
+  /**
+   * The toolbar's five-state reading, joined HERE from the two states that actually carry
+   * it: the page's transient `saveState` (the explicit save's own feedback) and the
+   * store's `dirty` (which an undo re-arms, D-184-03). The toolbar renders one union
+   * rather than combining a boolean and an enum itself.
+   *
+   * `idle` therefore means "clean, and nothing has been saved this second" — and the
+   * toolbar deliberately says nothing at all in that state.
+   */
+  const toolbarSaveState = saveState === "idle" && dirty ? "dirty" : saveState
+
+  /**
+   * The bottom region's whole payload, or `undefined` when the canvas flag is off — in
+   * which case the canvas is never rendered anyway, and the prop's absence keeps that
+   * fact stated rather than assumed (D-14 / D-181-01).
+   */
+  const canvasSession = useMemo<CanvasSession | undefined>(() => {
+    if (!canvasEnabled) return undefined
+    return {
+      saveState: toolbarSaveState,
+      saveErrorMessage: saveState === "error" ? (saveErrorMessage ?? GENERIC_SAVE_ERROR) : null,
+      onSaveDraft: () => void onSaveDraft(),
+      onTidyUp,
+      groups: verdictGroups,
+      // The store's cause is the persisted mirror; the tray's vocabulary is the loop's.
+      // One translation, in the one place that has both (`"422"` is the unreadable shape,
+      // `"network"` is the one worth retrying).
+      degraded: storeDegraded === null ? null : storeDegraded.kind === "422" ? "unreadable" : "unreachable",
+      checking,
+      trayOpen,
+      onToggleTray: toggleTray,
+      onJumpToStep: jumpToStep,
+    }
+  }, [
+    canvasEnabled,
+    toolbarSaveState,
+    saveState,
+    saveErrorMessage,
+    onSaveDraft,
+    onTidyUp,
+    verdictGroups,
+    storeDegraded,
+    checking,
+    trayOpen,
+    toggleTray,
+    jumpToStep,
+  ])
+
   /**
    * The in-app half. `WorkflowsPage` owns the `← Workflows` breadcrumb and this page
    * owns the dirty state, and there is no router between them — so the Builder hands the
@@ -1164,6 +1239,10 @@ export function WorkflowBuilderPage({
           onInsertAt={onInsertAt}
           onRequestRemove={onRequestRemove}
           notice={canvasNotice}
+          // Phase 184-13 — R12's ONE bottom region. Everything both rows render arrives
+          // in this single object: the toolbar's save reading, the tray's server-derived
+          // findings, and the three callbacks. The canvas composes; it derives nothing.
+          session={canvasSession}
         />
       </Suspense>
     ) : (
