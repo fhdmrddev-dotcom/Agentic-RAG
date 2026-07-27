@@ -1,16 +1,1566 @@
 {
   "_provenance": {
-    "dumped_at": "2026-07-27T06:01:44+00:00",
+    "dumped_at": "2026-07-27T13:53:15+00:00",
     "source": "postgresql://postgres:postgres@127.0.0.1:54322/postgres · public.workflow_definitions",
     "query": "SELECT id::text, slug, version, status, definition->'phases' AS phases FROM public.workflow_definitions ORDER BY slug, version",
-    "row_count": 0,
-    "note": "EMPTY BY HONESTY, NOT BY FACT. The local database was unreachable when this artifact was written, so NO shapes were read and none were invented. An empty definitions array here means 'not dumped', never 'the corpus is empty'. The hand-rolled shapeGenerator.ts carries the real coverage, so the round-trip property is meaningful without this file. Regenerate before phase verification: start the local stack, then run scripts/dump-workflow-corpus.py with the backend venv interpreter. Reason recorded in _provenance.unreachable_reason.",
-    "rows_with_zero_phases": 0,
+    "row_count": 108,
+    "note": "PHASES ONLY, key-preserving redaction: every key is kept, every free-text string value is replaced with a single U+2026, and every identifier-shaped value is replaced with a stable synthetic one. No prompt bodies, no folder or skill identifiers, no tenant, owner or authoring-account columns — none of those are selected at all. Enum-ish values the projection reads (phase type, citation and integrity policy, emitter, merge strategy, validator kind and timing, the on_failure disposition) are kept verbatim, and phase slugs are aliased through a per-row map so duplicates stay duplicated and a resolvable branch stays resolvable. Regenerate with scripts/dump-workflow-corpus.py. NEVER read live at test time — the round-trip suite imports this file.",
+    "rows_with_zero_phases": 84,
     "rows_with_duplicate_slugs": 0,
     "rows_with_index_gaps": 0,
-    "max_phase_count": 0,
-    "skip_to_phase_uses": 0,
-    "unreachable_reason": "OperationalError: connection to server at \"127.0.0.1\", port 54322 failed: Connection refused (0x0000274D/10061)\n\tIs the server running on that host and accepting TCP/IP connections?"
+    "max_phase_count": 5,
+    "skip_to_phase_uses": 0
   },
-  "definitions": []
+  "definitions": [
+    {
+      "id": "00000000-0000-4000-8000-000000000001",
+      "slug": "wf-001",
+      "version": 1,
+      "status": "published",
+      "phases": [
+        {
+          "slug": "step-1",
+          "config": {
+            "prompt": "…",
+            "phase_type": "llm_agent",
+            "available_tools": [
+              "…"
+            ]
+          },
+          "validators": [],
+          "phase_index": 0
+        },
+        {
+          "slug": "step-2",
+          "config": {
+            "prompt": "…",
+            "emitter": "render_template",
+            "phase_type": "llm_emit",
+            "citation_policy": "strict",
+            "integrity_policy": "strict"
+          },
+          "validators": [
+            {
+              "kind": "citations_required",
+              "config": {
+                "mode": "…"
+              },
+              "on_failure": "fail_run"
+            },
+            {
+              "kind": "output_file_valid",
+              "config": {},
+              "on_failure": "fail_run"
+            }
+          ],
+          "phase_index": 1
+        }
+      ]
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000002",
+      "slug": "wf-002",
+      "version": 1,
+      "status": "draft",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000003",
+      "slug": "wf-003",
+      "version": 1,
+      "status": "draft",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000004",
+      "slug": "wf-004",
+      "version": 1,
+      "status": "draft",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000005",
+      "slug": "wf-005",
+      "version": 1,
+      "status": "draft",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000006",
+      "slug": "wf-006",
+      "version": 1,
+      "status": "draft",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000007",
+      "slug": "wf-007",
+      "version": 1,
+      "status": "draft",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000008",
+      "slug": "wf-008",
+      "version": 1,
+      "status": "draft",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000009",
+      "slug": "wf-009",
+      "version": 1,
+      "status": "draft",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000010",
+      "slug": "wf-010",
+      "version": 1,
+      "status": "draft",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000011",
+      "slug": "wf-011",
+      "version": 1,
+      "status": "draft",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000012",
+      "slug": "wf-012",
+      "version": 1,
+      "status": "draft",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000013",
+      "slug": "wf-013",
+      "version": 1,
+      "status": "draft",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000014",
+      "slug": "wf-014",
+      "version": 1,
+      "status": "draft",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000015",
+      "slug": "wf-015",
+      "version": 1,
+      "status": "draft",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000016",
+      "slug": "wf-016",
+      "version": 1,
+      "status": "published",
+      "phases": [
+        {
+          "slug": "step-1",
+          "config": {
+            "prompt": "…",
+            "phase_type": "llm_agent",
+            "available_tools": [
+              "…"
+            ]
+          },
+          "validators": [],
+          "phase_index": 0
+        },
+        {
+          "slug": "step-2",
+          "config": {
+            "prompt": "…",
+            "options": [
+              "…",
+              "…"
+            ],
+            "phase_type": "llm_human_input"
+          },
+          "validators": [],
+          "phase_index": 1
+        },
+        {
+          "slug": "step-3",
+          "config": {
+            "prompt": "…",
+            "phase_type": "llm_single"
+          },
+          "validators": [],
+          "phase_index": 2
+        }
+      ]
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000017",
+      "slug": "wf-016",
+      "version": 2,
+      "status": "draft",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000018",
+      "slug": "wf-017",
+      "version": 1,
+      "status": "published",
+      "phases": [
+        {
+          "slug": "step-1",
+          "config": {
+            "prompt": "…",
+            "phase_type": "llm_agent",
+            "available_tools": [
+              "…"
+            ]
+          },
+          "validators": [],
+          "phase_index": 0
+        },
+        {
+          "slug": "step-2",
+          "config": {
+            "prompt": "…",
+            "options": [
+              "…",
+              "…"
+            ],
+            "phase_type": "llm_human_input"
+          },
+          "validators": [],
+          "phase_index": 1
+        },
+        {
+          "slug": "step-3",
+          "config": {
+            "prompt": "…",
+            "phase_type": "llm_single"
+          },
+          "validators": [],
+          "phase_index": 2
+        }
+      ]
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000019",
+      "slug": "wf-017",
+      "version": 2,
+      "status": "draft",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000021",
+      "slug": "wf-018",
+      "version": 1,
+      "status": "published",
+      "phases": [
+        {
+          "slug": "step-1",
+          "config": {
+            "prompt": "…",
+            "phase_type": "llm_agent",
+            "folder_scope": [
+              "00000000-0000-4000-8000-000000000020"
+            ],
+            "available_tools": [
+              "…"
+            ]
+          },
+          "validators": [],
+          "phase_index": 0
+        },
+        {
+          "slug": "step-2",
+          "config": {
+            "model": null,
+            "prompt": "…",
+            "emitter": "render_template",
+            "phase_type": "llm_emit"
+          },
+          "validators": [],
+          "phase_index": 1
+        }
+      ]
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000022",
+      "slug": "wf-018",
+      "version": 2,
+      "status": "draft",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000023",
+      "slug": "wf-019",
+      "version": 1,
+      "status": "published",
+      "phases": [
+        {
+          "slug": "step-1",
+          "config": {
+            "fn": "…",
+            "input_keys": [
+              "…",
+              "…"
+            ],
+            "phase_type": "programmatic"
+          },
+          "validators": [],
+          "phase_index": 0
+        },
+        {
+          "slug": "step-2",
+          "config": {
+            "prompt": "…",
+            "phase_type": "llm_batch_agents",
+            "merge_strategy": "concat_numbered",
+            "available_tools": [
+              "…"
+            ],
+            "max_parallel_agents": 5
+          },
+          "validators": [],
+          "phase_index": 1
+        },
+        {
+          "slug": "step-3",
+          "config": {
+            "prompt": "…",
+            "phase_type": "llm_agent",
+            "available_tools": [
+              "…",
+              "…"
+            ]
+          },
+          "validators": [],
+          "phase_index": 2
+        },
+        {
+          "slug": "step-4",
+          "config": {
+            "prompt": "…",
+            "options": [
+              "…",
+              "…"
+            ],
+            "phase_type": "llm_human_input"
+          },
+          "validators": [],
+          "phase_index": 3
+        },
+        {
+          "slug": "step-5",
+          "config": {
+            "prompt": "…",
+            "phase_type": "llm_single"
+          },
+          "validators": [],
+          "phase_index": 4
+        }
+      ]
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000024",
+      "slug": "wf-019",
+      "version": 2,
+      "status": "draft",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000025",
+      "slug": "wf-020",
+      "version": 1,
+      "status": "published",
+      "phases": [
+        {
+          "slug": "step-1",
+          "config": {
+            "prompt": "…",
+            "phase_type": "llm_agent",
+            "folder_scope": [
+              "00000000-0000-4000-8000-000000000020"
+            ],
+            "available_tools": [
+              "…"
+            ]
+          },
+          "validators": [
+            {
+              "kind": "freshness",
+              "config": {
+                "max_age_days": 2,
+                "check_versions": false
+              },
+              "timing": "pre",
+              "on_failure": "ask_user",
+              "max_retries": 2
+            }
+          ],
+          "phase_index": 0
+        }
+      ]
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000026",
+      "slug": "wf-020",
+      "version": 2,
+      "status": "draft",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000027",
+      "slug": "wf-021",
+      "version": 1,
+      "status": "published",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000028",
+      "slug": "wf-021",
+      "version": 2,
+      "status": "draft",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000029",
+      "slug": "wf-022",
+      "version": 1,
+      "status": "draft",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000030",
+      "slug": "wf-023",
+      "version": 1,
+      "status": "published",
+      "phases": [
+        {
+          "slug": "step-1",
+          "config": {
+            "fn": "…",
+            "input_keys": [
+              "…",
+              "…"
+            ],
+            "phase_type": "programmatic"
+          },
+          "validators": [],
+          "phase_index": 0
+        },
+        {
+          "slug": "step-2",
+          "config": {
+            "prompt": "…",
+            "phase_type": "llm_batch_agents",
+            "merge_strategy": "concat_numbered",
+            "available_tools": [
+              "…"
+            ],
+            "max_parallel_agents": 5
+          },
+          "validators": [],
+          "phase_index": 1
+        },
+        {
+          "slug": "step-3",
+          "config": {
+            "prompt": "…",
+            "phase_type": "llm_single"
+          },
+          "validators": [],
+          "phase_index": 2
+        }
+      ]
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000031",
+      "slug": "wf-024",
+      "version": 1,
+      "status": "draft",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000032",
+      "slug": "wf-025",
+      "version": 1,
+      "status": "draft",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000033",
+      "slug": "wf-026",
+      "version": 1,
+      "status": "draft",
+      "phases": [
+        {
+          "slug": "step-1",
+          "config": {
+            "model": "…",
+            "prompt": "…",
+            "max_steps": 12,
+            "phase_type": "llm_agent",
+            "folder_scope": [
+              "00000000-0000-4000-8000-000000000020"
+            ],
+            "available_tools": [
+              "…"
+            ]
+          },
+          "validators": [],
+          "phase_index": 0
+        },
+        {
+          "slug": "step-2",
+          "config": {
+            "model": "…",
+            "prompt": "…",
+            "phase_type": "llm_single"
+          },
+          "validators": [
+            {
+              "kind": "llm_judge_rubric",
+              "config": {
+                "criteria": "…"
+              },
+              "timing": "post",
+              "on_failure": "fail_run",
+              "max_retries": 0
+            }
+          ],
+          "phase_index": 1
+        }
+      ]
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000034",
+      "slug": "wf-027",
+      "version": 1,
+      "status": "draft",
+      "phases": [
+        {
+          "slug": "step-1",
+          "config": {
+            "model": "…",
+            "prompt": "…",
+            "max_steps": 12,
+            "phase_type": "llm_agent",
+            "folder_scope": [
+              "00000000-0000-4000-8000-000000000020"
+            ],
+            "available_tools": [
+              "…"
+            ]
+          },
+          "validators": [],
+          "phase_index": 0
+        },
+        {
+          "slug": "step-2",
+          "config": {
+            "model": "…",
+            "prompt": "…",
+            "phase_type": "llm_single"
+          },
+          "validators": [],
+          "phase_index": 1
+        }
+      ]
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000035",
+      "slug": "wf-028",
+      "version": 1,
+      "status": "published",
+      "phases": [
+        {
+          "slug": "step-1",
+          "config": {
+            "model": "…",
+            "prompt": "…",
+            "max_steps": 12,
+            "phase_type": "llm_agent",
+            "folder_scope": [
+              "00000000-0000-4000-8000-000000000020"
+            ],
+            "available_tools": [
+              "…"
+            ]
+          },
+          "validators": [],
+          "phase_index": 0
+        },
+        {
+          "slug": "step-2",
+          "config": {
+            "model": "…",
+            "prompt": "…",
+            "phase_type": "llm_single"
+          },
+          "validators": [
+            {
+              "kind": "llm_judge_rubric",
+              "config": {
+                "criteria": "…"
+              },
+              "timing": "post",
+              "on_failure": "fail_run",
+              "max_retries": 0
+            }
+          ],
+          "phase_index": 1
+        }
+      ]
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000036",
+      "slug": "wf-028",
+      "version": 2,
+      "status": "draft",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000037",
+      "slug": "wf-029",
+      "version": 1,
+      "status": "published",
+      "phases": [
+        {
+          "slug": "step-1",
+          "config": {
+            "model": "…",
+            "prompt": "…",
+            "max_steps": 12,
+            "phase_type": "llm_agent",
+            "folder_scope": [
+              "00000000-0000-4000-8000-000000000020"
+            ],
+            "available_tools": [
+              "…"
+            ]
+          },
+          "validators": [],
+          "phase_index": 0
+        },
+        {
+          "slug": "step-2",
+          "config": {
+            "model": "…",
+            "prompt": "…",
+            "phase_type": "llm_single"
+          },
+          "validators": [
+            {
+              "kind": "llm_judge_rubric",
+              "config": {
+                "criteria": "…"
+              },
+              "timing": "post",
+              "on_failure": "fail_run",
+              "max_retries": 2
+            }
+          ],
+          "phase_index": 1
+        }
+      ]
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000038",
+      "slug": "wf-029",
+      "version": 2,
+      "status": "draft",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000039",
+      "slug": "wf-030",
+      "version": 1,
+      "status": "draft",
+      "phases": [
+        {
+          "slug": "step-1",
+          "config": {
+            "model": "…",
+            "prompt": "…",
+            "max_steps": 12,
+            "phase_type": "llm_agent",
+            "folder_scope": [
+              "00000000-0000-4000-8000-000000000020"
+            ],
+            "available_tools": [
+              "…"
+            ]
+          },
+          "validators": [],
+          "phase_index": 0
+        },
+        {
+          "slug": "step-2",
+          "config": {
+            "model": "…",
+            "prompt": "…",
+            "phase_type": "llm_single"
+          },
+          "validators": [
+            {
+              "kind": "llm_judge_rubric",
+              "config": {
+                "criteria": "…"
+              },
+              "timing": "post",
+              "on_failure": "fail_run",
+              "max_retries": 0
+            }
+          ],
+          "phase_index": 1
+        }
+      ]
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000040",
+      "slug": "wf-031",
+      "version": 1,
+      "status": "published",
+      "phases": [
+        {
+          "slug": "step-1",
+          "config": {
+            "model": "…",
+            "prompt": "…",
+            "max_steps": 12,
+            "phase_type": "llm_agent",
+            "folder_scope": [
+              "00000000-0000-4000-8000-000000000020"
+            ],
+            "available_tools": [
+              "…"
+            ]
+          },
+          "validators": [],
+          "phase_index": 0
+        },
+        {
+          "slug": "step-2",
+          "config": {
+            "model": "…",
+            "prompt": "…",
+            "phase_type": "llm_single"
+          },
+          "validators": [
+            {
+              "kind": "llm_judge_rubric",
+              "config": {
+                "criteria": "…"
+              },
+              "timing": "post",
+              "on_failure": "fail_run",
+              "max_retries": 2
+            }
+          ],
+          "phase_index": 1
+        }
+      ]
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000041",
+      "slug": "wf-031",
+      "version": 2,
+      "status": "published",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000042",
+      "slug": "wf-031",
+      "version": 3,
+      "status": "draft",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000043",
+      "slug": "wf-032",
+      "version": 1,
+      "status": "draft",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000044",
+      "slug": "wf-033",
+      "version": 1,
+      "status": "published",
+      "phases": [
+        {
+          "slug": "step-1",
+          "config": {
+            "prompt": "…",
+            "phase_type": "llm_agent",
+            "available_tools": [
+              "…",
+              "…"
+            ]
+          },
+          "validators": [],
+          "phase_index": 0
+        }
+      ]
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000045",
+      "slug": "wf-033",
+      "version": 2,
+      "status": "draft",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000046",
+      "slug": "wf-034",
+      "version": 1,
+      "status": "published",
+      "phases": [
+        {
+          "slug": "step-1",
+          "config": {
+            "prompt": "…",
+            "phase_type": "llm_agent",
+            "folder_scope": [
+              "00000000-0000-4000-8000-000000000020"
+            ],
+            "available_tools": [
+              "…"
+            ]
+          },
+          "validators": [],
+          "phase_index": 0
+        },
+        {
+          "slug": "step-2",
+          "config": {
+            "model": null,
+            "prompt": "…",
+            "emitter": "render_template",
+            "phase_type": "llm_emit"
+          },
+          "validators": [],
+          "phase_index": 1
+        }
+      ]
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000047",
+      "slug": "wf-034",
+      "version": 2,
+      "status": "draft",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000048",
+      "slug": "wf-035",
+      "version": 1,
+      "status": "published",
+      "phases": [
+        {
+          "slug": "step-1",
+          "config": {
+            "prompt": "…",
+            "phase_type": "llm_single"
+          },
+          "validators": [],
+          "phase_index": 0
+        },
+        {
+          "slug": "step-2",
+          "config": {
+            "prompt": "…",
+            "phase_type": "llm_agent",
+            "available_tools": [
+              "…",
+              "…"
+            ]
+          },
+          "validators": [],
+          "phase_index": 1
+        },
+        {
+          "slug": "step-3",
+          "config": {
+            "prompt": "…",
+            "phase_type": "llm_single"
+          },
+          "validators": [],
+          "phase_index": 2
+        }
+      ]
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000050",
+      "slug": "wf-036",
+      "version": 1,
+      "status": "published",
+      "phases": [
+        {
+          "slug": "step-1",
+          "config": {
+            "prompt": "…",
+            "phase_type": "llm_agent",
+            "folder_scope": [
+              "00000000-0000-4000-8000-000000000049"
+            ],
+            "available_tools": [
+              "…"
+            ]
+          },
+          "validators": [],
+          "phase_index": 0
+        },
+        {
+          "slug": "step-2",
+          "config": {
+            "prompt": "…",
+            "emitter": "render_template",
+            "phase_type": "llm_emit",
+            "folder_scope": [
+              "00000000-0000-4000-8000-000000000049"
+            ],
+            "citation_policy": "strict",
+            "integrity_policy": "strict"
+          },
+          "validators": [
+            {
+              "kind": "citations_required",
+              "config": {
+                "mode": "…"
+              },
+              "on_failure": "fail_run"
+            },
+            {
+              "kind": "output_file_valid",
+              "config": {},
+              "on_failure": "fail_run"
+            }
+          ],
+          "phase_index": 1
+        }
+      ]
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000051",
+      "slug": "wf-036",
+      "version": 2,
+      "status": "draft",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000052",
+      "slug": "wf-037",
+      "version": 1,
+      "status": "published",
+      "phases": [
+        {
+          "slug": "step-1",
+          "config": {
+            "prompt": "…",
+            "phase_type": "llm_agent",
+            "folder_scope": [
+              "00000000-0000-4000-8000-000000000049"
+            ],
+            "available_tools": [
+              "…"
+            ]
+          },
+          "validators": [],
+          "phase_index": 0
+        },
+        {
+          "slug": "step-2",
+          "config": {
+            "prompt": "…",
+            "emitter": "render_template",
+            "phase_type": "llm_emit",
+            "folder_scope": [
+              "00000000-0000-4000-8000-000000000049"
+            ],
+            "citation_policy": "strict",
+            "integrity_policy": "strict"
+          },
+          "validators": [
+            {
+              "kind": "citations_required",
+              "config": {
+                "mode": "…"
+              },
+              "on_failure": "fail_run"
+            },
+            {
+              "kind": "output_file_valid",
+              "config": {},
+              "on_failure": "fail_run"
+            }
+          ],
+          "phase_index": 1
+        }
+      ]
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000053",
+      "slug": "wf-037",
+      "version": 2,
+      "status": "draft",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000054",
+      "slug": "wf-037",
+      "version": 3,
+      "status": "published",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000055",
+      "slug": "wf-037",
+      "version": 4,
+      "status": "draft",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000056",
+      "slug": "wf-038",
+      "version": 1,
+      "status": "published",
+      "phases": [
+        {
+          "slug": "step-1",
+          "config": {
+            "prompt": "…",
+            "phase_type": "llm_agent",
+            "available_tools": [
+              "…"
+            ]
+          },
+          "validators": [],
+          "phase_index": 0
+        }
+      ]
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000057",
+      "slug": "wf-039",
+      "version": 1,
+      "status": "published",
+      "phases": [
+        {
+          "slug": "step-1",
+          "config": {
+            "prompt": "…",
+            "phase_type": "llm_agent",
+            "available_tools": [
+              "…",
+              "…"
+            ]
+          },
+          "validators": [],
+          "phase_index": 0
+        },
+        {
+          "slug": "step-2",
+          "config": {
+            "prompt": "…",
+            "phase_type": "llm_single"
+          },
+          "validators": [],
+          "phase_index": 1
+        }
+      ]
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000058",
+      "slug": "wf-040",
+      "version": 1,
+      "status": "published",
+      "phases": [
+        {
+          "slug": "step-1",
+          "config": {
+            "prompt": "…",
+            "phase_type": "llm_agent",
+            "available_tools": [
+              "…"
+            ]
+          },
+          "validators": [],
+          "phase_index": 0
+        },
+        {
+          "slug": "step-2",
+          "config": {
+            "prompt": "…",
+            "emitter": "render_template",
+            "phase_type": "llm_emit",
+            "citation_policy": "strict",
+            "integrity_policy": "strict"
+          },
+          "validators": [
+            {
+              "kind": "citations_required",
+              "config": {
+                "mode": "…"
+              },
+              "on_failure": "fail_run"
+            },
+            {
+              "kind": "output_file_valid",
+              "config": {},
+              "on_failure": "fail_run"
+            }
+          ],
+          "phase_index": 1
+        }
+      ]
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000059",
+      "slug": "wf-041",
+      "version": 1,
+      "status": "draft",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000060",
+      "slug": "wf-042",
+      "version": 1,
+      "status": "published",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000061",
+      "slug": "wf-043",
+      "version": 1,
+      "status": "draft",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000062",
+      "slug": "wf-044",
+      "version": 1,
+      "status": "draft",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000063",
+      "slug": "wf-045",
+      "version": 1,
+      "status": "published",
+      "phases": [
+        {
+          "slug": "step-1",
+          "config": {
+            "prompt": "…",
+            "phase_type": "llm_agent",
+            "folder_scope": [
+              "00000000-0000-4000-8000-000000000020"
+            ],
+            "available_tools": [
+              "…"
+            ]
+          },
+          "validators": [],
+          "phase_index": 0
+        },
+        {
+          "slug": "step-2",
+          "config": {
+            "model": null,
+            "prompt": "…",
+            "emitter": "render_template",
+            "phase_type": "llm_emit"
+          },
+          "validators": [],
+          "phase_index": 1
+        }
+      ]
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000064",
+      "slug": "wf-045",
+      "version": 2,
+      "status": "draft",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000065",
+      "slug": "wf-046",
+      "version": 1,
+      "status": "draft",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000066",
+      "slug": "wf-047",
+      "version": 1,
+      "status": "draft",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000068",
+      "slug": "wf-048",
+      "version": 1,
+      "status": "published",
+      "phases": [
+        {
+          "slug": "step-1",
+          "config": {
+            "prompt": "…",
+            "skill_ref": "00000000-0000-4000-8000-000000000067",
+            "phase_type": "llm_agent",
+            "available_tools": [
+              "…"
+            ]
+          },
+          "validators": [],
+          "phase_index": 0
+        }
+      ]
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000069",
+      "slug": "wf-048",
+      "version": 2,
+      "status": "draft",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000070",
+      "slug": "wf-049",
+      "version": 1,
+      "status": "published",
+      "phases": [
+        {
+          "slug": "step-1",
+          "config": {
+            "prompt": "…",
+            "phase_type": "llm_agent",
+            "available_tools": [
+              "…"
+            ]
+          },
+          "validators": [],
+          "phase_index": 0
+        },
+        {
+          "slug": "step-2",
+          "config": {
+            "prompt": "…",
+            "emitter": "render_template",
+            "phase_type": "llm_emit",
+            "citation_policy": "strict",
+            "integrity_policy": "strict"
+          },
+          "validators": [
+            {
+              "kind": "citations_required",
+              "config": {
+                "mode": "…"
+              },
+              "on_failure": "fail_run"
+            },
+            {
+              "kind": "output_file_valid",
+              "config": {},
+              "on_failure": "fail_run"
+            }
+          ],
+          "phase_index": 1
+        }
+      ]
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000071",
+      "slug": "wf-050",
+      "version": 1,
+      "status": "draft",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000072",
+      "slug": "wf-051",
+      "version": 1,
+      "status": "published",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000073",
+      "slug": "wf-052",
+      "version": 1,
+      "status": "published",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000074",
+      "slug": "wf-053",
+      "version": 1,
+      "status": "published",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000075",
+      "slug": "wf-054",
+      "version": 1,
+      "status": "published",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000076",
+      "slug": "wf-055",
+      "version": 1,
+      "status": "published",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000077",
+      "slug": "wf-056",
+      "version": 1,
+      "status": "published",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000078",
+      "slug": "wf-057",
+      "version": 1,
+      "status": "published",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000079",
+      "slug": "wf-058",
+      "version": 1,
+      "status": "published",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000080",
+      "slug": "wf-059",
+      "version": 1,
+      "status": "published",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000081",
+      "slug": "wf-060",
+      "version": 1,
+      "status": "published",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000082",
+      "slug": "wf-061",
+      "version": 1,
+      "status": "published",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000083",
+      "slug": "wf-062",
+      "version": 1,
+      "status": "published",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000084",
+      "slug": "wf-063",
+      "version": 1,
+      "status": "published",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000085",
+      "slug": "wf-064",
+      "version": 1,
+      "status": "published",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000086",
+      "slug": "wf-065",
+      "version": 1,
+      "status": "published",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000087",
+      "slug": "wf-066",
+      "version": 1,
+      "status": "published",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000088",
+      "slug": "wf-067",
+      "version": 1,
+      "status": "published",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000089",
+      "slug": "wf-068",
+      "version": 1,
+      "status": "published",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000090",
+      "slug": "wf-069",
+      "version": 1,
+      "status": "published",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000091",
+      "slug": "wf-070",
+      "version": 1,
+      "status": "published",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000092",
+      "slug": "wf-071",
+      "version": 1,
+      "status": "published",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000093",
+      "slug": "wf-072",
+      "version": 1,
+      "status": "published",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000094",
+      "slug": "wf-073",
+      "version": 1,
+      "status": "published",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000095",
+      "slug": "wf-074",
+      "version": 1,
+      "status": "published",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000096",
+      "slug": "wf-075",
+      "version": 1,
+      "status": "published",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000097",
+      "slug": "wf-076",
+      "version": 1,
+      "status": "published",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000098",
+      "slug": "wf-077",
+      "version": 1,
+      "status": "published",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000099",
+      "slug": "wf-078",
+      "version": 1,
+      "status": "published",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000100",
+      "slug": "wf-079",
+      "version": 1,
+      "status": "published",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000101",
+      "slug": "wf-080",
+      "version": 1,
+      "status": "published",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000102",
+      "slug": "wf-081",
+      "version": 1,
+      "status": "published",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000103",
+      "slug": "wf-082",
+      "version": 1,
+      "status": "published",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000104",
+      "slug": "wf-083",
+      "version": 1,
+      "status": "published",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000105",
+      "slug": "wf-084",
+      "version": 1,
+      "status": "published",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000106",
+      "slug": "wf-085",
+      "version": 1,
+      "status": "published",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000107",
+      "slug": "wf-086",
+      "version": 1,
+      "status": "published",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000108",
+      "slug": "wf-087",
+      "version": 1,
+      "status": "published",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000109",
+      "slug": "wf-088",
+      "version": 1,
+      "status": "published",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000110",
+      "slug": "wf-089",
+      "version": 1,
+      "status": "published",
+      "phases": []
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000111",
+      "slug": "wf-090",
+      "version": 1,
+      "status": "published",
+      "phases": []
+    }
+  ]
 }
