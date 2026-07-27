@@ -7,6 +7,14 @@
  * module-scope `nodeTypes` map in `WorkflowCanvas.tsx` — `phase`,
  * `unresolvedSkip` and `endCap`, the exact vocabulary `CANVAS_NODE_TYPES` exports.
  *
+ * WHAT THIS FILE IS AFTER THE 184-03 SPLIT (D-184-06). `PhaseNode` is no longer the
+ * phase card — it is a thin `NodeProps` → slots ADAPTER over `PhaseNodeCard`, which
+ * lives in its own file and imports nothing from `@xyflow/react`. This file keeps the
+ * three things that genuinely belong to the graph library boundary: the `nodeTypes`
+ * entry points, the hidden `EdgeAnchors`, and the two small faces that have no reuse
+ * story outside the plane (`UnresolvedSkipNode`, `EndCapNode`). The presentation
+ * const-tables moved to `nodePresentation.ts` in the same plan.
+ *
  * PURE PRESENTATIONAL LEAVES. None of them reads a context, fetches anything, or
  * owns state. The ⌥ Technical-names reveal arrives as a `technical` field merged
  * onto `data` by the canvas shell, so there is exactly ONE technical-names state in
@@ -64,7 +72,6 @@
  */
 import { Handle, Position, type NodeProps } from "@xyflow/react"
 
-import { StatusChip } from "@/components/org/StatusChip"
 import {
   CANVAS_LAYOUT,
   type PhaseCanvasNode,
@@ -76,6 +83,11 @@ import {
   ICON_TINT,
   renderPhaseMark,
 } from "@/components/workflows/nodePresentation"
+import {
+  PhaseNodeCard,
+  type BadgeSlot,
+  type BadgeSlots,
+} from "@/components/workflows/PhaseNodeCard"
 import { cn } from "@/lib/utils"
 
 // ── Shared atoms ────────────────────────────────────────────────────────────────
@@ -107,12 +119,21 @@ function EdgeAnchors() {
   )
 }
 
-// ── PhaseNode — the phase card ──────────────────────────────────────────────────
+// ── PhaseNode — the NodeProps → slots adapter (D-184-06) ────────────────────────
 
 /**
  * One phase, one card. `llm_batch_agents` gets ONE node: the ×N fan-out is runtime
  * behaviour, not topology (sketch 136), and drawing N lanes would disagree with the
  * server's adjacency.
+ *
+ * THIS IS AN ADAPTER, NOT A CARD (D-184-06, plan 184-03 Task 2). The face itself is
+ * `PhaseNodeCard`, which imports nothing from the graph library so it renders in a
+ * plain provider-less test and Phase 188 can reuse it outside a `ReactFlowProvider`.
+ * Everything below is the mapping `NodeProps` → slots, plus the one thing that cannot
+ * cross that boundary: `<EdgeAnchors />`, injected through the card's `anchors` slot
+ * so the rendered DOM is byte-identical to the pre-split node. A custom node that
+ * renders no `Handle` paints ZERO edges, silently (see HANDLES ARE MANDATORY above),
+ * which is why the adapter — not the card — owns them.
  */
 export function PhaseNode({ data, selected }: NodeProps<PhaseCanvasNode>) {
   // The ⌥ reveal rides on `data` (set by the shell), so this leaf has no context
@@ -125,85 +146,37 @@ export function PhaseNode({ data, selected }: NodeProps<PhaseCanvasNode>) {
   // lookup does not live in this body.
   const tint = ICON_TINT[data.phaseType] ?? DEFAULT_TINT
 
+  // Badge slot 1 is always present; slot 2 only on `llm_human_input` (D-183-07). The
+  // tuple type caps the row at two, so a third badge is a typecheck error.
+  const grounding: BadgeSlot = {
+    testId: "canvas-grounding",
+    tone: GROUNDING_TONE[data.grounding.mode],
+    glyph: data.grounding.glyph,
+    label: data.grounding.words,
+    dataAttr: { "data-grounding": data.grounding.mode },
+  }
+  const waitsForYou: BadgeSlot = {
+    testId: "canvas-waits-for-you",
+    tone: "primary",
+    label: "Waits for you",
+    dataAttr: { "data-waits-for-you": "true" },
+  }
+  const badges: BadgeSlots = data.waitsForYou ? [grounding, waitsForYou] : [grounding]
+
+  // `status`, `verdict`, `technicalLine` and `stepNumber` are deliberately NOT passed:
+  // Wave 0 lands the seam, 184-08 / Phase 185 / Phase 188 land the data.
   return (
-    <div
-      data-testid={`canvas-node-${data.slug}`}
-      data-slug={data.slug}
-      data-phase-type={data.phaseType}
-      data-selected={selected ? "true" : "false"}
-      className="relative"
-      style={{ width: CANVAS_LAYOUT.NODE_WIDTH, minHeight: CANVAS_LAYOUT.NODE_MIN_HEIGHT }}
-    >
-      <EdgeAnchors />
-
-      {/* The frosted card. Neutral by construction — no per-type wash anywhere. */}
-      <div
-        className={cn(
-          "ml-6 flex flex-col justify-center rounded-2xl border py-3 pl-10 pr-3",
-          "bg-card/30 backdrop-blur-sm",
-          "shadow-[0_1px_0_hsl(var(--foreground)/0.06)_inset,0_18px_36px_-22px_rgba(0,0,0,0.95)]",
-          selected
-            ? "border-primary shadow-[0_0_0_1px_hsl(var(--primary)/0.4)]"
-            : "border-border/50",
-        )}
-        style={{ minHeight: CANVAS_LAYOUT.NODE_MIN_HEIGHT }}
-      >
-        <p className="truncate font-headline text-[14px] font-semibold leading-tight text-foreground">
-          {title}
-        </p>
-
-        {data.subtitle ? (
-          <p className="mt-1 text-[11px] leading-snug text-muted-foreground">{data.subtitle}</p>
-        ) : null}
-
-        {/* At most TWO word-badges (D-183-07). No tool chips, no gate identifiers,
-            no phase_index on the face. */}
-        <div className="mt-2 flex flex-wrap items-center gap-1.5">
-          <span data-grounding={data.grounding.mode}>
-            <StatusChip tone={GROUNDING_TONE[data.grounding.mode]} testId="canvas-grounding">
-              <span aria-hidden="true" className="mr-1">
-                {data.grounding.glyph}
-              </span>
-              {data.grounding.words}
-            </StatusChip>
-          </span>
-
-          {data.waitsForYou ? (
-            <span data-waits-for-you="true">
-              <StatusChip tone="primary" testId="canvas-waits-for-you">
-                Waits for you
-              </StatusChip>
-            </span>
-          ) : null}
-        </div>
-      </div>
-
-      {/* The 3D mark floating at the LEFT edge: a soft light disc behind it (the
-          D-183-14 canvas-local icon-well lightening, applied uniformly), the
-          per-type tint inside that disc, and its own contact shadow beneath. */}
-      <span
-        aria-hidden="true"
-        className="pointer-events-none absolute left-0 top-1/2 grid h-14 w-14 -translate-y-1/2 place-items-center"
-      >
-        <span
-          className="absolute inset-0 rounded-full"
-          style={{
-            background: `radial-gradient(circle, ${tint}, transparent 68%)`,
-          }}
-        />
-        <span
-          className="absolute inset-1 rounded-full bg-foreground/10"
-          style={{ filter: "blur(2px)" }}
-        />
-        <span
-          className="absolute bottom-0 left-1/2 h-2 w-9 -translate-x-1/2 rounded-[50%] bg-black/50"
-          style={{ filter: "blur(5px)" }}
-        />
-        <span className="relative grid place-items-center text-[20px] leading-none text-foreground drop-shadow-[0_9px_13px_rgba(0,0,0,0.8)]">
-          {renderPhaseMark(data.phaseType)}
-        </span>
-      </span>
-    </div>
+    <PhaseNodeCard
+      slug={data.slug}
+      phaseType={data.phaseType}
+      icon={renderPhaseMark(data.phaseType)}
+      title={title}
+      subtitle={data.subtitle}
+      tint={tint}
+      badges={badges}
+      selected={selected}
+      anchors={<EdgeAnchors />}
+    />
   )
 }
 
