@@ -15,7 +15,12 @@ import { describe, it, expect } from "vitest"
 
 import canvasModelSource from "./canvasModel?raw"
 import { toCanvas, CANVAS_LAYOUT } from "./canvasModel"
+// Phase 184-05 additions land as SEPARATE import statements rather than by widening
+// the two lines above, so this file's whole diff is ADDED lines only and D-184-08's
+// "no existing assertion touched" claim is auditable by `git diff` alone.
+import { fromCanvas } from "./canvasModel"
 import { ALL_FIXTURES, evalCoverage } from "./__fixtures__/canvasFixtures"
+import { indexGap } from "./__fixtures__/canvasFixtures"
 import type { PhaseSpecJSON } from "./phaseVocabulary"
 
 /** A JSON deep clone — every fixture is JSON-safe by construction. */
@@ -97,6 +102,37 @@ describe("canvasModel — the layout constants are the single source", () => {
   })
 })
 
+// ── Phase 184-05: the `fromCanvas` source slice, and why it is a slice ──────────
+//
+// The three new guards below are claims about ONE function, not about the module, so
+// they are scoped to that function's own source. Two helpers make that scoping real:
+//
+//  1. `sliceFrom` cuts from a declaration to the next TOP-LEVEL `export` (or EOF).
+//  2. `stripComments` then removes every comment from the cut.
+//
+// Step 2 is the load-bearing one. D-ITEM-183-02 — hit five-plus times in Phase 183 —
+// says a guard that can only pass by making a comment lie is a BROKEN guard. Without
+// the strip, "fromCanvas never reads a position" would forbid `fromCanvas`'s docblock
+// from using the word `position` while explaining that very rule. Both helpers carry
+// their own positive controls below; an extractor nobody proved is just an assumption
+// with a function name.
+
+/** Cut a top-level declaration's source out of a module, declaration → next export. */
+const sliceFrom = (source: string, marker: string): string => {
+  const start = source.indexOf(marker)
+  if (start < 0) throw new Error(`sliceFrom: marker not found — ${marker}`)
+  const rest = source.slice(start + marker.length)
+  const nextExport = rest.search(/\nexport\s/)
+  return marker + (nextExport < 0 ? rest : rest.slice(0, nextExport))
+}
+
+/** Remove block and line comments so the guards below test CODE, never prose. */
+const stripComments = (source: string): string =>
+  source.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/\/\/[^\n]*/g, " ")
+
+/** `fromCanvas`'s body, comments removed — the subject of the three new guards. */
+const FROM_CANVAS_CODE = stripComments(sliceFrom(canvasModelSource, "export function fromCanvas"))
+
 describe("canvasModel — source purity (the ?raw grep, the shipped house idiom)", () => {
   it("reads no DOM, no clock and no randomness", () => {
     expect(canvasModelSource).not.toMatch(
@@ -125,5 +161,110 @@ describe("canvasModel — source purity (the ?raw grep, the shipped house idiom)
   it("derives the sequential edge by phase_index LOOKUP, never by array adjacency", () => {
     expect(canvasModelSource).toMatch(/phase_index \+ 1/)
     expect(canvasModelSource).not.toMatch(/ordered\[\s*(i|index)\s*\+\s*1\s*\]/)
+  })
+
+  // ── Phase 184-05 — the three `fromCanvas` slice guards, each with a control ────
+
+  it("the slice extractor is real — it stops at the next top-level export", () => {
+    const synthetic = [
+      "export function fromCanvas(a) {",
+      "  return a",
+      "}",
+      "",
+      "export function somethingElse() {",
+      "  return node.position",
+      "}",
+    ].join("\n")
+    const cut = sliceFrom(synthetic, "export function fromCanvas")
+    expect(cut).toContain("return a")
+    expect(cut).not.toContain("somethingElse")
+    expect(cut).not.toContain("node.position")
+  })
+
+  it("the comment stripper is real — it removes prose and keeps code", () => {
+    const planted = "// mentions node.position in prose\nconst a = node.position\n/* .target */"
+    const stripped = stripComments(planted)
+    expect(stripped).toContain("const a = node.position")
+    expect(stripped.match(/\.position\b/g)).toHaveLength(1)
+    expect(stripped).not.toContain(".target")
+  })
+
+  it("the extracted slice is fromCanvas ONLY — no toCanvas body leaked in", () => {
+    expect(FROM_CANVAS_CODE).toContain("export function fromCanvas")
+    expect(FROM_CANVAS_CODE).not.toContain("export function toCanvas")
+    expect(FROM_CANVAS_CODE).not.toContain("CANVAS_LAYOUT.PITCH_X")
+  })
+
+  it("fromCanvas never reads an edge (RESEARCH Q1 — edges carry no authored data)", () => {
+    // MEMBER access specifically: the dot must follow an identifier or a closing
+    // bracket. A bare /\.(source|target)/ also matches the spread in `[...source]`,
+    // where `source` is this function's own PARAMETER and no member is read at all —
+    // a false positive the first run of this guard actually produced.
+    const memberAccess = /[A-Za-z0-9_$\])]\.(source|target)\b/
+    expect(FROM_CANVAS_CODE).not.toMatch(/\bedges\b/)
+    expect(FROM_CANVAS_CODE).not.toMatch(memberAccess)
+    // Controls: both regexes DO fire on a planted literal.
+    expect("const drawn = edges.filter(Boolean)").toMatch(/\bedges\b/)
+    expect("const from = edge.source").toMatch(memberAccess)
+    expect("const to = edge.target").toMatch(memberAccess)
+  })
+
+  it("fromCanvas never renumbers — renumbering lives in definitionOps.renumber", () => {
+    expect(FROM_CANVAS_CODE).not.toMatch(/phase_index\s*:/)
+    expect(FROM_CANVAS_CODE).not.toMatch(/phase_index\s*=[^=]/)
+    // Controls: both regexes DO fire on a planted literal.
+    expect("out.push({ phase_index: i })").toMatch(/phase_index\s*:/)
+    expect("phase.phase_index = i").toMatch(/phase_index\s*=[^=]/)
+  })
+
+  it("fromCanvas never reads a position — layout is never authored data (Pitfall 3)", () => {
+    expect(FROM_CANVAS_CODE).not.toMatch(/\.position\b/)
+    // Control: the regex DOES fire on a planted literal.
+    expect("const x = node.position.x").toMatch(/\.position\b/)
+  })
+})
+
+/**
+ * Phase 184-05 Task 1 — the four BEHAVIOURAL pins the source guards above cannot
+ * express. These are targeted assertions on named shapes; the full R2 property (the
+ * committed corpus dump × the generated shapes, swept) lives in
+ * `canvasModel.roundtrip.test.ts` and is a different kind of claim.
+ *
+ * THE TRAP, stated once so nobody files it as a defect: `toCanvas` SORTS its input by
+ * `(phase_index, slug)` at `canvasModel.ts:220-223`. The round trip therefore returns
+ * the SORTED source, not the caller's array order, and every comparison below is
+ * against the sorted source.
+ */
+describe("canvasModel — fromCanvas behaviour (the Task-1 acceptance pins)", () => {
+  /** The exact comparator `toCanvas` applies — index first, slug as the tiebreak. */
+  const byIndexThenSlug = (a: PhaseSpecJSON, b: PhaseSpecJSON) =>
+    a.phase_index - b.phase_index || (a.slug < b.slug ? -1 : a.slug > b.slug ? 1 : 0)
+
+  it("does NOT renumber — the shipped [0,1,3] gap survives the round trip", () => {
+    const round = fromCanvas(toCanvas(indexGap).nodes, indexGap)
+    expect(round.map((p) => p.phase_index)).toEqual([0, 1, 3])
+  })
+
+  it("returns the SAME objects (toBe), not copies — the R2 carry-through claim", () => {
+    const expected = [...evalCoverage].sort(byIndexThenSlug)
+    const round = fromCanvas(toCanvas(evalCoverage).nodes, evalCoverage)
+    expect(round).toHaveLength(expected.length)
+    round.forEach((phase, i) => expect(phase).toBe(expected[i]))
+  })
+
+  it("drops the end cap and every non-phase node, and nothing else", () => {
+    const { nodes } = toCanvas(indexGap)
+    expect(nodes.length).toBeGreaterThan(indexGap.length) // the ○ end cap is in there
+    expect(fromCanvas(nodes, indexGap)).toHaveLength(indexGap.length)
+  })
+
+  it("fails SAFE on duplicate slugs — hands the source back, drops no phase", () => {
+    const duplicateSlugs: PhaseSpecJSON[] = [
+      { slug: "step", phase_index: 0, config: { phase_type: "llm_agent" } },
+      { slug: "step", phase_index: 1, config: { phase_type: "llm_single" } },
+    ]
+    const round = fromCanvas(toCanvas(duplicateSlugs).nodes, duplicateSlugs)
+    expect(round).toHaveLength(duplicateSlugs.length)
+    round.forEach((phase, i) => expect(phase).toBe(duplicateSlugs[i]))
   })
 })

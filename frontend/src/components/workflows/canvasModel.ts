@@ -343,3 +343,80 @@ export function toCanvas(phases: PhaseSpecJSON[]): CanvasProjection {
 
   return { nodes, edges }
 }
+
+// ── The inverse: the ONE canvas-to-definition serializer (R2) ────────────────────
+
+/**
+ * Phase 184-05 Task 1 (R2, D-184-17) — `fromCanvas`, the ONE client serializer.
+ * It lands in this module and nowhere else.
+ *
+ * PURE (D-183-12), exactly as `toCanvas` is: no DOM read, no measurement, no clock,
+ * no randomness, no network, no mutation of either input. It reads `node.id` and node
+ * ORDER, and nothing else — never a node's computed layout, never its resolved face
+ * data. Both of those are RENDER products; neither is authored information.
+ *
+ * CARRY-THROUGH BY REFERENCE, NEVER A RECONSTRUCTION. The returned array holds the
+ * SAME `PhaseSpecJSON` objects the caller passed in as `source`. That is not an
+ * optimisation — it is the only shape that can satisfy R2. `toCanvas` reads exactly
+ * six things off a phase and DROPS everything else: `config.prompt`,
+ * `config.available_tools`, `config.skill_snapshot`, `config.merge_strategy` and
+ * `validators[].timing` are five of roughly twenty such fields that exist in the
+ * definition and appear nowhere on a node. A field-by-field rebuild would
+ * re-materialise Pydantic defaults where the source carried ABSENCE, and would
+ * silently drop every field nobody remembered to copy — i.e. it would lose real
+ * authored data the moment the user saved. Handing back the same object makes that
+ * entire class of failure unrepresentable, and reference identity (`toBe`) is a
+ * strictly stronger proof than any deep compare.
+ *
+ * IT NEVER RENUMBERS. Contiguous `[0..n-1]` renumbering is `definitionOps.renumber`'s
+ * job, applied AFTER a structural edit. Two homes for one rule is exactly the drift
+ * Wave 0 exists to prevent — and a `fromCanvas` that renumbered would turn the
+ * shipped `indexGap` fixture's `[0, 1, 3]` into `[0, 1, 2]`, failing its own identity
+ * property against a fixture already committed to this repo.
+ *
+ * DIVISION OF LABOUR, stated so neither home grows a second copy of the other's rule:
+ * `fromCanvas` is the sole CANVAS→DEFINITION serializer; `definitionOps` is the sole
+ * DEFINITION→DEFINITION mutation home.
+ *
+ * DUPLICATE SLUGS FAIL SAFE. `PhaseSpec.slug` is an unconstrained `str` on the backend
+ * (see `RESERVED_PREFIX` above, which exists for the same reason), so two phases CAN
+ * share one. A slug-keyed map collapses them, and walking the nodes would then hand
+ * back fewer phases than the user authored. Losing a step on save is the worst failure
+ * available here, so a collision is detected and the source is handed back untouched
+ * instead — never lossy, even on a shape the app cannot otherwise draw honestly.
+ *
+ * NO EDGE ARGUMENT (RESEARCH open question 1, resolved). Edges carry zero AUTHORED
+ * information in this phase: the run-order link is derived from `phase_index`, the
+ * branch link from `validators[].on_failure`, and neither free wiring nor
+ * `skip_to_phase` authoring is in scope. A future phase that wants topology authored
+ * from a drawn connection must make that argument explicitly rather than inherit it by
+ * accident. `canvasModel.purity.test.ts` pins "reads no edge", "never renumbers" and
+ * "reads no position" as source guards over this function's own slice.
+ *
+ * NOT A CONTRADICTION with `canvasModel.purity.test.ts:74-83`. That shipped assertion —
+ * "does not hand back a reference to any input phase object" — is about the NODE DATA
+ * `toCanvas` builds: a node's `data` must be a freshly resolved face, never an alias of
+ * the phase or its config, or the view could mutate the definition through it.
+ * `fromCanvas` deliberately returns the phases THEMSELVES. Different value, different
+ * claim; both hold at once.
+ */
+export function fromCanvas(
+  nodes: readonly CanvasNode[],
+  source: readonly PhaseSpecJSON[],
+): PhaseSpecJSON[] {
+  const bySlug = new Map(source.map((p) => [p.slug, p]))
+
+  // The fail-safe branch. A collapsed map means the caller's phases do not have
+  // distinct identities, so no node walk can reproduce them faithfully.
+  if (bySlug.size !== source.length) return [...source]
+
+  const out: PhaseSpecJSON[] = []
+  for (const node of nodes) {
+    // Only phase nodes correspond to a PhaseSpec. The end cap and the
+    // broken-reference stub carry reserved ids and model nothing in the definition.
+    if (node.type !== CANVAS_NODE_TYPES.phase) continue
+    const phase = bySlug.get(node.id)
+    if (phase !== undefined) out.push(phase)
+  }
+  return out
+}
