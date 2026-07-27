@@ -965,28 +965,41 @@ describe.each([
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Does `fromCanvas` take `edges`?**
+> All 5 questions were resolved during planning (2026-07-26) by adopting the recommendation
+> below each. The adopting plan is named inline. No question remains open at execution time.
+
+1. **Does `fromCanvas` take `edges`?** — **RESOLVED: recommendation adopted → plan `184-05` Task 1**
+   (signature omits `edges`; a `canvasModel.purity.test.ts` guard asserts the source never reads one).
    - What we know: SPEC R2 writes `fromCanvas(nodes, edges)`. Free wiring and `skip_to_phase` authoring are both out of scope, so edges carry no authored information in this phase.
    - What's unclear: whether the signature should keep an unused parameter for forward-compatibility.
    - Recommendation: **omit `edges`**, and add a `canvasModel.purity.test.ts` guard that `fromCanvas`'s source never reads an edge. A future phase that wants edge-authored topology then has to make that argument explicitly.
 
-2. **Is R2's property over `WorkflowDefinition` or over `phases[]`?**
+2. **Is R2's property over `WorkflowDefinition` or over `phases[]`?** — **RESOLVED: recommendation
+   adopted → plan `184-05` Task 3** (property over `phases[]`, plus the cheaper payload-level
+   assertion that also discharges R3).
    - What we know: `toCanvas` takes `phases` only; the 13 workflow-level fields never reach the canvas.
    - What's unclear: the acceptance wording says `fromCanvas(toCanvas(def))` deep-equals `def`.
    - Recommendation: state in the plan that the property is over **`phases[]`**, and add a **second, cheaper** assertion covering the workflow level: *the serialized `createWorkflowDraft`/`updateWorkflowDraft` body deep-equals the loaded definition with only `phases` differing* — which also discharges R3's "no positional field appears in any draft payload".
 
-3. **Duplicate slugs in the live corpus.**
+3. **Duplicate slugs in the live corpus.** — **RESOLVED: recommendation adopted → plan `184-05`
+   Task 1** (`fromCanvas` fails SAFE on a slug collision — returns the source untouched, never
+   silently drops a phase).
    - What we know: `PhaseSpec.slug` is an unconstrained `str`; `canvasModel.ts:161-163` explicitly warns a slug can even spell a reserved canvas id.
    - What's unclear: whether any live row has duplicate slugs (DB unreachable).
    - Recommendation: `fromCanvas` fails **safe** (returns the source untouched) on a slug collision; the dump's provenance records the count. Never silently drop a phase.
 
-4. **Where does the `dirty` flag live for the leave guard?**
+4. **Where does the `dirty` flag live for the leave guard?** — **RESOLVED: recommendation adopted
+   → plan `184-11` Task 3** (the Builder registers a `canLeave()` callback with `WorkflowsPage`;
+   no router, no context lift).
    - What we know: the breadcrumb is in `WorkflowsPage`, the dirty state in the Builder store, and there is no router.
    - Recommendation: expose the store via context above both, or have the Builder register a `canLeave()` callback with `WorkflowsPage`. Either way, name it in the plan — it is the one genuinely cross-component seam in the phase.
 
-5. **Does the icon-swap commit need its own vitest snapshot refresh?**
+5. **Does the icon-swap commit need its own vitest snapshot refresh?** — **RESOLVED:
+   recommendation adopted → plan `184-01` Task 2** (verified empirically via an explicit
+   snapshot-diff acceptance criterion; a moved snapshot is treated as a signal the extraction
+   boundary is wrong, never blessed).
    - What we know: `soulData.test.ts:132-133` asserts the slugs; `canvasModel.fixtures.test.ts.snap` (1,558 lines) records node data — but `PHASE_GLYPHS` is *not* in `PhaseNodeData`, so the canvas snapshot should be unaffected.
    - Recommendation: verify empirically in the 0a commit; if the snapshot does move, that is a signal the extraction boundary is wrong, not a snapshot to bless.
 

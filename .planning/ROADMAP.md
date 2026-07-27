@@ -89,9 +89,11 @@ Committed as gated phases (ship only if CORE lands clean and budget remains; v2.
   4. Any schema the milestone introduces is additive-nullable-only and every new route is flag/404-gated at every layer, so the off-switch can never leave a non-revertible remnant (Pitfall 2).
 
 **Plans**: 3 plans
+
 - [x] 181-01-PLAN.md — Backend off-switch: the "off" audience + 404 require_canvas gate + temporary canary route + backend byte-identical test gate (Wave 1)
 - [x] 181-02-PLAN.md — Frontend feature wiring + operator Off|On FeatureVisibility card + frontend nav byte-identical test (Wave 2)
 - [x] 181-03-PLAN.md — Scope-freeze script (doors/run-surface/harness frozen) + full-suite green + operator live-close UAT (Wave 3)
+
 **UI hint**: yes
 **Flags**: HARD gate #1 (preserve-v1/revert); red line D-14 (flag-off byte-identical, no new runtime); reuse-heavy (v3.3 `skill_studio` feature-flag pattern — known-good, repeat it); `test_revert_byte_identical` CI + live-close gate; additive-nullable-only schema; no threat model (tested-revert gate, not a trust boundary); no migration (flag key in `_GOVERNED_FEATURES`; `app_settings.feature_visibility` already exists).
 
@@ -108,6 +110,7 @@ Committed as gated phases (ship only if CORE lands clean and budget remains; v2.
   4. The verdict shape is consumable per-node (each verdict maps to a phase / node id) so a later canvas can paint per-node badges from it — and later carry the GOVERN grounding verdict (185).
 
 **Plans**: 12 plans (3 shipped + 4 gap closure round 1 + 5 gap closure round 2)
+
 - [x] 182-01-PLAN.md — Extract grounding into one shared `harness/grounding.py` source + thin delegates + extraction-parity/count-guard (Wave 1)
 - [x] 182-02-PLAN.md — `POST /workflows/validate` (full static gauntlet, severity verdicts) + `GET /workflows/grounding-bundle` palette + unit/integration tests (Wave 2)
 - [x] 182-03-PLAN.md — Retire the 181 `/canvas/ping` canary + repoint BOTH `test_revert_byte_identical.py` and `test_181_flip_on.py` onto the real routes (Wave 3)
@@ -120,6 +123,7 @@ Committed as gated phases (ship only if CORE lands clean and budget remains; v2.
 - [x] 182-10-PLAN.md — GAP r2 (WR-04): one non-raising ⊆ collector in `scope.py` so EVERY out-of-subtree phase gets its own keyed `folder_scope` verdict, with the raising form as a byte-identical presentation (Wave 2)
 - [x] 182-11-PLAN.md — GAP r2 (fail-honesty trio WR-01/02/07): `GroundingBundle.degraded` + a sealed `/validate` grounding section + a truncation-aware folders read, so a registry blip reports `grounding_unavailable` instead of a false `unregistered_skill` / 500 / false `folder_scope` (Wave 3)
 - [x] 182-12-PLAN.md — GAP r2 (WR-05 + WR-06): scope publish's grounding gate to the DEFINITION's `org_id` instead of the publisher's org union, and correct SEED-130's wrong "not a security issue" verdict + annotate its Option B unsafe-as-written (Wave 4)
+
 **Flags**: backend-only reuse (`reachability.lint_workflow` + `_check_grounding_fidelity` verbatim — the anti-drift seam, Pitfall 1); flag-gated 404 (inherits 181); red line D-14; no SC#10 (pure backend, no streaming/provider); no migration; no `@xyflow/react` required yet. **Gap-closure amendment (2026-07-25):** the original "no threat model (no new authz)" flag no longer holds — plan 182-06 converts publish from advisory to ENFORCING for grounding fidelity and builds an org-scoped service-role client on that path, so all four gap-closure plans carry a `<threat_model>` block (T-182-08..23). **Round-2 gap-closure amendment (2026-07-25):** the round-2 verification confirmed SC#3 FAILED (a malformed body returned 422 and `/openapi.json` advertised both routes + all 5 schemas to an anonymous caller with the flag off), so plans 182-08..12 close it plus four operator-selected round-2 review findings (WR-08, WR-01/02/07, WR-04, WR-05+WR-06); all five carry a `<threat_model>` block (T-182-24..58).
 
 #### Phase 183: Read-Only Canvas
@@ -135,6 +139,7 @@ Committed as gated phases (ship only if CORE lands clean and budget remains; v2.
   4. The projection renders every one of the 4 canonical seed shapes + the PM pack faithfully — no dropped phase, no phantom edge.
 
 **Plans**: 9 plans (4 waves + 2 gap-closure waves)
+
 - [x] 183-01-PLAN.md — Toolchain + jsdom harness: install `@xyflow/react@^12.11.2`, prove `tsc -b` + `vite build` (A4), the mandatory stylesheet at `index.css:1` (Pitfall 2/F-4), the file-local `mockReactFlow` helper, and the A1 handle spike (Wave 1)
 - [x] 183-02-PLAN.md — The ONE shared `phaseVocabulary.ts` (plain-language sentences, node titles, grounding derivation, moved read shapes) + `parseSkipTarget` corrected to backend semantics, pinned by a SHARED case table read by both a vitest suite and a pytest suite (C-1, D-183-15 amendment) (Wave 1)
 - [x] 183-03-PLAN.md — `EffectiveFeaturesProvider`: broadcast the existing single `GET /features` map through one context so the Builder can gate the toggle without a second fetch; fail-closed semantics and the 181 gate untouched (OP-2/F-2) (Wave 1)
@@ -144,6 +149,7 @@ Committed as gated phases (ship only if CORE lands clean and budget remains; v2.
 - [x] 183-07-PLAN.md — The door: the flag-gated `[≣ Spine] [⬡ Canvas]` in-Builder toggle (Spine default, session-only), the lazy-split canvas mount, the 5-variant flag-off VANISH proof, and the last stale-comment correction (Wave 4)
 - [x] 183-08-PLAN.md — GAP CLOSURE: keyboard activation of a canvas node (Enter/Space → `onSelectNode`, CR-01/SC#3) installed RED-first, the honest `ariaLabelConfig` replacing React Flow's delete/arrow-key promise (WR-06), `groundingFor("partial")` aligned to `deriveTier`'s MIDDLE tier and pinned cross-module (WR-01), and `PhaseNode.tsx` lint cleared (WR-05)
 - [x] 183-09-PLAN.md — GAP CLOSURE (post-live-UAT): a discoverable close for the step detail panel — a ✕ in the `PhaseFormPanel` header + Escape + canvas pane-click, landed for BOTH the Spine and the Canvas view because the defect is pre-existing shared-`handleSelectNode` debt the canvas inherited (GAP-1, operator-reported); the `event.repeat` guard so a held Enter/Space activates once instead of rapid-toggling (WR-08-01, confirmed live); and `domAttributes` clearing the inherited `aria-describedby` on the end cap + unresolved-skip stub so two inert nodes stop announcing an activation they cannot honour (WR-08-04, confirmed live)
+
 **UI hint**: yes
 **Flags**: G-2 sketch **SATISFIED** (134-137 shipped; **137-D is the locked acceptance bar**; no UI-SPEC by operator decision — the sketch READMEs are the design contract); stack — net-new dep `@xyflow/react` v12 (MIT, React-19) introduced here (never the frozen `reactflow` v11 name); G-5 ledger (new `WorkflowCanvas.tsx`/`canvasModel.ts`/`PhaseNode.tsx` mirror `PhaseSpineGraph.tsx` glyph/parse — proactively extract a shared glyph/parse module before the 3rd consumer, 1st touch); pure projection (layout computed, not persisted — Pitfall 3); red line D-14 (projection, never a runtime); no SC#10 (static projection); no migration; FRONTEND-ONLY (the one permitted backend file is a TEST: `backend/tests/unit/test_183_skip_parse_parity.py`). **Planning amendment (2026-07-25):** the "no threat model" flag is honoured as a CONCLUSION, not an omission — every plan carries a `<threat_model>` block recording the full ASVS-L1 walk and the STRIDE register (T-183-01..12 + T-183-SC), voided if any plan grows a backend SOURCE touch. Two operator decisions post-date CONTEXT.md: **OP-1** aligns the client `skip_to_phase` parse to the BACKEND (correction C-1 — `skip_to_phase:a:b` resolves to `a:b`, not `b`), and **OP-2** promotes `useEffectiveFeatures` to a context provider rather than a second `GET /features`.
 
@@ -163,19 +169,46 @@ Committed as gated phases (ship only if CORE lands clean and budget remains; v2.
 **Plans**: 13 plans in 9 waves
 
 Plans:
+**Wave 1**
+
 - [ ] 184-01-PLAN.md — D-184-07 icon swap (compass + handshake), own atomic commit at the head of Wave 0
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 184-02-PLAN.md — Wave 0: the D-184-08 count gate + pure `definitionOps` (ops, both refusals, slug, drag resolver)
 - [ ] 184-03-PLAN.md — Wave 0: `PhaseNode` splits into `nodePresentation` + zero-@xyflow `PhaseNodeCard` + adapter
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 184-04-PLAN.md — Wave 0: `zundo` per-mount builder store + Builder page rewire (persistence untouched)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
 - [ ] 184-05-PLAN.md — `fromCanvas` carry-through serializer + corpus dump + shape generator + the R2 round-trip property
 - [ ] 184-06-PLAN.md — `/validate` + `/grounding-bundle` clients + `useLiveValidation` (debounce, abort, sequence, degraded)
 - [ ] 184-07-PLAN.md — browser-local `canvasNudge` (zero migration) + the plain-language `StepTypePicker`
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
 - [ ] 184-08-PLAN.md — `verdictModel` + the two node marks + the problems tray (server-only verdicts)
 - [ ] 184-09-PLAN.md — `useGroundingBundle` + `PhaseFormPanel`'s optional governance rails (absent = today)
+
+**Wave 6** *(blocked on Wave 5 completion)*
+
 - [ ] 184-10-PLAN.md — canvas editing gestures: drag axis split, cosmetic nudge, ⌥←/⌥→ reorder, verdict marks
+
+**Wave 7** *(blocked on Wave 6 completion)*
+
 - [ ] 184-11-PLAN.md — session composition: live loop + rails wiring, publish handoff, leave guard, 409, WR-09
+
+**Wave 8** *(blocked on Wave 7 completion)*
+
 - [ ] 184-12-PLAN.md — the ＋ insert / ✕ delete affordances, both refusals in the UI, empty-draft invitation
+
+**Wave 9** *(blocked on Wave 8 completion)*
+
 - [ ] 184-13-PLAN.md — the one bottom region: canvas toolbar + tray composition + the D-184-04 key bindings
+
 **UI hint**: yes
 **Flags**: CORE deliverable (VALID-02 author-time STRUCTURAL validation); G-2 sketch (editable canvas + node config + the `workflow_layouts`-vs-auto-layout UX call); stack — `zundo` undo/redo; one-serializer round-trip → existing draft CRUD, layout OUT of JSONB (Pitfall 3 — tested byte-identical across the 4 canonical seeds + PM pack); server-authoritative per-node badges (VALID-03, never client-guess); CANVAS-04 rails graded per GOVERN (185); G-5 ledger (`WorkflowBuilderPage.tsx` = the 3rd authoring door; `PhaseNode.tsx` 2nd touch on the glyph/parse logic); migration SKETCH-CONDITIONAL — slot 114 reserved ONLY IF the nullable `workflow_layouts` side table is confirmed at sketch (OPEN-05), else ZERO migration; red line D-14; no SC#10 (authoring, no run stream); no threat model unless discuss surfaces one.
 
@@ -380,10 +413,12 @@ Committed as gated phases (ship only if CORE lands clean and budget remains; v2.
   5. All four hold across providers, multi-tool prompts, parallel threads, and long histories with Deep Mode byte-identical (SC#10).
 
 **Plans**: 4 plans (3 waves)
+
 - [x] 174-01-PLAN.md — STATE-03 pre-answer reasoning honesty (`outerBannerLabel` reasoningActive → "Reasoning…") [Wave 1]
 - [x] 174-02-PLAN.md — STATE-01a + STATE-02 verify-and-close (cancelled-no-output + stop-indicator reload-derive) [Wave 1]
 - [x] 174-03-PLAN.md — STATE-01b killed-workflow amber block (403 catch branch + composer unlock) [Wave 2]
 - [x] 174-04-PLAN.md — STATE-04 workflow-run timer anchor + single avatar (startedAt stamp + pre-runId dedup) [Wave 3]
+
 **UI hint**: yes
 **Flags**: SC#10; G-2 sketch (honest run-state "feels like"); G-5 (`MessageItem.tsx`, `StreamsProvider.tsx`, `useMessages.ts`, `threads.py` run-lifecycle — audit at discuss); reported-bugs fold (`cancelled-run-empty-bubble-early-cancel`, `killed-workflow-empty-chat-card`, `cancelled-run-stop-indicator-lost-on-navigation`, `setting-up-agent-hides-model-activity`, `BUG-260610-01`); no threat model; no migration.
 
@@ -400,10 +435,12 @@ Committed as gated phases (ship only if CORE lands clean and budget remains; v2.
   4. All three hold across the native providers with Deep Mode byte-identical — provider handling stays at the adapter/sanitizer boundary, no shared-path fork (SC#10 / D-14).
 
 **Plans**: 4 plans (2 waves) — XPROV-04 (BUG-260722-01) folded in per D-05.
+
 - [x] 175-01-PLAN.md — Foundation: capability markers (reasoning_first + reasoning_off SAFE list) + shared provider-safe utility-model guard (XPROV-01/03/04 substrate) [Wave 1]
 - [x] 175-02-PLAN.md — XPROV-02: DSML strip stream-end flush + honest-incomplete leak signal (Option-B post-drain, existing `error` event) [Wave 1]
 - [x] 175-03-PLAN.md — XPROV-01: reasoning_first STRUCTURED gate in resolve_calling_mode + honest reasoning-tools-unsupported error copy [Wave 2]
 - [x] 175-04-PLAN.md — XPROV-03/04: provider-safe guard at title-gen + suggestion + per-MODEL reasoning-off title call [Wave 2]
+
 **Flags**: SC#10; G-5 (gateway/adapter/sanitizer boundary — `openai_compat.py` DeepSeek strip, the `openai_service` param builder, `thread_title.py`; audit at discuss); red line D-14 (adapter boundary only); reported-bugs fold (`BUG-260714-01`, `BUG-260711-02` [deferred — triage fix-vs-verify], `BUG-260708-01`, `BUG-260623-01`, `BUG-260722-01` → XPROV-04); OpenRouter-specific 400s stay OUT (experimental — fix only if native-safe + low-complexity); no threat model; no migration.
 
 #### Phase 176: Chat Render Correctness + Exec Reliability
@@ -420,10 +457,12 @@ Committed as gated phases (ship only if CORE lands clean and budget remains; v2.
   5. The `execute_code` `libraries` parameter installs the requested packages reliably — no silent no-op, no wasted retry rounds (EXEC-01).
 
 **Plans**: 4 plans (2 waves) — created 2026-07-22
+
 - [x] 176-01-PLAN.md — RENDER-01 + RENDER-02: StreamsProvider reconcile correctness (user-bubble content-supersede drop + mount-path onTerminal un-fold by run.run_id) [Wave 1]
 - [x] 176-02-PLAN.md — RENDER-04: Skill-Studio live version pointer (refreshVersions mirror of refreshGate + VersionsTab refreshNonce) [Wave 1]
 - [x] 176-03-PLAN.md — EXEC-01: reliable execute_code install (python -m pip same-interpreter, retry x1) + bounded ModuleNotFound auto-heal + honest tool result [Wave 1]
 - [x] 176-04-PLAN.md — RENDER-03: honest send-drop (non-dispatch → failedSendDrafts/reconcileErrors seam) + fresh-thread pending-send ordering [Wave 2, depends 176-01]
+
 **UI hint**: yes
 **Flags**: SC#10 (chat UI state + agent loop); G-2 sketch (render visual — D-13: NO fresh sketch, sketch 014 + StreamingNarration are the anchor); G-5 (`StreamsProvider.tsx` render-layer only — additive reconcile at existing seams, no refactor-first; EXEC-01 → `tool_dispatcher.py` only, sandbox_service unchanged); reported-bugs fold (`BUG-260712-02`, `BUG-260707-03`, `general-chat-intermittent-silent-send-drop`, `BUG-260706-01`, `BUG-260708-02`; minor `BUG-260609-02`/`-04` deferred → Phase 178); honest threat model (no new trust boundary — all `accept`); no migration (D-16 — all app-layer).
 
@@ -439,11 +478,13 @@ Committed as gated phases (ship only if CORE lands clean and budget remains; v2.
   3. The polish preserves the already-secured 166–168 authz — no widening of org-admin capability, no cross-org leak, no new trust boundary.
 
 **Plans**: 5 plans (2 waves) — created 2026-07-23
+
 - [x] 177-01-PLAN.md — Wave 0: extract the 3 shared org-zone primitives — `StatusChip` (D-08) · `RoleBadge`/`OrgIdentity` (D-04) · `HonestNotice` (D-11) + co-located tests [Wave 1]
 - [x] 177-02-PLAN.md — Identity cohesion: OrgBand + ProfileMenu → shared RoleBadge; per-org-role / honest-absent / indigo-vs-amber-zone audit-and-lock (ORGUX-01, D-04/05/06/07) [Wave 2]
 - [x] 177-03-PLAN.md — Management chips: InvitationsTab + SsoTab → shared StatusChip, RETIRE the UPPERCASE off-grid fork + snap to the 4px grid; link-first + victim-naming preserved (ORGUX-02, D-08/09/10) [Wave 2]
 - [x] 177-04-PLAN.md — Roster + invite dialog: OrgMembersTab + InviteMemberDialog → shared RoleBadge/StatusChip/OrgAvatar + 4px grid; roster stays a pure read leaf (ORGUX-01/02, D-04/08/09/10) [Wave 2]
 - [x] 177-05-PLAN.md — Entry/failure honesty: one AuthCardShell + HonestNotice across SignInForm + AcceptInvitePage; recoverable dead-ends → calm; legible fail-open note (ORGUX-02, D-11/12/13/14) [Wave 2]
+
 **UI hint**: yes
 **Flags**: G-2 sketch (org-surface polish — "feels like"); G-5 light (`StreamsProvider.tsx` — keep `<OrgContext>` OUTSIDE the stream path, preserve the 067.5 Branch-D3 clear guard); rolls in the 166/167/168 live-UAT status-lag (cross-provider SC#10 + SSO round-trip); no SC#10 (not streamed state); no threat model (polish over already-secured surfaces, not new authz); no migration. Fold the LANG-01 relabel here if Phase 179 hasn't run yet.
 

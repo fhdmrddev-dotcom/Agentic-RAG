@@ -127,10 +127,18 @@ Task IDs are assigned by the planner; this map is the contract each task's
 | R12 | at 900 px: exactly one bottom-edge region, no horizontal overflow | 2 | component (structural) + **live G-4** | new composition suite (jsdom cannot measure real overflow) | ❌ W2 | ⬜ pending |
 | R12 | disabled publish's accessible name / adjacent text contains the first verdict message | 2 | component | same | ❌ W2 | ⬜ pending |
 | R12 | no net-new header band | 2 | DOM structure assertion | same | ❌ W2 | ⬜ pending |
-| D-14 | flag-off Builder byte-identical for every audience incl. operators | 0→2 | component | `revertByteIdentical.test.tsx` (7) + new "panel without `rails` prop is unchanged" assertion | ✅ extend | ⬜ pending |
+| D-14 | flag-off Builder byte-identical for every audience incl. operators | 0→2 | component | `revertByteIdentical.test.tsx` (7, unmodified) **+ new `PhaseFormPanel.rails.test.tsx`** carrying the "panel without `rails` prop is unchanged" assertion | ✅ / ❌ new | ⬜ pending |
 | D-184-08 | Wave 0 assertion-free: per-file counts pinned, canvas snapshot byte-unchanged, `tsc` errors ≤ 33 | 0 | script gate | JSON-reporter script above + `git diff --exit-code -- 'src/**/__snapshots__/*'` + `tsc` count | ❌ W0 | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
+
+> **Why D-14's panel guard is a NEW file, not an extension of `revertByteIdentical.test.tsx`:**
+> that suite never renders `PhaseFormPanel` at all, so an assertion added there would guard
+> nothing. `PhaseFormPanel` is a single instance shared by BOTH the Spine and Canvas views, so
+> R11's rails arrive as an **optional `rails` prop whose ABSENCE leaves today's surface
+> byte-for-byte** — and `PhaseFormPanel.rails.test.tsx` is the only place that property is
+> actually observable. `revertByteIdentical.test.tsx` stays **unmodified** (its 7 tests are part
+> of the Wave-0 count pin above).
 
 ---
 
