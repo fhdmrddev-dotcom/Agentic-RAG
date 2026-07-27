@@ -9,8 +9,10 @@
  *  - tierForDefinition resolves STRICT / MIDDLE / LOOSE from the REAL enums; a
  *    null def → LOOSE without throwing.
  *  - PHASE_GLYPHS maps the 6 phase types to the verified fluent-emoji slugs exactly
- *    (gear / memo / robot / busts-in-silhouette / raised-hand / package — the flat
- *    unicode marks it once listed were retired by Phase 127-01).
+ *    (gear / memo / compass / handshake / raised-hand / package — the flat unicode
+ *    marks it once listed were retired by Phase 127-01, and the `robot` /
+ *    `busts-in-silhouette` slugs it listed after that were retired by Phase 184-01
+ *    Task 2 / D-184-07; both names are kept here as HISTORY, not as current truth).
  *  - entryInputKeys prefers input_keys → inputs[].key → ["kickoff_prompt"].
  *  - soulDeliverable returns { kind: "file" } when a terminal llm_emit phase
  *    exists and the honest { kind: "chat" } when none does (D-03).
@@ -125,12 +127,17 @@ describe("soulData.PHASE_GLYPHS — one shared icon map", () => {
   // Phase 127-01 (WUX-03) replaced them with verified fluent-emoji SLUG strings that
   // phaseGlyph() resolves to bundled 3D SVG components. The assertion had been RED
   // ever since — a red claim about the module 183 declares canonical.
+  // Phase 184-01 Task 2 (D-184-07): `llm_agent` "robot" → "compass" and
+  // `llm_batch_agents` "busts-in-silhouette" → "handshake". This is the ONE
+  // assertion edit carved out of D-184-08's zero-assertion-edit gate — the swap is
+  // a deliberate vocabulary decision, not a behaviour-preserving extraction, and it
+  // is enumerated by file/line/old/new in 184-01-SUMMARY.md.
   it("maps the 6 phase types to the verified fluent-emoji slugs exactly", () => {
     expect(PHASE_GLYPHS).toMatchObject({
       programmatic: "gear",
       llm_single: "memo",
-      llm_agent: "robot",
-      llm_batch_agents: "busts-in-silhouette",
+      llm_agent: "compass",
+      llm_batch_agents: "handshake",
       llm_human_input: "raised-hand",
       llm_emit: "package",
     })

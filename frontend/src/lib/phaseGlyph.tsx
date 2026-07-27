@@ -16,10 +16,24 @@
  *     (build-time bundled by unplugin-icons, no runtime CDN fetch). This
  *     mirrors the providerLogo.tsx deep-subpath pattern and enforces the
  *     icon-convention "verify-or-bundle" rule (icon-convention §2, RDD 43).
- *   - Only verified fluent-emoji slugs are used (API-checked 2026-06-27):
- *     gear, memo, robot, busts-in-silhouette, raised-hand, package.
+ *   - Only verified fluent-emoji slugs are used (API-checked 2026-06-27;
+ *     re-verified 2026-07-27 against the INSTALLED
+ *     `@iconify-json/fluent-emoji@1.2.7` icon set, which is the source of
+ *     truth the build resolves against):
+ *     gear, memo, compass, handshake, raised-hand, package.
  *     `fluent-emoji:direct-hit` and `fluent-emoji:no-entry-sign` are ABSENT
  *     from the set and are NEVER referenced here.
+ *
+ * Phase 184-01 Task 2 (D-184-07) — the two cross-cutting slug swaps:
+ * `llm_agent` moved off the previous generic mark to `compass`, and
+ * `llm_batch_agents` moved off the previous silhouettes mark (measured
+ * luminance 34.5 on Deep Midnight — ~4x dimmer than the other five marks, it
+ * visually disappeared) to `handshake` (182.6). Sketch 137-B makes the 3D icon
+ * the SOLE carrier of step type (there is no per-type colour on the card), so
+ * a dim or generic mark means the step type is unreadable. Both maps below —
+ * this one and `soulData.PHASE_GLYPHS` — swapped in the SAME commit: swapping
+ * one alone leaves phaseGlyph() returning the old component while the string
+ * fallback changed, a silent split-brain.
  */
 import type { ComponentType, SVGProps } from "react"
 // Build-time bundled imports — unplugin-icons resolves each slug to a React
@@ -27,8 +41,8 @@ import type { ComponentType, SVGProps } from "react"
 // the "verify-or-bundle" discipline (RESEARCH §Pitfall 2).
 import Gear from "~icons/fluent-emoji/gear"
 import Memo from "~icons/fluent-emoji/memo"
-import Robot from "~icons/fluent-emoji/robot"
-import BustsInSilhouette from "~icons/fluent-emoji/busts-in-silhouette"
+import Compass from "~icons/fluent-emoji/compass"
+import Handshake from "~icons/fluent-emoji/handshake"
 import RaisedHand from "~icons/fluent-emoji/raised-hand"
 import Package from "~icons/fluent-emoji/package"
 
@@ -46,8 +60,8 @@ export type PhaseMark = ComponentType<SVGProps<SVGSVGElement> & { size?: number 
 const PHASE_GLYPH_MARKS: Record<string, PhaseMark> = {
   programmatic: Gear,
   llm_single: Memo,
-  llm_agent: Robot,
-  llm_batch_agents: BustsInSilhouette,
+  llm_agent: Compass,
+  llm_batch_agents: Handshake,
   llm_human_input: RaisedHand,
   llm_emit: Package,
 }

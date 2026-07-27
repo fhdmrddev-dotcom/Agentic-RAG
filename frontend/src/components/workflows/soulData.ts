@@ -32,11 +32,19 @@ import { deriveTier, type CitationPolicy, type ValidatorKind } from "@/component
 // for the phase-type → icon vocabulary; PhaseSpine.tsx reads it for the unicode
 // fallback ("•" for unknown types). Slugs verified API-present 2026-06-27.
 // NEVER use: "direct-hit" (missing from the set), "no-entry-sign" (missing).
+// Phase 184-01 Task 2 (D-184-07): the two cross-cutting swaps — `llm_agent` to
+// "compass" and `llm_batch_agents` to "handshake" (its previous silhouettes mark
+// measured luminance 34.5 on Deep Midnight, ~4x dimmer than the other five, and
+// disappeared). Sketch 137-B makes the 3D mark the SOLE carrier of step type, so
+// this is a correctness fix, not a taste call. Both slugs re-verified present in
+// the installed @iconify-json/fluent-emoji@1.2.7 set 2026-07-27; the swap landed
+// in ONE commit together with phaseGlyph.PHASE_GLYPH_MARKS, because changing this
+// map alone would leave phaseGlyph() returning the old 3D component.
 export const PHASE_GLYPHS: Record<string, string> = {
   programmatic: "gear",
   llm_single: "memo",
-  llm_agent: "robot",
-  llm_batch_agents: "busts-in-silhouette",
+  llm_agent: "compass",
+  llm_batch_agents: "handshake",
   llm_human_input: "raised-hand",
   llm_emit: "package",
 }
