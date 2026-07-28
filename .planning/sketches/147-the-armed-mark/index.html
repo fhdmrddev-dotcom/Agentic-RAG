@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sketch 147 — The armed mark on the canvas (Phase 185, GOVERN-03)</title>
+<link rel="stylesheet" href="../themes/default.css">
+<link rel="stylesheet" href="../themes/canvas-184.css">
+<style>
+  /* Generous vertical padding so variant C's full-height band has somewhere to
+     live without minting a scrollbar. Bottom band reserved for the two note
+     cards, so neither ever sits on a step or a mark. */
+  .flow { padding: 132px 40px 236px; zoom: .87; }
+  .conn { overflow: visible; }
+
+  /* ══ THE GOVERNANCE SEAL (143-A, the winner) ═══════════════════════════════
+     Drawn here on purpose. The real test of an action-risk mark is not whether
+     it works alone — it is whether the card still reads once BOTH governance
+     channels are on it at the same time. Top-right is CLAIMED; nothing below
+     may move, dim or reuse it. */
+  .node.proven {
+    border-color: hsl(220 30% 100% / .34);
+    box-shadow: 0 1px 0 hsl(220 30% 100% / .2) inset,
+                0 0 0 1px hsl(220 30% 100% / .16),
+                0 0 0 4px hsl(220 30% 100% / .05),
+                0 24px 48px -22px rgba(0,0,0,.95);
+  }
+  .seal { display: none; }
+  .node.proven .seal {
+    display: grid; position: absolute; top: 11px; right: 11px;
+    width: 21px; height: 21px; border-radius: 50%; place-items: center;
+    font-size: 11px; z-index: 6;
+    background: hsl(220 30% 100% / .1); border: 1px solid hsl(220 30% 100% / .34);
+    color: var(--color-text);
+  }
+
+  /* ══ ALL THREE MARKS ARE MADE OF SHAPE ════════════════════════════════════
+     No hue anywhere in this block. Every stroke is white-alpha, so the
+     greyscale test changes nothing. Colour stays banked for Phase 188. */
+
+  /* ── VARIANT A — THE BARRIER ─────────────────────────────────────────────
+     A level-crossing boom across the connector INTO the risky step. Armed =
+     boom down across the line. Unguarded = same posts, boom raised. The mark
+     is TALL rather than wide, which is what 144-B got wrong: a 30px chip in a
+     66px gap sits exactly where the eye skips. */
+  .gate { display: none; }
+  body.va .gate {
+    display: block; position: absolute; left: 50%; top: 50%;
+    transform: translate(-50%, -50%); width: 36px; height: 46px; z-index: 7;
+  }
+  .gate .post {
+    position: absolute; left: 3px; top: 0; bottom: 0; width: 3px; border-radius: 2px;
+    background: linear-gradient(to bottom, hsl(220 30% 100% / .62), hsl(220 30% 100% / .3));
+  }
+  .gate .post::after {
+    content: ''; position: absolute; left: -3px; bottom: -3px; width: 9px; height: 4px;
+    border-radius: 2px; background: hsl(220 30% 100% / .42);
+  }
+  .gate .boom {
+    position: absolute; left: 5px; top: 50%; width: 29px; height: 5px; border-radius: 2px;
+    transform-origin: 0 50%; transform: translateY(-50%) rotate(0deg);
+    transition: transform var(--dur-slow) var(--ease-out);
+    background: repeating-linear-gradient(90deg,
+      hsl(220 30% 100% / .88) 0 5px, hsl(220 30% 100% / .2) 5px 10px);
+  }
+  .gate.open .boom { transform: translateY(-50%) rotate(-64deg); }
+  .gate .cap {
+    position: absolute; top: 52px; left: 50%; transform: translateX(-50%);
+    white-space: nowrap; font-size: 10px; line-height: 1.3; text-align: center;
+    color: var(--color-text-muted); font-family: var(--font-sans);
+  }
+  .gate.open .cap { color: var(--color-text-dim); }
+
+  /* ── VARIANT B — THE LATCH ───────────────────────────────────────────────
+     A clasp on the card's LEADING EDGE. Left-centre is the one part of the
+     137-B card that is genuinely free: top-left is the step number, top-right
+     is the governance seal, top-centre is the floating icon, and the bottom
+     edge already carries the run chip and the per-node actions. */
+  .latch { display: none; }
+  body.vb .latch {
+    display: block; position: absolute; left: -14px; top: 50%;
+    transform: translateY(-50%); width: 28px; height: 32px; z-index: 7;
+  }
+  .latch .shell {
+    position: absolute; bottom: 0; left: 0; width: 28px; height: 19px; border-radius: 6px;
+    background: var(--color-bg-elev1); border: 1.5px solid hsl(220 30% 100% / .55);
+    box-shadow: 0 4px 10px -3px rgba(0,0,0,.9);
+  }
+  .latch .shell::after {
+    content: ''; position: absolute; left: 50%; top: 50%; width: 3px; height: 7px;
+    border-radius: 2px; transform: translate(-50%, -50%);
+    background: hsl(220 30% 100% / .62);
+  }
+  .latch .shackle {
+    position: absolute; top: 0; left: 7px; width: 14px; height: 15px;
+    border: 1.5px solid hsl(220 30% 100% / .55); border-bottom: 0;
+    border-radius: 9px 9px 0 0; transform-origin: 100% 100%;
+    transition: transform var(--dur-slow) var(--ease-out);
+  }
+  .latch.open .shackle { transform: rotate(32deg) translateY(-2px); }
+  .latch.open .shell::after { height: 3px; }
+
+  /* ── VARIANT C — THE THRESHOLD ───────────────────────────────────────────
+     A hatched band spanning the whole canvas at the checkpoint. Everything to
+     its right is past the point of no return. The loudest of the three, and
+     the only one that reads as a property of the FLOW rather than of a card. */
+  .band { display: none; }
+  body.vc .band {
+    display: block; position: absolute; left: 50%; transform: translateX(-50%);
+    top: -150px; bottom: -150px; width: 27px; border-radius: 3px; z-index: 2;
+    border-left: 1px solid hsl(220 30% 100% / .3);
+    border-right: 1px solid hsl(220 30% 100% / .3);
+    background: repeating-linear-gradient(-45deg,
+      hsl(220 30% 100% / .17) 0 5px, transparent 5px 10px);
+  }
+  body.vc .band.open {
+    background: none; border-style: dashed; border-color: hsl(220 30% 100% / .17);
+  }
+  .band .vlabel {
+    position: absolute; top: 50%; left: 50%; white-space: nowrap;
+    transform: translate(-50%, -50%) rotate(-90deg);
+    font-size: 10px; letter-spacing: .1em; text-transform: uppercase;
+    font-family: var(--font-mono); color: var(--color-text-muted);
+    background: var(--color-bg); padding: 3px 7px; border-radius: 4px;
+  }
+  .band.open .vlabel { color: var(--color-text-dim); }
+
+  /* the mark is a real control — clicking it arms / disarms the step */
+  .gate, .latch, .band { cursor: pointer; }
+  .gate:hover .boom { background: repeating-linear-gradient(90deg,
+      hsl(220 30% 100% / 1) 0 5px, hsl(220 30% 100% / .34) 5px 10px); }
+  .latch:hover .shell, .latch:hover .shackle { border-color: hsl(220 30% 100% / .85); }
+  .band:hover { border-color: hsl(220 30% 100% / .55); }
+  .gate:focus-visible, .latch:focus-visible, .band:focus-visible {
+    outline: 2px solid var(--color-primary); outline-offset: 3px; border-radius: 4px;
+  }
+
+  /* ══ PHASE 188's RUN STATUS — the thing every mark must survive ═══════════
+     Drawn exactly as 143 drew it: colour on the BORDER plus an outer glow. */
+  body.run-go .node.active {
+    border-color: hsl(239 90% 70% / .85) !important;
+    box-shadow: 0 0 0 1px hsl(239 90% 70% / .5), 0 0 40px -6px hsl(239 90% 70% / .6),
+                0 24px 48px -22px rgba(0,0,0,.95) !important;
+  }
+  body.run-you .node.active {
+    border-color: hsl(38 92% 62% / .9) !important;
+    box-shadow: 0 0 0 1px hsl(38 92% 62% / .5), 0 0 40px -6px hsl(38 92% 62% / .6),
+                0 24px 48px -22px rgba(0,0,0,.95) !important;
+  }
+  body.run-bad .node.active {
+    border-color: hsl(0 78% 58% / .9) !important;
+    box-shadow: 0 0 0 1px hsl(0 78% 58% / .5), 0 0 40px -6px hsl(0 78% 58% / .6),
+                0 24px 48px -22px rgba(0,0,0,.95) !important;
+  }
+  body.run-go .node.done, body.run-you .node.done, body.run-bad .node.done { opacity: .62; }
+  .runchip {
+    display: none; position: absolute; left: 50%; transform: translateX(-50%); bottom: -13px;
+    align-items: center; gap: 5px; border-radius: 999px; padding: 3px 11px; font-size: 10.5px;
+    white-space: nowrap; z-index: 9; font-weight: 500;
+  }
+  .node.active .runchip { display: inline-flex; }
+  body.run-go  .node.active .runchip { background: hsl(239 60% 22%); border: 1px solid hsl(239 90% 70% / .6); color: hsl(239 100% 88%); }
+  body.run-you .node.active .runchip { background: hsl(38 60% 18%);  border: 1px solid hsl(38 92% 62% / .6);  color: hsl(38 92% 84%); }
+  body.run-bad .node.active .runchip { background: hsl(0 55% 18%);   border: 1px solid hsl(0 78% 58% / .6);   color: hsl(0 90% 84%); }
+  body.run-go .node.active { animation: breathe 2.6s var(--ease-out) infinite; }
+  @keyframes breathe { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-3px) } }
+
+  /* the greyscale proof — no colour at all */
+  body.grey .plane { filter: grayscale(1); }
+
+  /* ── the two note cards, in the reserved bottom band ─────────────────────── */
+  .trythis {
+    position: absolute; left: 24px; bottom: 22px; z-index: 20; max-width: 330px;
+    background: hsl(220 30% 8% / .95); backdrop-filter: blur(16px);
+    border: 1px solid hsl(239 100% 82% / .28); border-radius: 14px; padding: 13px 15px;
+    box-shadow: var(--shadow-lg);
+  }
+  .trythis h5 { margin: 0 0 8px; font-size: 12px; font-family: var(--font-headline);
+                color: var(--color-text); font-weight: 600; }
+  .trythis ol { margin: 0; padding-left: 18px; font-size: 11.5px; line-height: 1.75; color: var(--color-text-muted); }
+  .trythis li { margin-bottom: 5px; }
+  .trythis li:last-child { margin-bottom: 0; }
+  .trythis b { color: var(--color-text); }
+  .trythis .close { position: absolute; top: 8px; right: 9px; background: none; border: 0;
+                    color: var(--color-text-dim); cursor: pointer; font-size: 14px; line-height: 1; }
+  .trythis .close:hover { color: var(--color-text); }
+
+  .verdict {
+    position: absolute; right: 24px; bottom: 22px; z-index: 20; max-width: 355px;
+    background: hsl(220 30% 8% / .95); backdrop-filter: blur(16px);
+    border: 1px solid var(--color-border); border-radius: 14px; padding: 13px 15px;
+    font-size: 11.5px; line-height: 1.7; color: var(--color-text-muted);
+  }
+  .verdict h5 { margin: 0 0 7px; font-size: 12px; font-family: var(--font-headline);
+                color: var(--color-text); font-weight: 600; }
+  .verdict b { color: var(--color-text); }
+  .verdict .bad { color: hsl(0 85% 76%); }
+  .verdict .good { color: hsl(142 71% 68%); }
+
+  .legend {
+    position: absolute; left: 50%; transform: translateX(-50%); bottom: 26px; z-index: 12;
+    display: flex; align-items: center; gap: 18px; padding: 9px 16px; border-radius: 12px;
+    background: hsl(220 30% 8% / .9); border: 1px solid var(--color-border);
+    font-size: 11.5px; color: var(--color-text-muted); white-space: nowrap;
+  }
+  .legend .k { display: inline-flex; align-items: center; gap: 7px; }
+</style>
+</head>
+<body class="alive card-b va run-off">
+
+<nav class="variant-nav">
+  <span class="label">Sketch 147</span>
+  <button class="variant-tab active" data-v="a" type="button">A: The barrier</button>
+  <button class="variant-tab" data-v="b" type="button">B: The latch</button>
+  <button class="variant-tab" data-v="c" type="button">C: The threshold</button>
+</nav>
+
+<p class="lead" id="lead"></p>
+
+<div class="bar">
+  <span class="lbl">Workflow</span>
+  <span style="font-size:var(--text-sm);color:var(--color-text)">Monthly supplier risk report</span>
+  <span class="lbl" style="margin-left:14px">What&rsquo;s armed</span>
+  <div class="seg" id="armseg">
+    <button type="button" data-arm="default" class="on">Email only</button>
+    <button type="button" data-arm="both">Both risky steps</button>
+    <button type="button" data-arm="none">Nothing armed</button>
+  </div>
+  <span class="lbl" style="margin-left:8px">Run state</span>
+  <div class="seg" id="runseg">
+    <button type="button" data-run="off" class="on">Not running</button>
+    <button type="button" data-run="go">Running</button>
+    <button type="button" data-run="you">Needs you</button>
+    <button type="button" data-run="bad">Failed</button>
+  </div>
+  <div class="spacer"></div>
+  <div class="seg" id="greyseg">
+    <button type="button" data-grey="off" class="on">Full colour</button>
+    <button type="button" data-grey="on">No colour</button>
+  </div>
+</div>
+
+<div class="stage" id="stage">
+  <div class="plane scrollbar-thin" id="plane">
+    <div class="amb"></div>
+    <div class="flow" id="flow"></div>
+    <div class="legend" id="legend"></div>
+  </div>
+
+  <div class="trythis" id="trythis">
+    <button class="close" type="button" id="closetry" aria-label="Hide">&#10005;</button>
+    <h5>Four things to try</h5>
+    <ol>
+      <li>Without reading a word &mdash; <b>which step stops and asks you?</b> And which one <i>should</i> but doesn&rsquo;t?</li>
+      <li><b>Click any mark</b> to arm or disarm that step. Does the change read instantly?</li>
+      <li>Set run state to <b>Running</b>, then <b>Failed</b>. Does the mark survive Phase 188&rsquo;s colour?</li>
+      <li>Switch to <b>No colour</b>, then look at steps 1 and 3 &mdash; can you still read <i>both</i> governance channels at once?</li>
+    </ol>
+  </div>
+  <div class="verdict" id="verdict"></div>
+</div>
+
+<div class="foot" id="foot"></div>
+
+<div class="toast" id="toast"></div>
+
+<div class="sketch-toolbar">
+  <span>147</span>
+  <select id="themesel" aria-label="Theme">
+    <option value="default">Deep Midnight</option>
+  </select>
+</div>
+
+<script src="../themes/phase-icons-3d.js"></script>
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   Sketch 147 — GOVERN-03. What shape marks a step that STOPS AND ASKS YOU?
+
+   THE OPEN QUESTION THIS EXISTS TO CLOSE. Sketch 144 drew two shapes and
+   locked no winner — 145/146 overtook it. `185-SPEC.md` records the gap
+   verbatim: the at-rest canvas mark for an armed action-risk checkpoint is
+   the one design question the 142–146 batch left open. Requirement 8 locks
+   THAT it must be marked; this sketch picks the shape.
+
+   WHAT 144 LEARNED, AND WHY NEITHER SHAPE SURVIVED AS DRAWN:
+     · 144-A, a collar on the card's bottom edge — the collar, the run chip
+       and the per-node editing actions all want that same edge. On the
+       shipped card-b that is literally true: `.runchip` sits at bottom:-13px
+       and `.acts` at bottom:-12px.
+     · 144-B, a checkpoint badge on the incoming connector — the mark was
+       30px in the 66px gap between steps, which is exactly where the eye
+       skips, and its label was wider than the connector it sat on.
+
+   So all three variants here are TALL, STRUCTURAL or OFF-CARD, and none of
+   them touches the bottom edge.
+
+   THE BUDGETS, both committed before this sketch started:
+     · NO COLOUR. Banked for Phase 188's run status. Every stroke below is
+       white-alpha, which is why the greyscale switch changes nothing.
+     · NO WORD-BADGE. Both card slots are spoken for. The mark is shape.
+     · TOP-RIGHT IS CLAIMED by the 143-A governance seal and may never be
+       reused, moved or dimmed. All three variants leave it alone.
+
+   THE SECOND DECISION, operator 2026-07-28: an UNARMED risky step is marked
+   too — same shape, unlatched. Without that, a step that sends an email with
+   nobody watching looks identical to a step that reads a file, and sketch
+   144's surviving finding (the default must be ARMED-ON) has nothing to
+   argue against on screen. Step 5 is the whole point of the picture.
+
+   The 5-step flow is the canonical one fixed in MANIFEST.md during the
+   cross-sketch alignment audit — the same workflow 142/143/145/146 use.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+var STEPS = [
+  { icon: 'llm_agent_compass', title: 'Find the risks in our supplier files',
+    sub: 'Reads your contracts and incident reports', proven: true,  risky: false },
+  { icon: 'llm_single',        title: 'Work out which suppliers look shaky',
+    sub: 'Judgement — no documents involved',      proven: false, risky: false },
+  { icon: 'llm_emit',          title: 'Write the risk report',
+    sub: 'Every claim has to trace to a document',      proven: true,  risky: false },
+  { icon: 'connector_email',   title: 'Email it to procurement',
+    sub: 'Sends the report outside the company',        proven: false, risky: true },
+  { icon: 'connector_link',    title: 'File it in the shared drive',
+    sub: 'Writes the report to your team folder',       proven: false, risky: true }
+];
+
+/* which step the run sits on, per run state. `you` MUST land on step 4 — that
+   is where an approval actually waits, and it is the collision worth seeing. */
+var ACTIVE = { off: -1, go: 0, you: 3, bad: 2 };
+
+/* the three arming presets. Index = step index. */
+var ARM_PRESETS = {
+  'default': { 3: true,  4: false },
+  'both':    { 3: true,  4: true  },
+  'none':    { 3: false, 4: false }
+};
+
+var LEAD = {
+  a: '<b>A — The barrier.</b> A level-crossing boom drops across the line going <i>into</i> the risky ' +
+     'step. Armed, the boom is down and the flow visibly cannot continue; unguarded, the same posts stand ' +
+     'with the boom raised. The mark is tall rather than wide, so it is not the 30px chip in a 66px gap ' +
+     'that 144-B became. Rides the <code>edgeTypes.flow</code> entry the canvas already registers.',
+  b: '<b>B — The latch.</b> A clasp on the card’s leading edge — closed when armed, sprung open ' +
+     'when not. Left-centre is the one part of the 137-B card that is genuinely free: the step number owns ' +
+     'top-left, the governance seal owns top-right, the 3D mark floats at top-centre, and the bottom edge ' +
+     'is already carrying the run chip and the editing actions. Cheapest to build — pure ' +
+     '<code>PhaseNodeCard</code>, no edge work at all.',
+  c: '<b>C — The threshold.</b> A hatched band spanning the whole canvas at the checkpoint. Everything ' +
+     'to its right is past the point of no return. The only one of the three that reads as a property of ' +
+     'the <i>flow</i> rather than of a card — and the only one you cannot possibly miss. The question ' +
+     'is whether a canvas that will also carry live run state (188) and connectors (189) can afford it.'
+};
+
+var VERDICT = {
+  a: '<h5>What A costs</h5>It is the most literal of the three — the boom is doing exactly what the ' +
+     'engine does, stopping the run <i>before</i> the action. <span class="good">Nothing on the card moves, ' +
+     'so the seal, the step number and the bottom edge are all untouched</span>, and run colour cannot ' +
+     'reach it. The cost: the mark lives in the gap, so on a long flow at fit-zoom it shrinks with ' +
+     'everything else, and a raised boom is a quieter “not armed” than the other two.',
+  b: '<h5>What B costs</h5>Cheapest by a distance — one pseudo-element on <code>PhaseNodeCard</code>, ' +
+     'no custom edge, no layout maths. <span class="good">It also scales down most gracefully</span>, ' +
+     'because it rides the card. The cost is real though: it puts a <i>second</i> lock-shaped mark on a ' +
+     'card that already carries the governance seal, and <span class="bad">at a glance the two can read ' +
+     'as the same channel</span> — which is the one thing graded governance cannot afford, since ' +
+     'they are orthogonal dials.',
+  c: '<h5>What C costs</h5>Unmissable, and the only variant where “which steps are past the ' +
+     'checkpoint” is answerable without looking at any card. <span class="good">It also survives ' +
+     'zoom-out better than either</span>. But it is loud in a way the calm-instrument direction has ' +
+     'resisted everywhere else, and it claims full canvas height — <span class="bad">a budget Phase ' +
+     '188’s run state and Phase 189’s connectors have not been asked about yet</span>. With two ' +
+     'steps armed it starts to look like a table, not a flow.'
+};
+
+var variant = 'a', run = 'off', armPreset = 'default';
+var armed = { 3: true, 4: false };
+
+function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'); }
+
+function markLabel(isArmed) {
+  return isArmed ? 'Stops and asks you' : 'Nobody is asked';
+}
+
+function renderFlow() {
+  var act = ACTIVE[run];
+  var html = '';
+  STEPS.forEach(function (s, i) {
+    if (i) {
+      /* the connector INTO this step carries A's barrier and C's band */
+      var connMark = '';
+      if (s.risky) {
+        var on = !!armed[i];
+        var open = on ? '' : ' open';
+        connMark =
+          '<div class="gate' + open + '" tabindex="0" role="button" data-arm-i="' + i + '"' +
+            ' aria-label="' + (on ? 'Armed' : 'Not armed') + ' — ' + esc(s.title) +
+            '. Activate to ' + (on ? 'disarm' : 'arm') + '.">' +
+            '<span class="post"></span><span class="boom"></span>' +
+            '<span class="cap">' + markLabel(on) + '</span>' +
+          '</div>' +
+          '<div class="band' + open + '" tabindex="0" role="button" data-arm-i="' + i + '"' +
+            ' aria-label="' + (on ? 'Armed' : 'Not armed') + ' — ' + esc(s.title) +
+            '. Activate to ' + (on ? 'disarm' : 'arm') + '.">' +
+            '<span class="vlabel">' + (on ? 'Your OK needed' : 'No OK needed') + '</span>' +
+          '</div>';
+      }
+      html += '<div class="conn">' + connMark + '<div class="line"></div><div class="tip"></div></div>';
+    }
+
+    var cls = 'node' + (s.proven ? ' proven' : '');
+    if (run !== 'off') {
+      if (i === act) cls += ' active';
+      else if (i < act) cls += ' done';
+    }
+    var chip = run === 'go' ? 'Running now' : run === 'you' ? 'Waiting for you' : run === 'bad' ? 'Failed here' : '';
+
+    /* B's latch rides the card itself */
+    var latch = '';
+    if (s.risky) {
+      var onB = !!armed[i];
+      latch = '<div class="latch' + (onB ? '' : ' open') + '" tabindex="0" role="button" data-arm-i="' + i + '"' +
+              ' aria-label="' + (onB ? 'Armed' : 'Not armed') + ' — ' + esc(s.title) +
+              '. Activate to ' + (onB ? 'disarm' : 'arm') + '.">' +
+              '<span class="shell"></span><span class="shackle"></span></div>';
+    }
+
+    var aria = 'Step ' + (i + 1) + ': ' + esc(s.title) +
+               (s.proven ? ' — must prove it' : '') +
+               (s.risky ? (armed[i] ? ' — stops and asks you' : ' — nobody is asked') : '');
+
+    html += '<div class="' + cls + '" data-i="' + i + '" tabindex="0" role="button" aria-label="' + aria + '">' +
+      '<span class="stepn">' + (i + 1) + '</span>' +
+      '<span class="seal" aria-hidden="true">⛨</span>' +
+      latch +
+      '<div class="icowrap">' + icon3d(s.icon, 52) + '</div>' +
+      '<div class="body">' +
+        '<div class="ttl">' + esc(s.title) + '</div>' +
+        '<div class="sub">' + esc(s.sub) + '</div>' +
+      '</div>' +
+      (chip ? '<span class="runchip">' + chip + '</span>' : '') +
+    '</div>';
+  });
+  html += '<div class="endpin"><span class="dot"></span> ends here</div>';
+  document.getElementById('flow').innerHTML = html;
+}
+
+function renderLegend() {
+  var shut, open;
+  if (variant === 'a') { shut = 'boom down'; open = 'boom raised'; }
+  else if (variant === 'b') { shut = 'clasp closed'; open = 'clasp sprung open'; }
+  else { shut = 'solid band'; open = 'dashed, empty band'; }
+  document.getElementById('legend').innerHTML =
+    '<span class="k"><b style="color:var(--color-text)">Stops and asks you</b> — ' + shut + '</span>' +
+    '<span class="k"><b style="color:var(--color-text)">Nobody is asked</b> — ' + open + '</span>' +
+    '<span class="k" style="color:var(--color-text-dim)">⛨ top-right is the governance seal — a different channel</span>';
+}
+
+function renderFoot() {
+  var nArmed = 0, nRisky = 0;
+  STEPS.forEach(function (s, i) { if (s.risky) { nRisky++; if (armed[i]) nArmed++; } });
+  var bits = [];
+  bits.push('<span class="pill">' + nArmed + ' of ' + nRisky + ' irreversible steps stop and ask you</span>');
+  if (nArmed < nRisky) {
+    bits.push('<span class="pill bad">' + (nRisky - nArmed) + ' can act with nobody watching — harmless today, the whole risk at Phase 190</span>');
+  } else {
+    bits.push('<span class="pill good">✓ Every irreversible step is guarded</span>');
+  }
+  bits.push('<span class="pill good">✓ No colour spent — Phase 188 keeps its whole budget</span>');
+  bits.push('<span class="pill good">✓ No word-badge spent — the mark is shape</span>');
+  bits.push('<span class="pill good">✓ Top-right seal untouched — 5 steps, still 5 steps</span>');
+  document.getElementById('foot').innerHTML = bits.join('');
+}
+
+function render() {
+  document.body.classList.remove('va', 'vb', 'vc');
+  document.body.classList.add('v' + variant);
+  document.body.classList.remove('run-off', 'run-go', 'run-you', 'run-bad');
+  document.body.classList.add('run-' + run);
+  document.getElementById('lead').innerHTML = LEAD[variant];
+  document.getElementById('verdict').innerHTML = VERDICT[variant] +
+    '<div style="margin-top:9px;padding-top:8px;border-top:1px dashed var(--color-border);font-size:11px">' +
+    '<b>All three survive “no colour”</b>, because none of them is made of colour. All three also ' +
+    'keep the flow at <b>5 steps</b> — the checkpoint is a gate ON the risky step, never an extra step, ' +
+    'so “step 4 of 5” keeps meaning what it says.</div>';
+  renderFlow(); renderLegend(); renderFoot();
+}
+
+function toast(msg) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(function () { t.classList.remove('show'); }, 2600);
+}
+
+function toggleArm(i) {
+  armed[i] = !armed[i];
+  var s = STEPS[i];
+  toast(armed[i]
+    ? '“' + s.title + '” now stops and asks you before it runs.'
+    : '“' + s.title + '” will now run with nobody asked.');
+  /* the preset control no longer describes reality — say so rather than lie */
+  armPreset = 'custom';
+  document.querySelectorAll('#armseg button').forEach(function (b) { b.classList.remove('on'); });
+  render();
+}
+
+document.querySelector('.variant-nav').addEventListener('click', function (e) {
+  var b = e.target.closest('.variant-tab'); if (!b) return;
+  document.querySelectorAll('.variant-tab').forEach(function (t) { t.classList.remove('active'); });
+  b.classList.add('active'); variant = b.getAttribute('data-v'); render();
+});
+
+document.querySelector('.bar').addEventListener('click', function (e) {
+  var b = e.target.closest('button'); if (!b) return;
+  var seg = b.closest('.seg'); if (!seg) return;
+  seg.querySelectorAll('button').forEach(function (x) { x.classList.remove('on'); });
+  b.classList.add('on');
+  if (b.hasAttribute('data-run'))  run = b.getAttribute('data-run');
+  if (b.hasAttribute('data-grey')) document.body.classList.toggle('grey', b.getAttribute('data-grey') === 'on');
+  if (b.hasAttribute('data-arm')) {
+    armPreset = b.getAttribute('data-arm');
+    var preset = ARM_PRESETS[armPreset];
+    Object.keys(preset).forEach(function (k) { armed[k] = preset[k]; });
+  }
+  render();
+});
+
+/* the marks are real controls — click or keyboard */
+document.getElementById('flow').addEventListener('click', function (e) {
+  var m = e.target.closest('[data-arm-i]'); if (!m) return;
+  e.stopPropagation();
+  toggleArm(parseInt(m.getAttribute('data-arm-i'), 10));
+});
+
+document.getElementById('flow').addEventListener('keydown', function (e) {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  if (e.repeat) return;                       /* the WR-08-01 lesson, in a sketch */
+  var m = e.target.closest('[data-arm-i]'); if (!m) return;
+  e.preventDefault(); e.stopPropagation();
+  toggleArm(parseInt(m.getAttribute('data-arm-i'), 10));
+});
+
+document.getElementById('closetry').addEventListener('click', function () {
+  document.getElementById('trythis').style.display = 'none';
+});
+
+document.getElementById('themesel').addEventListener('change', function () {
+  document.querySelector('link[href*="themes/default"]').href = '../themes/' + this.value + '.css';
+});
+
+render();
+</script>
+</body>
+</html>

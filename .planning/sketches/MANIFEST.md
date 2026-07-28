@@ -941,3 +941,33 @@ Ran across 142-146 before the wrap-up. **Three real misalignments found and fixe
 unconditionally at Phase 190**, when live connectors make an unread-but-approved document something that
 really leaves the company. The *behaviour* is not deferred: until it is decided the surface says so out
 loud and records **approved without a preview**.
+
+**Resolved at `/gsd:spec-phase 185` (2026-07-28, commit `4d7ea818`):** the `.docx` preview gets **its own
+insert phase immediately after 185** — not Phase 190, and not folded into 185. Its consumer
+(`FilesSection` → `FilePreview`, `frontend/src/components/panel/`) already ships and is independent of
+governance; it maps to no GOVERN requirement and needs a net-new frontend dependency. The 190 re-open
+trigger is satisfied early rather than dropped.
+
+### Phase 185 session (cont.) — the one shape 142–146 left open (2026-07-28)
+
+`185-SPEC.md` locked 9 requirements and recorded exactly one unsettled design question: **the at-rest
+canvas mark for an armed action-risk checkpoint.** Sketch 144 drew two shapes and locked no winner —
+145/146 overtook it — and neither survived as drawn once the shipped CSS was read: 144-A's collar wants
+the same bottom edge as `.runchip` (`bottom: -13px`) and `.acts` (`bottom: -12px`), and 144-B's connector
+badge was 30px of mark in a **66px** gap where the eye skips. Requirement 8 locks *that* an armed step
+must be marked and locks the budget (no colour, no word-badge, top-right seal untouched, still 5 steps);
+147 picks the shape. **Intake decisions:** the mark **interrupts the flow** rather than sitting quietly on
+a card, and an **unarmed risky step is marked too** — same shape, unlatched — because otherwise a step
+that emails a report with nobody watching looks identical to a step that reads a file, and 144's surviving
+finding (*the default must be ARMED-ON*) has nothing to argue against on screen.
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 147 | the-armed-mark | What shape marks a step that stops and asks you first — loud enough to read as "the run stops here", without colour, without a badge, and without touching the claimed top-right seal or the contested bottom edge? | *pending* | phase-185, govern-03, action-risk, armed-checkpoint, armed-default, unguarded-risk, canvas-mark, shape-only, phase-188, phase-189, g2-sketch-gate |
+
+**The build cost, established while drawing:** `WorkflowCanvas.tsx:279` already registers an `edgeTypes`
+entry named `flow` and `canvasModel.ts:88` gives every edge a `data.kind` — so a connector-based mark
+(A / C) rides a shipped seam rather than needing net-new infrastructure. B is still cheapest by a
+distance (one pseudo-element on `PhaseNodeCard`, no edge work, scales with the card at fit-zoom), but it
+puts a **second lock-shaped mark** on a card that already carries the governance seal, and the two dials
+are orthogonal — reading them as one channel is the specific risk to judge.
