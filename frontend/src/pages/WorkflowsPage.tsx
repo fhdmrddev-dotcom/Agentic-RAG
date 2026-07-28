@@ -47,7 +47,10 @@ import {
   type WorkflowDefinitionJSON,
   type WorkflowDeletePreview,
 } from "@/lib/api"
-import { type BuilderInitial } from "@/pages/WorkflowBuilderPage"
+// Phase 184.1-01 (D-184.1-04): the ONE canvas-gate rule, imported rather than
+// re-derived — three components now need the answer and a hand-copied three-part
+// predicate is exactly the drift this project keeps getting bitten by.
+import { type BuilderInitial, useCanvasGate } from "@/pages/WorkflowBuilderPage"
 import { PublishGauntlet } from "@/components/workflows/PublishGauntlet"
 // Phase 124-02 Task 1 (WUX-01): the soul atoms (tier + glyph + needs) now come from
 // the ONE shared soulData module (Plan 01 extracted them VERBATIM from this page —
@@ -106,6 +109,10 @@ interface WorkflowsPageProps {
 type PageView = "library" | "builder"
 
 export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
+  // Phase 184.1-01: does this page host the Builder's chrome, or has the Builder taken it?
+  // Fail-closed and read through the shared rule — see `useCanvasGate`'s docblock for why
+  // an ancestor has to ask at all (the three bands are contributed at three nesting levels).
+  const canvasEnabled = useCanvasGate()
   const [pageView, setPageView] = useState<PageView>("library")
   // null = "All projects"; "__unbound__" = unbound; else a folder id.
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
@@ -327,22 +334,43 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
 
   // ── BUILDER host (the Build-card / Open / Tweak destination — three-homes, no router). ──
   if (pageView === "builder") {
+    /**
+     * Phase 184.1-01 (D-184.1-01 / D-184.1-02) — the breadcrumb group, declared once and
+     * drawn either in this page's own band (flag off, exactly as it ships) or inside the
+     * Builder's merged header row (flag on).
+     *
+     * `backToLibrary` — and with it the whole unsaved-work leave guard — stays owned HERE.
+     * What moves is where the button is PAINTED, not what it closes over: the node travels
+     * down as an opaque child and neither the door shell nor the Builder reads anything out
+     * of it. That is the difference between this re-flow and a refactor.
+     */
+    const breadcrumbGroup = (
+      <>
+        <button
+          type="button"
+          data-testid="builder-back"
+          onClick={backToLibrary}
+          className="rounded-md border border-border px-2.5 py-1 text-[13px] text-muted-foreground hover:text-foreground"
+        >
+          ← Workflows
+        </button>
+        <span className="text-[13px] font-medium text-foreground">
+          {builderInitial ? builderInitial.label : "Build a workflow"}
+        </span>
+        <NetNewFlag />
+      </>
+    )
+
     return (
       <div className="flex h-full flex-col bg-background">
-        <div className="flex items-center gap-3 border-b border-border px-4 py-2">
-          <button
-            type="button"
-            data-testid="builder-back"
-            onClick={backToLibrary}
-            className="rounded-md border border-border px-2.5 py-1 text-[13px] text-muted-foreground hover:text-foreground"
-          >
-            ← Workflows
-          </button>
-          <span className="text-[13px] font-medium text-foreground">
-            {builderInitial ? builderInitial.label : "Build a workflow"}
-          </span>
-          <NetNewFlag />
-        </div>
+        {/* D-184.1-01 — flag off ⇒ this band renders exactly as it always has, and the two
+            merge props below are genuinely absent from the element. Flag on ⇒ no band here;
+            the group is hosted downstream. */}
+        {!canvasEnabled && (
+          <div className="flex items-center gap-3 border-b border-border px-4 py-2">
+            {breadcrumbGroup}
+          </div>
+        )}
         <div className="min-h-0 flex-1">
           {/* WUX-02 (047-A): the Studio authoring entry forks into the two-door shell.
               A FRESH build opens at the "both" chooser; Open/Tweak land straight in the
@@ -355,6 +383,10 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
             def={builderInitial?.definition as DefShape | undefined}
             // Open/Tweak land in the govern door; a fresh build opens at "both".
             initialDoor={builderInitial ? "govern" : "both"}
+            // Phase 184.1-01 — SPREAD-CONDITIONAL (the D-14 idiom): with the flag off both
+            // keys are ABSENT from the element, so the door shell and the Builder are
+            // reached by a call that is byte-for-byte the one that shipped.
+            {...(canvasEnabled ? { inline: true, headerLead: breadcrumbGroup } : {})}
             // OPEN/TWEAK: the existing definition + its real row id flows straight
             // through to the Builder's `initial` (saves PATCH it). Absent → fresh build.
             initial={

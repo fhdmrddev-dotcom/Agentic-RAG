@@ -179,6 +179,41 @@ import type { WorkflowDefinitionJSON } from "@/lib/api"
 const WorkflowCanvas = lazy(() => import("@/components/workflows/WorkflowCanvas").then((m) => ({ default: m.WorkflowCanvas })))
 
 /**
+ * Phase 184.1-01 (D-184.1-04) — THE CANVAS GATE, DEFINED EXACTLY ONCE.
+ *
+ * The three-part fail-closed rule D-183-03 specified, lifted out of this component's body
+ * and into the one function every consumer calls. Every part is still load-bearing: the
+ * OPTIONAL accessor (a null context reads exactly like the empty map), `!loading` (so a
+ * gated surface cannot flash in ~200 ms after load and shift the layout), and a STRICT
+ * `true` comparison (an absent key hides — the `visibleNavItems` VANISH contract).
+ *
+ * WHY IT IS EXPORTED, AND WHY THAT IS NOT A SECOND GATE. The Builder header's three bands
+ * are contributed at three NESTING LEVELS — `WorkflowsPage` wraps `WorkflowDoorSwitch`
+ * wraps this page — and the only component that read the flag was the innermost of the
+ * three. A parent cannot be handed a gate value by its child without either its own read
+ * or a mount-effect callback, and the callback paints the band once before removing it,
+ * which is precisely the flash-then-shift D-183-03 forbids. So the ancestors read too —
+ * and they read THIS function, so there is one RULE with several call sites rather than
+ * several hand-copied rules that drift the first time either side grows a condition.
+ *
+ * IT ADDS NO FETCH. `App.tsx` holds the single `useEffectiveFeatures()` call and broadcasts
+ * the result through `EffectiveFeaturesProvider`; this is a context read, which is what
+ * that provider exists for. The one-GET-per-session budget is untouched.
+ *
+ * The two literals below are also what `WorkflowBuilderPage.canvas.test.tsx`'s source guard
+ * greps this file for, so the rule stays HERE rather than moving to a hooks module — the
+ * alternative would have meant editing a shipped assertion to make a refactor look clean.
+ */
+export function useCanvasGate(): boolean {
+  const featuresCtx = useEffectiveFeaturesOptional()
+  return (
+    featuresCtx !== null &&
+    !featuresCtx.loading &&
+    featuresCtx.features.visual_workflow_canvas === true
+  )
+}
+
+/**
  * The locked save wording (184-CONTEXT `<specifics>`): the surface says the draft is
  * SAVED and, in the same breath, that it is still a draft. No word in it may imply
  * published — publishing is a separate act behind the gauntlet, and a save that reads
@@ -276,6 +311,58 @@ function gatesFor(phase: PhaseSpecJSON | null): PhaseGateRow[] {
   return grounding.mode === "open" ? [] : [{ label: grounding.words, locked: true }]
 }
 
+/**
+ * Phase 184.1-01 (D-184.1-01 … D-184.1-03) — THE MERGED HEADER ROW.
+ *
+ * Operator-reported in the Phase 184 UAT: *"the canvas space is very narrow because the
+ * header above is taking too much space… especially with the smaller screens."* Measured
+ * on a 639 px window: 275 px of chrome above a 288 px canvas — the flow got 45 % of the
+ * screen, and 146 px of that was three stacked bands doing one band's job.
+ *
+ * IT OWNS LAYOUT AND NOTHING ELSE (D-184.1-02). `lead` and `trail` arrive as opaque nodes
+ * from the two ANCESTOR band owners; every control in them keeps its original owner, its
+ * original handler and its original state. `← Workflows` still closes over `WorkflowsPage`'s
+ * `backToLibrary`, `‹ both doors` still closes over `WorkflowDoorSwitch`'s `goBoth`. This is
+ * a re-flow of where things are drawn, not a move of what owns them — which is also why
+ * nothing here needs to know what it is rendering.
+ *
+ * NOTHING IS REMOVED. Every control, badge and label from all three bands survives and keeps
+ * its accessible name, including the `🔧 Author & govern` label that the plan's illustrative
+ * row sketch omitted.
+ *
+ * IT WRAPS RATHER THAN TRUNCATES. `flex-wrap` lets the trailing group fall to a second line
+ * on a narrow window instead of overflowing or eliding a control — two rows is still one
+ * band better than the three this replaces, which is the point at ~900 px where the
+ * operator's complaint actually lives.
+ */
+function BuilderHeaderBar({
+  lead,
+  trail,
+  identity,
+  actions,
+}: {
+  lead?: React.ReactNode
+  trail?: React.ReactNode
+  identity?: React.ReactNode
+  actions?: React.ReactNode
+}) {
+  return (
+    <header
+      data-testid="builder-header-bar"
+      className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-border px-4 py-2"
+    >
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
+        {lead}
+        {identity}
+      </div>
+      <div className="ml-auto flex shrink-0 items-center gap-2">
+        {trail}
+        {actions}
+      </div>
+    </header>
+  )
+}
+
 /** The Builder's working definition shape (a refinement of the opaque
  *  `WorkflowDefinitionJSON` the api layer returns). */
 export interface BuilderDefinition {
@@ -352,6 +439,21 @@ export interface WorkflowBuilderPageProps {
    * before a Builder exists) supplies nothing and is unaffected.
    */
   registerCanLeave?: (canLeave: (() => boolean) | null) => void
+  /**
+   * Phase 184.1-01 (D-184.1-01) — the two MERGED-HEADER SLOTS.
+   *
+   * `headerLead` carries `WorkflowsPage`'s breadcrumb group (`← Workflows`, the workflow's
+   * label, `NET-NEW`); `headerTrail` carries `WorkflowDoorSwitch`'s door group (`‹ both
+   * doors`, `🔧 Author & govern`, `JUDGE ALWAYS-ON`). Both are OPAQUE nodes — this page
+   * renders them and reads nothing out of them, so no handler and no state changes hands.
+   *
+   * BOTH ARE OPTIONAL, AND BOTH ARE IGNORED WITH THE FLAG OFF. An absent pair is exactly
+   * the mount every existing test and the flag-off app perform, and the flag-off branch
+   * below does not reference them at all — so the shipped three-band surface is preserved
+   * by construction rather than by remembering to pass nothing.
+   */
+  headerLead?: React.ReactNode
+  headerTrail?: React.ReactNode
 }
 
 export function WorkflowBuilderPage({
@@ -360,6 +462,8 @@ export function WorkflowBuilderPage({
   initialDescribe,
   autoDraft,
   registerCanLeave,
+  headerLead,
+  headerTrail,
 }: WorkflowBuilderPageProps) {
   const [describe, setDescribe] = useState(initialDescribe ?? "")
   // Phase 184-04 (D-184-01): the definition's home. Created LAZILY so the factory
@@ -416,14 +520,10 @@ export function WorkflowBuilderPage({
   const canDraft = describe.trim().length > 0 && builderPhase !== "composing"
   const panelOpen = selectedSlug !== null
 
-  // Phase 183-07 (D-183-03) — the three-part fail-closed gate. The OPTIONAL accessor
-  // (a null context is read exactly like `{}`), `!loading` (no flash-in, no reserved
-  // space), and a strict comparison (an absent key hides).
-  const featuresCtx = useEffectiveFeaturesOptional()
-  const canvasEnabled =
-    featuresCtx !== null &&
-    !featuresCtx.loading &&
-    featuresCtx.features.visual_workflow_canvas === true
+  // Phase 183-07 (D-183-03) — the three-part fail-closed gate, now read through the ONE
+  // exported rule (see `useCanvasGate`'s docblock: 184.1 gave the two ancestor band
+  // owners the same call, so the rule had to stop being an inline expression).
+  const canvasEnabled = useCanvasGate()
   // The flag out-ranks stale session state: if the map is tightened mid-session while
   // the user is on Canvas, the column falls back to the Spine rather than stranding
   // them on a surface that just vanished.
@@ -1117,10 +1217,22 @@ export function WorkflowBuilderPage({
     }
   }, [])
 
+  /**
+   * Phase 184.1-01 — does the PRE-DRAFT screen have to host the merged row?
+   *
+   * Only when an ancestor actually handed a band down. With the flag on, `WorkflowsPage`
+   * and `WorkflowDoorSwitch` stop drawing their own bands and pass them here — and the
+   * describe screen has no `<header>` of its own, so without this the `← Workflows`
+   * breadcrumb would simply VANISH on a fresh build and strand the author on a screen
+   * with no way back. Gated on the slots rather than on the flag alone, because a bar
+   * with nothing in it is chrome that costs height and says nothing.
+   */
+  const preDraftHeaderHosted =
+    canvasEnabled && (headerLead !== undefined || headerTrail !== undefined)
+
   // ── EMPTY: just the describe box — a 3-second read, nothing else. ──
   if (builderPhase === "empty" || builderPhase === "composing" || builderPhase === "error") {
-    return (
-      <BuilderStoreProvider store={store}>
+    const describeScreen = (
       <div className="flex h-full flex-col items-center justify-center bg-background px-6 py-8">
         <div className="flex w-full max-w-[640px] flex-col gap-4">
           <div className="flex flex-col items-center gap-2 text-center">
@@ -1199,6 +1311,17 @@ export function WorkflowBuilderPage({
           )}
         </div>
       </div>
+    )
+    return (
+      <BuilderStoreProvider store={store}>
+        {preDraftHeaderHosted ? (
+          <div className="flex h-full flex-col bg-background">
+            <BuilderHeaderBar lead={headerLead} trail={headerTrail} />
+            <div className="min-h-0 flex-1">{describeScreen}</div>
+          </div>
+        ) : (
+          describeScreen
+        )}
       </BuilderStoreProvider>
     )
   }
@@ -1310,68 +1433,99 @@ export function WorkflowBuilderPage({
     graphChild
   )
 
+  /**
+   * Phase 184.1-01 — the header's two GROUPS, declared once and rendered by whichever
+   * shape is in play. Extracting them into fragments changes no DOM: a fragment emits no
+   * element, so the flag-off `<header>` below still renders the exact bytes Task 1's pin
+   * captured from the unmodified page.
+   */
+  const identityGroup = (
+    <>
+      <span className="min-w-0 truncate text-[14px] font-semibold text-foreground">
+        {meta.slug ?? "Untitled workflow"}
+      </span>
+      <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
+        draft
+      </span>
+      {/* Phase 103-ux: the bound project (knowledge base) NAME, not a UUID. */}
+      {boundFolderName && (
+        <span
+          data-testid="builder-bound-folder"
+          className="shrink-0 truncate rounded border border-border bg-card px-1.5 py-0.5 text-[11px] text-muted-foreground"
+        >
+          📁 {boundFolderName}
+        </span>
+      )}
+    </>
+  )
+
+  const actionGroup = (
+    <>
+      {/* Phase 103-ux: explicit Save draft + transient confirmation.
+          Phase 184-11 (R6): this region is the ONLY place the page says anything
+          about the save, and what it says is `Saved · still a draft`. */}
+      <div data-testid="builder-save-state" className="flex items-center gap-2">
+        <button
+          type="button"
+          data-testid="builder-save-draft"
+          onClick={() => void onSaveDraft()}
+          disabled={saveState === "saving"}
+          className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-[13px] font-medium text-foreground transition-opacity hover:bg-accent/40 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {saveState === "saving" ? (
+            <>
+              <span
+                aria-hidden="true"
+                className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent"
+              />
+              Saving…
+            </>
+          ) : (
+            "Save draft"
+          )}
+        </button>
+        {saveState === "saved" && (
+          <span data-testid="builder-save-confirm" role="status" className="text-[13px] font-medium text-success">
+            {SAVED_STILL_A_DRAFT}
+          </span>
+        )}
+        {saveState === "error" && (
+          <span data-testid="builder-save-error" role="alert" className="text-[13px] font-medium text-destructive">
+            {saveErrorMessage ?? GENERIC_SAVE_ERROR}
+          </span>
+        )}
+      </div>
+      {/* R12 — publish lives in the header that ALREADY EXISTS (sketch 141-B, the
+          operator's correction). No net-new band: the reason travels through the
+          shipped `renderPublish` seam as a third argument so the mount does not move. */}
+      {renderPublish && definition && <div>{renderPublish(definition, draftId, blockedReason)}</div>}
+    </>
+  )
+
   return (
     <BuilderStoreProvider store={store}>
     <div className="flex h-full flex-col bg-background">
-      <header className="flex items-center justify-between border-b border-border px-4 py-2.5">
-        <div className="flex min-w-0 items-center gap-2">
-          <span className="min-w-0 truncate text-[14px] font-semibold text-foreground">
-            {meta.slug ?? "Untitled workflow"}
-          </span>
-          <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
-            draft
-          </span>
-          {/* Phase 103-ux: the bound project (knowledge base) NAME, not a UUID. */}
-          {boundFolderName && (
-            <span
-              data-testid="builder-bound-folder"
-              className="shrink-0 truncate rounded border border-border bg-card px-1.5 py-0.5 text-[11px] text-muted-foreground"
-            >
-              📁 {boundFolderName}
-            </span>
-          )}
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
-          {/* Phase 103-ux: explicit Save draft + transient confirmation.
-              Phase 184-11 (R6): this region is the ONLY place the page says anything
-              about the save, and what it says is `Saved · still a draft`. */}
-          <div data-testid="builder-save-state" className="flex items-center gap-2">
-            <button
-              type="button"
-              data-testid="builder-save-draft"
-              onClick={() => void onSaveDraft()}
-              disabled={saveState === "saving"}
-              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-[13px] font-medium text-foreground transition-opacity hover:bg-accent/40 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {saveState === "saving" ? (
-                <>
-                  <span
-                    aria-hidden="true"
-                    className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent"
-                  />
-                  Saving…
-                </>
-              ) : (
-                "Save draft"
-              )}
-            </button>
-            {saveState === "saved" && (
-              <span data-testid="builder-save-confirm" role="status" className="text-[13px] font-medium text-success">
-                {SAVED_STILL_A_DRAFT}
-              </span>
-            )}
-            {saveState === "error" && (
-              <span data-testid="builder-save-error" role="alert" className="text-[13px] font-medium text-destructive">
-                {saveErrorMessage ?? GENERIC_SAVE_ERROR}
-              </span>
-            )}
-          </div>
-          {/* R12 — publish lives in the header that ALREADY EXISTS (sketch 141-B, the
-              operator's correction). No net-new band: the reason travels through the
-              shipped `renderPublish` seam as a third argument so the mount does not move. */}
-          {renderPublish && definition && <div>{renderPublish(definition, draftId, blockedReason)}</div>}
-        </div>
-      </header>
+      {/* D-184.1-01 — the WHOLE gate. Flag on ⇒ ONE row; flag off ⇒ the three-band surface
+          that shipped, reached by a branch that cannot see `headerLead` / `headerTrail` at
+          all. Flag-off identity therefore holds BY CONSTRUCTION rather than by a test — and
+          Task 1's pin, written against the unmodified page and passing unchanged after this
+          landed, is the evidence that it did.
+          D-184.1-03 — with the flag ON the merged row also shows in the Spine view. That is
+          permitted (D-181-01 constrains flag-OFF only) and is recorded as a decision rather
+          than discovered later. */}
+      {canvasEnabled ? (
+        <BuilderHeaderBar
+          lead={headerLead}
+          trail={headerTrail}
+          identity={identityGroup}
+          actions={actionGroup}
+        />
+      ) : (
+        <header className="flex items-center justify-between border-b border-border px-4 py-2.5">
+          <div className="flex min-w-0 items-center gap-2">{identityGroup}</div>
+          <div className="flex shrink-0 items-center gap-2">{actionGroup}</div>
+        </header>
+      )}
 
       <div
         data-testid="builder-grid"
