@@ -963,7 +963,7 @@ finding (*the default must be ARMED-ON*) has nothing to argue against on screen.
 
 | # | Name | Design Question | Winner | Tags |
 |---|------|----------------|--------|------|
-| 147 | the-armed-mark | What shape marks a step that stops and asks you first — loud enough to read as "the run stops here", without colour, without a badge, and without touching the claimed top-right seal or the contested bottom edge? | *pending* | phase-185, govern-03, action-risk, armed-checkpoint, armed-default, unguarded-risk, canvas-mark, shape-only, phase-188, phase-189, g2-sketch-gate |
+| 147 | the-armed-mark | Where does the mark for a step that stops and asks you belong — in the gap between steps, hugging the card, or across the whole canvas? | *pending* | phase-185, govern-03, action-risk, armed-checkpoint, armed-default, unguarded-risk, canvas-mark, shape-only, phase-188, phase-189, g2-sketch-gate |
 
 **The build cost, established while drawing:** `WorkflowCanvas.tsx:279` already registers an `edgeTypes`
 entry named `flow` and `canvasModel.ts:88` gives every edge a `data.kind` — so a connector-based mark
@@ -971,3 +971,17 @@ entry named `flow` and `canvasModel.ts:88` gives every edge a `data.kind` — so
 distance (one pseudo-element on `PhaseNodeCard`, no edge work, scales with the card at fit-zoom), but it
 puts a **second lock-shaped mark** on a card that already carries the governance seal, and the two dials
 are orthogonal — reading them as one channel is the specific risk to judge.
+
+**Round 1 rejected (`f7fad019`), and the reason is reusable.** The first pass drew three different
+PICTURES — a level-crossing boom, a padlock latch, a hazard-hatched band. Operator verdict: *the ideas
+hold, the treatment does not.* Two faults, the second worth remembering: they were **pictograms in a
+system made of structure** (edges, seals, rails, borders), and the padlock **collided with the seal** —
+the 143-A governance mark is a shield, so two ORTHOGONAL dials ended up wearing two security pictures,
+and *must prove it* vs *stops and asks you* blurred into one "governed" impression. **Nothing on this
+card may look like the seal, not just nothing may occupy its corner.**
+
+**Round 2 — one mark, three placements.** The mark is a **gate bar**, identical in every variant:
+*armed* = the bar is whole and the flow visibly cannot pass; *not armed* = the SAME bar splits in the
+middle and stands open. Because the mark no longer varies, the only thing under test is **where it
+belongs** — in the gap (truthful: the run really does pause BETWEEN steps), on the card's leading edge
+(cheapest, scales with the card), or across the whole canvas (unmissable, claims full height).
