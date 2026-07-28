@@ -427,3 +427,27 @@ describe("WorkflowCanvas — the scope fences (source guard)", () => {
     expect(workflowCanvasSource).not.toMatch(/grounding_mode/)
   })
 })
+
+// ── Measurements survive a node rebuild ─────────────────────────────────────────
+//
+// The operator reported a dragged card "blinks out and back". Cause, from
+// @xyflow/system's adoptUserNodes: when the node object handed to the library is a NEW
+// reference it rebuilds its internal node and reads `measured` from OUR object; if that
+// is undefined it sets nodesInitialized = false and the node renders HIDDEN until it is
+// measured again. 184 hands back a new object for the dragged node on every pointer
+// frame, so the card was hidden ~60x/s. 183 never hit this because a read-only canvas
+// hands back the SAME references, taking the equality branch that preserves measurement.
+//
+// jsdom measures everything as 0, so this cannot assert a rendered height. It asserts the
+// ECHO — the mechanism the library actually needs.
+describe("WorkflowCanvas 184-12 — the library's measurement is echoed back", () => {
+  it("consumes dimensions changes, not only position changes", () => {
+    expect(workflowCanvasSource).toMatch(/change\.type !== "position"/)
+    expect(workflowCanvasSource).toMatch(/change\.type !== "dimensions"/)
+  })
+
+  it("threads a measured field back onto the node objects", () => {
+    // Not merely READ for layout (heightAt does that) — spread onto the node we hand back.
+    expect(workflowCanvasSource).toMatch(/\{ measured \}/)
+  })
+})

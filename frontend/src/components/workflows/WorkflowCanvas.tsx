@@ -819,6 +819,14 @@ export function WorkflowCanvas({
    */
   const [dragOverlay, setDragOverlay] = useState<Record<string, XYPosition>>({})
 
+  /**
+   * The library's own measurement, echoed back so it survives our node rebuilds.
+   * See `handleNodesChange` for why dropping it makes a dragged card blink.
+   */
+  const [measuredById, setMeasuredById] = useState<
+    Record<string, { width: number; height: number }>
+  >({})
+
   /** Where the dragged card started. Captured on drag start; the axis split is read
    *  against it, never against the lane it happens to be nearest. */
   const dragOriginRef = useRef<XYPosition | null>(null)
@@ -847,9 +855,14 @@ export function WorkflowCanvas({
         const dy = nudges?.[node.id] ?? 0
         const position = dy === 0 ? node.position : { x: node.position.x, y: node.position.y + dy }
 
+        const measured = measuredById[node.id]
+
         return {
           ...node,
           position,
+          // Carried so `adoptUserNodes`'s else-branch finds a measurement on the object
+          // we hand it. Without this every rebuilt node is briefly `hidden`.
+          ...(measured === undefined ? {} : { measured }),
           // THE ONE READ-ONLY OPT-OUT THAT FLIPS, and it flips PER NODE: the end cap and
           // the broken-reference stub keep the `false` the model gave them.
           draggable: editable,
@@ -860,7 +873,7 @@ export function WorkflowCanvas({
           data: { ...node.data, technical: showTechnical, verdict: marks?.(node.id) },
         }
       }),
-    [projection.nodes, selectedSlug, showTechnical, editable, marks, nudges],
+    [projection.nodes, selectedSlug, showTechnical, editable, marks, nudges, measuredById],
   )
 
   /**
@@ -966,12 +979,33 @@ export function WorkflowCanvas({
    * REQUIRED with a controlled `nodes` prop — see `dragOverlay`. Only `position`
    * changes are applied.
    *
-   * Everything else the library computes is deliberately DROPPED: `dimensions` is
-   * measured into its internal lookup and needs no echo (183 proved that empirically by
-   * painting every edge with no handler at all), `select` belongs to the page's
-   * `selectedSlug`, and `remove` / `add` / `replace` belong to `definitionOps`. Applying
-   * them here would put a second, silent editing path beside the one this plan is
-   * chartered to build.
+   * `select` belongs to the page's `selectedSlug`, and `remove` / `add` / `replace`
+   * belong to `definitionOps`. Applying those here would put a second, silent editing
+   * path beside the one this plan is chartered to build.
+   *
+   * ⚠ `dimensions` IS echoed, and the comment that used to say it needed no echo was
+   * true only for the READ-ONLY canvas 183 shipped. Read `adoptUserNodes` in
+   * `@xyflow/system`:
+   *
+   *     if (checkEquality && userNode === internalNode?.internals.userNode) {
+   *       nodeLookup.set(userNode.id, internalNode)        // same ref -> keeps measured
+   *     } else {
+   *       internalNode = { ...userNode, measured: { width: userNode.measured?.width, … } }
+   *     }
+   *     if ((measured.width === undefined || measured.height === undefined) && !hidden) {
+   *       nodesInitialized = false                          // -> the node renders HIDDEN
+   *     }
+   *
+   * 183 always handed back the SAME node objects, so the equality branch hit and the
+   * measurement survived. 184 hands back a NEW object for the dragged node on every
+   * pointer frame, so the else-branch runs, `measured` is read from OUR object — which
+   * carried none — and the node is hidden until it is measured again. At ~60fps that is
+   * a card blinking out and back, which is exactly what the operator reported and what
+   * memoizing the card could not fix: the flicker is on the library's WRAPPER, not in
+   * our subtree.
+   *
+   * So the measurement is stored and threaded back on. It changes on mount and on
+   * resize, never per frame, so this costs one render per node per lifetime.
    */
   const handleNodesChange = useCallback((changes: NodeChange<CanvasNode>[]) => {
     setDragOverlay((previous) => {
@@ -980,6 +1014,24 @@ export function WorkflowCanvas({
         if (change.type !== "position" || change.position === undefined) continue
         if (next === previous) next = { ...previous }
         next[change.id] = change.position
+      }
+      return next
+    })
+
+    setMeasuredById((previous) => {
+      let next = previous
+      for (const change of changes) {
+        if (change.type !== "dimensions" || change.dimensions === undefined) continue
+        const seen = previous[change.id]
+        if (
+          seen !== undefined &&
+          seen.width === change.dimensions.width &&
+          seen.height === change.dimensions.height
+        ) {
+          continue
+        }
+        if (next === previous) next = { ...previous }
+        next[change.id] = { width: change.dimensions.width, height: change.dimensions.height }
       }
       return next
     })
