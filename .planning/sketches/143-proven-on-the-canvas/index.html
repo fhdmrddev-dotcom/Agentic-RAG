@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sketch 143 — Seeing which steps are proven (Phase 185)</title>
+<link rel="stylesheet" href="../themes/default.css">
+<link rel="stylesheet" href="../themes/canvas-184.css">
+<style>
+  /* The whole flow must fit on one screen, because the test is "scan it in three
+     seconds" — a scan you have to scroll is not a scan. Five 248px cards plus
+     four connectors overrun 1440px, so the flow sits at a fit-zoom, which is what
+     a real xyflow canvas does on open anyway (fitView). */
+  .flow { padding: 100px 34px; zoom: .87; }
+
+  /* ══ VARIANT A — THE SEALED EDGE ═══════════════════════════════════════
+     The card's own border carries the meaning: a proven step is drawn with a
+     heavier, double-struck edge and a wax-seal mark in its corner. */
+  body.va .node.proven {
+    border-color: hsl(220 30% 100% / .34);
+    box-shadow: 0 1px 0 hsl(220 30% 100% / .2) inset,
+                0 0 0 1px hsl(220 30% 100% / .16),
+                0 0 0 4px hsl(220 30% 100% / .05),
+                0 24px 48px -22px rgba(0,0,0,.95);
+  }
+  body.va .node.proven .seal {
+    position: absolute; top: 11px; right: 11px; width: 21px; height: 21px; border-radius: 50%;
+    display: grid; place-items: center; font-size: 11px; z-index: 4;
+    background: hsl(220 30% 100% / .1); border: 1px solid hsl(220 30% 100% / .34);
+    color: var(--color-text);
+  }
+
+  /* ══ VARIANT B — THE PROVEN RAIL ═══════════════════════════════════════
+     A bar down the card's leading edge, structurally separate from the border,
+     so run-status colour can land on the border without a collision. */
+  body.vb .node.proven::before {
+    content: ''; position: absolute; left: 0; top: 16px; bottom: 16px; width: 4px;
+    border-radius: 0 3px 3px 0; z-index: 4;
+    background: repeating-linear-gradient(
+      to bottom,
+      hsl(220 30% 100% / .85) 0 6px,
+      hsl(220 30% 100% / .35) 6px 10px);
+  }
+  body.vb .node.proven .seal {
+    position: absolute; left: 12px; top: 12px; font-size: 12px; z-index: 4; color: var(--color-text);
+  }
+  /* B moves the step number out of the rail's way */
+  body.vb.card-b .node .stepn { left: auto; right: 12px; }
+
+  .seal { display: none; }
+  .node.proven .seal { display: grid; }
+  body.vb .node.proven .seal { display: block; }
+
+  /* ══ PHASE 188's RUN STATUS — the thing the channel must not collide with ══
+     Drawn the way 188 would: colour on the BORDER plus an outer glow. */
+  body.run-go .node.active {
+    border-color: hsl(239 90% 70% / .85) !important;
+    box-shadow: 0 0 0 1px hsl(239 90% 70% / .5), 0 0 40px -6px hsl(239 90% 70% / .6),
+                0 24px 48px -22px rgba(0,0,0,.95) !important;
+  }
+  body.run-you .node.active {
+    border-color: hsl(38 92% 62% / .9) !important;
+    box-shadow: 0 0 0 1px hsl(38 92% 62% / .5), 0 0 40px -6px hsl(38 92% 62% / .6),
+                0 24px 48px -22px rgba(0,0,0,.95) !important;
+  }
+  body.run-bad .node.active {
+    border-color: hsl(0 78% 58% / .9) !important;
+    box-shadow: 0 0 0 1px hsl(0 78% 58% / .5), 0 0 40px -6px hsl(0 78% 58% / .6),
+                0 24px 48px -22px rgba(0,0,0,.95) !important;
+  }
+  body.run-go .node.done, body.run-you .node.done, body.run-bad .node.done { opacity: .62; }
+  .runchip {
+    display: none; position: absolute; left: 50%; transform: translateX(-50%); bottom: -13px;
+    align-items: center; gap: 5px; border-radius: 999px; padding: 3px 11px; font-size: 10.5px;
+    white-space: nowrap; z-index: 9; font-weight: 500;
+  }
+  .node.active .runchip { display: inline-flex; }
+  body.run-go  .node.active .runchip { background: hsl(239 60% 22%); border: 1px solid hsl(239 90% 70% / .6); color: hsl(239 100% 88%); }
+  body.run-you .node.active .runchip { background: hsl(38 60% 18%);  border: 1px solid hsl(38 92% 62% / .6);  color: hsl(38 92% 84%); }
+  body.run-bad .node.active .runchip { background: hsl(0 55% 18%);   border: 1px solid hsl(0 78% 58% / .6);   color: hsl(0 90% 84%); }
+  body.run-go .node.active { animation: breathe 2.6s var(--ease-out) infinite; }
+  @keyframes breathe { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-3px) } }
+
+  /* the greyscale proof — no colour at all */
+  body.grey .plane { filter: grayscale(1); }
+
+  /* the legend under the flow */
+  .legend {
+    position: absolute; left: 50%; transform: translateX(-50%); bottom: 26px; z-index: 12;
+    display: flex; align-items: center; gap: 18px; padding: 9px 16px; border-radius: 12px;
+    background: hsl(220 30% 8% / .9); border: 1px solid var(--color-border);
+    font-size: 11.5px; color: var(--color-text-muted);
+  }
+  .legend .k { display: inline-flex; align-items: center; gap: 7px; }
+  .legend .swA {
+    width: 26px; height: 17px; border-radius: 5px; border: 1px solid hsl(220 30% 100% / .34);
+    box-shadow: 0 0 0 3px hsl(220 30% 100% / .05); background: hsl(220 30% 100% / .05);
+  }
+  .legend .swB {
+    width: 26px; height: 17px; border-radius: 5px; border: 1px solid var(--color-border);
+    background: linear-gradient(to right, hsl(220 30% 100% / .8) 0 4px, hsl(220 30% 100% / .05) 4px);
+  }
+  .legend .swN { width: 26px; height: 17px; border-radius: 5px; border: 1px solid var(--color-border);
+                 background: hsl(220 30% 100% / .04); }
+
+  .trythis {
+    position: absolute; left: 24px; bottom: 22px; z-index: 20; max-width: 320px;
+    background: hsl(220 30% 8% / .95); backdrop-filter: blur(16px);
+    border: 1px solid hsl(239 100% 82% / .28); border-radius: 14px; padding: 13px 15px;
+    box-shadow: var(--shadow-lg);
+  }
+  .trythis h5 { margin: 0 0 8px; font-size: 12px; font-family: var(--font-headline);
+                color: var(--color-text); font-weight: 600; }
+  .trythis ol { margin: 0; padding-left: 18px; font-size: 11.5px; line-height: 1.75; color: var(--color-text-muted); }
+  .trythis li { margin-bottom: 5px; }
+  .trythis li:last-child { margin-bottom: 0; }
+  .trythis b { color: var(--color-text); }
+  .trythis .close { position: absolute; top: 8px; right: 9px; background: none; border: 0;
+                    color: var(--color-text-dim); cursor: pointer; font-size: 14px; line-height: 1; }
+  .trythis .close:hover { color: var(--color-text); }
+
+  .verdict {
+    position: absolute; right: 24px; bottom: 22px; z-index: 20; max-width: 330px;
+    background: hsl(220 30% 8% / .95); backdrop-filter: blur(16px);
+    border: 1px solid var(--color-border); border-radius: 14px; padding: 13px 15px;
+    font-size: 11.5px; line-height: 1.7; color: var(--color-text-muted);
+  }
+  .verdict h5 { margin: 0 0 7px; font-size: 12px; font-family: var(--font-headline);
+                color: var(--color-text); font-weight: 600; }
+  .verdict b { color: var(--color-text); }
+  .verdict .bad { color: hsl(0 85% 76%); }
+  .verdict .good { color: hsl(142 71% 68%); }
+</style>
+</head>
+<body class="alive card-b va run-off">
+
+<nav class="variant-nav">
+  <span class="label">Sketch 143</span>
+  <button class="variant-tab active" data-v="a" type="button">A: A sealed edge</button>
+  <button class="variant-tab" data-v="b" type="button">B: A proven rail</button>
+</nav>
+
+<p class="lead" id="lead"></p>
+
+<div class="bar">
+  <span class="lbl">Workflow</span>
+  <span style="font-size:var(--text-sm);color:var(--color-text)">Monthly supplier risk report</span>
+  <span class="lbl" style="margin-left:14px">Run state</span>
+  <div class="seg" id="runseg">
+    <button type="button" data-run="off" class="on">Not running</button>
+    <button type="button" data-run="go">Running</button>
+    <button type="button" data-run="you">Needs you</button>
+    <button type="button" data-run="bad">Failed</button>
+  </div>
+  <div class="spacer"></div>
+  <div class="seg" id="greyseg">
+    <button type="button" data-grey="off" class="on">Full colour</button>
+    <button type="button" data-grey="on">No colour at all</button>
+  </div>
+</div>
+
+<div class="stage" id="stage">
+  <div class="plane scrollbar-thin" id="plane">
+    <div class="amb"></div>
+    <div class="flow" id="flow"></div>
+    <div class="legend" id="legend"></div>
+  </div>
+
+  <div class="trythis" id="trythis">
+    <button class="close" type="button" id="closetry" aria-label="Hide">✕</button>
+    <h5>Three things to try</h5>
+    <ol>
+      <li>Without reading a word — <b>which steps are proven?</b> Should take under three seconds.</li>
+      <li>Set run state to <b>Running</b>, then <b>Failed</b>. Can you still read both things at once?</li>
+      <li>Switch to <b>No colour at all</b>. Does it still work?</li>
+    </ol>
+  </div>
+  <div class="verdict" id="verdict"></div>
+</div>
+
+<div class="foot" id="foot"></div>
+
+<div class="sketch-toolbar">
+  <span>143</span>
+  <select id="themesel" aria-label="Theme">
+    <option value="default">Deep Midnight</option>
+  </select>
+</div>
+
+<script src="../themes/phase-icons-3d.js"></script>
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   Sketch 143 — GOVERN-02. Seeing, at a glance, which steps are proven.
+
+   THE CONSTRAINT, and it is severe. Sketch 137-B locked a card that spends
+   NO per-step-type colour at all, deliberately, so Phase 188 gets the entire
+   colour budget for run status (running / needs you / failed). And the card
+   face allows at most TWO word-badges, both already committed (the grounding
+   word and "Waits for you"). The operator settled it at intake on 2026-07-28:
+
+       Governance gets its own channel. It may spend NEITHER colour NOR a
+       third badge.
+
+   So this sketch draws two channels that are made of SHAPE, not hue, and
+   tests each one against the thing it must survive — Phase 188's run status
+   landing on the same card, and a reader who cannot see colour at all.
+
+   Both variants also DROP the "⛨ Must prove it" word-badge that ships today.
+   That is the point: if the channel works, the badge is redundant, and the
+   two badge slots go back to being available for 188 and 189.
+
+   The workflow is the same realistic business example sketch 142 used
+   (operator, 2026-07-28: the shipped rows are engineering fixtures and made
+   the question harder to read, not easier). What is real: the phase types,
+   and which steps a document-reading tool would put in the "proven" state
+   under the rule 142 settled.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+var STEPS = [
+  { icon: 'llm_agent_compass', title: 'Find the risks in our supplier files',
+    sub: 'Reads your contracts and incident reports', proven: true },
+  { icon: 'llm_agent_compass', title: 'Pull last quarter’s incident numbers',
+    sub: 'Reads your incident log', proven: true },
+  { icon: 'llm_single', title: 'Work out which suppliers look shaky',
+    sub: 'Judgement — no documents involved', proven: false },
+  { icon: 'llm_human_input', title: 'Check with you before writing',
+    sub: 'Pauses here until you answer', proven: false, waits: true },
+  { icon: 'llm_emit', title: 'Write the risk report',
+    sub: 'Every claim traceable to a document', proven: true }
+];
+
+/* which step the run is sitting on, per run state */
+var ACTIVE = { off: -1, go: 1, you: 3, bad: 4 };
+
+var LEAD = {
+  a: '<b>A — The card itself is sealed.</b> A proven step is drawn with a heavier, double-struck edge and ' +
+     'a small seal in its corner, like a stamped document. Nothing is added beside the card; the card <i>is</i> ' +
+     'the signal. The thing to watch: run status also lives on the border, so the two want the same edge.',
+  b: '<b>B — A bar down the leading edge.</b> A proven step carries a short stitched rail on its left side, ' +
+     'sitting outside the border entirely. Less like a stamp, more like a marked file. Because it does not ' +
+     'touch the border, run-status colour has somewhere to land that is not already taken.'
+};
+
+var VERDICT = {
+  a: '<h5>What A costs</h5>The seal <b>is</b> the border, and Phase 188 paints run status on the border too. ' +
+     'Flip to <b>Running</b> or <b>Failed</b> and watch the active step: its proven edge is overwritten by ' +
+     'the status colour, so <span class="bad">at the exact moment a step matters most, you can no longer tell ' +
+     'whether it was proven</span>. The seal in the corner survives — which suggests the corner mark, not the ' +
+     'edge, is the part doing the real work.',
+  b: '<h5>What B costs</h5>The rail sits outside the border, so status colour lands on the border and ' +
+     '<span class="good">both readings survive together</span> — flip through all four run states and watch ' +
+     'the rail stay put. The cost is a busier left edge and one more thing on a 248px card; the step number ' +
+     'had to move to the other side to make room. Less elegant than a seal. More honest under load.'
+};
+
+var variant = 'a', run = 'off';
+
+function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'); }
+
+function renderFlow() {
+  var act = ACTIVE[run];
+  var html = '';
+  STEPS.forEach(function (s, i) {
+    if (i) html += '<div class="conn"><div class="line"></div><div class="tip"></div></div>';
+    var cls = 'node' + (s.proven ? ' proven' : '');
+    if (run !== 'off') {
+      if (i === act) cls += ' active';
+      else if (i < act) cls += ' done';
+    }
+    var chip = run === 'go' ? 'Running now' : run === 'you' ? 'Waiting for you' : run === 'bad' ? 'Failed here' : '';
+    html += '<div class="' + cls + '" data-i="' + i + '" tabindex="0" role="button"' +
+        ' aria-label="Step ' + (i + 1) + ': ' + esc(s.title) + (s.proven ? ' — proven' : '') + '">' +
+      '<span class="stepn">' + (i + 1) + '</span>' +
+      '<span class="seal" aria-hidden="true">⛨</span>' +
+      '<div class="icowrap">' + icon3d(s.icon, 52) + '</div>' +
+      '<div class="body">' +
+        '<div class="ttl">' + esc(s.title) + '</div>' +
+        '<div class="sub">' + esc(s.sub) + '</div>' +
+        (s.waits ? '<div class="badges"><span class="badge you">✋ Waits for you</span></div>' : '') +
+      '</div>' +
+      (chip ? '<span class="runchip">' + chip + '</span>' : '') +
+    '</div>';
+  });
+  html += '<div class="endpin"><span class="dot"></span> ends here</div>';
+  document.getElementById('flow').innerHTML = html;
+}
+
+function renderLegend() {
+  var sw = variant === 'a' ? 'swA' : 'swB';
+  document.getElementById('legend').innerHTML =
+    '<span class="k"><span class="' + sw + '"></span> Proven — every claim traceable to your documents</span>' +
+    '<span class="k"><span class="swN"></span> Free to think — judgement, nothing to cite</span>';
+}
+
+function renderFoot() {
+  var nP = STEPS.filter(function (s) { return s.proven; }).length;
+  var bits = ['<span class="pill">' + nP + ' of ' + STEPS.length + ' steps proven</span>'];
+  bits.push('<span class="pill good">✓ No colour spent — Phase 188 keeps its whole budget</span>');
+  bits.push('<span class="pill good">✓ No third badge — the "⛨ Must prove it" word is gone, both slots freed</span>');
+  bits.push(variant === 'a'
+    ? '<span class="pill warn">The seal and the run status want the same edge</span>'
+    : '<span class="pill warn">A busier left edge on a 248px card</span>');
+  document.getElementById('foot').innerHTML = bits.join('');
+}
+
+function render() {
+  document.body.classList.remove('va', 'vb');
+  document.body.classList.add('v' + variant);
+  document.body.classList.remove('run-off', 'run-go', 'run-you', 'run-bad');
+  document.body.classList.add('run-' + run);
+  document.getElementById('lead').innerHTML = LEAD[variant];
+  document.getElementById('verdict').innerHTML = VERDICT[variant] +
+    '<div style="margin-top:9px;padding-top:8px;border-top:1px dashed var(--color-border);font-size:11px">' +
+    '<b>Both variants survive “no colour at all”</b> — because neither is made of colour. Note what does ' +
+    '<i>not</i>: switch off colour while a run is on and the run status vanishes. That is Phase 188’s ' +
+    'problem, not this one, but it means <b>188 will need a shape of its own too</b>.</div>';
+  renderFlow(); renderLegend(); renderFoot();
+}
+
+document.querySelector('.variant-nav').addEventListener('click', function (e) {
+  var b = e.target.closest('.variant-tab'); if (!b) return;
+  document.querySelectorAll('.variant-tab').forEach(function (t) { t.classList.remove('active'); });
+  b.classList.add('active'); variant = b.getAttribute('data-v'); render();
+});
+
+document.querySelector('.bar').addEventListener('click', function (e) {
+  var b = e.target.closest('button'); if (!b) return;
+  var seg = b.closest('.seg'); if (!seg) return;
+  seg.querySelectorAll('button').forEach(function (x) { x.classList.remove('on'); });
+  b.classList.add('on');
+  if (b.hasAttribute('data-run'))  run = b.getAttribute('data-run');
+  if (b.hasAttribute('data-grey')) document.body.classList.toggle('grey', b.getAttribute('data-grey') === 'on');
+  render();
+});
+
+document.getElementById('closetry').addEventListener('click', function () {
+  document.getElementById('trythis').style.display = 'none';
+});
+
+document.getElementById('themesel').addEventListener('change', function () {
+  document.querySelector('link[href*="themes/default"]').href = '../themes/' + this.value + '.css';
+});
+
+render();
+</script>
+</body>
+</html>

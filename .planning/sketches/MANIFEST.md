@@ -826,6 +826,7 @@ workflows and say so**, while keeping the engine facts real (phase types, the `g
 | # | Name | Design Question | Winner | Tags |
 |---|------|----------------|--------|------|
 | 142 | grounding-dial-and-lock | A step that reads your documents is held to citing them, and that cannot be switched off. How does that read as a safety rail rather than as a broken setting? | **B — a switch that refuses** ★ | phase-185, govern-01, grounding-mode, detected-lock, one-way, escalate-only, phaseformpanel, plain-language, g2-sketch-gate |
+| 143 | proven-on-the-canvas | How do you mark a proven step on the canvas when colour and badges are both already spent? | *pending* | phase-185, govern-02, canvas-mark, non-colour-channel, badge-budget, colour-budget, phase-188-collision, greyscale-proof, g2-sketch-gate |
 
 **Two findings 142 produces that outlive whichever variant wins:**
 
@@ -838,3 +839,13 @@ workflows and say so**, while keeping the engine facts real (phase types, the `g
    `citations_required` validator is deterministic coverage, not a threshold. Phase 185 either adds a
    real confidence number (new field, new scope) or the word leaves the requirement. **Decide at spec
    time, not build time.**
+
+**Decision carried into 143 and beyond (operator, 2026-07-28):** grounding takes **no exceptions** — a
+step that reads your documents must prove it, full stop. The exploratory-reading case ("skim the board
+decks and suggest themes") is handled by *splitting the step in two* — a proven retrieval step feeding a
+free-to-think judgement step — not by a third state. Rejected alternative: an "reads, but exploring"
+mode, which would put a named escape hatch inside the one rail that is the milestone's differentiator.
+
+**A finding 143 hands forward to Phase 188.** Both governance channels survive a colour-blind read
+because neither is made of colour. Run status, as currently imagined, does **not** — switch colour off
+mid-run and it vanishes entirely. **188 needs a shape of its own, not just four colours.**
