@@ -426,6 +426,36 @@ export interface CanvasSession {
 
 /** The flow x of insertion boundary `index`: 0 = before the first card, `lanes.length`
  *  = after the last one, anything between = the midpoint of that connector. */
+/**
+ * THE VERTICAL OFFSET AN AFFORDANCE MUST INHERIT FROM THE CARD IT BELONGS TO.
+ *
+ * `EDIT_AFFORDANCE.INSERT_Y` is a LANE constant — it describes where the connector sits
+ * when every card is at its computed lane position. But a card can leave that line two
+ * ways: the cosmetic `dy` nudge (D-184-10), and a drag in flight. Positioning the
+ * affordances from the lane alone stranded them in empty space the moment either
+ * happened — a `✕` floating where its card used to be, which is what the operator
+ * screenshotted.
+ *
+ * The `✕` belongs to exactly one card, so it takes that card's whole offset. The `＋`
+ * sits ON the connector BETWEEN two cards, and the drawn edge slants when they differ,
+ * so it takes the midpoint — which keeps it on the line rather than merely near it,
+ * preserving sketch 138-A's finding under nudge.
+ *
+ * Reads the live overlay first so the affordances track the card DURING a drag, not
+ * only after it lands.
+ */
+function verticalOffsetFor(
+  slug: string | undefined,
+  nudges: Record<string, number> | undefined,
+  overlay: Record<string, XYPosition>,
+  laneY: number,
+): number {
+  if (slug === undefined) return 0
+  const live = overlay[slug]
+  if (live !== undefined) return live.y - laneY
+  return nudges?.[slug] ?? 0
+}
+
 function insertPointX(lanes: readonly number[], index: number): number {
   if (lanes.length === 0) return 0
   const half = EDIT_AFFORDANCE.GAP / 2
@@ -440,6 +470,10 @@ interface PlaneEditingLayerProps {
   lanes: readonly number[]
   /** Phase slugs in render order, the same array the keyboard reorder indexes. */
   phaseOrder: readonly string[]
+  /** The cosmetic offsets, so an affordance can follow the card it belongs to. */
+  nudges?: Record<string, number>
+  /** Live drag positions, so it follows DURING the gesture and not only after it. */
+  dragOverlay: Record<string, XYPosition>
   /** Which insertion boundary the picker is open at, or null. */
   pickerAt: number | null
   onOpenPicker: (index: number) => void
@@ -475,6 +509,8 @@ function PlaneEditingLayer({
   phases,
   lanes,
   phaseOrder,
+  nudges,
+  dragOverlay,
   pickerAt,
   onOpenPicker,
   onDismissPicker,
@@ -530,7 +566,14 @@ function PlaneEditingLayer({
             width: EDIT_AFFORDANCE.INSERT_SIZE,
             height: EDIT_AFFORDANCE.INSERT_SIZE,
             transform: `translate(${insertPointX(lanes, index) - EDIT_AFFORDANCE.INSERT_SIZE / 2}px, ${
-              EDIT_AFFORDANCE.INSERT_Y - EDIT_AFFORDANCE.INSERT_SIZE / 2
+              EDIT_AFFORDANCE.INSERT_Y -
+              EDIT_AFFORDANCE.INSERT_SIZE / 2 +
+              // The connector's own slant: the mean of the two cards this boundary sits
+              // between, so the `＋` stays ON the drawn line when either is nudged. At
+              // the two ends there is only one neighbour, so it simply follows that one.
+              (verticalOffsetFor(phaseOrder[index - 1], nudges, dragOverlay, CANVAS_LAYOUT.LANE_Y) +
+                verticalOffsetFor(phaseOrder[index], nudges, dragOverlay, CANVAS_LAYOUT.LANE_Y)) /
+                (index > 0 && index < phaseOrder.length ? 2 : 1)
             }px)`,
           }}
         >
@@ -567,7 +610,14 @@ function PlaneEditingLayer({
             height: EDIT_AFFORDANCE.REMOVE_SIZE,
             transform: `translate(${
               lanes[position] + CANVAS_LAYOUT.NODE_WIDTH / 2 - EDIT_AFFORDANCE.REMOVE_SIZE / 2
-            }px, ${heightAt(position) - EDIT_AFFORDANCE.REMOVE_SIZE / 2}px)`,
+            }px, ${
+              heightAt(position) -
+              EDIT_AFFORDANCE.REMOVE_SIZE / 2 +
+              // This button belongs to exactly one card, so it takes that card's whole
+              // offset — nudged or mid-drag. Without it the `✕` stays on the lane while
+              // its card walks away, which is the stranded control in the screenshots.
+              verticalOffsetFor(slug, nudges, dragOverlay, CANVAS_LAYOUT.LANE_Y)
+            }px)`,
           }}
         >
           <span aria-hidden="true">✕</span>
@@ -577,16 +627,30 @@ function PlaneEditingLayer({
       {pickerAt !== null ? (
         <div
           data-testid="canvas-insert-picker"
-          className="absolute"
+          // `pointer-events-auto` for the SAME reason the affordances carry it: this
+          // wrapper renders through `<ViewportPortal>`, whose ancestors the library
+          // pins to `pointer-events: none`. Without it the menu opens, reads correctly,
+          // and every row silently ignores the click — the failure the operator hit.
+          className="pointer-events-auto absolute"
           style={{
             left: 0,
             top: 0,
             transformOrigin: "top left",
             transform: `translate(${
               insertPointX(lanes, pickerAt) - EDIT_AFFORDANCE.PICKER_WIDTH / 2
-            }px, ${EDIT_AFFORDANCE.INSERT_Y + EDIT_AFFORDANCE.PICKER_DROP}px) scale(${
-              1 / (zoom || 1)
-            })`,
+            }px, ${
+              EDIT_AFFORDANCE.INSERT_Y +
+              EDIT_AFFORDANCE.PICKER_DROP +
+              // Opens under the `＋` it belongs to, so it tracks the same slant.
+              (verticalOffsetFor(
+                phaseOrder[pickerAt - 1],
+                nudges,
+                dragOverlay,
+                CANVAS_LAYOUT.LANE_Y,
+              ) +
+                verticalOffsetFor(phaseOrder[pickerAt], nudges, dragOverlay, CANVAS_LAYOUT.LANE_Y)) /
+                (pickerAt > 0 && pickerAt < phaseOrder.length ? 2 : 1)
+            }px) scale(${1 / (zoom || 1)})`,
           }}
         >
           <StepTypePicker
@@ -762,18 +826,26 @@ export function WorkflowCanvas({
   // A COPY. Selection, the ⌥ boolean, the cosmetic `dy`, the per-node drag flag and the
   // server verdict mark are all view state; the model output and the definition behind
   // it are never touched, which is why no layout key can reach the payload.
-  const nodes = useMemo<CanvasNode[]>(
+  /**
+   * The settled node array — everything EXCEPT the in-flight drag position.
+   *
+   * Split from the overlay deliberately. `handleNodesChange` fires `setDragOverlay` on
+   * every pointer frame; when the overlay was a dependency of the ONE memo, a drag
+   * rebuilt every node object AND a fresh `data` object for each, so React Flow
+   * re-rendered all of them ~60×/s and the cards visibly flickered. Now a drag frame
+   * only invalidates the memo below, and only the dragged node gets a new identity —
+   * every other card keeps its reference and does not re-render at all.
+   */
+  const settledNodes = useMemo<CanvasNode[]>(
     () =>
       projection.nodes.map((node) => {
         if (node.type !== CANVAS_NODE_TYPES.phase) return node
 
-        // The cosmetic offset is merged into a COPY of the position. A zero offset with
-        // no drag in flight reuses the model's own object, so an idle canvas hands the
-        // library a stable reference and does not re-measure on every parent render.
+        // The cosmetic offset is merged into a COPY of the position. A zero offset
+        // reuses the model's own object, so an idle canvas hands the library a stable
+        // reference and does not re-measure on every parent render.
         const dy = nudges?.[node.id] ?? 0
-        const overlay = dragOverlay[node.id]
-        const position =
-          overlay ?? (dy === 0 ? node.position : { x: node.position.x, y: node.position.y + dy })
+        const position = dy === 0 ? node.position : { x: node.position.x, y: node.position.y + dy }
 
         return {
           ...node,
@@ -788,8 +860,25 @@ export function WorkflowCanvas({
           data: { ...node.data, technical: showTechnical, verdict: marks?.(node.id) },
         }
       }),
-    [projection.nodes, selectedSlug, showTechnical, editable, marks, nudges, dragOverlay],
+    [projection.nodes, selectedSlug, showTechnical, editable, marks, nudges],
   )
+
+  /**
+   * The drag overlay applied on top — the ONLY thing a pointer frame invalidates.
+   *
+   * Returns `settledNodes` by reference when nothing is being dragged, so an idle
+   * canvas is byte-identical to the memo above and costs nothing.
+   */
+  const nodes = useMemo<CanvasNode[]>(() => {
+    let touched = false
+    const next = settledNodes.map((node) => {
+      const overlay = dragOverlay[node.id]
+      if (overlay === undefined) return node
+      touched = true
+      return { ...node, position: overlay }
+    })
+    return touched ? next : settledNodes
+  }, [settledNodes, dragOverlay])
 
   /**
    * The lane centres, in render order — the x-coordinate of every phase column, read
@@ -1316,6 +1405,8 @@ export function WorkflowCanvas({
               phases={phases}
               lanes={lanes}
               phaseOrder={phaseOrder}
+              nudges={nudges}
+              dragOverlay={dragOverlay}
               pickerAt={pickerAt}
               onOpenPicker={setPickerAt}
               onDismissPicker={dismissPicker}

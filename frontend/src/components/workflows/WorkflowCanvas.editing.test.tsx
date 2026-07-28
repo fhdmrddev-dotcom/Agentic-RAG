@@ -965,3 +965,31 @@ describe("WorkflowCanvas 184-12 — the ＋ / ✕ layer is hit-testable and reve
     expect(root!.contains(affordance!)).toBe(true)
   })
 })
+
+// ── 14. The PICKER is hit-testable too ───────────────────────────────────────────
+//
+// Section 13 fixed the ＋/✕ and I verified the menu OPENED — then stopped there. The
+// operator clicked a row and nothing happened: the picker wrapper is a third child of
+// <ViewportPortal> and had inherited the same pointer-events:none. "It renders" is not
+// "it works", and an open menu whose rows silently ignore clicks is worse than no menu,
+// because it looks functional.
+describe("WorkflowCanvas 184-12 — the insert menu is clickable, not merely visible", () => {
+  it("the picker wrapper re-enables pointer events", () => {
+    const { container } = renderEditable(evalCoverage, { onInsertAt: vi.fn() })
+    fireEvent.click(screen.getByTestId("canvas-insert-0"))
+    const wrapper = container.querySelector('[data-testid="canvas-insert-picker"]')
+    expect(wrapper).not.toBeNull()
+    expect((wrapper as HTMLElement).className).toMatch(/\bpointer-events-auto\b/)
+  })
+
+  it("choosing a row actually reaches the handler", () => {
+    const onInsertAt = vi.fn()
+    renderEditable(evalCoverage, { onInsertAt })
+    fireEvent.click(screen.getByTestId("canvas-insert-0"))
+    const rows = screen.getAllByRole("menuitem").filter((r) => r.getAttribute("aria-disabled") !== "true")
+    expect(rows.length).toBeGreaterThan(0)
+    fireEvent.click(rows[0])
+    // index 0 — the boundary the ＋ above was opened at.
+    expect(onInsertAt).toHaveBeenCalledWith(0, expect.any(String))
+  })
+})
