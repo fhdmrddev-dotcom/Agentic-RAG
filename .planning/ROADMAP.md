@@ -212,6 +212,26 @@ Plans:
 **UI hint**: yes
 **Flags**: CORE deliverable (VALID-02 author-time STRUCTURAL validation); G-2 sketch (editable canvas + node config + the `workflow_layouts`-vs-auto-layout UX call); stack — `zundo` undo/redo; one-serializer round-trip → existing draft CRUD, layout OUT of JSONB (Pitfall 3 — tested byte-identical across the 4 canonical seeds + PM pack); server-authoritative per-node badges (VALID-03, never client-guess); CANVAS-04 rails graded per GOVERN (185); G-5 ledger (`WorkflowBuilderPage.tsx` = the 3rd authoring door; `PhaseNode.tsx` 2nd touch on the glyph/parse logic); migration SKETCH-CONDITIONAL — slot 114 reserved ONLY IF the nullable `workflow_layouts` side table is confirmed at sketch (OPEN-05), else ZERO migration; red line D-14; no SC#10 (authoring, no run stream); no threat model unless discuss surfaces one.
 
+#### Phase 184.1: Builder Header Consolidation
+
+**Goal**: The Builder header collapses from three stacked bands into ONE row when the canvas flag is on, reclaiming ~90px of vertical space for the canvas (288px -> ~415px, +44%). The flag-off surface keeps today's three bands **by construction**, not by a test — because no test currently pins the Builder header at all.
+**Depends on**: Phase 184 (the canvas this reclaims space for)
+**Requirements**: none — new scope from Phase 184 live UAT, not one of its 12 locked SPEC requirements
+**Success Criteria** (what must be TRUE):
+
+  1. With the canvas flag ON, the Builder renders exactly ONE header band containing every control from today's three; measured height materially below the 146px it replaces.
+  2. With the canvas flag OFF, the Builder renders today's three separate bands, and `revertByteIdentical.test.tsx` + `WorkflowBuilderPage.canvas.test.tsx` pass with ZERO assertion edits.
+  3. A test pins the flag-off header structure — the first one to ever do so (D-181-01's Builder-header half was previously unguarded).
+  4. Nothing is removed: every control, badge and label from the three bands survives the re-flow and stays reachable by accessible name.
+
+**Plans**: TBD
+**Source**: `.planning/phases/184-editable-canvas-live-structural-validation-round-trip/184-HEADER-PLAN.md` (Option A, operator-selected)
+**Flags**: FE-only, no backend, no migration, no new dependency; touches the D-181-01 flag-off surface so the flag gate is the load-bearing decision; G-1 satisfied (no prior 184.x)
+
+Plans:
+
+- [ ] TBD (run /gsd:plan-phase 184.1 to break down)
+
 #### Phase 185: Graded Governance — Per-Node Grounding Mode + Action-Risk Dial
 
 **Goal**: Each node carries a **grounding mode** — *Grounded / strict* auto-attaches the immutable `citations_required` + confidence gate (must cite retrieved knowledge above the confidence threshold, else fail / route to HITL) vs *Open / flexible* (an ungated agentic / reasoning / tool step) — plus an orthogonal **action-risk** approval checkpoint on outbound / write nodes. A single workflow freely mixes strict-grounded and open nodes; the strict gate is structurally enforced and NOT author-loosenable-away. The milestone's headline differentiator (the deep-crawl white-space no competitor covers), sequenced right after the editable canvas so it lands on a working canvas.
