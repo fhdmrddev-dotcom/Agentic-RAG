@@ -963,7 +963,7 @@ finding (*the default must be ARMED-ON*) has nothing to argue against on screen.
 
 | # | Name | Design Question | Winner | Tags |
 |---|------|----------------|--------|------|
-| 147 | the-armed-mark | Where does the mark for a step that stops and asks you belong — in the gap between steps, hugging the card, or across the whole canvas? | *pending* | phase-185, govern-03, action-risk, armed-checkpoint, armed-default, unguarded-risk, canvas-mark, shape-only, phase-188, phase-189, g2-sketch-gate |
+| 147 | the-armed-mark | Who owns the canvas card — which shape is real (137-D shipped vs 137-B locked), where do the governance seal and the armed action-risk mark fit, and what collides once 185/188/189 have all landed? | *pending* | phase-185, govern-03, action-risk, armed-checkpoint, armed-default, unguarded-risk, canvas-mark, shape-only, phase-188, phase-189, g2-sketch-gate |
 
 **The build cost, established while drawing:** `WorkflowCanvas.tsx:279` already registers an `edgeTypes`
 entry named `flow` and `canvasModel.ts:88` gives every edge a `data.kind` — so a connector-based mark
@@ -985,3 +985,38 @@ card may look like the seal, not just nothing may occupy its corner.**
 middle and stands open. Because the mark no longer varies, the only thing under test is **where it
 belongs** — in the gap (truthful: the run really does pause BETWEEN steps), on the card's leading edge
 (cheapest, scales with the card), or across the whole canvas (unmissable, claims full height).
+
+**Round 2 rejected, and round 3 changed what the sketch IS.** Round 2 drew one gate bar in three
+placements — structural rather than pictogram, but still a **barrier**, which says *blocked* and has no
+person in it. The operator then named the real fault: *"you are not being comprehensive and not aligning
+on what we already built and what we will build collectively."* True — **rounds 1 and 2 were both drawn
+against `canvas-184.css` `body.card-b`, a sketch-era card, while the shipped `PhaseNodeCard.tsx` renders
+a different one.** Round 3 is therefore an **occupancy audit**, not a shape hunt.
+
+### ⚠ TWO STRUCTURAL FINDINGS — both affect phases beyond 185
+
+**1 · The card decision and the card code disagree.** `canvas-184.css:170-171` records *"the operator
+moved the locked card from 137-D to 137-B on 2026-07-26"* (icon floats on TOP, 248px, centred). But
+`PhaseNodeCard.tsx:311-313` renders the mark at `absolute left-0 top-1/2`, 56px, card inset `ml-6` /
+padded `pl-10`, 260×96 — **137-D, icon on the LEFT** — and nothing in `frontend/src` applies a `card-b`
+class. Stray 137-B reasoning is already embedded in shipped docblocks (`PhaseNodeCard.tsx:287`,
+`WorkflowCanvas.tsx:502-504`) justifying real placements on a premise the file does not render.
+
+**2 · `185-SPEC.md` Requirement 6 rests on an occupied corner.** Sketch 143-A put the governance seal at
+top-right and the SPEC locked that corner as CLAIMED — but the shipped **VALID-03 verdict mark is
+already there** (`PhaseNodeCard.tsx:298`, `-right-2 top-1.5`). They overlap **3×17px on BOTH card
+shapes**; sketch 147 computes it live rather than asserting it. A third collision (`stepNumber` × icon,
+22×8px) appears only on 137-D and is very likely why that slot renders nothing today.
+
+### Constraints that now bind every later canvas phase
+
+| Constraint | Source |
+|---|---|
+| A **third badge is a typecheck error** (`BadgeSlot2Tuple`) | `PhaseNodeCard.tsx:117-118` |
+| **No focusable control may live in the card** — one tab stop per node, asserted in `WorkflowCanvas.test.tsx:231-238`; this is *why* ✕ and ＋ sit on the LANE | `PhaseNodeCard.tsx:37-48` |
+| The **＋ owns the gap centre** — 26px at `INSERT_Y = 28`, in a `GAP = PITCH_X − NODE_WIDTH = 60`px span | `WorkflowCanvas.tsx:314-327, 575` |
+| `status` (188), `stepNumber`, `technicalLine` are **declared, unrendered slots** — future claimants | `PhaseNodeCard.tsx:141-149, 164-167, 181-184` |
+
+**Consequence for GOVERN-03:** if the armed mark is clickable it **cannot live on the card at all** —
+it is either a non-interactive mark (with arming done in the side panel, where 142-B already puts the
+grounding dial) or it lives on the lane like ✕ and ＋.

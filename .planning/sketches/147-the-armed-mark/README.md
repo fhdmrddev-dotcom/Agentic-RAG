@@ -1,64 +1,30 @@
 ---
 sketch: 147
 name: the-armed-mark
-question: "Where does the mark for a step that stops and asks you belong — in the gap between steps, hugging the card, or across the whole canvas?"
+question: "Who owns the canvas card — which shape is real (137-D shipped vs 137-B locked), where do the governance seal and the armed action-risk mark actually fit, and what collides once 185, 188 and 189 have all landed?"
 winner: null
-tags: [phase-185, govern-03, action-risk, armed-checkpoint, armed-default, unguarded-risk, canvas-mark, shape-only, structural-not-pictogram, phase-188, phase-189, g2-sketch-gate]
+tags: [phase-185, govern-02, govern-03, action-risk, armed-checkpoint, occupancy-audit, card-shape, 137b-vs-137d, seal-vs-verdict-collision, badge-budget, one-tab-stop, phase-188, phase-189, g2-sketch-gate]
 ---
 
-# Sketch 147: The armed mark
+# Sketch 147: Who owns the card?
 
-## The question, in one line
+## What this became, and why
 
-Some steps do things you cannot take back. Those steps can be made to **stop and ask you first** —
-and that has to be visible on the canvas before anything runs. Where does that mark belong?
+It started as "pick a shape for the armed action-risk mark". Two rounds of shapes were rejected, and
+the operator then named the real fault:
 
-## Why this sketch exists
+> *"did you consider that there the ＋ button that I can add steps in between does it conflict with
+> this … the icon of the node is to the left side … the designer showed the icon on the top … you are
+> not being comprehensive and not aligning on what we already built and what we will build
+> collectively."*
 
-`185-SPEC.md` (locked 2026-07-28, commit `4d7ea818`) records this as **the one design question the
-142–146 batch left open**. Requirement 8 locks *that* an armed step must be marked, and locks the
-budget it may spend; it deliberately does not pick the shape.
+That was literally true. **Rounds 1 and 2 were drawn against `themes/canvas-184.css` `body.card-b` — a
+sketch-era card — while the shipped `PhaseNodeCard.tsx` renders a different one.** Every geometry claim
+in those rounds ("top-right is claimed", "the bottom edge is contested", "left-centre is free") was
+reasoning about a card that does not exist in the app.
 
-Sketch **144** drew two shapes and locked no winner — 145/146 overtook it. Neither survived as drawn,
-and both failures are now grounded in the shipped CSS:
-
-| 144 variant | Why it failed |
-|---|---|
-| **A — a collar on the card's bottom edge** | The collar, the run chip and the per-node editing actions all want that edge. On the shipped card-b that is literally true: `.runchip` sits at `bottom: -13px` and `.acts` at `bottom: -12px` (`canvas-184.css`). |
-| **B — a checkpoint badge on the incoming connector** | 30px of mark in a **66px** gap, which is exactly where the eye skips — and its label was wider than the connector it sat on. |
-
----
-
-# Round 1 — three pictograms, rejected (commit `f7fad019`)
-
-The first pass drew **three different pictures** for three placements: a level-crossing boom on the
-connector, a padlock latch on the card's leading edge, a hazard-hatched threshold band across the
-canvas.
-
-**Operator verdict, 2026-07-28: the ideas hold, the treatment does not.**
-
-Two things were wrong, and the second is the one worth remembering:
-
-1. **They were pictograms in a system made of structure.** Everything else in this canvas language is
-   edges, seals, rails and borders. A railway crossing and a hazard band land in it like clip-art.
-2. **The padlock collided with the seal.** The 143-A governance mark is a shield in a circle. Putting a
-   padlock on the same card gives **two orthogonal dials two security pictures** — and *must prove it*
-   vs *stops and asks you* blurring into one "governed" impression is the single confusion graded
-   governance cannot afford.
-
-Kept in git history rather than as a tab, so the file stays readable.
-
----
-
-# Round 2 — one mark, three placements
-
-The mark is now a **gate bar**, and it is *identical in every variant*:
-
-> **Armed** — the bar is whole. The flow visibly cannot pass.
-> **Not armed** — the **same** bar splits in the middle and stands open.
-
-No lock, no stripes, no hazard tape, nothing round, nothing shield-shaped. Because the mark no longer
-varies, **the only thing under test is where it belongs** — which is the actual open question.
+So round 3 is not a shape hunt. It is an **occupancy audit**: both card shapes, every claimant, and
+collisions computed live from the shipped constants.
 
 ## How to View
 
@@ -66,64 +32,90 @@ varies, **the only thing under test is where it belongs** — which is the actua
 open .planning/sketches/147-the-armed-mark/index.html
 ```
 
-## The variants — three placements of one gate
+## The two findings this produced
 
-- **A: In the gap.** The gate stands on the connector going *into* the risky step, so the pause reads
-  as what it is — the run stopping *before* the action, not a property the step happens to have. Tall
-  rather than wide, so it is not 144-B's chip in a gap. Rides the `edgeTypes.flow` entry
-  `WorkflowCanvas.tsx:279` already registers.
-- **B: On the card.** The gate hugs the step's leading edge, like a jamb on the door into it.
-  Left-centre is the one genuinely free part of the 137-B card: step number owns top-left, the seal
-  owns top-right, the 3D mark floats at top-centre, the bottom edge is taken. Smallest change to
-  build, and it scales with the card at fit-zoom.
-- **C: Across the canvas.** The gate spans full height at the checkpoint; everything to its right is
-  past the point of no return. The only placement that reads as a property of the **flow** rather than
-  of a card, and the only one you cannot miss at any zoom.
+### 1 · The card decision and the card code disagree
 
-## Settled before drawing
+| | |
+|---|---|
+| **Decision** | `canvas-184.css:170-171` — *"The operator moved the locked card from 137-D to 137-B on 2026-07-26."* 137-B = the 3D mark floats **above** a 248px centred card, no per-type colour. |
+| **Shipped** | `PhaseNodeCard.tsx:311-313` renders the mark at `absolute left-0 top-1/2` (56px), card inset `ml-6`, padded `pl-10`. 260 × 96. That is **137-D — icon on the LEFT**. |
 
-**1. No colour, no word-badge.** Colour is banked for Phase 188's run status; both card badge slots are
-committed. Every stroke is white-alpha — which is why the *No colour* switch changes nothing.
+Nothing in `frontend/src` applies a `card-b` class. And stray 137-B reasoning is already embedded in
+shipped docblocks: `PhaseNodeCard.tsx:287` and `WorkflowCanvas.tsx:502-504` both justify a placement
+with *"Under 137-B the TOP edge belongs to the floating 3D icon"* — on a component that renders the
+icon at LEFT.
 
-**2. Top-right is CLAIMED** by the 143-A seal, and after round 1, **nothing may look like it either**.
-The seal is drawn here on purpose: the real test is whether the card still reads once *both* governance
-channels are on it.
+**Variant A draws what shipped. Variant B draws what was locked.** Same claimants on both.
 
-**3. The checkpoint is a gate ON the risky step, never an extra step** (operator, 144). All three
-placements keep the flow at **5 steps**, so "step 4 of 5" keeps meaning what it says.
+### 2 · A collision that is already inside `185-SPEC.md`
 
-**4. An unarmed risky step is marked too** — the same gate, standing open (operator, 2026-07-28).
-Without that, a step that emails a report with nobody watching looks identical to a step that reads a
-file, and 144's surviving finding — *the default must be ARMED-ON* — has nothing to argue against on
-screen. **Step 5 is the whole point of the picture.**
+Sketch **143-A** placed the governance seal at the card's top-right, and **`185-SPEC.md` Requirement 6
+locked that corner as CLAIMED for governance** — but the shipped **VALID-03 verdict mark is already
+there** (`PhaseNodeCard.tsx:298`, `-right-2 top-1.5`).
+
+```
+verdict {x 246, y 6, 22×22}   ×   seal 143-A {x 228, y 11, 21×21}
+                                   →  overlap 3 × 17 px
+```
+
+**On both card shapes.** The sketch computes it rather than asserting it — switch cards and watch the
+red box stay.
+
+A third collision shows only on 137-D: the **`stepNumber` slot × the icon, 22 × 8px**. That is almost
+certainly *why* the slot renders nothing today (`PhaseNodeCard.tsx:181`) and why 137-B moved the number
+to top-left. It is a real finding, not a false positive — on the shipped card there is nowhere to put a
+step number.
 
 ## Controls
 
-| Control | What it tests |
+| Control | What it shows |
 |---|---|
-| **What's armed** — Email only / Both risky steps / Nothing armed | The armed-vs-unguarded contrast, and what a fully-guarded flow looks like |
-| **Run state** — Not running / Running / Needs you / Failed | Whether the gate survives Phase 188's colour landing on the same card. *Needs you* deliberately lands on step 4, where an approval really waits |
-| **No colour** | The colour-blind read. Also worth checking on steps 1 and 3, where **both** governance channels are on one card |
-| **Click any gate** | Opens / shuts it live, with a toast. Keyboard-accessible, with an `event.repeat` guard (the WR-08-01 lesson) |
+| **A / B tabs** | 137-D (shipped, icon left, 260px) vs 137-B (locked, icon top, 248px) |
+| **Load** — Today (184) → +185 → +188 → Everything | Stacks what each phase adds. Watch the collision box appear as governance lands on a card that was already full. |
+| **Armed mark** — Detour / Countersign / Waiting card / None | The three meaning-first concepts, each tested against **both** cards |
+| **Show zones** | Outlines every zone from the same table the collision checker reads |
 
-## What to Look For
+## The three armed-mark concepts
 
-1. **The three-second scan.** Without reading a word — which step stops and asks you? And which one
-   *should* but doesn't?
-2. **Does "open" read as a state, or as an absence?** A split gate is meant to say *nobody is watching
-   this* rather than *nothing here*. If it reads as absence, the mark needs more weight when open.
-3. **Two channels, one card.** Look at steps 1 and 3 (seal) then step 4 (gate). Do they read as two
-   different questions now that the gate is not lock-shaped?
-4. **Truthfulness of placement.** The run actually pauses *between* steps 3 and 4. A puts the mark
-   there; B puts it on step 4. Does B's small lie matter, given how much cheaper it is?
-5. **Load.** This canvas also gets live run state (188) and connector nodes (189). Which placement
-   still has room?
+All three start from what actually happens — *the run stops, hands out to a person, waits as long as it
+takes* — rather than from "a barrier", which is what rounds 1 and 2 both drew and what neither
+convinced on. A barrier says *blocked*; it has no person in it.
 
-## Build cost — established while drawing, and it should not decide this
+- **Detour** — the connector visibly leaves the flow and comes back through a point that represents
+  you. Arcs **below** the line, so the ＋ (26px at y=28) keeps its place. Unarmed, the line runs
+  straight through.
+- **Countersign** — a ruled sign-off line at the foot of the card, like the bottom of a contract.
+  Armed = an empty rule waiting. Unarmed = a dashed rule reading *runs unsigned*.
+- **Waiting card** — a second card edge peeking out from behind: the decision that will come forward
+  when the run reaches here. Previews the 145 review moment instead of describing it.
 
-- **B** is the smallest change: one element on `PhaseNodeCard`, no edge work, no layout maths.
-- **A** and **C** need connector-level work but **not net-new infrastructure**:
-  `WorkflowCanvas.tsx:279` already registers an `edgeTypes` entry named `flow`, and `canvasModel.ts:88`
-  gives every edge a `data.kind`. The seam exists.
+## Hard constraints, all from shipped code
 
-The gap is *small vs moderate*, not *cheap vs expensive*. Pick the one that reads right.
+| Constraint | Source |
+|---|---|
+| A **third badge is a typecheck error** | `BadgeSlot2Tuple`, `PhaseNodeCard.tsx:117-118` |
+| **No focusable control may live in the card** — one tab stop per node, asserted in `WorkflowCanvas.test.tsx:231-238`. This is *why* the ✕ and ＋ sit on the lane. | `PhaseNodeCard.tsx:37-48` |
+| The **＋ owns the gap centre**: 26px at `INSERT_Y = LANE_Y + EDGE_ANCHOR_Y = 28`, in a `GAP = PITCH_X − NODE_WIDTH = 60`px span | `WorkflowCanvas.tsx:314-327, 575` |
+| The **✕** is `REMOVE_SIZE 24`, on the lane, tied to its card's offset | `WorkflowCanvas.tsx:439-449` |
+| `status` (Phase 188 run state), `stepNumber` and `technicalLine` are **declared, unrendered slots** — future claimants | `PhaseNodeCard.tsx:141-149, 164-167, 181-184` |
+
+**Consequence for the armed mark:** if it is something you can click, it **cannot live on the card at
+all**. Either it is a non-interactive mark (and arming happens in the side panel, where the grounding
+dial already goes per sketch 142-B), or it lives on the lane like ✕ and ＋.
+
+## What this sketch has to decide
+
+1. **Which card is real** — 137-B (and the code owes a change) or 137-D (and the decision + the stray
+   docblocks owe a correction). Everything downstream places against the answer.
+2. **Where the seal and the verdict mark both live**, since they currently overlap. `185-SPEC.md`
+   Requirement 6 must be amended either way.
+3. **Where the armed mark goes**, given 1 and 2 — and given it may not be a control on the card.
+
+## Rejected rounds, kept in git
+
+- **Round 1** (`f7fad019`) — three pictograms: a level-crossing boom, a padlock latch, a hazard-hatched
+  band. *The ideas hold, the treatment does not* — pictograms in a system made of structure, and the
+  padlock collided with the shield seal.
+- **Round 2** (`853bf94b`) — one gate bar in three placements. Structural, but still a **barrier**, and
+  drawn on the wrong card. Placement B landed exactly on the shipped left icon.
