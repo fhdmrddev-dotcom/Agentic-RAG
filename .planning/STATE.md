@@ -48,8 +48,15 @@ Phase: 184.1 (Builder Header Consolidation) — COMPLETE, ready for verification
 Plan: 1 of 1
 
 **Phase 184.1 COMPLETE (`90f07551` pin → `0e9466de` merge → `12c557b3` budget+guards → SUMMARY).**
-The Builder's three stacked header bands collapse into ONE flag-gated row, reclaiming ~90px above
-the canvas — the operator's Phase 184 UAT report (275px of chrome over a 288px canvas at 639px).
+The Builder's three stacked header bands collapse into ONE flag-gated row, reclaiming **a MEASURED
+61px** above the canvas — the operator's Phase 184 UAT report (275px of chrome over a 288px canvas
+at 639px). **Figure corrected 2026-07-28** at phase-184 verification, superseding the ~90px this
+line shipped with: measured live at a 900px viewport using the flag gate as the A/B (flag-off still
+renders the old three bands) — header chrome 146px → 85px = **61px**, canvas graph surface starting
+79px higher than the flag-off content. The 146px baseline was exact; the plan's own ~56px *target*
+for the merged row is what missed (it ships at 85px), so nothing is lost in the flag-off surface.
+On the Spine view the net is only 13px (the new tablist reinvests the saving); the gain belongs to
+the Canvas view. Working: `184-UAT-RESULTS.md` § Measured.
 **The pin was written FIRST**, green against the unmodified page, and passed after the merge with
 **zero edits** — which is the evidence the flag gate held. `WorkflowBuilderPage.header.test.tsx` is
 the first suite to ever pin this surface (D-181-01 was previously untested here). **Both required

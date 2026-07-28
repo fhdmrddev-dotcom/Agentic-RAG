@@ -214,7 +214,7 @@ Plans:
 
 #### Phase 184.1: Builder Header Consolidation
 
-**Goal**: The Builder header collapses from three stacked bands into ONE row when the canvas flag is on, reclaiming ~90px of vertical space for the canvas (288px -> ~415px, +44%). The flag-off surface keeps today's three bands **by construction**, not by a test — because no test currently pins the Builder header at all.
+**Goal**: The Builder header collapses from three stacked bands into ONE row when the canvas flag is on, reclaiming vertical space for the canvas. The flag-off surface keeps today's three bands **by construction**, not by a test — because no test currently pins the Builder header at all. **MEASURED at phase-184 verification (2026-07-28), superseding the ~90px estimate this goal was written with:** the merged row is **61px** shorter than the three-band stack at a 900px viewport (146px → 85px), and the canvas graph surface starts **79px** higher than the flag-off content did. The 146px baseline was exact; the plan's ~56px *target* for the merged row is what missed (it ships at 85px), so the shortfall is in the replacement, not in the problem. On the Spine view the net is only 13px — the new Spine/Canvas tablist reinvests most of the saving — so the gain belongs to the Canvas view. Width-dependent: the original ~90px came from a 639px observation. Detail: `184-UAT-RESULTS.md` § Measured.
 **Depends on**: Phase 184 (the canvas this reclaims space for)
 **Requirements**: none — new scope from Phase 184 live UAT, not one of its 12 locked SPEC requirements
 **Success Criteria** (what must be TRUE):
