@@ -1,5 +1,70 @@
 # Sketch Wrap-Up Summary
 
+## Wrap-up 2026-07-28 — Phase 185 Graded Governance (sketches 142–146)
+
+**Date:** 2026-07-28
+**Sketches processed:** 5 (5 included, 0 excluded — the operator directed all five in)
+**Design areas (2 new reference files):** graded-governance · approval-and-review
+**Skill output:** `./.claude/skills/sketch-findings-agentic-rag/` (append mode)
+
+### Included Sketches
+
+| # | Name | Winner | Design Area |
+|---|------|--------|-------------|
+| 142 | grounding-dial-and-lock | **B** — a switch that visibly refuses | Graded Governance |
+| 143 | proven-on-the-canvas | **A** — sealed edge + corner seal | Graded Governance |
+| 144 | the-approval-stop-sign | *no winner locked* — superseded by 145/146; its armed-on-by-default finding stands | Approval & Review |
+| 145 | the-review-moment | **A** — the document is the surface | Approval & Review |
+| 146 | the-round-trip | **A** — one place; the canvas you built on is the canvas you watch | Approval & Review |
+
+### Design direction — one addition this batch forced
+
+Unchanged overall (*calm instrument with selective signal-density at the live moment*), plus:
+**honesty has a visual cost and must be paid.** A locked control shows its lock and prints its reason; an
+unread document is marked unread and recorded as such; an assessment is labelled as an assessment inside
+the deliverable; "running" and "waiting for you" never share a word.
+
+Two budget rules held throughout: governance spends **no colour** (banked for Phase 188's run status) and
+**no third badge** (both slots committed). Every governance signal is made of **shape**.
+
+### Key decisions
+
+- **The model** — grounding is DETECTED and ONE-WAY, no exceptions. The precise rule is
+  **you can only undo a lock you created**. Detection is a named tool list, never a judgement call.
+- **The canvas mark** — a sealed edge with a corner seal, where **the seal is load-bearing** (run status
+  overwrites the border) and may never be conditional on run state. **Top-right of the card is claimed.**
+- **Vocabulary (binding)** — *must prove it* on the canvas, never *proven*; *free to think*; *nothing to
+  prove here*; *traceable* only at the review moment, where the check really ran.
+- **The approval gate** — a gate ON the risky step, never an extra step, **armed-on by default**.
+- **The review moment** — the document IS the surface, approve bar docked to it, backing marks inside the
+  document, and approve-blind visibly different + recorded as such.
+- **The round trip** — one place: build, watch, review and return all on the canvas.
+
+### Findings that leave Phase 185
+
+| Finding | Owner |
+|---|---|
+| `_exec_llm_human_input` times out at 300s and **advances the run** — the action-risk gate must fail closed | **185** (engine change, in scope) |
+| `.docx`/`.pptx`/`.pdf` are download-only while `render_template` produces `.docx` — the flagship deliverable cannot be previewed | **185 spec decision, DEFERRED with a trigger** — decide at `/gsd:spec-phase 185`, re-open unconditionally at **190** |
+| A second approver on an org-shared run must be told who decided | **186** (run-time twin of the co-editing guard) |
+| Workflows launch by redirecting into Chat; a run belongs on a dedicated surface | **188** (start from the 145/146 proposal) |
+| An external-action node arrives armed-on | **189** (already its SC#2) |
+| Run status needs a shape of its own — it does not survive a colour-blind read | **188** |
+
+### Cross-sketch alignment audit (operator-requested, same day)
+
+Three real misalignments found and fixed before packaging: the running example had drifted into **three
+different workflows** (now one canonical 5-step flow everywhere); 143 called a step **"Proven"** on a
+canvas that had never run; and 146's executing step and waiting-for-a-person step shared one chip.
+
+### Also recorded
+
+Every `workflow_definitions` row is throwaway test data (operator), so **no grandfathering or backfill
+affordance may be designed for them** — detection simply applies. Corpus counts stay useful as evidence
+about the engine (84 of 170 steps read the KB, 48 cite), never as user data to protect.
+
+---
+
 ## Wrap-up 2026-07-22 — v3.3/v3.4 catch-up + first v3.5 sketch (Phases 149/152/153/156/166 + 174)
 
 **Date:** 2026-07-22

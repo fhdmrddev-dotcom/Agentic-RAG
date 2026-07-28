@@ -598,6 +598,14 @@ Original sketch HTML files are preserved in `sources/` for complete reference. E
 **Phase 094 grounding** — [sources/094-grounding/](sources/094-grounding/) holds `BRIEF.md` (real harness SSE events + the "wire-only / dropped by `api.ts`" analysis) and `DATA-CONTRACT.md` (the event/wire data contract + the real-vs-invented field boundary). Read these for exact event names and which fields actually exist before wiring any 008–013 surface.
 
 **Phase 095 grounding** — [sources/095-grounding/](sources/095-grounding/) holds `GROUNDING.md` (the real Deep SSE event vocabulary, the 24-tool set with literal resting-essence strings, the current-render "before", and the three bug clusters with their root mechanisms) and `CONSISTENCY.md` (the build-once component inventory + the 13-drift cross-sketch audit). Read both before wiring real event names or building any of the 014–016 surfaces.
+
+**Phase 185 — Graded Governance (sketches 142–146, 2026-07-28):**
+
+| Area | Reference | Key Decision |
+|------|-----------|--------------|
+| Graded Governance | [references/graded-governance.md](references/graded-governance.md) | Grounding is **DETECTED and ONE-WAY** — a step that reads the KB locks itself to *must prove it*; an open step can be escalated; a locked step can never be loosened, **no exceptions** (the exploratory-read case splits into two steps, never a third state). The precise rule: **you can only undo a lock you created** (detected / already-set = no switch exists; escalated = yours to undo, until detection takes over). Detection is a NAMED tool list, never a judgement call. **142-B** the dial is a real switch whose loose side is struck through and prints its reason as real DOM text (`aria-describedby`, never a `title`); absent — not disabled — where it could never do anything. The tool list IS the dial. **143-A** the canvas mark is a **sealed edge + corner seal**, made of SHAPE not colour (137-B banked all colour for 188; both badge slots are committed) — and **the corner seal is LOAD-BEARING**: run status overwrites the border, so the seal is the only carrier left mid-run, may never be conditional on run state, and **claims top-right of the card**. Vocabulary is binding: **"must prove it"** on the canvas (never *proven* — nothing is proven until a gate passes), *free to think*, *nothing to prove here*. |
+| Approval & Review | [references/approval-and-review.md](references/approval-and-review.md) | **⚠ Two engine truths first:** (1) `_exec_llm_human_input` **times out at 300s (cap 1800) and returns normally**, so the run ADVANCES — an action-risk gate must reuse the substrate but **fail closed**; (2) `FilePreview` renders md/text/code/csv/images but **DOCX/PPTX/XLSX/PDF are download-only**, and `render_template` produces **.docx** — so the flagship deliverable is the one artefact a reviewer cannot see (**deferred with a trigger**: decide at spec-phase 185, re-open unconditionally at 190). **144** the stop sign is a gate ON the risky step, never an extra step; the unarmed outbound step on screen argues **armed-on by default** (= 189 SC#2). **145-A** the document IS the surface — approve bar docked to it, so decision and evidence are one object; marks go INSIDE the document (source chips + an explicit **"AI judgement"** on assessments); `check_coverage` coverage line; approve-blind must LOOK different and be **recorded as "approved without a preview"**. **146-A** **one place** — the canvas you built on is the canvas you watch, a pause grows the document over it, approving returns you to the running flow. Both are drawn on a **dedicated run surface (no message list, no composer)** — a proposal to **Phase 188**, since `WorkflowsPage` today launches by redirecting into Chat. Failure modes owned: closed tab (durable, but the clock does not stop), second approver (**Phase 186's run-time twin**), failure-after-approval (approval never looks undone; a retry must not re-send). |
+
 </findings_index>
 
 <when_to_load>
@@ -712,6 +720,24 @@ Load and apply this skill when:
 - Adding an operator audit action or receipt — inherit the 062-A vocabulary (plain sentence + ✎ write mark; the ledger is the receipt; polls never logged)
 - Touching feature visibility or access-control storage — the extensible-audience contract (never booleans; one swappable resolver; SEED-115 / v3.4 org-RBAC)
 - Working on any phase tagged `admin`, `operator`, `control-room`, `control-plane`, `kill-switches`, `audit`, `users`, `feature-visibility`, or on Phases 146/147/148 follow-ups (149 Model Registry / 150 Secrets inhabit the same shell)
+
+**Graded Governance (sketches 142–143, Phase 185) — load when:**
+
+- Adding or rendering a per-node **grounding mode** anywhere — the panel dial, the canvas mark, the auto-attached `citations_required` gate, or any "which steps must prove it" read (`references/graded-governance.md`)
+- Touching `PhaseNode.tsx`'s face, the `PHASE_GLYPHS`/badge budget, or anything that wants **colour** or a **third badge** on a step card — both budgets are committed (137-B / Phase 188), and top-right is claimed by the governance seal
+- Writing ANY refusal, lock or "you cannot change this" copy in the app — name the CAUSE, name what removing it COSTS, and put the reason in real DOM text (`aria-describedby`), never a `title`
+- Writing governance vocabulary — **"must prove it"** on the canvas (never *proven*), *free to think*, *nothing to prove here*
+- Working on any phase tagged `govern-01`, `govern-02`, `grounding-mode`, `detected-lock`, or `graded-governance`
+
+**Approval & Review (sketches 144–146, Phase 185; feeds 186/188/190) — load when:**
+
+- Building the **action-risk / approval checkpoint** (GOVERN-03) — read the fail-closed finding FIRST: `_exec_llm_human_input` times out at 300s and advances the run (`references/approval-and-review.md`)
+- Building ANY surface where a person approves, confirms or releases something a workflow produced — the artefact must be visible, approve-blind must LOOK different and be recorded as such
+- Rendering a workflow **deliverable** anywhere — know the preview matrix (md/text/code/csv/images render; **DOCX/PPTX/XLSX/PDF are download-only**, and `render_template` produces `.docx`)
+- Building the **workflow run surface** or touching how a run relates to chat — Phase 188 should start from the dedicated-run-surface proposal (no message list, no composer); `WorkflowsPage` today launches by redirecting into Chat
+- Building an external-action / connector node (Phases 189/190) — it arrives **armed-on** by default
+- Any run-state wording — "running" and "waiting for you" may never share a word
+- Working on any phase tagged `govern-03`, `action-risk`, `review-moment`, `run-surface`, `runviz-01`, `connectors`, or on Phases 186/188/189/190
 
 **Model Registry & Discovery (sketches 070–071, Phase 149) — load when:**
 
@@ -912,6 +938,14 @@ Skip when:
 
 - 129-terminal-run-states (winner: C — tiered dim/amber/red terminal vocabulary keyed off persisted `runs.status`)
 - 130-live-preparing-honesty (winner: C — run-header carries the live sub-state + anchored timer + single avatar)
+
+**Phase 185 — Graded Governance (2026-07-28):**
+
+- 142-grounding-dial-and-lock (winner: B — a switch that visibly refuses; the rule = you can only undo a lock you created)
+- 143-proven-on-the-canvas (winner: A — sealed edge + corner seal; the corner seal is load-bearing, top-right is claimed)
+- 144-the-approval-stop-sign (no winner locked — superseded by 145/146; its armed-on-by-default finding stands)
+- 145-the-review-moment (winner: A — the document is the surface, approve bar docked to it)
+- 146-the-round-trip (winner: A — one place; the canvas you built on is the canvas you watch)
 
 Excluded: 017-cross-thread-run-stop (orphan — no README, no MANIFEST row, no locked winner).
 </metadata>
