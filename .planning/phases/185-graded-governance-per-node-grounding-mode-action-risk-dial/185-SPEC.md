@@ -120,6 +120,21 @@ The `/validate` + `/grounding-bundle` seam (Phase 182) already returns per-node 
      needs-you / failed); a greyscale (colour-stripped) render still distinguishes a grounded card from an
      open one
 
+   > **⚠ AMENDED 2026-07-29 (sketch 147 occupancy audit, commit `6ed00af8`).** As originally written this
+   > requirement claimed top-right for governance **without knowing the corner was already occupied**. The
+   > shipped VALID-03 verdict mark sits at `-right-2 top-1.5` (`PhaseNodeCard.tsx:298`) and overlaps
+   > sketch 143-A's seal (`top:11 right:11`) by **3×17px — on both card shapes**. Computed, not asserted.
+   >
+   > **Operator resolution (2026-07-29): the verdict mark moves to `-left-2 top-1.5`; the seal keeps
+   > top-right.** The rationale is lifetime, not aesthetics — the seal is a *permanent* property of the
+   > step and was verified at all four run states in 143-A; a verdict only exists when the server has
+   > returned a problem. The permanent mark keeps the corner; the transient one moves. Residual: the moved
+   > verdict grazes the `stepNumber` slot by 2×16px, and that slot renders nothing (D-183-07 keeps
+   > `phase_index` off the face). If it is ever brought to the face, move it to `left:16` and this clears.
+   >
+   > **Add to acceptance:** the verdict mark renders at the card's LEFT; a zone check over
+   > {icon, verdict, seal, stepNumber, run-state slot} reports **0 overlaps between rendered marks**.
+
 7. **Binding vocabulary**: The surface uses the locked words and none of the banned ones.
    - Current: the shipped badge says "Must cite its sources"; nothing says "Must prove it"
    - Target: **Must prove it** (canvas, at rest) · **Free to think** · **Nothing to prove here**
@@ -196,6 +211,17 @@ The `/validate` + `/grounding-bundle` seam (Phase 182) already returns per-node 
   differentiator. The exploratory-reading case is handled by splitting the step in two.
 - **A separate refactor phase for `PhaseFormPanel.tsx`.** G-5 is honoured by construction instead — see
   Constraints.
+- **Rebuilding `PhaseNodeCard.tsx` from 137-D to 137-B.** Surfaced by sketch 147 on 2026-07-29: the
+  locked decision (`canvas-184.css:170-171`, operator 2026-07-26) is **137-B — the 3D mark floats above
+  a 248px centred card**, but the shipped component renders **137-D — the mark at `left-0 top-1/2`, 260
+  × 96** (`PhaseNodeCard.tsx:311-313`), and nothing in `frontend/src` applies a `card-b` class. The
+  operator confirmed 137-B is the target on 2026-07-29, together with two corrections the audit found:
+  `padding-top` 34 → **42** and `NODE_MIN_HEIGHT` 96 → **104**, so the visible 52px mark clears the title
+  by **11px** instead of 3. **This is a card-geometry change that moves the icon, the verdict mark and
+  the step number together — it belongs in its own task, not smuggled into a governance phase.** 185
+  places its marks against 137-B and must not also rebuild the card. Two shipped docblocks
+  (`PhaseNodeCard.tsx:287`, `WorkflowCanvas.tsx:502-504`) already justify real placements by reasoning
+  from 137-B on a component that renders 137-D; correcting them belongs to the same task.
 - **A run-state shape for the canvas** (run status does not survive a colour-blind read). → **Phase 188**
 - **Any database migration.** Live head stays at 113.
 

@@ -2,7 +2,7 @@
 sketch: 147
 name: the-armed-mark
 question: "Who owns the canvas card — which shape is real (137-D shipped vs 137-B locked), where do the governance seal and the armed action-risk mark actually fit, and what collides once 185, 188 and 189 have all landed?"
-winner: null
+winner: "B"
 tags: [phase-185, govern-02, govern-03, action-risk, armed-checkpoint, occupancy-audit, card-shape, 137b-vs-137d, seal-vs-verdict-collision, badge-budget, one-tab-stop, phase-188, phase-189, g2-sketch-gate]
 ---
 
@@ -104,13 +104,43 @@ convinced on. A barrier says *blocked*; it has no person in it.
 all**. Either it is a non-interactive mark (and arming happens in the side panel, where the grounding
 dial already goes per sketch 142-B), or it lives on the lane like ✕ and ＋.
 
-## What this sketch has to decide
+## RESOLVED 2026-07-29
 
-1. **Which card is real** — 137-B (and the code owes a change) or 137-D (and the decision + the stray
-   docblocks owe a correction). Everything downstream places against the answer.
-2. **Where the seal and the verdict mark both live**, since they currently overlap. `185-SPEC.md`
-   Requirement 6 must be amended either way.
-3. **Where the armed mark goes**, given 1 and 2 — and given it may not be a control on the card.
+**Winner: B — 137-B is the card.** Fewer collisions, and the operator confirmed the icon belongs on top.
+Three decisions locked:
+
+1. **137-B is the target.** `frontend/src` still renders 137-D, so the code owes a card-geometry change
+   that moves the icon, the verdict mark and the step number together. **Its own task** — `185-SPEC.md`
+   now lists it out-of-scope for Phase 185.
+2. **The verdict mark moves to `-left-2 top-1.5`; the seal keeps top-right.** The reason is lifetime, not
+   taste: the seal is a *permanent* property of the step, verified at all four run states in 143-A; a
+   verdict only exists when the server has returned a problem. **The permanent mark keeps the corner, the
+   transient one moves.** Residual: the moved verdict grazes the `stepNumber` slot by 2×16px, and that
+   slot renders nothing (D-183-07). If it is ever brought to the face, move it to `left:16` and it clears.
+3. **The icon clearance is widened.** `padding-top` 34 → **42**, `NODE_MIN_HEIGHT` 96 → **104**, so the
+   visible 52px mark clears the title by **11px** instead of 3. The operator spotted the tightness on
+   screen; the audit confirmed it was real (3px) *and* that the sketch had drawn it worse (2px overlap,
+   from text at y=30 instead of 34 and a 54px mark instead of 52).
+
+Result on 137-B: **zero collisions between rendered marks.**
+
+## Still open after this sketch
+
+**Only one thing: where the armed action-risk mark goes.** The card question and the seal/verdict
+question are both resolved above.
+
+But the constraint that decides it is now known, and it invalidates all three of my earlier attempts:
+**a clickable armed mark cannot live on the card at all.** One tab stop per node
+(`PhaseNodeCard.tsx:37-48`, asserted in `WorkflowCanvas.test.tsx:231-238`) is what forces the ✕ and ＋
+onto the lane, and it forces this too. So the remaining choice is:
+
+- a **non-interactive mark** on the card, with arming done in the side panel — where sketch 142-B
+  already puts the grounding dial, which keeps both governance controls in one place; **or**
+- a **control on the lane**, alongside the ✕ and ＋ — which puts arming where the other per-step
+  actions already are, at the cost of a third lane affordance.
+
+The three meaning-first concepts (detour / countersign / waiting card) remain drawn and switchable in
+the sketch, but each needs re-reading against whichever of those two homes wins.
 
 ## Rejected rounds, kept in git
 

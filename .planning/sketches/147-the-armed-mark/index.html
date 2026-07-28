@@ -140,12 +140,12 @@
                     color: var(--color-text-dim); cursor: pointer; font-size: 14px; line-height: 1; }
 </style>
 </head>
-<body class="alive va load-185 mk-detour run-off">
+<body class="alive vb load-185 mk-detour run-off">
 
 <nav class="variant-nav">
   <span class="label">Sketch 147</span>
-  <button class="variant-tab active" data-v="a" type="button">A: 137-D &mdash; what SHIPPED (icon left)</button>
-  <button class="variant-tab" data-v="b" type="button">B: 137-B &mdash; what was LOCKED (icon top)</button>
+  <button class="variant-tab" data-v="a" type="button">A: 137-D &mdash; what SHIPPED today (icon left)</button>
+  <button class="variant-tab active" data-v="b" type="button">B: 137-B &mdash; the card <span class="star">&#9733;</span></button>
 </nav>
 
 <p class="lead" id="lead"></p>
@@ -278,6 +278,25 @@ var C = { NODE_W: 260, NODE_H: 96, PITCH_X: 320, EDGE_ANCHOR_Y: 28,
 C.GAP = C.PITCH_X - C.NODE_W;          /* 60 */
 C.INSERT_Y = C.EDGE_ANCHOR_Y;          /* 28 */
 
+/* ── 137-B's OWN numbers, and the two corrections the operator made 2026-07-29 ──
+   The locked `canvas-184.css:182-188` gives 137-B `padding: 34px 20px 20px` with a
+   62px icon wrap at `top:-26`. The wrap therefore ends at y=36 and the text starts
+   at y=34 — and the VISIBLE 52px mark inside that wrap ends at y=31, clearing the
+   title by **3px**. Three pixels survives no font change and no longer title, so:
+
+     CORRECTION 1 — padding-top 34 → 42, giving the mark 11px of clearance.
+     CORRECTION 2 — min-height 96 → 104, so an unbadged card still fits its two
+                    lines inside the taller padding (title 17 + gap 3 + sub 15 = 35;
+                    35 + 42 + 20 = 97 > 96, which is why the floor had to move).
+
+   `CANVAS_LAYOUT.NODE_MIN_HEIGHT` is a FLOOR the card grows down from
+   (`canvasModel.ts:65-66`), so raising it is additive — nothing gets clipped. */
+C.NODE_W_B = 248;
+C.NODE_H_B = 104;      /* was 96 */
+C.PAD_TOP_B = 42;      /* was 34 */
+C.ICON_WRAP_B = 62;
+C.ICON_MARK_B = 52;    /* the visible mark inside the 62px wrap */
+
 var LOAD_ORDER = ['184', '185', '188', '189'];
 function loadAtLeast(lv) { return LOAD_ORDER.indexOf(load) >= LOAD_ORDER.indexOf(lv); }
 
@@ -285,8 +304,8 @@ function loadAtLeast(lv) { return LOAD_ORDER.indexOf(load) >= LOAD_ORDER.indexOf
    Node-local coordinates. The card is RENDERED from this table and the collision
    checker READS the same table, so the picture cannot disagree with the maths. */
 function zonesFor(card, step) {
-  var W = card === 'a' ? C.NODE_W : 248;
-  var H = C.NODE_H;
+  var W = card === 'a' ? C.NODE_W : C.NODE_W_B;
+  var H = card === 'a' ? C.NODE_H : C.NODE_H_B;
   var z = [];
 
   if (card === 'a') {
@@ -297,15 +316,23 @@ function zonesFor(card, step) {
              tag: 'ship', x: 24, y: 0, w: W - 24, h: H, soft: true });
   } else {
     /* 137-B LOCKED — canvas-184.css:186-188, icon floats above a 248px centred card */
-    z.push({ k: 'icon', label: 'the 3D phase mark', src: 'canvas-184.css:186  top:-26 centred 62px',
-             tag: 'ship', x: (W - 62) / 2, y: -26, w: 62, h: 62 });
-    z.push({ k: 'body', label: 'title · supporting line', src: 'canvas-184.css:182  248px, centred',
+    z.push({ k: 'icon', label: 'the 3D phase mark', src: 'canvas-184.css:186  top:-26, 62px wrap / 52px mark',
+             tag: 'ship', x: (W - C.ICON_WRAP_B) / 2, y: -26, w: C.ICON_WRAP_B, h: C.ICON_WRAP_B });
+    z.push({ k: 'body', label: 'title · supporting line', src: 'padding-top 42 (was 34) — 11px clearance',
              tag: 'ship', x: 0, y: 0, w: W, h: H, soft: true });
   }
 
-  /* the VALID-03 verdict mark — SHIPPED, and it owns the top-right corner */
-  z.push({ k: 'verdict', label: 'VALID-03 verdict mark', src: 'PhaseNodeCard:298  -right-2 top-1.5',
-           tag: 'ship', x: W - 22 + 8, y: 6, w: 22, h: 22, glyph: '○' });
+  /* The VALID-03 verdict mark.
+     ⚠ ON 137-B IT MOVES TO THE LEFT (operator, 2026-07-29). Shipped it is
+     `-right-2 top-1.5`, but 143-A's governance seal owns top-right and the two
+     overlapped 3×17px. The PERMANENT mark keeps the corner 143-A verified at all
+     four run states; the TRANSIENT one — a verdict only exists when the server has
+     returned a problem — moves. Mirrored as `-left-2`, so it hangs OUTSIDE the left
+     edge and barely grazes the (empty) stepNumber slot. */
+  z.push({ k: 'verdict', label: 'VALID-03 verdict mark',
+           src: card === 'a' ? 'PhaseNodeCard:298  -right-2 top-1.5'
+                             : 'MOVED to -left-2 top-1.5 (was -right-2)',
+           tag: 'ship', x: card === 'a' ? W - 22 + 8 : -8, y: 6, w: 22, h: 22, glyph: '○' });
 
   /* the step number — a DECLARED slot that renders nothing today */
   z.push({ k: 'stepn', label: 'stepNumber slot', src: 'PhaseNodeCard:181  declared, renders nothing',
@@ -362,8 +389,10 @@ function zoneHtml(z) {
   var st = 'left:' + z.x + 'px;top:' + z.y + 'px;width:' + z.w + 'px;height:' + z.h + 'px;';
   if (z.soft) return '';
   if (z.k === 'icon') {
+    /* the VISIBLE mark is smaller than its wrap — that gap is exactly what buys the
+       title its clearance, so it is drawn honestly rather than filling the box. */
     return '<span class="z icon" style="' + st + '"><span class="halo"></span><span class="sh"></span>' +
-           icon3d(z.iconKey, z.w - 8) + '</span>';
+           icon3d(z.iconKey, z.markSize || (z.w - 10)) + '</span>';
   }
   if (z.k === 'badges') return '';
   if (z.ghost) {
@@ -421,10 +450,12 @@ function renderFlow() {
   STEPS.forEach(function (s, i) {
     s.i = i;
     var card = variant;
-    var W = card === 'a' ? C.NODE_W : 248;
-    var H = C.NODE_H;
+    var W = card === 'a' ? C.NODE_W : C.NODE_W_B;
+    var H = card === 'a' ? C.NODE_H : C.NODE_H_B;
     var zs = zonesFor(card, s);
-    zs.forEach(function (z) { if (z.k === 'icon') z.iconKey = s.icon; });
+    zs.forEach(function (z) {
+      if (z.k === 'icon') { z.iconKey = s.icon; z.markSize = card === 'a' ? 48 : C.ICON_MARK_B; }
+    });
     var am = armedMark(card, s, W, H);
 
     /* the connector — real geometry, the ＋ centred in the 60px gap at y=28 */
@@ -448,7 +479,7 @@ function renderFlow() {
               (card === 'b' ? ' tb' : '') + '" style="width:' + W + 'px;height:' + (H + 70) + 'px">' +
       '<span class="frost" style="left:' + frostL + 'px;top:0;width:' + frostW + 'px;height:' + H + 'px"></span>' +
       am.onCard +
-      '<span class="txt" style="left:' + txtL + 'px;top:' + (card === 'a' ? 20 : 30) + 'px;width:' + txtW + 'px">' +
+      '<span class="txt" style="left:' + txtL + 'px;top:' + (card === 'a' ? 20 : C.PAD_TOP_B) + 'px;width:' + txtW + 'px">' +
         '<span class="ttl" style="display:block">' + esc(s.title) + '</span>' +
         '<span class="sub" style="display:block">' + esc(s.sub) + '</span>' +
       '</span>' +
@@ -469,26 +500,51 @@ function renderFlow() {
 }
 
 function renderRail() {
-  var W = variant === 'a' ? C.NODE_W : 248;
-  document.getElementById('dims').textContent = W + ' × ' + C.NODE_H + '  ·  gap ' + C.GAP;
+  var W = variant === 'a' ? C.NODE_W : C.NODE_W_B;
+  var H = variant === 'a' ? C.NODE_H : C.NODE_H_B;
+  document.getElementById('dims').textContent = W + ' × ' + H + '  ·  gap ' + C.GAP;
 
   var probe = { i: 0, proven: true, risky: false, icon: 'llm_agent_compass' };
   var zs = zonesFor(variant, probe);
+  zs.forEach(function (z) {
+    if (z.k === 'icon') { z.iconKey = probe.icon; z.markSize = variant === 'a' ? 48 : C.ICON_MARK_B; }
+  });
   var hits = collisions(zs);
 
-  document.getElementById('crashbox').innerHTML = hits.length
-    ? '<div class="crash"><h5>' + hits.length + ' collision' + (hits.length > 1 ? 's' : '') +
-      ' — computed, not asserted</h5>' +
-      hits.map(function (h) {
+  /* A collision against a DECLARED-BUT-EMPTY slot is not the same defect as two
+     rendered marks fighting. `stepNumber` draws nothing today (D-183-07 keeps
+     phase_index off the face), so it is reported separately and honestly rather
+     than inflating the red count — or being hidden, which would be worse. */
+  var hard = hits.filter(function (h) { return !h.a.ghost && !h.b.ghost; });
+  var soft = hits.filter(function (h) { return h.a.ghost || h.b.ghost; });
+  var html = '';
+  if (hard.length) {
+    html += '<div class="crash"><h5>' + hard.length + ' collision' + (hard.length > 1 ? 's' : '') +
+      ' between RENDERED marks — computed, not asserted</h5>' +
+      hard.map(function (h) {
         return '<div>' + esc(h.a.label) + '  ×  ' + esc(h.b.label) +
                '<br>&nbsp;&nbsp;overlap ' + h.o.w + '×' + h.o.h + 'px at (' + h.o.x + ',' + h.o.y + ')</div>';
-      }).join('') + '</div>'
-    : '<div class="clear">✓ No two hard marks overlap on this card at this load.</div>';
+      }).join('') + '</div>';
+  } else {
+    html += '<div class="clear">✓ No two rendered marks overlap on this card at this load.</div>';
+  }
+  if (soft.length) {
+    html += '<div style="border:1px solid hsl(38 92% 60% / .4);background:hsl(38 92% 60% / .1);' +
+      'border-radius:10px;padding:9px 12px;margin-bottom:12px;font-size:10.5px;line-height:1.6;' +
+      'color:hsl(38 92% 82%)">' +
+      soft.map(function (h) {
+        var ghost = h.a.ghost ? h.a : h.b, real = h.a.ghost ? h.b : h.a;
+        return '<b>Touches a reserved slot</b><br>' + esc(real.label) + ' × ' + esc(ghost.label) +
+               ' — ' + h.o.w + '×' + h.o.h + 'px. That slot renders NOTHING today (D-183-07). ' +
+               'If it is ever brought to the face, move it to <code>left:16</code> and this clears.';
+      }).join('<br>') + '</div>';
+  }
+  document.getElementById('crashbox').innerHTML = html;
 
   /* the anatomy diagram — the same zone table at 1.35× */
   var S = 1.35;
-  var box = '<div style="position:relative;width:' + (W * S + 40) + 'px;height:' + (C.NODE_H * S + 70) + 'px">' +
-    '<div style="position:absolute;left:20px;top:44px;width:' + (W * S) + 'px;height:' + (C.NODE_H * S) +
+  var box = '<div style="position:relative;width:' + (W * S + 40) + 'px;height:' + (H * S + 70) + 'px">' +
+    '<div style="position:absolute;left:20px;top:44px;width:' + (W * S) + 'px;height:' + (H * S) +
       'px;border:1px solid var(--color-border);border-radius:14px;background:hsl(220 30% 100% / .03)"></div>';
   zs.forEach(function (z) {
     if (z.soft) return;
@@ -520,19 +576,27 @@ function renderRail() {
 }
 
 var LEAD = {
-  a: '<b>A — 137-D, what actually shipped.</b> <code>PhaseNodeCard.tsx:311</code> puts the 3D mark at ' +
-     '<code>left-0 top-1/2</code>, 56px, with the card inset <code>ml-6</code> and padded <code>pl-10</code> ' +
-     'to clear it. 260 × 96. This is the card in the app today — and the one both earlier rounds of this ' +
-     'sketch failed to draw.',
-  b: '<b>B — 137-B, what was locked.</b> <code>canvas-184.css:170</code>: <i>“the operator moved the locked ' +
-     'card from 137-D to 137-B on 2026-07-26.”</i> The mark floats ABOVE a 248px centred card and there is no ' +
-     'per-type colour at all. <b>Nothing in <code>frontend/src</code> applies this shape.</b> The decision and ' +
-     'the code have been out of step since.'
+  a: '<b>A — 137-D, what is in the app TODAY.</b> <code>PhaseNodeCard.tsx:311</code> puts the 3D mark at ' +
+     '<code>left-0 top-1/2</code>, 56px, card inset <code>ml-6</code> padded <code>pl-10</code>. 260 × 96. ' +
+     'Kept here as the reference the code has to move away from — it carries <b>two</b> collisions, and the ' +
+     'extra one (stepNumber × icon, 22×8) is very likely why that slot renders nothing.',
+  b: '<b>B — 137-B, THE CARD (operator, 2026-07-29).</b> The mark floats above a 248px centred card, no ' +
+     'per-type colour. Two corrections applied: the <b>verdict mark moves to the LEFT</b> so 143-A’s ' +
+     'governance seal keeps the top-right corner it was verified on — the permanent mark keeps the corner, ' +
+     'the occasional one moves — and <b>padding-top goes 34 → 42</b> (min-height 96 → 104) so the icon ' +
+     'clears the title by <b>11px</b> instead of 3. <b>Zero collisions.</b> ' +
+     '<code>frontend/src</code> still renders 137-D, so the code owes this change.'
 };
 
 function renderFoot() {
   var bits = [];
-  bits.push('<span class="pill">' + (variant === 'a' ? '137-D · shipped' : '137-B · locked, never built') + '</span>');
+  bits.push('<span class="pill">' + (variant === 'a'
+    ? '137-D · in the app today, not the target'
+    : '137-B ★ · the card — code owes this change') + '</span>');
+  if (variant === 'b') {
+    bits.push('<span class="pill good">verdict moved LEFT · seal keeps top-right</span>');
+    bits.push('<span class="pill good">icon clears the title by 11px (was 3)</span>');
+  }
   bits.push('<span class="pill">load: ' + (load === '184' ? 'today' : '+' + load) + '</span>');
   bits.push('<span class="pill bad">3rd badge = typecheck error (BadgeSlot2Tuple)</span>');
   bits.push('<span class="pill bad">no focusable control may live in the card — one tab stop per node</span>');

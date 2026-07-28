@@ -963,7 +963,7 @@ finding (*the default must be ARMED-ON*) has nothing to argue against on screen.
 
 | # | Name | Design Question | Winner | Tags |
 |---|------|----------------|--------|------|
-| 147 | the-armed-mark | Who owns the canvas card — which shape is real (137-D shipped vs 137-B locked), where do the governance seal and the armed action-risk mark fit, and what collides once 185/188/189 have all landed? | *pending* | phase-185, govern-03, action-risk, armed-checkpoint, armed-default, unguarded-risk, canvas-mark, shape-only, phase-188, phase-189, g2-sketch-gate |
+| 147 | the-armed-mark | Who owns the canvas card — which shape is real (137-D shipped vs 137-B locked), where do the governance seal and the armed action-risk mark fit, and what collides once 185/188/189 have all landed? | **B — 137-B, verdict moves left** ★ | phase-185, govern-03, action-risk, armed-checkpoint, armed-default, unguarded-risk, canvas-mark, shape-only, phase-188, phase-189, g2-sketch-gate |
 
 **The build cost, established while drawing:** `WorkflowCanvas.tsx:279` already registers an `edgeTypes`
 entry named `flow` and `canvasModel.ts:88` gives every edge a `data.kind` — so a connector-based mark
@@ -1020,3 +1020,31 @@ shapes**; sketch 147 computes it live rather than asserting it. A third collisio
 **Consequence for GOVERN-03:** if the armed mark is clickable it **cannot live on the card at all** —
 it is either a non-interactive mark (with arming done in the side panel, where 142-B already puts the
 grounding dial) or it lives on the lane like ✕ and ＋.
+
+### ★ RESOLVED 2026-07-29 — sketch 147
+
+**Winner B: 137-B is the card.** Three decisions, all now binding on 185 / 188 / 189:
+
+1. **137-B is the target shape** (icon floats above a 248px centred card). `frontend/src` still renders
+   137-D, so the code owes a card-geometry change that moves the icon, the verdict mark and the step
+   number together — **its own task**, recorded out-of-scope in `185-SPEC.md`. The two shipped docblocks
+   that reason from 137-B on a 137-D component (`PhaseNodeCard.tsx:287`, `WorkflowCanvas.tsx:502-504`)
+   are corrected in the same task.
+2. **The verdict mark moves to `-left-2 top-1.5`; the 143-A governance seal keeps top-right.** The rule
+   this establishes is reusable: **a PERMANENT mark keeps a verified corner; a TRANSIENT one moves.** The
+   seal is a property of the step and was verified at all four run states; a verdict exists only when the
+   server returned a problem. `185-SPEC.md` Requirement 6 amended accordingly.
+3. **Icon clearance widened** — `padding-top` 34 → **42**, `NODE_MIN_HEIGHT` 96 → **104**, so the visible
+   52px mark clears the title by **11px** instead of 3. `NODE_MIN_HEIGHT` is a floor the card grows down
+   from, so raising it is additive.
+
+Result: **zero collisions between rendered marks on 137-B.** The one residual is the moved verdict
+grazing the `stepNumber` slot by 2×16px — a slot that renders nothing (D-183-07). If it is ever brought
+to the face, move it to `left:16` and it clears; the sketch reports that separately from real collisions
+rather than inflating the red count.
+
+**Still open:** the armed action-risk mark itself. Three meaning-first concepts (detour / countersign /
+waiting card) are drawn and switchable, but the binding constraint is now known — **a clickable armed
+mark cannot live on the card at all** (one tab stop per node, `PhaseNodeCard.tsx:37-48`), so it is either
+a non-interactive mark with arming done in the side panel (where 142-B already puts the grounding dial)
+or it lives on the lane like the ✕ and ＋.
