@@ -82,9 +82,9 @@ All three start from what actually happens — *the run stops, hands out to a pe
 takes* — rather than from "a barrier", which is what rounds 1 and 2 both drew and what neither
 convinced on. A barrier says *blocked*; it has no person in it.
 
-- **Detour** — the connector visibly leaves the flow and comes back through a point that represents
-  you. Arcs **below** the line, so the ＋ (26px at y=28) keeps its place. Unarmed, the line runs
-  straight through.
+- **Detour ★ (the winner)** — the connector visibly leaves the flow and comes back through a point that
+  represents you. Arcs **below** the line, so the ＋ (26px at y=28) keeps its place. Unarmed, the arc
+  stays as a faint dashed ghost with a solid line running through it — present and open, never absent.
 - **Countersign** — a ruled sign-off line at the foot of the card, like the bottom of a contract.
   Armed = an empty rule waiting. Unarmed = a dashed rule reading *runs unsigned*.
 - **Waiting card** — a second card edge peeking out from behind: the decision that will come forward
@@ -139,11 +139,39 @@ switch below — and the switch is live: tick it and watch the canvas mark chang
 themselves carry no `role`, no `tabIndex` and no handler, which is machine-checkable and is now an
 acceptance criterion in `185-SPEC.md` Requirement 8.
 
-## Still open after this sketch
+**5 · THE MARK IS THE DETOUR ★** (operator, 2026-07-29).
 
-**Only which of the three concepts the read-only mark uses** — detour, countersign, or waiting card.
-All three are drawn on the corrected 137-B card and switchable from the toolbar. Nothing structural
-remains: the card is settled, the corners are settled, the control's home is settled.
+The connector *into* the risky step **leaves the flow and comes back through a point that represents
+the person**. It is the only finalist that says what the engine actually does — the run stops, hands
+out to a human, resumes — rather than *blocked*, which is what both rejected rounds of barrier shapes
+said.
+
+| | |
+|---|---|
+| **Armed** | the solid arc **is** the path. No straight line runs past it, or the flow would appear to bypass the person |
+| **Not armed** | the arc stays as a faint dashed ghost with a solid line running straight through — the checkpoint is visibly **present and open**, never absent |
+
+**Verified geometry, computed rather than asserted:**
+
+```
+min clearance below the +   8.2px   (the curve never enters the + box)
+the x remove                card-centred, y = H-12 .. H+12  -> ON the card
+  countersign               would have landed exactly there
+  waiting card              grazes it by ~5px
+  detour                    lives in the GAP — clear of both
+```
+
+**Build note:** this is a **custom edge, not a node change**. It rides the `edgeTypes` entry named
+`flow` that `WorkflowCanvas.tsx:279` already registers, with `canvasModel.ts:88`'s `edge.data.kind`
+carrying the armed state. No net-new canvas infrastructure.
+
+## Nothing structural remains
+
+The card is settled, the corners are settled, the control's home is settled, the mark is settled.
+Sketch 147 is closed — `/gsd:discuss-phase 185` picks it up from here.
+
+The two rejected concepts stay switchable in the toolbar, and the toolbar now names what each one
+collides with, so the reasoning survives without needing this README.
 
 ## Rejected rounds, kept in git
 

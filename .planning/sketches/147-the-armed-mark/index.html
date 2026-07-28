@@ -188,7 +188,7 @@
   </div>
   <span class="lbl" style="margin-left:10px">Armed mark</span>
   <div class="seg" id="mkseg">
-    <button type="button" data-mk="detour" class="on">Detour</button>
+    <button type="button" data-mk="detour" class="on">Detour &#9733;</button>
     <button type="button" data-mk="sign">Countersign</button>
     <button type="button" data-mk="waiting">Waiting card</button>
     <button type="button" data-mk="none">None</button>
@@ -460,20 +460,40 @@ function armedMark(card, step, W, H) {
   var on = !!step.armed;
 
   if (mk === 'detour') {
-    /* arcs BELOW the connector line so the ＋ (26px at y=28) keeps its place */
-    var d = on
-      ? 'M0,' + C.INSERT_Y + ' C14,' + C.INSERT_Y + ' 16,' + (C.INSERT_Y + 34) + ' 30,' + (C.INSERT_Y + 34) +
-        ' C44,' + (C.INSERT_Y + 34) + ' 46,' + C.INSERT_Y + ' 60,' + C.INSERT_Y
-      : 'M0,' + C.INSERT_Y + ' L60,' + C.INSERT_Y;
+    /* ══ THE WINNER (operator, 2026-07-29) ══════════════════════════════════════
+       The run leaves the machine and comes back through a person. It arcs BELOW
+       the line, which is what keeps it off the ＋ (26px at y=28, x 17..43): the
+       tightest point of the curve inside that x-range sits 8.2px UNDER the ＋'s
+       bottom edge and the curve never enters its box.
+
+       It also dodges a collision the other two concepts did not. The ✕ remove is
+       card-centred straddling the card's BOTTOM edge (`WorkflowCanvas.tsx:618-627`,
+       y = H−12 … H+12) — exactly where `countersign` put its rule, and within ~5px
+       of where `waiting card` put its lower edge. The detour lives in the GAP, so
+       it is clear of the ✕ entirely.
+
+       ARMED     the solid arc IS the path. The flow physically goes through you.
+       NOT ARMED the arc stays, drawn as a faint dashed ghost, and a solid line runs
+                 straight past it. The checkpoint is visibly PRESENT AND OPEN —
+                 never absent. Drawing nothing here would break the rule that an
+                 unarmed risky step must be marked: a step that emails a report with
+                 nobody watching would look identical to one that reads a file. */
+    var ARC = 'M0,' + C.INSERT_Y + ' C14,' + C.INSERT_Y + ' 16,' + (C.INSERT_Y + 34) +
+              ' 30,' + (C.INSERT_Y + 34) + ' C44,' + (C.INSERT_Y + 34) + ' 46,' + C.INSERT_Y +
+              ' 60,' + C.INSERT_Y;
+    var LINE = 'M0,' + C.INSERT_Y + ' L' + C.GAP + ',' + C.INSERT_Y;
+    var svg = on
+      ? '<path d="' + ARC + '" fill="none" stroke="hsl(220 30% 100% / .62)" stroke-width="2"/>' +
+        '<circle cx="30" cy="' + (C.INSERT_Y + 34) + '" r="4.5" fill="none" ' +
+          'stroke="hsl(220 30% 100% / .85)" stroke-width="1.6"/>'
+      : '<path d="' + ARC + '" fill="none" stroke="hsl(220 30% 100% / .17)" stroke-width="1.5" ' +
+          'stroke-dasharray="3 3"/>' +
+        '<circle cx="30" cy="' + (C.INSERT_Y + 34) + '" r="4.5" fill="none" ' +
+          'stroke="hsl(220 30% 100% / .2)" stroke-width="1.4" stroke-dasharray="2 2"/>' +
+        '<path d="' + LINE + '" fill="none" stroke="var(--color-border)" stroke-width="2"/>';
     return { onCard: '', inGap:
       '<span class="detour" style="left:0;top:0;width:' + C.GAP + 'px;height:' + (C.INSERT_Y + 60) + 'px">' +
-        '<svg width="' + C.GAP + '" height="' + (C.INSERT_Y + 60) + '">' +
-          '<path d="' + d + '" fill="none" stroke="' +
-            (on ? 'hsl(220 30% 100% / .62)' : 'var(--color-border)') + '" stroke-width="2"' +
-            (on ? '' : ' stroke-dasharray="1 0"') + '/>' +
-          (on ? '<circle cx="30" cy="' + (C.INSERT_Y + 34) + '" r="4.5" fill="none" ' +
-                'stroke="hsl(220 30% 100% / .8)" stroke-width="1.6"/>' : '') +
-        '</svg>' +
+        '<svg width="' + C.GAP + '" height="' + (C.INSERT_Y + 60) + '">' + svg + '</svg>' +
         '<span class="who" style="top:' + (C.INSERT_Y + 44) + 'px">' +
           (on ? 'you say yes' : 'nobody asked') + '</span>' +
       '</span>' };
@@ -511,9 +531,15 @@ function renderFlow() {
 
     /* the connector — real geometry, the ＋ centred in the 60px gap at y=28 */
     if (i) {
+      /* When the detour is on a risky connector it OWNS the line — armed, the arc IS
+         the path and no straight line may run past it, or the flow would appear to
+         bypass the person. Unarmed, the detour draws its own straight line through
+         the open ghost. Either way the default `.ln` would double up, so it is
+         suppressed rather than layered. */
+      var detourOwnsLine = (mk === 'detour' && s.risky);
       html += '<div class="gapbox" style="width:' + C.GAP + 'px;height:' + (H + 70) + 'px">' +
-        (card === 'b' ? '' : '') +
-        '<span class="ln" style="left:0;top:' + C.INSERT_Y + 'px;width:' + C.GAP + 'px"></span>' +
+        (detourOwnsLine ? ''
+          : '<span class="ln" style="left:0;top:' + C.INSERT_Y + 'px;width:' + C.GAP + 'px"></span>') +
         am.inGap +
         '<span class="plus" style="left:' + ((C.GAP - C.INSERT_SIZE) / 2) + 'px;top:' +
           (C.INSERT_Y - C.INSERT_SIZE / 2) + 'px;width:' + C.INSERT_SIZE + 'px;height:' + C.INSERT_SIZE + 'px">＋</span>' +
@@ -631,12 +657,14 @@ var LEAD = {
      '<code>left-0 top-1/2</code>, 56px, card inset <code>ml-6</code> padded <code>pl-10</code>. 260 × 96. ' +
      'Kept here as the reference the code has to move away from — it carries <b>two</b> collisions, and the ' +
      'extra one (stepNumber × icon, 22×8) is very likely why that slot renders nothing.',
-  b: '<b>B — 137-B, THE CARD (operator, 2026-07-29).</b> The mark floats above a 248px centred card, no ' +
+  b: '<b>B — 137-B, THE CARD ★ (operator, 2026-07-29).</b> The mark floats above a 248px centred card, no ' +
      'per-type colour. Two corrections applied: the <b>verdict mark moves to the LEFT</b> so 143-A’s ' +
      'governance seal keeps the top-right corner it was verified on — the permanent mark keeps the corner, ' +
      'the occasional one moves — and <b>padding-top goes 34 → 42</b> (min-height 96 → 104) so the icon ' +
      'clears the title by <b>11px</b> instead of 3. <b>Zero collisions.</b> ' +
-     '<code>frontend/src</code> still renders 137-D, so the code owes this change.'
+     '<code>frontend/src</code> still renders 137-D, so the code owes this change. ' +
+     'The armed mark is <b>the detour ★</b>: the run leaves the machine and comes back through you. ' +
+     'Arming happens in the <b>panel</b> on the right — the canvas only shows it.'
 };
 
 function renderFoot() {
@@ -647,6 +675,14 @@ function renderFoot() {
   if (variant === 'b') {
     bits.push('<span class="pill good">verdict moved LEFT · seal keeps top-right</span>');
     bits.push('<span class="pill good">icon clears the title by 11px (was 3)</span>');
+  }
+  if (mk === 'detour') {
+    bits.push('<span class="pill good">★ detour · clears the ＋ by 8.2px, never enters it</span>');
+    bits.push('<span class="pill good">in the GAP — clear of the ✕ (card-centred, y H−12…H+12)</span>');
+  } else if (mk === 'sign') {
+    bits.push('<span class="pill bad">countersign lands ON the ✕ — card-centred bottom edge</span>');
+  } else if (mk === 'waiting') {
+    bits.push('<span class="pill warn">waiting card grazes the ✕ by ~5px</span>');
   }
   bits.push('<span class="pill">load: ' + (load === '184' ? 'today' : '+' + load) + '</span>');
   bits.push('<span class="pill bad">3rd badge = typecheck error (BadgeSlot2Tuple)</span>');

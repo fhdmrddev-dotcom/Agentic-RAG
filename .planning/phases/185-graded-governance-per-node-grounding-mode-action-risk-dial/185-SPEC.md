@@ -168,6 +168,29 @@ The `/validate` + `/grounding-bundle` seam (Phase 182) already returns per-node 
    > **Add to acceptance:** the canvas armed mark has no `role="button"`, no `tabIndex`, and no click
    > handler; a walk of every rendered `.react-flow__node` finds exactly ONE tab stop per node with the
    > mark present; arming and disarming are reachable only from the panel's governance section.
+   >
+   > **THE SHAPE IS LOCKED — the detour** (operator, 2026-07-29; sketch 147, three rounds). The connector
+   > *into* the risky step **leaves the flow and comes back through a point that represents the person**.
+   > It is the only one of the three finalists that says what the engine actually does — the run stops,
+   > hands out to a human, and resumes — rather than "blocked", which is what the two rejected rounds of
+   > barrier shapes both said.
+   >
+   > - **Armed:** the solid arc **is** the path. No straight line may run past it, or the flow would
+   >   appear to bypass the person.
+   > - **Not armed:** the arc remains as a faint dashed ghost with a solid line running straight through
+   >   it — the checkpoint is visibly **present and open**, never absent. Drawing nothing would break the
+   >   rule that an unarmed risky step must be marked (a step that emails a report with nobody watching
+   >   would look identical to one that reads a file).
+   >
+   > **Verified geometry** (computed, not asserted): the arc's tightest point inside the ＋'s x-range sits
+   > **8.2px below** the ＋'s bottom edge and the curve **never enters its box**. Living in the gap also
+   > clears the ✕, which is card-centred straddling the card's bottom edge (`WorkflowCanvas.tsx:618-627`,
+   > y = H−12 … H+12) — where the rejected *countersign* concept would have landed, and within ~5px of the
+   > rejected *waiting card*'s lower edge.
+   >
+   > **Build note:** this is a custom edge, not a node change — it rides the `edgeTypes` entry named
+   > `flow` that `WorkflowCanvas.tsx:279` already registers, with `canvasModel.ts:88`'s `edge.data.kind`
+   > carrying the armed state. No net-new canvas infrastructure.
 
 9. **The action-risk gate fails closed**: With the checkpoint set, no answer means the run never
    proceeds.

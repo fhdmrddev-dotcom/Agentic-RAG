@@ -963,7 +963,7 @@ finding (*the default must be ARMED-ON*) has nothing to argue against on screen.
 
 | # | Name | Design Question | Winner | Tags |
 |---|------|----------------|--------|------|
-| 147 | the-armed-mark | Who owns the canvas card — which shape is real (137-D shipped vs 137-B locked), where do the governance seal and the armed action-risk mark fit, and what collides once 185/188/189 have all landed? | **B — 137-B, verdict moves left** ★ | phase-185, govern-03, action-risk, armed-checkpoint, armed-default, unguarded-risk, canvas-mark, shape-only, phase-188, phase-189, g2-sketch-gate |
+| 147 | the-armed-mark | Who owns the canvas card — which shape is real (137-D shipped vs 137-B locked), where do the governance seal and the armed action-risk mark fit, and what collides once 185/188/189 have all landed? | **B — 137-B · verdict left · the detour** ★ | phase-185, govern-03, action-risk, armed-checkpoint, armed-default, unguarded-risk, canvas-mark, shape-only, phase-188, phase-189, g2-sketch-gate |
 
 **The build cost, established while drawing:** `WorkflowCanvas.tsx:279` already registers an `edgeTypes`
 entry named `flow` and `canvasModel.ts:88` gives every edge a `data.kind` — so a connector-based mark
@@ -1050,5 +1050,18 @@ rather than inflating the red count.
    the canvas is where you SEE.** `185-SPEC.md` Requirement 8 refined with a machine-checkable acceptance
    criterion (no `role`, no `tabIndex`, no handler on the mark; exactly one tab stop per node).
 
-**Still open:** only which of the three read-only concepts the mark uses — detour, countersign, or
-waiting card. Nothing structural remains.
+5. **THE ARMED MARK IS THE DETOUR** — the connector *into* the risky step leaves the flow and comes
+   back through a point representing the person. The only finalist that says what the engine DOES (stop,
+   hand out to a human, resume) rather than *blocked*, which is what both rejected rounds of barrier
+   shapes said. **Armed:** the solid arc IS the path, with no straight line running past it. **Not
+   armed:** the arc stays as a faint dashed ghost with a line through it — present and open, never
+   absent, which is what keeps the armed-on-by-default rule legible.
+
+   *Verified, computed not asserted:* the arc clears the ＋ by **8.2px** and never enters its box; and
+   because it lives in the GAP it is clear of the ✕, which is card-centred straddling the card's bottom
+   edge (`WorkflowCanvas.tsx:618-627`, y = H−12 … H+12) — **exactly where the rejected `countersign`
+   would have landed**, and within ~5px of the rejected `waiting card`. *Build note:* a CUSTOM EDGE, not
+   a node change — rides the `edgeTypes.flow` entry `WorkflowCanvas.tsx:279` already registers.
+
+**Sketch 147 is CLOSED.** Nothing structural remains — card, corners, control home and mark are all
+settled. `/gsd:discuss-phase 185` picks it up from here.
