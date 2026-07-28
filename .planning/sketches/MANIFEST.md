@@ -827,6 +827,7 @@ workflows and say so**, while keeping the engine facts real (phase types, the `g
 |---|------|----------------|--------|------|
 | 142 | grounding-dial-and-lock | A step that reads your documents is held to citing them, and that cannot be switched off. How does that read as a safety rail rather than as a broken setting? | **B — a switch that refuses** ★ | phase-185, govern-01, grounding-mode, detected-lock, one-way, escalate-only, phaseformpanel, plain-language, g2-sketch-gate |
 | 143 | proven-on-the-canvas | How do you mark a proven step on the canvas when colour and badges are both already spent? | **A — a sealed edge** ★ | phase-185, govern-02, canvas-mark, non-colour-channel, badge-budget, colour-budget, phase-188-collision, greyscale-proof, g2-sketch-gate |
+| 144 | the-approval-stop-sign | Where does "this step waits for your OK" live, so you can see it before a run and feel it during one — without adding a step to the flow? | *pending* | phase-185, govern-03, action-risk, approval-checkpoint, connectors, phase-189, phase-190, armed-default, g2-sketch-gate |
 
 **Two findings 142 produces that outlive whichever variant wins:**
 
@@ -855,3 +856,15 @@ reinforcement: run status overwrites the border, so mid-run the seal is the only
 live at all four run states — the seal stays legible on every one. Therefore (1) the seal may never be
 conditional on run state, and (2) top-right of the 137-B card is now **claimed** — Phases 188/189 may not
 take it. B (a rail outside the border) is the documented fallback if the seal proves too quiet in use.
+
+**Connectors are designed for now, not bolted on later (operator, 2026-07-28).** Sketch 144 draws an
+email-out and a file-to-shared-drive step as a labelled preview of Phases **189** (governed
+external-action node, no live egress) and **190** (2-3 live connectors + SSRF / credential /
+cross-tenant security). Reason: only **9 of 170** steps in the corpus do anything outbound today, which
+makes the action-risk gate look optional — and 189 SC#2 already commits that the external-action node
+"carries the Phase-185 action-risk approval checkpoint **by default**." The connector marks used are the
+already-verified `connector_email` / `connector_link` entries in `themes/phase-icons-3d.js`.
+
+**The finding 144 produces regardless of which variant wins:** an outbound step with no checkpoint is
+harmless today and is *the whole risk* the moment 190 ships. **The default must be armed-on** — a new
+external-action step arrives with its checkpoint set, and turning it off is the deliberate act.
