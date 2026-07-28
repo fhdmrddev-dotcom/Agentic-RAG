@@ -82,6 +82,12 @@ const TARGETS = [
   "src/pages/WorkflowBuilderPage.test.tsx",
   "src/pages/WorkflowBuilderPage.canvas.test.tsx",
   "src/components/admin/revertByteIdentical.test.tsx",
+  // Added in 184.1. This suite is the ONLY thing pinning the flag-off Builder header —
+  // D-181-01's Builder half was unguarded until it existed — so leaving it outside the
+  // gate's blast radius would mean the one guard for a byte-identity promise could be
+  // deleted without the gate noticing. It is deliberately NOT added to BASELINE: it
+  // postdates the 424 pin, so it reports as `new` and its own count is free to grow.
+  "src/pages/WorkflowBuilderPage.header.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
