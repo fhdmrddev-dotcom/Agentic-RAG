@@ -224,13 +224,13 @@ Plans:
   3. A test pins the flag-off header structure — the first one to ever do so (D-181-01's Builder-header half was previously unguarded).
   4. Nothing is removed: every control, badge and label from the three bands survives the re-flow and stays reachable by accessible name.
 
-**Plans**: TBD
+**Plans**: 1 of 1 complete
 **Source**: `.planning/phases/184-editable-canvas-live-structural-validation-round-trip/184-HEADER-PLAN.md` (Option A, operator-selected)
 **Flags**: FE-only, no backend, no migration, no new dependency; touches the D-181-01 flag-off surface so the flag gate is the load-bearing decision; G-1 satisfied (no prior 184.x)
 
 Plans:
 
-- [ ] TBD (run /gsd:plan-phase 184.1 to break down)
+- [x] 184.1-01-PLAN.md — the flag-off header pin (written FIRST), the flag-gated merged row, and the band-count budget + one-definition gate guard
 
 #### Phase 185: Graded Governance — Per-Node Grounding Mode + Action-Risk Dial
 

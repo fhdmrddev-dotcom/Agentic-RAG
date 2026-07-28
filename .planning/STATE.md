@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
 status: verifying
-last_updated: "2026-07-27T10:05:26.548Z"
-last_activity: 2026-07-27
+last_updated: "2026-07-28T03:58:52.642Z"
+last_activity: 2026-07-28
 progress:
-  total_phases: 18
-  completed_phases: 3
-  total_plans: 37
-  completed_plans: 37
-  percent: 17
+  total_phases: 19
+  completed_phases: 4
+  total_plans: 39
+  completed_plans: 38
+  percent: 21
 ---
 
 # Project State
@@ -44,8 +44,23 @@ Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 op
 
 ## Current Position
 
-Phase: 184 (Editable Canvas + Live Structural Validation (Round-Trip)) — EXECUTING
-Plan: 13 of 13
+Phase: 184.1 (Builder Header Consolidation) — COMPLETE, ready for verification
+Plan: 1 of 1
+
+**Phase 184.1 COMPLETE (`90f07551` pin → `0e9466de` merge → `12c557b3` budget+guards → SUMMARY).**
+The Builder's three stacked header bands collapse into ONE flag-gated row, reclaiming ~90px above
+the canvas — the operator's Phase 184 UAT report (275px of chrome over a 288px canvas at 639px).
+**The pin was written FIRST**, green against the unmodified page, and passed after the merge with
+**zero edits** — which is the evidence the flag gate held. `WorkflowBuilderPage.header.test.tsx` is
+the first suite to ever pin this surface (D-181-01 was previously untested here). **Both required
+falsifications were performed:** deleting a band red 6/7 (count 3→2); splitting the merged row red
+4 (count 1→2, budget delta 2→1). Gates: tsc **33**, `npx vite build` exit 0, snapshots unchanged,
+count gate **PublishGauntlet-flake only** across 3 runs. **D-184.1-04** recorded: the three bands
+sit at three NESTING levels, so the two ancestor owners read the flag through ONE exported
+`useCanvasGate()` rule (App.tsx's single fetch untouched) — the dispatch's "one call site in the
+whole tree" instruction was escalated as a checkpoint and withdrawn by the coordinator (`34ddff75`
+added `WorkflowsPage.tsx` to scope). **Owed:** operator UAT at ~900px width (the jsdom-unmeasurable
+half), and `scripts/vitest-count-gate.cjs` `TARGETS` does not yet include the new pin.
 
 **Plan 184-01 COMPLETE (`4a019bd8` gate → `ffb3e9cf` icon swap → `854ec42b` SUMMARY).** Wave 0's
 measuring stick landed FIRST as its own single-file commit: `scripts/vitest-count-gate.cjs` pins
@@ -260,7 +275,7 @@ Status: Phase complete — ready for verification
 
 **G-2 sketch gate for Phase 183: SATISFIED (2026-07-25).** Sketches 134-137 committed (`01bb4c64`, `7b74d2b5`, `01d50bba`, `86f866c5`, `e35c7489`). Winners: **136-B** (horizontal left->right flow) + **137-D** (frosted-glass step cards, 3D icon floating at the left edge, plain language with technical names behind the Alt reveal, Alive-by-default motion). Locked rules the canvas phases inherit: **colour budget** (step-type colour is a tint behind the icon only — the strong colours belong to Phase 188 run status) and **motion keys off run state, never selection**. New reusable asset `.planning/sketches/themes/phase-icons-3d.js` (verified 3D fluent-emoji marks; NEVER text glyphs). Icon choices: `llm_agent` -> `compass`; `llm_batch_agents` gets a lighter icon well in-scope, with the cross-cutting `handshake` swap left open. **Two findings that must reach the 183 plan: (1) `skip_to_phase` is used ZERO times in all 95 live definitions — SC#1's branch edge needs a fixture; (2) 40 of 95 definitions have zero phases — the empty projection is the most common canvas state.**
 
-Last activity: 2026-07-27
+Last activity: 2026-07-28
 
 ### Quick Tasks Completed
 
@@ -776,6 +791,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 184 P11 | 55min | 3 tasks | 8 files |
 | Phase 184 P12 | 21min | 3 tasks | 4 files |
 | Phase 184 P13 | 30min | 3 tasks | 7 files |
+| Phase 184.1 P01 | 35min | 3 tasks | 4 files |
 
 ## Decisions
 
@@ -994,6 +1010,8 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase 184]: 184-12: the canvas + / x affordances are plane-level overlays drawn through @xyflow ViewportPortal — they share the nodes' coordinate system while reporting a null .react-flow__node ancestor, so the one-tab-stop-per-node invariant holds by construction
 - [Phase 184]: 184-13: SAVED_STILL_A_DRAFT moved to builderStore.ts and re-exported from the page — a code-split leaf must not import a page module for a string
 - [Phase 184]: 184-13: the canvas bottom region is ONE optional session prop object, so 'two rows, never one, never three' is enforced by the type rather than by a test
+- [Phase ?]: D-184.1-04: the Builder's three header bands are contributed at three NESTING levels, so the two ancestor band owners read the canvas flag too — through ONE exported useCanvasGate() rule; App.tsx's single useEffectiveFeatures fetch is untouched
+- [Phase ?]: D-184.1-01: the merged Builder header is FLAG-GATED, so flag-off byte-identity holds by construction — the header had never been pinned by any suite before 184.1
 
 ## Operator Next Steps
 
