@@ -443,6 +443,16 @@ were verified against the live tree before deciding.
   run-state shape** → **Phase 188**.
 - **"Someone else approved it"** (a second approver must be told who decided) → **Phase 186**.
 - **Armed-on-by-default for external actions** → **Phase 189** (already its SC#2).
+- **The freshness gate's `ask_user` path is destroyed by a routine deploy** (found at plan-check,
+  2026-07-29). On a `{"kind": "shutdown"}` payload `_resolve_failure_with_ask_user` computes `choice = ""`,
+  `_is_abort_choice("")` is True, and the run is FAILED — safe, but it kills a healthy run on every
+  restart. 185 fixes exactly this for **armed checkpoints only** (`185-04` Task 3, guarded by
+  `is_action_risk`), because SPEC Req 9 and §Out-of-scope both scope the fail-closed change to armed
+  checkpoints and a wider fix would change shipped behaviour no GOVERN requirement asked for.
+  **Re-open trigger:** the first time a deploy is observed to fail a live run parked on a freshness gate,
+  OR when Phase 189's external-action node ships (it multiplies the number of parked runs). The fix is
+  one guard-widening — delete the `is_action_risk` condition on the `CancelledError` branch — plus the
+  non-armed control test `185-04` leaves in place, which would then flip.
 - **The stepNumber slot** — the relocated verdict mark grazes it by 2×16px, but that slot renders nothing
   (D-183-07 keeps `phase_index` off the face). If it is ever brought to the face, move it to `left:16` and
   the overlap clears.

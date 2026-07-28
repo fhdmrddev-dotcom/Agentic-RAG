@@ -248,16 +248,33 @@ Plans:
 **Plans**: 11 plans in 6 waves
 
 Plans:
+**Wave 1**
+
 - [ ] 185-01-PLAN.md — the 137-D → 137-B card-geometry rebuild (D-185-17), standalone, before any governance mark lands
 - [ ] 185-02-PLAN.md — the two additive-optional PhaseSpec booleans, KB_TOOLS + the pure grounding_cause derivation, and kb_tools on the palette route
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 185-03-PLAN.md — the retrieved_and_cited mode, the action_risk_approval kind, effective_phase, and the spec_by_slug enforcement seam
-- [ ] 185-04-PLAN.md — the fail-closed armed wait: indefinite subscribe, an explicit decline mapping, a verbatim prompt, a survivable shutdown
-- [ ] 185-05-PLAN.md — the honest wait end-to-end: action_risk_pending vocabulary, the armed resume sweep, a no-deadline prompt card
 - [ ] 185-06-PLAN.md — the client's data half: kbTools on the palette hook, the two booleans on PhaseSpecJSON, the caller-owned write chain and the governance copy constants
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 185-04-PLAN.md — the fail-closed armed wait: indefinite subscribe, an explicit decline mapping, a verbatim prompt, a survivable shutdown
 - [ ] 185-07-PLAN.md — GovernanceSection: the dial that visibly refuses, and the PhaseFormPanel mount point (G-5 honoured by construction)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 185-05-PLAN.md — the honest wait end-to-end: action_risk_pending vocabulary, the armed resume sweep, a no-deadline prompt card
 - [ ] 185-08-PLAN.md — delete the 3-face word-badge, synthesize the locked gate row client-side (D-185-19), thread grounded/armed, re-measure the count-gate pins
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
 - [ ] 185-09-PLAN.md — the corner seal at the CLAIMED top-right, never conditional on run state, with a props fence and a four-mark zone check
 - [ ] 185-10-PLAN.md — the detour edge: FlowEdge, the net-new edgeTypes map, edge.type on flow edges, and a no-visible-change guard on ordinary edges (D-185-18)
+
+**Wave 6** *(blocked on Wave 5 completion)*
+
 - [ ] 185-11-PLAN.md — the vocabulary sweep as a test, the four phase-level fences, the G-5 / D-185-17 / publish-behaviour records, and the G-4 + SC#10 gate
 
 **UI hint**: yes
