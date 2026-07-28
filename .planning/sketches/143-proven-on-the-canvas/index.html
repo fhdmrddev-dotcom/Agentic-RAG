@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Sketch 143 — Seeing which steps are proven (Phase 185)</title>
+<title>Sketch 143 — Seeing which steps must prove it (Phase 185)</title>
 <link rel="stylesheet" href="../themes/default.css">
 <link rel="stylesheet" href="../themes/canvas-184.css">
 <style>
@@ -171,7 +171,7 @@
     <button class="close" type="button" id="closetry" aria-label="Hide">✕</button>
     <h5>Three things to try</h5>
     <ol>
-      <li>Without reading a word — <b>which steps are proven?</b> Should take under three seconds.</li>
+      <li>Without reading a word — <b>which steps must prove it?</b> Should take under three seconds.</li>
       <li>Set run state to <b>Running</b>, then <b>Failed</b>. Can you still read both things at once?</li>
       <li>Switch to <b>No colour at all</b>. Does it still work?</li>
     </ol>
@@ -191,7 +191,15 @@
 <script src="../themes/phase-icons-3d.js"></script>
 <script>
 /* ══════════════════════════════════════════════════════════════════════════
-   Sketch 143 — GOVERN-02. Seeing, at a glance, which steps are proven.
+   Sketch 143 — GOVERN-02. Seeing, at a glance, which steps MUST PROVE IT.
+
+   VOCABULARY, settled 2026-07-28 during the cross-sketch alignment audit: at
+   rest the mark means "held to proof", NOT "proved it". Nothing has been proven
+   until a run's citation gate actually passes — so a canvas that has never run
+   calling a step "proven" would be the exact overclaim this milestone exists to
+   prevent. The seal reads **must prove it** everywhere on the canvas; the word
+   "traceable" appears only at the review moment (145), where the check has
+   really run. The folder name keeps its original slug for history.
 
    THE CONSTRAINT, and it is severe. Sketch 137-B locked a card that spends
    NO per-step-type colour at all, deliberately, so Phase 188 gets the entire
@@ -220,18 +228,20 @@
 var STEPS = [
   { icon: 'llm_agent_compass', title: 'Find the risks in our supplier files',
     sub: 'Reads your contracts and incident reports', proven: true },
-  { icon: 'llm_agent_compass', title: 'Pull last quarter’s incident numbers',
-    sub: 'Reads your incident log', proven: true },
   { icon: 'llm_single', title: 'Work out which suppliers look shaky',
     sub: 'Judgement — no documents involved', proven: false },
-  { icon: 'llm_human_input', title: 'Check with you before writing',
-    sub: 'Pauses here until you answer', proven: false, waits: true },
   { icon: 'llm_emit', title: 'Write the risk report',
-    sub: 'Every claim traceable to a document', proven: true }
+    sub: 'Every claim has to trace to a document', proven: true },
+  { icon: 'connector_email', title: 'Email it to procurement',
+    sub: 'Sends the report outside the company', proven: false, waits: true },
+  { icon: 'connector_link', title: 'File it in the shared drive',
+    sub: 'Writes the report to your team folder', proven: false }
 ];
 
 /* which step the run is sitting on, per run state */
-var ACTIVE = { off: -1, go: 1, you: 3, bad: 4 };
+/* go / bad MUST land on a step that must-prove, or the collision test proves
+   nothing; `you` lands on the email, which is where the approval waits. */
+var ACTIVE = { off: -1, go: 0, you: 3, bad: 2 };
 
 var LEAD = {
   a: '<b>A — The card itself is sealed.</b> A proven step is drawn with a heavier, double-struck edge and ' +
@@ -270,7 +280,7 @@ function renderFlow() {
     }
     var chip = run === 'go' ? 'Running now' : run === 'you' ? 'Waiting for you' : run === 'bad' ? 'Failed here' : '';
     html += '<div class="' + cls + '" data-i="' + i + '" tabindex="0" role="button"' +
-        ' aria-label="Step ' + (i + 1) + ': ' + esc(s.title) + (s.proven ? ' — proven' : '') + '">' +
+        ' aria-label="Step ' + (i + 1) + ': ' + esc(s.title) + (s.proven ? ' — must prove it' : '') + '">' +
       '<span class="stepn">' + (i + 1) + '</span>' +
       '<span class="seal" aria-hidden="true">⛨</span>' +
       '<div class="icowrap">' + icon3d(s.icon, 52) + '</div>' +
@@ -289,13 +299,13 @@ function renderFlow() {
 function renderLegend() {
   var sw = variant === 'a' ? 'swA' : 'swB';
   document.getElementById('legend').innerHTML =
-    '<span class="k"><span class="' + sw + '"></span> Proven — every claim traceable to your documents</span>' +
+    '<span class="k"><span class="' + sw + '"></span> Must prove it — every claim has to trace to a document</span>' +
     '<span class="k"><span class="swN"></span> Free to think — judgement, nothing to cite</span>';
 }
 
 function renderFoot() {
   var nP = STEPS.filter(function (s) { return s.proven; }).length;
-  var bits = ['<span class="pill">' + nP + ' of ' + STEPS.length + ' steps proven</span>'];
+  var bits = ['<span class="pill">' + nP + ' of ' + STEPS.length + ' steps must prove it</span>'];
   bits.push('<span class="pill good">✓ No colour spent — Phase 188 keeps its whole budget</span>');
   bits.push('<span class="pill good">✓ No third badge — the "⛨ Must prove it" word is gone, both slots freed</span>');
   bits.push(variant === 'a'

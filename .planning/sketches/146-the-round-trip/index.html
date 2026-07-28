@@ -36,7 +36,7 @@
   /* bottom band reserved for the two note cards, so the flow is never sat on */
   .miniflow { display: flex; align-items: center; padding: 30px 34px 210px; min-width: max-content; min-height: 100%; }
   .mnode {
-    position: relative; flex-shrink: 0; width: 196px; padding: 26px 15px 15px; margin-top: 24px;
+    position: relative; flex-shrink: 0; width: 214px; padding: 26px 15px 15px; margin-top: 24px;
     border-radius: 18px; text-align: center;
     background: linear-gradient(160deg, hsl(220 30% 100% / .075), hsl(220 30% 100% / .022));
     border: 1px solid hsl(220 30% 100% / .11); backdrop-filter: blur(14px);
@@ -181,7 +181,7 @@
 
 <nav class="variant-nav">
   <span class="label">Sketch 146</span>
-  <button class="variant-tab active" data-v="a" type="button">A: One place — the canvas is the run</button>
+  <button class="variant-tab active" data-v="a" type="button">A: One place — the canvas is the run <span class="star">★</span></button>
   <button class="variant-tab" data-v="b" type="button">B: Two places — build here, run there</button>
 </nav>
 
@@ -291,11 +291,11 @@
    ══════════════════════════════════════════════════════════════════════════ */
 
 var STEPS = [
-  { t: 'Find the risks', s: 'Reads your supplier files', proven: true },
-  { t: 'Work out what is shaky', s: 'Judgement, no documents' },
-  { t: 'Write the report', s: 'Fills your template', proven: true },
-  { t: 'Email it to procurement', s: 'Waits for your OK' },
-  { t: 'File it in the drive', s: 'Writes to your team folder' }
+  { t: 'Find the risks in our supplier files', s: 'Reads your contracts and incident reports', proven: true },
+  { t: 'Work out which suppliers look shaky', s: 'Judgement — no documents involved' },
+  { t: 'Write the risk report', s: 'Every claim has to trace to a document', proven: true },
+  { t: 'Email it to procurement', s: 'Sends the report outside the company' },
+  { t: 'File it in the shared drive', s: 'Writes the report to your team folder' }
 ];
 
 var JOURNEY = [
@@ -368,7 +368,9 @@ function nodeState(i) {
 
 function nodeChip(i) {
   var st = nodeState(i);
-  if (st === 'now') return 'Waiting for you';
+  /* "executing" and "waiting for a person" are NOT the same state and must never
+     share a word — conflating them is the Pitfall-4 dishonesty in miniature. */
+  if (st === 'now') return state === 'running' ? 'Running now' : 'Waiting for you';
   if (st === 'okd') return '✓ You approved it';
   if (st === 'failed') return 'Failed here';
   return '';

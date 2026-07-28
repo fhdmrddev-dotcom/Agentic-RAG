@@ -207,19 +207,23 @@ var TOOL_WORDS = {
 var TYPE_META = {
   llm_agent:       { icon: 'llm_agent_compass', label: 'AI agent step', tech: 'llm_agent' },
   llm_single:      { icon: 'llm_single',        label: 'AI write step', tech: 'llm_single' },
-  llm_human_input: { icon: 'llm_human_input',   label: 'Needs you',     tech: 'llm_human_input' },
-  llm_emit:        { icon: 'llm_emit',          label: 'Deliverable',   tech: 'llm_emit' }
+  llm_emit:        { icon: 'llm_emit',          label: 'Deliverable',   tech: 'llm_emit' },
+  /* Phases 189/190 preview — the same verified marks sketches 144/146 use. */
+  connector_email: { icon: 'connector_email',   label: 'Sends an email', tech: 'connector · later phase' },
+  connector_drive: { icon: 'connector_link',    label: 'Writes a file',  tech: 'connector · later phase' }
 };
 
 var STEPS = [
   { slug: 'find_risks', t: 'llm_agent', title: 'Find the risks in our supplier files',
     sub: 'Reads your contracts and incident reports', tools: ['search_documents'] },
   { slug: 'assess', t: 'llm_single', title: 'Work out which suppliers look shaky',
-    sub: 'Thinks it through — no documents involved', tools: null },
-  { slug: 'confirm', t: 'llm_human_input', title: 'Check with you before writing',
-    sub: 'Pauses here until you answer', tools: null },
+    sub: 'Judgement — no documents involved', tools: null },
   { slug: 'report', t: 'llm_emit', title: 'Write the risk report',
-    sub: 'Produces the finished document', tools: null, policy: 'strict' }
+    sub: 'Produces the finished document', tools: null, policy: 'strict' },
+  { slug: 'email', t: 'connector_email', title: 'Email it to procurement',
+    sub: 'Sends the report outside the company', tools: null, conn: true },
+  { slug: 'file', t: 'connector_drive', title: 'File it in the shared drive',
+    sub: 'Writes the report to your team folder', tools: null, conn: true }
 ];
 
 var LEAD = {
@@ -255,7 +259,10 @@ function toast(m) {
                        reading documents, that wins and the undo disappears.
    ────────────────────────────────────────────────────────────────────────── */
 function grounding(s) {
-  if (s.t === 'llm_human_input') return { mode: 'na' };
+  /* A connector performs an ACTION. It makes no claim of its own, so there is
+     nothing for it to back up — the same "nothing to prove" state a
+     question-to-a-human has. */
+  if (s.conn || s.t === 'llm_human_input') return { mode: 'na' };
   if (s.policy === 'strict')     return { mode: 'proves', cause: 'already-set', locked: true };
   var kb = (s.tools || []).filter(function (t) { return KB_TOOLS.indexOf(t) >= 0; });
   if (kb.length)                 return { mode: 'proves', cause: 'reads-documents', locked: true, via: kb };
@@ -274,7 +281,7 @@ function nodeHTML(s, i) {
   var m = TYPE_META[s.t], g = grounding(s);
   var badges = '';
   if (g.mode === 'proves') badges += '<span class="badge cited">⛨ Must prove it</span>';
-  if (s.t === 'llm_human_input') badges += '<span class="badge you">✋ Waits for you</span>';
+  if (s.conn) badges += '<span class="badge soon">connector · later phase</span>';
   return '<div class="node' + (selIdx === i ? ' sel' : '') + '" data-i="' + i + '" data-type="' + s.t + '"' +
       ' tabindex="0" role="button" aria-label="Step ' + (i + 1) + ': ' + esc(s.title) + '">' +
     '<span class="stepn">' + (i + 1) + '</span>' +
@@ -318,8 +325,8 @@ function toolBlock(s) {
 function govA(s, g) {
   if (g.mode === 'na') {
     return '<div class="gov na"><div class="gh"><span class="openmark">—</span> Nothing to prove here</div>' +
-      '<div class="gw">This step asks you a question and waits for your answer. It does not say anything ' +
-      'of its own, so there is nothing for it to back up.</div></div>';
+      '<div class="gw">This step performs an action — it does not say anything of its own, so there is ' +
+      'nothing for it to back up. Whether it should <b>ask you first</b> is a different dial entirely.</div></div>';
   }
   if (g.mode === 'free') {
     return '<div class="gov"><div class="gh"><span class="openmark">○</span> Free to think</div>' +
@@ -353,8 +360,8 @@ function govA(s, g) {
 function govB(s, g) {
   if (g.mode === 'na') {
     return '<div class="gov na"><div class="gh"><span class="openmark">—</span> Nothing to prove here</div>' +
-      '<div class="gw">This step asks you a question and waits. There is no control, because a control ' +
-      'that could never do anything is worse than none.</div></div>';
+      '<div class="gw">This step performs an action and makes no claim of its own. There is no control ' +
+      'here, because a control that could never do anything is worse than none.</div></div>';
   }
   var isP = g.mode === 'proves', locked = isP && g.locked;
   var dial =

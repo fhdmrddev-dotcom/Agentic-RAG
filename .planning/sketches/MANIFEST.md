@@ -829,7 +829,7 @@ workflows and say so**, while keeping the engine facts real (phase types, the `g
 | 143 | proven-on-the-canvas | How do you mark a proven step on the canvas when colour and badges are both already spent? | **A — a sealed edge** ★ | phase-185, govern-02, canvas-mark, non-colour-channel, badge-budget, colour-budget, phase-188-collision, greyscale-proof, g2-sketch-gate |
 | 144 | the-approval-stop-sign | Where does "this step waits for your OK" live, so you can see it before a run and feel it during one — without adding a step to the flow? | *pending* | phase-185, govern-03, action-risk, approval-checkpoint, connectors, phase-189, phase-190, armed-default, g2-sketch-gate |
 | 145 | the-review-moment | The run has stopped and is asking you to approve sending a document. What do you actually see before you say yes — and where are you standing when you see it? | *pending* | phase-185, govern-03, review-moment, artefact-preview, check-coverage, run-surface, workflow-vs-chat, phase-188-input, approve-blind-honesty, g2-sketch-gate |
-| 146 | the-round-trip | How do you get from the canvas into a human review and back out again — for every kind of output, and when things go wrong? | *pending* | phase-185, govern-03, round-trip, canvas-to-review, output-types, docx-not-previewable, ask-user-timeout, failure-modes, phase-188-input, g2-sketch-gate |
+| 146 | the-round-trip | How do you get from the canvas into a human review and back out again — for every kind of output, and when things go wrong? | **A — one place** ★ | phase-185, govern-03, round-trip, canvas-to-review, output-types, docx-not-previewable, ask-user-timeout, failure-modes, phase-188-input, g2-sketch-gate |
 
 **Two findings 142 produces that outlive whichever variant wins:**
 
@@ -911,3 +911,33 @@ deliverable is approved blind — which guts GOVERN-03. **Spec must take this fo
 clock does not stop; a second approver on an org-shared run must be told *who* decided (the run-time twin
 of Phase 186's co-editing guard — name it there); and a failure AFTER approval must never make the
 approval look undone, nor let a retry re-send.
+
+## Cross-sketch alignment audit (2026-07-28, operator-requested)
+
+Ran across 142-146 before the wrap-up. **Three real misalignments found and fixed**, not waved through:
+
+1. **The running example had drifted into three different workflows.** 142 drew 4 steps, 143 drew a
+   different 5, and 144/145/146 drew a third. Now **one canonical flow everywhere**, and it is the flow
+   the skill teaches:
+
+   | # | Step | Governance | Why it is in the example |
+   |---|---|---|---|
+   | 1 | Find the risks in our supplier files | **must prove it** (detected — reads the KB) | the auto-locked case |
+   | 2 | Work out which suppliers look shaky | free to think | judgement — the case that earns "free" |
+   | 3 | Write the risk report | **must prove it** (authored policy) | the deliverable + the citation gate |
+   | 4 | Email it to procurement | nothing to prove · **approval armed** | connector (189/190) + the action-risk gate |
+   | 5 | File it in the shared drive | nothing to prove · **not armed** | the contrast that argues armed-on by default |
+
+2. **A vocabulary overclaim.** 143 called a step **"Proven"** on a canvas that has never run. Nothing is
+   proven until a run's citation gate passes. **Settled rule: the seal reads "must prove it" everywhere
+   on the canvas; the word "traceable" appears only at the review moment (145), where the check has
+   actually run.** Calling an unrun step "proven" is the exact overclaim this milestone exists to prevent.
+
+3. **A state conflation in 146.** The executing step and the waiting-for-a-person step shared one chip
+   ("Waiting for you"). Split — "Running now" vs "Waiting for you". Pitfall 4 in miniature.
+
+**Deferred with a trigger:** inline rendering of `.docx` / `.pptx` / `.pdf` is **not decided** (operator,
+2026-07-28 — *"we will decide later"*). The finding stands. **Re-open at `/gsd:spec-phase 185`, and
+unconditionally at Phase 190**, when live connectors make an unread-but-approved document something that
+really leaves the company. The *behaviour* is not deferred: until it is decided the surface says so out
+loud and records **approved without a preview**.

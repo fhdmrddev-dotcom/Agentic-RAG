@@ -2,7 +2,7 @@
 sketch: 146
 name: the-round-trip
 question: "How do you get from the canvas into a human review and back out again — for every kind of output, and when things go wrong?"
-winner: null
+winner: "A"
 tags: [phase-185, govern-03, round-trip, canvas-to-review, output-types, docx-not-previewable, ask-user-timeout, failure-modes, phase-188-input, g2-sketch-gate]
 ---
 
@@ -24,6 +24,15 @@ produced** (six output types), and **what went wrong** (four real failure modes)
 ```
 open .planning/sketches/146-the-round-trip/index.html
 ```
+
+> **Winner: A — one place** (operator, 2026-07-28). The canvas you built on is the canvas you watch, and
+> a pause grows the document over it. Two consequences the build inherits: **the canvas carries two jobs**
+> (design-time editing and run-time watching), which is exactly the "one run stream, two views" shape
+> Phase 188 already commits to; and **there is no hand-off to design** — no "where did it go", no return
+> destination to decide, because you never left.
+>
+> **B stays on file** as the fallback if the canvas proves too loaded once live run state (188) and
+> connectors (189) both land on it.
 
 ## The variants — where does the canvas sit in the journey?
 
@@ -119,6 +128,17 @@ deliberately. Cycle **It produced** through all six to see exactly where the wal
 5. **In A, press *← back to the flow* without deciding.** Nothing was lost and nothing was decided. In B,
    the same press takes you somewhere else and the report is one click away again. Which do you want at
    5pm?
+
+## Deferred, with a trigger (operator, 2026-07-28)
+
+**Whether to render `.docx` / `.pptx` / `.pdf` inline is DEFERRED** — *"we will decide later if we will
+render directly."* The finding stands and is not softened: today those formats are download-only, so a
+template deliverable is approved unread.
+
+**Re-open trigger:** decide at `/gsd:spec-phase 185`, and re-open unconditionally at **Phase 190**, when
+live connectors make an unread-but-approved document something that actually leaves the company. Until
+it is decided, the surface must keep saying so out loud and recording *approved without a preview* —
+that behaviour is NOT deferred.
 
 ## Verification
 
