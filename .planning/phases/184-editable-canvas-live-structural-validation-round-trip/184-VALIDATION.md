@@ -10,8 +10,14 @@ created: 2026-07-26
 # Phase 184 — Validation Strategy
 
 > Per-phase validation contract for feedback sampling during execution.
-> Derived from `184-RESEARCH.md` § Validation Architecture. Frontend-only phase —
-> **zero backend change, zero migration**; the backend suite is not in this sampling loop.
+> Derived from `184-RESEARCH.md` § Validation Architecture. Planned as a frontend-only phase —
+> **zero migration** (true throughout: `git diff -- supabase/migrations` is 0 lines and slot
+> 114 stays RESERVED). **"Zero backend change" did NOT survive the phase** and is corrected
+> here rather than left standing: the UAT wave landed `1c94ffd4` (settings-cache re-warm) and
+> the security audit landed the `T-184-UAT-02` staleness bound, both in
+> `backend/app/models/user_settings.py` and its callers. So the backend suite IS in this
+> phase's evidence loop after all — see `184-SECURITY.md` and
+> `backend/tests/test_184_uat02_staleness_bound.py`.
 
 ---
 

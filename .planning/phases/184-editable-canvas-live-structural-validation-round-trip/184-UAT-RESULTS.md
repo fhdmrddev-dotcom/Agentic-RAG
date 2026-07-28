@@ -83,3 +83,35 @@ three bands wrap into more lines and therefore cost more. Both figures can be tr
 own widths — which is exactly why a single number should not be carried forward without one.
 
 The direction, and the operator's "looks much better", both hold.
+
+---
+
+## Addendum — a SEVENTH defect, found by the security audit (2026-07-28)
+
+The six defects above were all found by watching the surface. `/gsd:secure-phase 184` found a
+seventh that UAT could not have seen by looking, and it is the only one with a security
+consequence:
+
+**D-7 — the canvas kill switch did not take effect on non-writing workers.**
+
+This is the same incident already recorded as the `1c94ffd4` re-warm fix — the operator flipped
+`visual_workflow_canvas` OFF, Postgres held `{"audience":"off"}`, and `GET /features` kept
+answering `true`. What the UAT fix closed was the **writing** worker. The audit measured what
+was left: `load_app_settings()` (the SYNC reader that `/features`, `require_canvas` and
+`CanvasGateMiddleware` all resolve through) checks **no timestamp at all**, so under the
+`WORKER_COUNT=2` default the *other* worker kept enforcing the pre-flip audience with **no
+code-level bound** — not a 30s TTL, no bound.
+
+Why UAT could not see it: a local dev box runs one worker, and the symptom is invisible unless
+you flip a flag and then keep watching the surface that is supposed to disappear. Assessed
+MEDIUM — feature-visibility latency, not an authz bypass; anyone reaching the canvas in that
+window still faces v3.4 org/RLS and can only author their own workflows.
+
+Tracked as `T-184-UAT-02` in `184-SECURITY.md`, now **CLOSED** — the operator chose to bound it
+in code rather than accept the window. Covered by 8 tests, all 8 falsified against the pre-fix
+tree (`backend/tests/test_184_uat02_staleness_bound.py`).
+
+**The lesson worth carrying forward:** a kill switch needs a UAT row that flips it and then
+watches the gated surface for longer than one request — on more than one worker. "The flag
+wrote to the DB" and "the flag is being enforced" are different claims, and only the second one
+is the contract.
