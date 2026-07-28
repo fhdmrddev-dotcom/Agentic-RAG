@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sketch 142 — Which steps have to prove it (Phase 185)</title>
+<link rel="stylesheet" href="../themes/default.css">
+<link rel="stylesheet" href="../themes/canvas-184.css">
+<style>
+  .gov {
+    margin: 0 0 15px; padding: 13px 14px; border-radius: 13px;
+    border: 1px solid var(--color-border); background: var(--color-surface);
+  }
+  .gov.grounded { border-color: hsl(142 71% 45% / .4); background: hsl(142 71% 45% / .07); }
+  .gov.na       { border-style: dashed; }
+  .gov .gh {
+    display: flex; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 600;
+    color: var(--color-text); margin-bottom: 7px; font-family: var(--font-headline);
+  }
+  .gov .gw { font-size: 12px; color: var(--color-text-muted); line-height: 1.7; }
+  .gov .gw + .gw { margin-top: 7px; }
+  .gov .gw b { color: var(--color-text); font-weight: 600; }
+  .lockmark { color: hsl(142 71% 62%); }
+  .openmark { color: var(--color-text-dim); }
+
+  .attached {
+    display: flex; align-items: center; gap: 9px; padding: 9px 11px; border-radius: 10px;
+    background: hsl(142 71% 45% / .1); border: 1px solid hsl(142 71% 45% / .3);
+    font-size: 12px; color: hsl(142 71% 74%); margin-top: 11px; line-height: 1.5;
+  }
+
+  /* the refusal — REAL text on the page, never a tooltip */
+  .refusal {
+    margin-top: 11px; padding: 10px 12px; border-radius: 10px; font-size: 12px; line-height: 1.7;
+    background: hsl(38 92% 60% / .1); border: 1px solid hsl(38 92% 60% / .34); color: hsl(38 92% 78%);
+  }
+  .refusal b { color: hsl(38 92% 88%); }
+
+  .govacts { display: flex; gap: 7px; margin-top: 12px; flex-wrap: wrap; }
+  .govacts .btn { font-size: 12px; padding: 7px 13px; }
+  .btn.refuse { border-style: dashed; color: var(--color-text-dim); }
+
+  /* B's switch */
+  .dial { display: inline-flex; background: var(--color-muted); border: 1px solid var(--color-border);
+          border-radius: 999px; padding: 3px; }
+  .dial button {
+    border: 0; background: transparent; color: var(--color-text-dim); font-family: inherit;
+    font-size: 12.5px; padding: 7px 17px; border-radius: 999px; cursor: pointer;
+    transition: all var(--dur-base) var(--ease-out);
+  }
+  .dial button:hover:not(.locked) { color: var(--color-text); }
+  .dial button.on { background: var(--color-surface-hi); color: var(--color-text); box-shadow: var(--shadow-sm); }
+  .dial button.on.grounded {
+    background: hsl(142 71% 45% / .22); color: hsl(142 71% 74%); box-shadow: 0 0 0 1px hsl(142 71% 45% / .4);
+  }
+  .dial button.locked { opacity: .42; cursor: not-allowed; text-decoration: line-through; }
+  .dial button:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+
+  /* the tool list — the CAUSE */
+  .toolgrid { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 9px; }
+  .tool {
+    display: inline-flex; align-items: center; gap: 5px; border-radius: 999px;
+    padding: 4px 10px; font-size: 11.5px; cursor: pointer;
+    background: var(--color-muted); border: 1px solid var(--color-border); color: var(--color-text-muted);
+    transition: all var(--dur-fast) var(--ease-out);
+  }
+  .tool:hover { border-color: var(--color-text-dim); color: var(--color-text); }
+  .tool.on { background: var(--color-primary-dim); border-color: hsl(239 100% 82% / .45); color: var(--color-primary); }
+  .tool.on.kb { background: hsl(142 71% 45% / .16); border-color: hsl(142 71% 45% / .45); color: hsl(142 71% 70%); }
+  /* the raw tool id rides inside the chip, but ONLY under ⌥ Technical names —
+     `.techline` is display:none by default and the theme flips it on `body.tech`,
+     so this must be a rule, never an inline style (an inline display would leak
+     the technical name into plain-language mode). */
+  body.tech .tool .techline { display: inline; margin-left: 5px; }
+  .tool.flash { animation: flashKB 1.1s var(--ease-out) 2; }
+  @keyframes flashKB {
+    0%, 100% { box-shadow: 0 0 0 0 hsl(142 71% 55% / 0); }
+    50%      { box-shadow: 0 0 0 4px hsl(142 71% 55% / .4); }
+  }
+
+  .xbtn { margin-left: auto; background: transparent; border: 0; color: var(--color-text-dim);
+          cursor: pointer; font-size: 15px; line-height: 1; padding: 2px 4px; border-radius: 6px; }
+  .xbtn:hover { color: var(--color-text); background: var(--color-accent); }
+
+  .sechd { font-size: 10px; font-family: var(--font-mono); letter-spacing: .09em;
+           text-transform: uppercase; color: var(--color-text-dim); margin: 22px 0 9px; }
+  .sechd:first-child { margin-top: 0; }
+
+  /* the three-step try-this card, so nobody has to guess what to do */
+  .trythis {
+    position: absolute; left: 24px; bottom: 22px; z-index: 20; max-width: 340px;
+    background: hsl(220 30% 8% / .95); backdrop-filter: blur(16px);
+    border: 1px solid hsl(239 100% 82% / .28); border-radius: 14px; padding: 13px 15px;
+    box-shadow: var(--shadow-lg);
+  }
+  .trythis h5 { margin: 0 0 8px; font-size: 12px; font-family: var(--font-headline);
+                color: var(--color-text); font-weight: 600; }
+  .trythis ol { margin: 0; padding-left: 18px; font-size: 11.5px; line-height: 1.75; color: var(--color-text-muted); }
+  .trythis li { margin-bottom: 5px; }
+  .trythis li:last-child { margin-bottom: 0; }
+  .trythis b { color: var(--color-text); }
+  .trythis .close { position: absolute; top: 8px; right: 9px; background: none; border: 0;
+                    color: var(--color-text-dim); cursor: pointer; font-size: 14px; line-height: 1; }
+  .trythis .close:hover { color: var(--color-text); }
+</style>
+</head>
+<body class="alive card-b va">
+
+<nav class="variant-nav">
+  <span class="label">Sketch 142</span>
+  <button class="variant-tab" data-v="a" type="button">A: It just tells you</button>
+  <button class="variant-tab active" data-v="b" type="button">B: A switch that refuses <span class="star">★</span></button>
+</nav>
+
+<p class="lead" id="lead"></p>
+
+<div class="bar">
+  <span class="lbl">Workflow</span>
+  <span style="font-size:var(--text-sm);color:var(--color-text)">Monthly supplier risk report</span>
+  <div class="spacer"></div>
+  <div class="seg" id="techseg">
+    <button type="button" data-tech="off" class="on">Plain language</button>
+    <button type="button" data-tech="on">⌥ Technical names</button>
+  </div>
+</div>
+
+<div class="stage" id="stage">
+  <div class="plane scrollbar-thin" id="plane">
+    <div class="amb"></div>
+    <div class="flow" id="flow"></div>
+    <div class="trythis" id="trythis">
+      <button class="close" type="button" id="closetry" aria-label="Hide">✕</button>
+      <h5>Three things to try</h5>
+      <ol>
+        <li>Step 1 is locked to <b>must prove it</b>. Try to unlock it — read what comes back.</li>
+        <li>Then switch off <b>Search your documents</b> in the panel. Watch the lock disappear.</li>
+        <li>Go to step 2 and press <b>make it prove it too</b>. Now undo that — allowed, because you did it.</li>
+      </ol>
+    </div>
+  </div>
+
+  <aside class="side" id="side">
+    <header id="sidehdr"></header>
+    <div class="scroll" id="sidebody"></div>
+  </aside>
+</div>
+
+<div class="foot" id="foot"></div>
+<div class="toast" id="toast" role="status"></div>
+
+<div class="sketch-toolbar">
+  <span>142</span>
+  <select id="themesel" aria-label="Theme">
+    <option value="default">Deep Midnight</option>
+  </select>
+</div>
+
+<script src="../themes/phase-icons-3d.js"></script>
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   Sketch 142 — GOVERN-01. Which steps have to prove what they say.
+
+   THE ONE QUESTION: a step that reads your documents is held to citing them,
+   and that cannot be switched off. How does that read as a safety rail rather
+   than as a broken setting?
+
+   ── ON THE CONTENT (operator, 2026-07-28) ────────────────────────────────
+   The first draft of this sketch drew two SHIPPED workflow rows, per the house
+   "nothing invented" rule. The operator's review killed that: every workflow in
+   the database is engineering test data (`eval_coverage`, `split`, `fanout`),
+   so grounding the sketch in real rows made it LESS readable, not more — the
+   design question got buried under names that mean nothing to a business
+   reader. The workflow drawn here is therefore a REALISTIC BUSINESS EXAMPLE,
+   deliberately authored, and it is the right call for exactly one reason: the
+   thing being judged is whether the words work for a business user.
+
+   What is still real and must not drift: the six phase types, the KB-reading
+   tool names (the actual `get_tools` registry), and the gate that gets
+   attached — {kind:"citations_required", config:{mode:"deterministic"}}, the
+   shape used by 42 of the 43 citation gates in the corpus.
+
+   ALSO CUT after the same review: the "what happens to your existing
+   workflows" control. Every row is throwaway test data, so there is no
+   migration problem to design around. Detection simply applies.
+
+   NOT DRAWN HERE ON PURPOSE: how a grounded step is marked on the canvas
+   itself. Sketch 143 owns that. The node faces are exactly what 183/184 ship.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* The KB-reading tools in the real registry (`get_tools`, openai_service.py).
+   The rule has to be a NAMED LIST, not a judgement call, or nobody can predict
+   when the lock appears. */
+var KB_TOOLS = ['search_documents', 'query_documents', 'read_document', 'analyze_document',
+                'get_related_documents'];
+var REGISTRY = ['search_documents', 'query_documents', 'read_document', 'analyze_document',
+                'get_related_documents', 'web_search', 'execute_code'];
+var TOOL_WORDS = {
+  search_documents:      'Search your documents',
+  query_documents:       'Ask a question of your documents',
+  read_document:         'Read a whole document',
+  analyze_document:      'Analyse a document',
+  get_related_documents: 'Find related documents',
+  web_search:            'Search the web',
+  execute_code:          'Run code'
+};
+
+var TYPE_META = {
+  llm_agent:       { icon: 'llm_agent_compass', label: 'AI agent step', tech: 'llm_agent' },
+  llm_single:      { icon: 'llm_single',        label: 'AI write step', tech: 'llm_single' },
+  llm_human_input: { icon: 'llm_human_input',   label: 'Needs you',     tech: 'llm_human_input' },
+  llm_emit:        { icon: 'llm_emit',          label: 'Deliverable',   tech: 'llm_emit' }
+};
+
+var STEPS = [
+  { slug: 'find_risks', t: 'llm_agent', title: 'Find the risks in our supplier files',
+    sub: 'Reads your contracts and incident reports', tools: ['search_documents'] },
+  { slug: 'assess', t: 'llm_single', title: 'Work out which suppliers look shaky',
+    sub: 'Thinks it through — no documents involved', tools: null },
+  { slug: 'confirm', t: 'llm_human_input', title: 'Check with you before writing',
+    sub: 'Pauses here until you answer', tools: null },
+  { slug: 'report', t: 'llm_emit', title: 'Write the risk report',
+    sub: 'Produces the finished document', tools: null, policy: 'strict' }
+];
+
+var LEAD = {
+  a: '<b>A — It just tells you, and says why.</b> The panel states where the step stands — ' +
+     '<i>must prove it</i> or <i>free to think</i> — and directly underneath, the reason it stands there. ' +
+     'There is no switch to hunt for. When you try to unlock it, it explains itself instead of greying out.',
+  b: '<b>B — There is a switch, and it refuses in the open.</b> Every step shows a real two-position ' +
+     'control. On a step that reads your documents, the loose side is struck through, and pressing it ' +
+     'prints the reason right there. You see the door and you see it locked, rather than never seeing a door.'
+};
+
+var variant = 'b', selIdx = 0, toastT = null;   /* B = the winner (operator, 2026-07-28) */
+var state = JSON.parse(JSON.stringify(STEPS));
+
+function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'); }
+function toast(m) {
+  var el = document.getElementById('toast'); el.innerHTML = m; el.classList.add('show');
+  if (toastT) clearTimeout(toastT);
+  toastT = setTimeout(function () { el.classList.remove('show'); }, 5600);
+}
+
+/* ── THE RULE, in one function ───────────────────────────────────────────────
+   The precise meaning of "cannot be switched off":
+
+        YOU CAN ONLY UNDO A LOCK YOU CREATED.
+
+   · reads-documents — the step has a document-reading tool on. No switch exists.
+                       Removing the tool is the only exit.
+   · already-set     — a deliverable whose sourcing dial is already "cite every
+                       claim". The existing dial owns it, exactly as today.
+   · you-asked       — you turned it on by hand on a step that did not need it,
+                       so you can turn it back off. If the step later starts
+                       reading documents, that wins and the undo disappears.
+   ────────────────────────────────────────────────────────────────────────── */
+function grounding(s) {
+  if (s.t === 'llm_human_input') return { mode: 'na' };
+  if (s.policy === 'strict')     return { mode: 'proves', cause: 'already-set', locked: true };
+  var kb = (s.tools || []).filter(function (t) { return KB_TOOLS.indexOf(t) >= 0; });
+  if (kb.length)                 return { mode: 'proves', cause: 'reads-documents', locked: true, via: kb };
+  if (s.escalated)               return { mode: 'proves', cause: 'you-asked', locked: false };
+  return { mode: 'free' };
+}
+
+var CAUSE_WORDS = {
+  'reads-documents': 'Because this step reads your documents.',
+  'already-set':     'Because this report is already set to cite every claim.',
+  'you-asked':       'Because you asked for it on this step.'
+};
+
+/* ── the canvas — deliberately UNCHANGED from what 183/184 ship ───────────── */
+function nodeHTML(s, i) {
+  var m = TYPE_META[s.t], g = grounding(s);
+  var badges = '';
+  if (g.mode === 'proves') badges += '<span class="badge cited">⛨ Must prove it</span>';
+  if (s.t === 'llm_human_input') badges += '<span class="badge you">✋ Waits for you</span>';
+  return '<div class="node' + (selIdx === i ? ' sel' : '') + '" data-i="' + i + '" data-type="' + s.t + '"' +
+      ' tabindex="0" role="button" aria-label="Step ' + (i + 1) + ': ' + esc(s.title) + '">' +
+    '<span class="stepn">' + (i + 1) + '</span>' +
+    '<div class="icowrap">' + icon3d(m.icon, 52) + '</div>' +
+    '<div class="body">' +
+      '<div class="ttl">' + esc(s.title) + '</div>' +
+      '<div class="sub">' + esc(s.sub) + '</div>' +
+      (badges ? '<div class="badges">' + badges + '</div>' : '') +
+      '<div class="techline">' + esc(m.tech) + ' · ' + esc(s.slug) + '</div>' +
+    '</div>' +
+  '</div>';
+}
+
+function renderFlow() {
+  var html = '';
+  state.forEach(function (s, i) {
+    if (i) html += '<div class="conn"><div class="line"></div><div class="tip"></div></div>';
+    html += nodeHTML(s, i);
+  });
+  html += '<div class="endpin"><span class="dot"></span> ends here</div>';
+  document.getElementById('flow').innerHTML = html;
+}
+
+/* ── the tool list: the CAUSE, in both variants ──────────────────────────── */
+function toolBlock(s) {
+  if (s.t !== 'llm_agent') return '';
+  var chips = REGISTRY.map(function (t) {
+    var on = (s.tools || []).indexOf(t) >= 0;
+    var isKb = KB_TOOLS.indexOf(t) >= 0;
+    return '<button type="button" class="tool' + (on ? ' on' : '') + (isKb ? ' kb' : '') +
+      '" data-tool="' + t + '">' + (on ? '✓ ' : '') + esc(TOOL_WORDS[t]) + (isKb ? ' ⛨' : '') +
+      '<span class="techline">' + t + '</span></button>';
+  }).join('');
+  return '<div class="sechd">What this step is allowed to do</div>' +
+    '<div class="gov"><div class="gw">The ones marked <b style="color:hsl(142 71% 70%)">⛨</b> read your ' +
+    'documents. <b>Switching any of them on is what makes this step have to prove itself</b> — this list ' +
+    'is the real control.</div><div class="toolgrid">' + chips + '</div></div>';
+}
+
+/* ── VARIANT A — it just tells you ───────────────────────────────────────── */
+function govA(s, g) {
+  if (g.mode === 'na') {
+    return '<div class="gov na"><div class="gh"><span class="openmark">—</span> Nothing to prove here</div>' +
+      '<div class="gw">This step asks you a question and waits for your answer. It does not say anything ' +
+      'of its own, so there is nothing for it to back up.</div></div>';
+  }
+  if (g.mode === 'free') {
+    return '<div class="gov"><div class="gh"><span class="openmark">○</span> Free to think</div>' +
+      '<div class="gw">This step does not read your documents, so nothing it says has to be backed up by ' +
+      'one. That is a perfectly good step — judgement is not a gap.</div>' +
+      '<div class="govacts"><button class="btn" type="button" data-act="escalate">Make it prove it too</button></div>' +
+      '<div class="gw" style="font-size:11px;color:var(--color-text-dim)">You can always ask for more. ' +
+      'What you cannot do is take away something you did not add.</div></div>';
+  }
+  var attached = '<div class="attached"><span>🔒</span><span>Before this step is accepted, everything it ' +
+    'says is checked against your documents. Anything it cannot back up fails.' +
+    '<span class="techline" style="margin:3px 0 0">citations_required · mode: deterministic · on_failure: fail_run</span>' +
+    '</span></div>';
+  var extra = g.cause === 'reads-documents'
+    ? '<div class="gw"><b>' + esc(TOOL_WORDS[g.via[0]]) + '</b> is switched on below. Turn that off and this ' +
+      'step stops having to prove itself — that is the only way, and it is the honest one.</div>'
+    : g.cause === 'already-set'
+      ? '<div class="gw">The sourcing setting on this report already promises every claim is cited. ' +
+        'This did not add anything — it named what was already true.</div>'
+      : '<div class="gw">Nothing about this step required it. You chose it, so it is yours to remove.</div>';
+  var acts = g.cause === 'you-asked'
+    ? '<div class="govacts"><button class="btn" type="button" data-act="unescalate">Undo — you added this</button></div>'
+    : '<div class="govacts"><button class="btn refuse" type="button" data-act="loosen">Let it off this</button></div>';
+  return '<div class="gov grounded">' +
+    '<div class="gh"><span class="lockmark">🔒</span> Must prove it</div>' +
+    '<div class="gw">' + esc(CAUSE_WORDS[g.cause]) + '</div>' + extra + attached + acts +
+    '<div class="refusal" id="whybox" style="display:none"></div></div>';
+}
+
+/* ── VARIANT B — a switch that refuses ───────────────────────────────────── */
+function govB(s, g) {
+  if (g.mode === 'na') {
+    return '<div class="gov na"><div class="gh"><span class="openmark">—</span> Nothing to prove here</div>' +
+      '<div class="gw">This step asks you a question and waits. There is no control, because a control ' +
+      'that could never do anything is worse than none.</div></div>';
+  }
+  var isP = g.mode === 'proves', locked = isP && g.locked;
+  var dial =
+    '<div class="dial" role="group" aria-label="How strictly this step is held">' +
+      '<button type="button" class="' + (!isP ? 'on' : '') + (locked ? ' locked' : '') + '" data-dial="free"' +
+        (locked ? ' aria-disabled="true" aria-describedby="whybox"' : '') + '>○ Free to think</button>' +
+      '<button type="button" class="' + (isP ? 'on grounded' : '') + '" data-dial="proves">⛨ Must prove it</button>' +
+    '</div>';
+  var body = isP
+    ? '<div class="gw" style="margin-top:11px">' + esc(CAUSE_WORDS[g.cause]) + '</div>' +
+      '<div class="attached"><span>🔒</span><span>Before this step is accepted, everything it says is ' +
+      'checked against your documents. Anything it cannot back up fails.' +
+      '<span class="techline" style="margin:3px 0 0">citations_required · mode: deterministic</span></span></div>'
+    : '<div class="gw" style="margin-top:11px">This step weighs up what the step before it already found ' +
+      'and proved. It is judgement, not lookup — it makes no new factual claim of its own, so there is ' +
+      'nothing for it to cite. <b>That is what free to think is for.</b></div>' +
+      '<div class="gw">Press <b>Must prove it</b> if you want sources demanded here anyway — and you can ' +
+      'undo that, because it would be your call.</div>';
+  return '<div class="gov' + (isP ? ' grounded' : '') + '">' + dial + body +
+    '<div class="refusal" id="whybox" style="display:none"></div></div>';
+}
+
+function renderSide() {
+  var s = state[selIdx], m = TYPE_META[s.t], g = grounding(s);
+  document.getElementById('sidehdr').innerHTML =
+    icon3d(m.icon, 26) +
+    '<span style="flex:1;min-width:0"><b style="font-family:var(--font-headline);display:block;font-size:13px">' +
+      esc(s.title) + '</b><span class="techline" style="margin:0">' + esc(m.tech) + ' · ' + esc(s.slug) + '</span>' +
+      '<span style="display:block;font-size:11px;color:var(--color-text-dim);margin-top:2px">Step ' +
+      (selIdx + 1) + ' of ' + state.length + ' · ' + esc(m.label) + '</span></span>' +
+    '<button class="xbtn" id="closeside" type="button" aria-label="Close">✕</button>';
+  document.getElementById('sidebody').innerHTML =
+    '<div class="sechd">How strictly this step is held</div>' +
+    (variant === 'a' ? govA(s, g) : govB(s, g)) + toolBlock(s);
+}
+
+function renderFoot() {
+  var all = state.map(grounding);
+  var nP = all.filter(function (x) { return x.mode === 'proves'; }).length;
+  var nF = all.filter(function (x) { return x.mode === 'free'; }).length;
+  var nN = all.filter(function (x) { return x.mode === 'na'; }).length;
+  var bits = ['<span class="pill">' + nP + ' must prove it · ' + nF + ' free to think · ' + nN + ' not applicable</span>'];
+  if (variant === 'a') {
+    bits.push('<span class="pill good">✓ No control to hunt for — it states where you stand</span>');
+    bits.push('<span class="pill warn">A button whose only job is to say no</span>');
+  } else {
+    bits.push('<span class="pill good">✓ You see the door, and you see it locked</span>');
+    bits.push('<span class="pill warn">A switch that is mostly not yours to turn</span>');
+  }
+  bits.push('<span class="pill net">A realistic example workflow · the tool names and the check are the real ones</span>');
+  document.getElementById('foot').innerHTML = bits.join('');
+}
+
+function render() {
+  document.getElementById('lead').innerHTML = LEAD[variant];
+  renderFlow(); renderSide(); renderFoot();
+}
+
+/* ── events ──────────────────────────────────────────────────────────────── */
+document.querySelector('.variant-nav').addEventListener('click', function (e) {
+  var b = e.target.closest('.variant-tab'); if (!b) return;
+  document.querySelectorAll('.variant-tab').forEach(function (t) { t.classList.remove('active'); });
+  b.classList.add('active'); variant = b.getAttribute('data-v'); render();
+});
+
+document.querySelector('.bar').addEventListener('click', function (e) {
+  var b = e.target.closest('button'); if (!b) return;
+  var seg = b.closest('.seg'); if (!seg) return;
+  seg.querySelectorAll('button').forEach(function (x) { x.classList.remove('on'); });
+  b.classList.add('on');
+  if (b.hasAttribute('data-tech')) document.body.classList.toggle('tech', b.getAttribute('data-tech') === 'on');
+  render();
+});
+
+document.getElementById('closetry').addEventListener('click', function () {
+  document.getElementById('trythis').style.display = 'none';
+});
+
+function flashTools() {
+  document.querySelectorAll('.tool.kb.on').forEach(function (el) {
+    el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
+  });
+}
+
+function showWhy(html) {
+  var box = document.getElementById('whybox');
+  if (box) { box.innerHTML = html; box.style.display = 'block'; }
+  flashTools();
+}
+
+document.getElementById('stage').addEventListener('click', function (e) {
+  if (e.target.id === 'closeside') {
+    toast('In the real app this folds away to a narrow rail, and becomes a panel from the bottom on a small screen.');
+    return;
+  }
+
+  /* the tool list IS the control */
+  var tl = e.target.closest('.tool[data-tool]');
+  if (tl) {
+    var t = tl.getAttribute('data-tool'), s = state[selIdx];
+    s.tools = s.tools || [];
+    var k = s.tools.indexOf(t), was = grounding(s).mode;
+    if (k >= 0) s.tools.splice(k, 1); else s.tools.push(t);
+    var now = grounding(s).mode;
+    render();
+    if (was !== now && now === 'proves') {
+      toast('It reads your documents now — so it has to prove what it says, and the check came with it. ' +
+            'Nobody chose that, and nobody can unchoose it while that is switched on.');
+    } else if (was !== now && now === 'free') {
+      toast('The lock is gone — and look what it cost. This step can no longer open your supplier files at all, ' +
+            'so it has nothing left to find risks <i>in</i>. <b>That is why this is a rail and not a loophole:</b> ' +
+            'the only way out destroys the reason the step exists.');
+    }
+    return;
+  }
+
+  var act = e.target.closest('[data-act]');
+  if (act) {
+    var a = act.getAttribute('data-act'), st = state[selIdx], gg = grounding(st);
+    if (a === 'loosen') {
+      showWhy(gg.cause === 'reads-documents'
+        ? '<b>No.</b> Reading your files is what this step is <i>for</i>, so it has to be able to show where its ' +
+          'answers came from. You can switch off <b>' + esc(TOOL_WORDS[gg.via[0]]) + '</b> below — but that does ' +
+          'not loosen the step, it stops it opening your files at all, and then it has nothing to find risks in.'
+        : '<b>No.</b> This report is set to cite every claim. Change that setting and this goes with it. There is ' +
+          'no separate switch that drops the check while the promise stays.');
+      return;
+    }
+    if (a === 'escalate')   { st.escalated = true;  render(); toast('Done — and because <i>you</i> asked for it, you can undo it. That is the whole rule: you can only undo a lock you created.'); return; }
+    if (a === 'unescalate') { st.escalated = false; render(); toast('Back to free. It was yours to remove because nothing about the step required it.'); return; }
+  }
+
+  var d = e.target.closest('[data-dial]');
+  if (d) {
+    var pos = d.getAttribute('data-dial'), cs = state[selIdx], cg = grounding(cs);
+    if (pos === 'free') {
+      if (cg.locked) {
+        showWhy(cg.cause === 'reads-documents'
+          ? '<b>This one is not yours to turn.</b> Reading your files is what this step is <i>for</i>, so it has ' +
+            'to be able to show where its answers came from. You can switch off <b>' + esc(TOOL_WORDS[cg.via[0]]) +
+            '</b> below — but that does not loosen the step, it stops it opening your files at all, and then it ' +
+            'has nothing to find risks in.'
+          : '<b>This one is not yours to turn.</b> The sourcing setting on this report already promises every ' +
+            'claim is cited. Change that and this follows.');
+        return;
+      }
+      cs.escalated = false; render();
+      toast('Back to free — you could do that because you were the one who asked for it.');
+      return;
+    }
+    if (cg.mode === 'free') { cs.escalated = true; render(); toast('Done. You can undo this one; a step that reads your documents you could not.'); }
+    return;
+  }
+
+  var n = e.target.closest('.node');
+  if (n) { selIdx = parseInt(n.getAttribute('data-i'), 10); render(); }
+});
+
+document.getElementById('stage').addEventListener('keydown', function (e) {
+  if (e.repeat) return;
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  var n = e.target.closest('.node');
+  if (n) { e.preventDefault(); selIdx = parseInt(n.getAttribute('data-i'), 10); render(); }
+});
+
+document.getElementById('themesel').addEventListener('change', function () {
+  document.querySelector('link[href*="themes/default"]').href = '../themes/' + this.value + '.css';
+});
+
+render();
+</script>
+</body>
+</html>

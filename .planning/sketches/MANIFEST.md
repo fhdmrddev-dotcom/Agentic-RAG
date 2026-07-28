@@ -579,7 +579,7 @@ G-2 sketch, BEFORE spec/discuss-phase. First sketch batch of **v3.6 Visual / No-
 
 | # | Name | Design Question | Winner | Tags |
 |---|------|----------------|--------|------|
-| 137 | agentic-canvas-look | What should the canvas actually LOOK like — modern, 3D, alive and agentic, while staying calm and non-technical? | **D — Synthesis (B’s depth + C’s warmth, colour budget reserved)** ★ | phase-183, canvas-01, visual-direction, 3d-icons, icon-convention, energy-language, plain-language, connectors-preview, g2-sketch-gate |
+| 137 | agentic-canvas-look | What should the canvas actually LOOK like — modern, 3D, alive and agentic, while staying calm and non-technical? | **B — Glass Depth** ★ (operator changed D → B, 2026-07-26; D remains on file as the documented alternative) | phase-183, canvas-01, visual-direction, 3d-icons, icon-convention, energy-language, plain-language, connectors-preview, g2-sketch-gate |
 
 **⚠ 137's winner CHANGED D → B (operator, 2026-07-26).** The locked card is now **137-B — Glass Depth**:
 the 3D mark floats ABOVE a narrower centre-aligned frosted panel with its own contact shadow, and there
@@ -792,3 +792,49 @@ never become the thing that stops someone building.
 `compass`) are now REQUIRED before 184 builds, because 137-B makes the icon the sole carrier of step type.
 
 **Feeds `/gsd:spec-phase 184` / `/gsd:discuss-phase 184`** — acceptance bar = these four winners as marked.
+
+---
+
+## Phase 185 — Graded Governance (`/gsd:sketch 185`, 2026-07-28)
+
+Four sketches for the milestone's **headline differentiator**: per-node grounding mode + the orthogonal
+action-risk dial (GOVERN-01/02/03). They inherit the whole 184 language unchanged — **137-B** Glass Depth
+cards, **139-A** mark + problems tray, **140-A** the shipped 400px `PhaseFormPanel`, **141-B** canvas
+toolbar + page header — and add data to it, never layout.
+
+**Three model decisions taken by the operator at intake (2026-07-28), BEFORE any variant was drawn:**
+
+1. **Grounding is DETECTED and ONE-WAY.** A step that reads the knowledge base switches itself to
+   Grounded and locks; an open step can be escalated by hand; a grounded step can never be loosened.
+   This is the literal reading of "structurally enforced and NOT author-loosenable-away", and the only
+   option that closes the 36-step gap without waiting for a human to notice it.
+2. **Governance gets a dedicated NON-COLOUR, NON-BADGE channel on the canvas.** The face's two-badge
+   budget is fully spent (grounding + "Waits for you") and 137-B banked 100% of the colour budget for
+   Phase 188's run status. Governance may spend neither.
+3. **The action-risk checkpoint is a gate ON the risky step**, not an extra step in the flow. Step count
+   and step numbering stay true; whether it materialises as an `llm_human_input` phase underneath is an
+   engine detail the canvas hides.
+
+**The corpus is NOT a constraint (operator, 2026-07-28).** Every workflow row in the database is
+engineering test data, so there is no migration or grandfathering problem to design around — detection
+simply applies. This also reverses the usual "nothing invented" rule for THIS phase's sketches: the
+shipped rows are fixtures named `eval_coverage` / `split` / `fanout`, and grounding a business-wording
+question in them made the sketches LESS readable, not more. **Phase-185 sketches draw realistic business
+workflows and say so**, while keeping the engine facts real (phase types, the `get_tools` registry, the
+`{kind: "citations_required", config: {mode: "deterministic"}}` gate shape).
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 142 | grounding-dial-and-lock | A step that reads your documents is held to citing them, and that cannot be switched off. How does that read as a safety rail rather than as a broken setting? | **B — a switch that refuses** ★ | phase-185, govern-01, grounding-mode, detected-lock, one-way, escalate-only, phaseformpanel, plain-language, g2-sketch-gate |
+
+**Two findings 142 produces that outlive whichever variant wins:**
+
+1. **"Not author-loosenable-away" resolves to one precise rule — _you can only undo a lock you created._**
+   A detected lock (a KB tool is on) and a policy lock (`citation_policy: strict`) are owned by their
+   cause and have no switch at all; an author-escalated lock is undoable because it was a choice. If
+   detection later applies to an escalated step, detection wins and the undo disappears.
+2. **The requirement's "confidence gate" has no field behind it.** `grep -rn confidence` over
+   `backend/app/services/harness/` and `backend/app/models/harness.py` returns nothing; the shipped
+   `citations_required` validator is deterministic coverage, not a threshold. Phase 185 either adds a
+   real confidence number (new field, new scope) or the word leaves the requirement. **Decide at spec
+   time, not build time.**
