@@ -826,7 +826,7 @@ workflows and say so**, while keeping the engine facts real (phase types, the `g
 | # | Name | Design Question | Winner | Tags |
 |---|------|----------------|--------|------|
 | 142 | grounding-dial-and-lock | A step that reads your documents is held to citing them, and that cannot be switched off. How does that read as a safety rail rather than as a broken setting? | **B — a switch that refuses** ★ | phase-185, govern-01, grounding-mode, detected-lock, one-way, escalate-only, phaseformpanel, plain-language, g2-sketch-gate |
-| 143 | proven-on-the-canvas | How do you mark a proven step on the canvas when colour and badges are both already spent? | *pending* | phase-185, govern-02, canvas-mark, non-colour-channel, badge-budget, colour-budget, phase-188-collision, greyscale-proof, g2-sketch-gate |
+| 143 | proven-on-the-canvas | How do you mark a proven step on the canvas when colour and badges are both already spent? | **A — a sealed edge** ★ | phase-185, govern-02, canvas-mark, non-colour-channel, badge-budget, colour-budget, phase-188-collision, greyscale-proof, g2-sketch-gate |
 
 **Two findings 142 produces that outlive whichever variant wins:**
 
@@ -849,3 +849,9 @@ mode, which would put a named escape hatch inside the one rail that is the miles
 **A finding 143 hands forward to Phase 188.** Both governance channels survive a colour-blind read
 because neither is made of colour. Run status, as currently imagined, does **not** — switch colour off
 mid-run and it vanishes entirely. **188 needs a shape of its own, not just four colours.**
+
+**The build rule 143-A creates.** The corner seal is the **load-bearing** mark and the edge is
+reinforcement: run status overwrites the border, so mid-run the seal is the only carrier left. Verified
+live at all four run states — the seal stays legible on every one. Therefore (1) the seal may never be
+conditional on run state, and (2) top-right of the 137-B card is now **claimed** — Phases 188/189 may not
+take it. B (a rail outside the border) is the documented fallback if the seal proves too quiet in use.

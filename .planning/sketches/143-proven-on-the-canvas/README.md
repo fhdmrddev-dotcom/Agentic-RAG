@@ -2,7 +2,7 @@
 sketch: 143
 name: proven-on-the-canvas
 question: "How do you mark a proven step on the canvas when colour and badges are both already spent?"
-winner: null
+winner: "A"
 tags: [phase-185, govern-02, canvas-mark, non-colour-channel, badge-budget, colour-budget, phase-188-collision, greyscale-proof, g2-sketch-gate]
 ---
 
@@ -31,6 +31,31 @@ open .planning/sketches/143-proven-on-the-canvas/index.html
 ```
 
 Three things to do, written on the screen.
+
+> **Winner: A — a sealed edge** (operator, 2026-07-28).
+
+## The build rule that choice creates
+
+A was chosen knowing its cost, so the cost becomes a constraint rather than a surprise:
+
+> **The corner seal is the load-bearing mark. The edge is reinforcement.**
+
+Verified live at all four run states: when a proven step goes *running* / *needs you* / *failed*, its
+double-struck border is replaced by the status colour, but **the corner seal stays legible on every one
+of them** (measured — the seal keeps its own background and border, independent of the card's). So the
+governance reading never actually disappears; it degrades from two carriers to one.
+
+Two things the build must therefore honour:
+
+1. **The seal may never be conditional on run state.** It is the only carrier left mid-run. Anything that
+   hides, dims or repositions it during a run silently deletes the governance reading at the moment it
+   matters most.
+2. **The seal must not share its corner.** In the shipped 137-B card the step number sits top-left and
+   the verdict mark sits outside the right edge, so top-right is free — but Phases 188/189 must not be
+   allowed to claim it later.
+
+**B stays on file** as the documented alternative: its rail sits outside the border and survives run
+status intact. If the seal alone ever proves too quiet in live use, B is the fallback, not a redesign.
 
 ## The two variants
 

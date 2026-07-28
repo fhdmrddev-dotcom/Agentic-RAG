@@ -11,7 +11,8 @@
      seconds" — a scan you have to scroll is not a scan. Five 248px cards plus
      four connectors overrun 1440px, so the flow sits at a fit-zoom, which is what
      a real xyflow canvas does on open anyway (fitView). */
-  .flow { padding: 100px 34px; zoom: .87; }
+  /* the bottom band is reserved for the two note cards, so neither ever sits on a step */
+  .flow { padding: 20px 34px 250px; zoom: .87; }
 
   /* ══ VARIANT A — THE SEALED EDGE ═══════════════════════════════════════
      The card's own border carries the meaning: a proven step is drawn with a
@@ -136,7 +137,7 @@
 
 <nav class="variant-nav">
   <span class="label">Sketch 143</span>
-  <button class="variant-tab active" data-v="a" type="button">A: A sealed edge</button>
+  <button class="variant-tab active" data-v="a" type="button">A: A sealed edge <span class="star">★</span></button>
   <button class="variant-tab" data-v="b" type="button">B: A proven rail</button>
 </nav>
 
@@ -253,7 +254,7 @@ var VERDICT = {
      'had to move to the other side to make room. Less elegant than a seal. More honest under load.'
 };
 
-var variant = 'a', run = 'off';
+var variant = 'a', run = 'off';   /* A = the winner (operator, 2026-07-28) */
 
 function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'); }
 
