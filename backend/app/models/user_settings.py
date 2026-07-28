@@ -299,16 +299,76 @@ async def _load_settings_from_db() -> dict[str, Any]:
 
 
 def invalidate_settings_cache() -> None:
-    """Zero out settings cache timestamp so next read hits DB (D-07)."""
+    """Zero out settings cache timestamp so next read hits DB (D-07).
+
+    NOTE (Phase 184 UAT): this is only half a contract. It expires the timestamp the ASYNC
+    reader checks; it deliberately does NOT clear ``_settings_cache``, because the SYNC
+    reader ``load_app_settings()`` falls back to ``_build_settings_from_row({})`` — i.e.
+    env/Pydantic DEFAULTS for EVERY column — when the cache is empty. Blanking it would
+    trade one stale value for a window in which the whole app reads default model, default
+    thresholds and no keys. Callers that need their write to be observable to a SYNC reader
+    must use ``refresh_settings_cache()`` below, not this.
+    """
     global _settings_cache_time
     _settings_cache_time = 0.0
+
+
+async def refresh_settings_cache() -> None:
+    """Expire AND re-warm the settings cache, so a just-completed write is observable.
+
+    THE PROBLEM THIS SOLVES (found in the Phase 184 live UAT). ``invalidate_settings_cache()``
+    zeroes ``_settings_cache_time``, which is enough for ``_load_settings_from_db()`` (it
+    checks the timestamp) but is a NO-OP for ``load_app_settings()``, which reads
+    ``_settings_cache`` directly with no staleness check. ``GET /features`` resolves through
+    the sync path (``feature_audience`` -> ``_feature_record`` -> ``load_app_settings``), so
+    an operator flipping ``visual_workflow_canvas`` off wrote the DB and was then never
+    observed: the endpoint kept answering ``true`` until some unrelated request happened to
+    await the async loader and re-warm the cache.
+
+    So the write seams expire the timestamp and then IMMEDIATELY re-read, leaving
+    ``_settings_cache`` holding what was just written. This is the idiom Phase 149 already
+    used at admin.py's disable-path guard (``invalidate_settings_cache()`` +
+    ``await _load_settings_from_db()``), promoted from a local workaround to the contract of
+    the write seams.
+
+    NEVER RAISES. The write is the contract; the re-warm is an optimization on top of it. A
+    failed refresh must not turn a successful write into an error — the zeroed timestamp
+    means the next async read repairs the cache anyway.
+
+    NOT a cross-process fix. Under the ``WORKER_COUNT=2`` production default each worker
+    still holds its own cache, so a sibling worker keeps serving its copy until its own 30s
+    TTL lapses (the hazard admin.py:1263 already notes). This makes the WRITING worker
+    correct immediately, which is what the operator's own next request hits.
+
+    STRICTLY ADDITIVE TO D-07. The timestamp is zeroed again at the end, so D-07's existing
+    guarantee — "after a write the cache is expired, and the next read hits the DB" — stays
+    literally true and its pinned assertion (test_147_flag_failure_semantics) is untouched.
+    The ONLY thing this adds is that ``_settings_cache`` now holds the just-written row for
+    the SYNC reader in the meantime. The cost is one redundant re-read on the next async
+    call, which is the right trade for a settings write.
+    """
+    invalidate_settings_cache()
+    try:
+        await _load_settings_from_db()
+    except Exception:  # noqa: BLE001 — a refresh blip must never fail the write
+        logger.warning(
+            "refresh_settings_cache: re-read after write failed; cache left expired "
+            "(the next async read will refresh it)",
+            exc_info=True,
+        )
+    finally:
+        # Re-expire: the re-read above set the timestamp to now. Zeroing it again preserves
+        # D-07 unchanged while leaving the freshly-read row in place for sync callers.
+        invalidate_settings_cache()
 
 
 async def save_app_settings(updates: dict[str, Any]) -> bool:
     """Write settings to app_settings DB row via asyncpg.
 
     Ports the _is_valid_api_key sentinel guard (D-14).
-    Calls invalidate_settings_cache() on success (D-07).
+    Calls refresh_settings_cache() on success (D-07 + the Phase 184 UAT re-warm): the cache
+    is expired AND re-read, so the SYNC load_app_settings() reader observes this write
+    immediately instead of serving the pre-write row.
 
     Returns:
         True  — the UPDATE persisted, OR there was nothing to write (the
@@ -393,7 +453,11 @@ async def save_app_settings(updates: dict[str, Any]) -> bool:
             f"WHERE id = ${len(vals)}",
             *vals,
         )
-        invalidate_settings_cache()
+        # Phase 184 UAT: re-warm rather than merely expire — load_app_settings() (the SYNC
+        # reader used by tool_dispatcher / documents / extraction_service / feature_audience)
+        # never checks the timestamp, so an invalidate-only call leaves it serving the
+        # pre-write row until an unrelated async read happens along.
+        await refresh_settings_cache()
         return True
     except Exception:
         logger.warning(
@@ -1181,7 +1245,11 @@ async def set_feature_visibility(
     BEFORE calling — this function still only ever serializes the single validated record
     (SQLi-safe: asyncpg ``$1`` + JSONB codec). This is a GLOBAL feature-visibility writer
     (no per-user scope) so it STAYS on the service-role pool (user_settings.py header rule;
-    contrast the VIS-02 per-user writer). Invalidates the cache so the next read reflects it.
+    contrast the VIS-02 per-user writer).
+
+    RE-WARMS the cache (not merely invalidates it) so the next read — including the SYNC
+    ``load_app_settings()`` path that ``GET /features`` uses — reflects this write. An
+    invalidate-only call never reaches that reader; see ``refresh_settings_cache``.
     """
     from app.dependencies import get_pg_pool
     pool = await get_pg_pool()
@@ -1192,7 +1260,12 @@ async def set_feature_visibility(
         "WHERE id = 'global'",
         {feature: record},  # JSONB codec serializes the validated dict
     )
-    invalidate_settings_cache()
+    # Phase 184 UAT: the operator kill-switch defect. GET /features resolves through
+    # feature_audience -> _feature_record -> load_app_settings() (SYNC), which an
+    # invalidate-only call never reaches — so the flip landed in the DB and was never
+    # observed. Re-warm so the audience this call just persisted is the one the very next
+    # read reports.
+    await refresh_settings_cache()
     return True
 
 
