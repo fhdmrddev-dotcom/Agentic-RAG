@@ -18,6 +18,29 @@ GREEN in wave 3. Owner: 148-05.
 FEATURE_KEYS = {"skill_studio", "model_management", "workflow_authoring", "governance_health"}
 
 
+def _cold_defaults(monkeypatch):
+    """Pin the COLD-DEFAULT settings read both tests below are actually about.
+
+    T-184-UAT-02 made this explicit. Both assertions describe the ``_GOVERNED_FEATURES``
+    cold-read polarity (D-06), which requires an EMPTY ``feature_visibility``. That used to
+    hold by accident: ``GET /features`` resolved purely from the in-process settings cache and
+    never read the DB, so in a test run the map was empty unless something else had warmed it.
+    The endpoint now awaits ``ensure_settings_fresh()`` first (so a flipped kill switch cannot
+    be served from an unboundedly stale cache), which means it reads the real ``app_settings``
+    row — and a developer whose local DB has ``visual_workflow_canvas`` flipped ON would see
+    the canvas assertion below fail for a reason that has nothing to do with the contract.
+
+    So the precondition is now STATED rather than assumed. The assertions are unchanged; only
+    their input is pinned. Same one-line idiom as ``test_182_canvas_gate.py``'s ``_cold_off``.
+    """
+    from types import SimpleNamespace
+
+    monkeypatch.setattr(
+        "app.models.user_settings.load_app_settings",
+        lambda: SimpleNamespace(feature_visibility={}),
+    )
+
+
 def test_operator_sees_all_features_true(client, auth_headers, mock_asyncpg_pool, monkeypatch):
     """An operator's effective map is all-True across the four SHIPPED governed features.
 
@@ -27,6 +50,7 @@ def test_operator_sees_all_features_true(client, auth_headers, mock_asyncpg_pool
     Phase-148 regression, REVERT-02), and the canvas key is False (the master switch wins
     over the operator short-circuit).
     """
+    _cold_defaults(monkeypatch)
     monkeypatch.setattr("app.dependencies._pg_pool", mock_asyncpg_pool)
     mock_asyncpg_pool.set_fetchrow_result({"user_id": "op-1"})  # membership present -> operator
 
@@ -41,6 +65,7 @@ def test_operator_sees_all_features_true(client, auth_headers, mock_asyncpg_pool
 
 def test_end_user_sees_only_everyone_features(client, auth_headers, mock_asyncpg_pool, monkeypatch):
     """A non-operator sees True only for the day-one Everyone features (D-05 map)."""
+    _cold_defaults(monkeypatch)
     monkeypatch.setattr("app.dependencies._pg_pool", mock_asyncpg_pool)
     mock_asyncpg_pool.set_fetchrow_result(None)  # no membership -> end user
 

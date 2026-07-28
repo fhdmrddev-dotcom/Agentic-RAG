@@ -362,6 +362,51 @@ async def refresh_settings_cache() -> None:
         invalidate_settings_cache()
 
 
+async def ensure_settings_fresh() -> None:
+    """Bound the SYNC reader's staleness to ``_SETTINGS_CACHE_TTL`` on THIS worker.
+
+    THE PROBLEM THIS SOLVES (T-184-UAT-02, Phase 184 security audit). ``refresh_settings_cache``
+    above fixes the WRITING worker: the operator flips a flag and their own next request sees
+    it. It is explicitly "NOT a cross-process fix" — and the gap it leaves is wider than a TTL.
+    ``load_app_settings()`` reads ``_settings_cache`` with **no staleness check at all**
+    (:892); the 30s TTL at :280 is checked only by the ASYNC ``_load_settings_from_db``. So on
+    a NON-writing worker nothing expires the sync reader's view — it keeps serving the
+    pre-flip audience until some *unrelated* request on that worker happens to await the async
+    loader. Under the ``WORKER_COUNT=2`` default that is ~30s in a busy app but has **no
+    code-level bound**, and ``visual_workflow_canvas`` is a kill switch: the master off-switch
+    for a whole surface, read by ``CanvasGateMiddleware`` and ``require_canvas``.
+
+    Awaiting this before a *gated* read gives that bound. ``_load_settings_from_db`` is
+    already TTL-checked, so a fresh cache costs one comparison and NO DB I/O — the DB is
+    touched at most once per TTL per worker.
+
+    WHY NOT PUT THE TTL CHECK IN ``load_app_settings()`` ITSELF — the obvious one-line fix,
+    deliberately rejected. That reader is sync and cannot refresh, so an expired cache could
+    only DEGRADE to ``env_settings``/Pydantic defaults. Every setting in the app resolves
+    through it (models, token ceilings, extraction knobs), so a worker that merely went quiet
+    for 30s would silently serve defaults for ALL of them. Bounding the flag is worth a
+    per-TTL query; reverting the platform's configuration to defaults is not.
+
+    CALL IT ONLY ON GATED PATHS, never on the hot path — that keeps D-v2.5-01's "no
+    per-request DB call" property where it was actually claimed (``_read_canvas_is_off``'s
+    docblock) and pays the bounded cost only where a stale answer has a security consequence.
+
+    NEVER RAISES. ``_load_settings_from_db`` already swallows its own failures and falls back
+    to the stale/empty cache; this wrapper adds a second net so a settings blip can never turn
+    a gate check into a 500. A failed refresh leaves the previous cache in place, and every
+    caller downstream is fail-closed (``feature_audience`` -> hardcoded default -> "off" for
+    the canvas), so the degraded direction is HIDE, never REVEAL.
+    """
+    try:
+        await _load_settings_from_db()
+    except Exception:  # noqa: BLE001 — defensive: a blip must never fail the gate check
+        logger.warning(
+            "ensure_settings_fresh: refresh failed; gate will read the previous cache "
+            "(fail-closed downstream)",
+            exc_info=True,
+        )
+
+
 async def save_app_settings(updates: dict[str, Any]) -> bool:
     """Write settings to app_settings DB row via asyncpg.
 
@@ -1067,8 +1112,10 @@ def document_management_enabled() -> bool:
 
 
 # ── Phase 147 (FLAG-01) — operator control-plane flag reads ────────────────────
-# All three read through the per-worker 30s TTL settings cache (load_app_settings),
-# so a flip propagates within the TTL window with NO server restart, and a transient
+# All three read through the per-worker settings cache (load_app_settings). A flip
+# propagates within the 30s TTL window with NO server restart *on any worker that awaits
+# the async loader* — the sync reader itself checks no timestamp, so a caller that needs a
+# bounded read awaits ``ensure_settings_fresh()`` first (T-184-UAT-02). A transient
 # DB blip returns LAST-KNOWN-GOOD (the cache is not reset on a read failure — see
 # _load_settings_from_db:233-241), never "unknown". A truly-cold cache / a
 # load_app_settings() exception falls back to the D-Q4 polarity below.
@@ -1162,7 +1209,10 @@ def _feature_record(feature: str) -> dict:
 
     Shared by ``feature_audience`` AND ``resolve_feature_access`` so there is exactly ONE
     parse path (no second serialization branch — D-167-06 "extend, never fork"). Reads the
-    per-worker 30s TTL settings cache (load_app_settings().feature_visibility). Returns the
+    per-worker settings cache (load_app_settings().feature_visibility) — note that the SYNC
+    reader applies NO staleness check, so the 30s TTL binds only where a caller has awaited
+    ``ensure_settings_fresh()`` first (the canvas gate, ``require_canvas``, ``/features``;
+    T-184-UAT-02). Returns the
     stored ``{"audience": ..., "roles": [...], "groups": [...]}`` dict when present + well-
     formed; a cold cache / DB blip / missing key / non-dict record yields ``{}``. NEVER
     raises (mirrors maintenance_mode's no-raise posture).

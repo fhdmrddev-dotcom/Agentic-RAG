@@ -625,8 +625,11 @@ app.openapi = build_canvas_aware_openapi(app)
 # router's own 404 does.
 #
 # Pure-ASGI (NOT BaseHTTPMiddleware) so it never buffers the SSE stream; it reads the flag
-# from the in-memory TTL settings cache (no per-request DB, D-v2.5-01) and fails CLOSED on a
-# cold/blip read (D-181-02 — the deliberate opposite of Maintenance's fail-OPEN).
+# from the in-memory settings cache and fails CLOSED on a cold/blip read (D-181-02 — the
+# deliberate opposite of Maintenance's fail-OPEN). D-v2.5-01's "no per-request DB call" holds
+# for every request EXCEPT the gated paths themselves, which await a TTL-checked refresh
+# first so the kill switch cannot be enforced from an unboundedly stale cache
+# (T-184-UAT-02) — at most one query per 30s per worker, and none on the hot path.
 # ``Depends(require_canvas())`` REMAINS on both canvas routes as defense in depth (D-182-05):
 # this seam owns only the master off-switch, the dependency still owns caller resolution and
 # the operator/everyone/role audience.

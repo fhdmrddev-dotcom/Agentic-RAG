@@ -65,14 +65,47 @@ CANVAS_GATED_PATHS: frozenset[str] = frozenset(
     }
 )
 
+# The schema half's path — FastAPI's default ``openapi_url`` (main.py:593 passes no override).
+# Named here only so the middleware knows where to bound the flag's staleness for the SYNC
+# ``build_canvas_aware_openapi`` hook, which cannot await for itself (T-184-UAT-02). This is
+# NOT a gated path: ``/openapi.json`` still answers 200 in both flag states, filtered.
+_SCHEMA_PATH: str = "/openapi.json"
+
+
+async def _ensure_flag_fresh() -> None:
+    """Bound the flag read's staleness before ``_read_canvas_is_off`` consults the cache.
+
+    T-184-UAT-02 (Phase 184 security audit). ``_read_canvas_is_off`` resolves through the
+    SYNC settings reader, which performs no staleness check of its own — so on a worker that
+    did not service the operator's write, this gate kept enforcing the PRE-FLIP audience with
+    no code-level bound. ``ensure_settings_fresh`` is TTL-checked, so this is one comparison
+    and no DB I/O on a warm cache, and at most one query per 30s per worker on a cold one.
+
+    Awaited ONLY after ``_is_canvas_path`` has already matched (and for the schema path), so
+    the overwhelming majority of requests never reach it — the "no per-request DB call"
+    property below is preserved exactly where it was claimed, and the bounded cost is paid
+    only on the paths where a stale read has a security consequence.
+
+    NEVER RAISES (``ensure_settings_fresh`` swallows its own failures), so a settings blip
+    still lands in ``_read_canvas_is_off``'s fail-closed branch below.
+    """
+    try:
+        from app.models.user_settings import ensure_settings_fresh
+
+        await ensure_settings_fresh()
+    except Exception:  # noqa: BLE001 — defensive: never let a refresh blip escape the gate
+        pass
+
 
 def _read_canvas_is_off() -> bool:
     """True when ``visual_workflow_canvas`` is off — the master revert switch.
 
-    Reads the per-worker 30s TTL settings cache through ``feature_audience`` — a pure
-    in-memory read (NO per-request DB call of any kind, D-v2.5-01), so it never blocks the
-    event loop. ``feature_audience`` is documented never to raise (a cold cache / DB blip /
-    missing key resolves to the hardcoded default, which for this key is ``"off"``).
+    Reads the per-worker settings cache through ``feature_audience`` — a pure in-memory read
+    (NO DB call, D-v2.5-01), so it never blocks the event loop. Callers on a gated path
+    ``await _ensure_flag_fresh()`` FIRST, which is what actually bounds this cache's staleness
+    to the 30s TTL; this function itself only reads whatever is there. ``feature_audience``
+    is documented never to raise (a cold cache / DB blip / missing key resolves to the
+    hardcoded default, which for this key is ``"off"``).
 
     FAIL-CLOSED (``True`` = gate ON) on ANY read failure — the DELIBERATE OPPOSITE of the
     ``MaintenanceMiddleware`` analog this file otherwise mirrors. Maintenance fails OPEN
@@ -117,6 +150,14 @@ class CanvasGateMiddleware:
             return
 
         path = scope.get("path", "")
+
+        # T-184-UAT-02 — bound the flag's staleness on THIS worker before either half reads
+        # it. Gated on the paths whose answer depends on the flag: the canvas routes (the
+        # request-path half below) and the schema document (the `build_canvas_aware_openapi`
+        # half, which is SYNC and therefore cannot refresh for itself — this is its only
+        # opportunity). Every other request skips it entirely and pays nothing.
+        if _is_canvas_path(path) or path == _SCHEMA_PATH:
+            await _ensure_flag_fresh()
 
         # Gate on PATH ONLY — NEVER on method. A path that was never built answers the SAME
         # way for every method, so restricting the gate to POST/GET would leave the

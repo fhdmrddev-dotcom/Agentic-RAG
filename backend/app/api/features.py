@@ -27,6 +27,7 @@ from fastapi import APIRouter, Depends, Request
 from app.dependencies import get_current_user, resolve_caller_role
 from app.models.user_settings import (
     _GOVERNED_FEATURES,
+    ensure_settings_fresh,
     feature_audience,
     resolve_feature_access,
 )
@@ -48,6 +49,12 @@ async def get_effective_features(
     (``feature_audience`` + ``resolve_feature_access``), so hide == refuse (VIS-01 / D-167-06).
     Never operator-gated: a non-operator reaches it (200) to learn their own map.
     """
+    # T-184-UAT-02 — bound this worker's view of the flags before resolving the map. Every
+    # ``feature_audience`` call below reads the SYNC settings cache, which has no staleness
+    # check of its own; this endpoint is what the UI polls to learn whether a surface exists,
+    # so an unbounded stale read here is precisely how the Phase 184 UAT saw a flipped-off
+    # canvas keep answering ``true``. TTL-checked (no DB I/O on a warm cache) and non-raising.
+    await ensure_settings_fresh()
     op = await is_operator(current_user["id"])
     # Resolve the caller's role only when some governed feature is role-audience (avoid a
     # query for the common operator/everyone-only case). Fail-closed via resolve_caller_role.

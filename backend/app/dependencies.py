@@ -655,7 +655,18 @@ def require_canvas():
         credentials: HTTPAuthorizationCredentials | None = Depends(_canvas_bearer_scheme),
         supabase: Client = Depends(get_supabase),
     ):
-        from app.models.user_settings import feature_audience, resolve_feature_access
+        from app.models.user_settings import (
+            ensure_settings_fresh,
+            feature_audience,
+            resolve_feature_access,
+        )
+        # (0) T-184-UAT-02 — bound the flag's staleness on THIS worker before reading it.
+        #     ``feature_audience`` resolves through the SYNC settings reader, which has no
+        #     staleness check of its own, so a worker that did not service the operator's
+        #     write would otherwise keep enforcing the pre-flip audience unbounded. TTL-checked
+        #     and non-raising: no DB I/O on a warm cache, and a blip still lands in the
+        #     fail-closed "off" default below rather than fail-open.
+        await ensure_settings_fresh()
         # (1) FLAG FIRST — 404 for ALL callers (authenticated or not, operators included) while
         #     off, BEFORE any token is validated. CR-01: no auth-derived 403/401 can precede this.
         audience = feature_audience("visual_workflow_canvas")
