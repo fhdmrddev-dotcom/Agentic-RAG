@@ -1043,8 +1043,12 @@ grazing the `stepNumber` slot by 2×16px — a slot that renders nothing (D-183-
 to the face, move it to `left:16` and it clears; the sketch reports that separately from real collisions
 rather than inflating the red count.
 
-**Still open:** the armed action-risk mark itself. Three meaning-first concepts (detour / countersign /
-waiting card) are drawn and switchable, but the binding constraint is now known — **a clickable armed
-mark cannot live on the card at all** (one tab stop per node, `PhaseNodeCard.tsx:37-48`), so it is either
-a non-interactive mark with arming done in the side panel (where 142-B already puts the grounding dial)
-or it lives on the lane like the ✕ and ＋.
+4. **Arming happens in the SIDE PANEL; the canvas mark is READ-ONLY.** Forced as much as chosen —
+   `PhaseNodeCard.tsx:37-48` forbids any focusable control inside the card (one tab stop per node), which
+   is why the ✕ and ＋ live on the lane. The operator chose the panel over a third lane affordance so
+   **both governance dials sit together**, beside 142-B's grounding dial. **The panel is where you SET,
+   the canvas is where you SEE.** `185-SPEC.md` Requirement 8 refined with a machine-checkable acceptance
+   criterion (no `role`, no `tabIndex`, no handler on the mark; exactly one tab stop per node).
+
+**Still open:** only which of the three read-only concepts the mark uses — detour, countersign, or
+waiting card. Nothing structural remains.

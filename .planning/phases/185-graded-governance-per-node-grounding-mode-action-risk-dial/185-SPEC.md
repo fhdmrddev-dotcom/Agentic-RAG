@@ -155,6 +155,20 @@ The `/validate` + `/grounding-bundle` seam (Phase 182) already returns per-node 
    - Acceptance: arming a checkpoint on a 5-step workflow leaves `len(phases) == 5`, every `phase_index`
      unchanged, and the canvas rendering exactly 5 nodes; "step 4 of 5" still means what it says
 
+   > **⚠ REFINED 2026-07-29 (sketch 147, operator).** **Arming happens in the step's side panel, in the
+   > same governance section as the 142-B grounding dial. The canvas mark is READ-ONLY — a signal, never
+   > a control.**
+   >
+   > This is forced as much as chosen: `PhaseNodeCard.tsx:37-48` forbids **any** focusable control inside
+   > the card (one tab stop per node, asserted in `WorkflowCanvas.test.tsx:231-238`) — which is precisely
+   > why the ✕ and ＋ live on the lane. A clickable armed mark on the card is not representable. The
+   > operator chose the panel over a third lane affordance so that **both governance dials live in one
+   > place**: the panel is where you SET, the canvas is where you SEE.
+   >
+   > **Add to acceptance:** the canvas armed mark has no `role="button"`, no `tabIndex`, and no click
+   > handler; a walk of every rendered `.react-flow__node` finds exactly ONE tab stop per node with the
+   > mark present; arming and disarming are reachable only from the panel's governance section.
+
 9. **The action-risk gate fails closed**: With the checkpoint set, no answer means the run never
    proceeds.
    - Current: `_exec_llm_human_input:594` sets `answer = ""` on timeout and **returns normally**, so the

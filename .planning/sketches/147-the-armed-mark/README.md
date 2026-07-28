@@ -124,23 +124,26 @@ Three decisions locked:
 
 Result on 137-B: **zero collisions between rendered marks.**
 
+**4 · Arming happens in the SIDE PANEL. The canvas mark is READ-ONLY** (operator, 2026-07-29).
+
+Forced as much as chosen: `PhaseNodeCard.tsx:37-48` forbids **any** focusable control inside the card
+(one tab stop per node, asserted in `WorkflowCanvas.test.tsx:231-238`) — which is exactly why the ✕ and
+＋ live on the lane. A clickable armed mark on the card is not representable. The operator chose the
+panel over a third lane affordance so **both governance dials live in one place**, beside the 142-B
+grounding dial.
+
+> **The panel is where you SET. The canvas is where you SEE.**
+
+The sketch's rail now draws that panel section — the grounding dial above, the *Stop and ask me first*
+switch below — and the switch is live: tick it and watch the canvas mark change. The canvas marks
+themselves carry no `role`, no `tabIndex` and no handler, which is machine-checkable and is now an
+acceptance criterion in `185-SPEC.md` Requirement 8.
+
 ## Still open after this sketch
 
-**Only one thing: where the armed action-risk mark goes.** The card question and the seal/verdict
-question are both resolved above.
-
-But the constraint that decides it is now known, and it invalidates all three of my earlier attempts:
-**a clickable armed mark cannot live on the card at all.** One tab stop per node
-(`PhaseNodeCard.tsx:37-48`, asserted in `WorkflowCanvas.test.tsx:231-238`) is what forces the ✕ and ＋
-onto the lane, and it forces this too. So the remaining choice is:
-
-- a **non-interactive mark** on the card, with arming done in the side panel — where sketch 142-B
-  already puts the grounding dial, which keeps both governance controls in one place; **or**
-- a **control on the lane**, alongside the ✕ and ＋ — which puts arming where the other per-step
-  actions already are, at the cost of a third lane affordance.
-
-The three meaning-first concepts (detour / countersign / waiting card) remain drawn and switchable in
-the sketch, but each needs re-reading against whichever of those two homes wins.
+**Only which of the three concepts the read-only mark uses** — detour, countersign, or waiting card.
+All three are drawn on the corrected 137-B card and switchable from the toolbar. Nothing structural
+remains: the card is settled, the corners are settled, the control's home is settled.
 
 ## Rejected rounds, kept in git
 
