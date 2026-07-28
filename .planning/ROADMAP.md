@@ -245,7 +245,21 @@ Plans:
   4. Each node can carry an **action-risk** checkpoint — an outbound / write / external-action node gets an approval / human-in-the-loop gate before it executes, built on the existing `llm_human_input` phase-type substrate (GOVERN-03).
   5. Graded strictness holds across providers — a grounded node's citation/confidence enforcement rides the provider-sensitive retrieval/agent path uniformly, Deep byte-identical when unset (SC#10 / D-14).
 
-**Plans**: TBD
+**Plans**: 11 plans in 6 waves
+
+Plans:
+- [ ] 185-01-PLAN.md — the 137-D → 137-B card-geometry rebuild (D-185-17), standalone, before any governance mark lands
+- [ ] 185-02-PLAN.md — the two additive-optional PhaseSpec booleans, KB_TOOLS + the pure grounding_cause derivation, and kb_tools on the palette route
+- [ ] 185-03-PLAN.md — the retrieved_and_cited mode, the action_risk_approval kind, effective_phase, and the spec_by_slug enforcement seam
+- [ ] 185-04-PLAN.md — the fail-closed armed wait: indefinite subscribe, an explicit decline mapping, a verbatim prompt, a survivable shutdown
+- [ ] 185-05-PLAN.md — the honest wait end-to-end: action_risk_pending vocabulary, the armed resume sweep, a no-deadline prompt card
+- [ ] 185-06-PLAN.md — the client's data half: kbTools on the palette hook, the two booleans on PhaseSpecJSON, the caller-owned write chain and the governance copy constants
+- [ ] 185-07-PLAN.md — GovernanceSection: the dial that visibly refuses, and the PhaseFormPanel mount point (G-5 honoured by construction)
+- [ ] 185-08-PLAN.md — delete the 3-face word-badge, synthesize the locked gate row client-side (D-185-19), thread grounded/armed, re-measure the count-gate pins
+- [ ] 185-09-PLAN.md — the corner seal at the CLAIMED top-right, never conditional on run state, with a props fence and a four-mark zone check
+- [ ] 185-10-PLAN.md — the detour edge: FlowEdge, the net-new edgeTypes map, edge.type on flow edges, and a no-visible-change guard on ordinary edges (D-185-18)
+- [ ] 185-11-PLAN.md — the vocabulary sweep as a test, the four phase-level fences, the G-5 / D-185-17 / publish-behaviour records, and the G-4 + SC#10 gate
+
 **UI hint**: yes
 **Flags**: HEADLINE differentiator (no competitor grades by KB-grounding — the Beam/Glean/n8n deep-crawl white-space; `.planning/research/deep-dive/`); ENGINE-ADDITIVE (an optional per-node `grounding_mode` field on the phase-config model that AUTO-ATTACHES the EXISTING immutable `citations_required` + confidence gate on grounded nodes — reuses the shipped validation-gate library; open nodes ungated); GOVERN-03 reuses the existing `llm_human_input` phase-type for the action-risk/approval checkpoint; Deep byte-identical when unset (D-14 load-bearing); G-2 sketch (governance state on the canvas — grounded-strict vs open-flexible badges + the mode toggle — is a "feels like" surface); SC#10 (a grounded node's citation/confidence enforcement rides the provider-sensitive retrieval/agent path — verify graded strictness holds cross-provider); G-5 ledger (`PhaseNode.tsx` node model, ~3rd touch after 183/184 → apply refactor-before-3rd-touch PROACTIVELY + the validation seam); no full threat model (reuses the enforced gate library; the structural "not author-loosenable-away" property is verified in-phase; the connector threat model lands at 190); NO migration (additive optional field in the WorkflowDefinition JSONB, not a column).
 
