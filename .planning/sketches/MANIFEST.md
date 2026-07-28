@@ -828,6 +828,7 @@ workflows and say so**, while keeping the engine facts real (phase types, the `g
 | 142 | grounding-dial-and-lock | A step that reads your documents is held to citing them, and that cannot be switched off. How does that read as a safety rail rather than as a broken setting? | **B — a switch that refuses** ★ | phase-185, govern-01, grounding-mode, detected-lock, one-way, escalate-only, phaseformpanel, plain-language, g2-sketch-gate |
 | 143 | proven-on-the-canvas | How do you mark a proven step on the canvas when colour and badges are both already spent? | **A — a sealed edge** ★ | phase-185, govern-02, canvas-mark, non-colour-channel, badge-budget, colour-budget, phase-188-collision, greyscale-proof, g2-sketch-gate |
 | 144 | the-approval-stop-sign | Where does "this step waits for your OK" live, so you can see it before a run and feel it during one — without adding a step to the flow? | *pending* | phase-185, govern-03, action-risk, approval-checkpoint, connectors, phase-189, phase-190, armed-default, g2-sketch-gate |
+| 145 | the-review-moment | The run has stopped and is asking you to approve sending a document. What do you actually see before you say yes — and where are you standing when you see it? | *pending* | phase-185, govern-03, review-moment, artefact-preview, check-coverage, run-surface, workflow-vs-chat, phase-188-input, approve-blind-honesty, g2-sketch-gate |
 
 **Two findings 142 produces that outlive whichever variant wins:**
 
@@ -868,3 +869,21 @@ already-verified `connector_email` / `connector_link` entries in `themes/phase-i
 **The finding 144 produces regardless of which variant wins:** an outbound step with no checkpoint is
 harmless today and is *the whole risk* the moment 190 ships. **The default must be armed-on** — a new
 external-action step arrives with its checkpoint set, and turning it off is the deliberate act.
+
+**Sketch 145 carries a proposal that belongs to PHASE 188, not 185.** Two operator questions on
+2026-07-28 turned out to be one: *"how does the user view the artefact before approving?"* and
+*"workflows run and appear in the chat — we need to isolate them."* Verified in code: `WorkflowsPage.tsx`
+launches a workflow by creating a thread and **redirecting into Chat**. You cannot draw "what do I see
+before I approve" without deciding where you are standing, so **both 145 variants are drawn on a
+dedicated workflow run surface — own header, own compact spine, no message list, no composer.** Phase 188
+("a business view distinct from the developer timeline, painted from the same run stream") should start
+from that rather than re-derive it.
+
+**Two honesty cases 145 settles for any approval surface, whichever variant wins:**
+
+1. **Approving blind must look different from reviewing.** When the artefact cannot be previewed, the
+   surface says so in as many words, offers the download first, and records the approval as *without a
+   preview*. An approve-blind that renders identically to a real review is the failure mode.
+2. **A long deliverable gets a reviewer's summary, not 40 unread pages** — total coverage, which sections
+   are the AI's own assessment rather than quotation, and what changed since the last approved version.
+   And *Not yet* HOLDS: the run waits for a person, it never quietly times out and sends.
