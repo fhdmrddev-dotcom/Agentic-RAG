@@ -75,7 +75,14 @@ that is doing.
 
 ## The two honest cases, which matter more than the layout
 
-**"Something we cannot show."** A PDF the preview stack cannot render. The screen says so in as many
+**⚠ CORRECTED 2026-07-28 by sketch 146 — the artefact split drawn here is backwards.** This sketch
+renders the **Word report** beautifully and treats **PDF** as the un-previewable case. In the shipped
+`FilePreview.tsx`, markdown / plain text / code / CSV / images all render — and **DOCX, PPTX, XLSX and
+PDF are all download-only**. Since `llm_emit` + `render_template` produces `.docx`, the flagship
+deliverable is the artefact a reviewer *cannot* see. The honesty pattern below is right; the file type it
+was attached to was wrong.
+
+**"Something we cannot show."** A file the preview stack cannot render. The screen says so in as many
 words — *"approving now means approving something you have not read. That is allowed. It is not
 hidden."* — offers to download it first, and when you approve anyway the record says **approved without
 a preview**. An approve-blind that looks identical to a real review is the failure mode; this makes the
@@ -85,8 +92,11 @@ two visibly different.
 nobody. So the surface leads with what a reviewer actually needs: total coverage, **which sections are
 the AI's own assessment rather than quotation**, and what changed since the last approved version.
 
-**And in both: pressing *Not yet* holds.** The run waits until a person decides — it does not quietly
-time out and send.
+**And in both: pressing *Not yet* holds** — in the drawing. **⚠ CORRECTED 2026-07-28 by sketch 146:
+that is FALSE against the shipped engine.** `_exec_llm_human_input` blocks for `timeout_seconds`
+(default **300s**, cap 1800) and on timeout completes with an empty answer, so the run **advances** —
+and here the next step is the email. Making the action-risk gate **fail closed** is a Phase-185 scope
+item, not a UAT detail. See `146-the-round-trip`.
 
 ## What to Look For
 

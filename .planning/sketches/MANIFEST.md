@@ -829,6 +829,7 @@ workflows and say so**, while keeping the engine facts real (phase types, the `g
 | 143 | proven-on-the-canvas | How do you mark a proven step on the canvas when colour and badges are both already spent? | **A — a sealed edge** ★ | phase-185, govern-02, canvas-mark, non-colour-channel, badge-budget, colour-budget, phase-188-collision, greyscale-proof, g2-sketch-gate |
 | 144 | the-approval-stop-sign | Where does "this step waits for your OK" live, so you can see it before a run and feel it during one — without adding a step to the flow? | *pending* | phase-185, govern-03, action-risk, approval-checkpoint, connectors, phase-189, phase-190, armed-default, g2-sketch-gate |
 | 145 | the-review-moment | The run has stopped and is asking you to approve sending a document. What do you actually see before you say yes — and where are you standing when you see it? | *pending* | phase-185, govern-03, review-moment, artefact-preview, check-coverage, run-surface, workflow-vs-chat, phase-188-input, approve-blind-honesty, g2-sketch-gate |
+| 146 | the-round-trip | How do you get from the canvas into a human review and back out again — for every kind of output, and when things go wrong? | *pending* | phase-185, govern-03, round-trip, canvas-to-review, output-types, docx-not-previewable, ask-user-timeout, failure-modes, phase-188-input, g2-sketch-gate |
 
 **Two findings 142 produces that outlive whichever variant wins:**
 
@@ -887,3 +888,26 @@ from that rather than re-derive it.
 2. **A long deliverable gets a reviewer's summary, not 40 unread pages** — total coverage, which sections
    are the AI's own assessment rather than quotation, and what changed since the last approved version.
    And *Not yet* HOLDS: the run waits for a person, it never quietly times out and sends.
+
+## ⚠ Two engine truths sketch 146 found — both are PHASE-185 SCOPE, both falsify sketch 145
+
+Found by reading shipped code while drawing 146, not assumed. 145's README carries corrections in place.
+
+**1. The approval gate expires into "yes".** `_exec_llm_human_input` (`phase_types.py`) blocks on
+`subscribe_for_response(..., timeout_seconds)` — default **300s**, cap 1800
+(`settings.ask_user_max_timeout_seconds`). On timeout it returns `None`, `answer` becomes `""`, and the
+phase **returns normally**, so the workflow ADVANCES — and in the drawn flow the next step is the email.
+GOVERN-03 may reuse the `llm_human_input` SUBSTRATE (durable prompt row, `tool_call_id`, resume sweep)
+but **must not inherit its timeout disposition**. An action-risk gate has to **fail closed**. Engine
+change; belongs in the phase scope.
+
+**2. The flagship deliverable cannot be previewed.** `FilePreview.tsx` renders markdown, plain text,
+code, CSV and images; **DOCX / PPTX / XLSX / PDF fall through to download-only**. And `llm_emit` +
+`render_template` (docxtpl) produces **`.docx`**. So the most important artefact a workflow makes is the
+one a reviewer cannot see. Either the review moment gains a docx→viewable conversion, or every template
+deliverable is approved blind — which guts GOVERN-03. **Spec must take this fork deliberately.**
+
+**Three more failure modes 146 names, with owners:** the durable prompt survives a closed tab but the
+clock does not stop; a second approver on an org-shared run must be told *who* decided (the run-time twin
+of Phase 186's co-editing guard — name it there); and a failure AFTER approval must never make the
+approval look undone, nor let a retry re-send.
