@@ -74,9 +74,11 @@ export interface WorkflowDoorSwitchProps {
    * only passes by making a comment lie is a broken guard):
    * ABSENT ⇒ today's markup, byte-identical, which is what keeps the 13 shipped
    * assertions in `WorkflowDoorSwitch.test.tsx` passing unmodified and the flag-off app
-   * exactly as it ships. This shell does NOT read the canvas flag — `WorkflowsPage`
-   * evaluates the one shared `useCanvasGate()` rule and passes the answer down, so there
-   * is no second copy of the gate here to drift from it.
+   * exactly as it ships. This shell does NOT read the canvas flag at all — the host page
+   * evaluates the one shared gate rule and passes the answer down as this prop, so there is
+   * no second copy of the gate here to drift from it. (Stated without naming that rule's
+   * identifier: the header suite greps this source to zero for it, and a guard that only
+   * passes by making a comment lie is a broken guard.)
    */
   inline?: boolean
   /** The HOST's band content (the `← Workflows` breadcrumb group), passed through

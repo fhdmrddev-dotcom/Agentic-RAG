@@ -112,6 +112,13 @@ import { WorkflowsPage } from "./WorkflowsPage"
 import { EffectiveFeaturesProvider } from "@/providers/EffectiveFeaturesProvider"
 import type { EffectiveFeatures } from "@/lib/api"
 
+// The three band owners' SOURCE via Vite's ?raw loader — the idiom this phase's suites
+// already use (`PhaseSpineGraph.test.tsx`, `WorkflowDoorSwitch.test.tsx`) to make a scope
+// fence machine-checkable rather than merely intended.
+import builderSource from "./WorkflowBuilderPage?raw"
+import workflowsPageSource from "./WorkflowsPage?raw"
+import doorSwitchSource from "@/components/workflows/WorkflowDoorSwitch?raw"
+
 /** Two steps, hand-authored so `__fixtures__/canvasFixtures.ts` stays untouched
  *  (D-184-17 — that corpus belongs to the snapshot + round-trip suites). */
 const definition = {
@@ -314,5 +321,148 @@ describe("Builder header, canvas flag OFF — the markup itself is pinned", () =
     expect(headerMarkup(screen.getByTestId("builder-grid"), container)).toBe(
       FLAG_OFF_HEADER_MARKUP,
     )
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════════════
+// Task 3 — THE FLAG-ON SIDE: one row, nothing lost, and it cannot silently regrow.
+//
+// Appended; nothing above this line was edited when the merge landed, which is itself
+// the evidence that the flag gate held (D-184.1-01).
+// ══════════════════════════════════════════════════════════════════════════════════
+
+const FLAG_ON = { features: { visual_workflow_canvas: true }, loading: false } as const
+
+describe("Builder header, canvas flag ON — ONE row (D-184.1-01)", () => {
+  it("renders EXACTLY ONE header band where the flag-off surface renders three", async () => {
+    const { container } = await openDraftBuilder(FLAG_ON)
+    const bands = headerBandsAbove(screen.getByTestId("builder-grid"), container)
+    expect(bands).toHaveLength(1)
+    expect(bands[0].getAttribute("data-testid")).toBe("builder-header-bar")
+  })
+
+  it("every control from all three bands survives, reachable BY ACCESSIBLE NAME (D-184.1-02)", async () => {
+    // The merge is a RE-FLOW, not a cull. Queried by ROLE + NAME rather than by testid on
+    // purpose: a testid survives a control being turned into an unreachable div, and the
+    // thing being promised here is that each of these is still an operable control a person
+    // (or a screen reader) can find by the words on it.
+    await openDraftBuilder(FLAG_ON)
+
+    expect(screen.getByRole("button", { name: "← Workflows" })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "‹ both doors" })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Save draft" })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "◆ Publish…" })).toBeInTheDocument()
+
+    // …and every badge and label rides along with them — nothing was dropped to make the
+    // row fit, including the `🔧 Author & govern` label the plan's row sketch omitted.
+    const bar = screen.getByTestId("builder-header-bar")
+    expect(bar).toHaveTextContent("Edit · Vendor brief v1")
+    expect(bar).toHaveTextContent("vendor-brief")
+    expect(bar).toHaveTextContent("draft")
+    expect(bar).toHaveTextContent("🔧 Author & govern")
+    expect(bar.contains(screen.getByTestId("net-new-flag"))).toBe(true)
+    expect(bar.contains(screen.getByTestId("judge-locked"))).toBe(true)
+    expect(bar.contains(screen.getByTestId("builder-save-state"))).toBe(true)
+    expect(bar.contains(screen.getByTestId("publish-trigger"))).toBe(true)
+  })
+
+  it("the ancestors stop drawing their own bands — the controls are IN the merged row", async () => {
+    // The half a band count alone cannot see: `builder-back` and `both-doors` could both
+    // still exist in their old bands while a fourth, merged row appeared beside them.
+    await openDraftBuilder(FLAG_ON)
+    const bar = screen.getByTestId("builder-header-bar")
+    expect(bar.contains(screen.getByTestId("builder-back"))).toBe(true)
+    expect(bar.contains(screen.getByTestId("both-doors"))).toBe(true)
+    // One header element, still — 141-B's operator correction survives the merge.
+    expect(screen.getAllByRole("banner")).toHaveLength(1)
+  })
+
+  it("the breadcrumb NEVER vanishes on a fresh build, where no draft header exists", async () => {
+    // The regression this branch exists to prevent: with the flag on both ancestors stop
+    // drawing their bands, and the describe/chooser screens have no header of their own —
+    // so `← Workflows` would simply disappear and strand the author with no way back.
+    render(
+      <EffectiveFeaturesProvider value={{ ...FLAG_ON, refetch: vi.fn() }}>
+        <div style={{ width: 1200, height: 800 }}>
+          <WorkflowsPage folders={[]} onLaunch={vi.fn()} />
+        </div>
+      </EffectiveFeaturesProvider>,
+    )
+    fireEvent.click(await screen.findByTestId("build-card"))
+    await screen.findByTestId("workflow-doors")
+    expect(screen.getByRole("button", { name: "← Workflows" })).toBeInTheDocument()
+  })
+})
+
+describe("Builder header — the band-count BUDGET (it cannot silently regrow)", () => {
+  it("flag-on bands are strictly FEWER than flag-off bands, measured in one run", async () => {
+    /**
+     * jsdom REPORTS EVERY ELEMENT AS ZERO-HEIGHT — `getBoundingClientRect()` and
+     * `offsetHeight` are 0 for everything here — so this budget is expressed in BANDS, not
+     * pixels. That is the honest proxy: the reclaimed height is the sum of the rows that
+     * stopped being drawn, and a row that is gone is gone at any viewport. The actual
+     * ~90 px win at the ~900 px width that prompted the phase is an operator observation
+     * and belongs in the phase's UAT, not in a jsdom suite.
+     *
+     * BOTH SIDES ARE MEASURED IN THE SAME RUN rather than compared against a hardcoded 3,
+     * so the budget stays meaningful if the flag-off surface itself ever legitimately
+     * changes — it is a relationship, not two numbers that can drift apart.
+     */
+    const off = await openDraftBuilder(OFF_VARIANTS[0].value)
+    const flagOffBands = headerBandsAbove(
+      screen.getByTestId("builder-grid"),
+      off.container,
+    ).length
+    cleanup()
+
+    const on = await openDraftBuilder(FLAG_ON)
+    const flagOnBands = headerBandsAbove(screen.getByTestId("builder-grid"), on.container).length
+
+    expect(flagOnBands).toBeLessThan(flagOffBands)
+    expect(flagOffBands - flagOnBands).toBe(2)
+  })
+})
+
+// ── THE GATE RULE HAS EXACTLY ONE DEFINITION (D-184.1-04) ─────────────────────────
+
+/**
+ * Three components now need the canvas gate, and three components each re-deriving a
+ * three-part predicate is precisely the drift this project keeps getting bitten by. These
+ * guards are what make three CALL SITES safe rather than merely allowed: one definition,
+ * and the two ancestors reach it by import rather than by copy.
+ */
+describe("Builder header — the canvas gate is defined ONCE (D-184.1-04)", () => {
+  const occurrences = (haystack: string, needle: string) => haystack.split(needle).length - 1
+
+  it("only WorkflowBuilderPage spells the rule out; the other two import it", () => {
+    // The comparison literal is the rule's load-bearing half (the strict `=== true` that
+    // makes an absent key HIDE). It must exist in exactly one source file.
+    expect(occurrences(builderSource, "visual_workflow_canvas === true")).toBe(1)
+    expect(workflowsPageSource).not.toMatch(/visual_workflow_canvas/)
+    expect(doorSwitchSource).not.toMatch(/visual_workflow_canvas/)
+
+    // …and the accessor itself is reached only through that one rule.
+    expect(workflowsPageSource).not.toMatch(/useEffectiveFeaturesOptional/)
+    expect(doorSwitchSource).not.toMatch(/useEffectiveFeaturesOptional/)
+  })
+
+  it("useCanvasGate is DEFINED once and IMPORTED where it is needed", () => {
+    expect(occurrences(builderSource, "export function useCanvasGate")).toBe(1)
+    expect(workflowsPageSource).not.toMatch(/function useCanvasGate/)
+    expect(doorSwitchSource).not.toMatch(/function useCanvasGate/)
+    // WorkflowsPage is the ancestor that had to start asking; the door shell deliberately
+    // does NOT read the flag at all — it is handed the answer as `inline`, which is one
+    // fewer place the gate can drift.
+    expect(workflowsPageSource).toMatch(/useCanvasGate/)
+    expect(doorSwitchSource).not.toMatch(/useCanvasGate/)
+  })
+
+  it("the merged row is reached ONLY through that gate — no second condition guards it", () => {
+    expect(builderSource).toMatch(/const canvasEnabled = useCanvasGate\(\)/)
+    // The spread-conditional that keeps the flag-off props genuinely ABSENT, on all three
+    // sides. `rails` is the shipped precedent (D-14); the two header slots follow it.
+    expect(builderSource).toMatch(/canvasEnabled \? \{ rails \}/)
+    expect(workflowsPageSource).toMatch(/canvasEnabled \? \{ inline: true, headerLead/)
+    expect(doorSwitchSource).toMatch(/inline \? \{ headerLead, headerTrail/)
   })
 })
