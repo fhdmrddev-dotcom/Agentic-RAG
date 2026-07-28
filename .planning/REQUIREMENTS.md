@@ -19,15 +19,15 @@
 ### VALID — the anti-drift governance seam (the differentiator)
 
 - [x] **VALID-01**: The server exposes `POST /workflows/validate` that reuses the existing `reachability.lint_workflow` + grounding-fidelity checks verbatim — the single source of validation truth; the canvas never re-implements the rules client-side.
-- [ ] **VALID-02**: A user editing on the canvas is prevented from drawing a **structurally** invalid workflow — reachability / tool-whitelist / gate-wiring violations surface live *as the canvas is built* ("you cannot draw an invalid workflow"). *(Headline differentiator — no competitor validates the flow at author-time.)* Per-node grounding *strictness* is layered on top by GOVERN (graded, not blanket).
-- [ ] **VALID-03**: A user sees per-node validation status (badges / inline errors) derived from the server verdict, never from a client-side guess.
+- [x] **VALID-02**: A user editing on the canvas is prevented from drawing a **structurally** invalid workflow — reachability / tool-whitelist / gate-wiring violations surface live *as the canvas is built* ("you cannot draw an invalid workflow"). *(Headline differentiator — no competitor validates the flow at author-time.)* Per-node grounding *strictness* is layered on top by GOVERN (graded, not blanket).
+- [x] **VALID-03**: A user sees per-node validation status (badges / inline errors) derived from the server verdict, never from a client-side guess.
 
 ### CANVAS — the visual authoring surface
 
 - [x] **CANVAS-01**: A user can view an existing workflow as a visual node canvas — a read-only projection of its `WorkflowDefinition` (nodes = phases, edges = flow + `skip_to_phase` branches), rendered via `@xyflow/react`.
-- [ ] **CANVAS-02**: A user can add, move, connect, and delete phase-nodes; edits round-trip losslessly back to `WorkflowDefinition` (one client serializer) and save through the **existing** draft CRUD (create-once-then-PATCH). Node layout/positions are kept OUT of the immutable definition JSONB.
-- [ ] **CANVAS-03**: A user can configure a selected node in a side panel, backed by the existing `PhaseConfig` discriminated-union schema (Pydantic stays authoritative).
-- [ ] **CANVAS-04**: The canvas expresses governance as visible rails — locked phase order, per-phase tool whitelists, and validation gates the user cannot wire around (governance rendered, never removed). The rails are **graded** per GOVERN — strict on grounded nodes, flexible on open agentic nodes.
+- [x] **CANVAS-02**: A user can add, move, connect, and delete phase-nodes; edits round-trip losslessly back to `WorkflowDefinition` (one client serializer) and save through the **existing** draft CRUD (create-once-then-PATCH). Node layout/positions are kept OUT of the immutable definition JSONB.
+- [x] **CANVAS-03**: A user can configure a selected node in a side panel, backed by the existing `PhaseConfig` discriminated-union schema (Pydantic stays authoritative).
+- [x] **CANVAS-04**: The canvas expresses governance as visible rails — locked phase order, per-phase tool whitelists, and validation gates the user cannot wire around (governance rendered, never removed). The rails are **graded** per GOVERN — strict on grounded nodes, flexible on open agentic nodes.
 
 ### GOVERN — graded per-node governance (the deep-crawl differentiator)
 
@@ -100,12 +100,12 @@ Which phases cover which requirements. Filled at roadmap creation 2026-07-24, re
 | REVERT-01 | Phase 181 | Complete |
 | REVERT-02 | Phase 181 | Complete |
 | VALID-01 | Phase 182 | Complete |
-| VALID-02 | Phase 184 | Pending |
-| VALID-03 | Phase 184 | Pending |
+| VALID-02 | Phase 184 | Complete |
+| VALID-03 | Phase 184 | Complete |
 | CANVAS-01 | Phase 183 | Complete |
-| CANVAS-02 | Phase 184 | Pending |
-| CANVAS-03 | Phase 184 | Pending |
-| CANVAS-04 | Phase 184 | Pending |
+| CANVAS-02 | Phase 184 | Complete |
+| CANVAS-03 | Phase 184 | Complete |
+| CANVAS-04 | Phase 184 | Complete |
 | GOVERN-01 | Phase 185 | Pending |
 | GOVERN-02 | Phase 185 | Pending |
 | GOVERN-03 | Phase 185 | Pending |
