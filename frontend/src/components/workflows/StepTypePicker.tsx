@@ -108,14 +108,25 @@ export function StepTypePicker({
 
   // A press outside the panel closes it. `mousedown` rather than `click`, so a press
   // that starts outside dismisses before any stray activation inside can land.
+  //
+  // ⚠ CAPTURE PHASE, and it is not defensive style — it is the only phase that works
+  // here. The canvas plane is driven by d3-zoom, which calls `stopPropagation()` on
+  // mousedown to own its pan gesture, so a bubble-phase listener on `window` NEVER sees
+  // a press on the plane. Measured live: pressing `.react-flow__pane` reached window 0
+  // times bubbling and 1 time capturing. The menu was therefore inescapable by clicking
+  // away — the operator found it could only be closed by picking something, which turns
+  // "let me see my options" into a forced choice.
+  //
+  // Capture fires before the target's own handlers, and the containment check below is
+  // what keeps a press INSIDE the panel from dismissing it, so ordering costs nothing.
   useEffect(() => {
     if (!open) return
     const onPointer = (event: MouseEvent) => {
       const panel = panelRef.current
       if (panel && event.target instanceof Node && !panel.contains(event.target)) dismiss()
     }
-    window.addEventListener("mousedown", onPointer)
-    return () => window.removeEventListener("mousedown", onPointer)
+    window.addEventListener("mousedown", onPointer, true)
+    return () => window.removeEventListener("mousedown", onPointer, true)
   }, [open, dismiss])
 
   if (!open) return null

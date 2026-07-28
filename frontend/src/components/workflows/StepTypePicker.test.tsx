@@ -39,7 +39,7 @@ import {
   vi,
   type MockInstance,
 } from "vitest"
-import { render, screen } from "@testing-library/react"
+import { fireEvent, render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 
 import stepTypePickerSource from "./StepTypePicker?raw"
@@ -375,5 +375,44 @@ describe("StepTypePicker — zero network calls across the entire suite", () => 
   it("the fetch spy recorded exactly 0 calls", () => {
     expect(fetchSpy).not.toHaveBeenCalled()
     expect(fetchSpy.mock.calls).toHaveLength(0)
+  })
+})
+
+// ── Dismissal must survive a plane that stops propagation ────────────────────────
+//
+// The operator found the menu inescapable: clicking the canvas did nothing, so the only
+// way out was to pick a step — a forced choice, not a menu. Cause: the plane is driven
+// by d3-zoom, which calls stopPropagation() on mousedown, so a BUBBLE-phase window
+// listener never sees the press. Measured live: 0 bubble hits, 1 capture hit.
+describe("StepTypePicker — dismissal survives a stopPropagation'd press", () => {
+  it("closes on an outside press even when propagation is stopped before window", () => {
+    const onDismiss = vi.fn()
+    render(
+      <div>
+        <div
+          data-testid="pane"
+          // Stands in for `.react-flow__pane`: swallows the event in the bubble phase.
+          onMouseDown={(e) => e.stopPropagation()}
+        />
+        <StepTypePicker
+          phases={[]}
+          index={0}
+          open
+          onChoose={vi.fn()}
+          onDismiss={onDismiss}
+        />
+      </div>,
+    )
+    fireEvent.mouseDown(screen.getByTestId("pane"))
+    expect(onDismiss).toHaveBeenCalledTimes(1)
+  })
+
+  it("a press INSIDE the panel does not dismiss it", () => {
+    const onDismiss = vi.fn()
+    render(
+      <StepTypePicker phases={[]} index={0} open onChoose={vi.fn()} onDismiss={onDismiss} />,
+    )
+    fireEvent.mouseDown(screen.getByRole("menu"))
+    expect(onDismiss).not.toHaveBeenCalled()
   })
 })
