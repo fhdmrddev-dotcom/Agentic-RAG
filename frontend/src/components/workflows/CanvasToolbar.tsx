@@ -118,6 +118,19 @@ export interface CanvasToolbarProps {
   onSave: () => void
   /** Clear this workflow's cosmetic nudges (`canvasNudge`'s per-draft key only). */
   onTidyUp: () => void
+  /**
+   * Fired AFTER this toolbar steps the history, in either direction (UAT-found).
+   *
+   * The toolbar keeps owning its own `getState().undo()/redo()` call — that discipline is
+   * the whole point of this file's zundo-#207 docblock and is not moved. What it did NOT
+   * do is TELL anyone it had stepped, so the page could not retire a message describing an
+   * edit the author had just taken back. This reports the step; what that means is the
+   * page's business, not the toolbar's.
+   *
+   * OPTIONAL, and its ABSENCE is today's behaviour exactly — the same additive shape
+   * 184-09 used for `PhaseFormPanel`'s `rails`.
+   */
+  onHistoryStep?: () => void
 }
 
 export function CanvasToolbar({
@@ -125,6 +138,7 @@ export function CanvasToolbar({
   errorMessage,
   onSave,
   onTidyUp,
+  onHistoryStep,
 }: CanvasToolbarProps) {
   const store = useBuilderStore()
 
@@ -134,8 +148,15 @@ export function CanvasToolbar({
   const canRedo = useBuilderTemporal((t) => t.futureStates.length > 0)
 
   // …and the side-effect half, which is exactly where `getState()` IS correct.
-  const undo = () => store.temporal.getState().undo()
-  const redo = () => store.temporal.getState().redo()
+  // Each steps the history and then REPORTS that it did (see `onHistoryStep`).
+  const undo = () => {
+    store.temporal.getState().undo()
+    onHistoryStep?.()
+  }
+  const redo = () => {
+    store.temporal.getState().redo()
+    onHistoryStep?.()
+  }
 
   const reading = saveState === "idle" || saveState === "error" ? null : SAVE_READING[saveState]
 

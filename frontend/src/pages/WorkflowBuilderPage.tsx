@@ -637,6 +637,11 @@ export function WorkflowBuilderPage({
       const temporal = store.temporal.getState()
       if (isUndo) temporal.undo()
       else temporal.redo()
+      // Stepping the history retires the canvas notice — see `canvasNotice`'s docblock.
+      // This path and the toolbar's (`onHistoryStep`) join the notice's own inline Undo,
+      // which was the only one that used to do it; the other two left a sentence on
+      // screen describing an edit the author had just taken back.
+      setCanvasNotice(null)
     }
 
     window.addEventListener("keydown", onKeyDown)
@@ -794,6 +799,20 @@ export function WorkflowBuilderPage({
    * What the canvas says about the last structural act. Replaced by the next act, and
    * cleared by an Undo — a message about an edit that has been taken back is a message
    * that has started lying.
+   *
+   * THE RULE APPLIES TO EVERY WAY THE HISTORY CAN MOVE, and for a while it did not. The
+   * Phase 184 UAT found that only the notice's OWN inline Undo cleared it: `⌘Z`/`Ctrl+Z`
+   * and the toolbar's Undo/Redo both stepped the store and left the message up, with no
+   * timeout, still reporting "Removed X" about a step that was visibly back. So all three
+   * paths now retire it:
+   *   1. the inline Undo, in `onRequestRemove`'s `onUndo`;
+   *   2. the D-184-04 key bindings, in the keydown effect above;
+   *   3. the toolbar, via its optional `onHistoryStep` report (its own `getState()` call
+   *      stays where it is — that is `CanvasToolbar`'s zundo-#207 discipline).
+   * A REDO retires it too: a notice reports an ACT the author just performed, not a caption
+   * for the current state, so a message that happens to match again is luck, not
+   * correctness. What must NOT happen is an indiscriminate clear — a new act still speaks,
+   * because each act sets its own notice after mutating the store.
    */
   const [canvasNotice, setCanvasNotice] = useState<CanvasNotice | null>(null)
 
@@ -1156,6 +1175,9 @@ export function WorkflowBuilderPage({
       saveErrorMessage: saveState === "error" ? (saveErrorMessage ?? GENERIC_SAVE_ERROR) : null,
       onSaveDraft: () => void onSaveDraft(),
       onTidyUp,
+      // The toolbar steps the history itself; this is how it reports that it did, so the
+      // notice can be retired on that path too (see `canvasNotice`'s docblock).
+      onHistoryStep: () => setCanvasNotice(null),
       groups: verdictGroups,
       // The store's cause is the persisted mirror; the tray's vocabulary is the loop's.
       // One translation, in the one place that has both (`"422"` is the unreadable shape,

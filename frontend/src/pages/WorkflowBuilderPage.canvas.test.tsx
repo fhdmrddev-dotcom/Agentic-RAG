@@ -1222,6 +1222,71 @@ describe("WorkflowBuilderPage 184-13 — the undo/redo keys (D-184-04)", () => {
     // the first time somebody fixed a bug in it. What must be zero is the WRITE — which
     // is exactly what the two lines above measure.
   })
+
+  // ── UAT-found: a notice must not outlive the act it describes ──────────────────
+  //
+  // Found in the Phase 184 live UAT. Delete a step: the canvas says "Removed X · 1 step
+  // renumbered". Press Ctrl+Z or the toolbar Undo — the step comes back, and the message
+  // STAYS, indefinitely, still saying it was removed. Only the notice's OWN inline Undo
+  // cleared it (`setCanvasNotice(null)` lives in that one handler), so the two OTHER
+  // paths through the same history left a sentence on screen that had become false.
+  //
+  // The page's own docblock already stated the contract — "cleared by an Undo — a message
+  // about an edit that has been taken back is a message that has started lying" — so this
+  // is the documented rule going unenforced on two of its three paths, not a new rule.
+  //
+  // All three paths are asserted, and the last test is the OVER-clearing guard: a fix that
+  // simply cleared the notice whenever history moved would also wipe the message a new act
+  // just set, which is the opposite defect.
+
+  it("Ctrl+Z clears the message describing the edit it just took back", async () => {
+    await canvasWithOneEdit()
+    expect(screen.getByTestId("canvas-notice-action").textContent).toContain("Removed")
+
+    fireEvent.keyDown(window, { key: "z", ctrlKey: true })
+
+    await waitFor(() => expect(latestPhases()).toHaveLength(5))
+    await waitFor(() => expect(screen.queryByTestId("canvas-notice-action")).toBeNull())
+  })
+
+  it("the TOOLBAR's Undo clears it too — same history, same rule", async () => {
+    await canvasWithOneEdit()
+    expect(screen.getByTestId("canvas-notice-action").textContent).toContain("Removed")
+
+    fireEvent.click(screen.getByTestId("canvas-toolbar-undo"))
+
+    await waitFor(() => expect(latestPhases()).toHaveLength(5))
+    await waitFor(() => expect(screen.queryByTestId("canvas-notice-action")).toBeNull())
+  })
+
+  it("a REDO clears it as well — the message is stale in both directions", async () => {
+    await canvasWithOneEdit()
+
+    fireEvent.keyDown(window, { key: "z", ctrlKey: true })
+    await waitFor(() => expect(latestPhases()).toHaveLength(5))
+    // Redo re-applies the delete. The old message happened to describe that delete, but a
+    // message is a report of an ACT the author just performed, not a caption for the
+    // current state — leaving it up would be luck, not correctness.
+    fireEvent.keyDown(window, { key: "y", ctrlKey: true })
+
+    await waitFor(() => expect(latestPhases()).toHaveLength(4))
+    await waitFor(() => expect(screen.queryByTestId("canvas-notice-action")).toBeNull())
+  })
+
+  it("but a NEW act still gets its message — the clear is not indiscriminate", async () => {
+    await canvasWithOneEdit()
+
+    fireEvent.keyDown(window, { key: "z", ctrlKey: true })
+    await waitFor(() => expect(screen.queryByTestId("canvas-notice-action")).toBeNull())
+
+    // A fresh structural edit pushes history AND must speak. A fix that cleared on every
+    // temporal change would swallow this one and pass the three tests above.
+    fireEvent.click(screen.getByTestId("canvas-remove-confirm"))
+
+    await waitFor(() =>
+      expect(screen.getByTestId("canvas-notice-action").textContent).toContain("Removed"),
+    )
+  })
 })
 
 // ═══════════════════════════════════════════════════════════════════════════════

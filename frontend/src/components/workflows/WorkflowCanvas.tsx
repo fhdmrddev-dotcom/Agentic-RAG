@@ -410,6 +410,13 @@ export interface CanvasSession {
   onSaveDraft: () => void
   /** Clear this draft's cosmetic nudges — the current workflow's key ONLY. */
   onTidyUp: () => void
+  /**
+   * The toolbar stepped the history (either direction). Optional — absent is today's
+   * behaviour. The caller uses it to retire a notice that has stopped being true; this
+   * component neither knows nor decides that (UAT-found; see `WorkflowBuilderPage`'s
+   * `canvasNotice` docblock).
+   */
+  onHistoryStep?: () => void
   /** The server's findings, grouped by `verdictModel`. Nothing is classified here. */
   groups: VerdictGroups
   /** Why the last check produced no verdict, or null when it answered. */
@@ -1306,6 +1313,7 @@ export function WorkflowCanvas({
           errorMessage={session.saveErrorMessage}
           onSave={session.onSaveDraft}
           onTidyUp={session.onTidyUp}
+          onHistoryStep={session.onHistoryStep}
         />
         <ProblemsTray
           groups={session.groups}
