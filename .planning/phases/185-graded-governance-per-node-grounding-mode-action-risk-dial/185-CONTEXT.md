@@ -211,6 +211,62 @@ part of the locked spec, not commentary.
   no control. The author learns *why* there is nothing to set, the required-term grep (≥ 1 occurrence) has
   a home, and "this step is ungoverned" never reads as "this build forgot to render it".
 
+### F. Post-research lock reconciliation (added 2026-07-29 after `185-RESEARCH.md`)
+
+`185-RESEARCH.md` §"⚠ Lock Conflicts" found three places where the locked SPEC/CONTEXT reasoned from
+code that is not what ships today. None changes a requirement; each needed an explicit call. All three
+were verified against the live tree before deciding.
+
+- **D-185-17 — LC-2: the 137-B card rebuild is sequenced as Wave 1 of THIS phase, as its own plan.**
+  SPEC Req 6's amendment moves the verdict mark to `-left-2 top-1.5` and adds the acceptance criterion
+  *"a zone check … reports 0 overlaps between rendered marks."* Computed against the **shipped** card
+  (`PhaseNodeCard.tsx:238-240` `ml-6`, `:293-313` verdict, `:311-313` icon well `left-0 top-1/2 h-14 w-14`,
+  `canvasModel.ts:62-66` 260×96): the icon well occupies x 0…56 / y 20…76, so a verdict at `-left-2 top-1.5`
+  (x −8…14, y 6…28) **overlaps it 14×8 px**. Worse, `ml-6` puts the frosted card's left border at x = 24, so
+  on 137-D `-left-2` does not straddle the card edge at all — it floats 10 px clear of it. **No left
+  placement reproduces the operator's intent on 137-D.**
+
+  The SPEC's own sentence — *"185 places its marks against 137-B"* — is only true if 137-B exists when the
+  marks land. Therefore the deferred geometry rebuild (`padding-top` 34 → **42**, `NODE_MIN_HEIGHT` 96 →
+  **104**, the 248 px centred card, the icon to the top edge, plus the two docblocks at
+  `PhaseNodeCard.tsx:287` and `WorkflowCanvas.tsx:502-504` that already reason from 137-B) ships as
+  **its own PLAN file in Wave 1**, before any governance mark is placed.
+
+  This honours the operator's 2026-07-29 wording rather than contradicting it: *"its own task, **not
+  smuggled into** a governance phase."* A separately-planned, separately-committed Wave-1 plan is the
+  opposite of smuggling. **Rejected: moving the seal to top-left** (amends Req 6's CLAIMED corner — a lock).
+  **Rejected: weakening acceptance criterion 23** (the operator added it on purpose, after a computed
+  occupancy audit). **Rejected: an ad-hoc y-offset on 137-D** — it clears the icon only by abandoning the
+  card edge, i.e. it invents a third geometry nobody approved.
+
+  ⚠ **This is the one scope decision taken without the operator in the room. It is the single most
+  reversible thing in the phase: drop the Wave-1 plan file and Wave 2+ still build, with acceptance
+  criterion 23 failing until the rebuild lands separately.**
+
+- **D-185-18 — LC-1: the detour edge IS net-new canvas infrastructure; plan it as its own task with a
+  no-visible-change guard on ordinary edges.** SPEC Req 8's build note says the detour *"rides the
+  `edgeTypes` entry named `flow` that `WorkflowCanvas.tsx:279` already registers — no net-new canvas
+  infrastructure."* **That entry does not exist.** `grep -rn edgeTypes frontend/src` returns exactly one
+  hit: a comment at `WorkflowCanvas.tsx:279` stating *"183 registers none"*. `canvasModel.ts` sets
+  `data.kind` on all four edge-push sites and never sets `edge.type`.
+
+  The requirement is unchanged — armed renders a solid detour arc that IS the path, unarmed renders a faint
+  dashed ghost with the line through — but the work is four pieces (a `FlowEdge` component, a module-level
+  `edgeTypes` map, `edge.type` now set in `toCanvas`, and `markerEnd` re-rendered inside the custom edge),
+  and setting `type` switches **every** flow edge from the library's default renderer to ours. The plan
+  must carry an explicit acceptance criterion that an ordinary unarmed edge renders identically to today.
+  No estimate may treat this as "just wire the data".
+
+- **D-185-19 — LC-3: the `🔒` locked gate row is CLIENT-synthesized; nothing waits on `/validate`.**
+  D-185-11 assumed parse-time attachment makes the synthesized gate visible to `/validate` "for free".
+  `POST /workflows/validate` returns `ValidateResponse(ok, verdicts)` where a verdict is
+  `{code, phase, message, severity}` (`api/workflows.py:645-653`) — a list of **problems**, with no channel
+  for "here is a gate that will run", and a passing gate produces nothing. The intended outcome still
+  holds and needs no lock amendment: the client already holds `available_tools` and (per D-185-09) the
+  server's `kb_tools`, so the panel synthesizes the `🔒` row locally — the same client-predicts /
+  server-enforces split D-185-09 already establishes. **No task may expect `/validate` to return the row.**
+  The **publish** half of D-185-11 is true and does bite: the gauntlet's golden run now enforces the gate.
+
 ### Claude's Discretion
 
 - Exact field names for the two PhaseSpec booleans (D-185-08 locks the shape, not the spelling).
@@ -366,6 +422,11 @@ part of the locked spec, not commentary.
 
 <deferred>
 ## Deferred Ideas
+
+- ~~**`PhaseNodeCard` 137-D → 137-B geometry rebuild**~~ → **NO LONGER DEFERRED. Pulled in as Wave 1 by
+  D-185-17** after the research pass computed that no left-edge verdict placement satisfies acceptance
+  criterion 23 on the shipped 137-D card. It keeps its "own task" status as its own Wave-1 PLAN file. The
+  original reasoning is retained below for the record:
 
 - **`PhaseNodeCard` 137-D → 137-B geometry rebuild** — the locked decision is 137-B (`canvas-184.css:170-171`,
   operator 2026-07-26) but the shipped component renders 137-D (`PhaseNodeCard.tsx:311-313`). Confirmed by
