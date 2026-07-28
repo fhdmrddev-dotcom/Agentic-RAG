@@ -70,6 +70,8 @@
  * clause itself must be quoted verbatim in this docblock, exactly as it is in
  * `PhaseSpine.tsx`, `WorkflowSoul.tsx` and `WorkflowDoorSwitch.tsx`.)
  */
+import { memo } from "react"
+
 import { Handle, Position, type NodeProps } from "@xyflow/react"
 
 import {
@@ -136,7 +138,7 @@ function EdgeAnchors() {
  * renders no `Handle` paints ZERO edges, silently (see HANDLES ARE MANDATORY above),
  * which is why the adapter — not the card — owns them.
  */
-export function PhaseNode({ data, selected }: NodeProps<PhaseCanvasNode>) {
+function PhaseNodeImpl({ data, selected }: NodeProps<PhaseCanvasNode>) {
   // The ⌥ reveal rides on `data` (set by the shell), so this leaf has no context
   // dependency of its own and there can never be a second technical-names state.
   const technical = data.technical === true
@@ -256,3 +258,22 @@ export function EndCapNode() {
     </div>
   )
 }
+
+/**
+ * MEMOIZED, and the reason is a measured drag defect rather than a habit.
+ *
+ * A drag moves the card by rewriting the WRAPPER's transform every pointer frame. The
+ * adapter's own props do not change while that happens — `position` lives on the node
+ * object, not in `data` — but without a memo React re-rendered this subtree ~60x/s
+ * anyway, re-running `renderPhaseMark()` and rebuilding the 3D mark's SVG on every
+ * frame. The browser re-rasterised it each time, which is the flicker the operator
+ * reported as "blinking while I drag".
+ *
+ * This only holds because `WorkflowCanvas`'s node memo is split (settledNodes + a thin
+ * drag overlay): `data` keeps its identity for the WHOLE drag, including for the card
+ * being dragged, so the default shallow compare genuinely short-circuits. If a future
+ * change rebuilds `data` per frame this memo goes quiet without failing — the pairing
+ * is the load-bearing part, not this line on its own.
+ */
+export const PhaseNode = memo(PhaseNodeImpl)
+PhaseNode.displayName = "PhaseNode"

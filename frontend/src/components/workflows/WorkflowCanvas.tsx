@@ -1331,9 +1331,11 @@ export function WorkflowCanvas({
   }
 
   return (
-    <section aria-label={sectionLabel} className="flex h-full min-w-0 flex-col bg-background">
+    <section
+      aria-label={sectionLabel}
+      className="relative flex h-full min-w-0 flex-col bg-background"
+    >
       {header}
-      {noticeRegion}
       {/* The polite announcer, in the shipped `PhaseTimeline.tsx:172` shape: PRESENT at
           load (empty) so the assistive tech has already picked the region up, written
           only on a real move. Editing-only — a read-only canvas has nothing to announce
@@ -1346,8 +1348,22 @@ export function WorkflowCanvas({
       {/* The parent MUST have a width and a height or the plane measures to zero.
           `group/canvas` is the hover root the edit affordances reveal from — see
           REVEAL_ON_HOVER. It is named rather than bare so a future nested `group`
-          cannot capture it by accident. */}
-      <div className="group/canvas h-full w-full min-w-0 flex-1">
+          cannot capture it by accident. `relative` anchors the floated notice below. */}
+      <div className="group/canvas relative h-full w-full min-w-0 flex-1">
+        {/* FLOATED OVER THE PLANE, not stacked above it. The notice is TRANSIENT — it
+            appears after a delete or an add and then goes — but as a layout band it spent
+            its height permanently, on a surface where the chrome above the canvas already
+            costs 275px of a 639px viewport and leaves the flow 45% of the screen. It is
+            anchored to the PLANE rather than the section so it never covers the header's
+            own controls (the ⌥ reveal sits up there). Markup, testids, roles and copy are
+            byte-identical; only where it sits changed. */}
+        {noticeRegion ? (
+          <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex justify-center px-4 pt-2">
+            <div className="pointer-events-auto w-full max-w-3xl overflow-hidden rounded-lg border border-border/60 bg-card/95 shadow-lg backdrop-blur-sm">
+              {noticeRegion}
+            </div>
+          </div>
+        ) : null}
         <ReactFlow
           nodes={nodes}
           edges={edges}
