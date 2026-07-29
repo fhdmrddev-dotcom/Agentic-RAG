@@ -583,3 +583,120 @@ def test_criterion_20_exec_llm_human_input_is_untouched():
 
     # Req 9 third bullet: the unarmed surface never claims the run waits.
     assert "waiting here and will not continue" not in src
+
+
+# ═════ plan 185-05 Task 1 — WAITING IS NOT FAILING (RESEARCH L-5) ═════════════
+#
+# The pre-gate pass in ``_run_phase_with_gates`` announced ``gate_failed`` (audit
+# row + SSE) BEFORE handing control to the disposition that pauses. For an armed
+# checkpoint that is a lie the ledger tells about itself: nothing failed, the
+# author simply said a person decides first. These tests drive the REAL
+# ``_run_phase_with_gates`` pre-gate block with ``run_gates`` faked to fail, and
+# assert over the audit + emit mocks. ``_resolve_failure_with_ask_user`` is
+# stubbed to a terminal outcome so the function returns immediately after the
+# block under test (the disposition itself is covered by the 185-04 tests above).
+
+
+def _drive_failing_pre_gate(finding: str):
+    """Run the pre-gate block with ``run_gates`` failing on ``finding``.
+
+    Returns ``(write_audit_mock, emit_mock)``. Every network dependency is mocked:
+    ``write_audit`` (Postgres), ``_emit`` (Redis XADD), ``run_gates`` (the gate
+    fan-in) and the disposition helper. ``pool``/``redis`` are opaque objects the
+    block only forwards.
+    """
+    import asyncio
+    from unittest.mock import AsyncMock, patch
+    from uuid import uuid4
+
+    from app.services import harness_engine
+    from app.services.harness.validators import GateResult
+
+    _authored, eff = _armed_effective_phase()
+    write_audit = AsyncMock()
+    emit = AsyncMock()
+
+    with patch.object(harness_engine, "write_audit", write_audit), \
+         patch.object(harness_engine, "_emit", emit), \
+         patch("app.services.harness.validators.run_gates",
+               AsyncMock(return_value=GateResult(False, finding, 0))), \
+         patch.object(
+             harness_engine, "_resolve_failure_with_ask_user",
+             AsyncMock(return_value=harness_engine.PhaseOutcome(
+                 "fail_run", None, None, "stub — the disposition is tested above")),
+         ):
+        asyncio.run(
+            harness_engine._run_phase_with_gates(
+                eff, {}, _armed_ctx(),
+                run_id=uuid4(), pool=object(), redis=object(),
+                wall_clock=60, _audit_user_id=uuid4(),
+            )
+        )
+    return write_audit, emit
+
+
+def _audit_event_types(write_audit) -> list[str]:
+    return [c.kwargs.get("event_type") for c in write_audit.await_args_list]
+
+
+def _emitted_event_names(emit) -> list[str]:
+    # ``_emit(redis, run_id, type, **fields)`` — the event name is positional #3.
+    return [c.args[2] for c in emit.await_args_list if len(c.args) >= 3]
+
+
+def test_an_armed_pre_gate_records_a_pause_not_a_failure():
+    """L-5, the ledger half. An armed checkpoint about to wait writes EXACTLY ONE
+    audit row, under ``action_risk_pending`` — and ZERO ``gate_failed`` rows. The
+    metadata carries the phase and the timing, never the raw finding: the finding IS
+    the person's prompt sentence, and the ledger's job here is the consequence (the
+    run paused), not the message (T-185-05-04)."""
+    write_audit, _emit = _drive_failing_pre_gate(
+        "action_risk:approval|Step 2 of 4 is about to run."
+    )
+
+    types = _audit_event_types(write_audit)
+    assert types == ["action_risk_pending"], f"the armed pause wrote {types}"
+    assert "gate_failed" not in types
+
+    meta = write_audit.await_args_list[0].kwargs["metadata"]
+    assert meta == {"phase": "send-notice", "timing": "pre"}
+    assert "action_risk:approval|" not in str(meta)
+
+
+def test_an_armed_pre_gate_never_announces_gate_failed_to_the_frontend():
+    """L-5, the SSE half. The producer stream sees ``action_risk_pending`` and NEVER
+    ``gate_failed`` — the frontend's shipped ``gate_failed`` handler renders a problem,
+    and a step that is merely waiting is not one. The payload carries ``phase`` only;
+    the sentence the person reads rides the ``ask_user_prompt`` emit (D-185-13)."""
+    _write_audit, emit = _drive_failing_pre_gate(
+        "action_risk:approval|Step 2 of 4 is about to run."
+    )
+
+    names = _emitted_event_names(emit)
+    assert names == ["action_risk_pending"], f"the armed pause emitted {names}"
+    assert "gate_failed" not in names
+
+    fields = emit.await_args_list[0].kwargs
+    assert fields == {"phase": "send-notice"}
+
+
+def test_a_freshness_pre_gate_still_fails_exactly_as_it_shipped():
+    """THE BYTE-IDENTITY CONTROL, and the reason the branch is guarded by the finding
+    predicate rather than applied to the whole block. A non-armed pre-gate failure
+    still writes ``gate_failed`` with its attempt/error/timing metadata and still emits
+    ``gate_failed`` with attempt + error. If this ever goes green-by-renaming, the L-5
+    fix has silently moved another gate's vocabulary."""
+    write_audit, emit = _drive_failing_pre_gate("freshness:staleness|400d old")
+
+    assert _audit_event_types(write_audit) == ["gate_failed"]
+    assert write_audit.await_args_list[0].kwargs["metadata"] == {
+        "phase": "send-notice", "attempt": 0,
+        "error": "freshness:staleness|400d old", "timing": "pre",
+    }
+
+    assert _emitted_event_names(emit) == ["gate_failed"]
+    assert emit.await_args_list[0].kwargs == {
+        "phase": "send-notice", "attempt": 0,
+        "error": "freshness:staleness|400d old",
+    }
+    assert "action_risk_pending" not in _emitted_event_names(emit)

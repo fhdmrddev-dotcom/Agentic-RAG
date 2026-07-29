@@ -694,14 +694,40 @@ async def _run_phase_with_gates(
     # GateResult immediately → byte-identical (the existing default-post path).
     pre = await run_gates(phase, {"_phase_inputs": accumulated_outputs}, ctx, timing="pre")
     if not pre.passed:
-        await write_audit(
-            pool, run_id, user_id=_audit_user_id, event_type="gate_failed",
-            metadata={"phase": phase.slug, "attempt": 0, "error": pre.error_message,
-                      "timing": "pre"},
-        )
-        await _emit(redis, stream_run_id, "gate_failed",
-            phase=phase.slug, attempt=0, error=pre.error_message,
-        )
+        # ── Phase 185 (GOVERN-03 / RESEARCH L-5) — WAITING IS NOT FAILING ────────
+        # An armed action-risk checkpoint reaches this block on its way to a PAUSE,
+        # not to a failure: ``action_risk_approval`` always "fails" precisely so the
+        # shipped ask_user disposition below owns the wait (D-185-12/13). Announcing
+        # ``gate_failed`` first would tell the ledger and the frontend that something
+        # went wrong when nothing did — and the audit ledger's own vocabulary rule
+        # (consequence ≠ receipt) makes that a correctness defect, not cosmetics.
+        # The reading comes from the ONE predicate the disposition also uses, so both
+        # call sites spell "this is an armed pause" identically.
+        if _is_action_risk_finding(pre.error_message):
+            # The ledger records the CONSEQUENCE (the run paused for a person). The
+            # RECEIPT is the separate ``validator_ask_user_approved`` row the approval
+            # itself writes. The raw finding is deliberately NOT carried here: it IS
+            # the user-facing prompt sentence, and it already reaches the browser on
+            # the durable ``ask_user_prompt`` row + emit below (T-185-05-04).
+            await write_audit(
+                pool, run_id, user_id=_audit_user_id,
+                event_type="action_risk_pending",
+                metadata={"phase": phase.slug, "timing": "pre"},
+            )
+            # ``phase`` only, for the same reason. No frontend handler is added in
+            # this plan: an unhandled event is inert, and the ``ask_user_prompt`` emit
+            # that follows immediately is what the person actually sees (D-185-13).
+            # THE CONSUMER IS PHASE 188's run surface.
+            await _emit(redis, stream_run_id, "action_risk_pending", phase=phase.slug)
+        else:
+            await write_audit(
+                pool, run_id, user_id=_audit_user_id, event_type="gate_failed",
+                metadata={"phase": phase.slug, "attempt": 0, "error": pre.error_message,
+                          "timing": "pre"},
+            )
+            await _emit(redis, stream_run_id, "gate_failed",
+                phase=phase.slug, attempt=0, error=pre.error_message,
+            )
         outcome = await _resolve_failure_with_ask_user(
             phase, pre.error_message, 0, pre.validator_index,
             run_id=run_id, pool=pool, redis=redis, ctx=ctx,
@@ -886,6 +912,25 @@ def _is_abort_choice(choice: str) -> bool:
     return (choice or "").strip().lower() in _ABORT_LIKE_CHOICES
 
 
+# Phase 185 (GOVERN-03 / RESEARCH L-5) — the structured finding prefix
+# ``validator_kinds._validate_action_risk_approval`` emits. Written ONCE so the two
+# readers below (the pre-gate announce block and the disposition) cannot drift apart.
+_ACTION_RISK_FINDING_PREFIX = "action_risk:approval|"
+
+
+def _is_action_risk_finding(error_message: str | None) -> bool:
+    """True when a failing gate is the ARMED action-risk checkpoint (GOVERN-03).
+
+    THE ONE READING of "this gate is about to WAIT for a person, not fail". It is
+    taken off the FINDING rather than off the phase because the finding is what
+    identifies WHICH validator failed — an armed phase can carry authored gates too,
+    and only the armed one gets the armed treatment. Every other finding (freshness,
+    citations, an authored regex) returns False here and keeps byte-identical
+    behaviour on both call sites.
+    """
+    return (error_message or "").startswith(_ACTION_RISK_FINDING_PREFIX)
+
+
 async def _resolve_failure_with_ask_user(
     phase,
     error_message: str,
@@ -943,7 +988,7 @@ async def _resolve_failure_with_ask_user(
     # disposition. An unarmed ``llm_human_input`` step and every freshness gate keep
     # byte-identical behaviour: for them ``is_action_risk`` is False and each branch
     # below evaluates to exactly the expression that shipped.
-    is_action_risk = (error_message or "").startswith("action_risk:approval|")
+    is_action_risk = _is_action_risk_finding(error_message)
 
     tool_call_id = uuid4().hex
     choices = _ask_user_choices_from_finding(error_message)
