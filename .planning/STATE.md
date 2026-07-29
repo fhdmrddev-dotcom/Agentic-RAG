@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
 status: executing
-last_updated: "2026-07-29T15:14:06.604Z"
-last_activity: 2026-07-29 -- Phase 185 plan 03 executed (engine attachment - retrieved_and_cited mode + effective_phase at the spec_by_slug seam)
+last_updated: "2026-07-29T15:44:00.000Z"
+last_activity: 2026-07-29
 progress:
   total_phases: 19
   completed_phases: 4
   total_plans: 50
-  completed_plans: 41
+  completed_plans: 43
   percent: 21
 ---
 
@@ -45,7 +45,48 @@ Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 op
 ## Current Position
 
 Phase: 185 (graded-governance-per-node-grounding-mode-action-risk-dial) — EXECUTING
-Plan: 4 of 11
+Plan: 4 of 11 (185-06 landed OUT OF ORDER — it is Wave 2 and depends only on 185-02, so 04 and 05
+remain the next sequential work. Summaries on disk: 01, 02, 03, 06.)
+
+**Plan 185-06 COMPLETE (`e1ed4011` the KB list on the palette hook → `65438580` the two intents +
+12 copy constants + `setPhaseGovernance` → `10aababe` the `setGovernance` store action).** The
+CLIENT HALF of the governance data. **Names plans 07/08/09/10 use verbatim:**
+`GroundingBundle.kb_tools` (api.ts), **`kbTools`** on `GroundingBundleState`,
+`PhaseSpecJSON.grounding_escalated?` / `.action_risk_armed?`,
+**`setPhaseGovernance(phases, slug, patch)`** + the exported **`PhaseGovernancePatch`** type
+(`definitionOps.ts`), **`setGovernance(slug, patch)`** (`builderStore.ts`), and the twelve copy
+constants `GROUNDING_DIAL_LOOSE_LABEL` / `GROUNDING_DIAL_STRICT_LABEL` /
+`GROUNDING_NOTHING_TO_PROVE` / `GROUNDING_WHY_DETECTED` / `GROUNDING_WHY_ESCALATED` /
+`GROUNDING_ALREADY_SET_NOTE` / `GROUNDING_TOOL_LIST_IS_THE_CONTROL` / `GROUNDING_ATTACHED_GATE` /
+`GROUNDING_LOCK_REFUSAL` / `GOVERNANCE_GATE_ROW_LABEL` / `ACTION_RISK_ARM_LABEL` /
+`ACTION_RISK_ARMED_NOTE`. **⚠ PLAN-VS-TREE PATH ERROR, inherited from PATTERNS §12 — plans 07-10
+must not repeat it:** the plan named `frontend/src/stores/builderStore.ts`; that file does not
+exist (`src/stores/` holds only `streamsStore.ts`). The builder store is
+**`frontend/src/components/workflows/builderStore.ts`**. **`kbTools` rides on BOTH answer members
+of the hook's union and on NEITHER waiting member** — a degraded folders/skills read must not
+un-mark a locked step, while `idle`/`loading` stay data-free so their frozen module-scope identity
+survives (pinned by an `Object.keys(state) === ["kind"]` assertion). Read as `bundle.kb_tools ?? []`
+so a stale backend degrades to marking nothing rather than crashing a render site.
+**Round-trip criterion 3 cost zero serializer code** — `fromCanvas` carries phases through BY
+REFERENCE, so the new `canvasModel.roundtrip.test.ts` case is a `toBe` assertion, not a feature.
+**`setPhaseGovernance` can never write into `config`, and the proof is reference identity**
+(`expect(out[0].config).toBe(input[0].config)`); `PhaseConfigPatch` was NOT widened (D-185-10) and
+`PhaseGovernancePatch` is a closed two-key type, so a general PhaseSpec writer is a typecheck error.
+**D-185-02 honoured in copy AND in a test:** `GROUNDING_ATTACHED_GATE` claims
+*retrieved-and-pointed-at*, and a fragment-assembled guard asserts the two emit-path signature
+phrases are absent. The plan's own docblock instruction contradicted its own acceptance grep here
+(it asked the file to quote what the grep forbids) — the grep won, and the rule is stated in the
+docblock's own words. `setGovernance`'s `lastEditKind` is **`"config"`**, decided not copied:
+arming changes no run order, no node count, no `phase_index`, so two flicks are ONE undo.
+Gates: 52/52 hooks, 236/236 store+ops, 706/706 ops+roundtrip, tsc **33** (= baseline, 0 naming a
+touched file), `npx vite build` exit 0, `git diff -- backend/ supabase/migrations` **0 files**.
+Count gate per the VALIDATION posture: total 1504 → **1529**, no `[count-decrease]`, no
+`[total-below-baseline]`, no `[missing-file]`, and all 24 failures are pre-existing SEED-056 rot in
+files this plan never opened (below the recorded 34/35/40 churn band). **This plan renders nothing
+and deletes nothing** — `groundingFor()` still ships; 185-08 owns its removal.
+**GOVERN-01 / GOVERN-03 stay `Pending`** (the 184-02 / 185-02 / 185-03 precedent): the data and the
+write chain exist, but no surface exposes them and the write chain is still missing its page
+`useCallback` and its `PhaseFormPanel` prop.
 
 **Plan 185-03 COMPLETE (`34532b9b` the two validator behaviours → `fa4fd3de` `effective_phase` →
 `beae4639` the seam swap + suite → `cb329a36` SUMMARY). THE GATE NOW BITES.** `run_workflow`'s
