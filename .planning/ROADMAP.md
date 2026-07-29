@@ -266,7 +266,7 @@ Plans:
 **Wave 4** *(blocked on Wave 3 completion)*
 
 - [x] 185-05-PLAN.md — the honest wait end-to-end: action_risk_pending vocabulary, the armed resume sweep, a no-deadline prompt card
-- [ ] 185-08-PLAN.md — delete the 3-face word-badge, synthesize the locked gate row client-side (D-185-19), thread grounded/armed, re-measure the count-gate pins
+- [x] 185-08-PLAN.md — delete the 3-face word-badge, synthesize the locked gate row client-side (D-185-19), thread grounded/armed, re-measure the count-gate pins
 
 **Wave 5** *(blocked on Wave 4 completion)*
 

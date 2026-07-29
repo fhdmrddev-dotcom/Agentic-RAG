@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
 status: executing
-last_updated: "2026-07-29T17:23:30.225Z"
-last_activity: 2026-07-29
+last_updated: "2026-07-29T22:30:28.661Z"
+last_activity: 2026-07-30
 progress:
   total_phases: 19
   completed_phases: 4
   total_plans: 50
-  completed_plans: 45
+  completed_plans: 46
   percent: 21
 ---
 
@@ -45,9 +45,28 @@ Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 op
 ## Current Position
 
 Phase: 185 (graded-governance-per-node-grounding-mode-action-risk-dial) — EXECUTING
-Plan: 6 of 11 (185-06 AND 185-07 landed OUT OF ORDER — both are Wave 2/3 frontend plans depending
-only on 185-02/185-06. Summaries on disk: 01, 02, 03, 04, 05, 06, 07. Next sequential work is
-185-08.)
+Plan: 8 of 11 (185-06 AND 185-07 landed OUT OF ORDER — both are Wave 2/3 frontend plans depending
+only on 185-02/185-06. Summaries on disk: 01, 02, 03, 04, 05, 06, 07, 08. Next sequential work is
+185-09.)
+
+**Plan 185-08 COMPLETE — executed ACROSS AN INTERRUPTION, so `git log` reads as if the plan ran
+backwards (Tasks 2→3→1).** Run 1: `814879b3` (Task 2 — the canvas carries `grounded`/`armed`, badge
+slot 1 freed) → `d3b19858` (Task 3 — the client-synthesized locked gate row + the governance write
+chain closed inside the D-14 `canvasEnabled` spread-conditional), then interrupted mid-Task-1.
+Run 2: `30cb77f9` (Task 1 — the word-badge deletion + the count-gate re-pin, one commit).
+**The 3-face grounding word-badge is GONE from the tree** — `groundingFor`, `GROUNDINGS`, the
+`Grounding` interface, `nodePresentation.GROUNDING_TONE` and all three retired badge strings; a
+whole-`frontend/src` grep returns **0** for each. Badge slot 1 is empty and reserved for 188/189
+(a third badge is still a typecheck error). **THE PIN: `phaseVocabulary.test.ts` 42 → 33,
+`BASELINE_TOTAL` 424 → 415, in the SAME COMMIT as the deletion (L-9), number read from the gate's
+own `actual` column.** **The plan's "COMPLETE DELETION INVENTORY" was incomplete** — it missed
+`nodePresentation.ts` importing the deleted `Grounding` **type**, which the acceptance greps could
+not see and only `npx tsc -b` caught (34 vs the 33 baseline). `tsc -b` is back to **33** with 0
+errors naming a touched file; `vite build` exit 0; **0 backend files, 0 migrations** (live head
+**113**). **185-09 reads `PhaseNodeData.grounded`; 185-10 reads `PhaseNodeData.armed`** — and
+`CanvasEdgeData` still carries only `{kind}`, so 185-10 must read `armed` off the target node or add
+the field. The 137-B card rebuild (D-185-17, criterion 23) is **still entirely owed** — 185-08
+touched `PhaseNodeCard.tsx` for two docblock lines only.
 
 **Plan 185-05 COMPLETE (`7a55b9da` waiting-is-not-failing → `a4010b46` the resume sweep's armed
 branch → `fa2b56da` the no-deadline card).** The armed wait is now HONEST end to end. **(1) L-5
@@ -974,6 +993,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 185 P04 | 20min | 3 tasks | 5 files |
 | Phase 185 P07 | 26min | 3 tasks | 4 files |
 | Phase 185 P05 | 40 | 3 tasks | 7 files |
+| Phase 185 P08 | 57min | 3 tasks | 17 files |
 
 ## Decisions
 
@@ -1204,6 +1224,10 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase 185]: 185-05: L-7 fixed by re-subscribing the SAME tool_call_id (fix a), not expire-and-re-ask — re-asking with a new id IS G-4 scenario 3's named failure from the person's chair
 - [Phase 185]: 185-05: an armed pause writes and emits action_risk_pending, never gate_failed; the audit row carries {phase,timing} only because the raw finding IS the person's prompt and already reaches the browser (T-185-05-04)
 - [Phase 185]: 185-05: PendingAsk.timeout_seconds is number|null and the countdown is TOTAL over null; NO_DEADLINE_WAITING_LINE renders only without a deadline (SPEC Req 9 honesty fence, asserted on both sides)
+- [Phase ?]: Phase 185-08: nodePresentation.GROUNDING_TONE was DELETED, not re-typed off the dead Grounding type — zero consumers remained and Req 6 says governance spends no colour, so a surviving exported strict->green/flag->indigo table was the partial-deletion hazard T-185-08-02 names. Its ?raw guard was INVERTED in place to assert absence (with a positive control), holding PhaseNodeCard.test.tsx at 49 tests.
+- [Phase ?]: Phase 185-08: the vitest count-gate pin for phaseVocabulary.test.ts moved 42 -> 33 and BASELINE_TOTAL 424 -> 415, in the SAME COMMIT as the groundingFor deletion (L-9), with 33 READ FROM THE GATE'S OWN 'actual' COLUMN, never hand-computed. ONLY that pin moved: the three stale POSITIVE pins (canvasModel.purity 69->79, WorkflowCanvas 31->33, WorkflowBuilderPage.canvas 22->77) stay deferred to SEED-056 per 185-VALIDATION.md, leaving 2/10/55 tests of deletion blind spot in those files.
+- [Phase ?]: Phase 185-08: the grounding cause derivation moved DOWN into phaseVocabulary (groundingCause flat-input core + groundingCauseOf phase-shaped adapter + GROUNDING_DIAL_TYPES) as the ONE client home, so the panel dial and canvasModel cannot drift. Canvas consumes it as two flat booleans PhaseNodeData.grounded (185-09 seal) and .armed (185-10 detour); CanvasEdgeData still carries only {kind}, so 185-10 must read armed off the target node or add the field.
+- [Phase ?]: Phase 185-08 LESSON: the plan's self-described 'COMPLETE DELETION INVENTORY' was incomplete — it missed nodePresentation.ts importing the deleted Grounding TYPE, and the acceptance greps (groundingFor|GROUNDINGS) could not catch it because the dangling symbol matched neither needle. Only 'npx tsc -b' caught it (34 errors vs the 33 baseline). An inventory built by grepping a FUNCTION name misses type-only call sites.
 
 ## Operator Next Steps
 
