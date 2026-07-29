@@ -38,13 +38,13 @@
 import type { Edge, Node } from "@xyflow/react"
 
 import {
-  groundingFor,
+  actionRiskArmed,
+  groundingCauseOf,
   nodeTitle,
   parseSkipTarget,
   technicalTitle,
   waitsForYou,
   PHASE_TYPE_SUBTITLES,
-  type Grounding,
   type PhaseSpecJSON,
 } from "@/components/workflows/phaseVocabulary"
 
@@ -118,8 +118,25 @@ export interface PhaseNodeData {
   technicalTitle: string
   /** The one supporting line; empty string for a type we do not know. */
   subtitle: string
-  /** Badge slot 1 (D-183-07) — always present. */
-  grounding: Grounding
+  /**
+   * GOVERN-02 — this step must prove it (any of the three causes). Resolved once
+   * here, through `phaseVocabulary.groundingCauseOf`, which is the ONE client home
+   * of the rule the panel's dial also reads.
+   *
+   * The canvas RENDERS this as SHAPE (the corner seal, plan 185-09), never as
+   * colour and never as a word-badge: SPEC Req 6 says governance spends neither,
+   * and both badge slots are committed to 188/189. Badge slot 1 is deliberately
+   * EMPTY from this plan onward — see `PhaseNode.tsx`'s `badges` assembly.
+   */
+  grounded: boolean
+  /**
+   * GOVERN-03 — an action-risk checkpoint is armed on this step. READ-ONLY on the
+   * canvas: arming happens in the panel's governance section (sketch 147 — the
+   * panel is where you SET, the canvas is where you SEE), and `PhaseNodeCard`
+   * forbids any focusable control inside the card, so a clickable armed mark is
+   * not representable here even in principle.
+   */
+  armed: boolean
   /** Badge slot 2 — true ONLY on `llm_human_input`. */
   waitsForYou: boolean
   [k: string]: unknown
@@ -186,8 +203,26 @@ function ariaLabelFor(phase: PhaseSpecJSON, title: string): string {
   return `Phase ${phase.phase_index + 1}: ${title} (${phase.config.phase_type})`
 }
 
+/**
+ * GOVERN-02 — does this step have to prove itself? A NAMED TOTAL FUNCTION, so the
+ * boolean on the node face has a name to argue with rather than an inline ternary,
+ * exactly as every other face value here does.
+ *
+ * It declares no branch of its own: the cause and its total order live in
+ * `phaseVocabulary.groundingCauseOf`, which the panel's dial reads through the
+ * same body. "Grounded" is simply "there is a cause".
+ */
+function isGrounded(phase: PhaseSpecJSON, kbTools: readonly string[]): boolean {
+  return groundingCauseOf(phase, kbTools) !== null
+}
+
+/** GOVERN-03 — is a checkpoint armed on this step? Delegated for the same reason. */
+function isArmed(phase: PhaseSpecJSON): boolean {
+  return actionRiskArmed(phase)
+}
+
 /** Resolve every face value a phase card needs, once. */
-function buildPhaseData(phase: PhaseSpecJSON): PhaseNodeData {
+function buildPhaseData(phase: PhaseSpecJSON, kbTools: readonly string[]): PhaseNodeData {
   const phaseType = phase.config.phase_type
   return {
     slug: phase.slug,
@@ -196,7 +231,8 @@ function buildPhaseData(phase: PhaseSpecJSON): PhaseNodeData {
     title: nodeTitle(phase),
     technicalTitle: technicalTitle(phase),
     subtitle: PHASE_TYPE_SUBTITLES[phaseType] ?? "",
-    grounding: groundingFor(phase),
+    grounded: isGrounded(phase, kbTools),
+    armed: isArmed(phase),
     waitsForYou: waitsForYou(phase),
   }
 }
@@ -213,10 +249,32 @@ function buildPhaseData(phase: PhaseSpecJSON): PhaseNodeData {
  *
  * An empty definition returns empty arrays: no end cap, no ghost node, no chrome
  * (D-183-11 — the single most common canvas state).
+ *
+ * `options.kbTools` (Phase 185 / D-185-09) is the server's KB-reading tool list,
+ * passed IN so this module stays PURE — it fetches nothing and hardcodes nothing;
+ * the safety-DEFINING list has one home and it is the server's. It is OPTIONAL and
+ * defaults to EMPTY, and the default is the safe direction stated out loud: an
+ * unread palette marks NOTHING rather than un-marking something, because the
+ * run-time gate is server-side and unconditional either way (D-185-09). Every
+ * shipped caller that omits it therefore projects exactly as it did before.
  */
-export function toCanvas(phases: PhaseSpecJSON[]): CanvasProjection {
+export interface ToCanvasOptions {
+  /** The server-supplied KB-reading tool names. Absent or empty marks nothing. */
+  kbTools?: readonly string[]
+}
+
+/** Module-scope so an omitted `kbTools` hands the same reference on every call —
+ *  the projection must be deterministic to the byte (the snapshot gate depends
+ *  on it) and a fresh `[]` per call is a needless identity change. */
+const NO_KB_TOOLS: readonly string[] = Object.freeze([])
+
+export function toCanvas(
+  phases: PhaseSpecJSON[],
+  options: ToCanvasOptions = {},
+): CanvasProjection {
   const nodes: CanvasNode[] = []
   const edges: CanvasEdge[] = []
+  const kbTools = options.kbTools ?? NO_KB_TOOLS
 
   if (!phases || phases.length === 0) return { nodes, edges }
 
@@ -234,7 +292,7 @@ export function toCanvas(phases: PhaseSpecJSON[]): CanvasProjection {
   // node: the ×N fan-out is a RUNTIME behaviour, not topology, and drawing N lanes
   // would disagree with the server's adjacency.
   for (const [col, phase] of ordered.entries()) {
-    const data = buildPhaseData(phase)
+    const data = buildPhaseData(phase, kbTools)
     nodes.push({
       id: phase.slug,
       type: CANVAS_NODE_TYPES.phase,

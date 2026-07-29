@@ -183,6 +183,140 @@ export function technicalTitle(phase: PhaseSpecJSON): string {
   return `${label} · ${phase.slug}`
 }
 
+// ── Phase 185 (GOVERN-01 / GOVERN-02) — THE ONE CLIENT GROUNDING DERIVATION ────
+//
+// This section REPLACES `groundingFor` (SPEC Req 6: "Phase 185 replaces this
+// derivation"). The shipped three-face word-badge read `citation_policy` plus a
+// declared `citations_required` validator and rendered a WORD; graded governance
+// reads the tool intersection FIRST and renders a SHAPE (the corner seal, plan
+// 185-09). Different question, different answer, one home.
+//
+// WHY IT LIVES HERE AND IN EXACTLY ONE PLACE. Two surfaces consume this rule and
+// they sit one click apart: the panel's `GovernanceSection` (which draws the dial
+// and must know WHICH cause applies, because the cause decides whether the loose
+// side refuses) and `canvasModel.buildPhaseData` (which needs only the boolean).
+// 185-07's own hand-off note states the constraint plainly — the intersection has
+// exactly one client home, and a second copy in `canvasModel.ts` or on the card is
+// the drift this phase's red line forbids. So the rule moved DOWN into the shared
+// vocabulary module both views already read, rather than being re-typed beside the
+// second consumer.
+//
+// CLIENT-PREDICTS / SERVER-ENFORCES (D-185-09). Nothing here authorizes anything.
+// The gate that actually runs is synthesized server-side at the run seam from the
+// server's own `KB_TOOLS`; this is the DISPLAY prediction, so a wrong read is a
+// display bug and never a safety hole. That is also why `kbTools` is passed IN and
+// never hardcoded: the safety-DEFINING list has one home and it is not this file.
+//
+// TOTALITY (CANVAS-01). Every branch resolves; an unknown `phase_type`, an absent
+// `available_tools`, an absent `kbTools` and an unknown `citation_policy` all read
+// honestly and none of them throws.
+
+/**
+ * The three grounding causes and their absence, in the SAME total order the
+ * server's `grounding_cause()` uses: `detected` → `already-set` → `escalated`.
+ * That ordering IS the mechanism behind "detection wins and the undo disappears"
+ * (D-185-07): a detected step can never be read back as free to think, because
+ * the branch that would say so is never reached.
+ */
+export type GroundingCause = "detected" | "already-set" | "escalated" | null
+
+/**
+ * The two step types that can carry a grounding dial (D-185-15). Mirrors the
+ * backend rule exactly: `available_tools` exists only on `LlmAgentPhaseConfig`
+ * and `LlmBatchAgentsPhaseConfig`, so these are the only types the server's
+ * `grounding_cause` can ever report `detected` for — and the only types on which
+ * a stored `grounding_escalated` bit means anything.
+ */
+export const GROUNDING_DIAL_TYPES: readonly string[] = ["llm_agent", "llm_batch_agents"]
+
+/** The deliverable — the one type whose strictness is owned by another control. */
+const EMIT_PHASE_TYPE = "llm_emit"
+
+/** The `citation_policy` value that makes the deliverable already-strict. */
+const STRICT_CITATION_POLICY = "strict"
+
+/**
+ * The flat inputs the cause is a pure function of. Flat rather than phase-shaped
+ * because the panel holds these five values as separate props (it renders a form
+ * over a phase, not the phase itself) while the canvas holds a whole phase —
+ * `groundingCauseOf` below is the phase-shaped adapter, so BOTH consumers reach
+ * the same body and neither owns a second copy of the branch order.
+ */
+export interface GroundingInputs {
+  /** The step's `phase_type`. Decides whether a dial exists at all (D-185-15). */
+  phaseType: string
+  /** The step's currently selected tools. */
+  availableTools: readonly string[]
+  /** The server's KB-reading tool names (D-185-09). EMPTY marks NOTHING — an
+   *  unread palette must not un-mark a locked step, and it must not invent one
+   *  either; the run-time gate is unconditional and server-side regardless. */
+  kbTools: readonly string[]
+  /** Author intent only (D-185-07). Inert wherever detection applies. */
+  groundingEscalated: boolean
+  /** `llm_emit` only: its shipped `citation_policy`. */
+  citationPolicy?: string
+}
+
+/**
+ * Resolve WHY a step must prove itself, or `null` when it is held to nothing.
+ * TOTAL — every input shape returns, and none of them throws.
+ */
+export function groundingCause(inputs: GroundingInputs): GroundingCause {
+  const hasDial = GROUNDING_DIAL_TYPES.includes(inputs.phaseType)
+
+  // (1) DETECTED — the step reads your documents. Structural, never stored, and it
+  //     wins over both branches below, which is what makes the lock one-way.
+  if (hasDial && inputs.availableTools.some((tool) => inputs.kbTools.includes(tool))) {
+    return "detected"
+  }
+
+  // (2) ALREADY-SET — the deliverable's own `citation_policy` dial said so. This
+  //     section owns no second control for it; it reports what that one decided.
+  if (inputs.phaseType === EMIT_PHASE_TYPE && inputs.citationPolicy === STRICT_CITATION_POLICY) {
+    return "already-set"
+  }
+
+  // (3) ESCALATED — the author turned it on by hand. Read ONLY where a dial
+  //     exists: a stored bit on a type that can never carry the control is inert,
+  //     by the same rule that makes detection win.
+  if (hasDial && inputs.groundingEscalated) return "escalated"
+
+  return null
+}
+
+/**
+ * The phase-shaped adapter over `groundingCause`. Reads the five inputs off a
+ * definition phase and delegates; it declares no branch of its own, so the canvas
+ * and the panel cannot drift apart by construction.
+ *
+ * `available_tools` and `citation_policy` are read defensively: `PhaseConfigJSON`
+ * is the LOOSE definition-JSONB read shape, so a hand-edited row can carry either
+ * as any JSON value, and a projection must not crash on one.
+ */
+export function groundingCauseOf(
+  phase: PhaseSpecJSON,
+  kbTools: readonly string[],
+): GroundingCause {
+  const rawTools = phase.config.available_tools
+  const citationPolicy = phase.config.citation_policy
+  return groundingCause({
+    phaseType: phase.config.phase_type,
+    availableTools: Array.isArray(rawTools) ? rawTools.filter((t): t is string => typeof t === "string") : [],
+    kbTools,
+    groundingEscalated: phase.grounding_escalated === true,
+    citationPolicy: typeof citationPolicy === "string" ? citationPolicy : undefined,
+  })
+}
+
+/**
+ * GOVERN-03 — is an action-risk checkpoint armed on this step? A plain read of the
+ * author's intent, offered on EVERY step type (SPEC Req 8) and defaulting to OFF:
+ * an absent field means unarmed, and no step type performs outbound egress in 185.
+ */
+export function actionRiskArmed(phase: PhaseSpecJSON): boolean {
+  return phase.action_risk_armed === true
+}
+
 // ── The two badge slots (D-183-07) ──────────────────────────────────────────────
 
 /**

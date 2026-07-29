@@ -81,7 +81,6 @@ import {
 } from "@/components/workflows/canvasModel"
 import {
   DEFAULT_TINT,
-  GROUNDING_TONE,
   ICON_TINT,
   renderPhaseMark,
   type VerdictMarkKind,
@@ -158,22 +157,27 @@ function PhaseNodeImpl({ data, selected }: NodeProps<PhaseCanvasNode>) {
   // guaranteed at the shell's `marks` prop, which is typed to this exact union.
   const verdict = data.verdict as VerdictMarkKind | undefined
 
-  // Badge slot 1 is always present; slot 2 only on `llm_human_input` (D-183-07). The
-  // tuple type caps the row at two, so a third badge is a typecheck error.
-  const grounding: BadgeSlot = {
-    testId: "canvas-grounding",
-    tone: GROUNDING_TONE[data.grounding.mode],
-    glyph: data.grounding.glyph,
-    label: data.grounding.words,
-    dataAttr: { "data-grounding": data.grounding.mode },
-  }
+  // BADGE SLOT 1 IS DELIBERATELY EMPTY, AND IT IS SPOKEN FOR (Phase 185, SPEC Req 6).
+  //
+  // Until this plan slot 1 carried the three-face grounding word-badge. That badge is
+  // DELETED, not moved: governance now renders as SHAPE — the corner seal (plan 185-09)
+  // — and SPEC Req 6 states that governance spends no colour and no word-badge slot.
+  // Its inputs still reach this component, as `data.grounded` and `data.armed`; what is
+  // gone is the chip that spoke them.
+  //
+  // DO NOT FILL THE FREED SLOT with a governance mark. The freed slot belongs to
+  // Phase 188 (run state) and Phase 189 (external actions), and `BadgeSlots` is a max-2
+  // tuple union, so a third badge is a typecheck error rather than a review comment —
+  // which is exactly the budget `PhaseNodeCard`'s own docblock says it enforces.
+  //
+  // Slot 2 is unchanged: `Waits for you`, on `llm_human_input` only (D-183-07).
   const waitsForYou: BadgeSlot = {
     testId: "canvas-waits-for-you",
     tone: "primary",
     label: "Waits for you",
     dataAttr: { "data-waits-for-you": "true" },
   }
-  const badges: BadgeSlots = data.waitsForYou ? [grounding, waitsForYou] : [grounding]
+  const badges: BadgeSlots = data.waitsForYou ? [waitsForYou] : []
 
   // `status`, `technicalLine` and `stepNumber` are still deliberately NOT passed: Wave 0
   // landed the seam and Phase 185 / Phase 188 land those. `verdict` WAS in that list

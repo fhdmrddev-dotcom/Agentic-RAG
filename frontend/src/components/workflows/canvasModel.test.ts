@@ -318,7 +318,7 @@ describe("canvasModel.toCanvas — node data (both title forms, always)", () => 
     expect(first.data.subtitle).toBe("Searches and decides its own next move")
   })
 
-  it("carries slug, phaseIndex, phaseType, grounding and waitsForYou on every node", () => {
+  it("carries slug, phaseIndex, phaseType, grounded, armed and waitsForYou on every node", () => {
     const { nodes } = toCanvas(threePhase)
     for (const n of phaseNodes(nodes)) {
       expect(typeof n.data.slug).toBe("string")
@@ -326,7 +326,13 @@ describe("canvasModel.toCanvas — node data (both title forms, always)", () => 
       expect(typeof n.data.phaseType).toBe("string")
       expect(typeof n.data.title).toBe("string")
       expect(typeof n.data.technicalTitle).toBe("string")
-      expect(n.data.grounding).toMatchObject({ mode: expect.any(String), words: expect.any(String) })
+      // Phase 185 — the two governance booleans replace the three-face `grounding`
+      // object. FLAT and always present: the seal (185-09) and the detour (185-10)
+      // both read a boolean, and an absent key would make "not marked" and "not
+      // resolved" indistinguishable on the face.
+      expect(typeof n.data.grounded).toBe("boolean")
+      expect(typeof n.data.armed).toBe("boolean")
+      expect(n.data.grounding).toBeUndefined()
       expect(typeof n.data.waitsForYou).toBe("boolean")
     }
     const human = phaseNodes(nodes).find((n) => n.data.phaseType === "llm_human_input")
@@ -343,7 +349,7 @@ describe("canvasModel.toCanvas — node data (both title forms, always)", () => 
     expect(phaseNodes(nodes)[0].data.title).toBe("future_type")
   })
 
-  it("derives the grounding badge from citation_policy / citations_required", () => {
+  it("an llm_emit at citation_policy 'strict' is grounded; a plain agent is not", () => {
     const emit: PhaseSpecJSON[] = [
       {
         slug: "emit",
@@ -352,8 +358,85 @@ describe("canvasModel.toCanvas — node data (both title forms, always)", () => 
         validators: [{ kind: "citations_required", on_failure: "fail_run" }],
       },
     ]
-    expect(phaseNodes(toCanvas(emit).nodes)[0].data.grounding.mode).toBe("strict")
-    expect(phaseNodes(toCanvas(threePhase).nodes)[0].data.grounding.mode).toBe("open")
+    expect(phaseNodes(toCanvas(emit).nodes)[0].data.grounded).toBe(true)
+    expect(phaseNodes(toCanvas(threePhase).nodes)[0].data.grounded).toBe(false)
+  })
+})
+
+// ── Phase 185 (GOVERN-01 / GOVERN-02 / GOVERN-03) — the two governance booleans ──
+//
+// The cause and its total order live in `phaseVocabulary.groundingCauseOf`, which the
+// panel's dial reads through the same body. These cases pin what the PROJECTION does
+// with it: which phases come out marked, and what an unread palette does.
+
+describe("canvasModel.toCanvas — grounded / armed (Phase 185)", () => {
+  /** An agent step that reads the knowledge base. `search_documents` is one of the
+   *  five names the SERVER serves as `kb_tools`; the client never hardcodes them. */
+  const kbAgent: PhaseSpecJSON[] = [
+    {
+      slug: "research",
+      phase_index: 0,
+      config: { phase_type: "llm_agent", available_tools: ["search_documents"] },
+    },
+  ]
+  const SERVER_KB_TOOLS = ["search_documents"] as const
+
+  it("a phase carrying a KB tool is grounded — cause DETECTED", () => {
+    const { nodes } = toCanvas(kbAgent, { kbTools: SERVER_KB_TOOLS })
+    expect(phaseNodes(nodes)[0].data.grounded).toBe(true)
+  })
+
+  it("a phase with only NON-KB tools is not grounded", () => {
+    const other: PhaseSpecJSON[] = [
+      {
+        slug: "crunch",
+        phase_index: 0,
+        config: { phase_type: "llm_agent", available_tools: ["execute_code", "web_search"] },
+      },
+    ]
+    expect(phaseNodes(toCanvas(other, { kbTools: SERVER_KB_TOOLS }).nodes)[0].data.grounded).toBe(false)
+  })
+
+  it("grounding_escalated marks a step with no tool at all — cause ESCALATED", () => {
+    const escalated: PhaseSpecJSON[] = [
+      { slug: "think", phase_index: 0, config: { phase_type: "llm_agent" }, grounding_escalated: true },
+    ]
+    expect(phaseNodes(toCanvas(escalated, { kbTools: SERVER_KB_TOOLS }).nodes)[0].data.grounded).toBe(true)
+  })
+
+  it("a stored escalation on a type that carries no dial is INERT (D-185-07)", () => {
+    // The same bit on an `llm_single`. Detection can never apply there, so neither
+    // can the author's escalation — the canvas must not claim a lock the panel does
+    // not offer, or two surfaces one click apart disagree about one stored field.
+    const inert: PhaseSpecJSON[] = [
+      { slug: "write", phase_index: 0, config: { phase_type: "llm_single" }, grounding_escalated: true },
+    ]
+    expect(phaseNodes(toCanvas(inert, { kbTools: SERVER_KB_TOOLS }).nodes)[0].data.grounded).toBe(false)
+  })
+
+  it("action_risk_armed lands on the face as `armed`, and defaults to OFF", () => {
+    const armed: PhaseSpecJSON[] = [
+      { slug: "send", phase_index: 0, config: { phase_type: "llm_emit" }, action_risk_armed: true },
+    ]
+    expect(phaseNodes(toCanvas(armed).nodes)[0].data.armed).toBe(true)
+    expect(phaseNodes(toCanvas(threePhase).nodes)[0].data.armed).toBe(false)
+  })
+
+  it("NO kbTools marks NOTHING — an unread palette never un-marks, and never invents", () => {
+    // The same KB-reading phase, projected with the option omitted entirely. The safe
+    // direction, stated as an executable case: the run-time gate is server-side and
+    // unconditional, so under-marking is a display gap and over-marking would be a lie.
+    expect(phaseNodes(toCanvas(kbAgent).nodes)[0].data.grounded).toBe(false)
+    expect(phaseNodes(toCanvas(kbAgent, {}).nodes)[0].data.grounded).toBe(false)
+    expect(phaseNodes(toCanvas(kbAgent, { kbTools: [] }).nodes)[0].data.grounded).toBe(false)
+  })
+
+  it("stays TOTAL on a hand-edited row whose available_tools is not an array", () => {
+    const junk: PhaseSpecJSON[] = [
+      { slug: "odd", phase_index: 0, config: { phase_type: "llm_agent", available_tools: "search_documents" } },
+    ]
+    expect(() => toCanvas(junk, { kbTools: SERVER_KB_TOOLS })).not.toThrow()
+    expect(phaseNodes(toCanvas(junk, { kbTools: SERVER_KB_TOOLS }).nodes)[0].data.grounded).toBe(false)
   })
 })
 

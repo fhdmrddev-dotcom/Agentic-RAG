@@ -275,13 +275,18 @@ describe("WorkflowCanvas — the ⌥ Technical-names reveal (D-183-08)", () => {
   })
 })
 
-describe("WorkflowCanvas — the badge slots (D-183-07)", () => {
-  it("every phase node carries EXACTLY ONE grounding chip", () => {
+describe("WorkflowCanvas — the badge slots (D-183-07, Phase 185 frees slot 1)", () => {
+  it("NO phase node carries a grounding chip — slot 1 is empty and reserved", () => {
+    // Phase 185 / SPEC Req 6: the three-face word-badge is DELETED, not moved.
+    // Governance renders as shape (the corner seal, 185-09); the freed slot belongs
+    // to 188/189. Asserted as an absence on every node, so a resurrected chip fails
+    // here rather than being noticed in a screenshot.
     renderCanvas(docQaHuman)
     const nodes = screen.getAllByTestId(/^canvas-node-/)
     expect(nodes).toHaveLength(docQaHuman.length)
     for (const node of nodes) {
-      expect(node.querySelectorAll("[data-grounding]")).toHaveLength(1)
+      expect(node.querySelectorAll("[data-grounding]")).toHaveLength(0)
+      expect(node.querySelectorAll('[data-testid="canvas-grounding"]')).toHaveLength(0)
     }
   })
 
@@ -297,10 +302,22 @@ describe("WorkflowCanvas — the badge slots (D-183-07)", () => {
     }
   })
 
-  it("says grounding in WORDS, never colour alone (WCAG 1.4.1)", () => {
+  it("the badge that SURVIVES still says its meaning in WORDS (WCAG 1.4.1)", () => {
+    // The never-colour-alone rule did not go away with the grounding chip — it moved
+    // to the one badge still rendered. Slot 2 carries a readable sentence, and the
+    // step that has no badge at all renders none rather than a wordless mark.
     renderCanvas(docQaHuman)
-    const chip = within(screen.getByTestId("canvas-node-draft")).getByTestId("canvas-grounding")
-    expect(chip.textContent).toContain("No sources needed")
+    const waiting = within(screen.getByTestId("canvas-node-confirm")).getByTestId(
+      "canvas-waits-for-you",
+    )
+    expect(waiting.textContent).toContain("Waits for you")
+    // …and the ordinary step now carries NO badge at all — neither of the two the
+    // card can render. A wordless mark is not what replaced the chip; nothing did.
+    const draft = screen.getByTestId("canvas-node-draft")
+    expect(draft.querySelectorAll("[data-waits-for-you], [data-grounding]")).toHaveLength(0)
+    expect(
+      draft.querySelectorAll('[data-testid="canvas-waits-for-you"], [data-testid="canvas-grounding"]'),
+    ).toHaveLength(0)
   })
 })
 

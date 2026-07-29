@@ -49,11 +49,8 @@ exports[`toCanvas sweep — 'branching (synthetic skip_to_phase)' > matches its 
       "ariaLabel": "Phase 1: Work out how to do it (llm_agent)",
       "ariaRole": "button",
       "data": {
-        "grounding": {
-          "glyph": "○",
-          "mode": "open",
-          "words": "No sources needed",
-        },
+        "armed": false,
+        "grounded": false,
         "phaseIndex": 0,
         "phaseType": "llm_agent",
         "slug": "gather",
@@ -74,11 +71,8 @@ exports[`toCanvas sweep — 'branching (synthetic skip_to_phase)' > matches its 
       "ariaLabel": "Phase 2: Write it up (llm_single)",
       "ariaRole": "button",
       "data": {
-        "grounding": {
-          "glyph": "○",
-          "mode": "open",
-          "words": "No sources needed",
-        },
+        "armed": false,
+        "grounded": false,
         "phaseIndex": 1,
         "phaseType": "llm_single",
         "slug": "assess",
@@ -99,11 +93,8 @@ exports[`toCanvas sweep — 'branching (synthetic skip_to_phase)' > matches its 
       "ariaLabel": "Phase 3: Write it up (llm_single)",
       "ariaRole": "button",
       "data": {
-        "grounding": {
-          "glyph": "○",
-          "mode": "open",
-          "words": "No sources needed",
-        },
+        "armed": false,
+        "grounded": false,
         "phaseIndex": 2,
         "phaseType": "llm_single",
         "slug": "draft",
@@ -124,11 +115,8 @@ exports[`toCanvas sweep — 'branching (synthetic skip_to_phase)' > matches its 
       "ariaLabel": "Phase 4: Check with you (llm_human_input)",
       "ariaRole": "button",
       "data": {
-        "grounding": {
-          "glyph": "○",
-          "mode": "open",
-          "words": "No sources needed",
-        },
+        "armed": false,
+        "grounded": false,
         "phaseIndex": 3,
         "phaseType": "llm_human_input",
         "slug": "escalate",
@@ -189,11 +177,8 @@ exports[`toCanvas sweep — 'compliance-gap-report (Starter Librar…' > matches
       "ariaLabel": "Phase 1: Work out how to do it (llm_agent)",
       "ariaRole": "button",
       "data": {
-        "grounding": {
-          "glyph": "○",
-          "mode": "open",
-          "words": "No sources needed",
-        },
+        "armed": false,
+        "grounded": false,
         "phaseIndex": 0,
         "phaseType": "llm_agent",
         "slug": "retrieve",
@@ -214,11 +199,8 @@ exports[`toCanvas sweep — 'compliance-gap-report (Starter Librar…' > matches
       "ariaLabel": "Phase 2: Produce the deliverable (llm_emit)",
       "ariaRole": "button",
       "data": {
-        "grounding": {
-          "glyph": "🔒",
-          "mode": "strict",
-          "words": "Must cite its sources",
-        },
+        "armed": false,
+        "grounded": true,
         "phaseIndex": 1,
         "phaseType": "llm_emit",
         "slug": "emit",
@@ -287,11 +269,8 @@ exports[`toCanvas sweep — 'doc_qa_human (canonical seed 4)' > matches its comm
       "ariaLabel": "Phase 1: Work out how to do it (llm_agent)",
       "ariaRole": "button",
       "data": {
-        "grounding": {
-          "glyph": "○",
-          "mode": "open",
-          "words": "No sources needed",
-        },
+        "armed": false,
+        "grounded": false,
         "phaseIndex": 0,
         "phaseType": "llm_agent",
         "slug": "draft",
@@ -312,11 +291,8 @@ exports[`toCanvas sweep — 'doc_qa_human (canonical seed 4)' > matches its comm
       "ariaLabel": "Phase 2: Check with you (llm_human_input)",
       "ariaRole": "button",
       "data": {
-        "grounding": {
-          "glyph": "○",
-          "mode": "open",
-          "words": "No sources needed",
-        },
+        "armed": false,
+        "grounded": false,
         "phaseIndex": 1,
         "phaseType": "llm_human_input",
         "slug": "confirm",
@@ -337,11 +313,8 @@ exports[`toCanvas sweep — 'doc_qa_human (canonical seed 4)' > matches its comm
       "ariaLabel": "Phase 3: Write it up (llm_single)",
       "ariaRole": "button",
       "data": {
-        "grounding": {
-          "glyph": "○",
-          "mode": "open",
-          "words": "No sources needed",
-        },
+        "armed": false,
+        "grounded": false,
         "phaseIndex": 2,
         "phaseType": "llm_single",
         "slug": "finalize",
@@ -433,11 +406,8 @@ exports[`toCanvas sweep — 'eval_coverage (the 5-phase maximum)' > matches its 
       "ariaLabel": "Phase 1: Prepare the inputs (programmatic)",
       "ariaRole": "button",
       "data": {
-        "grounding": {
-          "glyph": "○",
-          "mode": "open",
-          "words": "No sources needed",
-        },
+        "armed": false,
+        "grounded": false,
         "phaseIndex": 0,
         "phaseType": "programmatic",
         "slug": "split",
@@ -458,11 +428,8 @@ exports[`toCanvas sweep — 'eval_coverage (the 5-phase maximum)' > matches its 
       "ariaLabel": "Phase 2: Work on the parts together (llm_batch_agents)",
       "ariaRole": "button",
       "data": {
-        "grounding": {
-          "glyph": "○",
-          "mode": "open",
-          "words": "No sources needed",
-        },
+        "armed": false,
+        "grounded": false,
         "phaseIndex": 1,
         "phaseType": "llm_batch_agents",
         "slug": "fanout",
@@ -483,11 +450,8 @@ exports[`toCanvas sweep — 'eval_coverage (the 5-phase maximum)' > matches its 
       "ariaLabel": "Phase 3: Work out how to do it (llm_agent)",
       "ariaRole": "button",
       "data": {
-        "grounding": {
-          "glyph": "○",
-          "mode": "open",
-          "words": "No sources needed",
-        },
+        "armed": false,
+        "grounded": false,
         "phaseIndex": 2,
         "phaseType": "llm_agent",
         "slug": "deep_dive",
@@ -508,11 +472,8 @@ exports[`toCanvas sweep — 'eval_coverage (the 5-phase maximum)' > matches its 
       "ariaLabel": "Phase 4: Check with you (llm_human_input)",
       "ariaRole": "button",
       "data": {
-        "grounding": {
-          "glyph": "○",
-          "mode": "open",
-          "words": "No sources needed",
-        },
+        "armed": false,
+        "grounded": false,
         "phaseIndex": 3,
         "phaseType": "llm_human_input",
         "slug": "confirm",
@@ -533,11 +494,8 @@ exports[`toCanvas sweep — 'eval_coverage (the 5-phase maximum)' > matches its 
       "ariaLabel": "Phase 5: Write it up (llm_single)",
       "ariaRole": "button",
       "data": {
-        "grounding": {
-          "glyph": "○",
-          "mode": "open",
-          "words": "No sources needed",
-        },
+        "armed": false,
+        "grounded": false,
         "phaseIndex": 4,
         "phaseType": "llm_single",
         "slug": "summarize",
@@ -606,11 +564,8 @@ exports[`toCanvas sweep — 'literature_review (canonical seed 3)' > matches its
       "ariaLabel": "Phase 1: Prepare the inputs (programmatic)",
       "ariaRole": "button",
       "data": {
-        "grounding": {
-          "glyph": "○",
-          "mode": "open",
-          "words": "No sources needed",
-        },
+        "armed": false,
+        "grounded": false,
         "phaseIndex": 0,
         "phaseType": "programmatic",
         "slug": "split",
@@ -631,11 +586,8 @@ exports[`toCanvas sweep — 'literature_review (canonical seed 3)' > matches its
       "ariaLabel": "Phase 2: Work on the parts together (llm_batch_agents)",
       "ariaRole": "button",
       "data": {
-        "grounding": {
-          "glyph": "○",
-          "mode": "open",
-          "words": "No sources needed",
-        },
+        "armed": false,
+        "grounded": false,
         "phaseIndex": 1,
         "phaseType": "llm_batch_agents",
         "slug": "review",
@@ -656,11 +608,8 @@ exports[`toCanvas sweep — 'literature_review (canonical seed 3)' > matches its
       "ariaLabel": "Phase 3: Write it up (llm_single)",
       "ariaRole": "button",
       "data": {
-        "grounding": {
-          "glyph": "○",
-          "mode": "open",
-          "words": "No sources needed",
-        },
+        "armed": false,
+        "grounded": false,
         "phaseIndex": 2,
         "phaseType": "llm_single",
         "slug": "merge",
@@ -721,11 +670,8 @@ exports[`toCanvas sweep — 'non-contiguous phase_index [0,1,3]' > matches its c
       "ariaLabel": "Phase 1: Work out how to do it (llm_agent)",
       "ariaRole": "button",
       "data": {
-        "grounding": {
-          "glyph": "○",
-          "mode": "open",
-          "words": "No sources needed",
-        },
+        "armed": false,
+        "grounded": false,
         "phaseIndex": 0,
         "phaseType": "llm_agent",
         "slug": "first",
@@ -746,11 +692,8 @@ exports[`toCanvas sweep — 'non-contiguous phase_index [0,1,3]' > matches its c
       "ariaLabel": "Phase 2: Write it up (llm_single)",
       "ariaRole": "button",
       "data": {
-        "grounding": {
-          "glyph": "○",
-          "mode": "open",
-          "words": "No sources needed",
-        },
+        "armed": false,
+        "grounded": false,
         "phaseIndex": 1,
         "phaseType": "llm_single",
         "slug": "second",
@@ -771,11 +714,8 @@ exports[`toCanvas sweep — 'non-contiguous phase_index [0,1,3]' > matches its c
       "ariaLabel": "Phase 4: Write it up (llm_single)",
       "ariaRole": "button",
       "data": {
-        "grounding": {
-          "glyph": "○",
-          "mode": "open",
-          "words": "No sources needed",
-        },
+        "armed": false,
+        "grounded": false,
         "phaseIndex": 3,
         "phaseType": "llm_single",
         "slug": "stranded",
@@ -844,11 +784,8 @@ exports[`toCanvas sweep — 'plan_execute_verify (canonical seed 2)' > matches i
       "ariaLabel": "Phase 1: Write it up (llm_single)",
       "ariaRole": "button",
       "data": {
-        "grounding": {
-          "glyph": "○",
-          "mode": "open",
-          "words": "No sources needed",
-        },
+        "armed": false,
+        "grounded": false,
         "phaseIndex": 0,
         "phaseType": "llm_single",
         "slug": "plan",
@@ -869,11 +806,8 @@ exports[`toCanvas sweep — 'plan_execute_verify (canonical seed 2)' > matches i
       "ariaLabel": "Phase 2: Work out how to do it (llm_agent)",
       "ariaRole": "button",
       "data": {
-        "grounding": {
-          "glyph": "○",
-          "mode": "open",
-          "words": "No sources needed",
-        },
+        "armed": false,
+        "grounded": false,
         "phaseIndex": 1,
         "phaseType": "llm_agent",
         "slug": "execute",
@@ -894,11 +828,8 @@ exports[`toCanvas sweep — 'plan_execute_verify (canonical seed 2)' > matches i
       "ariaLabel": "Phase 3: Write it up (llm_single)",
       "ariaRole": "button",
       "data": {
-        "grounding": {
-          "glyph": "○",
-          "mode": "open",
-          "words": "No sources needed",
-        },
+        "armed": false,
+        "grounded": false,
         "phaseIndex": 2,
         "phaseType": "llm_single",
         "slug": "verify",
@@ -959,11 +890,8 @@ exports[`toCanvas sweep — 'pm-risk-register (PM pack 2)' > matches its committ
       "ariaLabel": "Phase 1: Work out how to do it (llm_agent)",
       "ariaRole": "button",
       "data": {
-        "grounding": {
-          "glyph": "○",
-          "mode": "open",
-          "words": "No sources needed",
-        },
+        "armed": false,
+        "grounded": false,
         "phaseIndex": 0,
         "phaseType": "llm_agent",
         "slug": "retrieve",
@@ -984,11 +912,8 @@ exports[`toCanvas sweep — 'pm-risk-register (PM pack 2)' > matches its committ
       "ariaLabel": "Phase 2: Produce the deliverable (llm_emit)",
       "ariaRole": "button",
       "data": {
-        "grounding": {
-          "glyph": "🔒",
-          "mode": "strict",
-          "words": "Must cite its sources",
-        },
+        "armed": false,
+        "grounded": true,
         "phaseIndex": 1,
         "phaseType": "llm_emit",
         "slug": "emit",
@@ -1049,11 +974,8 @@ exports[`toCanvas sweep — 'pm-weekly-status-report (PM pack 1)' > matches its 
       "ariaLabel": "Phase 1: Work out how to do it (llm_agent)",
       "ariaRole": "button",
       "data": {
-        "grounding": {
-          "glyph": "○",
-          "mode": "open",
-          "words": "No sources needed",
-        },
+        "armed": false,
+        "grounded": false,
         "phaseIndex": 0,
         "phaseType": "llm_agent",
         "slug": "retrieve",
@@ -1074,11 +996,8 @@ exports[`toCanvas sweep — 'pm-weekly-status-report (PM pack 1)' > matches its 
       "ariaLabel": "Phase 2: Produce the deliverable (llm_emit)",
       "ariaRole": "button",
       "data": {
-        "grounding": {
-          "glyph": "🔒",
-          "mode": "strict",
-          "words": "Must cite its sources",
-        },
+        "armed": false,
+        "grounded": true,
         "phaseIndex": 1,
         "phaseType": "llm_emit",
         "slug": "emit",
@@ -1139,11 +1058,8 @@ exports[`toCanvas sweep — 'research_summarize (canonical seed 1)' > matches it
       "ariaLabel": "Phase 1: Work out how to do it (llm_agent)",
       "ariaRole": "button",
       "data": {
-        "grounding": {
-          "glyph": "○",
-          "mode": "open",
-          "words": "No sources needed",
-        },
+        "armed": false,
+        "grounded": false,
         "phaseIndex": 0,
         "phaseType": "llm_agent",
         "slug": "research",
@@ -1164,11 +1080,8 @@ exports[`toCanvas sweep — 'research_summarize (canonical seed 1)' > matches it
       "ariaLabel": "Phase 2: Write it up (llm_single)",
       "ariaRole": "button",
       "data": {
-        "grounding": {
-          "glyph": "○",
-          "mode": "open",
-          "words": "No sources needed",
-        },
+        "armed": false,
+        "grounded": false,
         "phaseIndex": 1,
         "phaseType": "llm_single",
         "slug": "summarize",
@@ -1229,11 +1142,8 @@ exports[`toCanvas sweep — 'risk-register (Starter Library 1)' > matches its co
       "ariaLabel": "Phase 1: Work out how to do it (llm_agent)",
       "ariaRole": "button",
       "data": {
-        "grounding": {
-          "glyph": "○",
-          "mode": "open",
-          "words": "No sources needed",
-        },
+        "armed": false,
+        "grounded": false,
         "phaseIndex": 0,
         "phaseType": "llm_agent",
         "slug": "retrieve",
@@ -1254,11 +1164,8 @@ exports[`toCanvas sweep — 'risk-register (Starter Library 1)' > matches its co
       "ariaLabel": "Phase 2: Produce the deliverable (llm_emit)",
       "ariaRole": "button",
       "data": {
-        "grounding": {
-          "glyph": "🔒",
-          "mode": "strict",
-          "words": "Must cite its sources",
-        },
+        "armed": false,
+        "grounded": true,
         "phaseIndex": 1,
         "phaseType": "llm_emit",
         "slug": "emit",
@@ -1311,11 +1218,8 @@ exports[`toCanvas sweep — 'single phase (1 phase)' > matches its committed sna
       "ariaLabel": "Phase 1: Write it up (llm_single)",
       "ariaRole": "button",
       "data": {
-        "grounding": {
-          "glyph": "○",
-          "mode": "open",
-          "words": "No sources needed",
-        },
+        "armed": false,
+        "grounded": false,
         "phaseIndex": 0,
         "phaseType": "llm_single",
         "slug": "answer",
@@ -1384,11 +1288,8 @@ exports[`toCanvas sweep — 'unresolvable skip (broken reference)' > matches its
       "ariaLabel": "Phase 1: Work out how to do it (llm_agent)",
       "ariaRole": "button",
       "data": {
-        "grounding": {
-          "glyph": "○",
-          "mode": "open",
-          "words": "No sources needed",
-        },
+        "armed": false,
+        "grounded": false,
         "phaseIndex": 0,
         "phaseType": "llm_agent",
         "slug": "start",
@@ -1409,11 +1310,8 @@ exports[`toCanvas sweep — 'unresolvable skip (broken reference)' > matches its
       "ariaLabel": "Phase 2: Write it up (llm_single)",
       "ariaRole": "button",
       "data": {
-        "grounding": {
-          "glyph": "○",
-          "mode": "open",
-          "words": "No sources needed",
-        },
+        "armed": false,
+        "grounded": false,
         "phaseIndex": 1,
         "phaseType": "llm_single",
         "slug": "check",
@@ -1492,11 +1390,8 @@ exports[`toCanvas sweep — 'weekly-status-report (Starter Library…' > matches
       "ariaLabel": "Phase 1: Work out how to do it (llm_agent)",
       "ariaRole": "button",
       "data": {
-        "grounding": {
-          "glyph": "○",
-          "mode": "open",
-          "words": "No sources needed",
-        },
+        "armed": false,
+        "grounded": false,
         "phaseIndex": 0,
         "phaseType": "llm_agent",
         "slug": "retrieve",
@@ -1517,11 +1412,8 @@ exports[`toCanvas sweep — 'weekly-status-report (Starter Library…' > matches
       "ariaLabel": "Phase 2: Produce the deliverable (llm_emit)",
       "ariaRole": "button",
       "data": {
-        "grounding": {
-          "glyph": "🔒",
-          "mode": "strict",
-          "words": "Must cite its sources",
-        },
+        "armed": false,
+        "grounded": true,
         "phaseIndex": 1,
         "phaseType": "llm_emit",
         "slug": "emit",

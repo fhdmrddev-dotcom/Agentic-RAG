@@ -713,6 +713,20 @@ export interface WorkflowCanvasProps {
   /** Release the selection (a click on empty space). REQUIRED — the deselect half of
    *  the same contract; a canvas that can only select is a panel with no way out. */
   onClearSelection: () => void
+  /**
+   * Phase 185 (D-185-09) — the server's KB-reading tool names, handed straight to
+   * `toCanvas` so the canvas and the panel's governance dial read ONE value. This
+   * component fetches it no more than it fetches anything else: the PAGE reads it
+   * off `useGroundingBundle` and hands the answer down, exactly as it does for
+   * `marks` and `nudges`.
+   *
+   * OPTIONAL, and absent marks NOTHING. That is the safe direction rather than a
+   * convenience: the run-time gate is server-side and unconditional, so a canvas
+   * rendered before the palette lands under-marks for one frame instead of making
+   * a claim it cannot support. Every shipped caller that omits it renders exactly
+   * as it did before this plan.
+   */
+  kbTools?: readonly string[]
 
   // ── 184-10, the editing half. Every one of these is OPTIONAL and every one is
   //    inert while `editable` is false, so the shipped read-only callers compile and
@@ -799,6 +813,7 @@ export function WorkflowCanvas({
   selectedSlug,
   onSelectNode,
   onClearSelection,
+  kbTools,
   editable = false,
   marks,
   nudges,
@@ -813,7 +828,7 @@ export function WorkflowCanvas({
   const technicalNames = useTechnicalNamesOptional()
   const showTechnical = technicalNames?.showTechnical ?? false
 
-  const projection = useMemo(() => toCanvas(phases), [phases])
+  const projection = useMemo(() => toCanvas(phases, { kbTools }), [phases, kbTools])
 
   /**
    * The IN-FLIGHT drag position, per node id — pure view state that exists for exactly
