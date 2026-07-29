@@ -148,3 +148,89 @@ def test_each_phase_config_validates(config_dict, expected_cls):
         {"slug": "s", "phase_index": 0, "config": config_dict}
     )
     assert type(spec.config) is expected_cls
+
+
+# ── Phase 185 (GOVERN-01 / GOVERN-03, D-185-06/07/08) — the two governance intents ──
+
+
+def test_pre_185_phase_row_parses_without_the_governance_keys():
+    """SPEC acceptance criterion 1: a PhaseSpec dict carrying NEITHER governance key
+    still `model_validate()`s, and both attributes read False.
+
+    This is the whole zero-migration claim. `PhaseSpec` is a `_StrictBase`
+    (`extra="forbid"`), so the ONLY way a stored pre-185 `workflow_definitions` JSONB
+    row keeps parsing is if both new fields are additive-optional — the same property
+    `name` has carried since Phase 103. Every row in the table today is a pre-185 row.
+    """
+    spec = PhaseSpec.model_validate(
+        {
+            "slug": "research",
+            "phase_index": 0,
+            "config": {
+                "phase_type": "llm_agent",
+                "prompt": "Research the topic.",
+                "available_tools": ["search_documents"],
+            },
+        }
+    )
+
+    assert spec.grounding_escalated is False
+    assert spec.action_risk_armed is False
+    # `False` is the ONLY absent-value (D-185-08): there is no `None` third state to
+    # disambiguate, so "unset" and "explicitly off" are the same value on purpose.
+    assert spec.model_dump(mode="json")["grounding_escalated"] is False
+    assert spec.model_dump(mode="json")["action_risk_armed"] is False
+
+
+def test_governance_intents_round_trip_through_model_dump():
+    """Both intents survive a JSON round trip when explicitly authored.
+
+    SIDE EFFECT WORTH RECORDING: `model_dump(mode="json")` now writes
+    `"grounding_escalated": false, "action_risk_armed": false` into EVERY saved draft
+    JSONB — including drafts that never touched governance. That is additive and
+    harmless (it is identical to what `name: null` has done since Phase 103), but it
+    does mean the first save of any pre-185 definition after this phase is NOT a
+    zero-diff save. Nothing reads the keys yet; only the author's INTENT is stored
+    (D-185-07) — `detected` and `already-set` are derived at read time and never
+    persisted, so the dump below can never claim a cause.
+    """
+    spec = PhaseSpec.model_validate(
+        {
+            "slug": "send",
+            "phase_index": 1,
+            "config": {"phase_type": "llm_single", "prompt": "Draft the note."},
+            "grounding_escalated": True,
+            "action_risk_armed": True,
+        }
+    )
+
+    dumped = spec.model_dump(mode="json")
+    assert dumped["grounding_escalated"] is True
+    assert dumped["action_risk_armed"] is True
+    # No derived cause is ever stored — the JSONB carries intent and nothing else.
+    assert "grounding_mode" not in dumped
+    assert "grounding_cause" not in dumped
+
+    assert PhaseSpec.model_validate(dumped).grounding_escalated is True
+    assert PhaseSpec.model_validate(dumped).action_risk_armed is True
+
+
+def test_action_risk_approval_is_a_registered_validator_kind():
+    """The 10th `ValidatorSpec.kind` member parses (GOVERN-03 / D-185-12).
+
+    `ValidatorSpec` is a `_StrictBase`, so an unlisted kind cannot even be
+    CONSTRUCTED — the synthesized armed pre-gate plan 185-04 attaches would raise at
+    build time without this Literal member. The pre-185 kinds all still validate.
+    """
+    from app.models.harness import ValidatorSpec
+
+    spec = ValidatorSpec.model_validate(
+        {"kind": "action_risk_approval", "timing": "pre", "on_failure": "ask_user"}
+    )
+    assert spec.kind == "action_risk_approval"
+    assert spec.timing == "pre"
+
+    # Control: growth is ADDITIVE — the shipped kinds are untouched.
+    assert ValidatorSpec.model_validate({"kind": "citations_required"}).timing == "post"
+    with pytest.raises(ValidationError):
+        ValidatorSpec.model_validate({"kind": "not_a_registered_kind"})

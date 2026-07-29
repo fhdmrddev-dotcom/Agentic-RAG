@@ -7,13 +7,18 @@ the codebase: every model subclasses :class:`_StrictBase`, which sets
 phase config raises ``pydantic.ValidationError`` BEFORE the Phase 091 engine
 consumes it (threat T-090-01 / V5 input validation).
 
-The 5 phase-type literals and the 4 validator ``kind`` literals are FIRM (they
-mirror Phase 091 SC#1/#3 verbatim). The individual per-phase field names
+The two Literal sets GROW ADDITIVELY, and always have. ``phase_type`` went 5 -> 6
+at Phase 101.1 (the ``llm_emit`` member); the validator ``kind`` set went 4 -> 9 at
+Phase 102 (GATE-01 / D-12) and 9 -> 10 at Phase 185 (GOVERN-03 —
+``action_risk_approval``). Growth is SAFE because every value a stored JSONB row
+can already carry still validates: an old row never names the new member, and an
+unrecognized kind fails CLOSED downstream in ``run_gates``. What must NOT change is
+an EXISTING member's spelling — renaming one orphans every stored row that uses it
+— nor the mechanism around them: the discriminator, ``extra='forbid'`` and the
+union structure remain LOCKED. The individual per-phase field names
 (``input_keys``, ``model``/``temperature`` overrides, ``wall_clock_seconds``,
 ask_user ``options``/``timeout_seconds``, ...) are FINALIZED in Phase 091 — the
-engine is the consumer and these are the fields it reads. The discriminator
-mechanism + ``extra='forbid'`` + union structure + the two Literal sets remain
-LOCKED (do NOT change them).
+engine is the consumer and these are the fields it reads.
 """
 
 from __future__ import annotations
@@ -173,12 +178,19 @@ class ValidatorSpec(_StrictBase):
     Phase 102 (GATE-01): + 5 library kinds (D-12) + timing (D-10) + ask_user
     on_failure value (D-11, on_failure stays a str — skip_to_phase:<slug> already
     parses, so ask_user is just one more recognized value, not a new type).
+
+    Phase 185 (GOVERN-03 / D-185-12): + ``action_risk_approval``, the armed
+    action-risk checkpoint's ``timing="pre"`` kind. Additive in the same sense as
+    102's five: no stored row names it, so every pre-185 row still validates. It is
+    registered here because ``ValidatorSpec`` is a ``_StrictBase`` and construction
+    validates — a synthesized spec of an unlisted kind could not be built at all.
     """
 
     kind: Literal[
         "json_schema", "regex_match", "workspace_file_exists", "programmatic",
         "citations_required", "freshness", "structure_check",
         "output_file_valid", "llm_judge_rubric",
+        "action_risk_approval",  # 185 GOVERN-03 (D-185-12) — the armed pre-gate
     ]
     config: dict = Field(default_factory=dict)
     on_failure: str = "fail_run"  # fail_run | retry | skip_to_phase:<slug> | ask_user (D-11)
@@ -192,6 +204,35 @@ class PhaseSpec(_StrictBase):
     config: PhaseConfig  # parsed via discriminator
     validators: list[ValidatorSpec] = Field(default_factory=list)
     name: str | None = None  # REQ-3 — additive; serializes into the definition JSONB; pre-103 rows validate with it absent
+
+    # ── Phase 185 (GOVERN-01 / GOVERN-03; D-185-06/07/08) — the two governance
+    # intents, at PhaseSpec level as siblings of `validators` and `name`.
+    #
+    # (a) ADDITIVE / ZERO-MIGRATION, exactly like `name` above: a pre-185
+    #     `workflow_definitions` JSONB row carrying NEITHER key still
+    #     `model_validate()`s, and both read False. `bool = False` rather than
+    #     `bool | None = None` is the one deliberate deviation from `name`'s
+    #     spelling — D-185-08 requires absence to be unambiguous, so there is
+    #     exactly one way to say "not set".
+    #
+    # (b) INTENT ONLY (D-185-07). Of the three grounding causes only `escalated`
+    #     is ever AUTHORED. `detected` is a pure function of
+    #     `config.available_tools ∩ KB_TOOLS`; `already-set` is a pure function of
+    #     `config.citation_policy == "strict"`. Both are DERIVED at read time from
+    #     data already in the row and are NEVER stored — which is what makes SPEC
+    #     Req 3 true BY CONSTRUCTION rather than by a code audit: "a detected step
+    #     set back to free-to-think" is not a representable value, so a stale or
+    #     hand-edited JSONB row cannot lie about it. Nothing here is a
+    #     `model_validator` on purpose — the draft save path persists
+    #     `model_dump(mode="json")`, so a derivation living in this model would be
+    #     BAKED into the JSONB and would contradict (b) permanently.
+    #
+    # (c) THE ONE HOME of that derivation is
+    #     `app.services.harness.grounding` (`KB_TOOLS` / `grounding_cause`) — the
+    #     D-182-06 red line: exactly one copy of every grounding rule, server-side.
+    #     Read that module's docblock before adding a grounding rule anywhere else.
+    grounding_escalated: bool = False   # GOVERN-01 / D-185-08 — the author hand-locked this step
+    action_risk_armed: bool = False     # GOVERN-03 / D-185-08 — stop and ask a human before this step runs
 
 
 # ── 098 co-lock input/asset shapes (CONCLUSION.md §3 verbatim; JSONB makes the ──
