@@ -260,7 +260,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 185-04-PLAN.md — the fail-closed armed wait: indefinite subscribe, an explicit decline mapping, a verbatim prompt, a survivable shutdown
+- [x] 185-04-PLAN.md — the fail-closed armed wait: indefinite subscribe, an explicit decline mapping, a verbatim prompt, a survivable shutdown
 - [ ] 185-07-PLAN.md — GovernanceSection: the dial that visibly refuses, and the PhaseFormPanel mount point (G-5 honoured by construction)
 
 **Wave 4** *(blocked on Wave 3 completion)*
