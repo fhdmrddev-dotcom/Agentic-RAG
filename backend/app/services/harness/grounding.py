@@ -117,6 +117,14 @@ class GroundingBundle:
     skills: list[dict] = field(default_factory=list)
     skill_ids: set[str] = field(default_factory=set)  # membership set for fidelity
     placeholders: list[str] = field(default_factory=list)  # template placeholder fields
+    # Phase 185 (GOVERN-01 / D-185-09) — the KB-reading tool names, carried so the ONE
+    # bundle assembler stays the ONE computation and the palette route serializes a field
+    # rather than reaching for the constant itself. This is the safety-DEFINING list, NOT a
+    # per-caller registry read: unlike `tools` / `folders` / `skills` it does not depend on
+    # who is asking, and it is populated UNCONDITIONALLY — INCLUDING on the `degraded` path
+    # below. A folders/skills outage must never silently un-mark a locked step: "we could
+    # not read your palette" is a different sentence from "this step reads nothing".
+    kb_tools: list[str] = field(default_factory=list)  # == KB_TOOLS_SORTED (the wire form)
     # THE ONE DEGRADATION SIGNAL (round-2 gap closure — WR-01 / WR-02 / WR-07). The set of
     # registry names that could NOT be resolved for this bundle; currently ``"folders"``
     # and/or ``"skills"``. Declared last because a dataclass field with a default must follow
@@ -422,6 +430,10 @@ async def assemble_grounding_bundle(
         skills=list(skills or []),
         skill_ids=skill_ids,
         placeholders=placeholders,
+        # D-185-09 — the ONE computation stays here, not in the palette route. Placed
+        # OUTSIDE every ``try`` above on purpose: it is a module constant, it cannot fail,
+        # and a degraded registry read must not blank it (see the field's own comment).
+        kb_tools=KB_TOOLS_SORTED,
         degraded=frozenset(degraded),
     )
 
@@ -769,3 +781,58 @@ def business_requirement_missing(definition: "WorkflowDefinition") -> bool:
     and a copy-pasted rule drifts (Pitfall 4 / D-182-06).
     """
     return not (definition.business_requirement or "").strip()
+
+
+# ── Phase 185 (GOVERN-01 / D-185-09) — the KB-reading rule ────────────────────
+#
+# THE ONE HOME, and the reason it is here rather than in the canvas: this list DEFINES
+# which steps are governed, so a second copy is a safety hole, not a duplication smell.
+# The day a 6th KB tool lands, a frontend constant would silently stop marking it and the
+# author would see an ungoverned step that the engine gates anyway. That is the exact drift
+# D-182-06's RED LINE (see this module's docblock) was written against. The client receives
+# this list as DATA on ``GET /workflows/grounding-bundle`` and performs only the trivial set
+# intersection, for zero-lag display; it never enforces.
+
+
+KB_TOOLS: frozenset[str] = frozenset({
+    "search_documents", "query_documents", "read_document",
+    "analyze_document", "get_related_documents",
+})
+# The wire/JSON form, mirroring how ``GroundingBundle`` already carries ``tools: list[str]``
+# (JSON-friendly, sorted) beside ``tool_names: set[str]`` (membership) for the same values.
+KB_TOOLS_SORTED: list[str] = sorted(KB_TOOLS)
+
+
+def grounding_cause(phase) -> str | None:
+    """Why this phase is locked to *must prove it* — ``"detected"`` / ``"already-set"`` /
+    ``"escalated"``, or ``None`` when it is free to think.
+
+    PURE, ZERO I/O, NO DB POOL. Unlike almost everything else in this module — which reads
+    the folder tree and the skill registry — this is a total function of one already-parsed
+    ``PhaseSpec``. Do not assume a pool is needed to call it.
+
+    D-185-07: only ``escalated`` is ever AUTHORED. ``detected`` and ``already-set`` are
+    recomputed here, every read, from data already in the row, and are NEVER persisted. That
+    is what makes SPEC Req 3 structural: there is no representable value that says a detected
+    step is free to think, so a stale or hand-edited JSONB row cannot claim one.
+
+    **THE BRANCH ORDER IS LOAD-BEARING AND MUST NOT BE REORDERED.** Checking ``detected``
+    FIRST is what makes "detection wins and the undo disappears" true by construction rather
+    than by a rule somebody has to keep enforcing: an escalated step that later gains
+    ``search_documents`` reports ``detected``, and its stored ``grounding_escalated: True``
+    simply goes inert — the author is offered no undo, because the cause is no longer theirs.
+    Remove the tool again and the cause falls back to ``escalated``, undo included.
+
+    ``folder_scope`` is deliberately NOT an input. It exists on all five LLM config members
+    (including ``llm_single``, which has no tools at all), so reading it would auto-lock steps
+    that read nothing — and a step with no retrieval path can never satisfy the gate.
+    ``getattr(..., None)`` is this module's shipped totality idiom for the discriminated
+    config union: only some members carry ``available_tools`` / ``citation_policy``.
+    """
+    if set(getattr(phase.config, "available_tools", None) or ()) & KB_TOOLS:
+        return "detected"
+    if getattr(phase.config, "citation_policy", None) == "strict":
+        return "already-set"
+    if getattr(phase, "grounding_escalated", False):
+        return "escalated"
+    return None
