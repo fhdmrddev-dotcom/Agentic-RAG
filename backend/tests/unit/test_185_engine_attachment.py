@@ -700,3 +700,153 @@ def test_a_freshness_pre_gate_still_fails_exactly_as_it_shipped():
         "error": "freshness:staleness|400d old",
     }
     assert "action_risk_pending" not in _emitted_event_names(emit)
+
+
+# ═════ plan 185-05 Task 2 — the resume sweep re-subscribes the SAME prompt ════
+#
+# RESEARCH L-7. ``resume_stranded_workflows`` gates its re-subscribe branch on
+# ``_is_llm_human_input(active)``, which is False for an armed ``llm_agent``: its
+# stored config type is ``llm_agent`` and its output was never persisted. The run
+# was still re-driven and re-asked (fail-closed) — but with a NEW ``tool_call_id``,
+# while the OLD durable row is never expired on the graceful-shutdown path. The
+# card the person is looking at then belongs to nobody. Fix (a): re-subscribe the
+# SAME id, indefinitely.
+
+
+def _armed_active_row(slug: str = "send-notice") -> dict:
+    """The ``workflow_phases`` row an armed step parked on its pre-gate leaves behind.
+
+    THE EXACT SHAPE ``_is_llm_human_input`` RETURNS FALSE FOR: ``phase_type`` is
+    ``llm_agent`` (arming is a validator, never a step) and there is no stored
+    ``output``, because the phase never completed.
+    """
+    return {
+        "id": "wp-1", "slug": slug, "phase_index": 1, "status": "active",
+        "output": None, "config": {"phase_type": "llm_agent"},
+    }
+
+
+def _definition_with(*phases):
+    from app.models.harness import WorkflowDefinition
+
+    return WorkflowDefinition(
+        slug="renewals", name="Renewals", version=1, phases=list(phases),
+    )
+
+
+def test_the_two_resume_predicates_are_independent():
+    """The armed row is invisible to ``_is_llm_human_input`` and visible to
+    ``_is_armed_action_risk`` — which is the whole reason the second predicate exists
+    rather than the first being widened. ``_is_llm_human_input`` is a correct predicate
+    about a DIFFERENT thing and stays untouched."""
+    from app.services import harness_engine
+
+    active = _armed_active_row()
+    armed_spec = _agent_phase(slug="send-notice", phase_index=1, tools=["execute_code"], armed=True)
+    definition = _definition_with(armed_spec)
+
+    assert harness_engine._is_llm_human_input(active) is False
+    assert harness_engine._is_armed_action_risk(active, definition) is True
+
+    # And an UNARMED agent step with the same row shape is False for both.
+    unarmed = _definition_with(
+        _agent_phase(slug="send-notice", phase_index=1, tools=["execute_code"], armed=False)
+    )
+    assert harness_engine._is_armed_action_risk(active, unarmed) is False
+    # A definition that no longer carries the slug, and a missing definition.
+    assert harness_engine._is_armed_action_risk(active, _definition_with(
+        _agent_phase(slug="other", phase_index=0))) is False
+    assert harness_engine._is_armed_action_risk(active, None) is False
+
+
+def _drive_resume_sweep(active_row: dict, definition, pending: dict | None):
+    """Run ``resume_stranded_workflows`` over ONE stranded run with everything mocked.
+
+    Explicit mocks for every network dependency: the four ``db.workflows`` reads, the
+    ``ask_user_service`` re-subscribe, the resume ctx build, the re-drive and the
+    prompt-expiry finalizer. Returns the ``resume_pending_prompt`` mock.
+    """
+    import asyncio
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock, patch
+    from uuid import uuid4
+
+    from app.services import harness_engine
+
+    run_id = uuid4()
+    resume_prompt = AsyncMock(return_value={"kind": "response", "response_text": "x"})
+
+    with patch.object(harness_engine, "find_resumable_runs",
+                      AsyncMock(return_value=[{"run_id": run_id, "thread_id": uuid4()}])), \
+         patch.object(harness_engine, "claim_run", AsyncMock(return_value=True)), \
+         patch.object(harness_engine, "get_active_phase", AsyncMock(return_value=active_row)), \
+         patch.object(harness_engine, "_load_run_definition", AsyncMock(return_value=definition)), \
+         patch.object(harness_engine, "get_pending_ask_user", AsyncMock(return_value=pending)), \
+         patch.object(harness_engine, "ask_user_response_exists", AsyncMock(return_value=False)), \
+         patch.object(harness_engine, "resume_pending_prompt", resume_prompt), \
+         patch.object(harness_engine, "_build_resume_context",
+                      AsyncMock(return_value=SimpleNamespace(producer_run_id=None, org_id=None))), \
+         patch.object(harness_engine, "_resume_run", AsyncMock()), \
+         patch.object(harness_engine, "_expire_pending_ask_user", AsyncMock()):
+        asyncio.run(harness_engine.resume_stranded_workflows(pool=object(), redis=object()))
+
+    return resume_prompt
+
+
+def test_a_restart_re_subscribes_the_armed_prompt_with_no_deadline():
+    """L-7 / G-4 scenario 3, both halves. The sweep re-subscribes the SAME
+    ``tool_call_id`` the durable row carries — so the card the person is looking at is
+    still the one the run is listening to — and it does so with ``timeout_seconds=None``,
+    so the restart does not quietly re-introduce a deadline the arming removed."""
+    armed = _agent_phase(slug="send-notice", phase_index=1, tools=["execute_code"], armed=True)
+    pending = {
+        "tool_call_id": "tc-armed-1",
+        "prompt": 'Step 2 of 4, "Send the renewal notice", is about to run.',
+        "options": ["Approve and run this step", "Do not run it"],
+        "timeout_seconds": None,
+    }
+
+    resume_prompt = _drive_resume_sweep(_armed_active_row(), _definition_with(armed), pending)
+
+    assert resume_prompt.await_count == 1
+    args, _kwargs = resume_prompt.await_args
+    assert args[2] == "tc-armed-1", "the resumed prompt is a DIFFERENT one — orphaned card"
+    assert args[5] is None, f"the restart re-introduced a {args[5]!r}s deadline"
+    assert args[4] == ["Approve and run this step", "Do not run it"]
+
+
+def test_an_armed_phase_with_no_durable_prompt_row_falls_through_unchanged():
+    """The crash-before-the-insert edge. Nothing to re-subscribe → no call, and the
+    ordinary re-drive runs: the pre-gate re-attaches and re-asks. Fail-closed either
+    way — the run never advances without an answer."""
+    armed = _agent_phase(slug="send-notice", phase_index=1, tools=["execute_code"], armed=True)
+
+    resume_prompt = _drive_resume_sweep(_armed_active_row(), _definition_with(armed), None)
+
+    assert resume_prompt.await_count == 0
+
+
+def test_an_llm_human_input_resume_still_uses_its_original_timeout():
+    """THE BYTE-IDENTITY CONTROL. A plain ``llm_human_input`` step takes the ORIGINAL
+    step-2 branch with the durable row's own ``timeout_seconds`` — the armed branch must
+    not capture it (it is guarded by ``not _is_llm_human_input(active)``), and its
+    disposition is explicitly out of scope (SPEC Req 9)."""
+    human_row = {
+        "id": "wp-2", "slug": "ask-them", "phase_index": 1, "status": "active",
+        "output": {"tool_call_id": "tc-human-1"},
+        "config": {"phase_type": "llm_human_input"},
+    }
+    pending = {
+        "tool_call_id": "tc-human-1", "prompt": "Which dataset?",
+        "options": ["a", "b"], "timeout_seconds": 300,
+    }
+    # An ARMED definition for the same slug, to prove the guard order: even here the
+    # llm_human_input branch wins and the armed branch never fires.
+    armed = _agent_phase(slug="ask-them", phase_index=1, tools=["execute_code"], armed=True)
+
+    resume_prompt = _drive_resume_sweep(human_row, _definition_with(armed), pending)
+
+    assert resume_prompt.await_count == 1, "the armed branch stole an llm_human_input resume"
+    args, _kwargs = resume_prompt.await_args
+    assert args[2] == "tc-human-1"
+    assert args[5] == 300, f"the shipped resume timeout became {args[5]!r}"

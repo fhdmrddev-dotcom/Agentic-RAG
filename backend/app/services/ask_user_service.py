@@ -207,12 +207,16 @@ async def _emit_ask_user_prompt(
     tool_call_id: str,
     prompt: str,
     options: "list | None",
-    timeout_seconds: float,
+    timeout_seconds: float | None,
 ) -> None:
     """XADD an ``ask_user_prompt`` event to ``run:{run_id}`` (mirrors the engine _emit).
 
     One canonical event so the reconnected frontend re-renders the question on
     resume. Same stream/shape the live ``_exec_llm_human_input`` path emits.
+
+    Phase 185 (L-7/L-15): ``None`` serializes to JSON ``null`` — "no deadline", which
+    ``PendingAskCard`` renders as an open-ended wait. Type-only widening; every shipped
+    caller still passes a number.
     """
     await redis.xadd(
         f"run:{run_id}",
@@ -238,7 +242,7 @@ async def resume_pending_prompt(
     tool_call_id: str,
     prompt: str,
     options: "list | None",
-    timeout_seconds: float,
+    timeout_seconds: float | None,
 ) -> "dict | None":
     """Resume a still-PENDING ask_user prompt after a restart (HARNESS-03 / Plan 04).
 
@@ -260,16 +264,24 @@ async def resume_pending_prompt(
     its ``on_subscribed`` window (guaranteeing subscribe-before-emit). Returns the
     parsed wake payload (response / cancel / shutdown) or ``None`` on timeout —
     identical to ``subscribe_for_response``.
+
+    ``timeout_seconds=None`` means **wait indefinitely** — the Phase 185 armed
+    action-risk-checkpoint disposition (GOVERN-03 / SPEC Req 9). A restart must not
+    quietly convert an indefinite wait into a bounded one: the run was parked on a
+    person before the restart and is still parked on them after it.
     """
     async def _reemit():
         await _emit_ask_user_prompt(
             redis, run_id, tool_call_id, prompt, options, timeout_seconds
         )
 
-    # Phase 185 (L-7): plan 185-05 widens this cast so an armed action-risk gate can be
-    # resumed with timeout_seconds=None. Left as-is here — behaviour unchanged.
+    # Phase 185 (L-7): ``None`` passes through UNCHANGED (a ``float()`` cast would
+    # TypeError on it); a real number is still coerced exactly as it shipped, so every
+    # pre-185 caller reaches ``_subscribe_and_block`` with the identical float.
     return await _subscribe_and_block(
-        redis, run_id, tool_call_id, float(timeout_seconds), on_subscribed=_reemit
+        redis, run_id, tool_call_id,
+        None if timeout_seconds is None else float(timeout_seconds),
+        on_subscribed=_reemit,
     )
 
 

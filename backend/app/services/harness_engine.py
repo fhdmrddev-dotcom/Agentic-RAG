@@ -1928,6 +1928,12 @@ async def resume_stranded_workflows(*, pool, redis) -> int:
            - PENDING (False): ``resume_pending_prompt`` re-SUBSCRIBES + re-SADDs +
              re-EMITs the SAME prompt (subscribe-before-emit, Pitfall 2) and blocks
              on the answer BEFORE handing back to the loop.
+      2b. Phase 185 (L-7): an ARMED action-risk step parked on its pre-gate is NOT
+         an ``llm_human_input`` phase (its stored config type is ``llm_agent`` and it
+         has no stored output), so step 2 never sees it. It gets its own branch,
+         keyed on the loaded definition, which re-subscribes the SAME
+         ``tool_call_id`` with NO timeout — the person keeps the card they were
+         already looking at, and the wait stays indefinite across the restart.
       3. Re-drive via ``_resume_run`` → ``run_workflow``, riding the same engine
          machinery a fresh run uses (single producer per run).
 
@@ -1979,6 +1985,44 @@ async def resume_stranded_workflows(*, pool, redis) -> int:
                 "(re-claimable after lease expiry)", run_id,
             )
             continue
+
+        # 2b. Phase 185 (GOVERN-03 / RESEARCH L-7) — the ARMED action-risk branch.
+        #     Runs AFTER the definition load because the arming is only legible on the
+        #     parsed definition (see ``_is_armed_action_risk``); step 2's branch above
+        #     and the load above it are untouched.
+        #
+        #     FIX (a), CHOSEN DELIBERATELY: re-subscribe the SAME ``tool_call_id``
+        #     rather than expire-then-re-ask. G-4 scenario 3's stated failure is "the
+        #     prompt survived but is UNREACHABLE" — and re-asking with a new id IS that
+        #     failure from the person's chair: the card they are looking at (and that
+        #     ``/pending`` serves) stops being the one the run is listening to, while a
+        #     graceful shutdown leaves the old row un-expired (``run_workflow``'s escape
+        #     handler skips ``_expire_pending_ask_user`` when ``is_app_shutting_down()``
+        #     — the 096-09 fix). Preserving the id means exactly ONE live prompt per
+        #     armed pause, and the answer lands on the channel the person can see.
+        #
+        #     ``timeout_seconds=None``: the wait was indefinite before the restart and
+        #     must still be after it, or a restart would quietly re-introduce the expiry
+        #     that reads as "yes" (SPEC Req 9).
+        if active is not None and not _is_llm_human_input(active) \
+                and _is_armed_action_risk(active, definition):
+            pending = await get_pending_ask_user(pool, run_id)
+            _tcid = (pending or {}).get("tool_call_id")
+            if _tcid:
+                if not await ask_user_response_exists(pool, run_id, _tcid):
+                    await resume_pending_prompt(
+                        redis,
+                        run_id,
+                        _tcid,
+                        (pending.get("prompt") or ""),
+                        (pending.get("options") or []),
+                        None,   # indefinite — never a restart-introduced deadline
+                    )
+                # answered → fall through; the re-drive re-runs the phase.
+            # No durable prompt row (a crash BEFORE the insert) → fall through to the
+            # ordinary re-drive unchanged: the pre-gate re-attaches and re-asks. Either
+            # way the run does not advance without an answer.
+
         ctx = await _build_resume_context(run, redis, pool)
         # Facet C (092-07): MANDATORY resume finalizer — terminalize the
         # producer-shell minted in _build_resume_context on EVERY exit path
@@ -2049,6 +2093,31 @@ def _is_llm_human_input(active_phase: dict) -> bool:
     output = active_phase.get("output")
     if isinstance(output, dict) and "tool_call_id" in output:
         return True
+    return False
+
+
+def _is_armed_action_risk(active_phase: dict, definition) -> bool:
+    """True if the active phase row is an ARMED action-risk step (Phase 185 / L-7).
+
+    WHY THE STORED CONFIG CANNOT ANSWER THIS. ``_is_llm_human_input`` reads the
+    ``workflow_phases`` row, which is the right source for the question IT asks. It
+    cannot answer this one: an armed step's stored ``config.phase_type`` is
+    ``llm_agent`` (arming is a VALIDATOR the engine synthesizes at the run seam, never
+    a step — D-185-12/18), and its ``output`` is ``None`` because the phase never
+    completed. So the row looks exactly like any other mid-flight agent step, and the
+    only place the arming is legible is the parsed ``WorkflowDefinition``.
+
+    The two predicates are INDEPENDENT and deliberately kept so: this one is a second
+    named reading beside ``_is_llm_human_input``, not a widening of it. Returns False
+    for anything without a matching ``PhaseSpec`` — a definition that no longer carries
+    the slug falls through to the ordinary re-drive, which is fail-closed either way.
+    """
+    slug = active_phase.get("slug")
+    if not slug or definition is None:
+        return False
+    for spec in getattr(definition, "phases", None) or []:
+        if getattr(spec, "slug", None) == slug:
+            return bool(getattr(spec, "action_risk_armed", False))
     return False
 
 
