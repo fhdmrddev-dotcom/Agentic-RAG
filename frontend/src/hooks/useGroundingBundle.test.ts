@@ -33,10 +33,26 @@ vi.mock("@/lib/api", async () => {
 
 const mockedBundle = vi.mocked(getGroundingBundle)
 
+/**
+ * The server's knowledge-base tool list, as `GET /workflows/grounding-bundle` serves it
+ * (`grounding.KB_TOOLS_SORTED`, 5 names). Written here as a FIXTURE, which is the whole
+ * point of D-185-09: the hook must carry whatever the server said, so the test states the
+ * server's answer and watches the hook's answer follow. The hook itself declares no list —
+ * the `?raw` fence at the bottom of this file is what keeps that true.
+ */
+const SERVER_KB_TOOLS = [
+  "analyze_document",
+  "get_related_documents",
+  "query_documents",
+  "read_document",
+  "search_documents",
+]
+
 /** A complete bundle by default; every test names only the field it is about. */
 function bundleOf(over: Partial<GroundingBundle> = {}): GroundingBundle {
   return {
     tools: [],
+    kb_tools: [],
     folders: [],
     skills: [],
     template_placeholders: [],
@@ -182,6 +198,82 @@ describe("useGroundingBundle — the palette's only caller", () => {
     expect(result.current.kind).toBe("loading")
     expect(warn).not.toHaveBeenCalled()
     warn.mockRestore()
+  })
+
+  // ── Phase 185 (D-185-09) — the KB tool list on every honest reading ──────────────
+
+  it("a ready palette carries the server's KB tool list, by identity", async () => {
+    mockedBundle.mockResolvedValue(bundleOf({ kb_tools: SERVER_KB_TOOLS }))
+
+    const { result } = renderHook(() => useGroundingBundle(true))
+
+    await waitFor(() => expect(result.current.kind).toBe("ready"))
+    if (result.current.kind !== "ready") throw new Error("unreachable — narrowed above")
+    expect(result.current.kbTools).toHaveLength(5)
+    // By IDENTITY: handed on, not rebuilt — the same rule `tools` already obeys.
+    expect(result.current.kbTools).toBe(SERVER_KB_TOOLS)
+  })
+
+  it("a DEGRADED read still carries the full KB list — a failed registry never un-marks a locked step", async () => {
+    mockedBundle.mockResolvedValue(
+      bundleOf({ kb_tools: SERVER_KB_TOOLS, degraded: ["folders"] }),
+    )
+
+    const { result } = renderHook(() => useGroundingBundle(true))
+
+    await waitFor(() => expect(result.current.kind).toBe("unavailable"))
+    if (result.current.kind !== "unavailable") throw new Error("unreachable — narrowed above")
+    expect(result.current.reason).toBe("degraded")
+    // The load-bearing assertion: the folder registry blew up, the lock survives.
+    expect(result.current.kbTools).toHaveLength(5)
+    expect(result.current.kbTools).toEqual(SERVER_KB_TOOLS)
+  })
+
+  it("an unreachable read carries an EMPTY KB list — no answer means no list", async () => {
+    mockedBundle.mockRejectedValue(new Error("network down"))
+
+    const { result } = renderHook(() => useGroundingBundle(true))
+
+    await waitFor(() => expect(result.current.kind).toBe("unavailable"))
+    if (result.current.kind !== "unavailable") throw new Error("unreachable — narrowed above")
+    expect(result.current.reason).toBe("unreachable")
+    expect(result.current.kbTools).toEqual([])
+  })
+
+  it("CHANGE THE MOCK, CHANGE THE KB LIST — the hook declares none of its own", async () => {
+    mockedBundle.mockResolvedValue(bundleOf({ kb_tools: SERVER_KB_TOOLS }))
+    const first = renderHook(() => useGroundingBundle(true))
+    await waitFor(() => expect(first.result.current.kind).toBe("ready"))
+    const before = first.result.current.kind === "ready" ? first.result.current.kbTools : null
+    first.unmount()
+
+    // A 6th KB tool lands backend-side: the client follows with no frontend edit.
+    const grown = [...SERVER_KB_TOOLS, "summarize_document"]
+    mockedBundle.mockResolvedValue(bundleOf({ kb_tools: grown }))
+    const second = renderHook(() => useGroundingBundle(true))
+    await waitFor(() => expect(second.result.current.kind).toBe("ready"))
+    const after = second.result.current.kind === "ready" ? second.result.current.kbTools : null
+
+    expect(before).toHaveLength(5)
+    expect(after).toHaveLength(6)
+    expect(after).toEqual(grown)
+  })
+
+  it("the two waiting readings carry NO kbTools field at all (frozen, identity-comparable)", async () => {
+    const idle = renderHook(() => useGroundingBundle(false))
+    await waitFor(() => expect(idle.result.current).toEqual({ kind: "idle" }))
+    expect(Object.keys(idle.result.current)).toEqual(["kind"])
+
+    const d = deferred<GroundingBundle>()
+    mockedBundle.mockReturnValue(d.promise)
+    const loading = renderHook(() => useGroundingBundle(true))
+    await waitFor(() => expect(loading.result.current.kind).toBe("loading"))
+    expect(Object.keys(loading.result.current)).toEqual(["kind"])
+
+    await act(async () => {
+      d.resolve(bundleOf({ kb_tools: SERVER_KB_TOOLS }))
+      await d.promise
+    })
   })
 
   it("issues exactly ONE request while `enabled` stays true across re-renders (no polling)", async () => {

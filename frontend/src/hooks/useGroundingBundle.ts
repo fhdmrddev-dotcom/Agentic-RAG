@@ -43,6 +43,16 @@
  * transition someone could forget to write, and a previously read palette SURVIVES a
  * transient disable or a re-enable instead of being wiped back to a client-authored empty.
  *
+ * PHASE 185 (D-185-09) — `kbTools` RIDES ON BOTH ANSWER MEMBERS, DELIBERATELY. The
+ * server's knowledge-base tool list is a fixed constant served OUTSIDE every registry
+ * read in `assemble_grounding_bundle`, so it arrives intact even on a 200 that named a
+ * failed folder or skill registry. Carrying it only on `ready` would mean a PostgREST
+ * blip on an unrelated registry silently UN-MARKS a locked step — the canvas would show
+ * a governed step as ungoverned while the engine went on gating it. The client uses this
+ * list for one thing: the local `available_tools ∩ kb_tools` intersection that moves the
+ * dial, the strike-through and the canvas seal on the SAME render as a tool chip. It
+ * never enforces, so a wrong read is a display bug and never a safety hole.
+ *
  * `isAbortError` is a module-local copy of the double-shaped check shipped at
  * `usePanelReconcile.ts:84-92`, exactly as `useLiveValidation.ts:168-173` also keeps one.
  * Neither hook can import the other's private predicate without depending on a whole
@@ -58,6 +68,10 @@ import { getGroundingBundle, type GroundingBundle } from "@/lib/api"
  * `ready.degraded` is the empty TUPLE type, not `string[]`: the only way to construct this
  * member is with a literal `[]`, so a caller cannot widen a partial read into a complete
  * one and the compiler carries the guarantee the docblock above claims.
+ *
+ * `kbTools` sits on BOTH ANSWER members and on NEITHER waiting member. The two waiting
+ * readings carry no data by design and are frozen at module scope so a caller may compare
+ * them by identity across renders; giving either a field would break that.
  */
 export type GroundingBundleState =
   /** Never asked — `enabled` has not been true yet. Zero requests have been issued. */
@@ -68,6 +82,8 @@ export type GroundingBundleState =
   | {
       kind: "ready"
       tools: string[]
+      /** D-185-09 — the server's knowledge-base tool list, handed on untouched. */
+      kbTools: string[]
       folders: GroundingBundle["folders"]
       skills: GroundingBundle["skills"]
       degraded: readonly []
@@ -81,6 +97,13 @@ export type GroundingBundleState =
       kind: "unavailable"
       reason: "degraded" | "unreachable"
       tools: string[]
+      /**
+       * D-185-09 — STILL POPULATED on the `"degraded"` reading. The list is a fixed
+       * server constant, not a per-caller registry read, so a failed folder/skill read
+       * must never un-mark a locked step. On `"unreachable"` there is no answer at all,
+       * so it is `[]` and the canvas simply marks nothing — the server still enforces.
+       */
+      kbTools: string[]
       degraded: string[]
     }
 
@@ -132,6 +155,8 @@ export function useGroundingBundle(enabled: boolean): GroundingBundleState {
             kind: "unavailable",
             reason: "degraded",
             tools: bundle.tools,
+            // Deliberately NOT suppressed on this branch — see the union member's note.
+            kbTools: bundle.kb_tools ?? [],
             degraded: bundle.degraded,
           })
           return
@@ -139,6 +164,7 @@ export function useGroundingBundle(enabled: boolean): GroundingBundleState {
         setAnswer({
           kind: "ready",
           tools: bundle.tools,
+          kbTools: bundle.kb_tools ?? [],
           folders: bundle.folders,
           skills: bundle.skills,
           degraded: [],
@@ -148,7 +174,15 @@ export function useGroundingBundle(enabled: boolean): GroundingBundleState {
         // An abort caused by unmount or by a change in `enabled` is silent by design.
         if (isAbortError(err)) return
         if (controller.signal.aborted) return
-        setAnswer({ kind: "unavailable", reason: "unreachable", tools: [], degraded: [] })
+        // No answer at all means no list: the canvas marks nothing and the server, which
+        // is the only thing that enforces, is unaffected.
+        setAnswer({
+          kind: "unavailable",
+          reason: "unreachable",
+          tools: [],
+          kbTools: [],
+          degraded: [],
+        })
       })
 
     return () => controller.abort()

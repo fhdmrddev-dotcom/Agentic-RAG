@@ -3430,6 +3430,11 @@ export interface ValidateResponse {
  */
 export interface GroundingBundle {
   tools: string[]
+  /** D-185-09 — the SERVER's safety-defining list of knowledge-base-reading tool names.
+   *  The client intersects it with a step's `available_tools` to PREDICT the lock; it
+   *  never enforces (the run-time gate is server-side and unconditional), so a wrong
+   *  read here is a display bug by construction. Never re-declare this list client-side. */
+  kb_tools: string[]
   folders: { id: string; name: string; parent_id: string | null }[]
   skills: { id: string; name: string | null }[]
   template_placeholders: string[]
