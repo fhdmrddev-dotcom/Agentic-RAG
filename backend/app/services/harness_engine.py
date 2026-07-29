@@ -826,9 +826,17 @@ def _ask_user_choices_from_finding(error_message: str) -> list[str]:
     ``error_message`` prefix:
       - ``freshness:staleness|...``         → ["Proceed anyway", "Abort"]
       - ``freshness:version_ambiguity|...`` → ["Proceed despite version ambiguity", "Abort"]
+      - ``action_risk:approval|...``        → ["Approve and run this step", "Do not run it"]
     Any other finding falls back to the generic Proceed/Abort pair. The choices are
     presented to the user; the engine maps the chosen text back to a continue/fail
     routing (an Abort-like choice → fail_run; anything else → Proceed).
+
+    Phase 185 (GOVERN-03 / D-185-14): the ``action_risk:approval|`` pair is the ARMED
+    action-risk checkpoint's. Its wording is deliberately about THE STEP rather than
+    about a finding — nothing was flagged, the author simply said a person decides
+    before this one runs — which is why it does not reuse "Proceed anyway" / "Abort".
+    EVERY string returned from here MUST be classified by ``_is_abort_choice``; see
+    that function's docstring for why an unclassified decline phrase is a fail-open.
 
     WR-08: the version-ambiguity branch presents the HONEST pair matching the
     staleness pair — NOT "Use newest version" / "Use as-is", which implied
@@ -841,12 +849,41 @@ def _ask_user_choices_from_finding(error_message: str) -> list[str]:
         return ["Proceed despite version ambiguity", "Abort"]
     if msg.startswith("freshness:staleness|"):
         return ["Proceed anyway", "Abort"]
+    if msg.startswith("action_risk:approval|"):
+        return ["Approve and run this step", "Do not run it"]
     return ["Proceed anyway", "Abort"]
 
 
+# Phase 185 (GOVERN-03 / RESEARCH L-4) — the set of chosen texts that mean "do NOT
+# proceed". Lower-cased comparison values; the armed decline phrase is written as the
+# SAME literal ``_ask_user_choices_from_finding`` returns, lowered here, so the two
+# cannot drift apart under a rename.
+_ABORT_LIKE_CHOICES = ("abort", "cancel", "stop", "", "Do not run it".lower())
+
+
 def _is_abort_choice(choice: str) -> bool:
-    """A chosen option that means 'do NOT proceed' → honest fail_run (D-11)."""
-    return (choice or "").strip().lower() in ("abort", "cancel", "stop", "")
+    """A chosen option that means 'do NOT proceed' → honest fail_run (D-11).
+
+    **THE INVARIANT (Phase 185 / L-4): every string a branch of
+    ``_ask_user_choices_from_finding`` can return must be classified by this
+    function** — exactly one of each presented pair is abort-like and the other is not.
+
+    THE FAIL-OPEN SHAPE THIS CLOSES. The routing is not symmetric: an abort-like
+    choice fails the run, and *everything else* — including a decline phrase this
+    function does not recognise — falls through to the Proceed branch, which writes a
+    ``validator_ask_user_approved`` receipt and RUNS the step. Before Phase 185 the set
+    was ``("abort", "cancel", "stop", "")``, so the armed checkpoint's ``"Do not run
+    it"`` would have been read as approval: a person clicking *don't* would have sent
+    the email and been recorded as having authorised it. Any FUTURE choice pair must
+    therefore extend this set in the SAME commit that adds it; the invariant guard in
+    ``tests/unit/test_ask_user_disposition.py`` drives every known finding prefix plus
+    the generic fallback and fails if a pair is ever left unclassified.
+
+    The three shipped freshness/generic choices are literally ``"Proceed anyway"``,
+    ``"Proceed despite version ambiguity"`` and ``"Abort"`` — none of which the Phase
+    185 addition touches, so those routings are byte-identical.
+    """
+    return (choice or "").strip().lower() in _ABORT_LIKE_CHOICES
 
 
 async def _resolve_failure_with_ask_user(

@@ -38,6 +38,31 @@ def _phase(slug="p", on_failure="ask_user"):
     )
 
 
+def _armed_phase(slug="send-the-notice"):
+    """Phase 185 (GOVERN-03) — a phase carrying the ARMED action-risk pre-gate, as
+    ``grounding.effective_phase`` synthesizes it: ``timing="pre"``,
+    ``on_failure="ask_user"``, ``max_retries=0``, prompt in ``config``."""
+    from app.models.harness import PhaseSpec, ValidatorSpec
+
+    return PhaseSpec(
+        slug=slug,
+        phase_index=1,
+        config={"phase_type": "programmatic", "fn": "noop"},
+        validators=[
+            ValidatorSpec(
+                kind="action_risk_approval",
+                timing="pre",
+                on_failure="ask_user",
+                max_retries=0,
+                config={"prompt": "Step 2 of 4 is about to run."},
+            )
+        ],
+    )
+
+
+_ARMED_FINDING = "action_risk:approval|Step 2 of 4 is about to run."
+
+
 def _ctx():
     # A minimal ctx: no supabase (skip the durable-row insert), an emit stub, a
     # producer_run_id so the prompt emits on the producer stream.
@@ -257,3 +282,173 @@ def test_non_ask_user_disposition_delegates_to_route():
 
     assert outcome.kind == "fail_run"
     subscribe.assert_not_awaited()
+
+
+# ══ Phase 185 (GOVERN-03 / L-4) — the armed action-risk checkpoint's choices ═══
+#
+# The fail-open being closed here: the routing is asymmetric. An abort-like choice
+# fails the run; EVERYTHING ELSE falls through to Proceed, writes a
+# ``validator_ask_user_approved`` receipt and runs the step. Before this plan
+# ``_is_abort_choice`` matched only ("abort","cancel","stop",""), so an armed
+# checkpoint's "Do not run it" was read as APPROVAL.
+
+
+def test_action_risk_choices_are_about_the_step_not_a_finding():
+    """The ``action_risk:approval|`` prefix yields the armed pair. Nothing was flagged
+    on an armed step — the author simply said a person decides first — so the wording is
+    about the STEP ("Approve and run this step" / "Do not run it"), not about proceeding
+    despite a problem. The three shipped freshness/generic branches are untouched."""
+    from app.services.harness_engine import _ask_user_choices_from_finding
+
+    armed = _ask_user_choices_from_finding(_ARMED_FINDING)
+    assert armed == ["Approve and run this step", "Do not run it"]
+
+    # The shipped branches are byte-identical (regression fence for the new branch).
+    assert _ask_user_choices_from_finding("freshness:staleness|400d old") == [
+        "Proceed anyway", "Abort"
+    ]
+    assert _ask_user_choices_from_finding(
+        "freshness:version_ambiguity|a.docx,b.docx"
+    ) == ["Proceed despite version ambiguity", "Abort"]
+    assert _ask_user_choices_from_finding("anything else") == ["Proceed anyway", "Abort"]
+
+
+def test_every_presented_choice_pair_is_classified():
+    """THE INVARIANT GUARD (L-4), pinned instead of the instance. For EVERY finding
+    prefix ``_ask_user_choices_from_finding`` branches on — plus the generic fallback —
+    the returned pair must contain EXACTLY ONE abort-like choice and one that is not.
+
+    This is deliberately stronger than "does 'Do not run it' fail_run?": it makes a
+    FUTURE third choice pair impossible to add fail-open silently. Add a branch without
+    extending ``_is_abort_choice`` and this test goes red on the new pair, before a user
+    ever clicks a decline that runs the step."""
+    from app.services.harness_engine import (
+        _ask_user_choices_from_finding,
+        _is_abort_choice,
+    )
+
+    findings = [
+        "freshness:staleness|400d old",
+        "freshness:version_ambiguity|a.docx,b.docx",
+        _ARMED_FINDING,
+        "some validator said something unstructured",  # the generic fallback
+        "",                                            # and the empty finding
+    ]
+
+    for finding in findings:
+        pair = _ask_user_choices_from_finding(finding)
+        assert len(pair) == 2, f"{finding!r} did not present a two-option pair"
+        aborts = [c for c in pair if _is_abort_choice(c)]
+        assert len(aborts) == 1, (
+            f"{finding!r} presented {pair!r}, of which {len(aborts)} classify as "
+            f"abort-like — exactly one must. An UNCLASSIFIED decline reads as PROCEED "
+            f"and runs the step with an 'approved' receipt (L-4)."
+        )
+        # And the surviving option is the one that continues.
+        assert not _is_abort_choice([c for c in pair if not _is_abort_choice(c)][0])
+
+
+def test_armed_decline_fails_the_run_and_writes_no_approval():
+    """L-4, the instance. Clicking "Do not run it" on an armed checkpoint FAILS the run.
+    No ``validator_ask_user_approved`` receipt is written — declining is not approving,
+    and the ledger must not record it as such."""
+    from app.services import harness_engine
+
+    write_audit = AsyncMock()
+    subscribe = AsyncMock(
+        return_value={"kind": "response", "response_text": "Do not run it"}
+    )
+
+    with patch.object(harness_engine, "write_audit", write_audit), \
+         patch("app.services.ask_user_service.subscribe_for_response", subscribe):
+        outcome = asyncio.run(
+            harness_engine._resolve_failure_with_ask_user(
+                _armed_phase(), _ARMED_FINDING, 0, 0,
+                run_id=uuid4(), pool=object(), redis=object(), ctx=_ctx(),
+                _audit_user_id=uuid4(), is_pre=True,
+            )
+        )
+
+    assert outcome is not None, "a decline returned None — the body would RUN"
+    assert outcome.kind == "fail_run"
+    assert write_audit.await_count == 0
+
+
+def test_armed_approval_runs_the_body_and_writes_the_receipt():
+    """The other half of the pair. "Approve and run this step" on a PRE gate returns
+    ``None`` (the signal: run the body) and writes the governance receipt carrying the
+    chosen text — so the ledger records WHO said yes to WHAT."""
+    from app.services import harness_engine
+
+    write_audit = AsyncMock()
+    subscribe = AsyncMock(
+        return_value={"kind": "response", "response_text": "Approve and run this step"}
+    )
+
+    with patch.object(harness_engine, "write_audit", write_audit), \
+         patch("app.services.ask_user_service.subscribe_for_response", subscribe):
+        outcome = asyncio.run(
+            harness_engine._resolve_failure_with_ask_user(
+                _armed_phase(), _ARMED_FINDING, 0, 0,
+                run_id=uuid4(), pool=object(), redis=object(), ctx=_ctx(),
+                _audit_user_id=uuid4(), is_pre=True,
+            )
+        )
+
+    assert outcome is None  # pre-gate approval → run the body
+    assert write_audit.await_count == 1
+    _, kwargs = write_audit.await_args
+    assert kwargs["event_type"] == "validator_ask_user_approved"
+    assert kwargs["metadata"]["choice"] == "Approve and run this step"
+
+
+def test_armed_empty_answer_fails_the_run():
+    """An empty answer is not consent. A ``{"kind": "response"}`` carrying no text and
+    no resolvable ``choice_index`` classifies as abort-like → fail_run, so a silently
+    empty POST can never advance an armed step."""
+    from app.services import harness_engine
+
+    write_audit = AsyncMock()
+    subscribe = AsyncMock(
+        return_value={"kind": "response", "response_text": "", "choice_index": None}
+    )
+
+    with patch.object(harness_engine, "write_audit", write_audit), \
+         patch("app.services.ask_user_service.subscribe_for_response", subscribe):
+        outcome = asyncio.run(
+            harness_engine._resolve_failure_with_ask_user(
+                _armed_phase(), _ARMED_FINDING, 0, 0,
+                run_id=uuid4(), pool=object(), redis=object(), ctx=_ctx(),
+                _audit_user_id=uuid4(), is_pre=True,
+            )
+        )
+
+    assert outcome is not None
+    assert outcome.kind == "fail_run"
+    assert write_audit.await_count == 0
+
+
+def test_armed_decline_by_choice_index_also_fails():
+    """A choice CLICK arrives as ``{response_text: "", choice_index: 1}``. The engine
+    resolves index 1 of the armed pair back to "Do not run it" and fails the run — the
+    click path and the typed path must route identically."""
+    from app.services import harness_engine
+
+    write_audit = AsyncMock()
+    subscribe = AsyncMock(
+        return_value={"kind": "response", "response_text": "", "choice_index": 1}
+    )
+
+    with patch.object(harness_engine, "write_audit", write_audit), \
+         patch("app.services.ask_user_service.subscribe_for_response", subscribe):
+        outcome = asyncio.run(
+            harness_engine._resolve_failure_with_ask_user(
+                _armed_phase(), _ARMED_FINDING, 0, 0,
+                run_id=uuid4(), pool=object(), redis=object(), ctx=_ctx(),
+                _audit_user_id=uuid4(), is_pre=True,
+            )
+        )
+
+    assert outcome is not None
+    assert outcome.kind == "fail_run"
+    assert write_audit.await_count == 0
