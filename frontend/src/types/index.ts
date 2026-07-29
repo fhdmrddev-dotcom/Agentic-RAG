@@ -926,7 +926,13 @@ export interface PendingAsk {
   tool_call_id: string
   prompt: string
   options: string[]
-  timeout_seconds: number
+  /** Phase 185 (GOVERN-03): `null` means **no deadline — the run is waiting for
+   *  you**, the armed action-risk checkpoint's disposition (SPEC Req 9: with the
+   *  checkpoint set, no answer must mean the run never proceeds, so there is no
+   *  expiry that could quietly read as "yes"). Additive — every other prompt still
+   *  sends a number, and PendingAskCard renders the null case as an open-ended
+   *  wait rather than counting it down to expired (L-15). */
+  timeout_seconds: number | null
   message_id?: string
   run_id?: string
   created_at?: string

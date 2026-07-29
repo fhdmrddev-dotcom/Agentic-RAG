@@ -7,7 +7,7 @@
  * ABSENT — A2 / Pitfall 1: submit must be gated + reconcile triggered).
  */
 import { describe, it, expect, vi, afterEach } from "vitest"
-import { render, screen, waitFor, cleanup, within } from "@testing-library/react"
+import { act, render, screen, waitFor, cleanup, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { axe } from "vitest-axe"
 import { mockPendingAskWithRunId, mockPendingAskNoRunId } from "./fixtures"
@@ -55,7 +55,11 @@ vi.mock("@/providers/StreamsProvider", () => ({
   }),
 }))
 
-import { PendingAskCard, PendingAskStack } from "../PendingAskCard"
+import {
+  NO_DEADLINE_WAITING_LINE,
+  PendingAskCard,
+  PendingAskStack,
+} from "../PendingAskCard"
 
 afterEach(() => {
   cleanup()
@@ -363,5 +367,77 @@ describe("PendingAskCard (096-04) — 404 honesty + created_at-derived countdown
     // genuinely-fresh SSE path (emission ≈ mount) honestly shows the full clock.
     render(<PendingAskCard ask={mockPendingAskNoRunIdButReady()} reconcile={noopReconcile} />)
     expect(screen.getByText("5:00")).toBeInTheDocument()
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 185 Plan 05 (GOVERN-03 / L-15) — a prompt with NO deadline.
+//
+// The armed action-risk checkpoint sends `timeout_seconds: null`: the engine
+// subscribes with no timeout, so the run really does wait for a person forever
+// (SPEC Req 9 — no answer must mean the run never proceeds). Before this plan the
+// card seeded its countdown from that value and flipped to `expired`, rendering
+// "No response within 0:00 — agent stopped" the instant the prompt appeared —
+// G-4 scenario 3's named failure ("the prompt survived but is unreachable"),
+// shipped by the fix meant to prevent it.
+//
+// The honesty fence cuts BOTH ways: the waiting sentence may appear on the
+// null-deadline card and must NEVER appear on a card that has a deadline.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const mockPendingAskNoDeadline = (): PendingAsk => ({
+  ...mockPendingAskWithRunId,
+  tool_call_id: "tc-armed-1",
+  prompt: 'Step 2 of 4, "Send the renewal notice", is about to run.',
+  options: ["Approve and run this step", "Do not run it"],
+  timeout_seconds: null,
+})
+
+describe("PendingAskCard (185-05) — a null deadline is a wait, never an expiry", () => {
+  it("stays pending forever with timeout_seconds: null — fake timers advanced far past any plausible deadline", () => {
+    vi.useFakeTimers()
+    try {
+      render(<PendingAskCard ask={mockPendingAskNoDeadline()} reconcile={noopReconcile} />)
+      // 100_000 s ≫ the 300 s the shipped prompts use, and ≫ the created_at
+      // seed that makes a stale reconciled prompt mount expired.
+      act(() => {
+        vi.advanceTimersByTime(100_000_000)
+      })
+      // Still the amber needs-you card…
+      expect(screen.getByText("Needs you")).toBeInTheDocument()
+      // …and nothing anywhere claims it stopped.
+      expect(screen.queryByText(/agent stopped/i)).not.toBeInTheDocument()
+      expect(screen.queryByText(/^Expired$/)).not.toBeInTheDocument()
+      // No countdown is rendered at all — a clock with no deadline behind it is
+      // the lie this task removes.
+      expect(screen.queryByText(/^\d+:\d{2}$/)).not.toBeInTheDocument()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it("renders the waiting line verbatim from the exported const when there is no deadline", () => {
+    render(<PendingAskCard ask={mockPendingAskNoDeadline()} reconcile={noopReconcile} />)
+    expect(screen.getByText(NO_DEADLINE_WAITING_LINE)).toBeInTheDocument()
+    // The question itself still renders — the card is not replaced by the line.
+    expect(
+      screen.getByText('Step 2 of 4, "Send the renewal notice", is about to run.'),
+    ).toBeInTheDocument()
+  })
+
+  it("NEVER renders the waiting line on a card that HAS a deadline (SPEC Req 9, third bullet)", () => {
+    // timeout_seconds: 300 — the unarmed control. This run does not wait; it
+    // expires. Saying "the run is waiting for your answer" here would be false.
+    render(<PendingAskCard ask={mockPendingAskWithRunId} reconcile={noopReconcile} />)
+    expect(screen.queryByText(NO_DEADLINE_WAITING_LINE)).toBeNull()
+    // …and its countdown is untouched.
+    expect(screen.getByText(/^\d+:\d{2}$/)).toBeInTheDocument()
+  })
+
+  it("has no axe violations with no deadline", async () => {
+    const { container } = render(
+      <PendingAskCard ask={mockPendingAskNoDeadline()} reconcile={noopReconcile} />,
+    )
+    expect(await axe(container)).toHaveNoViolations()
   })
 })

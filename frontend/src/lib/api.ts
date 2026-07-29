@@ -835,7 +835,8 @@ export async function subscribeToRun(
             tool_call_id: parsed.tool_call_id as string,
             prompt: parsed.prompt as string,
             options: (parsed.options ?? []) as string[],
-            timeout_seconds: parsed.timeout_seconds as number,
+            // Phase 185: `null` = no deadline (the armed action-risk checkpoint).
+            timeout_seconds: parsed.timeout_seconds as number | null,
             // D-12 (Phase 093): additive — the prior-phase draft the user confirms.
             // Optional; absent on older streams → undefined (harmless).
             draft: parsed.draft as string | undefined,
