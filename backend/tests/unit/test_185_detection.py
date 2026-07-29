@@ -441,3 +441,179 @@ def test_the_models_module_declares_no_model_validator_on_phase_spec():
     )
     # Control: the regex DOES fire on a planted decorator.
     assert re.search(r"@\s*model_validator", "@model_validator(mode='after')\ndef f(): ...")
+
+
+# ══ D-185-09 — the palette route serves the list as DATA ═════════════════════
+#
+# The route half of the one-home rule. These call the REAL
+# `grounding.assemble_grounding_bundle` behind a fake supabase (rather than monkeypatching
+# the assembler), because the claim under test is precisely that the ASSEMBLER populates the
+# field on every path — a stubbed bundle would prove only that the route copies whatever it
+# is handed. The fakes are the `test_182_grounding_degradation.py` doubles, trimmed.
+
+
+class _FakeQuery:
+    """A fluent supabase-py query stand-in serving a fixed row set."""
+
+    def __init__(self, rows):
+        self._rows = list(rows)
+        self._ranged = None
+
+    def select(self, *_a, **_k):
+        return self
+
+    def eq(self, *_a, **_k):
+        return self
+
+    def or_(self, *_a, **_k):
+        return self
+
+    def range(self, start, end):
+        self._ranged = (start, end)
+        return self
+
+    def execute(self):
+        if self._ranged is not None:
+            start, end = self._ranged
+            self._ranged = None
+            return SimpleNamespace(data=self._rows[start:end + 1])
+        return SimpleNamespace(data=list(self._rows))
+
+
+class _RaisingQuery(_FakeQuery):
+    """A table whose read blows up — the DEGRADED path, not a verdict."""
+
+    def __init__(self):
+        super().__init__([])
+
+    def execute(self):
+        raise RuntimeError("simulated registry outage")
+
+
+class _FakeSupabase:
+    def __init__(self, **tables):
+        self.tables = dict(tables)
+
+    def table(self, name):
+        return self.tables.setdefault(name, _FakeQuery([]))
+
+
+def _folder_rows(n: int = 2) -> list[dict]:
+    return [
+        {
+            "id": f"{i:08d}-0000-0000-0000-00000000000f",
+            "user_id": _CALLER,
+            "name": f"folder-{i}",
+            "parent_id": None,
+            "is_org_shared": False,
+            "org_id": _ORG,
+        }
+        for i in range(n)
+    ]
+
+
+def _skill_rows() -> list[dict]:
+    return [
+        {
+            "id": _SKILL_ID,
+            "name": "A Real Registered Skill",
+            "user_id": _CALLER,
+            "is_org_shared": False,
+            "is_system": False,
+            "org_id": _ORG,
+            "is_enabled": True,
+        }
+    ]
+
+
+def _healthy_client() -> _FakeSupabase:
+    return _FakeSupabase(
+        folders=_FakeQuery(_folder_rows()),
+        org_members=_FakeQuery([{"org_id": _ORG}]),
+        skills=_FakeQuery(_skill_rows()),
+    )
+
+
+async def _palette(supabase):
+    """Call the `/workflows/grounding-bundle` handler DIRECTLY (the `_validate` posture)."""
+    from app.api import workflows as wf
+
+    return await wf.get_grounding_bundle(
+        current_user={"id": _CALLER},
+        supabase=supabase,
+        template_asset_id=None,
+    )
+
+
+@pytest.mark.asyncio
+async def test_the_palette_serves_every_kb_tool_name_sorted():
+    """D-185-09 — the client can read the safety-defining list instead of hardcoding it."""
+    from app.services.harness.grounding import KB_TOOLS_SORTED
+
+    response = await _palette(_healthy_client())
+
+    assert response.kb_tools == KB_TOOLS_SORTED
+    assert len(response.kb_tools) == 5
+    assert response.degraded == []  # the healthy control
+
+
+@pytest.mark.asyncio
+async def test_a_degraded_palette_still_carries_the_kb_tool_list():
+    """A folders/skills outage must NOT silently un-mark a locked step.
+
+    PRE-FIX SHAPE THIS GUARDS AGAINST: filtering the list through `tools`, or skipping it on
+    the degraded branch. Either would make a transient PostgREST blip render a grounded step
+    as ungoverned — on the one surface whose whole job is to say what is governed — while the
+    engine went on gating it. "We could not read your palette" is a different sentence from
+    "this step reads nothing".
+    """
+    from app.services.harness.grounding import KB_TOOLS_SORTED
+
+    degraded_client = _FakeSupabase(
+        folders=_RaisingQuery(),
+        org_members=_FakeQuery([{"org_id": _ORG}]),
+        skills=_FakeQuery(_skill_rows()),
+    )
+
+    response = await _palette(degraded_client)
+
+    assert response.degraded == ["folders"], "the control: this request really did degrade"
+    assert response.kb_tools == KB_TOOLS_SORTED
+
+
+@pytest.mark.asyncio
+async def test_the_route_computes_nothing_it_serves_the_shared_bundle_field():
+    """The list is read off the ONE shared bundle, never re-derived in the route.
+
+    Proven behaviourally: swap the assembler for one returning a DIFFERENT list and the
+    response follows it. A route that spelled the constant itself would ignore the swap —
+    and would be a second home for the safety-defining names (D-182-06).
+    """
+    from app.services.harness import grounding as g
+
+    async def _fake_assemble(**_kwargs):
+        return g.GroundingBundle(
+            tools=["search_documents"],
+            tool_names={"search_documents"},
+            kb_tools=["a_sentinel_tool"],
+        )
+
+    original = g.assemble_grounding_bundle
+    g.assemble_grounding_bundle = _fake_assemble
+    try:
+        response = await _palette(_healthy_client())
+    finally:
+        g.assemble_grounding_bundle = original
+
+    assert response.kb_tools == ["a_sentinel_tool"]
+
+
+@pytest.mark.asyncio
+async def test_the_tools_field_keeps_its_shipped_string_list_shape():
+    """`tools: list[str]` is typed `string[]` on BOTH members of `useGroundingBundle`'s state
+    union and on `PhaseFormRails.toolOptions` — converting it to a list of objects would be a
+    breaking change to a shipped, cacheable, near-static route. The new list is ADDITIVE."""
+    response = await _palette(_healthy_client())
+
+    assert response.tools, "the healthy control must actually carry a tool palette"
+    assert all(isinstance(t, str) for t in response.tools)

@@ -367,6 +367,21 @@ class GroundingBundleResponse(BaseModel):
     (D-182-01): ``/validate`` fires on every canvas edit; the palette is near-static."""
 
     tools: list[str] = Field(default_factory=list)
+    # Phase 185 (D-185-09 / GOVERN-01) — the KB-READING tool names. The client intersects
+    # this with a phase's ``available_tools`` so the grounding dial, the strike-through on the
+    # loose side and the canvas seal all move on the SAME render as a tool chip: no debounce,
+    # no reload, and no network hop just to print a refusal reason.
+    #
+    # THE CLIENT NEVER ENFORCES. Req 4's run-time gate is unconditional and server-side, so a
+    # wrong client read is a DISPLAY bug by construction and never a safety hole. What the
+    # client must not do is own the LIST — a hardcoded frontend copy is a second copy of the
+    # safety-defining names, and the day a 6th KB tool lands backend-side the canvas silently
+    # stops marking it (the exact drift D-182-06's RED LINE was written against).
+    #
+    # NOT filtered by ``tools``, and NOT suppressed when ``degraded`` is non-empty: this is the
+    # safety-DEFINING list, not a per-caller registry read, and a degraded folder/skill read
+    # must never silently un-mark a locked step.
+    kb_tools: list[str] = Field(default_factory=list)
     # CR-02: EXPLICIT per-row models, never ``list[dict]``. A bare ``list[dict]`` shipped the raw
     # ``folders``/``skills`` DB rows verbatim — leaking ``org_id`` + the seeding owner's
     # ``user_id`` on a brand-new surface, bypassing the projection every sibling read applies.
@@ -706,6 +721,10 @@ async def get_grounding_bundle(
     _null_foreign_global_owner(bundle.skills, str(user_id))
     return GroundingBundleResponse(
         tools=bundle.tools,
+        # Read off the SHARED bundle, NEVER recomputed here — the same discipline the
+        # ``degraded`` comment below enforces. ``assemble_grounding_bundle`` stays the ONE
+        # computation, so this route cannot drift from the rule the engine enforces.
+        kb_tools=bundle.kb_tools,
         folders=bundle.folders,
         skills=bundle.skills,
         template_placeholders=bundle.placeholders,
