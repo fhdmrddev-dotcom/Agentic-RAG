@@ -25,6 +25,7 @@ import { fireEvent, render, screen, within } from "@testing-library/react"
 
 import phaseFormPanelSource from "./PhaseFormPanel?raw"
 import { PhaseFormPanel, type PhaseFormRails, type PhaseGateRow } from "./PhaseFormPanel"
+import { GOVERNANCE_GATE_ROW_LABEL } from "./definitionOps"
 import type { PhaseSpecJSON } from "./phaseVocabulary"
 
 function phaseOf(config: Record<string, unknown>): PhaseSpecJSON {
@@ -114,7 +115,7 @@ describe("PhaseFormPanel — WITHOUT rails, the panel is today's panel (D-14 / D
     // Without this, the assertion above could pass on a typo in every marker string.
     const { container } = renderPanel(
       AGENT,
-      railsOf({ toolOptions: ["search_documents"], gates: [{ label: "Must cite its sources", locked: true }] }),
+      railsOf({ toolOptions: ["search_documents"], gates: [{ label: GOVERNANCE_GATE_ROW_LABEL, locked: true }] }),
     )
     for (const marker of RAIL_MARKERS) {
       expect(container.innerHTML).toContain(marker)
@@ -276,7 +277,7 @@ describe("PhaseFormPanel rails — the tool whitelist comes from the bundle (R11
 
 describe("PhaseFormPanel rails — gates cannot be wired around", () => {
   const gates: PhaseGateRow[] = [
-    { label: "Must cite its sources", locked: true },
+    { label: GOVERNANCE_GATE_ROW_LABEL, locked: true },
     { label: "Output file is valid", locked: false, onRemove: () => {} },
   ]
 
@@ -296,7 +297,7 @@ describe("PhaseFormPanel rails — gates cannot be wired around", () => {
       AGENT,
       railsOf({
         gates: [
-          { label: "Must cite its sources", locked: true },
+          { label: GOVERNANCE_GATE_ROW_LABEL, locked: true },
           { label: "Output file is valid", locked: false, onRemove },
         ],
       }),

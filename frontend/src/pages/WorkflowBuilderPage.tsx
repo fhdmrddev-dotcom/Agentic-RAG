@@ -139,7 +139,7 @@ import { useStore } from "zustand"
 import { generateWorkflow, createWorkflowDraft, updateWorkflowDraft, listFolders, listSkills } from "@/lib/api"
 import { PhaseSpineGraph } from "@/components/workflows/PhaseSpineGraph"
 import {
-  groundingFor,
+  groundingCauseOf,
   nodeTitle,
   type PhaseSpecJSON,
 } from "@/components/workflows/phaseVocabulary"
@@ -164,7 +164,13 @@ import { useLiveValidation } from "@/hooks/useLiveValidation"
 import { useGroundingBundle } from "@/hooks/useGroundingBundle"
 import { DEGRADED_SENTENCE, groupVerdicts } from "@/components/workflows/verdictModel"
 import { clearNudges, readNudges, writeNudge } from "@/components/workflows/canvasNudge"
-import { canRemovePhase, renumber, type PhaseTypeId } from "@/components/workflows/definitionOps"
+import {
+  canRemovePhase,
+  renumber,
+  GOVERNANCE_GATE_ROW_LABEL,
+  type PhaseGovernancePatch,
+  type PhaseTypeId,
+} from "@/components/workflows/definitionOps"
 import type { CanvasNode } from "@/components/workflows/canvasModel"
 // TYPE-ONLY, and that is load-bearing: `WorkflowCanvas` is `React.lazy` so the chunk is
 // never requested with the flag off, and a value import of anything from that module
@@ -290,25 +296,47 @@ function countMoved(
 }
 
 /**
- * The gates rail, DERIVED exactly as the shipped `groundingFor()` derives grounding
- * today — `citation_policy` plus the presence of a `citations_required` validator, and
- * nothing else. **Phase 184 invents no authored grounding field**; Phase 185 replaces
- * this derivation and plugs into the same `rails.gates` array (D-183-07 / the panel's
- * own rails docblock).
+ * The gates rail. **Phase 185 replaces the 184 derivation** (`citation_policy` plus a
+ * declared `citations_required` validator) with the graded-governance reading: the row
+ * appears when the step's grounding CAUSE is `detected` or `escalated`, and it carries
+ * `GOVERNANCE_GATE_ROW_LABEL` — the one home of that sentence.
  *
- * Every row is LOCKED, and that is the honest reading rather than a shortcut: both
- * causes are structural from this panel's point of view. A `strict` / `flag` policy came
- * with the Sourcing-strictness dial rendered a few rows above — change it and the gate
- * goes, which is exactly what the rail's own footnote promises — and a `citations_required`
- * validator is a `validators` entry, which this form has no write seam for at all
- * (`onChange` patches `config`). Offering a Remove button that could not remove anything
+ * ── D-185-19 — WHY THIS IS SYNTHESIZED HERE AND NOT READ OFF THE SERVER ──
+ *
+ * `POST /workflows/validate` returns `ValidateResponse(ok, verdicts)` where a verdict is
+ * `{code, phase, message, severity}` — a list of PROBLEMS. It has no channel for "here is
+ * a gate that will run", a passing gate produces nothing at all, and whether a future run
+ * will retrieve anything is unknowable at author time. So nothing here waits on that
+ * route. The client already holds `available_tools` and the server's `kb_tools`, so it
+ * PREDICTS here while the server ENFORCES at run time — the same client-predicts /
+ * server-enforces split D-185-09 established, and the reason a wrong reading is a display
+ * bug rather than a safety hole. `WorkflowBuilderPage.canvas.test.tsx` pins the negative
+ * with a positive control.
+ *
+ * ── D-185-11 — the publish half, which IS true and DOES bite ──
+ *
+ * The gauntlet gains no new stage for this. But its golden run drives `run_workflow` and
+ * therefore the run-time enforcement seam, so a detected step whose golden run retrieves
+ * nothing now blocks publish. The row is an author-time warning about a real consequence,
+ * not decoration.
+ *
+ * Every row is LOCKED, and that is the honest reading rather than a shortcut: the cause is
+ * structural from this panel's point of view. `detected` follows from the tool list a few
+ * rows above — switch the document tools off and the gate goes, which is exactly what the
+ * rail's own footnote promises — and `escalated` is undone on the governance dial below,
+ * not by a Remove button here. Offering a Remove button that could not remove anything
  * would be the "a removable gate with no way to remove it" lie the row union exists to
  * make un-representable.
  */
-function gatesFor(phase: PhaseSpecJSON | null): PhaseGateRow[] {
+function gatesFor(phase: PhaseSpecJSON | null, kbTools: readonly string[]): PhaseGateRow[] {
   if (phase === null) return []
-  const grounding = groundingFor(phase)
-  return grounding.mode === "open" ? [] : [{ label: grounding.words, locked: true }]
+  const cause = groundingCauseOf(phase, kbTools)
+  // `already-set` deliberately produces NO row. Its gate is owned by the Sourcing-
+  // strictness control a few rows above, and 185-07's section says so in words; a second
+  // claim here would be two surfaces one scroll apart describing one stored field.
+  return cause === "detected" || cause === "escalated"
+    ? [{ label: GOVERNANCE_GATE_ROW_LABEL, locked: true }]
+    : []
 }
 
 /**
@@ -747,7 +775,29 @@ export function WorkflowBuilderPage({
   const bundle = useGroundingBundle(canvasEnabled)
   const toolOptions: string[] | "degraded" = bundle.kind === "ready" ? bundle.tools : "degraded"
 
-  /** The three governance rails for the SELECTED step. Every value is derived or
+  /**
+   * The server's KB-reading tool names (Phase 185 / D-185-09), read on BOTH honest
+   * readings of the palette — deliberately NOT gated the way `toolOptions` is.
+   *
+   * `toolOptions` answers "which tools may this person pick", so anything short of a
+   * complete `ready` read must fail closed to `"degraded"`. `kbTools` answers a
+   * different question — "which tool names mean this step reads your documents" — and
+   * the server serves that list OUTSIDE every try/except precisely because it does not
+   * depend on who is asking (185-02 / 185-06: the `unavailable` member carries the full
+   * list). A folders-or-skills outage must never silently un-mark a locked step. Absent
+   * (`idle` / `loading`) it is EMPTY, which marks nothing — the safe direction, because
+   * the run-time gate is server-side and unconditional either way.
+   *
+   * ONE value, TWO readers: the same array goes to `gatesFor`, to the panel's governance
+   * section via `rails.kbTools`, and to `toCanvas` via the canvas's `kbTools` prop — so
+   * the seal, the dial and the locked row can never disagree about one step.
+   */
+  const kbTools = useMemo<readonly string[]>(
+    () => (bundle.kind === "ready" || bundle.kind === "unavailable" ? bundle.kbTools : []),
+    [bundle],
+  )
+
+  /** The four governance rails for the SELECTED step. Every value is derived or
    *  server-sourced HERE; the panel computes none of it. */
   const rails = useMemo<PhaseFormRails>(() => {
     const order = renumber(phases).map((p) => p.slug)
@@ -755,9 +805,10 @@ export function WorkflowBuilderPage({
     return {
       order: { index: at + 1, total: order.length },
       toolOptions,
-      gates: gatesFor(selectedPhase),
+      gates: gatesFor(selectedPhase, kbTools),
+      kbTools,
     }
-  }, [phases, selectedSlug, selectedPhase, toolOptions])
+  }, [phases, selectedSlug, selectedPhase, toolOptions, kbTools])
 
   /**
    * The cosmetic vertical nudge. `canvasNudge.ts` owns every read and every write —
@@ -1044,6 +1095,21 @@ export function WorkflowBuilderPage({
     (patch: PhaseConfigPatch) => {
       if (selectedSlug === null) return
       store.getState().patchConfig(selectedSlug, patch)
+    },
+    [selectedSlug, store],
+  )
+
+  // Phase 185 (D-185-10) — the governance write, in `onPhaseChange`'s exact shape and
+  // for the same reason: the immutable merge lives in `definitionOps.setPhaseGovernance`
+  // and is reached through the store's `setGovernance` action, so this page declares no
+  // second copy of it. It is a SEPARATE callback rather than a widening of `onPhaseChange`
+  // because the two booleans are PhaseSpec-level siblings of `validators`, not config
+  // keys — `PhaseConfigPatch` was deliberately not widened, which makes writing one of
+  // them into `config` a typecheck error rather than a review comment.
+  const onGovernanceChange = useCallback(
+    (patch: PhaseGovernancePatch) => {
+      if (selectedSlug === null) return
+      store.getState().setGovernance(selectedSlug, patch)
     },
     [selectedSlug, store],
   )
@@ -1371,6 +1437,9 @@ export function WorkflowBuilderPage({
           selectedSlug={selectedSlug}
           onSelectNode={handleSelectNode}
           onClearSelection={clearSelection}
+          // Phase 185 (D-185-09) — the SAME list the panel's dial and `gatesFor` read.
+          // One value, three readers; the canvas derives none of it and fetches none of it.
+          kbTools={kbTools}
           // Phase 184-11 — the editing half, composed HERE and nowhere else. This branch
           // is unreachable unless `canvasEnabled` is true (`activeGraphView` pins to
           // "spine" otherwise), so the flag is passed explicitly rather than assumed.
@@ -1570,7 +1639,13 @@ export function WorkflowBuilderPage({
           // Spine view and the flagged Canvas view, and "absent renders today's panel" is
           // the mechanism that keeps a flag-off surface byte-identical for everyone
           // including operators.
-          {...(canvasEnabled ? { rails } : {})}
+          //
+          // Phase 185's `onGovernanceChange` rides the SAME conditional rather than
+          // arriving as a second, unconditional prop. The governance section is mounted
+          // on `rails`, so a handler passed without it could never fire — and adding an
+          // always-on governance prop would leak the canvas contract into the Spine view,
+          // which is precisely what D-181-01's byte-identity promise forbids.
+          {...(canvasEnabled ? { rails, onGovernanceChange } : {})}
         />
       </div>
     </div>

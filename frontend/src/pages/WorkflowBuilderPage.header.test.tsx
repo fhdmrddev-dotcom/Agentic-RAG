@@ -461,7 +461,12 @@ describe("Builder header — the canvas gate is defined ONCE (D-184.1-04)", () =
     expect(builderSource).toMatch(/const canvasEnabled = useCanvasGate\(\)/)
     // The spread-conditional that keeps the flag-off props genuinely ABSENT, on all three
     // sides. `rails` is the shipped precedent (D-14); the two header slots follow it.
-    expect(builderSource).toMatch(/canvasEnabled \? \{ rails \}/)
+    // Phase 185-08 widened the payload — `onGovernanceChange` rides the SAME conditional
+    // rather than arriving as a second, unconditional prop — so the guard is anchored on
+    // the CONDITIONAL and on `rails` leading it, not on the object being one key wide.
+    // A governance prop that escaped the gate would still fail here.
+    expect(builderSource).toMatch(/canvasEnabled \? \{ rails[,\s}]/)
+    expect(builderSource).not.toMatch(/^\s*onGovernanceChange=\{/m)
     expect(workflowsPageSource).toMatch(/canvasEnabled \? \{ inline: true, headerLead/)
     expect(doorSwitchSource).toMatch(/inline \? \{ headerLead, headerTrail/)
   })

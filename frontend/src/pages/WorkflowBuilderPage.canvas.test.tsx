@@ -93,6 +93,9 @@ import { PublishGauntlet } from "@/components/workflows/PublishGauntlet"
 // rather than hardcoded so an assertion cannot drift from the card's own vocabulary.
 import { branching, evalCoverage } from "@/components/workflows/__fixtures__/canvasFixtures"
 import { nodeTitle } from "@/components/workflows/phaseVocabulary"
+// Phase 185-08: the ONE home of the locked-row sentence. IMPORTED, never re-typed, so
+// the assertions below are character-identity rather than a second copy of the copy.
+import { GOVERNANCE_GATE_ROW_LABEL } from "@/components/workflows/definitionOps"
 
 mockReactFlow()
 
@@ -745,7 +748,18 @@ describe("WorkflowBuilderPage 184-11 — the page source fences hold with the lo
   })
 
   it("passes rails SPREAD-CONDITIONALLY so the flag-off prop is absent by construction", () => {
-    expect(builderSource).toMatch(/canvasEnabled \? \{ rails \}/)
+    // Phase 185-08 widened the payload: `onGovernanceChange` rides the SAME conditional.
+    // The guard is therefore anchored on the CONDITIONAL with `rails` leading it, not on
+    // the object being exactly one key wide — the property being defended is "every
+    // canvas-only prop is absent with the flag off", not the key count.
+    expect(builderSource).toMatch(/canvasEnabled \? \{ rails[,\s}]/)
+    // …and the governance handler is INSIDE it, never a second always-on prop line.
+    expect(builderSource).toMatch(/canvasEnabled \? \{ rails, onGovernanceChange \}/)
+    expect(builderSource).not.toMatch(/^\s*onGovernanceChange=\{/m)
+    // POSITIVE CONTROL — the escaped form really would be caught.
+    expect("          onGovernanceChange={onGovernanceChange}").toMatch(
+      /^\s*onGovernanceChange=\{/m,
+    )
   })
 })
 
@@ -1417,5 +1431,163 @@ describe("WorkflowBuilderPage 184-13 — R12: the bottom region adds no band to 
     // ONE save path, two entry points: the toolbar's trigger and the header's shipped one
     // both call `onSaveDraft`, so the row was PATCHed exactly once.
     expect(mockUpdate).toHaveBeenCalledTimes(1)
+  })
+})
+
+// ── Phase 185-08 (GOVERN-01 / GOVERN-02 · D-185-11 / D-185-19) ───────────────────────
+//
+// The author-time `🔒` row and the governance write chain, asserted on the PAGE because
+// the page is where both are composed: `gatesFor` synthesizes the row from data the
+// client already holds, and `onGovernanceChange` closes the four-layer chain
+// (page useCallback → builderStore.setGovernance → definitionOps.setPhaseGovernance →
+// the definition).
+//
+// THE LOAD-BEARING ONE IS THE NEGATIVE. D-185-19: `POST /workflows/validate` returns
+// PROBLEMS, with no channel for "here is a gate that will run", so nothing may wait on
+// it for this row. That is asserted with a positive control, because a spy that could
+// never fire proves nothing at all.
+
+describe("WorkflowBuilderPage 185-08 — the client-synthesized locked gate row", () => {
+  /** The SERVER's answer, as the wire serves it. The client hardcodes no tool name;
+   *  these arrive on `GET /workflows/grounding-bundle` (D-185-09). */
+  const SERVER_KB_TOOLS = [
+    "search_documents",
+    "list_documents",
+    "get_document",
+    "search_folder",
+    "read_file",
+  ]
+
+  /** Two steps, the first an agent. `available_tools` is the only thing that differs
+   *  between the two readings below, so nothing else can explain a changed verdict. */
+  function draftWithTools(tools: string[]): BuilderDefinition {
+    return {
+      ...definition,
+      phases: [
+        {
+          slug: "research",
+          phase_index: 0,
+          config: { phase_type: "llm_agent", prompt: "look it up", available_tools: tools },
+        },
+        { slug: "summarize", phase_index: 1, config: { phase_type: "llm_single", prompt: "write it" } },
+      ],
+    }
+  }
+
+  const seen: BuilderDefinition[] = []
+  const latest = () => seen[seen.length - 1]
+
+  /** Render the Builder with the flag on, observing the live definition through the
+   *  shipped `renderPublish` seam — the 184-12 idiom, so the write chain is asserted on
+   *  what the page actually holds rather than on a mocked store. */
+  function renderGoverned(def: BuilderDefinition) {
+    seen.length = 0
+    mockBundle.mockResolvedValue({
+      tools: ["search_documents", "execute_code"],
+      kb_tools: SERVER_KB_TOOLS,
+      folders: [],
+      skills: [],
+      degraded: [],
+    })
+    return render(
+      <EffectiveFeaturesProvider value={{ ...FLAG_ON, refetch: vi.fn() }}>
+        <div style={{ width: 1200, height: 800 }}>
+          <WorkflowBuilderPage
+            initial={{ definition: def, draftId: "draft-1" }}
+            renderPublish={(d) => {
+              seen.push(d as BuilderDefinition)
+              return null
+            }}
+          />
+        </div>
+      </EffectiveFeaturesProvider>,
+    )
+  }
+
+  /** Open the step's form and wait for the palette to land, so an assertion about the
+   *  KB reading is never taken on the pre-fetch frame. */
+  async function openResearch(tools: string[], cause: string) {
+    renderGoverned(draftWithTools(tools))
+    fireEvent.click(await screen.findByTestId("spine-node-research"))
+    const section = await screen.findByTestId("rail-governance")
+    await waitFor(() => expect(section.getAttribute("data-cause")).toBe(cause))
+    return section
+  }
+
+  it("a KB-reading step shows EXACTLY ONE locked row, carrying the one constant", async () => {
+    await openResearch(["search_documents"], "detected")
+
+    const rows = await screen.findAllByTestId("gate-row")
+    expect(rows).toHaveLength(1)
+    expect(rows[0].textContent).toContain(GOVERNANCE_GATE_ROW_LABEL)
+    expect(rows[0].getAttribute("data-locked")).toBe("true")
+    // Locked means locked: a Remove button that could remove nothing would be the lie
+    // the row union exists to make un-representable.
+    expect(rows[0].querySelectorAll('button, [role="button"], input')).toHaveLength(0)
+  })
+
+  it("the SAME step with only non-KB tools produces ZERO rows", async () => {
+    // The contrast case, in the same block on purpose: a test that only ever shows the
+    // row is compatible with a page that shows it unconditionally.
+    await openResearch(["execute_code"], "none")
+
+    expect(screen.queryAllByTestId("gate-row")).toHaveLength(0)
+    expect(screen.getByTestId("rail-gates").textContent).not.toContain(GOVERNANCE_GATE_ROW_LABEL)
+  })
+
+  it("D-185-19 — the row is synthesized LOCALLY; /workflows/validate is never asked for it", async () => {
+    await openResearch(["search_documents"], "detected")
+    expect((await screen.findAllByTestId("gate-row"))[0].textContent).toContain(
+      GOVERNANCE_GATE_ROW_LABEL,
+    )
+
+    // Well past the live loop's 500 ms debounce, so "zero" is not "not yet".
+    await new Promise((resolve) => setTimeout(resolve, 700))
+    expect(mockValidate).toHaveBeenCalledTimes(0)
+
+    // POSITIVE CONTROL — the very same spy DOES fire once the page has a reason to ask.
+    // Without this the assertion above would be green on a spy wired to nothing.
+    const field = await screen.findByLabelText(/instructions/i)
+    fireEvent.change(field, { target: { value: "search the vendor corpus" } })
+    await waitFor(() => expect(mockValidate).toHaveBeenCalled(), { timeout: 3000 })
+  })
+
+  it("the dial writes through the store, and every other phase stays toBe-identical", async () => {
+    // A LOOSE agent, so the strict side is pressable — a detected step's dial is already
+    // strict and clicking it writes nothing (that is D-185-07, asserted in 185-07).
+    const section = await openResearch(["execute_code"], "none")
+
+    const before = latest().phases
+    expect(before[0].grounding_escalated ?? false).toBe(false)
+    const untouched = before[1]
+
+    fireEvent.click(screen.getByTestId("governance-dial-strict"))
+
+    await waitFor(() => expect(latest().phases[0].grounding_escalated).toBe(true))
+    // The write landed at PhaseSpec level on the NAMED slug only. Reference identity is
+    // the strongest available statement that the merge did not go one layer down or
+    // rebuild a neighbour.
+    expect(latest().phases[1]).toBe(untouched)
+    expect(latest().phases).toHaveLength(2)
+    expect(latest().phases.map((p) => p.phase_index)).toEqual([0, 1])
+
+    // …and the synthesized row follows the new cause, with no reload and no server ask.
+    await waitFor(() => expect(section.getAttribute("data-cause")).toBe("escalated"))
+    const rows = await screen.findAllByTestId("gate-row")
+    expect(rows).toHaveLength(1)
+    expect(rows[0].textContent).toContain(GOVERNANCE_GATE_ROW_LABEL)
+  })
+
+  it("the arming switch writes action_risk_armed and changes no step count or index", async () => {
+    await openResearch(["execute_code"], "none")
+    const untouched = latest().phases[1]
+
+    fireEvent.click(screen.getByTestId("governance-arm"))
+
+    await waitFor(() => expect(latest().phases[0].action_risk_armed).toBe(true))
+    // SPEC Req 8: arming is a gate ON the step, never an extra step.
+    expect(latest().phases).toHaveLength(2)
+    expect(latest().phases.map((p) => p.phase_index)).toEqual([0, 1])
+    expect(latest().phases[1]).toBe(untouched)
   })
 })
