@@ -250,7 +250,7 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 185-01-PLAN.md — the 137-D → 137-B card-geometry rebuild (D-185-17), standalone, before any governance mark lands
+- [x] 185-01-PLAN.md — the 137-D → 137-B card-geometry rebuild (D-185-17), standalone, before any governance mark lands
 - [ ] 185-02-PLAN.md — the two additive-optional PhaseSpec booleans, KB_TOOLS + the pure grounding_cause derivation, and kb_tools on the palette route
 
 **Wave 2** *(blocked on Wave 1 completion)*

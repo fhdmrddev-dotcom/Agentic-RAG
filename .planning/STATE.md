@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
 status: executing
-last_updated: "2026-07-28T22:00:36.119Z"
-last_activity: 2026-07-28 -- Phase 185 planning complete
+last_updated: "2026-07-29T14:27:01.959Z"
+last_activity: 2026-07-29 -- Phase 185 plan 01 executed (137-B card rebuild)
 progress:
   total_phases: 19
   completed_phases: 4
   total_plans: 50
-  completed_plans: 38
+  completed_plans: 39
   percent: 21
 ---
 
@@ -22,7 +22,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-20 — Phase 163 THE ATOMIC CRUX complete; membership RLS enforced)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 184 — Editable Canvas + Live Structural Validation (Round-Trip)
+**Current focus:** Phase 185 — graded-governance-per-node-grounding-mode-action-risk-dial
 
 ## Deferred Items
 
@@ -44,8 +44,8 @@ Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 op
 
 ## Current Position
 
-Phase: 184.1 (Builder Header Consolidation) — COMPLETE, ready for verification
-Plan: 1 of 1
+Phase: 185 (graded-governance-per-node-grounding-mode-action-risk-dial) — EXECUTING
+Plan: 2 of 11
 
 **Phase 184.1 COMPLETE (`90f07551` pin → `0e9466de` merge → `12c557b3` budget+guards → SUMMARY).**
 The Builder's three stacked header bands collapse into ONE flag-gated row, reclaiming **a MEASURED
@@ -282,7 +282,7 @@ Status: Ready to execute
 
 **G-2 sketch gate for Phase 183: SATISFIED (2026-07-25).** Sketches 134-137 committed (`01bb4c64`, `7b74d2b5`, `01d50bba`, `86f866c5`, `e35c7489`). Winners: **136-B** (horizontal left->right flow) + **137-D** (frosted-glass step cards, 3D icon floating at the left edge, plain language with technical names behind the Alt reveal, Alive-by-default motion). Locked rules the canvas phases inherit: **colour budget** (step-type colour is a tint behind the icon only — the strong colours belong to Phase 188 run status) and **motion keys off run state, never selection**. New reusable asset `.planning/sketches/themes/phase-icons-3d.js` (verified 3D fluent-emoji marks; NEVER text glyphs). Icon choices: `llm_agent` -> `compass`; `llm_batch_agents` gets a lighter icon well in-scope, with the cross-cutting `handshake` swap left open. **Two findings that must reach the 183 plan: (1) `skip_to_phase` is used ZERO times in all 95 live definitions — SC#1's branch edge needs a fixture; (2) 40 of 95 definitions have zero phases — the empty projection is the most common canvas state.**
 
-Last activity: 2026-07-28 -- Phase 185 planning complete
+Last activity: 2026-07-29
 
 ### Quick Tasks Completed
 
@@ -698,6 +698,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 122 P02 | ~13min | 2 tasks (TDD) tasks | 3 files files |
 | Phase 122 P03 | ~6min | 2 tasks | 3 files |
 | Phase 175 P01 | ~35min | 2 tasks (1 TDD) | 5 files |
+| Phase 185 P01 | 33min | 2 tasks | 5 files |
 | Phase 175 P04 | ~7min | 2 tasks (2 TDD) | 5 files |
 | Phase 123 P01 | 9min | 2 tasks | 8 files |
 | Phase 123 P02 | 7min | 2 tasks | 3 files |
@@ -804,6 +805,10 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 
 ## Decisions
 
+- [Phase 185]: 185-01 (D-185-17): the 137-D → 137-B card rebuild SHIPPED as its own Wave-1 plan, before any governance mark. `PhaseNodeCard` is now a 248px centre-aligned card inside the 260px node box with the 3D mark floating above its top edge (`left-1/2 top-[-26px]`, 62×62); `CANVAS_LAYOUT.NODE_MIN_HEIGHT` 96 → 104 and `pt-[42px]` are D-185-17's amendments to `themes/canvas-184.css` (which carries 96/34) — every other constant is the sketch theme verbatim. The VALID-03 verdict mark moved `-right-2` → `-left-2 top-1.5`; the card's TOP-RIGHT corner is now empty and CLAIMED for plan 185-09's governance seal. Zero governance signal was added.
+- [Phase 185]: 185-01: SPEC acceptance criterion 23's zone check runs over RENDERED marks only. The plan's Task-2 prose asked for zero overlap across {icon, verdict, stepNumber}, which its own Task-1 prose contradicts (the relocated verdict grazes the 137-B `.stepn` slot by 2×16px) — resolved toward the `must_haves`/SPEC wording, with the graze pinned as a hard `toBe(32)` residual plus a live assertion that the slot paints nothing (D-183-07) and that the documented `left:16` remedy clears it.
+- [Phase 185]: 185-01: geometry assertions PARSE the component's own Tailwind placement classes off the rendered DOM (container dims from `CANVAS_LAYOUT`) rather than re-typing literals, so editing a placement class moves the boxes. The check was physically driven RED on the pre-rebuild card (`icon well × verdict = 112px²`, exactly D-185-17's hand-computed 14×8) before being accepted green, and those pre-rebuild boxes are now a permanent positive control so it can never go vacuous.
+- [Phase 185]: 185-01: `vitest-count-gate.cjs` CANNOT exit 0 in this phase — measured pre-existing, not caused here. Baseline (`59c32a06`, all five files reverted) = 1497 total / **34 failed** with three stale positive pins (`canvasModel.purity.test.ts` +10, `WorkflowCanvas.test.tsx` +2, `WorkflowBuilderPage.canvas.test.tsx` +50); after the plan = 1504 / 35, the +7 being exactly this plan's new tests. Failing-test NAME diff = 5 new / 4 fixed, all in untouched files, no test in both lists — flake churn (SEED-056 + the `Axe is already running` cross-file pollution). The half this plan owns holds: `canvasModel.test.ts` is exactly 26, delta 0.
 - [Phase 184]: 184-01 (D-184-08): the count gate ships as its OWN single-file commit BEFORE any Wave-0 source change, so the icon swap it carves out is itself measured by it. `scripts/vitest-count-gate.cjs` pins per-FILE counts keyed by bare filename with named failure reasons (`[failing-tests]` / `[total-below-baseline]` / `[missing-file]` / `[count-decrease]`); INCREASES are allowed and printed as `+N` (feature waves add tests), only decreases fail. A gate is falsified before it is trusted — delete a test, observe the named failure, restore, observe green, record both.
 - [Phase 184]: 184-01 (D-184-07): the icon swap touches FIVE places in ONE commit — both maps, both `~icons` imports, the verified-slugs docblock, and the one pinned assertion. Swapping `soulData.PHASE_GLYPHS` alone leaves `phaseGlyph()` returning the old 3D component while the string fallback changed (a silent split-brain). The commit contains exactly the three icon files, so `git revert ffb3e9cf` undoes the icon decision alone and leaves the gate standing.
 - [Phase 184]: 184-01 (D-184-08 carve-out — SPENT): `soulData.test.ts:132-133` (`"robot"`→`"compass"`, `"busts-in-silhouette"`→`"handshake"`) is the ONE permitted assertion edit in phase 184. Every other plan is under a zero-assertion-edit gate: an assertion that HAS to change means the extraction was not behaviour-preserving — that is the signal, not an inconvenience.
