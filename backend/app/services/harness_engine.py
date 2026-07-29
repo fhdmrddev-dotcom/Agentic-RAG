@@ -1115,7 +1115,33 @@ async def run_workflow(
 
     # Map the parsed definition's PhaseSpec by slug so we dispatch on the typed
     # config while iterating the durable rows in phase_index order.
-    spec_by_slug = {p.slug: p for p in definition.phases}
+    #
+    # ── Phase 185 (GOVERN-01 Req 4) — THE ONE ENFORCEMENT SEAM ──────────────────
+    # The synthesis below is what makes the citation gate fire "whether or not the
+    # definition JSONB declares it, including on already-published definitions" —
+    # its rule, its rationale and its NEVER-persisted contract live in one place,
+    # `app.services.harness.grounding` (read that docstring before changing this).
+    # This dict is the single chokepoint: DOWNSTREAM of every
+    # `WorkflowDefinition.model_validate()` (fresh kickoff, boot-time resume, AND the
+    # publish golden run, which drives `run_workflow` from
+    # `publish_service._drive_golden_run`) and UPSTREAM of `_run_phase_with_gates`,
+    # which owns the pre-gate pass, the post-gate pass, the WR-03 retry rebinding and
+    # `_route_on_failure` — all of which read `phase.validators` off the object handed
+    # over here. Because the synthesis happens inside `run_workflow` it never touches
+    # the save path (`db/workflows.py` persists `model_dump(mode="json")`), so no
+    # synthesized `ValidatorSpec` can ever be persisted; and the `workflow_phases`
+    # rows, minted from the original definition, are left untouched. An ungoverned
+    # phase comes back BY REFERENCE — the same object, not a copy.
+    #
+    # PUBLISH CONSEQUENCE, stated here rather than discovered in UAT: the publish
+    # gauntlet gains NO new stage (D-185-11's letter holds), but publish BEHAVIOUR
+    # changes for detected steps — a detected step whose golden run retrieves nothing
+    # now fails the existing golden-run stage and blocks publish. Every
+    # `workflow_definitions` row today is throwaway test data, so this is acceptable.
+    from app.services.harness.grounding import effective_phase
+
+    _total = len(definition.phases)
+    spec_by_slug = {p.slug: effective_phase(p, total_phases=_total) for p in definition.phases}
     ordered = sorted(rows, key=lambda r: r["phase_index"])
     index_by_slug = {row["slug"]: i for i, row in enumerate(ordered)}
 
