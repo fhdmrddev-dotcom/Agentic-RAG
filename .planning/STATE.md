@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
 status: executing
-last_updated: "2026-07-29T14:27:01.959Z"
-last_activity: 2026-07-29 -- Phase 185 plan 01 executed (137-B card rebuild)
+last_updated: "2026-07-29T14:56:00.000Z"
+last_activity: 2026-07-29 -- Phase 185 plan 02 executed (detection foundation - PhaseSpec intents + KB_TOOLS)
 progress:
   total_phases: 19
   completed_phases: 4
   total_plans: 50
-  completed_plans: 39
+  completed_plans: 40
   percent: 21
 ---
 
@@ -45,7 +45,40 @@ Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 op
 ## Current Position
 
 Phase: 185 (graded-governance-per-node-grounding-mode-action-risk-dial) — EXECUTING
-Plan: 2 of 11
+Plan: 3 of 11
+
+**Plan 185-02 COMPLETE (`f3584c5b` PhaseSpec intents → `04d475d4` KB_TOOLS + grounding_cause →
+`9fe05885` the palette field → `df28e813` SUMMARY).** The detection foundation plans 03/06/07/08
+all read from. **The names are final and downstream plans reference them literally:**
+`PhaseSpec.grounding_escalated` / `PhaseSpec.action_risk_armed` (both `bool = False`),
+`ValidatorSpec.kind` grown 9 → 10 with `"action_risk_approval"`, `grounding.KB_TOOLS` (frozenset)
++ `grounding.KB_TOOLS_SORTED` (wire form) + `grounding_cause(phase) -> "detected" | "already-set"
+| "escalated" | None`, `GroundingBundle.kb_tools`, and the wire key **`kb_tools`** on
+`GET /workflows/grounding-bundle`. **Req 3 is now true BY CONSTRUCTION, not by audit** — only the
+author's escalation INTENT is stored; `detected` and `already-set` are recomputed at read time
+from `config`, so there is no representable value that says a detected step is free to think and a
+hand-edited JSONB row cannot lie. **The branch order is the mechanism** (detection checked FIRST):
+an escalated step that gains `search_documents` reports `detected` and the stored bit goes INERT
+without being rewritten, so the undo disappears and returns on its own when the tool is removed.
+The KB list has exactly ONE backend home (D-182-06 red line) and reaches the client as DATA;
+the client predicts, the server enforces. **Falsified:** `grounding_mode = "detected"` planted at
+module scope in `grounding.py` turned the criterion-8 tokenizer source guard RED (output quoted in
+the SUMMARY), then reverted — the guard strips comments AND string literals, so it cannot be
+satisfied by editing prose (the D-ITEM-183-02 trap), and its needles are assembled from fragments.
+Gates: 11/11 + 38/38 new, 161 passed across the grounding/harness/182/185 set, `git diff --stat --
+supabase/migrations` **0 files** (live head stays 113), `-- frontend/` **0 files**, the D-14 Deep
+fence **0 files**, exactly the 5 planned files touched. **Nothing enforces anything yet** — the
+`harness_engine.py:1118` `spec_by_slug` seam is untouched and is plan 185-03's.
+**GOVERN-01 / GOVERN-03 deliberately left `Pending`** in REQUIREMENTS.md (the 184-02 precedent):
+this plan ships the substrate, not a user-visible capability, and marking them Complete at plan 2
+of 11 would make the traceability table lie for the rest of the phase.
+**Side effect to expect at every surface:** `model_dump(mode="json")` now writes
+`"grounding_escalated": false, "action_risk_armed": false` into every saved draft JSONB — additive
+and harmless (identical to `name: null` since 103), but the first save after 185 is not a
+zero-diff save. **Out of scope, logged:** `pytest tests/unit` is 62 failed / 1549 passed on this
+tree, all pre-existing rot in unrelated files (retrieval/sql/explorer/multimodal + one unmocked
+live-provider test) — recorded in the phase's `deferred-items.md`; verification must scope its
+pytest runs rather than assert a globally green suite.
 
 **Phase 184.1 COMPLETE (`90f07551` pin → `0e9466de` merge → `12c557b3` budget+guards → SUMMARY).**
 The Builder's three stacked header bands collapse into ONE flag-gated row, reclaiming **a MEASURED
