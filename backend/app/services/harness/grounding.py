@@ -89,7 +89,7 @@ from app.utils.db import coerce_uid
 from app.utils.skill_visibility import build_skill_visibility_or, skill_row_visible
 
 if TYPE_CHECKING:  # pragma: no cover — typing only, keeps the module import-light
-    from app.models.harness import WorkflowDefinition
+    from app.models.harness import ValidatorSpec, WorkflowDefinition
 
 logger = logging.getLogger(__name__)
 
@@ -836,3 +836,118 @@ def grounding_cause(phase) -> str | None:
     if getattr(phase, "grounding_escalated", False):
         return "escalated"
     return None
+
+
+# ── Phase 185 (GOVERN-01 / GOVERN-03) — the ONE synthesis home ────────────────
+#
+# What the ENGINE runs is not always what the author wrote. Two gates are attached at
+# run time and NEVER stored: the citation gate a *detected* step earns (D-185-01/04)
+# and the approval pre-gate an *armed* step earns (D-185-12). Both live here, in the
+# D-182-06 one-rule-one-home module, for the same reason the KB list does — a second
+# copy of "which steps are governed" is a safety hole, not a duplication smell.
+
+
+def _approval_sentence(phase, total_phases: int) -> str:
+    """The D-185-14 engine-generated approval prompt for an ARMED step.
+
+    There is NO new authored-message field. The sentence is composed here, at synthesis
+    time, because this is the one place where ``len(definition.phases)`` is in hand, and
+    it rides to the pause inside the synthesized spec's ``config["prompt"]``.
+
+    HONESTY RULES (SPEC Req 9). This copy MAY say the run waits — with plan 185-04's
+    indefinite subscribe that is simply true, and a person deciding whether to answer
+    now deserves to know the run is not proceeding without them. It never says
+    *approved*, *safe*, or *proven*: it states POSITION (which step, out of how many),
+    IDENTITY (what the step is called) and CONSEQUENCE (the run is stopped here), and
+    nothing about the quality of what is about to happen. The UNARMED
+    ``llm_human_input`` copy is untouched by this and must NOT say the run waits — that
+    step is a question inside the flow, not a hold on it.
+
+    Pure; no I/O. ``phase.name or phase.slug`` is the author-facing label (``name`` is
+    the Phase-103 optional display name; the slug is the always-present fallback).
+    """
+    label = getattr(phase, "name", None) or phase.slug
+    return (
+        f'Step {phase.phase_index + 1} of {total_phases}, "{label}", is about to run. '
+        f"This step is marked as needing your approval first. "
+        f"The run is waiting here and will not continue until you answer."
+    )
+
+
+def effective_phase(phase, *, total_phases: int):
+    """The phase the ENGINE runs: the authored validators PLUS any synthesized gates.
+
+    **NEVER PERSISTED. Called from ``harness_engine.py``'s ``spec_by_slug`` seam ONLY.**
+    Pure — no I/O, no pool, no clock. That seam sits downstream of every
+    ``WorkflowDefinition.model_validate()`` (fresh kickoff, boot-time resume, and the
+    publish golden run) and upstream of ``_run_phase_with_gates``, and it never touches
+    the save path, so no synthesized ``ValidatorSpec`` can reach the JSONB.
+
+    **This must never become a Pydantic ``model_validator``** (RESEARCH L-2). The draft
+    save path is ``json.dumps(definition.model_dump(mode="json"))`` (``db/workflows.py``),
+    so a ``@model_validator(mode="after")`` on ``PhaseSpec`` would bake the synthesized
+    gate permanently into the stored definition on the very next save — after which
+    removing the KB tool would leave the gate attached forever, breaking SPEC Req 3's
+    "removing the tool is the only exit" and contradicting D-185-07.
+
+    APPEND, NEVER PREPEND. ``harness_engine`` seeds the WR-03 retry bound from
+    ``validators[0].max_retries``; prepending would change that seed for every phase
+    that already carries authored validators. Appending keeps ``validators[0]`` the
+    author's first spec, so the seed is byte-identical.
+
+    RETURNS THE PHASE ITSELF WHEN THERE IS NOTHING TO ADD — identity, by reference, the
+    ``graft_skill_snapshots`` early-return shape. That is what makes "byte-identical when
+    unset" (D-14) a STRUCTURAL property rather than a claim: an ungoverned phase is not
+    copied, not rebuilt, not re-defaulted — it is the same object.
+
+    DOES NOT MUTATE. ``graft_skill_snapshots`` is the right analog for WHERE and WHEN and
+    the wrong one for HOW: it writes ``phase.config.skill_snapshot`` in place because that
+    value belongs to the run's definition. A synthesized gate must never be observable to
+    any other reader holding the same parsed object, so this uses ``model_copy``.
+
+    D-185-05 — WHEN THE AUTHOR ALREADY DECLARED A ``citations_required`` VALIDATOR, BOTH
+    SPECS RUN. The engine's spec is appended, never substituted: the author's runs at its
+    own index and the engine's at index N. ``run_gates`` returns on the FIRST failure, so
+    a deliberately weak author spec (``mode: presence, min_markers: 0``) passes and is
+    then followed by the real one. The author's spec cannot displace the engine's, and
+    substituting would silently discard the author's ``on_failure`` routing. That is what
+    makes "not author-loosenable-away" structural rather than trusted.
+    """
+    from app.models.harness import ValidatorSpec  # function-local (import-light module)
+
+    extra: list[ValidatorSpec] = []
+
+    # D-185-12 — the armed action-risk checkpoint, a timing="pre" gate. It runs BEFORE
+    # the executor body and always fails, so the shipped ask_user disposition owns the
+    # pause. Arming therefore changes neither len(phases) nor any phase_index: no phase
+    # is added, one validator is.
+    if getattr(phase, "action_risk_armed", False):
+        extra.append(
+            ValidatorSpec(
+                kind="action_risk_approval",
+                timing="pre",
+                on_failure="ask_user",
+                max_retries=0,
+                config={"prompt": _approval_sentence(phase, total_phases)},
+            )
+        )
+
+    # D-185-01/04 — the citation gate a DETECTED step earns. Only "detected": an
+    # "already-set" step declared its own policy and an "escalated" one is the author's
+    # own doing, both of which the shipped paths already handle. The disposition is
+    # retry-with-feedback then fail_run (on_failure="fail_run", max_retries=2), NOT
+    # ask_user — 185 ships no run surface to ask on (that is Phase 188).
+    if grounding_cause(phase) == "detected":
+        extra.append(
+            ValidatorSpec(
+                kind="citations_required",
+                timing="post",
+                on_failure="fail_run",
+                max_retries=2,
+                config={"mode": "retrieved_and_cited"},
+            )
+        )
+
+    if not extra:
+        return phase
+    return phase.model_copy(update={"validators": [*phase.validators, *extra]})
