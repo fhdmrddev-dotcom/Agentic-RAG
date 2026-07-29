@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
 status: executing
-last_updated: "2026-07-29T16:00:36.237Z"
+last_updated: "2026-07-29T16:34:51.838Z"
 last_activity: 2026-07-29
 progress:
   total_phases: 19
@@ -916,6 +916,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 184 P13 | 30min | 3 tasks | 7 files |
 | Phase 184.1 P01 | 35min | 3 tasks | 4 files |
 | Phase 185 P04 | 20min | 3 tasks | 5 files |
+| Phase 185 P07 | 26min | 3 tasks | 4 files |
 
 ## Decisions
 
@@ -1141,6 +1142,8 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase ?]: D-184.1-04: the Builder's three header bands are contributed at three NESTING levels, so the two ancestor band owners read the canvas flag too — through ONE exported useCanvasGate() rule; App.tsx's single useEffectiveFeatures fetch is untouched
 - [Phase ?]: D-184.1-01: the merged Builder header is FLAG-GATED, so flag-off byte-identity holds by construction — the header had never been pinned by any suite before 184.1
 - [Phase ?]: 185-04: the armed action-risk shutdown fix is guarded by is_action_risk; the freshness gate keeps today's destructive-on-deploy fail_run because SPEC Req 9 scopes the fail-closed change to armed checkpoints only, proved by an unchanged-path control test
+- [Phase ?]: 185-07: PhaseFormRails.kbTools ships OPTIONAL — required would break WorkflowBuilderPage typecheck; absent marks nothing (D-185-09 safe direction)
+- [Phase ?]: 185-07: the grounding refusal renders whenever the loose side is refused, not on press — a disabled button fires no click, so press-to-reveal could never appear
 
 ## Operator Next Steps
 
