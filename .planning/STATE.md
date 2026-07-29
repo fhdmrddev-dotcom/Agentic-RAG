@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
 status: executing
-last_updated: "2026-07-29T16:34:51.838Z"
+last_updated: "2026-07-29T17:23:30.225Z"
 last_activity: 2026-07-29
 progress:
   total_phases: 19
   completed_phases: 4
   total_plans: 50
-  completed_plans: 44
+  completed_plans: 45
   percent: 21
 ---
 
@@ -45,8 +45,64 @@ Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 op
 ## Current Position
 
 Phase: 185 (graded-governance-per-node-grounding-mode-action-risk-dial) — EXECUTING
-Plan: 4 of 11 (185-06 landed OUT OF ORDER — it is Wave 2 and depends only on 185-02, so 04 and 05
-remain the next sequential work. Summaries on disk: 01, 02, 03, 06.)
+Plan: 6 of 11 (185-06 AND 185-07 landed OUT OF ORDER — both are Wave 2/3 frontend plans depending
+only on 185-02/185-06. Summaries on disk: 01, 02, 03, 04, 05, 06, 07. Next sequential work is
+185-08.)
+
+**Plan 185-05 COMPLETE (`7a55b9da` waiting-is-not-failing → `a4010b46` the resume sweep's armed
+branch → `fa2b56da` the no-deadline card).** The armed wait is now HONEST end to end. **(1) L-5
+closed:** the pre-gate failure block no longer announces `gate_failed` before it pauses — an armed
+checkpoint writes an **`action_risk_pending`** audit row (`{phase, timing}` only, never the raw
+finding) and emits **`action_risk_pending`** (`phase` only) on the producer stream. **Phase 188's
+run surface is the named consumer; no frontend handler exists yet, deliberately** (an unhandled
+event is inert and the `ask_user_prompt` that follows is what the person sees — D-185-13). Every
+other failing pre-gate keeps `gate_failed` byte-identical in BOTH channels; `grep -c
+'event_type="gate_failed"'` is **3 before and 3 after**. **(2) L-7 closed with fix (a):**
+`resume_stranded_workflows` gained a step-**2b** branch (inserted AFTER the existing
+`_load_run_definition`, so the whole sweep diff is **purely additive — zero deleted lines**) keyed
+on the NEW predicate **`_is_armed_action_risk(active_phase, definition)`**, which reads the parsed
+`WorkflowDefinition` because an armed step's stored `workflow_phases.config` says `llm_agent` and
+its `output` is null. It re-subscribes the **SAME `tool_call_id`** with **`timeout_seconds=None`**
+— chosen over expire-and-re-ask because re-asking with a new id IS G-4 scenario 3's named failure
+from the person's chair. **`_is_llm_human_input` is byte-UNCHANGED** and the two predicates are
+asserted independent on the same fixture. `resume_pending_prompt` + `_emit_ask_user_prompt` widened
+to `float | None` with a `None`-preserving coercion. **(3) L-15 closed:**
+`PendingAsk.timeout_seconds` is now **`number | null`** and `PendingAskCard` is TOTAL over the null
+case (one `hasDeadline` reading; the tick effect returns early so `remaining <= 0 → expired` is
+UNREACHABLE; no clock renders; `formatClock` is never called on a null) — without it every armed
+prompt would have rendered *"No response within 0:00 — agent stopped"* on arrival. The waiting copy
+has ONE home, the exported **`NO_DEADLINE_WAITING_LINE`**, asserted PRESENT on the null card and
+**ABSENT** on a `timeout_seconds: 300` card (SPEC Req 9's honesty fence, both sides).
+**All three tasks falsified RED and reverted** (always-armed predicate → the freshness control red;
+`_is_armed_action_risk → False` → both L-7 tests red; the `hasDeadline` guard disabled → both card
+tests red). Gates: `test_185_engine_attachment.py` **22 passed**, **281 passed** across the
+harness/grounding/185/ask_user/validator/gate/workflow/publish/resume set, `PendingAskCard.test.tsx`
+**27 passed** (23→27, no case deleted, 0 deletions inside either pre-existing expiry block), tsc
+**33** (= baseline, 0 naming a touched file), count gate per the VALIDATION posture (no
+`[count-decrease]` / `[total-below-baseline]` / `[missing-file]`; total **1574**; failures churned
+20→24 on an unchanged tree, and `PendingAskCard` is absent from the 63-file failing list).
+`phase_types.py` **0 files** (criterion 20 holds), migrations **0 files** (head stays 113), D-14
+Deep fence **0 files**.
+**⚠ G-4 scenario 3 is NOT closed by this plan — every layer of it is now individually correct and
+the SEAM BETWEEN THEM IS UAT.** Unproven by unit tests: that an armed run genuinely reaches
+`find_resumable_runs` after a real restart; that `/pending` serves the resumed card to a
+reconnected browser with `timeout_seconds: null` intact through the real wire; and that a click on
+the resumed card publishes onto the channel the sweep re-subscribed.
+**⚠ RESIDUE, recorded in the phase's `deferred-items.md` with a re-open trigger:** answering an
+armed checkpoint DURING a resume produces ONE further ask (the sweep unblocks, `_resume_run`
+re-runs the still-`active` phase, the pre-gate mints a new id). Strictly better than before — the
+pre-185-05 path produced that fresh ask anyway *while leaving the old row un-expired*, so
+`/pending` served a DEAD card beside a live one — and fail-CLOSED throughout. Closing it needs a
+durable-answer short-circuit at the disposition seam (a DB read + a resume-identity contract), i.e.
+an architectural change outside SPEC Req 9's wording. **Phase 188 will render both asks.**
+**Plan-internal contradiction documented (no code change forced):** Task 2's action mandates
+`None if timeout_seconds is None else float(timeout_seconds)` while its own acceptance grep
+requires `float(timeout_seconds)` to score 0 — the substring is inside the mandated expression. The
+action text won; the bare hard cast at the call site is gone (`grep -c "tool_call_id,
+float(timeout_seconds)"` → 0). **One Rule-2 auto-fix:** `api.ts`'s `ask_user_prompt` SSE parse cast
+the value to `number`, laundering the very `null` this plan plumbs — now `number | null`.
+**GOVERN-03 stays `Pending`** in REQUIREMENTS.md (the 185-02/03/04/06 precedent): the engine and
+the card are honest, but the arming AFFORDANCE is 185-07/08's and the live G-4 pass has not run.
 
 **Plan 185-06 COMPLETE (`e1ed4011` the KB list on the palette hook → `65438580` the two intents +
 12 copy constants + `setPhaseGovernance` → `10aababe` the `setGovernance` store action).** The
@@ -917,6 +973,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 184.1 P01 | 35min | 3 tasks | 4 files |
 | Phase 185 P04 | 20min | 3 tasks | 5 files |
 | Phase 185 P07 | 26min | 3 tasks | 4 files |
+| Phase 185 P05 | 40 | 3 tasks | 7 files |
 
 ## Decisions
 
@@ -1144,6 +1201,9 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase ?]: 185-04: the armed action-risk shutdown fix is guarded by is_action_risk; the freshness gate keeps today's destructive-on-deploy fail_run because SPEC Req 9 scopes the fail-closed change to armed checkpoints only, proved by an unchanged-path control test
 - [Phase ?]: 185-07: PhaseFormRails.kbTools ships OPTIONAL — required would break WorkflowBuilderPage typecheck; absent marks nothing (D-185-09 safe direction)
 - [Phase ?]: 185-07: the grounding refusal renders whenever the loose side is refused, not on press — a disabled button fires no click, so press-to-reveal could never appear
+- [Phase 185]: 185-05: L-7 fixed by re-subscribing the SAME tool_call_id (fix a), not expire-and-re-ask — re-asking with a new id IS G-4 scenario 3's named failure from the person's chair
+- [Phase 185]: 185-05: an armed pause writes and emits action_risk_pending, never gate_failed; the audit row carries {phase,timing} only because the raw finding IS the person's prompt and already reaches the browser (T-185-05-04)
+- [Phase 185]: 185-05: PendingAsk.timeout_seconds is number|null and the countdown is TOTAL over null; NO_DEADLINE_WAITING_LINE renders only without a deadline (SPEC Req 9 honesty fence, asserted on both sides)
 
 ## Operator Next Steps
 
