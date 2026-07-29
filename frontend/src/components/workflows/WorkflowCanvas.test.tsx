@@ -57,6 +57,11 @@ function renderCanvas(
     onSelectNode?: (slug: string) => void
     onClearSelection?: () => void
     provider?: boolean
+    /** 185-09: the server's KB-reading tool names. OMITTED on every shipped call above,
+     *  and omitting it marks NOTHING — `toCanvas` defaults it to a frozen empty list — so
+     *  passing `undefined` here leaves every pre-185 assertion projecting exactly as it
+     *  did. Only the grounded-node walk below supplies one. */
+    kbTools?: readonly string[]
   } = {},
 ) {
   const ui = (
@@ -66,6 +71,7 @@ function renderCanvas(
         selectedSlug={opts.selectedSlug ?? null}
         onSelectNode={opts.onSelectNode ?? vi.fn()}
         onClearSelection={opts.onClearSelection ?? vi.fn()}
+        kbTools={opts.kbTools}
       />
     </div>
   )
@@ -221,6 +227,22 @@ describe("WorkflowCanvas — keyboard activation (CR-01, SC#3)", () => {
   })
 })
 
+/**
+ * 185-09 — the same canvas with a step that must PROVE ITSELF.
+ *
+ * `docQaHuman` with its agent step switched on to read the knowledge base. That is the
+ * `detected` grounding cause, the one an author cannot undo (sketch 142-B), and it is
+ * driven the way the live surface drives it: the tool is on the phase, the KB list comes
+ * from the SERVER through `kbTools`, and the client only intersects the two. The other
+ * two steps stay open, so the walk below sees both kinds of node in one render.
+ */
+const KB_TOOL = "search_documents"
+const docQaHumanGrounded: typeof docQaHuman = docQaHuman.map((phase) =>
+  phase.slug === "draft"
+    ? { ...phase, config: { ...phase.config, available_tools: [KB_TOOL] } }
+    : phase,
+)
+
 describe("WorkflowCanvas — one tab stop per node (Pattern 3 Option A)", () => {
   it("the tabbable node count equals the phase count", () => {
     const { container } = renderCanvas(evalCoverage)
@@ -235,6 +257,41 @@ describe("WorkflowCanvas — one tab stop per node (Pattern 3 Option A)", () => 
     for (const node of nodes) {
       expect(node.querySelectorAll("button, a, [tabindex]")).toHaveLength(0)
     }
+  })
+
+  it("BOTH halves still hold when a node wears the governance seal (185-09, criterion 24)", () => {
+    // T-185-09-01: a focusable seal would be a SECOND tab stop per node — ten tab presses
+    // to cross five steps, and a screen reader announcing every step twice. That is the
+    // whole reason the ✕ and ＋ live on the lane rather than in the card, so the seal is
+    // walked here, at the canvas level, and not only in the card's isolated suite.
+    const { container } = renderCanvas(docQaHumanGrounded, { kbTools: [KB_TOOL] })
+
+    // NON-VACUITY, twice over. The shipped guard (nodes exist) is kept verbatim — it is
+    // the reason the loop means anything — and a second one is added: the seal this test
+    // exists for is really on the canvas. Without it, a `grounded` prop that silently
+    // stopped being threaded would leave this test green while testing nothing.
+    const nodes = Array.from(container.querySelectorAll(".react-flow__node"))
+    expect(nodes.length).toBeGreaterThan(0)
+    expect(container.querySelectorAll('[data-testid="canvas-node-seal"]')).toHaveLength(1)
+    expect(
+      screen.getByTestId("canvas-node-draft").querySelectorAll('[data-testid="canvas-node-seal"]'),
+    ).toHaveLength(1)
+
+    // …and the two shipped assertions, re-run over this canvas.
+    expect(container.querySelectorAll('.react-flow__node[tabindex="0"]')).toHaveLength(
+      docQaHumanGrounded.length,
+    )
+    for (const node of nodes) {
+      expect(node.querySelectorAll("button, a, [tabindex]")).toHaveLength(0)
+    }
+  })
+
+  it("the seal is threaded from the DEFINITION, not painted on every node", () => {
+    // The negative half of the same wiring: switch the KB list off and the identical
+    // definition marks nothing. This is what makes the assertion above evidence about
+    // `grounded` rather than about a seal that renders unconditionally.
+    const { container } = renderCanvas(docQaHumanGrounded)
+    expect(container.querySelectorAll('[data-testid="canvas-node-seal"]')).toHaveLength(0)
   })
 })
 

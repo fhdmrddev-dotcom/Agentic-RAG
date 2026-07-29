@@ -49,6 +49,10 @@ import { VERDICT_DESTRUCTIVE_TOKEN, VERDICT_MARK } from "./nodePresentation"
 // the component itself reads, so a layout change moves the computed boxes rather than
 // silently disagreeing with them. Its own import line, same convention as 184-08's.
 import { CANVAS_LAYOUT } from "./canvasModel"
+// 185-09: the seal's accessible label and the panel dial's strict side, imported from
+// the ONE home the card also imports from — the pair is asserted still-in-agreement
+// below, which is what stops Req 7's locked words drifting between panel and canvas.
+import { GOVERNANCE_SEAL_LABEL, GROUNDING_DIAL_STRICT_LABEL } from "./definitionOps"
 
 /** The minimal slot set — everything else on the contract is optional by design. */
 function renderCard(overrides: Partial<React.ComponentProps<typeof PhaseNodeCard>> = {}) {
@@ -78,6 +82,11 @@ const waitsBadge: BadgeSlot = {
   label: "Waits for you",
   dataAttr: { "data-waits-for-you": "true" },
 }
+
+/** The governance seal's stable hook (185-09). Module scope because BOTH the 185-01
+ *  occupancy block and the 185-09 block below select on it, and a second spelling of a
+ *  test id is how two halves of one suite start measuring different elements. */
+const SEAL_TEST_ID = "canvas-node-seal"
 
 describe("PhaseNodeCard — renders with no provider at all (D-184-06)", () => {
   it("renders the data-attribute contract outside any provider, without throwing", () => {
@@ -642,8 +651,12 @@ function sizeOf(className: string, axis: "h" | "w"): number {
   throw new Error(`no ${axis}- size class in: ${className}`)
 }
 
-/** The x of a mark's LEFT edge. Handles the four placement forms this card spends:
- *  `left-1/2` + `-translate-x-1/2` (centred), `left-N`, `-left-N`, `-right-N`. */
+/** The x of a mark's LEFT edge. Handles the six placement forms this card spends:
+ *  `left-1/2` + `-translate-x-1/2` (centred), `left-N`, `-left-N`, `-right-N`, and —
+ *  added by 185-09 for the governance seal — the ARBITRARY forms `left-[Npx]` /
+ *  `right-[Npx]`. The arbitrary branches are checked FIRST because the token regexes
+ *  below require a digit immediately after the dash and would otherwise fall through to
+ *  the throw, turning a real placement into "no horizontal placement class". */
 function xOf(className: string, width: number, containerWidth: number): number {
   if (/(?:^|\s)left-1\/2(?:\s|$)/.test(className)) {
     if (!/(?:^|\s)-translate-x-1\/2(?:\s|$)/.test(className)) {
@@ -651,6 +664,10 @@ function xOf(className: string, width: number, containerWidth: number): number {
     }
     return containerWidth / 2 - width / 2
   }
+  const arbitraryLeft = /(?:^|\s)left-\[(-?\d+)px\](?:\s|$)/.exec(className)
+  if (arbitraryLeft) return Number(arbitraryLeft[1])
+  const arbitraryRight = /(?:^|\s)right-\[(-?\d+)px\](?:\s|$)/.exec(className)
+  if (arbitraryRight) return containerWidth - Number(arbitraryRight[1]) - width
   const negLeft = /(?:^|\s)-left-(\d+(?:\.\d+)?)(?:\s|$)/.exec(className)
   if (negLeft) return -twSpacing(negLeft[1])
   const left = /(?:^|\s)left-(\d+(?:\.\d+)?)(?:\s|$)/.exec(className)
@@ -696,14 +713,24 @@ function overlapArea(a: MarkBox, b: MarkBox): number {
   return w > 0 && h > 0 ? w * h : 0
 }
 
-/** Read the two rendered marks' classes back off a real render of the card. */
-function renderedMarkClasses(): { icon: string; verdict: string } {
-  const { container, unmount } = renderCard({ verdict: "error" })
+/** Read the three rendered marks' classes back off a real render of the card.
+ *
+ *  185-09 added the seal, which means this render must pass `grounded` — a card that is
+ *  not grounded paints no seal at all, and a silently-empty class string would make
+ *  every seal box collapse to `no size class` and throw rather than pass vacuously
+ *  (`sizeOf` refuses to default). The verdict and icon classes are unaffected by it. */
+function renderedMarkClasses(): { icon: string; verdict: string; seal: string } {
+  const { container, unmount } = renderCard({ verdict: "error", grounded: true })
   // The icon well is the PARENT of the radial-gradient tint layer — the same handle
   // `wellBackground` above already uses, so there is one way to find it in this file.
   const well = container.querySelector('[style*="radial-gradient"]')?.parentElement
   const verdict = container.querySelector('[data-testid="canvas-node-verdict"]')
-  const classes = { icon: well?.className ?? "", verdict: verdict?.className ?? "" }
+  const seal = container.querySelector(`[data-testid="${SEAL_TEST_ID}"]`)
+  const classes = {
+    icon: well?.className ?? "",
+    verdict: verdict?.className ?? "",
+    seal: seal?.className ?? "",
+  }
   unmount()
   return classes
 }
@@ -713,13 +740,26 @@ function renderedMarkClasses(): { icon: string; verdict: string } {
  *  — which is precisely the fact the residual assertion below turns on. */
 const STEP_NUMBER_BOX: MarkBox = { x0: 12, y0: 12, x1: 34, y1: 34 }
 
+/**
+ * The four marks criterion 23 names, three of them measured off the DOM.
+ *
+ * WHAT IS STILL NOT IN THE TABLE, and where Phase 188 must add it: the RUN-STATE slot.
+ * `status` is declared on `PhaseNodeCardProps` and renders NOTHING today, so it has no
+ * box to measure and listing it with an invented one would be a geometry claim nobody
+ * has made. Phase 188 adds a `{ name: "run state", rendered: true, box: boxOf(...) }`
+ * row HERE, from the classes of the element it renders, and every assertion below then
+ * covers it with no other change — exactly how 185-09 added the seal to the table
+ * 185-01 built. The one corner it may NOT use is top-right: SPEC Req 6 claims it for
+ * governance, and the seal's own docblock in `PhaseNodeCard.tsx` says so.
+ */
 function markTable(): MarkZone[] {
-  const { icon, verdict } = renderedMarkClasses()
+  const { icon, verdict, seal } = renderedMarkClasses()
   const w = CANVAS_LAYOUT.NODE_WIDTH
   const h = CANVAS_LAYOUT.NODE_MIN_HEIGHT
   return [
     { name: "icon well", rendered: true, box: boxOf(icon, w, h) },
     { name: "verdict", rendered: true, box: boxOf(verdict, w, h) },
+    { name: "governance seal", rendered: true, box: boxOf(seal, w, h) },
     { name: "stepNumber", rendered: false, box: STEP_NUMBER_BOX },
   ]
 }
@@ -755,8 +795,10 @@ describe("PhaseNodeCard — 137-B mark occupancy (SPEC criterion 23)", () => {
   it("every pair of RENDERED marks reports ZERO overlap (acceptance criterion 23)", () => {
     const rendered = markTable().filter((zone) => zone.rendered)
     // Guard against a vacuous pass: if the card ever stops rendering a mark, this
-    // check would trivially succeed over an empty or one-element set.
-    expect(rendered.map((z) => z.name)).toEqual(["icon well", "verdict"])
+    // check would trivially succeed over an empty or one-element set. 185-09 widened
+    // the expected set from two names to three — the seal joined the rendered marks,
+    // so a seal that silently stops painting fails HERE rather than in a screenshot.
+    expect(rendered.map((z) => z.name)).toEqual(["icon well", "verdict", "governance seal"])
 
     const collisions: string[] = []
     for (let i = 0; i < rendered.length; i += 1) {
@@ -852,5 +894,384 @@ describe("PhaseNodeCard — the occupancy check CAN go red (falsification contro
     const preRebuildCardLeftBorder = 24
     expect(verdict.x1).toBeLessThan(preRebuildCardLeftBorder)
     expect(preRebuildCardLeftBorder - verdict.x1).toBe(10)
+  })
+})
+
+/**
+ * ── 185-09 (GOVERN-02 · SPEC Req 6 · sketch 143-A) — THE GOVERNANCE SEAL ─────────────
+ *
+ * APPENDED, not woven in: everything above belongs to 184-03 / 184-08 / 185-01 and stays
+ * theirs. Exactly ONE shipped assertion was touched — the zero-overlap check's
+ * non-vacuity NAME LIST grew from two entries to three — and it had to be: this plan
+ * renders a third mark, so a list that still said two would have had to be wrong for the
+ * check to pass. Nothing was deleted and no expectation was weakened.
+ *
+ * WHAT jsdom CAN AND CANNOT PROVE HERE. Criterion 16 reads *"the corner seal renders
+ * identically across idle / running / needs-you / failed"*. jsdom computes no paint, so
+ * the VISUAL half is operator UAT — `185-VALIDATION.md` §"G-4 lived-experience UAT"
+ * scenario 2, *"the seal survives a live run"*, whose failure condition is the seal
+ * dimming, hiding, shifting or being swallowed by the status colour. What IS mechanically
+ * checkable is stronger than a screenshot of any one state: **the seal markup cannot read
+ * run state at all.** Two guards below say so — a `?raw` props fence over the seal's own
+ * JSX block, and a four-value render asserting the rendered class list and text are
+ * identical. A surface that cannot express a dependency cannot regress into one.
+ *
+ * CRITERION 17 IS OPERATOR UAT ONLY, deliberately not simulated. *"A colour-stripped
+ * render still distinguishes grounded from open"* needs computed paint — a greyscale
+ * screenshot of the real canvas — and it is recorded as manual in `185-VALIDATION.md`
+ * §"Acceptance Criteria → Cheapest Honest Proof" row 17. A jsdom test that inspected
+ * class names and CLAIMED to have checked a greyscale render would be worse than no test:
+ * it would retire a manual check without performing it. What this file contributes toward
+ * it instead is the colour scan below — the seal spends no colour token, so there is
+ * nothing for greyscale to take away.
+ */
+
+/**
+ * The run-state prop's name, ASSEMBLED from fragments rather than spelled.
+ *
+ * The point of the fence is that the seal's MARKUP never reads run state. The card's
+ * docblock, by contrast, must be free to SAY that — it explains the whole reason the seal
+ * exists. A guard that searched this file's own literal, or that scanned the component
+ * whole, could only pass by making that explanation disappear: the D-ITEM-183-02 trap
+ * this project has now hit half a dozen times. So the needle is assembled, and the
+ * haystack is the extracted BLOCK rather than the file.
+ */
+const STATUS_PROP = ["sta", "tus"].join("")
+
+/** A fresh regex per call — a shared one carries `lastIndex` state between assertions. */
+function statusIdentifier(): RegExp {
+  return new RegExp(`\\b${STATUS_PROP}\\b`)
+}
+
+const SEAL_GUARD_OPEN = "{grounded ? ("
+const SEAL_GUARD_CLOSE = ") : null}"
+
+/**
+ * Carve the seal's JSX block out of a component source: from the guard that opens it to
+ * the guard that closes it, anchored on the seal's test id so it cannot latch onto the
+ * verdict mark's structurally identical block above it.
+ *
+ * Throws rather than returning `""` on a miss. A silently empty slice would make every
+ * absence assertion below pass vacuously, which is the one failure mode a source fence
+ * has to be built against.
+ */
+function sealJsxBlock(source: string): string {
+  const anchor = source.indexOf(SEAL_TEST_ID)
+  if (anchor < 0) throw new Error(`no ${SEAL_TEST_ID} in the source under guard`)
+  const start = source.lastIndexOf(SEAL_GUARD_OPEN, anchor)
+  const end = source.indexOf(SEAL_GUARD_CLOSE, anchor)
+  if (start < 0 || end < 0) throw new Error("could not carve the seal's JSX block")
+  return source.slice(start, end + SEAL_GUARD_CLOSE.length)
+}
+
+/** The positive control: a seal that DOES read run state, in the same shape as the real
+ *  one so the extractor carves it identically. Built from the same assembled token, so
+ *  this file still never spells the prop name. */
+const PLANTED_SEAL_SOURCE = `
+      {/* a docblock, which the fence must NOT be reading */}
+      ${SEAL_GUARD_OPEN}
+        <span
+          data-testid="${SEAL_TEST_ID}"
+          data-grounded="true"
+          className={cn(
+            "pointer-events-none absolute right-[17px] top-[11px]",
+            ${STATUS_PROP} === "running" ? "opacity-40" : "",
+          )}
+        >
+          <span aria-hidden="true">S</span>
+          <span className="sr-only">{GOVERNANCE_SEAL_LABEL}</span>
+        </span>
+      ${SEAL_GUARD_CLOSE}
+`
+
+describe("PhaseNodeCard — the seal cannot READ run state (props fence, criterion 16)", () => {
+  it("the extractor really carves the seal's block — a slice, not nothing and not the file", () => {
+    const block = sealJsxBlock(phaseNodeCardSource)
+    expect(block).toContain(SEAL_TEST_ID)
+    expect(block).toContain("aria-hidden")
+    expect(block).toContain("sr-only")
+    expect(block.startsWith(SEAL_GUARD_OPEN)).toBe(true)
+    expect(block.endsWith(SEAL_GUARD_CLOSE)).toBe(true)
+    // Not the whole file — otherwise the fence would be scanning the docblocks it is
+    // deliberately scoped to exclude, and would go red for the wrong reason.
+    expect(block.length).toBeLessThan(phaseNodeCardSource.length / 4)
+  })
+
+  it("the seal's JSX block never names the run-state prop", () => {
+    expect(sealJsxBlock(phaseNodeCardSource)).not.toMatch(statusIdentifier())
+  })
+
+  it("the POSITIVE CONTROL: a seal that DID read run state turns this fence red", () => {
+    // Without this, the assertion above would pass just as happily on a typo'd needle,
+    // on an extractor that returned the wrong slice, or on a regex that matched nothing.
+    expect(sealJsxBlock(PLANTED_SEAL_SOURCE)).toMatch(statusIdentifier())
+  })
+
+  it("the fence is SCOPED — the card's docblock is still free to name the prop", () => {
+    // The component explains, at length, why the seal must not depend on run state. It
+    // cannot do that without naming it. This asserts the needle is real against the real
+    // file, and pins that the scoping is intentional rather than an accident of spelling.
+    expect(phaseNodeCardSource).toMatch(statusIdentifier())
+  })
+
+  it("renders a BYTE-IDENTICAL seal at all four run states (the strongest jsdom form)", () => {
+    // The visual claim is UAT (G-4 #2). This is the part a machine can hold: the seal's
+    // whole rendered element, whatever the run says. `status` is typed as an open string
+    // in 184, so these are the four states criterion 16 names, not a library union.
+    //
+    // IT COMPARES `outerHTML`, AND THAT IS A CORRECTION THIS PLAN'S OWN FALSIFICATION
+    // FORCED. Written first as `{ className, textContent }`, it stayed GREEN while a
+    // planted `data-run={props.status}` sat on the seal — an attribute-level dependency
+    // on run state is invisible to both of those readings. The props fence caught it and
+    // this did not, so the two guards were not the complementary pair they were meant to
+    // be. `outerHTML` closes it: every attribute, class and character is in the compare.
+    const readings = ["idle", "running", "needs-you", "failed"].map((runState) => {
+      const { container, unmount } = renderCard({ grounded: true, status: runState })
+      const seal = container.querySelector(`[data-testid="${SEAL_TEST_ID}"]`)
+      expect(seal).not.toBeNull()
+      const reading = seal!.outerHTML
+      unmount()
+      return reading
+    })
+
+    expect(readings).toHaveLength(4)
+    for (const reading of readings) expect(reading).toBe(readings[0])
+    // Non-vacuity: the value being compared is a real seal, not an empty string.
+    expect(readings[0].length).toBeGreaterThan(0)
+    expect(readings[0]).toContain(GOVERNANCE_SEAL_LABEL)
+    expect(readings[0]).toContain(SEAL_TEST_ID)
+  })
+})
+
+/** The frosted card's own class list — the element the sealed EDGE lives on. It is the
+ *  wrapper's first `div` child; the marks around it are all `span`s. */
+function frostedCardClasses(
+  overrides: Partial<React.ComponentProps<typeof PhaseNodeCard>> = {},
+): string {
+  const { container, unmount } = renderCard(overrides)
+  const card = container.querySelector('[data-testid="canvas-node-summarize"] > div')
+  const className = card?.className ?? ""
+  unmount()
+  if (className.length === 0) throw new Error("did not find the frosted card element")
+  return className
+}
+
+/** 143-A's reinforcement colour, as the card spends it. Read from the DOM below rather
+ *  than trusted from here — this literal is only the needle. */
+const SEALED_EDGE_TOKEN = "border-[hsl(220_30%_100%/0.34)]"
+
+describe("PhaseNodeCard — the seal is made of SHAPE, and the edge only reinforces it", () => {
+  it("renders NO seal when grounded is omitted, and none when it is explicitly false", () => {
+    for (const overrides of [{}, { grounded: false }]) {
+      const { container, unmount } = renderCard(overrides)
+      expect(container.querySelector(`[data-testid="${SEAL_TEST_ID}"]`)).toBeNull()
+      expect(container.querySelectorAll("[data-grounded]")).toHaveLength(0)
+      unmount()
+    }
+  })
+
+  it("renders one seal with an aria-hidden glyph PLUS a real accessible label", () => {
+    renderCard({ grounded: true })
+    const seal = screen.getByTestId(SEAL_TEST_ID)
+    expect(seal.getAttribute("data-grounded")).toBe("true")
+    expect(seal.querySelector('[aria-hidden="true"]')?.textContent).toBe("⛨")
+    expect(seal.querySelector(".sr-only")?.textContent).toBe(GOVERNANCE_SEAL_LABEL)
+    // The glyph is decoration; the WORDS carry the meaning (WCAG 1.4.1, never shape or
+    // colour alone) — so a screen-reader user hears the same claim a sighted one reads.
+    expect(GOVERNANCE_SEAL_LABEL.trim().length).toBeGreaterThan(0)
+  })
+
+  it("speaks Req 7's BINDING words, and the panel's dial still speaks the same ones", () => {
+    // The vocabulary is a LOCK: an unrun step is never "proven", because nothing is
+    // proven until a run's citation gate passes. This is the assertion `definitionOps`'
+    // own docblock promises exists, so the two homes cannot be edited apart silently.
+    expect(GOVERNANCE_SEAL_LABEL).toBe("Must prove it")
+    expect(GROUNDING_DIAL_STRICT_LABEL.endsWith(GOVERNANCE_SEAL_LABEL)).toBe(true)
+
+    const { container } = renderCard({ grounded: true, verdict: "incomplete" })
+    expect(container.textContent ?? "").not.toMatch(/\bproven\b|\bungoverned\b|\bunchecked\b/i)
+  })
+
+  it("spends NO colour — a grounded card emits the destructive token zero times", () => {
+    // 137-B banks all colour for Phase 188's run status, so governance is shape only.
+    // Scanned rather than eyeballed, the R9 way, and over the loudest card the contract
+    // allows: grounded, selected, badged.
+    const { container } = renderCard({ grounded: true, badges: [waitsBadge], selected: true })
+    expect(container.innerHTML).not.toContain(VERDICT_DESTRUCTIVE_TOKEN)
+    const seal = screen.getByTestId(SEAL_TEST_ID)
+    expect(seal.className).not.toMatch(/destructive|success|warning|amber|emerald|rose|green|red-/)
+  })
+
+  it("costs NO badge slot — a grounded card renders no extra chip (SPEC Req 6)", () => {
+    // The three-face word-badge 185-08 deleted must not come back through this door.
+    // Slot 1 stays empty for 188 / 189; the seal is not a badge and does not become one.
+    const { container } = renderCard({ grounded: true, badges: [waitsBadge] })
+    expect(container.querySelectorAll("[data-tone]")).toHaveLength(1)
+    expect(container.querySelector('[data-testid="canvas-grounding"]')).toBeNull()
+  })
+
+  it("a grounded card still contains NO focusable control (one tab stop per node)", () => {
+    // A pressable seal would make it two, and the canvas-level walk in
+    // `WorkflowCanvas.test.tsx` would go red. Arming and escalating happen in the panel.
+    const { container } = renderCard({
+      grounded: true,
+      verdict: "error",
+      badges: [waitsBadge],
+      selected: true,
+      status: "running",
+    })
+    expect(container.querySelectorAll("button, a, [tabindex]")).toHaveLength(0)
+    const seal = screen.getByTestId(SEAL_TEST_ID)
+    expect(seal.getAttribute("role")).toBeNull()
+    expect(seal.getAttribute("tabindex")).toBeNull()
+    expect(seal.className).toContain("pointer-events-none")
+  })
+
+  it("does not animate — motion keys off run state, and the seal keys off nothing", () => {
+    const seal = renderedMarkClasses().seal
+    expect(seal).not.toMatch(/animate-|transition-|motion-safe:/)
+  })
+
+  it("the sealed EDGE lifts an unselected grounded card's border", () => {
+    const open = frostedCardClasses()
+    const grounded = frostedCardClasses({ grounded: true })
+    expect(open).toContain("border-border/50")
+    expect(open).not.toContain(SEALED_EDGE_TOKEN)
+    expect(grounded).toContain(SEALED_EDGE_TOKEN)
+    expect(grounded).not.toContain("border-border/50")
+  })
+
+  it("the edge is REINFORCEMENT: a selected grounded card keeps its primary border", () => {
+    // This IS the degradation 143-A verified, not a bug: the edge is expected to be
+    // overwritten — by selection today, by Phase 188's run status tomorrow — and the
+    // reading survives because the seal carries its own background and border. Two
+    // carriers become one; never zero.
+    const selectedGrounded = frostedCardClasses({ grounded: true, selected: true })
+    expect(selectedGrounded).toContain("border-primary")
+    expect(selectedGrounded).not.toContain(SEALED_EDGE_TOKEN)
+
+    // …and the surviving carrier is really still there, with its own border and its own
+    // background. That is the whole argument for the corner seal over the edge alone.
+    renderCard({ grounded: true, selected: true })
+    const seal = screen.getByTestId(SEAL_TEST_ID)
+    expect(seal.className).toContain(SEALED_EDGE_TOKEN)
+    expect(seal.className).toContain("bg-[hsl(220_30%_100%/0.1)]")
+  })
+})
+
+describe("PhaseNodeCard — the seal's zone (criterion 23, extended to four marks)", () => {
+  it("sits at the card's top-right, 21×21, exactly 11px inside the CARD's right border", () => {
+    const seal = markTable().find((z) => z.name === "governance seal")?.box
+    expect(seal).toEqual({ x0: 222, y0: 11, x1: 243, y1: 32 })
+
+    // THE NUMBER THE SKETCH LOCKED IS THE CLEARANCE A READER SEES, not the Tailwind
+    // token. 143-A places the seal `top: 11px; right: 11px` inside the 248px CARD; the
+    // element is a sibling of the verdict mark, so its containing block is the 260px NODE
+    // BOX, whose right edge sits 6px outside the card's border. `right-[17px]` is that
+    // composite. Asserting the CLEARANCE is what stops the 17 drifting from the 11 it is
+    // derived from — if either number is edited alone, this goes red.
+    const cardRightBorder = (CANVAS_LAYOUT.NODE_WIDTH + 248) / 2
+    expect(cardRightBorder).toBe(254)
+    expect(cardRightBorder - seal!.x1).toBe(11)
+    expect(seal!.y0).toBe(11)
+    expect(seal!.x1 - seal!.x0).toBe(21)
+    expect(seal!.y1 - seal!.y0).toBe(21)
+
+    // Unlike the verdict mark, the seal sits fully INSIDE the card — it is a property of
+    // the card's face, not a flag pinned to its edge.
+    expect(seal!.x1).toBeLessThan(cardRightBorder)
+  })
+
+  it("all FOUR marks are pairwise clear — the only nonzero pair is the recorded residual", () => {
+    const table = markTable()
+    // Non-vacuity first: four zones, in the order criterion 23 names them.
+    expect(table.map((z) => z.name)).toEqual([
+      "icon well",
+      "verdict",
+      "governance seal",
+      "stepNumber",
+    ])
+
+    const collisions: string[] = []
+    for (let i = 0; i < table.length; i += 1) {
+      for (let j = i + 1; j < table.length; j += 1) {
+        const area = overlapArea(table[i].box, table[j].box)
+        if (area > 0) collisions.push(`${table[i].name} × ${table[j].name} = ${area}px²`)
+      }
+    }
+
+    // The verdict × stepNumber graze is 185-01's WRITTEN residual against a slot that
+    // paints nothing (D-183-07 keeps `phase_index` off the face), pinned above with its
+    // remedy. Every other pair — and therefore every pair of marks a person can actually
+    // SEE — is zero, which is what criterion 23 asks for.
+    expect(collisions).toEqual(["verdict × stepNumber = 32px²"])
+  })
+
+  it("the seal clears the UNRENDERED stepNumber slot too, with room to spare", () => {
+    const table = markTable()
+    const seal = table.find((z) => z.name === "governance seal")!
+    const stepNumber = table.find((z) => z.name === "stepNumber")!
+    expect(stepNumber.rendered).toBe(false)
+    expect(overlapArea(seal.box, stepNumber.box)).toBe(0)
+    // Bringing `phase_index` to the face therefore cannot collide with governance: the
+    // step number is top-LEFT and the seal is top-RIGHT, 188px of card between them.
+    expect(seal.box.x0 - stepNumber.box.x1).toBe(188)
+  })
+})
+
+/**
+ * ── THE SEAL'S FALSIFICATION ────────────────────────────────────────────────────────
+ *
+ * A zone check that has never been red about the SEAL is not evidence about the seal.
+ *
+ * ⚠ THE PLAN'S STATED FALSIFICATION CANNOT GO RED, and the reason is worth recording
+ * rather than quietly substituting: it asks for the seal to be placed at *"the verdict's
+ * old `-right-2 top-1.5`"*. That corner is now EMPTY — 185-01 moved the verdict to
+ * `-left-2` — so a seal placed there collides with nothing at all, which the second test
+ * below asserts. The meaningful falsification is the verdict's CURRENT corner, and the
+ * first test pins the 21×21 = 441px² collision it produces.
+ *
+ * The executor ALSO performed the physical falsification: the component's seal was
+ * temporarily moved to `-left-2 top-1.5` and the suite run. Its verbatim output is quoted
+ * in `185-09-SUMMARY.md`, and the seal was then restored.
+ */
+const SEAL_ON_THE_VERDICTS_CORNER =
+  "pointer-events-none absolute -left-2 top-1.5 z-[6] grid h-[21px] w-[21px] place-items-center"
+const SEAL_ON_THE_VERDICTS_OLD_CORNER =
+  "pointer-events-none absolute -right-2 top-1.5 z-[6] grid h-[21px] w-[21px] place-items-center"
+
+describe("PhaseNodeCard — the seal's zone check CAN go red (falsification control)", () => {
+  it("the same checker reports a 21×21 collision when the seal takes the verdict's corner", () => {
+    const w = CANVAS_LAYOUT.NODE_WIDTH
+    const h = CANVAS_LAYOUT.NODE_MIN_HEIGHT
+    const { verdict: verdictClasses } = renderedMarkClasses()
+    const verdict = boxOf(verdictClasses, w, h)
+    const planted = boxOf(SEAL_ON_THE_VERDICTS_CORNER, w, h)
+
+    expect(planted).toEqual({ x0: -8, y0: 6, x1: 13, y1: 27 })
+    expect(overlapArea(planted, verdict)).toBe(441) // 21px × 21px — the whole seal
+
+    // …and it is REALLY zero where the seal actually ships, measured by the same
+    // function on the same render. Both halves, or neither means anything.
+    const shipped = markTable()
+    const shippedSeal = shipped.find((z) => z.name === "governance seal")!
+    const shippedVerdict = shipped.find((z) => z.name === "verdict")!
+    expect(overlapArea(shippedSeal.box, shippedVerdict.box)).toBe(0)
+  })
+
+  it("records WHY the plan's stated falsification is inert: that corner is now empty", () => {
+    const w = CANVAS_LAYOUT.NODE_WIDTH
+    const h = CANVAS_LAYOUT.NODE_MIN_HEIGHT
+    const planted = boxOf(SEAL_ON_THE_VERDICTS_OLD_CORNER, w, h)
+    expect(planted).toEqual({ x0: 247, y0: 6, x1: 268, y1: 27 })
+
+    // Against every other zone in the table: nothing. 185-01 vacated this corner, so a
+    // seal parked here is merely WRONG (it hangs off the card's right edge instead of
+    // sitting inside it) — it is not a collision, and a zone check is the wrong
+    // instrument for it. The `right-[17px]` clearance assertion above is the one that
+    // catches this class of mistake.
+    for (const zone of markTable()) {
+      expect(overlapArea(planted, zone.box)).toBe(0)
+    }
   })
 })
