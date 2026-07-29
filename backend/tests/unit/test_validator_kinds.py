@@ -171,3 +171,167 @@ def test_judge_rides_forced_emit():
     not_passed = {"_judge_verdict": {"overall_passed": False, "criteria": []}}
     r2 = asyncio.run(validator(not_passed, {}, None))
     assert r2.passed is False
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Phase 185 (GOVERN-01 / GOVERN-03) — the engine-synthesized behaviours.
+#
+# Neither of these is ever declared by an author: ``retrieved_and_cited`` and
+# ``action_risk_approval`` are both attached at run time by
+# ``harness/grounding.effective_phase``. They are tested here, at the registry, so
+# the BEHAVIOUR is pinned independently of the attachment seam (which
+# ``test_185_engine_attachment.py`` owns).
+# ══════════════════════════════════════════════════════════════════════════════
+
+# The agent-step output shape (``_exec_llm_agent`` / ``_exec_llm_batch_agents``):
+# {text, sub_run_id(s), source_refs, citations, similarity_scores}. Note what is
+# NOT here and never is: ``field_map``. That absence is the whole reason the new
+# mode exists (RESEARCH L-1).
+def _agent_output(text: str, citations: list | None) -> dict:
+    return {
+        "text": text,
+        "sub_run_id": "sub-1",
+        "source_refs": [{"doc": "unrelated-non-kb-tool-ref"}],
+        "citations": citations if citations is not None else [],
+        "similarity_scores": [0.71],
+    }
+
+
+def test_retrieved_and_cited_fails_when_nothing_was_retrieved():
+    """D-185-01 half (a): an EMPTY ``citations`` list fails the gate outright, with the
+    retrieval reason — even when the text is stuffed with citation markers, which is
+    exactly the fabricated-citation case the half exists to catch (T-185-03-02).
+    ``source_refs`` being populated must not rescue it."""
+    import asyncio
+
+    import app.services.harness.validator_kinds  # noqa: F401
+    from app.services.harness.validators import VALIDATOR_REGISTRY
+
+    validator = VALIDATOR_REGISTRY["citations_required"]
+    cfg = {"mode": "retrieved_and_cited"}
+
+    result = asyncio.run(
+        validator(_agent_output("A claim [1] and another [2].", []), cfg, None)
+    )
+    assert result.passed is False
+    assert "nothing was retrieved" in result.error_message
+    assert result.error_message.startswith("citations_required: ")
+
+
+def test_retrieved_and_cited_fails_when_the_answer_points_at_nothing():
+    """D-185-01 half (b): real retrieval but ZERO citation markers in the text fails,
+    with the marker reason (not the retrieval one)."""
+    import asyncio
+
+    import app.services.harness.validator_kinds  # noqa: F401
+    from app.services.harness.validators import VALIDATOR_REGISTRY
+
+    validator = VALIDATOR_REGISTRY["citations_required"]
+    cfg = {"mode": "retrieved_and_cited"}
+
+    result = asyncio.run(
+        validator(
+            _agent_output("Revenue grew last quarter.", [{"chunk_id": "c1"}]),
+            cfg,
+            None,
+        )
+    )
+    assert result.passed is False
+    assert "citation markers in the answer" in result.error_message
+    assert "nothing was retrieved" not in result.error_message
+
+
+def test_retrieved_and_cited_passes_when_both_halves_hold():
+    """BOTH halves satisfied -> pass. The default ``min_markers`` is 1 and the default
+    pattern is the shipped ``presence`` one, reused rather than re-derived."""
+    import asyncio
+
+    import app.services.harness.validator_kinds  # noqa: F401
+    from app.services.harness.validators import VALIDATOR_REGISTRY
+
+    validator = VALIDATOR_REGISTRY["citations_required"]
+    cfg = {"mode": "retrieved_and_cited"}
+
+    result = asyncio.run(
+        validator(
+            _agent_output("Revenue grew 4% [1].", [{"chunk_id": "c1"}]),
+            cfg,
+            None,
+        )
+    )
+    assert result.passed is True
+    assert result.error_message is None
+
+
+def test_retrieved_and_cited_never_reads_field_map():
+    """THE headline landmine (RESEARCH L-1). The shipped default/emit mode returns
+    ``"citations_required: no field_map on output"`` when ``output["field_map"]`` is
+    absent — and NO agent step ever produces one, so attaching the shipped mode
+    unchanged would fail 100% of detected steps. An agent-shaped output with no
+    ``field_map`` key at all must PASS the new mode when both halves hold."""
+    import asyncio
+
+    import app.services.harness.validator_kinds  # noqa: F401
+    from app.services.harness.validators import VALIDATOR_REGISTRY
+
+    validator = VALIDATOR_REGISTRY["citations_required"]
+    output = _agent_output("Findings [1] and [2].", [{"chunk_id": "c1"}])
+    assert "field_map" not in output  # the positive control for the claim below
+
+    ok = asyncio.run(validator(output, {"mode": "retrieved_and_cited"}, None))
+    assert ok.passed is True
+
+    # The SAME output through the shipped deterministic mode fails on field_map —
+    # this is what the new mode routes around, asserted rather than assumed.
+    shipped = asyncio.run(validator(output, {"mode": "deterministic"}, None))
+    assert shipped.passed is False
+    assert "no field_map" in shipped.error_message
+
+
+def test_action_risk_approval_always_fails_with_the_structured_prefix():
+    """D-185-12: the armed pre-gate NEVER inspects ``output`` and ALWAYS fails, so the
+    shipped ``on_failure: ask_user`` disposition owns the pause. The
+    ``action_risk:approval|`` prefix mirrors ``freshness:staleness|`` because
+    ``_ask_user_choices_from_finding`` branches on exactly that shape."""
+    import asyncio
+
+    import app.services.harness.validator_kinds  # noqa: F401
+    from app.services.harness.validators import VALIDATOR_REGISTRY
+
+    assert "action_risk_approval" in VALIDATOR_REGISTRY
+    validator = VALIDATOR_REGISTRY["action_risk_approval"]
+
+    # An empty output and an empty config still fail, and never raise.
+    bare = asyncio.run(validator({}, {}, None))
+    assert bare.passed is False
+    assert bare.error_message == "action_risk:approval|"
+
+    # The engine-generated sentence rides through as the payload, verbatim.
+    sentence = 'Step 2 of 4, "Send the renewal notice", is about to run.'
+    withprompt = asyncio.run(
+        validator(_agent_output("anything", [{"chunk_id": "c1"}]), {"prompt": sentence}, None)
+    )
+    assert withprompt.passed is False
+    assert withprompt.error_message == "action_risk:approval|" + sentence
+
+
+def test_presence_mode_is_byte_unchanged_by_the_new_mode():
+    """The regression fence for sharing the branch: ``presence`` must still ignore
+    ``citations`` entirely (a text-only gate) and must still emit its ORIGINAL
+    message. Phase 185 added a mode, it did not change one."""
+    import asyncio
+
+    import app.services.harness.validator_kinds  # noqa: F401
+    from app.services.harness.validators import VALIDATOR_REGISTRY
+
+    validator = VALIDATOR_REGISTRY["citations_required"]
+    cfg = {"mode": "presence", "min_markers": 1}
+
+    # Zero citations but a marker present -> presence PASSES (it never reads citations).
+    passes = asyncio.run(validator(_agent_output("a claim [1]", []), cfg, None))
+    assert passes.passed is True
+
+    # No markers -> the original wording, character-identical.
+    fails = asyncio.run(validator({"text": "no markers here"}, cfg, None))
+    assert fails.passed is False
+    assert fails.error_message == "citations_required: only 0/1 citation markers"

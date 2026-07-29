@@ -13,6 +13,13 @@ only ``freshness`` is net-new:
     | llm_judge_rubric   | forced_emit.forced_emit (NEVER a silent pass)    |
     | freshness          | freshness.py deterministic KB queries (net-new)  |
 
+Phase 185 (GOVERN-03 / D-185-12) adds a 6th, ``action_risk_approval`` — the only
+kind that wraps nothing and always fails, because its whole job is to hand the
+``ask_user`` disposition a structured finding. See its docstring for why the wait
+lives in the disposition machinery and not in the gate. Phase 185 also adds a third
+``citations_required`` mode, ``retrieved_and_cited`` (GOVERN-01 / D-185-01), which
+the ENGINE synthesizes — no author declares it.
+
 DISCIPLINE (the validators.py contract + Pitfall 4):
   - Each kind is ``async fn(output: dict, config: dict, ctx) -> GateResult``, fails
     CLOSED with a descriptive ``error_message``, and NEVER raises into ``run_gates``
@@ -205,10 +212,48 @@ async def _validate_citations_required(output: dict, config: dict, ctx) -> GateR
         any uncited or invented-citation leaf FAILS (the GATE-01 "reject uncited
         register rows before any judge call" rule; mirrors the _exec_llm_emit gate).
       - presence: counts citation markers in the text output; ``< min_markers`` FAILS.
+      - retrieved_and_cited: Phase 185 (D-185-01/D-185-02) — the mode the ENGINE
+        synthesizes for a *detected* agent step. BOTH halves are required: the phase
+        must have really retrieved something (a non-empty ``output["citations"]``,
+        built by the retrieval TOOL off ``ToolResult`` and therefore not narratable
+        by the model), AND its answer must point at what it read (the same marker
+        count the ``presence`` branch runs). This mode is deliberately NOT
+        ``check_coverage``: coverage is computable only over a structured leaf set
+        (a ``field_map``), which NO agent step produces — ``_exec_llm_agent`` /
+        ``_exec_llm_batch_agents`` return ``{text, sub_run_id(s), source_refs,
+        citations, similarity_scores}``. So the honest claim on an agent step is
+        *retrieved-and-pointed-at*, not *every value traceable* (D-185-02), and the
+        panel copy must not reuse the emit wording.
+
+    WHY half (a) READS ``citations`` AND NOTHING ELSE (RESEARCH L-1): citations are
+    the deduped, passage-bearing objects the retrieval TOOL builds off ``ToolResult``
+    via the sub-agent loop (``task_service.py``), so the model cannot narrate them
+    into existence. The sibling ``source_refs`` list can be populated by a non-KB
+    tool, so reading it would weaken the gate to something a step that never touched
+    the knowledge base could satisfy. It is deliberately not an input here.
     """
     mode = config.get("mode", "deterministic")
 
-    if mode == "presence":
+    # ``retrieved_and_cited`` shares this branch with ``presence`` ON PURPOSE rather
+    # than sitting beside it as a physically separate third ``if``: its half (b) IS
+    # the presence check, and the plan requires the SAME code path (same default
+    # pattern literal, same re.error guard, same ``min_markers`` default) rather than
+    # a re-derived copy that could drift. ``presence`` itself is byte-unchanged — for
+    # ``mode == "presence"`` both Phase-185 conditionals below are False, so the
+    # executed lines and the emitted message are exactly what they were.
+    if mode in ("presence", "retrieved_and_cited"):
+        # Phase 185 half (a) — real retrieval evidence, checked FIRST so a step that
+        # retrieved nothing gets the honest reason rather than a marker count. The
+        # ONE key this half reads is stated in the docstring above, along with the
+        # sibling it must never read and why.
+        if mode == "retrieved_and_cited" and not (output.get("citations") or []):
+            return GateResult(
+                False,
+                "citations_required: nothing was retrieved (0 sources) — this step "
+                "reads your documents and must show where its answer came from",
+            )
+        # Half (b) — the marker count, the SAME code path as ``presence``: same
+        # default pattern literal, same re.error guard, same ``min_markers`` default.
         text = _output_text(output)
         pattern = config.get("pattern", r"\[\d+\]|\(doc[^)]*\)")
         try:
@@ -218,6 +263,11 @@ async def _validate_citations_required(output: dict, config: dict, ctx) -> GateR
         need = config.get("min_markers", 1)
         if n >= need:
             return GateResult(True, None)
+        if mode == "retrieved_and_cited":
+            return GateResult(
+                False,
+                f"citations_required: {n}/{need} citation markers in the answer",
+            )
         return GateResult(False, f"citations_required: only {n}/{need} citation markers")
 
     # deterministic / emit mode — wrap check_coverage.
@@ -605,3 +655,36 @@ def _evaluate_freshness(probe: dict, config: dict, max_age_days) -> GateResult:
             )
 
     return GateResult(True, None)
+
+
+# ── 6. action_risk_approval (timing=pre; net-new; ALWAYS fails, by design) ─────
+@register_validator("action_risk_approval")
+async def _validate_action_risk_approval(output: dict, config: dict, ctx) -> GateResult:
+    """Phase 185 (GOVERN-03 / D-185-12) — the armed action-risk checkpoint.
+
+    It ALWAYS returns ``GateResult(False, ...)`` and never inspects ``output``. That
+    is not a stub: the gate's job is to say *"a human has to answer before this step
+    runs"*, and in this engine the way a gate says that is to fail with a structured
+    finding and let the ``on_failure: "ask_user"`` disposition machinery own the
+    pause (``harness_engine._resolve_failure_with_ask_user`` — the durable prompt
+    row, the emit, the cross-worker SUBSCRIBE, the receipt, and the Proceed/Abort
+    routing are ALL already shipped there for the ``timing="pre"`` case).
+
+    WHY the wait is not in here: ``validators.py``'s contract says a gate never
+    blocks and never raises. Putting an indefinite pub/sub block inside a gate would
+    break that abstraction for every other kind and would make ``run_gates`` — a
+    pure fan-in — the owner of a durable human rendezvous. The shipped ``ask_user``
+    disposition already pauses in exactly the right place, so this kind stays a pure
+    total function and the pause stays where the machinery for it lives. (Plan
+    185-04 is what makes that wait indefinite; nothing here changes.)
+
+    The ``"action_risk:approval|<sentence>"`` finding follows the
+    ``freshness:staleness|<payload>`` shape character-for-character in structure
+    because ``_ask_user_choices_from_finding`` (``harness_engine.py``) branches on
+    exactly that ``<kind>:<subkind>|<payload>`` prefix to derive the choice menu.
+    The payload is the engine-generated approval sentence carried in
+    ``config["prompt"]`` (D-185-14 — there is NO authored-message field); an absent
+    prompt degrades to an empty payload rather than failing differently, because the
+    gate's verdict must not depend on the copy.
+    """
+    return GateResult(False, "action_risk:approval|" + (config.get("prompt") or ""))
