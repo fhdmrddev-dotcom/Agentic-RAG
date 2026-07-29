@@ -62,8 +62,11 @@ import {
 export const CANVAS_LAYOUT = {
   /** Uniform node width — every card is the same width; content wraps, never widens. */
   NODE_WIDTH: 260,
-  /** The floor a card may not shrink below; it grows DOWNWARD from here. */
-  NODE_MIN_HEIGHT: 96,
+  /** The floor a card may not shrink below; it grows DOWNWARD from here. Raised
+   *  96 → 104 by D-185-17: 104 is the 137-B floor, the height at which the mark
+   *  floating above the card's top edge clears the title line by 11px rather than
+   *  the 3px the sketch theme's own `padding-top: 34` left. */
+  NODE_MIN_HEIGHT: 104,
   /** Horizontal distance between two adjacent phase columns. */
   PITCH_X: 320,
   /** The single spine lane every phase node sits on. */

@@ -499,10 +499,12 @@ interface PlaneEditingLayerProps {
  * coordinates, through the library's own `<ViewportPortal>`, so they pan and zoom with
  * the cards they belong to while living outside every node's DOM subtree.
  *
- * Under 137-B (`themes/canvas-184.css` `body.card-b`) the card's TOP edge belongs to
- * the floating icon and its RIGHT edge carries the verdict mark (184-08), so the `✕`
- * sits on the BOTTOM edge — `body.card-b .acts { bottom: -12px }`, i.e. straddling the
- * card's lower border. The card's height is READ from the library's measurement rather
+ * Under 137-B (`themes/canvas-184.css` `body.card-b`, built by 185-01) every other edge
+ * of the card is already spoken for: the TOP edge belongs to the floating 3D icon, the
+ * LEFT edge carries the verdict mark (184-08, moved left by 185-01), and the TOP-RIGHT
+ * corner is CLAIMED for the governance seal (SPEC Req 6 / D-185-17). So the `✕` sits on
+ * the BOTTOM edge — `body.card-b .acts { bottom: -12px }`, i.e. straddling the card's
+ * lower border. The card's height is READ from the library's measurement rather
  * than assumed, because a card grows downward from `NODE_MIN_HEIGHT` and a fixed offset
  * would drift up into the body of a two-line title.
  *

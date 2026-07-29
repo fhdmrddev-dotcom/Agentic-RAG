@@ -22,14 +22,15 @@
  * (D-184-08) while still adding the seam.
  *
  * WHAT 184-08 CHANGED, stated literally so this docblock does not drift: the `verdict`
- * slot is now RENDERED — a corner mark on the card's right edge — while `status` and
+ * slot is now RENDERED — a corner mark on the card's left edge (it landed on the right
+ * in 184-08 and was moved by 185-01; see the mark's own docblock) — while `status` and
  * `stepNumber` are still declared and still render nothing. The seam worked exactly as
  * D-184-06 intended: filling it was a change to this component's body and to nobody
  * else's contract. The card is still the wrong place to ask what a verdict MEANS: the
  * value arrives already reduced to one of three states by `verdictModel.markFor`, which
  * reads the server's `severity` and derives none of it (VALID-03 / D-182-06).
  *
- * THE TWO-BADGE BUDGET IS ENFORCED BY THE TYPE SYSTEM (137-D / D-183-07). `BadgeSlots`
+ * THE TWO-BADGE BUDGET IS ENFORCED BY THE TYPE SYSTEM (137-B / D-183-07). `BadgeSlots`
  * is a max-2 TUPLE union, so a third badge is a typecheck error rather than a review
  * comment. Phase 185's graded-governance dial therefore physically cannot spend a
  * budget it was not given — it adds data to an existing row.
@@ -47,9 +48,23 @@
  * in isolation. It is also what forces the ✕-delete and ＋-insert affordances onto
  * the lane rather than into the card (184-12).
  *
- * THE LOOK IS SKETCH 137-D, the locked acceptance bar: a frosted-glass card that
- * stays NEUTRAL, with the 3D mark floating at the LEFT edge over its own contact
- * shadow, one plain-language title, one supporting line, and at most two word-badges.
+ * THE LOOK IS SKETCH 137-B, the locked acceptance bar: a frosted-glass card that stays
+ * NEUTRAL — 248px wide, centre-aligned, centred inside the 260px node box — with the 3D
+ * mark FLOATING ABOVE ITS TOP EDGE over its own contact shadow, then one plain-language
+ * title, one supporting line, and at most two word-badges, all centred beneath it.
+ *
+ * (185-01 rebuilt this from 137-D, where the mark sat at the LEFT edge of a full-width
+ * card pushed 24px right by a left margin, its body padded to clear the icon. The card
+ * class names of that shape are deliberately NOT quoted anywhere in this file: the
+ * plan's acceptance greps assert they are gone, and a docblock that spelled them would
+ * make its own guard vacuous. The move is not decoration: SPEC Req 6 CLAIMS top-right
+ * for the governance seal and relocates the verdict mark to the left, and on 137-D a
+ * left verdict overlapped the left-edge icon well by 14×8px — no left placement was
+ * reachable at all. D-185-17 sequences the rebuild ahead of every governance mark, as
+ * its own separately-committed plan. The clearance numbers `pt-[42px]` and
+ * `NODE_MIN_HEIGHT: 104` are D-185-17's amendments to the sketch theme, which carries
+ * 34 and 96; every other constant here is the theme's, verbatim.)
+ *
  * Per-step-type colour is a TINT BEHIND THE ICON ONLY — the colour budget is
  * load-bearing, because Phase 188 paints run state onto these same nodes and needs
  * the strong colours free. Motion keys off RUN STATE, never off selection (the defect
@@ -106,7 +121,7 @@ export interface BadgeSlot {
 }
 
 /**
- * **THE 137-D TWO-BADGE BUDGET, ENFORCED BY THE TYPE SYSTEM.**
+ * **THE 137-B TWO-BADGE BUDGET, ENFORCED BY THE TYPE SYSTEM.**
  *
  * A max-2 tuple union. Zero, one or two badges are representable; a third is a
  * TYPECHECK ERROR, not a review comment. That is deliberate and it is the mechanism
@@ -172,8 +187,9 @@ export interface PhaseNodeCardProps {
   badges?: BadgeSlots
   /** Phase 188's run state. Declared, rendered as nothing in 184. */
   status?: NodeRunStatus
-  /** The server's verdict mark (VALID-03), rendered on the card's RIGHT edge by
-   *  184-08. **Every value here is SERVER-DERIVED** — the caller reads it off
+  /** The server's verdict mark (VALID-03), rendered by 184-08 and relocated to the
+   *  card's LEFT edge by 185-01 (D-185-17 — top-right is CLAIMED for the governance
+   *  seal). **Every value here is SERVER-DERIVED** — the caller reads it off
    *  `verdictModel.markFor(slug)`, which reads `verdict.severity` and derives nothing.
    *  Absent ⇒ the card renders no verdict element at all, which is the state a draft
    *  is in before its first check has answered (D-184-15). */
@@ -234,10 +250,15 @@ export function PhaseNodeCard(props: PhaseNodeCardProps) {
     >
       {anchors}
 
-      {/* The frosted card. Neutral by construction — no per-type wash anywhere. */}
+      {/* The frosted card. Neutral by construction — no per-type wash anywhere.
+          137-B geometry (`themes/canvas-184.css` `body.card-b .node`): a 248px
+          centre-aligned BLOCK card, horizontally centred inside the 260px node box,
+          `border-radius: 22px`, padding `42px 20px 20px`. The top padding is the one
+          number that does NOT come from the sketch theme — D-185-17 raises it 34 → 42
+          so the mark floating above the top edge clears the title by 11px. */}
       <div
         className={cn(
-          "ml-6 flex flex-col justify-center rounded-2xl border py-3 pl-10 pr-3",
+          "mx-auto block w-[248px] rounded-[22px] border pb-5 pt-[42px] px-5 text-center",
           "bg-card/30 backdrop-blur-sm",
           "shadow-[0_1px_0_hsl(var(--foreground)/0.06)_inset,0_18px_36px_-22px_rgba(0,0,0,0.95)]",
           selected
@@ -283,19 +304,31 @@ export function PhaseNodeCard(props: PhaseNodeCardProps) {
         ) : null}
       </div>
 
-      {/* The server's verdict mark, on the RIGHT edge (`themes/canvas-184.css`
-          `body.card-b .vmark`). Under 137-B the TOP edge belongs to the floating 3D
-          icon and the BOTTOM edge is reserved for the per-node actions 184-12 adds, so
-          right is the only edge left — and it is also the one that never overlaps the
-          icon. It is `pointer-events-none` and carries no control of any kind: one tab
-          stop per node is a canvas-level invariant, and a pressable mark would make it
+      {/* The server's verdict mark, on the card's LEFT edge (D-185-17 / SPEC Req 6).
+          THE REASON IS LIFETIME, NOT TASTE. The card has exactly two free corners and
+          two claimants with different lifespans. The governance seal is a PERMANENT
+          property of the step — it is true of the step whether or not anything has run,
+          and it was verified at all four run states in sketch 143-A — so it keeps the
+          top-right corner, which SPEC Req 6 CLAIMS for it. A verdict only exists once
+          the server has returned a problem, so the TRANSIENT mark is the one that
+          moves. The permanent mark keeps its corner; the transient one relocates.
+
+          RESIDUAL, recorded rather than discovered later: the moved verdict grazes the
+          `stepNumber` slot by 2×16px (verdict x −8…14 / y 6…28 against 137-B's
+          `.stepn` at x 12…34 / y 12…34). That is not a collision today because the slot
+          RENDERS NOTHING — D-183-07 keeps `phase_index` off the face. If `phase_index`
+          is ever brought to the face, move the step number to `left:16` and the graze
+          clears. `PhaseNodeCard.test.tsx`'s occupancy block pins both halves.
+
+          It is `pointer-events-none` and carries no control of any kind: one tab stop
+          per node is a canvas-level invariant, and a pressable mark would make it
           two. */}
       {mark ? (
         <span
           data-testid="canvas-node-verdict"
           data-verdict={verdict}
           className={cn(
-            "pointer-events-none absolute -right-2 top-1.5 z-[8] grid h-[22px] w-[22px]",
+            "pointer-events-none absolute -left-2 top-1.5 z-[8] grid h-[22px] w-[22px]",
             "place-items-center rounded-full text-[11px] font-bold leading-none",
             mark.className,
           )}
@@ -305,12 +338,18 @@ export function PhaseNodeCard(props: PhaseNodeCardProps) {
         </span>
       ) : null}
 
-      {/* The 3D mark floating at the LEFT edge: a soft light disc behind it (the
-          D-183-14 canvas-local icon-well lightening, applied uniformly), the
-          per-type tint inside that disc, and its own contact shadow beneath. */}
+      {/* The 3D mark FLOATING ABOVE THE CARD'S TOP EDGE, horizontally centred on it
+          (`themes/canvas-184.css` `body.card-b .node .icowrap`: `left:50%; top:-26px;
+          62×62`): a soft light disc behind it (the D-183-14 canvas-local icon-well
+          lightening, applied uniformly), the per-type tint inside that disc, and its
+          own contact shadow beneath.
+
+          It overflows the node box upward by 26px. That is the SAME overflow the
+          verdict mark already relies on, and it is why nothing in this subtree — or in
+          the node wrapper around it — may ever take `overflow-hidden`. */}
       <span
         aria-hidden="true"
-        className="pointer-events-none absolute left-0 top-1/2 grid h-14 w-14 -translate-y-1/2 place-items-center"
+        className="pointer-events-none absolute left-1/2 top-[-26px] grid h-[62px] w-[62px] -translate-x-1/2 place-items-center"
       >
         <span
           className="absolute inset-0 rounded-full"
