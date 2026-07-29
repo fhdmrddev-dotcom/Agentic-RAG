@@ -935,13 +935,41 @@ async def _resolve_failure_with_ask_user(
 
     from uuid import uuid4
 
+    # ── Phase 185 (GOVERN-03 / SPEC Req 9) — THE ARMED-GATE READING ──────────────
+    # ONE predicate; every Phase-185 delta below branches on it. Read off the FINDING
+    # (the structured prefix ``_validate_action_risk_approval`` emits) rather than off
+    # the phase, because the finding is what identifies WHICH validator failed — an
+    # armed phase can also carry authored gates, and only the armed one gets this
+    # disposition. An unarmed ``llm_human_input`` step and every freshness gate keep
+    # byte-identical behaviour: for them ``is_action_risk`` is False and each branch
+    # below evaluates to exactly the expression that shipped.
+    is_action_risk = (error_message or "").startswith("action_risk:approval|")
+
     tool_call_id = uuid4().hex
     choices = _ask_user_choices_from_finding(error_message)
-    prompt = (
-        f"A validation check on phase '{phase.slug}' flagged: {error_message}. "
-        "How should the run proceed?"
-    )
-    timeout_seconds = min(
+    if is_action_risk:
+        # DELTA 1 — the prompt. "A validation check on phase 'X' flagged: …" is wrong
+        # for an armed step: nothing was flagged, the author simply said a person
+        # decides before this one runs. Use the engine-generated sentence carried AFTER
+        # the prefix, VERBATIM (D-185-14) — composed by ``grounding._approval_sentence``,
+        # already honest about POSITION, IDENTITY and CONSEQUENCE, and deliberately not
+        # wrapped in the generic validation-flagged sentence.
+        prompt = error_message.split("|", 1)[1]
+    else:
+        prompt = (
+            f"A validation check on phase '{phase.slug}' flagged: {error_message}. "
+            "How should the run proceed?"
+        )
+    # DELTA 2 — the timeout. An armed checkpoint waits INDEFINITELY: with the checkpoint
+    # set, no answer must mean the run NEVER proceeds (SPEC Req 9), so there can be no
+    # expiry that quietly reads as "yes". ``None``, never ``0``: the shipped
+    # ``PendingAskCard`` seeds its countdown from this value and counts a null/zero
+    # deadline down to EXPIRED ("No response within 0:00 — agent stopped"), so emitting
+    # ``0`` would render every armed prompt as dead the instant it appeared. Plan 185-05
+    # teaches the card to render ``None`` as "no deadline"; this path's job is to SEND
+    # ``None`` — it rides into the durable prompt row and the ``ask_user_prompt`` emit
+    # below unchanged, both of which simply carry ``timeout_seconds``.
+    timeout_seconds = None if is_action_risk else min(
         getattr(phase.config, "timeout_seconds", settings.ask_user_max_timeout_seconds)
         if getattr(phase, "config", None) is not None
         else settings.ask_user_max_timeout_seconds,
@@ -1007,8 +1035,38 @@ async def _resolve_failure_with_ask_user(
     from app.services.ask_user_service import subscribe_for_response
 
     payload = await subscribe_for_response(
-        redis, run_id, tool_call_id, float(timeout_seconds)
+        redis, run_id, tool_call_id,
+        # DELTA 2 (cont.) — armed: pass ``None`` straight through for the indefinite
+        # wait (the ``float()`` cast would TypeError on it). The non-armed expression is
+        # byte-identical to what shipped.
+        timeout_seconds if is_action_risk else float(timeout_seconds),
     )
+
+    # DELTA 3 (RESEARCH L-6) — a graceful restart must not DESTROY an armed run.
+    # A ``{"kind": "shutdown"}`` payload comes ONLY from main.py's
+    # ``broadcast_shutdown_sentinel_to_all``. It is not a decision, and today it is read
+    # as one: the payload is not ``kind: "response"``, so ``choice`` stays ``""``,
+    # ``_is_abort_choice("")`` is True, and the run is FAILED by a routine deploy. Copy
+    # the shipped 096-09 precedent (``harness/phase_types._exec_llm_human_input``):
+    # raise ``asyncio.CancelledError`` so the phase stays ``active`` and the durable
+    # prompt row survives, and let the boot-time resume sweep re-ask. ``run_workflow``'s
+    # escape handler already skips ``_expire_pending_ask_user`` when
+    # ``is_app_shutting_down()``, so the prompt is not expired out from under it.
+    #
+    # SCOPED TO ARMED CHECKPOINTS ONLY, DELIBERATELY. The freshness gate reaching this
+    # same line has the identical destructive-on-deploy behaviour, but SPEC Req 9 scopes
+    # the fail-closed change to armed checkpoints ("a plain llm_human_input step keeps
+    # its CURRENT timeout disposition unchanged"; §Out-of-scope: "Only armed checkpoints
+    # change") and no D-185-NN decision authorises widening it. So the asymmetry inside
+    # this one function is intentional: an armed gate escapes via CancelledError, every
+    # other disposition keeps today's choice="" → _is_abort_choice("") → fail_run path
+    # byte-for-byte. The freshness twin is recorded as a deferred item in
+    # ``185-CONTEXT.md`` with a re-open trigger; it is not fixed here.
+    if is_action_risk and payload and payload.get("kind") == "shutdown":
+        raise asyncio.CancelledError(
+            "action-risk checkpoint interrupted by server shutdown — phase left active "
+            "for the boot-time resume sweep (096-09 precedent)"
+        )
 
     reason_base = (
         f"Phase {phase.phase_index + 1} ({phase.slug}) validation flagged: {error_message}"
@@ -1016,6 +1074,12 @@ async def _resolve_failure_with_ask_user(
 
     if payload is None:
         # Unanswered (the 085 expiry) → honest fail, never hung.
+        #
+        # DELTA 4 — KEPT ON PURPOSE for armed gates. With ``timeout_seconds=None`` this
+        # branch is unreachable for an armed checkpoint except on an UNPARSEABLE payload
+        # (``_subscribe_and_block`` also returns ``None`` for malformed JSON). Keeping
+        # it is the fail-closed posture: a payload we could not read is not consent, and
+        # the only safe reading of "we don't know what they said" is "do not run it".
         return PhaseOutcome(
             "fail_run", None, None, f"{reason_base} — unanswered, run failed"
         )

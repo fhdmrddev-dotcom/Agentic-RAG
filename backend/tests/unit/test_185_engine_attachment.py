@@ -282,3 +282,304 @@ def test_grounding_declares_no_model_validator_in_CODE():
         f"grounding.py declares a Pydantic {needle} — the synthesis must stay at the "
         f"run seam or it will be persisted into the definition JSONB (L-2 / D-185-07)"
     )
+
+
+# ═════ plan 185-04 — the ARMED disposition: no timeout, verbatim prompt, ═══════
+# ═════ shutdown survives. SPEC Req 9 / criteria 19 and 20.               ═══════
+#
+# These DO drive ``_resolve_failure_with_ask_user`` (unlike the attachment tests
+# above, which are pure), because the claim IS the disposition's behaviour. The
+# mock posture is ``test_ask_user_disposition.py``'s: ``subscribe_for_response``
+# (the 085 block primitive), ``write_audit`` (the receipt) and — where the durable
+# row matters — ``app.utils.db.aexec``. Every network dependency is mocked
+# (``feedback_mock_completeness``); ``redis``/``pool`` are opaque objects the helper
+# only forwards.
+
+
+def _armed_effective_phase(*, total_phases: int = 4, index: int = 1, label: str = "Send the renewal notice"):
+    """The phase as the ENGINE sees it: run the real synthesis so the prompt under test
+    is the real generated sentence, never a hand-copied twin that could drift.
+
+    ``execute_code`` (not a KB tool) keeps the citation gate off, so ``validators[0]``
+    is unambiguously the armed pre-gate."""
+    from app.services.harness.grounding import effective_phase
+
+    authored = _agent_phase(
+        slug="send-notice", phase_index=index, name=label,
+        tools=["execute_code"], validators=[], armed=True,
+    )
+    return authored, effective_phase(authored, total_phases=total_phases)
+
+
+def _armed_ctx(*, supabase=None, thread_id=None):
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+    from uuid import uuid4
+
+    return SimpleNamespace(
+        supabase=supabase, thread_id=thread_id, current_user={"id": uuid4()},
+        producer_run_id=uuid4(), emit=AsyncMock(),
+    )
+
+
+def test_armed_gate_subscribes_with_no_timeout_at_all():
+    """SPEC Req 9, the indefinite-wait proof. ``subscribe_for_response`` is awaited with
+    ``None`` as its fourth argument for an armed checkpoint — not a big float, not 0 —
+    which is what makes "no answer" mean "the run never proceeds" rather than "the run
+    advances in N seconds". The freshness gate in the same file still gets a ``float``,
+    which is what proves the change did not widen past armed checkpoints."""
+    import asyncio
+    from unittest.mock import AsyncMock, patch
+    from uuid import uuid4
+
+    from app.services import harness_engine
+
+    _authored, eff = _armed_effective_phase()
+    finding = "action_risk:approval|" + eff.validators[0].config["prompt"]
+    subscribe = AsyncMock(return_value={"kind": "response", "response_text": "Approve and run this step"})
+
+    with patch.object(harness_engine, "write_audit", AsyncMock()), \
+         patch("app.services.ask_user_service.subscribe_for_response", subscribe):
+        asyncio.run(
+            harness_engine._resolve_failure_with_ask_user(
+                eff, finding, 0, 0,
+                run_id=uuid4(), pool=object(), redis=object(), ctx=_armed_ctx(),
+                _audit_user_id=uuid4(), is_pre=True,
+            )
+        )
+
+    args, _kwargs = subscribe.await_args
+    assert args[3] is None, f"armed gate subscribed with {args[3]!r}, not an indefinite wait"
+
+    # ── the NON-ARMED control, same file, same mock: still a float ──
+    from app.models.harness import PhaseSpec, ValidatorSpec
+
+    fresh = PhaseSpec(
+        slug="p", phase_index=0,
+        config={"phase_type": "programmatic", "fn": "noop"},
+        validators=[ValidatorSpec(kind="freshness", timing="pre", on_failure="ask_user")],
+    )
+    subscribe2 = AsyncMock(return_value={"kind": "response", "response_text": "Proceed anyway"})
+    with patch.object(harness_engine, "write_audit", AsyncMock()), \
+         patch("app.services.ask_user_service.subscribe_for_response", subscribe2):
+        asyncio.run(
+            harness_engine._resolve_failure_with_ask_user(
+                fresh, "freshness:staleness|400d old", 0, 0,
+                run_id=uuid4(), pool=object(), redis=object(), ctx=_armed_ctx(),
+                _audit_user_id=uuid4(), is_pre=True,
+            )
+        )
+    args2, _ = subscribe2.await_args
+    assert isinstance(args2[3], float), "the freshness gate's clamped timeout changed"
+
+
+def test_criterion_19_unanswered_armed_gate_does_not_advance_the_run():
+    """CRITERION 19. With the checkpoint SET and ``subscribe_for_response`` returning
+    ``None``, the helper returns a ``fail_run`` outcome — crucially NOT ``None``, which
+    on a pre-gate is the signal "run the body". The body never runs, so the run does not
+    advance to the next phase; in the canonical example the email is not sent."""
+    import asyncio
+    from unittest.mock import AsyncMock, patch
+    from uuid import uuid4
+
+    from app.services import harness_engine
+
+    _authored, eff = _armed_effective_phase()
+    finding = "action_risk:approval|" + eff.validators[0].config["prompt"]
+    write_audit = AsyncMock()
+
+    with patch.object(harness_engine, "write_audit", write_audit), \
+         patch("app.services.ask_user_service.subscribe_for_response",
+               AsyncMock(return_value=None)):
+        outcome = asyncio.run(
+            harness_engine._resolve_failure_with_ask_user(
+                eff, finding, 0, 0,
+                run_id=uuid4(), pool=object(), redis=object(), ctx=_armed_ctx(),
+                _audit_user_id=uuid4(), is_pre=True,
+            )
+        )
+
+    assert outcome is not None, "the pre-gate caller would have RUN THE BODY"
+    assert outcome.kind == "fail_run"
+    assert write_audit.await_count == 0  # nothing was approved
+
+
+def test_armed_prompt_is_the_generated_sentence_character_identically():
+    """D-185-14. The prompt handed to the person is the sentence
+    ``grounding._approval_sentence`` composed — VERBATIM. Not wrapped in "A validation
+    check on phase 'X' flagged: …", not prefixed, not truncated. The expected string is
+    built by CALLING the composer, so this assertion cannot drift from the composer and
+    plan 185-05 can assert against the same value."""
+    import asyncio
+    from unittest.mock import AsyncMock, MagicMock, patch
+    from uuid import uuid4
+
+    from app.services import harness_engine
+    from app.services.harness.grounding import _approval_sentence
+
+    authored, eff = _armed_effective_phase(total_phases=4, index=1)
+    expected = _approval_sentence(authored, 4)
+    finding = "action_risk:approval|" + eff.validators[0].config["prompt"]
+
+    supabase = MagicMock()
+    ctx = _armed_ctx(supabase=supabase, thread_id=uuid4())
+
+    with patch.object(harness_engine, "write_audit", AsyncMock()), \
+         patch("app.utils.db.aexec", AsyncMock()), \
+         patch("app.services.ask_user_service.subscribe_for_response",
+               AsyncMock(return_value={"kind": "response", "response_text": "Do not run it"})):
+        asyncio.run(
+            harness_engine._resolve_failure_with_ask_user(
+                eff, finding, 0, 0,
+                run_id=uuid4(), pool=object(), redis=object(), ctx=ctx,
+                _audit_user_id=uuid4(), is_pre=True,
+            )
+        )
+
+    # The SSE the frontend renders.
+    emitted = ctx.emit.await_args.kwargs
+    assert emitted["prompt"] == expected
+    # And the durable row /pending replays.
+    row = supabase.table.return_value.insert.call_args[0][0]
+    assert row["content"] == expected
+    assert row["tool_calls"][0]["prompt"] == expected
+
+    # Sanity: the generic validation-flagged wrapper is nowhere near it.
+    assert "A validation check on phase" not in expected
+    assert expected.startswith('Step 2 of 4, "Send the renewal notice", is about to run.')
+
+
+def test_armed_prompt_and_row_carry_a_null_deadline_never_zero():
+    """L-15. Both the ``ask_user_prompt`` emit and the durable prompt row carry
+    ``timeout_seconds = None``. ``0`` would be catastrophic rather than merely wrong:
+    ``PendingAskCard`` counts a null/zero deadline down to EXPIRED and renders "No
+    response within 0:00 — agent stopped", so every armed prompt would appear dead the
+    instant it appeared — G-4 scenario 3's named failure, shipped by the fix meant to
+    prevent it. Plan 185-05 teaches the card to read ``None`` as "no deadline"; sending
+    ``None`` is this plan's half."""
+    import asyncio
+    from unittest.mock import AsyncMock, MagicMock, patch
+    from uuid import uuid4
+
+    from app.services import harness_engine
+
+    _authored, eff = _armed_effective_phase()
+    finding = "action_risk:approval|" + eff.validators[0].config["prompt"]
+    supabase = MagicMock()
+    ctx = _armed_ctx(supabase=supabase, thread_id=uuid4())
+
+    with patch.object(harness_engine, "write_audit", AsyncMock()), \
+         patch("app.utils.db.aexec", AsyncMock()), \
+         patch("app.services.ask_user_service.subscribe_for_response",
+               AsyncMock(return_value={"kind": "response", "response_text": "Do not run it"})):
+        asyncio.run(
+            harness_engine._resolve_failure_with_ask_user(
+                eff, finding, 0, 0,
+                run_id=uuid4(), pool=object(), redis=object(), ctx=ctx,
+                _audit_user_id=uuid4(), is_pre=True,
+            )
+        )
+
+    emitted = ctx.emit.await_args.kwargs
+    assert emitted["timeout_seconds"] is None
+    assert emitted["timeout_seconds"] != 0  # explicit: the value that renders EXPIRED
+
+    tool_call = supabase.table.return_value.insert.call_args[0][0]["tool_calls"][0]
+    assert tool_call["timeout_seconds"] is None
+    assert tool_call["options"] == ["Approve and run this step", "Do not run it"]
+
+
+def test_shutdown_mid_wait_leaves_an_armed_run_resumable():
+    """L-6 / G-4 scenario 3. A ``{"kind": "shutdown"}`` payload is NOT a decision. It
+    arrives only from ``main.py``'s graceful-drain broadcast, and today it computes
+    ``choice = ""`` → ``_is_abort_choice("")`` → the run is FAILED by a routine deploy.
+    The armed gate now escapes via ``asyncio.CancelledError`` (the shipped 096-09
+    precedent), which leaves the phase ``active`` and the durable prompt row alive for
+    the boot-time resume sweep — a deploy no longer destroys a run parked on a person."""
+    import asyncio
+    from unittest.mock import AsyncMock, patch
+    from uuid import uuid4
+
+    import pytest
+
+    from app.services import harness_engine
+
+    _authored, eff = _armed_effective_phase()
+    finding = "action_risk:approval|" + eff.validators[0].config["prompt"]
+
+    with patch.object(harness_engine, "write_audit", AsyncMock()), \
+         patch("app.services.ask_user_service.subscribe_for_response",
+               AsyncMock(return_value={"kind": "shutdown"})):
+        with pytest.raises(asyncio.CancelledError):
+            asyncio.run(
+                harness_engine._resolve_failure_with_ask_user(
+                    eff, finding, 0, 0,
+                    run_id=uuid4(), pool=object(), redis=object(), ctx=_armed_ctx(),
+                    _audit_user_id=uuid4(), is_pre=True,
+                )
+            )
+
+
+def test_shutdown_on_a_NON_armed_gate_still_fails_the_run():
+    """THE UNCHANGED-PATH CONTROL, and the whole point of guarding delta 3 with the
+    predicate. The freshness gate has the identical destructive-on-deploy behaviour, but
+    SPEC Req 9 and §Out-of-scope both scope the fail-closed change to armed checkpoints
+    ONLY, and no D-185-NN decision authorises widening it. So a shutdown on a freshness
+    gate must STILL return ``fail_run`` — byte-for-byte today's path. If this test ever
+    goes green-by-raising, the fix has silently widened past its authorisation.
+    (The freshness twin is a recorded deferred item with a re-open trigger.)"""
+    import asyncio
+    from unittest.mock import AsyncMock, patch
+    from uuid import uuid4
+
+    from app.models.harness import PhaseSpec, ValidatorSpec
+    from app.services import harness_engine
+
+    fresh = PhaseSpec(
+        slug="p", phase_index=0,
+        config={"phase_type": "programmatic", "fn": "noop"},
+        validators=[ValidatorSpec(kind="freshness", timing="pre", on_failure="ask_user")],
+    )
+
+    with patch.object(harness_engine, "write_audit", AsyncMock()), \
+         patch("app.services.ask_user_service.subscribe_for_response",
+               AsyncMock(return_value={"kind": "shutdown"})):
+        outcome = asyncio.run(
+            harness_engine._resolve_failure_with_ask_user(
+                fresh, "freshness:staleness|400d old", 0, 0,
+                run_id=uuid4(), pool=object(), redis=object(), ctx=_armed_ctx(),
+                _audit_user_id=uuid4(), is_pre=True,
+            )
+        )
+
+    assert outcome is not None
+    assert outcome.kind == "fail_run"
+    assert "aborted" in (outcome.reason or "").lower()
+
+
+def test_criterion_20_exec_llm_human_input_is_untouched():
+    """CRITERION 20 / D-14. ``_exec_llm_human_input`` keeps its CLAMPED timeout and its
+    NORMAL return — the unarmed human-input step behaves exactly as it did yesterday.
+
+    Asserted against the function's own source rather than against ``git diff``, so the
+    fence survives the commit that introduces it: the shipped clamp and the shipped
+    ``float()`` cast must still be there, and no Phase-185 armed vocabulary may have
+    leaked in. SPEC Req 9's third bullet also lives here — the unarmed copy must never
+    claim the run waits; that wording belongs to the armed checkpoint alone."""
+    import inspect
+
+    from app.services.harness.phase_types import _exec_llm_human_input
+
+    src = inspect.getsource(_exec_llm_human_input)
+
+    # The shipped disposition, intact.
+    assert "settings.ask_user_max_timeout_seconds" in src
+    assert "float(timeout_seconds)" in src
+    assert 'answer = ""' in src
+
+    # No armed-checkpoint machinery leaked into the unarmed path.
+    for leaked in ("action_risk", "is_action_risk", "timeout_seconds = None"):
+        assert leaked not in src, f"{leaked!r} leaked into _exec_llm_human_input"
+
+    # Req 9 third bullet: the unarmed surface never claims the run waits.
+    assert "waiting here and will not continue" not in src
