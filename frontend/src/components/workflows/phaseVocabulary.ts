@@ -185,11 +185,12 @@ export function technicalTitle(phase: PhaseSpecJSON): string {
 
 // ── Phase 185 (GOVERN-01 / GOVERN-02) — THE ONE CLIENT GROUNDING DERIVATION ────
 //
-// This section REPLACES `groundingFor` (SPEC Req 6: "Phase 185 replaces this
-// derivation"). The shipped three-face word-badge read `citation_policy` plus a
-// declared `citations_required` validator and rendered a WORD; graded governance
-// reads the tool intersection FIRST and renders a SHAPE (the corner seal, plan
-// 185-09). Different question, different answer, one home.
+// This section REPLACES the shipped three-face word-badge derivation, which
+// Req 6 deletes ("Phase 185 replaces this derivation" was that derivation's own
+// docblock, so the removal was pre-authorized in the source). It read
+// `citation_policy` plus a declared `citations_required` validator and rendered a
+// WORD; graded governance reads the tool intersection FIRST and renders a SHAPE
+// (the corner seal, plan 185-09). Different question, different answer, one home.
 //
 // WHY IT LIVES HERE AND IN EXACTLY ONE PLACE. Two surfaces consume this rule and
 // they sit one click apart: the panel's `GovernanceSection` (which draws the dial
@@ -317,74 +318,20 @@ export function actionRiskArmed(phase: PhaseSpecJSON): boolean {
   return phase.action_risk_armed === true
 }
 
-// ── The two badge slots (D-183-07) ──────────────────────────────────────────────
-
-/**
- * Badge slot 1 — grounding. `words` is what the user reads; `glyph` is the
- * never-colour-alone control (WCAG 1.4.1), so the state survives a colour-blind
- * read at rest. Both are always non-empty.
- */
-export interface Grounding {
-  mode: "strict" | "flag" | "open"
-  words: string
-  glyph: string
-}
-
-/**
- * The three grounding faces. Glyphs REUSE the shipped strictness vocabulary from
- * `deriveTier.ts:57-79` (STRICT 🔒 / MIDDLE ◐ / LOOSE ○) so the whole app speaks one
- * strictness language rather than inventing a canvas-local dialect.
- *
- * The reuse is a BAND match, not just a glyph match: the `flag` face covers exactly
- * the `flag | partial` band `deriveTier` calls MIDDLE (`deriveTier.ts:112-115`), so a
- * phase cannot read one strictness on the canvas and a different one on the workflow
- * soul a click away. `phaseVocabulary.test.ts` imports `deriveTier` and pins that
- * agreement for both policies, so the two modules cannot drift apart silently.
- */
-const GROUNDINGS = {
-  strict: { mode: "strict", words: "Must cite its sources", glyph: "🔒" },
-  flag: { mode: "flag", words: "Flags uncited claims", glyph: "◐" },
-  open: { mode: "open", words: "No sources needed", glyph: "○" },
-} as const satisfies Record<Grounding["mode"], Grounding>
-
-/**
- * D-183-07 slot 1 — grounding DERIVED from fields that exist TODAY: the
- * `citation_policy` dial plus the presence of a `citations_required` validator
- * gate. Phase 185 later replaces this derivation with an authored grounding-mode
- * field; 183 must NOT invent that field.
- *
- * `strict` when the policy is `"strict"` OR any validator declares
- * `citations_required`; the MIDDLE `flag` face for `"flag"` AND for `"partial"`;
- * `"open"` for everything else — `"draft"`, an absent value and any future/unknown
- * value — so the function stays TOTAL and never throws.
- *
- * `"partial"` reads as the middle face because it is a REAL enforcement level, not
- * an absence of one: `deriveTier.ts:112-115` maps it to MIDDLE alongside `flag`, and
- * `soulData.POLICY_ORDER` ranks it above `draft`. Calling it "No sources needed"
- * here would have two governance surfaces one click apart making opposite claims
- * about the same stored value. Totality is unaffected — it is the UNKNOWN policy,
- * not the known-but-middling one, that falls through to `open`.
- *
- * `v.kind` is compared as a plain string and is NEVER cast to `ValidatorKind`: the
- * backend declares nine kinds while `deriveTier.ts:28-33` narrows to five, so a cast
- * would be a lie and an unmodelled kind such as `regex_match` must simply be ignored.
- *
- * C-8 holds: `citation_policy` exists only on `llm_emit` configs, so a NON-emit phase
- * can only reach `strict` via the `citations_required` validator. That is intended —
- * a gate is a property of the phase that carries it.
- */
-export function groundingFor(phase: PhaseSpecJSON): Grounding {
-  const validators = phase.validators ?? []
-  const hasCitationGate = validators.some((v) => v?.kind === "citations_required")
-  const policy = phase.config.citation_policy
-  if (policy === "strict" || hasCitationGate) return GROUNDINGS.strict
-  if (policy === "flag" || policy === "partial") return GROUNDINGS.flag
-  return GROUNDINGS.open
-}
+// ── The badge slots (D-183-07 — Phase 185 leaves slot 1 EMPTY) ──────────────────
+//
+// Slot 1 carried a three-face grounding word-badge until Phase 185. SPEC Req 6
+// DELETES it: governance renders as shape (the corner seal), spends no colour and
+// spends no badge slot, and the freed slot belongs to 188 (run state) / 189
+// (external actions). `PhaseNodeCard`'s max-2 tuple union is what enforces that
+// budget; nothing here reserves the slot, because a reserved slot is a slot spent.
+// The signal itself still reaches the face — as `PhaseNodeData.grounded`, resolved
+// from the section above.
 
 /**
  * D-183-07 slot 2 — "Waits for you", true ONLY on `llm_human_input`. Every other
- * node face stays at ONE badge (137-D allows at most two).
+ * node face now carries NO badge at all (137-B allows at most two, and slot 1 is
+ * deliberately unspent).
  */
 export function waitsForYou(phase: PhaseSpecJSON): boolean {
   return phase.config.phase_type === "llm_human_input"

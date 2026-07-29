@@ -1,10 +1,9 @@
 /**
  * Phase 184-03 Task 1 (D-184-06, Wave-0 G-5 extraction) — nodePresentation.
  *
- * THE CANVAS NODE PRESENTATION TABLES, in one copy. The per-step-type icon tint,
- * the grounding tone mapping for the shared `StatusChip`, and the module-scope 3D
- * mark resolver — the things a canvas node face needs that are neither layout
- * (`canvasModel.CANVAS_LAYOUT`) nor vocabulary (`phaseVocabulary`).
+ * THE CANVAS NODE PRESENTATION TABLES, in one copy. The per-step-type icon tint and
+ * the module-scope 3D mark resolver — the things a canvas node face needs that are
+ * neither layout (`canvasModel.CANVAS_LAYOUT`) nor vocabulary (`phaseVocabulary`).
  *
  * Phase 184-08 added a fourth table at the foot of this file: the two verdict marks
  * plus the degraded one, and the single named destructive-token literal the R9 colour
@@ -14,20 +13,31 @@
  *
  * Structural template: `components/org/StatusChip.tsx` (Phase 177 D-08). Its
  * docblock draws exactly the boundary this module sits on — the shared COMPONENT is
- * the cohesion win, the tone MAPPING stays domain-specific. `GROUNDING_TONE` is that
- * domain mapping for the canvas; `StatusChip` itself stays where it is.
+ * the cohesion win, the tone MAPPING stays domain-specific. This module no longer
+ * carries such a mapping (see the Phase 185 note below); `StatusChip` itself stays
+ * where it is.
+ *
+ * PHASE 185 (SPEC Req 6) REMOVED THE GROUNDING TONE MAP. `GROUNDING_TONE` mapped the
+ * three faces of the retired grounding word-badge onto chip colours. Req 6 deletes
+ * that badge and states that governance spends **no colour and no badge slot** — it
+ * renders as SHAPE (the corner seal, plan 185-09) instead. A tone table for a badge
+ * that no longer exists is not dead-but-harmless: it is a live, exported
+ * three-face-in-colour reading that 188/189 could pick up, which is exactly the
+ * partial-deletion hazard the deletion's own threat register names. So it went with
+ * the badge. `PhaseNodeCard.test.tsx`'s source guard now asserts its ABSENCE, and
+ * `PhaseNode.tsx` is still checked for a resurrected local copy.
  *
  * STATE OF THE EXTRACTION — read this literally, it is not a claim about the future:
- * `ICON_TINT`, `DEFAULT_TINT`, `GROUNDING_TONE` and `renderPhaseMark` were CUT out of
- * `PhaseNode.tsx` (they were declared there at `:113`, `:122`, `:137` and `:159`
- * before this plan). It is a hard cut: `PhaseNode.tsx` declares none of them any more
- * and NO re-export shim was left behind — it imports all four from here. The values
- * moved byte-for-byte, docblocks intact; nothing was re-typed.
+ * `ICON_TINT`, `DEFAULT_TINT` and `renderPhaseMark` were CUT out of `PhaseNode.tsx`
+ * (they were declared there at `:113`, `:122` and `:159` before the 184-03 plan). It
+ * is a hard cut: `PhaseNode.tsx` declares none of them any more and NO re-export shim
+ * was left behind — it imports all three from here. The values moved byte-for-byte,
+ * docblocks intact; nothing was re-typed.
  *
  * This paragraph is kept honest by machine, not by habit. `PhaseNodeCard.test.tsx`
  * ships a `?raw` source guard — the `canvasModel.purity.test.ts:14-17` house idiom —
- * that reads `PhaseNode?raw` and fails the moment a second declaration of any of the
- * four reappears there, and asserts positively that `PhaseNode.tsx` imports from this
+ * that reads `PhaseNode?raw` and fails the moment a second declaration of any of them
+ * reappears there, and asserts positively that `PhaseNode.tsx` imports from this
  * module. It carries a positive control, so the guard is falsifiable rather than
  * vacuous. An in-code claim of a prior extraction with no guard behind it is the
  * exact anti-drift hazard 184-CONTEXT note 3 names (`soulData.ts` once asserted an
@@ -36,8 +46,8 @@
  *
  * Purity contract: pure and client-side. This module imports NOTHING from the API
  * client and reads no DOM — a tint is looked up, never fetched. It invents no
- * authoring field: a stored grounding-mode dial belongs to Phase 185, and the
- * `Grounding` shape here is the DERIVED one `phaseVocabulary` already ships.
+ * authoring field and holds no governance reading at all: the one client home for
+ * that is `phaseVocabulary.groundingCause`, and the canvas consumes it as a boolean.
  *
  * TOTALITY contract: both resolvers are total. An unknown `phase_type` resolves to
  * `DEFAULT_TINT` and to the `"•"` mark rather than throwing — the definition JSONB is
@@ -50,9 +60,7 @@
  */
 import { createElement, type ReactNode } from "react"
 
-import type { ChipTone } from "@/components/org/StatusChip"
 import { PHASE_GLYPHS } from "@/components/workflows/soulData"
-import type { Grounding } from "@/components/workflows/phaseVocabulary"
 import { phaseGlyph } from "@/lib/phaseGlyph"
 
 /**
@@ -70,25 +78,6 @@ export const ICON_TINT: Record<string, string> = {
 }
 
 export const DEFAULT_TINT = "hsl(220 30% 100% / 0.18)"
-
-/**
- * The canvas-domain tone mapping for the shared `StatusChip` (D-183-07 slot 1).
- *
- * This is the documented reuse shape, not a fork: `StatusChip`'s own docblock
- * separates the shared COMPONENT (the cohesion win) from the tone MAPPING (always
- * domain-specific — `statusChipMeta` maps the invitation/SSO lifecycle,
- * `adoptionChip` maps the roster's adoption state, and this maps grounding). A
- * third inline pill is exactly the fork Phase 177 retired.
- *
- * `strict` reads as a satisfied constraint (green), `flag` as a live/attention
- * state (indigo), `open` as calm. The WORD carries the meaning either way — the
- * glyph beside it is decorative and aria-hidden (WCAG 1.4.1, never colour alone).
- */
-export const GROUNDING_TONE: Record<Grounding["mode"], ChipTone> = {
-  strict: "success",
-  flag: "primary",
-  open: "muted",
-}
 
 /**
  * The 3D mark, resolved at MODULE scope and returned as a `ReactNode`.

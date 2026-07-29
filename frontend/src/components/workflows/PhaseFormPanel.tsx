@@ -95,9 +95,12 @@ export type PhaseGateRow =
  *   means the palette read FAILED and the surface must say so; an empty array would be
  *   byte-indistinguishable from an author who owns no tools, which is the lie R11 exists
  *   to prevent.
- * - `gates` — derived exactly as the shipped `groundingFor()` derives grounding today
- *   (`citation_policy` plus the presence of a `citations_required` validator). Phase 185
- *   plugs its own 🔒 row into THIS array; the shipped derivation retires in plan 185-08.
+ * - `gates` — derived by the caller from the grounding CAUSE (`groundingCauseOf` in
+ *   `phaseVocabulary.ts`): the page emits one locked `GOVERNANCE_GATE_ROW_LABEL` row when
+ *   the cause is `detected` or `escalated`, and none otherwise. The row is synthesized
+ *   CLIENT-side, never read off `/workflows/validate`, which returns problems and has no
+ *   channel for a gate that will run (D-185-19). The pre-185 three-face derivation off
+ *   `citation_policy` plus a `citations_required` validator is gone (SPEC Req 6).
  * - `kbTools` — the SERVER's knowledge-base tool names (D-185-09), read off
  *   `useGroundingBundle`. Absent or empty marks NOTHING, which is the safe direction: the
  *   run-time gate is server-side and unconditional, so a failed palette read can only cost

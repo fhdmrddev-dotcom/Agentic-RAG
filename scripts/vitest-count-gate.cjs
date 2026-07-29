@@ -21,9 +21,21 @@
  * .planning/phases/184-editable-canvas-live-structural-validation-round-trip/
  * 184-VALIDATION.md § "Wave 0 Count Pin"): 16 files / 424 tests / 0 failing.
  *
+ * RE-PINNED ONCE, on purpose: Phase 185 plan 185-08 (SPEC Req 6) DELETED the
+ * three-face grounding word-badge and the ~9 `it()` blocks that covered it, so
+ * `phaseVocabulary.test.ts` went 42 → 33 and the pinned total 424 → 415. That
+ * re-pin rode in the SAME COMMIT as the deletion, and its number was READ FROM
+ * THIS SCRIPT'S OWN OUTPUT (the `actual` column) rather than hand-computed —
+ * which is the only honest way to move a pin. A deletion that lands without its
+ * pin edit leaves HEAD red; a pin edit that lands without the deletion leaves the
+ * gate blind to the NEXT deleted test. See
+ * .planning/phases/185-graded-governance-per-node-grounding-mode-action-risk-dial/
+ * 185-RESEARCH.md § L-9. **A pin is lowered ONLY alongside a deliberate,
+ * plan-authorized deletion — never to make a red gate go quiet.**
+ *
  * The gate FAILS (exit 1) when:
  *   [failing-tests]        numFailedTests > 0
- *   [total-below-baseline] numTotalTests < 424
+ *   [total-below-baseline] numTotalTests < BASELINE_TOTAL
  *   [missing-file]         a pinned baseline file did not run at all
  *   [count-decrease]       a pinned file reports FEWER tests than its pin
  * A count that INCREASED is ALLOWED and printed as `+N` — feature waves add
@@ -58,7 +70,9 @@ const path = require("node:path")
 const BASELINE = {
   "canvasModel.fixtures.test.ts": 100,
   "canvasModel.purity.test.ts": 69,
-  "phaseVocabulary.test.ts": 42,
+  // 185-08: 42 → 33. Req 6 deleted the slot-1 grounding word-badge; the 9 `it()`
+  // blocks over its three faces went with it. Measured, not computed.
+  "phaseVocabulary.test.ts": 33,
   "WorkflowCanvas.test.tsx": 31,
   "canvasModel.test.ts": 26,
   "PublishGauntlet.test.tsx": 24,
@@ -74,7 +88,7 @@ const BASELINE = {
   "revertByteIdentical.test.tsx": 7,
 }
 
-const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // 424
+const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // 415 (was 424 pre-185-08)
 
 // ── The Wave-0 blast radius (184-VALIDATION.md § "quick run command"). ──
 const TARGETS = [

@@ -10,24 +10,28 @@
  *    slice, NEVER a `lastIndexOf(":")` split (correction C-1 under D-183-15).
  *  - `nodeTitle` resolves to a plain-language business sentence and NEVER leaks
  *    the slug into the default face (D-183-06).
- *  - `groundingFor` DERIVES grounding from `citation_policy` + a
- *    `citations_required` validator and always carries a glyph beside its words
- *    (D-183-07, WCAG 1.4.1 never-colour-alone), and its MIDDLE band AGREES with
- *    `deriveTier` — pinned cross-module rather than assumed (183-08, WR-01).
  *  - Every exported resolver is TOTAL — unknown phase types, unknown citation
  *    policies, unknown validator kinds, malformed `on_failure` and a missing
  *    `validators` array all resolve honestly and never throw (CANVAS-01).
  *  - The module is pure: no API-client import, no re-declared glyph map.
+ *
+ * Phase 185 (SPEC Req 6) DELETED the slot-1 grounding word-badge and with it the
+ * ~9 cases that covered its three faces, including the cross-module glyph-band pin
+ * against `deriveTier` (183-08 / WR-01). That pin had a subject only while the
+ * canvas rendered a strictness WORD next to the workflow soul's; graded governance
+ * renders a SHAPE instead (the corner seal, plan 185-09) and derives its state from
+ * the tool intersection, not from `citation_policy`, so there is no longer a second
+ * strictness reading for it to agree with. `deriveTier`'s own band mapping stays
+ * pinned in `deriveTier.test.ts`. The count-gate pin for this file moved 42 → 33 in
+ * the same commit as the deletion (L-9 / the Phase-177 lesson).
  */
 import { describe, it, expect } from "vitest"
 import phaseVocabularySource from "./phaseVocabulary?raw"
 import skipParseCases from "./__fixtures__/skipParseCases.json"
-import { deriveTier, TIERS } from "./deriveTier"
 import {
   parseSkipTarget,
   nodeTitle,
   technicalTitle,
-  groundingFor,
   waitsForYou,
   PHASE_TYPE_SENTENCES,
   PHASE_TYPE_SUBTITLES,
@@ -159,77 +163,6 @@ describe("phaseVocabulary.technicalTitle — the ⌥ Technical-names reveal (D-1
     expect(technicalTitle(phase({ slug: "probe", config: { phase_type: "weird" } }))).toBe(
       "weird · probe",
     )
-  })
-})
-
-describe("phaseVocabulary.groundingFor — derived grounding, slot 1 (D-183-07)", () => {
-  it("citation_policy 'strict' → strict", () => {
-    expect(groundingFor(phase({ config: { phase_type: "llm_emit", citation_policy: "strict" } })).mode).toBe(
-      "strict",
-    )
-  })
-
-  it("a citations_required validator → strict even without a citation_policy", () => {
-    const p = phase({ validators: [{ kind: "citations_required", on_failure: "fail_run" }] })
-    expect(groundingFor(p).mode).toBe("strict")
-  })
-
-  it("citation_policy 'flag' → flag", () => {
-    expect(groundingFor(phase({ config: { phase_type: "llm_emit", citation_policy: "flag" } })).mode).toBe(
-      "flag",
-    )
-  })
-
-  it("citation_policy 'partial' → the MIDDLE face, never 'no sources needed' (WR-01)", () => {
-    const g = groundingFor(phase({ config: { phase_type: "llm_emit", citation_policy: "partial" } }))
-    expect(g.mode).toBe("flag")
-    expect(g.glyph).toBe("◐")
-    expect(g.words.length).toBeGreaterThan(0)
-  })
-
-  it("'draft', an absent policy and an unknown value all → open", () => {
-    expect(groundingFor(phase({ config: { phase_type: "llm_emit", citation_policy: "draft" } })).mode).toBe("open")
-    expect(groundingFor(phase()).mode).toBe("open")
-    expect(groundingFor(phase({ config: { phase_type: "llm_emit", citation_policy: "tomorrow" } })).mode).toBe("open")
-  })
-
-  // THE CROSS-MODULE PIN (WR-01). The canvas grounding badge and the workflow-soul
-  // strictness badge are one click apart and read the SAME stored `citation_policy`.
-  // Asserting agreement here makes "they say the same thing" a machine-checked
-  // property rather than a habit two authors have to remember.
-  it("agrees with deriveTier for the whole MIDDLE band ('flag' and 'partial')", () => {
-    for (const policy of ["flag", "partial"] as const) {
-      expect(deriveTier(policy, new Set()).id).toBe("MIDDLE")
-      expect(
-        groundingFor(phase({ config: { phase_type: "llm_emit", citation_policy: policy } })).glyph,
-      ).toBe(TIERS.MIDDLE.glyph)
-    }
-  })
-
-  it("never throws on a missing validators array, an unknown validator kind, or a bare config", () => {
-    expect(() => groundingFor(phase({ validators: undefined }))).not.toThrow()
-    expect(() => groundingFor(phase({ validators: [{ kind: "regex_match" }] }))).not.toThrow()
-    expect(groundingFor(phase({ validators: [{ kind: "regex_match" }] })).mode).toBe("open")
-    expect(() => groundingFor(phase({ validators: [{}] }))).not.toThrow()
-  })
-
-  it("every grounding carries non-empty WORDS and a non-empty GLYPH (never colour alone)", () => {
-    const samples = [
-      phase({ config: { phase_type: "llm_emit", citation_policy: "strict" } }),
-      phase({ config: { phase_type: "llm_emit", citation_policy: "flag" } }),
-      phase(),
-    ]
-    for (const p of samples) {
-      const g = groundingFor(p)
-      expect(g.words.length).toBeGreaterThan(0)
-      expect(g.glyph.length).toBeGreaterThan(0)
-    }
-  })
-
-  it("reuses the shipped strictness glyph vocabulary (🔒 / ◐ / ○)", () => {
-    expect(groundingFor(phase({ config: { phase_type: "llm_emit", citation_policy: "strict" } })).glyph).toBe("🔒")
-    expect(groundingFor(phase({ config: { phase_type: "llm_emit", citation_policy: "flag" } })).glyph).toBe("◐")
-    expect(groundingFor(phase()).glyph).toBe("○")
   })
 })
 

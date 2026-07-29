@@ -103,14 +103,16 @@ import { cn } from "@/lib/utils"
  * when present, is rendered `aria-hidden` beside it (WCAG 1.4.1, never colour alone).
  *
  * `dataAttr` is spread onto the badge's WRAPPER, not onto the chip: the shipped
- * canvas suite selects on `[data-grounding]` / `[data-waits-for-you]` wrappers while
- * `StatusChip` owns its own `data-testid` / `data-tone`.
+ * canvas suite selects on wrappers such as `[data-waits-for-you]` while `StatusChip`
+ * owns its own `data-testid` / `data-tone`.
  */
 export interface BadgeSlot {
-  /** The chip's stable test hook — e.g. `"canvas-grounding"`. */
+  /** The chip's stable test hook — e.g. `"canvas-waits-for-you"`. */
   testId: string
-  /** The shared three-tone org vocabulary. Domain→tone mapping stays at the caller
-   *  (`nodePresentation.GROUNDING_TONE`), per `StatusChip`'s own scope rule. */
+  /** The shared three-tone org vocabulary. Domain→tone mapping stays at the CALLER,
+   *  per `StatusChip`'s own scope rule — this file ships no such table. (Phase 185
+   *  deleted `nodePresentation.GROUNDING_TONE` along with the badge it coloured;
+   *  governance spends no colour and no badge slot.) */
   tone: ChipTone
   /** The visible label. A plain string, rendered as a React text child. */
   label: string

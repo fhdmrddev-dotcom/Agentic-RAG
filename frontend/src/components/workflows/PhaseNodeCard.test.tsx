@@ -373,6 +373,9 @@ describe("PhaseNodeCard — the scope fences (source guard)", () => {
 })
 
 describe("nodePresentation — the 184-03 hard cut (source guard)", () => {
+  // `GROUNDING_TONE` stays in the regex below even though Phase 185 deleted it: the
+  // guard's job flips from "no second copy" to "no resurrection" and the assertion is
+  // identical either way.
   it("PhaseNode declares no second copy of the tint table, the tone map or the mark resolver", () => {
     expect(phaseNodeSource).not.toMatch(/const (ICON_TINT|DEFAULT_TINT|GROUNDING_TONE)\b/)
     expect(phaseNodeSource).not.toMatch(/function renderPhaseMark/)
@@ -383,11 +386,18 @@ describe("nodePresentation — the 184-03 hard cut (source guard)", () => {
     expect(phaseNodeSource).not.toMatch(/export \{[^}]*ICON_TINT/)
   })
 
-  it("the control: nodePresentation IS where all four are declared", () => {
+  it("the control: nodePresentation IS where the surviving three are declared", () => {
     expect(nodePresentationSource).toMatch(/export const ICON_TINT/)
     expect(nodePresentationSource).toMatch(/export const DEFAULT_TINT/)
-    expect(nodePresentationSource).toMatch(/export const GROUNDING_TONE/)
     expect(nodePresentationSource).toMatch(/export function renderPhaseMark/)
+    // Phase 185 (SPEC Req 6): the grounding tone map went with the word-badge it
+    // coloured. Governance spends no colour and no badge slot, so a live
+    // three-face-in-colour table is a resurrection risk, not harmless dead code.
+    // Asserted as an ABSENCE here — the `:377` guard above independently forbids a
+    // local copy reappearing in `PhaseNode.tsx`.
+    expect(nodePresentationSource).not.toMatch(/export const GROUNDING_TONE/)
+    // Positive control: the regex still matches a planted declaration.
+    expect("export const GROUNDING_TONE = {}").toMatch(/export const GROUNDING_TONE/)
   })
 
   it("the tint values did not drift on the move", () => {
