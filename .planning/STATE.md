@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
 status: executing
-last_updated: "2026-07-29T22:30:28.661Z"
-last_activity: 2026-07-30
+last_updated: "2026-07-30T03:20:00.000Z"
+last_activity: 2026-07-30 -- Phase 185 plan 09 complete (the governance seal on the canvas card)
 progress:
   total_phases: 19
   completed_phases: 4
   total_plans: 50
-  completed_plans: 46
+  completed_plans: 48
   percent: 21
 ---
 
@@ -45,9 +45,44 @@ Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 op
 ## Current Position
 
 Phase: 185 (graded-governance-per-node-grounding-mode-action-risk-dial) — EXECUTING
-Plan: 8 of 11 (185-06 AND 185-07 landed OUT OF ORDER — both are Wave 2/3 frontend plans depending
-only on 185-02/185-06. Summaries on disk: 01, 02, 03, 04, 05, 06, 07, 08. Next sequential work is
-185-09.)
+Plan: 9 of 11 complete
+(Summaries on disk: 01, 02, 03, 04, 05, 06, 07, 08, 09. Next sequential work is **185-10** — the
+armed detour EDGE, which is net-new canvas infrastructure: `edgeTypes` does not exist in this tree,
+and `CanvasEdgeData` still carries only `{kind}`, so 185-10 must read `armed` off the TARGET node or
+add the field.)
+
+**Plan 185-09 COMPLETE (`6bdc658a` the seal + the sealed edge → `59c54ba0` the props fence, the
+four-mark zone check and the tab-stop walk → `6713a0fc` SUMMARY). THE CANVAS NOW SHOWS WHICH STEPS
+MUST PROVE THEMSELVES, AND IT SPENDS NEITHER COLOUR NOR A BADGE TO DO IT.** A grounded card wears a
+21×21 `<span>` at its top-right carrying its OWN `bg-[hsl(220_30%_100%/0.1)]` and its OWN
+`border-[hsl(220_30%_100%/0.34)]`, plus a border reinforcement on the card itself that is EXPECTED to
+be overwritten (by `selected` today, by Phase 188's run status tomorrow) — the 143-A degradation from
+two carriers to one, never to zero. **⚠ EXECUTED AS A RESUMPTION: Task 1 was already complete and
+UNCOMMITTED in the tree** from an interrupted earlier run (including `definitionOps.ts`, a 5th file
+outside `files_modified`); it was verified rather than trusted — every acceptance grep re-run, `tsc
+-b` re-measured, both suites re-run — then committed with one correction. **The seal ships at
+`right-[17px]`, NOT the plan's literal `right-[11px]`** (143-A's 11px is measured inside the 248px
+CARD; the element is positioned against the 260px NODE BOX, so 11 + the 6px gutter = 17) — and the
+test asserts the **11px CLEARANCE** from the card's right border, never the 17, so the composite
+cannot drift from the locked number. The plan contradicted itself here: its own Task 2 states the box
+as `CARD_RIGHT−32 … CARD_RIGHT−11`, reachable only at 17. **THE FALSIFICATION CHANGED THE CODE:** the
+four-run-state identity assertion, written as the plan specifies it (`className` + `textContent`),
+stayed **GREEN** under a planted `data-run={props.status}` — an attribute-level dependency on run
+state is invisible to both readings — so it now compares **`outerHTML`**, after which BOTH criterion-16
+guards go red on the same plant. **The plan's stated zone-check falsification is INERT** (185-01
+vacated `-right-2`); the verdict's CURRENT corner reds at `verdict × governance seal = 441px²`, and
+both facts are live tests. Also fixed: a PRE-EXISTING 184-08 comment carried a Req-7 banned word and
+made Task 1's own file-wide grep unsatisfiable — reworded, meaning preserved. Gates:
+`PhaseNodeCard.test.tsx` **49 → 68**, `WorkflowCanvas.test.tsx` **33 → 35** (57 insertions, **0
+deletions** — both shipped tab-stop `it()` blocks intact), **103/103** together, tsc **33** (=
+baseline, 0 naming a touched file), `vite build` exit 0, count gate per the VALIDATION posture (no
+`[count-decrease]` — `WorkflowCanvas.test.tsx` +4 — no `[total-below-baseline]`, no `[missing-file]`,
+total **1598**, and all **5** failures in `PublishGauntlet.test.tsx`, a file this plan never opened,
+below the recorded churn band). `git diff -- backend/ supabase/migrations` **0 files** (head stays
+113). **GOVERN-02 stays `Pending`** (the 185-02/03/05/06/08 precedent): the canvas half is real and
+pinned, but the panel's dial is 185-07's and criteria **16 (visual)** + **17 (colour-stripped
+greyscale)** are operator UAT that has not run. `status` and `stepNumber` remain declared-and-
+unrendered for 188; **badge slot 1 is still empty and a third badge is still a typecheck error**.
 
 **Plan 185-08 COMPLETE — executed ACROSS AN INTERRUPTION, so `git log` reads as if the plan ran
 backwards (Tasks 2→3→1).** Run 1: `814879b3` (Task 2 — the canvas carries `grounded`/`armed`, badge
@@ -462,7 +497,7 @@ the U-5 accessibility-tree + real-key-press pass, operator confirmed each checkp
 
 **Re-verification 2026-07-26 (`096a9e58`): `gaps_found` → `human_needed`, 4/4 must-haves verified.** The SC#3 blocker is closed for real (verifier read `WorkflowCanvas.tsx` directly, did not trust the SUMMARY). **Nothing code-side blocks the phase; the only thing between 183 and `passed` is operator-driven live UAT** — the four G-4 rows **U-1…U-4** plus a real-screen-reader pass on the newly-added keyboard path, persisted as `183-HUMAN-UAT.md` (5 items, all pending). `visual_workflow_canvas` cold-defaults to `"off"` — flip it **On in the Control Room first**; U-4 flips it back. **New Warning-level debt from the scoped gap-closure review `183-REVIEW-08.md` (0 Critical / 4 Warning / 4 Info), independently re-derived by the verifier and NOT auto-folded:** **WR-08-01** no `event.repeat` guard — a held Enter rapid-toggles the panel and can settle CLOSED, contradicting the ARIA promise (the new test can't see it: synthetic `fireEvent.keyDown` never sets `repeat`); **WR-08-02** the grounding/tier agreement docblock overclaims — three gate-carrying configs still disagree and the new pin (`deriveTier(policy, new Set())`) is scoped to hide them, so WR-01's contradiction stays reachable; **WR-08-03** `ARIA_LABELS` is untyped so a library key rename silently reverts WR-06 with a green build; **WR-08-04** the end cap + unresolved-skip stub — the two nodes the CR-01 guard keeps inert — still announce "Press enter or space to open this step's details". **Operator decision owed:** fold these into a `183-09` gap plan, or accept as debt alongside WR-02/03/04 and carry into Phase 184. Orchestrator note: `state.advance-plan` bumped `completed_phases` 2→3 in `1b9fad84`, falsely marking 183 complete — reverted in `b6ae96f7`.
 
-Status: Ready to execute
+Status: Executing Phase 185
 
 **Phase 184 — ALL 13 PLANS EXECUTED 2026-07-27** (`184-13-SUMMARY.md`, commits `dfee9500` / `e72b561e` / `42bd7533` / `728fc564`). The final plan mounted the problems tray, put undo/redo + the honest save state on the canvas in one bottom region with the tray's summary (R12: one region, two rows, at 900 px), and landed D-184-04's four key bindings behind a single gated window listener that yields to text fields. Count gate exit 0 at **1037 tests / 0 failing**, `tsc` differential held at **33**, `npx vite build` exit 0, canvas snapshot byte-unchanged, `revertByteIdentical.test.tsx` green at 7. **Phase-wide: zero `backend/` files and zero `supabase/migrations` files changed** — slot 114 stays RESERVED. **All 5 REQ-IDs (CANVAS-02/03/04, VALID-02/03) remain Pending — REQUIREMENTS.md is deliberately untouched and the orchestrator marks them at phase end after live verification.** Orchestrator note: `state.advance-plan` again bumped `completed_phases` 3→4, falsely marking 184 complete before verification — **reverted here**, exactly as it was for 183 in `b6ae96f7`. Owed to `/gsd:verify-work`: regenerate `__fixtures__/corpusDump.json` (184-05) and the live five-surface icon sweep (184-01), both needing Docker up; plus R12's visual half at 900 px and the two-save-entry-points read (184-13 Deviation 3).
 
@@ -470,7 +505,7 @@ Status: Ready to execute
 
 **G-2 sketch gate for Phase 183: SATISFIED (2026-07-25).** Sketches 134-137 committed (`01bb4c64`, `7b74d2b5`, `01d50bba`, `86f866c5`, `e35c7489`). Winners: **136-B** (horizontal left->right flow) + **137-D** (frosted-glass step cards, 3D icon floating at the left edge, plain language with technical names behind the Alt reveal, Alive-by-default motion). Locked rules the canvas phases inherit: **colour budget** (step-type colour is a tint behind the icon only — the strong colours belong to Phase 188 run status) and **motion keys off run state, never selection**. New reusable asset `.planning/sketches/themes/phase-icons-3d.js` (verified 3D fluent-emoji marks; NEVER text glyphs). Icon choices: `llm_agent` -> `compass`; `llm_batch_agents` gets a lighter icon well in-scope, with the cross-cutting `handshake` swap left open. **Two findings that must reach the 183 plan: (1) `skip_to_phase` is used ZERO times in all 95 live definitions — SC#1's branch edge needs a fixture; (2) 40 of 95 definitions have zero phases — the empty projection is the most common canvas state.**
 
-Last activity: 2026-07-29
+Last activity: 2026-07-29 -- Phase 185 execution started
 
 ### Quick Tasks Completed
 
@@ -994,6 +1029,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 185 P07 | 26min | 3 tasks | 4 files |
 | Phase 185 P05 | 40 | 3 tasks | 7 files |
 | Phase 185 P08 | 57min | 3 tasks | 17 files |
+| Phase 185 P09 | 42min | 2 tasks | 5 files |
 
 ## Decisions
 
@@ -1228,6 +1264,10 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase ?]: Phase 185-08: the vitest count-gate pin for phaseVocabulary.test.ts moved 42 -> 33 and BASELINE_TOTAL 424 -> 415, in the SAME COMMIT as the groundingFor deletion (L-9), with 33 READ FROM THE GATE'S OWN 'actual' COLUMN, never hand-computed. ONLY that pin moved: the three stale POSITIVE pins (canvasModel.purity 69->79, WorkflowCanvas 31->33, WorkflowBuilderPage.canvas 22->77) stay deferred to SEED-056 per 185-VALIDATION.md, leaving 2/10/55 tests of deletion blind spot in those files.
 - [Phase ?]: Phase 185-08: the grounding cause derivation moved DOWN into phaseVocabulary (groundingCause flat-input core + groundingCauseOf phase-shaped adapter + GROUNDING_DIAL_TYPES) as the ONE client home, so the panel dial and canvasModel cannot drift. Canvas consumes it as two flat booleans PhaseNodeData.grounded (185-09 seal) and .armed (185-10 detour); CanvasEdgeData still carries only {kind}, so 185-10 must read armed off the target node or add the field.
 - [Phase ?]: Phase 185-08 LESSON: the plan's self-described 'COMPLETE DELETION INVENTORY' was incomplete — it missed nodePresentation.ts importing the deleted Grounding TYPE, and the acceptance greps (groundingFor|GROUNDINGS) could not catch it because the dangling symbol matched neither needle. Only 'npx tsc -b' caught it (34 errors vs the 33 baseline). An inventory built by grepping a FUNCTION name misses type-only call sites.
+- [Phase 185]: 185-09: the governance seal ships at right-[17px], not the plan's literal right-[11px] — sketch 143-A's 11px is measured inside the 248px CARD while the element is positioned against the 260px NODE BOX (11 + the 6px gutter). The test asserts the 11px CLEARANCE from the card's right border, never the 17, so the composite cannot drift from the locked number.
+- [Phase 185]: 185-09: criterion 16's identity assertion compares the seal's outerHTML, not className+textContent — the falsification proved the plan's wording leaves a hole (a planted data-run={props.status} kept the className/text form GREEN while the props fence caught it), so the two criterion-16 guards were not the complementary pair they were meant to be. Falsify a guard PAIR, not each guard.
+- [Phase 185]: 185-09: the plan's stated zone-check falsification (seal at the verdict's OLD -right-2 top-1.5) is INERT — 185-01 vacated that corner, so a seal parked there collides with nothing. The meaningful plant is the verdict's CURRENT corner (-left-2 top-1.5), which reds at 'verdict × governance seal = 441px²'. Both facts are now live tests, and the class of mistake the inert plant represents is caught by the 11px clearance assertion, not by a zone check.
+- [Phase 185]: 185-09: the seal's sr-only label is definitionOps.GOVERNANCE_SEAL_LABEL (a 5th file, outside the plan's files_modified), not a literal in the card's JSX — Req 7's vocabulary is a LOCK and GROUNDING_DIAL_STRICT_LABEL already lives there, so a card-local literal would be a second copy of a locked word free to drift from the panel's. Pinned by GROUNDING_DIAL_STRICT_LABEL.endsWith(GOVERNANCE_SEAL_LABEL).
 
 ## Operator Next Steps
 

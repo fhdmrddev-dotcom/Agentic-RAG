@@ -233,3 +233,7 @@ None introduced. `status` and `stepNumber` remain **declared and unrendered** on
 - **Criterion 17 is entirely unproven** by anything in this commit. It needs a greyscale screenshot of the real canvas. What the suite contributes is the *precondition*: the seal spends no colour token, so there is nothing for greyscale to remove.
 - **G-4 scenario 1's third beat** ("the canvas card grows its corner seal, with no reload, at the same moment the chip flips") is a live-surface claim about propagation through `useGroundingBundle` → page → `kbTools` → `toCanvas` → the adapter. Every link is individually pinned; the **seam** is UAT.
 - **Sketch 143-B remains the documented fallback** if the seal alone reads too quiet in live use — a swap of one block, not a redesign. Recorded in the seal's own docblock so the option is not lost.
+
+## Self-Check: PASSED
+
+All 5 claimed source files plus this SUMMARY exist on disk. All 3 claimed commits exist in `git log` (`6bdc658a` Task 1, `59c54ba0` Task 2, `6713a0fc` this SUMMARY), and each claimed file appears in the commit the task table attributes it to. No file deletions in either task commit; no untracked files left in `frontend/src/components/workflows/`.

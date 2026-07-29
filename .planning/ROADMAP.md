@@ -270,7 +270,7 @@ Plans:
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 185-09-PLAN.md — the corner seal at the CLAIMED top-right, never conditional on run state, with a props fence and a four-mark zone check
+- [x] 185-09-PLAN.md — the corner seal at the CLAIMED top-right, never conditional on run state, with a props fence and a four-mark zone check
 - [ ] 185-10-PLAN.md — the detour edge: FlowEdge, the net-new edgeTypes map, edge.type on flow edges, and a no-visible-change guard on ordinary edges (D-185-18)
 
 **Wave 6** *(blocked on Wave 5 completion)*
@@ -387,7 +387,7 @@ Plans:
 | 182. Server Validation Seam | 12/12 | Complete (SC#3 accepted risk — SEED-134) | 2026-07-25 |
 | 183. Read-Only Canvas | 9/9 | **COMPLETE** — verify `passed`; `183-09` closed all 3 live-confirmed defects, live gate closed 7/7 (U-5 canvas findability + U-6 spine flag-off) | 2026-07-26 |
 | 184. Editable Canvas + Live Structural Validation | 1/13 | In Progress — Wave 0: count gate + D-184-07 glyph swap shipped (`4a019bd8`, `ffb3e9cf`) | - |
-| 185. Graded Governance — Grounding Mode + Action-Risk Dial | 0/? | Not started | - |
+| 185. Graded Governance — Grounding Mode + Action-Risk Dial | 9/11 | In Progress — Waves 0–5 shipped: detection + the biting gate + the honest armed wait + the client governance data + the panel dial + the word-badge deletion + the 137-B rebuild + **185-09's corner seal** (`6bdc658a`, `59c54ba0`). Remaining: `185-10` (the detour EDGE — net-new `edgeTypes`) and `185-11`. GOVERN-01/02/03 all still `Pending` (criteria 16/17 + the 4 G-4 scenarios are operator UAT) | - |
 | 186. Concurrency & Autosave | 0/? | Not started | - |
 | 187. Business Vocabulary + AI-Seeded Canvas | 0/? | Not started | - |
 | 188. Non-Technical Run Observability | 0/? | Not started | - |
