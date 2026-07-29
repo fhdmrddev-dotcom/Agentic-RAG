@@ -190,6 +190,80 @@ describe("builderStore — a run of config edits is ONE undo, not forty", () => 
   })
 })
 
+// ── 2b. Phase 185 — the governance write (D-185-10) ─────────────────────────────
+
+describe("builderStore — setGovernance mirrors patchConfig, guard for guard", () => {
+  it("writes the intent onto the named step only, and bumps editSeq", () => {
+    const store = createBuilderStore(draft())
+    const seqBefore = store.getState().editSeq
+
+    store.getState().setGovernance("search", { grounding_escalated: true })
+
+    const phases = store.getState().phases
+    expect(phases[0].grounding_escalated).toBe(true)
+    expect(phases[1].grounding_escalated).toBeUndefined()
+    expect(phases[2].grounding_escalated).toBeUndefined()
+    expect(store.getState().editSeq).toBe(seqBefore + 1)
+  })
+
+  it("writes at PhaseSpec level — the target's config is untouched, by reference", () => {
+    const store = createBuilderStore(draft())
+    const configBefore = store.getState().phases[1].config
+
+    store.getState().setGovernance("write", { action_risk_armed: true })
+
+    expect(store.getState().phases[1].config).toBe(configBefore)
+    expect(store.getState().phases[1].action_risk_armed).toBe(true)
+  })
+
+  it("a non-drafted builder is a NO-OP — editSeq is unchanged", () => {
+    const store = createBuilderStore(draft())
+    store.getState().setComposing()
+    const seqBefore = store.getState().editSeq
+    const phasesBefore = store.getState().phases
+
+    store.getState().setGovernance("search", { grounding_escalated: true })
+
+    expect(store.getState().editSeq).toBe(seqBefore)
+    expect(store.getState().phases).toBe(phasesBefore)
+  })
+
+  it("an unknown slug is a NO-OP — editSeq is unchanged", () => {
+    const store = createBuilderStore(draft())
+    const seqBefore = store.getState().editSeq
+    const phasesBefore = store.getState().phases
+
+    store.getState().setGovernance("no-such-step", { action_risk_armed: true })
+
+    expect(store.getState().editSeq).toBe(seqBefore)
+    expect(store.getState().phases).toBe(phasesBefore)
+  })
+
+  it('two consecutive calls both report lastEditKind "config" (the coalescing contract)', () => {
+    vi.useFakeTimers()
+    const store = createBuilderStore(draft())
+
+    store.getState().setGovernance("search", { grounding_escalated: true })
+    expect(store.getState().lastEditKind).toBe("config")
+
+    store.getState().setGovernance("search", { action_risk_armed: true })
+    expect(store.getState().lastEditKind).toBe("config")
+  })
+
+  it("a run of governance flicks inside the quiet period is ONE undo, not two", async () => {
+    vi.useFakeTimers()
+    const store = createBuilderStore(draft())
+    const before = store.getState().phases
+
+    store.getState().setGovernance("search", { grounding_escalated: true })
+    store.getState().setGovernance("search", { action_risk_armed: true })
+    await vi.advanceTimersByTimeAsync(CONFIG_COALESCE_MS)
+
+    expect(past(store)).toHaveLength(1)
+    expect(past(store)[0]?.phases).toBe(before)
+  })
+})
+
 // ── 3. A structural edit interleaved into a coalescing run flushes it FIRST ──────
 
 describe("builderStore — an atomic act never swallows the config run it interrupted", () => {

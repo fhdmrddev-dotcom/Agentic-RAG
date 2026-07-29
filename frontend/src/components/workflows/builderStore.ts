@@ -63,7 +63,9 @@ import {
   patchPhaseConfig,
   removePhase,
   renumber,
+  setPhaseGovernance,
   slugForType,
+  type PhaseGovernancePatch,
   type PhaseTypeId,
 } from "@/components/workflows/definitionOps"
 import type { PhaseSpecJSON } from "@/components/workflows/phaseVocabulary"
@@ -223,6 +225,10 @@ export interface BuilderStoreState extends TrackedSlice {
   removePhaseBySlug: (slug: string) => void
   /** Merge a phase-form patch into one step's config (config — coalesces). */
   patchConfig: (slug: string, patch: Readonly<Record<string, unknown>>) => void
+  /** Set one step's governance intent at PhaseSpec level (config — coalesces).
+   *  Separate from `patchConfig` because these fields are siblings of `validators`,
+   *  not members of the config union (D-185-10). */
+  setGovernance: (slug: string, patch: PhaseGovernancePatch) => void
 
   setVerdicts: (verdicts: readonly ServerVerdict[]) => void
   setChecking: (checking: boolean) => void
@@ -481,6 +487,28 @@ export function createBuilderStore(initial: BuilderDefinition | null): BuilderSt
           if (!s.phases.some((p) => p.slug === slug)) return
           set({
             phases: patchPhaseConfig(s.phases, slug, patch),
+            lastEditKind: "config",
+            editSeq: s.editSeq + 1,
+          })
+        },
+
+        /**
+         * Phase 185 (D-185-10) — the governance write, mirroring `patchConfig` exactly:
+         * the same two guards, delegation to the ONE pure op, the same `editSeq` bump.
+         *
+         * `lastEditKind` IS `"config"`, DECIDED RATHER THAN COPIED. Arming a checkpoint
+         * or escalating grounding changes no run order, no node count and no
+         * `phase_index` — nothing a `"structural"` entry exists to record. What it does
+         * resemble is a run of inspector edits, so it takes the coalescing branch: a
+         * person who flicks a switch twice, or sets both dials in one visit to a step,
+         * should not have to press undo twice to get back where they were.
+         */
+        setGovernance: (slug, patch) => {
+          const s = get()
+          if (s.builderPhase !== "drafted") return
+          if (!s.phases.some((p) => p.slug === slug)) return
+          set({
+            phases: setPhaseGovernance(s.phases, slug, patch),
             lastEditKind: "config",
             editSeq: s.editSeq + 1,
           })
