@@ -255,7 +255,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 185-03-PLAN.md — the retrieved_and_cited mode, the action_risk_approval kind, effective_phase, and the spec_by_slug enforcement seam
+- [x] 185-03-PLAN.md — the retrieved_and_cited mode, the action_risk_approval kind, effective_phase, and the spec_by_slug enforcement seam
 - [ ] 185-06-PLAN.md — the client's data half: kbTools on the palette hook, the two booleans on PhaseSpecJSON, the caller-owned write chain and the governance copy constants
 
 **Wave 3** *(blocked on Wave 2 completion)*

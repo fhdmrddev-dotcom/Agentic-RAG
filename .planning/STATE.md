@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
 status: executing
-last_updated: "2026-07-29T14:56:00.000Z"
-last_activity: 2026-07-29 -- Phase 185 plan 02 executed (detection foundation - PhaseSpec intents + KB_TOOLS)
+last_updated: "2026-07-29T15:14:06.604Z"
+last_activity: 2026-07-29 -- Phase 185 plan 03 executed (engine attachment - retrieved_and_cited mode + effective_phase at the spec_by_slug seam)
 progress:
   total_phases: 19
   completed_phases: 4
   total_plans: 50
-  completed_plans: 40
+  completed_plans: 41
   percent: 21
 ---
 
@@ -45,14 +45,53 @@ Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 op
 ## Current Position
 
 Phase: 185 (graded-governance-per-node-grounding-mode-action-risk-dial) — EXECUTING
-Plan: 3 of 11
+Plan: 4 of 11
+
+**Plan 185-03 COMPLETE (`34532b9b` the two validator behaviours → `fa4fd3de` `effective_phase` →
+`beae4639` the seam swap + suite → `cb329a36` SUMMARY). THE GATE NOW BITES.** `run_workflow`'s
+`spec_by_slug` is a comprehension over **`effective_phase(phase, *, total_phases: int)`**
+(`harness/grounding.py`) — the ONE enforcement seam, downstream of every
+`WorkflowDefinition.model_validate()` (fresh kickoff, boot-time resume AND the publish golden run)
+and upstream of `_run_phase_with_gates`, never on the save path. **Names plans 04/05/06 use
+verbatim:** mode string **`"retrieved_and_cited"`**, finding prefix **`"action_risk:approval|"`**,
+and `total_phases` is **keyword-only**. **The headline landmine is dead:** the shipped
+`deterministic` mode reads `output["field_map"]`, which NO agent step produces, so attaching it
+unchanged would have failed 100% of detected steps — the new mode reads **`citations`** (built by
+the retrieval TOOL off `ToolResult`, so unfakeable) and never `source_refs`. Three properties are
+structural, not asserted: an ungoverned phase is returned **BY REFERENCE**
+(`effective_phase(p, total_phases=1) is p` — that IS D-14's byte-identical-when-unset); the
+engine's spec is **APPENDED** so `validators[0]` stays the author's and the WR-03 retry seed is
+untouched; and a deliberately weak author spec (`presence, min_markers: 0`) passes at index 0 and
+is then followed by the real gate failing at `validator_index == 1` (D-185-05 — not
+author-loosenable-away). **Falsified:** the return was flipped to PREPEND and the index-0
+assertion turned RED (output quoted in the SUMMARY), then reverted — the other 7 tests stayed
+green under the plant, which is exactly why that assertion had to exist. **Publish consequence,
+confirmed with greps before being recorded:** `_drive_golden_run` (`:688-865`) reaches the engine
+only via `run_workflow` (`:717` import, `:830` call), so the gauntlet gains NO new stage but a
+detected step whose golden run retrieves nothing now **fails the golden-run stage and blocks
+publish** — acceptable, every `workflow_definitions` row is throwaway test data.
+**Plan-vs-tree discrepancy (no code change):** Task 2's criterion "`grep -c model_validator` returns
+0 for both files" is unsatisfiable — `harness.py` has carried two `@model_validator(mode="after")`
+since 098/099, both pure structural REJECTIONS that never touch `validators`, untouched by this
+plan. L-2's real intent is now enforced by a tokenize-based code-only guard with two positive
+controls. Gates: 13/13 + 8/8 new, **284 passed** across the harness/grounding/182/185/validator/
+publish set, migrations **0 files** (head stays 113), `frontend/` **0 files**, D-14 Deep fence
+**0 files**, exactly the 5 planned files touched.
+**GOVERN-01 / GOVERN-03 stay `Pending`** in REQUIREMENTS.md (the 184-02 / 185-02 precedent) —
+enforcement is now real but no surface exposes it; marking them Complete at plan 3 of 11 would
+make the traceability table lie. **Nothing pauses yet:** `action_risk_approval` is registered and
+attached, but its wait is the shipped bounded `ask_user` timeout until 185-04 makes it indefinite —
+and RESEARCH L-4/L-5/L-6/L-7 plus the five `_resolve_failure_with_ask_user` deltas are ALL still
+open and are that plan's work.
 
 **Plan 185-02 COMPLETE (`f3584c5b` PhaseSpec intents → `04d475d4` KB_TOOLS + grounding_cause →
 `9fe05885` the palette field → `df28e813` SUMMARY).** The detection foundation plans 03/06/07/08
 all read from. **The names are final and downstream plans reference them literally:**
 `PhaseSpec.grounding_escalated` / `PhaseSpec.action_risk_armed` (both `bool = False`),
 `ValidatorSpec.kind` grown 9 → 10 with `"action_risk_approval"`, `grounding.KB_TOOLS` (frozenset)
+
 + `grounding.KB_TOOLS_SORTED` (wire form) + `grounding_cause(phase) -> "detected" | "already-set"
+
 | "escalated" | None`, `GroundingBundle.kb_tools`, and the wire key **`kb_tools`** on
 `GET /workflows/grounding-bundle`. **Req 3 is now true BY CONSTRUCTION, not by audit** — only the
 author's escalation INTENT is stored; `detected` and `already-set` are recomputed at read time
