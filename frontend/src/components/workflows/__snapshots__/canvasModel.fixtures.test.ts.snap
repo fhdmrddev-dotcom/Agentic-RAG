@@ -10,6 +10,7 @@ exports[`toCanvas sweep — 'branching (synthetic skip_to_phase)' > matches its 
       "id": "seq:gather->assess",
       "source": "gather",
       "target": "assess",
+      "type": "flow",
     },
     {
       "data": {
@@ -18,6 +19,7 @@ exports[`toCanvas sweep — 'branching (synthetic skip_to_phase)' > matches its 
       "id": "seq:assess->draft",
       "source": "assess",
       "target": "draft",
+      "type": "flow",
     },
     {
       "data": {
@@ -34,6 +36,7 @@ exports[`toCanvas sweep — 'branching (synthetic skip_to_phase)' > matches its 
       "id": "seq:draft->escalate",
       "source": "draft",
       "target": "escalate",
+      "type": "flow",
     },
     {
       "data": {
@@ -162,6 +165,7 @@ exports[`toCanvas sweep — 'compliance-gap-report (Starter Librar…' > matches
       "id": "seq:retrieve->emit",
       "source": "retrieve",
       "target": "emit",
+      "type": "flow",
     },
     {
       "data": {
@@ -246,6 +250,7 @@ exports[`toCanvas sweep — 'doc_qa_human (canonical seed 4)' > matches its comm
       "id": "seq:draft->confirm",
       "source": "draft",
       "target": "confirm",
+      "type": "flow",
     },
     {
       "data": {
@@ -254,6 +259,7 @@ exports[`toCanvas sweep — 'doc_qa_human (canonical seed 4)' > matches its comm
       "id": "seq:confirm->finalize",
       "source": "confirm",
       "target": "finalize",
+      "type": "flow",
     },
     {
       "data": {
@@ -367,6 +373,7 @@ exports[`toCanvas sweep — 'eval_coverage (the 5-phase maximum)' > matches its 
       "id": "seq:split->fanout",
       "source": "split",
       "target": "fanout",
+      "type": "flow",
     },
     {
       "data": {
@@ -375,6 +382,7 @@ exports[`toCanvas sweep — 'eval_coverage (the 5-phase maximum)' > matches its 
       "id": "seq:fanout->deep_dive",
       "source": "fanout",
       "target": "deep_dive",
+      "type": "flow",
     },
     {
       "data": {
@@ -383,6 +391,7 @@ exports[`toCanvas sweep — 'eval_coverage (the 5-phase maximum)' > matches its 
       "id": "seq:deep_dive->confirm",
       "source": "deep_dive",
       "target": "confirm",
+      "type": "flow",
     },
     {
       "data": {
@@ -391,6 +400,7 @@ exports[`toCanvas sweep — 'eval_coverage (the 5-phase maximum)' > matches its 
       "id": "seq:confirm->summarize",
       "source": "confirm",
       "target": "summarize",
+      "type": "flow",
     },
     {
       "data": {
@@ -541,6 +551,7 @@ exports[`toCanvas sweep — 'literature_review (canonical seed 3)' > matches its
       "id": "seq:split->review",
       "source": "split",
       "target": "review",
+      "type": "flow",
     },
     {
       "data": {
@@ -549,6 +560,7 @@ exports[`toCanvas sweep — 'literature_review (canonical seed 3)' > matches its
       "id": "seq:review->merge",
       "source": "review",
       "target": "merge",
+      "type": "flow",
     },
     {
       "data": {
@@ -655,6 +667,7 @@ exports[`toCanvas sweep — 'non-contiguous phase_index [0,1,3]' > matches its c
       "id": "seq:first->second",
       "source": "first",
       "target": "second",
+      "type": "flow",
     },
     {
       "data": {
@@ -761,6 +774,7 @@ exports[`toCanvas sweep — 'plan_execute_verify (canonical seed 2)' > matches i
       "id": "seq:plan->execute",
       "source": "plan",
       "target": "execute",
+      "type": "flow",
     },
     {
       "data": {
@@ -769,6 +783,7 @@ exports[`toCanvas sweep — 'plan_execute_verify (canonical seed 2)' > matches i
       "id": "seq:execute->verify",
       "source": "execute",
       "target": "verify",
+      "type": "flow",
     },
     {
       "data": {
@@ -875,6 +890,7 @@ exports[`toCanvas sweep — 'pm-risk-register (PM pack 2)' > matches its committ
       "id": "seq:retrieve->emit",
       "source": "retrieve",
       "target": "emit",
+      "type": "flow",
     },
     {
       "data": {
@@ -959,6 +975,7 @@ exports[`toCanvas sweep — 'pm-weekly-status-report (PM pack 1)' > matches its 
       "id": "seq:retrieve->emit",
       "source": "retrieve",
       "target": "emit",
+      "type": "flow",
     },
     {
       "data": {
@@ -1043,6 +1060,7 @@ exports[`toCanvas sweep — 'research_summarize (canonical seed 1)' > matches it
       "id": "seq:research->summarize",
       "source": "research",
       "target": "summarize",
+      "type": "flow",
     },
     {
       "data": {
@@ -1127,6 +1145,7 @@ exports[`toCanvas sweep — 'risk-register (Starter Library 1)' > matches its co
       "id": "seq:retrieve->emit",
       "source": "retrieve",
       "target": "emit",
+      "type": "flow",
     },
     {
       "data": {
@@ -1265,6 +1284,7 @@ exports[`toCanvas sweep — 'unresolvable skip (broken reference)' > matches its
       "id": "seq:start->check",
       "source": "start",
       "target": "check",
+      "type": "flow",
     },
     {
       "data": {
@@ -1375,6 +1395,7 @@ exports[`toCanvas sweep — 'weekly-status-report (Starter Library…' > matches
       "id": "seq:retrieve->emit",
       "source": "retrieve",
       "target": "emit",
+      "type": "flow",
     },
     {
       "data": {

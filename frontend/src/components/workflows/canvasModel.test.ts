@@ -451,3 +451,79 @@ describe("canvasModel.toCanvas — serializable (the snapshot gate depends on it
     walk(out)
   })
 })
+
+// ── 185-10 (GOVERN-03 / D-185-18) — edge.type and the armed detour state ────────
+//
+// `edge.type` was set on NONE of the four pushes before this plan, so these cases pin
+// the two halves of D-185-18 that a pure function can prove: that ONLY flow edges moved
+// onto our renderer, and that the checkpoint state rides on the edge running INTO the
+// step rather than out of it.
+
+/** Two adjacent steps where the SECOND one is armed. */
+const armedSecond: PhaseSpecJSON[] = [
+  { slug: "compose", phase_index: 0, config: { phase_type: "llm_single" } },
+  {
+    slug: "send",
+    phase_index: 1,
+    config: { phase_type: "llm_emit" },
+    action_risk_armed: true,
+  },
+  { slug: "log", phase_index: 2, config: { phase_type: "programmatic" } },
+]
+
+const flowEdges = (edges: ReturnType<typeof toCanvas>["edges"]) =>
+  edges.filter((e) => e.data?.kind === "flow")
+
+describe("canvasModel.toCanvas — edge.type (D-185-18)", () => {
+  it("sets type === 'flow' on every flow edge", () => {
+    const flow = flowEdges(toCanvas(threePhase).edges)
+    expect(flow.length).toBeGreaterThan(0)
+    for (const edge of flow) expect(edge.type).toBe("flow")
+  })
+
+  it("leaves the SKIP edge without a type, so it keeps the library's default renderer", () => {
+    const skips = toCanvas(branching).edges.filter((e) => e.data?.kind === "skip")
+    expect(skips.length).toBeGreaterThan(0)
+    for (const edge of skips) expect(edge.type).toBeUndefined()
+  })
+
+  it("leaves the END edge without a type, for the same reason", () => {
+    const ends = toCanvas(threePhase).edges.filter((e) => e.data?.kind === "end")
+    expect(ends).toHaveLength(1)
+    expect(ends[0].type).toBeUndefined()
+  })
+
+  it("leaves the unresolvable-skip stub edge without a type", () => {
+    const stubs = toCanvas(unresolvable).edges.filter((e) => e.data?.kind === "skip")
+    expect(stubs.length).toBeGreaterThan(0)
+    for (const edge of stubs) expect(edge.type).toBeUndefined()
+  })
+})
+
+describe("canvasModel.toCanvas — the armed checkpoint rides the edge INTO the step", () => {
+  it("marks the edge INTO an armed phase with armed: true", () => {
+    const into = toCanvas(armedSecond).edges.find((e) => e.id === "seq:compose->send")
+    expect(into).toBeDefined()
+    expect(into!.data?.armed).toBe(true)
+  })
+
+  it("does NOT mark the edge OUT of an armed phase (the checkpoint is on the way IN)", () => {
+    const outOf = toCanvas(armedSecond).edges.find((e) => e.id === "seq:send->log")
+    expect(outOf).toBeDefined()
+    expect(outOf!.data?.armed).not.toBe(true)
+  })
+
+  it("carries NO armed key at all on an unarmed neighbour's connector", () => {
+    // The ABSENT third state, asserted as absence rather than as `false`: an ordinary
+    // step declares no checkpoint, so its `data` object is byte-identical to the
+    // pre-185 projection and the committed snapshot gains nothing on that edge.
+    const outOf = toCanvas(armedSecond).edges.find((e) => e.id === "seq:send->log")
+    expect(Object.keys(outOf!.data!)).toEqual(["kind"])
+  })
+
+  it("marks nothing when no phase is armed", () => {
+    for (const edge of toCanvas(threePhase).edges) {
+      expect(Object.keys(edge.data!)).toEqual(["kind"])
+    }
+  })
+})

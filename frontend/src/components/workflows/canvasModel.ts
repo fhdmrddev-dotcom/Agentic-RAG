@@ -88,7 +88,16 @@ export const CANVAS_NODE_TYPES = {
   endCap: "endCap",
 } as const
 
-/** The three edge kinds, carried on `edge.data.kind` (styling is the view's job). */
+/**
+ * The three edge kinds, carried on `edge.data.kind` (styling is the view's job).
+ *
+ * 185-10: `flow` is now ALSO an `edge.type`, and therefore the key of the view's
+ * module-scope `edgeTypes` map — exactly as `CANVAS_NODE_TYPES` are the keys of
+ * `nodeTypes`. `skip` and `end` are NOT set as `edge.type` and keep the library's
+ * default renderer, so this table is the vocabulary of both classification and
+ * (for `flow` alone) rendering. The docblock is spelled out because it used to say
+ * `data.kind` was the only carrier, and that is no longer true.
+ */
 export const CANVAS_EDGE_KINDS = {
   /** The run-order `phase_index + 1` link. */
   flow: "flow",
@@ -166,9 +175,39 @@ export type CanvasNode = PhaseCanvasNode | UnresolvedSkipCanvasNode | EndCapCanv
 
 export interface CanvasEdgeData extends Record<string, unknown> {
   kind: CanvasEdgeKind
+  /**
+   * GOVERN-03 — the action-risk checkpoint state of the step this edge runs INTO.
+   * The checkpoint sits on the connector INTO the risky step, because what it
+   * describes is the moment before that step runs.
+   *
+   * THREE STATES, NOT TWO, and the third is what keeps two shipped promises from
+   * contradicting each other (sketch 147 `index.html:459` — `if (mk === 'none' ||
+   * !step.risky) return { onCard: '', inGap: '' }` — and `:539`'s `detourOwnsLine`):
+   *
+   *   ABSENT  the step declares no checkpoint. The connector is ORDINARY and
+   *           `FlowEdge` draws it exactly as the library's default renderer drew it
+   *           before this plan. This is the state every shipped canvas is in, and it
+   *           is why "an ordinary unarmed flow edge renders identically to today"
+   *           and "unarmed shows a ghost" are both true at once.
+   *   false   a checkpoint is declared and OPEN. The detour is drawn as a faint
+   *           dashed ghost with a solid line running straight through it — visibly
+   *           present and open, never absent, so a step that emails a report with
+   *           nobody watching cannot look identical to one that reads a file.
+   *   true    ARMED. The arc IS the path and no straight line runs past it.
+   *
+   * Today only `true` and ABSENT are producible: SPEC Req 8 arms nothing by default
+   * in 185 and no shipped step type performs outbound egress, so no step is
+   * inherently risky yet. `false` is Phase 189's state — an external-action step
+   * whose checkpoint the author turned off — and `FlowEdge` carries it now so the
+   * unarmed reading is a shipped, tested behaviour rather than a promise.
+   */
+  armed?: boolean
 }
 
-/** An edge the canvas draws. `data.kind` is the whole classification. */
+/**
+ * An edge the canvas draws. `data.kind` is the whole CLASSIFICATION; since 185-10 a
+ * flow edge additionally carries `type: "flow"`, which chooses WHO RENDERS it.
+ */
 export type CanvasEdge = Edge<CanvasEdgeData>
 
 export interface CanvasProjection {
@@ -219,6 +258,20 @@ function isGrounded(phase: PhaseSpecJSON, kbTools: readonly string[]): boolean {
 /** GOVERN-03 — is a checkpoint armed on this step? Delegated for the same reason. */
 function isArmed(phase: PhaseSpecJSON): boolean {
   return actionRiskArmed(phase)
+}
+
+/**
+ * GOVERN-03 — the checkpoint state to carry on the edge running INTO `phase`, as the
+ * THREE states `CanvasEdgeData.armed` documents rather than a plain boolean.
+ *
+ * It declares no rule of its own: the armed reading is `phaseVocabulary.actionRiskArmed`,
+ * the SAME body `isArmed` above hands to the node face, so the mark on the connector and
+ * the state of the step can never disagree. What this function adds is the ABSENCE case —
+ * an unarmed step declares no checkpoint today, so its connector carries no key at all
+ * and is drawn exactly as it was before Phase 185.
+ */
+function checkpointOnTarget(phase: PhaseSpecJSON): boolean | undefined {
+  return actionRiskArmed(phase) ? true : undefined
 }
 
 /** Resolve every face value a phase card needs, once. */
@@ -318,11 +371,30 @@ export function toCanvas(
     // edge, and the phase after the gap is honestly left as an orphan.
     const successor = byIndexValue.get(phase.phase_index + 1)
     if (successor !== undefined && successor.slug !== phase.slug) {
+      // ⚠ `type` IS NEW HERE IN 185-10, AND IT CHANGES WHO DRAWS THIS EDGE (D-185-18).
+      //
+      // Until this line `type` was set on NONE of the four edge pushes, so every edge
+      // rendered through `@xyflow/react`'s built-in `default` renderer (`BezierEdgeInternal`
+      // — verified in `node_modules/@xyflow/react/dist/esm/index.mjs`: `edge.type || 'default'`).
+      // Setting it moves EVERY flow edge onto `WorkflowCanvas`'s `edgeTypes.flow`, i.e. onto
+      // `FlowEdge`. That is why `FlowEdge` must reproduce the built-in bezier rendering — path,
+      // stroke AND arrowhead — for the ordinary unarmed non-risky case, and why the plan gave
+      // that a task and a regression guard of its own. It is NOT "just wiring the data".
+      //
+      // `skip` and `end` are deliberately left WITHOUT a `type`: they keep the default
+      // renderer and `DEFAULT_EDGE_OPTIONS`, which holds this plan's blast radius to the flow
+      // edges alone.
+      //
+      // `armed` is spread CONDITIONALLY (the shipped D-14 `{...(cond ? { x } : {})}` idiom), so
+      // an ordinary step's connector carries no new key and its projection — and therefore the
+      // committed snapshot's `data` object — is byte-identical to before.
+      const armed = checkpointOnTarget(successor)
       pushEdge({
         id: `seq:${phase.slug}->${successor.slug}`,
         source: phase.slug,
         target: successor.slug,
-        data: { kind: CANVAS_EDGE_KINDS.flow },
+        type: CANVAS_EDGE_KINDS.flow,
+        data: { kind: CANVAS_EDGE_KINDS.flow, ...(armed === undefined ? {} : { armed }) },
       })
     }
 
