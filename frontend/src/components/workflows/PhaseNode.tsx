@@ -159,11 +159,12 @@ function PhaseNodeImpl({ data, selected }: NodeProps<PhaseCanvasNode>) {
 
   // BADGE SLOT 1 IS DELIBERATELY EMPTY, AND IT IS SPOKEN FOR (Phase 185, SPEC Req 6).
   //
-  // Until this plan slot 1 carried the three-face grounding word-badge. That badge is
-  // DELETED, not moved: governance now renders as SHAPE — the corner seal (plan 185-09)
-  // — and SPEC Req 6 states that governance spends no colour and no word-badge slot.
-  // Its inputs still reach this component, as `data.grounded` and `data.armed`; what is
-  // gone is the chip that spoke them.
+  // Until 185-08 slot 1 carried the three-face grounding word-badge. That badge is
+  // DELETED, not moved: governance renders as SHAPE — the corner seal 185-09 places at
+  // the card's top-right, passed below as `grounded` — and SPEC Req 6 states that
+  // governance spends no colour and no word-badge slot. Its inputs still reach this
+  // component, as `data.grounded` and `data.armed`; what is gone is the chip that spoke
+  // them, and what replaced it costs neither a slot nor a colour.
   //
   // DO NOT FILL THE FREED SLOT with a governance mark. The freed slot belongs to
   // Phase 188 (run state) and Phase 189 (external actions), and `BadgeSlots` is a max-2
@@ -180,9 +181,15 @@ function PhaseNodeImpl({ data, selected }: NodeProps<PhaseCanvasNode>) {
   const badges: BadgeSlots = data.waitsForYou ? [waitsForYou] : []
 
   // `status`, `technicalLine` and `stepNumber` are still deliberately NOT passed: Wave 0
-  // landed the seam and Phase 185 / Phase 188 land those. `verdict` WAS in that list
-  // until 184-10 — the line is corrected here rather than left, because a comment that
-  // still names a slot the component now fills is the same defect as a false docblock.
+  // landed the seam and Phase 188 lands those. `verdict` WAS in that list until 184-10
+  // and `grounded` until 185-09 — the line is corrected each time rather than left,
+  // because a comment that still names a slot the component now fills is the same defect
+  // as a false docblock.
+  //
+  // `data.armed` IS DELIBERATELY UNCONSUMED HERE, and it is not an oversight: the armed
+  // action-risk mark is an EDGE, not a node change (plan 185-10 — the detour arc, sketch
+  // 147). Do not look for it on the card, and do not add it: a second mark on the face
+  // would spend the corner the seal claims or a badge slot 188/189 owns.
   return (
     <PhaseNodeCard
       slug={data.slug}
@@ -193,6 +200,7 @@ function PhaseNodeImpl({ data, selected }: NodeProps<PhaseCanvasNode>) {
       tint={tint}
       badges={badges}
       verdict={verdict}
+      grounded={data.grounded}
       selected={selected}
       anchors={<EdgeAnchors />}
     />

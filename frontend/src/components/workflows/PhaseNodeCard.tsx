@@ -21,6 +21,14 @@
  * NOTHING when absent, which is what keeps this extraction behaviour-preserving
  * (D-184-08) while still adding the seam.
  *
+ * WHAT 185 FILLED, stated literally so this paragraph does not drift either: plan
+ * 185-09 added ONE slot, `grounded`, and renders it as the corner seal at top-right
+ * plus a border reinforcement — no new layout constant, no new badge. `status` and
+ * `stepNumber` are STILL declared and STILL render nothing (Phase 188 owns both).
+ * Badge slot 1 stayed EMPTY on purpose: SPEC Req 6 says governance spends no colour
+ * and no word-badge slot, so the freed slot belongs to 188 / 189 and the governance
+ * reading is made of SHAPE instead.
+ *
  * WHAT 184-08 CHANGED, stated literally so this docblock does not drift: the `verdict`
  * slot is now RENDERED — a corner mark on the card's left edge (it landed on the right
  * in 184-08 and was moved by 185-01; see the mark's own docblock) — while `status` and
@@ -89,6 +97,11 @@ import type { ReactNode } from "react"
 
 import { StatusChip, type ChipTone } from "@/components/org/StatusChip"
 import { CANVAS_LAYOUT } from "@/components/workflows/canvasModel"
+// 185-09: the seal's accessible label. IMPORTED, never re-typed — SPEC Req 7's
+// vocabulary is a lock, and `definitionOps`' copy block is where the governance words
+// already live (the dial's two labels, the refusal, the gate row). A local literal here
+// would be a second copy of a locked word, free to drift from the panel's.
+import { GOVERNANCE_SEAL_LABEL } from "@/components/workflows/definitionOps"
 // 184-08: the verdict-mark table and its key type. This is the ONLY thing this card
 // takes from the presentation module — the TINT is still resolved by the adapter and
 // handed over as a plain string, and the fence in `PhaseNodeCard.test.tsx` still says
@@ -196,6 +209,17 @@ export interface PhaseNodeCardProps {
    *  Absent ⇒ the card renders no verdict element at all, which is the state a draft
    *  is in before its first check has answered (D-184-15). */
   verdict?: NodeVerdictMark
+  /** GOVERN-02 (sketch 143-A) — this step must prove it. Renders the corner seal.
+   *
+   *  THE SEAL IS NEVER CONDITIONAL ON RUN STATE: run status overwrites the border, so
+   *  the seal is the only carrier that survives mid-run, and hiding, dimming or moving
+   *  it would delete the reading at exactly the moment it matters most. Top-right of
+   *  the card is CLAIMED for governance — 188/189 may not take it.
+   *
+   *  Resolved by the CALLER, once, at projection time (`canvasModel.buildPhaseData`
+   *  via `phaseVocabulary.groundingCauseOf` — the ONE client home of the rule the
+   *  panel's dial also reads). This card neither derives it nor asks why. */
+  grounded?: boolean
   /** The 137-B step number. Declared, rendered as nothing in 184-03 — D-183-07 keeps
    *  `phase_index` off the face today, and putting it on is a sketch decision with its
    *  own acceptance bar, not a side effect of an extraction. */
@@ -221,7 +245,8 @@ export function PhaseNodeCard(props: PhaseNodeCardProps) {
   // `status` and `stepNumber` are declared on the interface above and deliberately
   // unread here — Wave 0 added the seam, Phase 188 adds the behaviour. `verdict`
   // joined the rendered set in 184-08 and is the ONE slot whose value comes from the
-  // server rather than from a local derivation.
+  // server rather than from a local derivation. `grounded` joined it in 185-09 and is
+  // the ONE slot resolved by a shared client rule rather than by the server.
   const {
     slug,
     phaseType,
@@ -232,13 +257,20 @@ export function PhaseNodeCard(props: PhaseNodeCardProps) {
     tint,
     badges,
     verdict,
+    grounded,
     selected,
     anchors,
   } = props
 
   // Total by construction: the slot is typed, but a forward-compat value arriving from
   // a caller falls back to the degraded mark rather than to nothing. Falling back to
-  // NOTHING would render an unchecked node as a checked-and-clean one.
+  // NOTHING would render a node nobody could check as a checked-and-clean one.
+  //
+  // (The word this sentence used to spell for "nobody could check" is on SPEC Req 7's
+  // banned list, and 185-09's acceptance grep is file-wide rather than scoped to
+  // rendered strings. The meaning is unchanged — `VERDICT_MARK.unknown` is exactly the
+  // "we could not check" state — so the rewording costs nothing and lets the grep
+  // return 0 honestly instead of carrying a documented exception forever.)
   const mark = verdict ? (VERDICT_MARK[verdict] ?? VERDICT_MARK.unknown) : null
 
   return (
@@ -257,7 +289,18 @@ export function PhaseNodeCard(props: PhaseNodeCardProps) {
           centre-aligned BLOCK card, horizontally centred inside the 260px node box,
           `border-radius: 22px`, padding `42px 20px 20px`. The top padding is the one
           number that does NOT come from the sketch theme — D-185-17 raises it 34 → 42
-          so the mark floating above the top edge clears the title by 11px. */}
+          so the mark floating above the top edge clears the title by 11px.
+
+          THE SEALED EDGE (185-09, sketch 143-A) is the third branch of the border
+          ternary: a grounded step's border is lifted to `hsl(220 30% 100% / .34)`. It
+          is REINFORCEMENT, never the carrier. It is EXPECTED to be overwritten — by
+          the `selected` treatment today and by Phase 188's run status tomorrow — and
+          that is ACCEPTED, because the corner seal below carries its own background
+          and its own border and therefore survives both. 143-A verified exactly this
+          degradation live at all four run states: the reading drops from two carriers
+          to one, and never to zero. The three branches are mutually exclusive on
+          purpose — one border-colour utility per state, so nothing depends on which
+          order Tailwind happens to emit two same-specificity colour classes in. */}
       <div
         className={cn(
           "mx-auto block w-[248px] rounded-[22px] border pb-5 pt-[42px] px-5 text-center",
@@ -265,7 +308,9 @@ export function PhaseNodeCard(props: PhaseNodeCardProps) {
           "shadow-[0_1px_0_hsl(var(--foreground)/0.06)_inset,0_18px_36px_-22px_rgba(0,0,0,0.95)]",
           selected
             ? "border-primary shadow-[0_0_0_1px_hsl(var(--primary)/0.4)]"
-            : "border-border/50",
+            : grounded
+              ? "border-[hsl(220_30%_100%/0.34)]"
+              : "border-border/50",
         )}
         style={{ minHeight: CANVAS_LAYOUT.NODE_MIN_HEIGHT }}
       >
@@ -337,6 +382,63 @@ export function PhaseNodeCard(props: PhaseNodeCardProps) {
         >
           <span aria-hidden="true">{mark.glyph}</span>
           <span className="sr-only">{mark.label}</span>
+        </span>
+      ) : null}
+
+      {/* ── THE GOVERNANCE SEAL (GOVERN-02 · SPEC Req 6 · sketch 143-A) ───────────
+          THE CORNER IS CLAIMED. Top-right of the card belongs to governance and to
+          nothing else. 185-01 moved the verdict mark to the card's LEFT precisely to
+          free it, and Phases 188 (run state) and 189 (external actions) may not take
+          it back. See the verdict mark's block above for why the PERMANENT mark keeps
+          a corner and the TRANSIENT one moves.
+
+          THE SEAL IS LOAD-BEARING; THE EDGE IS REINFORCEMENT. Governance may spend
+          neither colour (137-B banks all of it for Phase 188's run status) nor a
+          word-badge (both slots are committed to 188/189), so the mark is made of
+          SHAPE. It carries its OWN background and its OWN border, which is the whole
+          reason it works: when a step goes running / needs-you / failed the status
+          colour overwrites the card border, and the seal stays legible anyway. The
+          reading degrades from two carriers to one; it never disappears.
+
+          THEREFORE IT IS NEVER CONDITIONAL ON RUN STATE. This block reads `grounded`
+          and nothing else — no `status`, no selection, no run phase. Hiding, dimming
+          or moving it mid-run would delete the reading at exactly the moment a person
+          most needs it. `PhaseNodeCard.test.tsx` pins that mechanically, twice: a
+          `?raw` props fence proving this block never names the run-state prop, and a
+          four-value render asserting the seal's class list and text are IDENTICAL
+          across every run state.
+
+          THE 17px. Sketch 143-A places the seal `top: 11px; right: 11px` inside the
+          248px CARD. This element is a sibling of the verdict mark, so its containing
+          block is the 260px NODE BOX, whose right edge sits 6px outside the card's
+          border ((260 − 248) / 2). 11 + 6 = 17 keeps the sketch's 11px clearance from
+          the border the reader actually sees — `right-[11px]` here would leave 5px and
+          crowd the card's 22px corner radius. `top-[11px]` needs no such correction:
+          the card's top edge IS the node box's top edge. The test asserts the 11px
+          clearance from the card's right border rather than the 17, so this composite
+          cannot drift away from the number the sketch locked.
+
+          THE DOCUMENTED FALLBACK is sketch 143-B — a stitched rail outside the card's
+          border, which survives run status intact rather than degrading to one
+          carrier. If the seal alone reads too quiet in live use, that is a SWAP, not a
+          redesign: this block is replaced, and nothing else here moves.
+
+          It is `pointer-events-none` and carries no control of any kind — no role, no
+          tab index, no handler. One tab stop per node is a canvas-level invariant, and
+          a pressable seal would make it two. Arming and escalating happen in the
+          panel; the canvas is where you SEE, never where you SET (sketch 147). */}
+      {grounded ? (
+        <span
+          data-testid="canvas-node-seal"
+          data-grounded="true"
+          className={cn(
+            "pointer-events-none absolute right-[17px] top-[11px] z-[6] grid h-[21px] w-[21px]",
+            "place-items-center rounded-full text-[11px] leading-none",
+            "border border-[hsl(220_30%_100%/0.34)] bg-[hsl(220_30%_100%/0.1)] text-foreground",
+          )}
+        >
+          <span aria-hidden="true">⛨</span>
+          <span className="sr-only">{GOVERNANCE_SEAL_LABEL}</span>
         </span>
       ) : null}
 

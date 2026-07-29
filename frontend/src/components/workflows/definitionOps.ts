@@ -374,6 +374,19 @@ export const GROUNDING_DIAL_LOOSE_LABEL = "○ Free to think"
 /** The strict side of the dial. */
 export const GROUNDING_DIAL_STRICT_LABEL = "⛨ Must prove it"
 
+/**
+ * The canvas seal's ACCESSIBLE label (185-09) — the same binding words as the strict
+ * side of the dial, with the glyph removed because the seal renders `⛨` itself as an
+ * `aria-hidden` child and a screen reader must not hear it twice.
+ *
+ * It lives here, beside the dial's label, rather than as a literal in
+ * `PhaseNodeCard.tsx`: Req 7's vocabulary is a LOCK, and two copies of a locked word in
+ * two files can drift. `PhaseNodeCard.test.tsx` asserts that
+ * `GROUNDING_DIAL_STRICT_LABEL` still ends with this string, so the pair cannot be
+ * edited apart silently either.
+ */
+export const GOVERNANCE_SEAL_LABEL = "Must prove it"
+
 /** A step type that makes no factual claim carries this INSTEAD of a control (D-185-16). */
 export const GROUNDING_NOTHING_TO_PROVE = "Nothing to prove here"
 
