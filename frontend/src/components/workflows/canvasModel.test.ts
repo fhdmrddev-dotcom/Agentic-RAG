@@ -105,7 +105,11 @@ describe("canvasModel.CANVAS_LAYOUT — the ONE frozen constants table", () => {
   it("carries the locked layout values (183-06's CSS reads these, not literals)", () => {
     expect(CANVAS_LAYOUT).toEqual({
       NODE_WIDTH: 260,
-      NODE_MIN_HEIGHT: 96,
+      // 185-01 (D-185-17): raised 96 → 104 with the 137-B card rebuild. 104 is the
+      // floor at which the mark floating above the card's top edge clears the title
+      // by 11px. `NODE_WIDTH` is unchanged and is the NODE BOX — the 137-B card is
+      // 248px INSIDE it.
+      NODE_MIN_HEIGHT: 104,
       PITCH_X: 320,
       LANE_Y: 0,
       SKIP_LANE_Y: 200,
