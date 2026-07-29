@@ -74,6 +74,49 @@ The SPEC's 23 criteria plus the Req 8 amendment. `PLAN`/`TASK` columns are fille
 
 ---
 
+## Count-gate posture — READ BEFORE ASSERTING `exits 0`
+
+**`node scripts/vitest-count-gate.cjs` CANNOT exit 0 in this phase, and that is not this phase's fault.**
+Measured at `59c32a06` (phase start, before any 185 commit) and re-measured after plan `185-01`:
+
+| Run | total | failed | pinned-file count violations |
+|---|---|---|---|
+| pre-185 baseline (`59c32a06`, measured by the 185-01 executor) | 1497 | **34** | none |
+| after `185-01` | 1504 | **35** | none |
+| orchestrator re-run, same tree | 1504 | **40** | none |
+
+The gate fails on `[failing-tests] N > 0`. Those failures are **pre-existing suite rot (SEED-056)** and
+they **churn between runs (34 → 35 → 40 on an unchanged tree)** — they are flaky, not deterministic.
+Failing files at the 40-failure reading: `PublishGauntlet` (10), `WorkflowBuilderPage.canvas` (6),
+`WorkflowBuilderPage` (5), `WorkflowCanvas.composition` (5), `WorkflowCanvas` (4),
+`WorkflowBuilderPage.header` (3), `PhaseSpineGraph` (2), `StepTypePicker` (2),
+`WorkflowCanvas.editing` (2), `revertByteIdentical` (1).
+
+**The half that matters for this phase is intact.** Every one of the 16 pinned files reports delta ≥ 0.
+The gate's real job here — catching the `it()` blocks that vanish when `185-08` deletes `groundingFor()`
+(`phaseVocabulary.test.ts`, pinned 42) — works exactly as designed. `[count-decrease]` is live.
+
+### The rule every plan in this phase uses instead of `exits 0`
+
+A count-gate check PASSES when **all** of these hold:
+
+1. No `[count-decrease]` — no pinned file reports fewer tests than its pin. **This is the load-bearing one.**
+2. No `[total-below-baseline]` and no `[missing-file]`.
+3. **No NEW failing test in any file the plan touched.** Compare against the table above. Churn in a file
+   the plan never opened is pre-existing rot — record it, do not chase it.
+4. Where a plan deliberately re-pins a count (`185-08` only), the `BASELINE` edit lands in the **same
+   commit** as the deletion, with the number **read from the gate's own output**, never guessed.
+
+`[failing-tests]` alone is a KNOWN, RECORDED block. Do not fix the 40 rotted tests inside this phase — it
+is unscoped, unrelated to GOVERN-01/02/03, and the churn makes it a moving target.
+
+**Deferred:** re-pin the three stale positive pins the gate reports (`canvasModel.purity.test.ts` 69 → 79,
+`WorkflowCanvas.test.tsx` 31 → 33, `WorkflowBuilderPage.canvas.test.tsx` 22 → 72) and triage the 40 rotted
+tests. **Re-open trigger:** the next phase that touches the frontend workflow suite, or the moment a
+`[count-decrease]` is ever masked by the noise. Tracked against SEED-056.
+
+---
+
 ## Per-Task Verification Map
 
 *Filled after planning. One row per task; every task must map to a criterion above or to a Wave-0 stub.*
