@@ -209,6 +209,39 @@ export function patchPhaseConfig(
   )
 }
 
+/** The only two fields `setPhaseGovernance` may write (D-185-10). */
+export type PhaseGovernancePatch = Readonly<{
+  grounding_escalated?: boolean
+  action_risk_armed?: boolean
+}>
+
+/**
+ * Set one step's governance intent, immutably, at the **PhaseSpec level**.
+ *
+ * WHY THIS IS ITS OWN OP AND NOT A `patchPhaseConfig` CALL (D-185-10). These two fields
+ * are siblings of `validators` and `name`, not members of the config union, and
+ * `PhaseFormPanel`'s only write seam patches `config` — its own shipped docblock defines
+ * `PhaseConfigPatch` that way. Widening that prop would silently change the meaning of a
+ * shipped contract, so the write is CALLER-owned through this narrow op instead, exactly
+ * as `PhaseGateRow.onRemove` already belongs to the caller for the same reason.
+ *
+ * The parameter type admits ONLY the two booleans, so growing this into a general
+ * `PhaseSpec` writer is a typecheck error rather than a review comment (T-185-06-02).
+ *
+ * Like `patchPhaseConfig` it deliberately does NOT renumber and does NOT reorder — arming
+ * a checkpoint or escalating grounding cannot change run order, and re-sorting here would
+ * make a switch flick move a card. It returns a new array with a new object for the named
+ * slug ONLY; every other phase stays identical by reference, which is what `fromCanvas`'s
+ * carry-through invariant needs (`canvasModel.ts:358-369`).
+ */
+export function setPhaseGovernance(
+  phases: readonly PhaseSpecJSON[],
+  slug: string,
+  patch: PhaseGovernancePatch,
+): PhaseSpecJSON[] {
+  return phases.map((p) => (p.slug === slug ? { ...p, ...patch } : p))
+}
+
 // ── R10a — the orphaning-delete refusal ────────────────────────────────────────
 
 /**
@@ -302,6 +335,80 @@ export function allowedTypesAt(
     strands ? { type, disabledReason: STRANDING_REASON } : { type },
   )
 }
+
+// ── Phase 185 governance vocabulary (GOVERN-01 / GOVERN-03) ────────────────────
+
+/**
+ * EVERY user-visible governance sentence, one exported const each — never a literal in
+ * JSX. This is the `STRANDING_REASON` / `StepTypePicker` idiom: the surface AUTHORS NO
+ * SENTENCE OF ITS OWN, imports what it renders, and its suite asserts character-identity
+ * against these names. A refusal reason that lives in a component is a refusal reason
+ * nobody can test for drift.
+ *
+ * TWO RULES THIS COPY SATISFIES, AND BOTH ARE LOCKS.
+ *
+ * 1. D-185-02 — the attached-gate sentence is AGENT-STEP copy and is deliberately worded
+ *    from scratch rather than lifted off the deliverable path. The shipped `check_coverage`
+ *    claim is computable only over a STRUCTURED LEAF SET (`output.field_map`, which only
+ *    `llm_emit` produces); free prose has no leaves, and detection only ever fires on
+ *    `llm_agent` / `llm_batch_agents`. The honest claim on a detected agent step is
+ *    RETRIEVED-AND-POINTED-AT — it opened a file, and it says which. Promising more here
+ *    would be the precise overclaim this milestone exists to prevent, so the deliverable
+ *    path's stronger wording must never be transplanted onto `GROUNDING_ATTACHED_GATE`.
+ *
+ * 2. SPEC Req 7's binding vocabulary — say *Must prove it*, *Free to think*, *Nothing to
+ *    prove here*. The four banned readings are the past participle of "prove", the two
+ *    "no governance at all" adjectives, and the two clerical ways of saying a step is
+ *    outside the rule. *Traceable* becomes legitimate only at the review moment, where a
+ *    coverage check has actually run — that is Phase 188, not here.
+ *
+ * The refusal below is the "lobotomy, not a loophole" wording (sketch 142-B, operator-
+ * locked): switching the document tools off does not loosen the step, it stops the step
+ * reading your files. Framing that as a reasonable alternative is what the first draft
+ * did wrong.
+ */
+
+/** The loose side of the dial. Struck through, never hidden, on a locked step. */
+export const GROUNDING_DIAL_LOOSE_LABEL = "○ Free to think"
+
+/** The strict side of the dial. */
+export const GROUNDING_DIAL_STRICT_LABEL = "⛨ Must prove it"
+
+/** A step type that makes no factual claim carries this INSTEAD of a control (D-185-16). */
+export const GROUNDING_NOTHING_TO_PROVE = "Nothing to prove here"
+
+/** Why the step is locked, when the cause is `detected`. */
+export const GROUNDING_WHY_DETECTED = "Because this step reads your documents."
+
+/** Why the step is locked, when the cause is `escalated` — the one authored cause. */
+export const GROUNDING_WHY_ESCALATED = "Because you turned this on by hand."
+
+/** The `already-set` reading: the strictness is the citation policy's, not this dial's. */
+export const GROUNDING_ALREADY_SET_NOTE =
+  "This step already has to cite its sources — that comes from its citation policy above, not from this dial."
+
+/** The tool chips ARE the dial — said in-surface so the real control is never hidden. */
+export const GROUNDING_TOOL_LIST_IS_THE_CONTROL =
+  "Switching any of them on is what makes this step have to prove itself — this list is the real control."
+
+/** What the engine-attached gate actually checks. See rule 1 above before editing this. */
+export const GROUNDING_ATTACHED_GATE =
+  "Before this step is accepted it must have actually retrieved something from your documents, and point at what it used. A step that answers without opening a file fails."
+
+/** The refusal printed when the loose side of a locked dial is pressed. */
+export const GROUNDING_LOCK_REFUSAL =
+  "Reading your files is what this step is for, so it has to show where its answers came from. You can switch off the document tools below — but that does not loosen the step, it stops it opening your files at all."
+
+/** The label of the 🔒 locked row the gates rail synthesizes for a governed step. */
+export const GOVERNANCE_GATE_ROW_LABEL =
+  "Must prove it — retrieved sources, pointed at in the answer"
+
+/** The action-risk switch. Default OFF; arming is always the author's act. */
+export const ACTION_RISK_ARM_LABEL = "Stop and ask me first"
+
+/** What arming costs, said plainly: an indefinite wait, not a timeout that advances. */
+export const ACTION_RISK_ARMED_NOTE =
+  "When this step is reached the run stops and waits for your answer. It will not continue on its own."
 
 // ── D-184-11 — slug generation and the minimal valid phase ─────────────────────
 

@@ -29,8 +29,21 @@ import {
   removePhase,
   renumber,
   resolveDrop,
+  setPhaseGovernance,
   slugForType,
   STRANDING_REASON,
+  ACTION_RISK_ARM_LABEL,
+  ACTION_RISK_ARMED_NOTE,
+  GOVERNANCE_GATE_ROW_LABEL,
+  GROUNDING_ALREADY_SET_NOTE,
+  GROUNDING_ATTACHED_GATE,
+  GROUNDING_DIAL_LOOSE_LABEL,
+  GROUNDING_DIAL_STRICT_LABEL,
+  GROUNDING_LOCK_REFUSAL,
+  GROUNDING_NOTHING_TO_PROVE,
+  GROUNDING_TOOL_LIST_IS_THE_CONTROL,
+  GROUNDING_WHY_DETECTED,
+  GROUNDING_WHY_ESCALATED,
   type PhaseTypeId,
 } from "./definitionOps"
 import { ALL_FIXTURES } from "./__fixtures__/canvasFixtures"
@@ -354,6 +367,191 @@ describe("definitionOps — patchPhaseConfig preserves everything it is not aske
     const before = clone(shaped)
     patchPhaseConfig(shaped, "emit", { citation_policy: "draft" })
     expect(shaped).toStrictEqual(before)
+  })
+})
+
+// ── Phase 185 — setPhaseGovernance writes at the PhaseSpec level, never into config ──
+
+describe("definitionOps — setPhaseGovernance (D-185-10)", () => {
+  const governed: PhaseSpecJSON[] = [
+    {
+      slug: "search",
+      phase_index: 0,
+      name: "Find the risks",
+      config: {
+        phase_type: "llm_agent",
+        prompt: "find them",
+        available_tools: ["search_documents"],
+      },
+      validators: [{ kind: "citations_required", on_failure: "fail_run" }],
+    },
+    { slug: "send", phase_index: 1, config: { phase_type: "programmatic", fn: "send_email" } },
+    { slug: "deliver", phase_index: 2, config: { phase_type: "llm_emit", prompt: "write it" } },
+  ]
+
+  it("sets the named field on the named slug only", () => {
+    const out = setPhaseGovernance(governed, "send", { action_risk_armed: true })
+    expect(out[1].action_risk_armed).toBe(true)
+    expect(out[0].action_risk_armed).toBeUndefined()
+    expect(out[2].action_risk_armed).toBeUndefined()
+  })
+
+  it("leaves every OTHER phase toBe-identical — the carry-through invariant", () => {
+    const out = setPhaseGovernance(governed, "send", { action_risk_armed: true })
+    expect(out[0]).toBe(governed[0])
+    expect(out[2]).toBe(governed[2])
+    // The target is a NEW object — the op is immutable, not a mutation in disguise.
+    expect(out[1]).not.toBe(governed[1])
+  })
+
+  it("NEVER writes into config — the whole reason this op exists", () => {
+    const out = setPhaseGovernance(governed, "search", { grounding_escalated: true })
+    // Reference identity on the config object is the strongest possible proof that the
+    // spread landed at PhaseSpec level and not one layer down.
+    expect(out[0].config).toBe(governed[0].config)
+    expect(out[0].grounding_escalated).toBe(true)
+    expect("grounding_escalated" in out[0].config).toBe(false)
+  })
+
+  it("keeps the array length and every phase_index unchanged (no renumber, no reorder)", () => {
+    const out = setPhaseGovernance(governed, "deliver", { action_risk_armed: true })
+    expect(out).toHaveLength(governed.length)
+    expect(indicesOf(out)).toEqual(indicesOf(governed))
+    expect(out.map((p) => p.slug)).toEqual(governed.map((p) => p.slug))
+  })
+
+  it("keeps every other PhaseSpec key on the target (name, validators, slug, index)", () => {
+    const out = setPhaseGovernance(governed, "search", { grounding_escalated: true })
+    expect(out[0].slug).toBe("search")
+    expect(out[0].phase_index).toBe(0)
+    expect(out[0].name).toBe("Find the risks")
+    expect(out[0].validators).toBe(governed[0].validators)
+  })
+
+  it("writes both booleans in one patch", () => {
+    const out = setPhaseGovernance(governed, "search", {
+      grounding_escalated: true,
+      action_risk_armed: true,
+    })
+    expect(out[0].grounding_escalated).toBe(true)
+    expect(out[0].action_risk_armed).toBe(true)
+  })
+
+  it("an unknown slug is a no-op — every member comes back toBe-identical", () => {
+    const out = setPhaseGovernance(governed, "no-such-step", { action_risk_armed: true })
+    expect(out).toHaveLength(governed.length)
+    out.forEach((phase, i) => expect(phase).toBe(governed[i]))
+  })
+
+  it("un-setting is expressible — false is a real value, not an absence", () => {
+    const armed = setPhaseGovernance(governed, "send", { action_risk_armed: true })
+    const disarmed = setPhaseGovernance(armed, "send", { action_risk_armed: false })
+    expect(disarmed[1].action_risk_armed).toBe(false)
+  })
+
+  it("does not mutate the input", () => {
+    const before = clone(governed)
+    setPhaseGovernance(governed, "send", { action_risk_armed: true })
+    expect(governed).toStrictEqual(before)
+  })
+
+  it("survives an empty phases array and never throws (TOTALITY)", () => {
+    expect(setPhaseGovernance([], "nope", { action_risk_armed: true })).toEqual([])
+    expect(() => setPhaseGovernance(governed, "send", {})).not.toThrow()
+  })
+})
+
+// ── Phase 185 — the governance vocabulary is BINDING (SPEC Req 7 / D-185-02) ──────
+
+describe("definitionOps — the governance copy is a lock, not a suggestion", () => {
+  /** Every user-visible governance sentence this phase ships. */
+  const GOVERNANCE_COPY = [
+    GROUNDING_DIAL_LOOSE_LABEL,
+    GROUNDING_DIAL_STRICT_LABEL,
+    GROUNDING_NOTHING_TO_PROVE,
+    GROUNDING_WHY_DETECTED,
+    GROUNDING_WHY_ESCALATED,
+    GROUNDING_ALREADY_SET_NOTE,
+    GROUNDING_TOOL_LIST_IS_THE_CONTROL,
+    GROUNDING_ATTACHED_GATE,
+    GROUNDING_LOCK_REFUSAL,
+    GOVERNANCE_GATE_ROW_LABEL,
+    ACTION_RISK_ARM_LABEL,
+    ACTION_RISK_ARMED_NOTE,
+  ]
+
+  it("ships all twelve sentences, each non-empty", () => {
+    expect(GOVERNANCE_COPY).toHaveLength(12)
+    for (const sentence of GOVERNANCE_COPY) expect(sentence.length).toBeGreaterThan(0)
+  })
+
+  it("carries the three REQUIRED phrases of Req 7's binding vocabulary", () => {
+    expect(GROUNDING_DIAL_STRICT_LABEL).toContain("Must prove it")
+    expect(GROUNDING_DIAL_LOOSE_LABEL).toContain("Free to think")
+    expect(GROUNDING_NOTHING_TO_PROVE).toBe("Nothing to prove here")
+  })
+
+  it("uses NONE of the banned readings anywhere in the copy", () => {
+    // Assembled from parts so a grep of this file for the banned words does not itself
+    // become the thing that fails (the D-ITEM-183-02 trap). "prove"/"proves" are fine;
+    // the banned one is the past participle.
+    const banned = [
+      ["prov", "en"].join(""),
+      ["un", "governed"].join(""),
+      ["un", "checked"].join(""),
+      ["not ", "applicable"].join(""),
+      ["n", "/", "a"].join(""),
+      // `traceable` is legitimate only at the review moment, which is Phase 188.
+      ["trace", "able"].join(""),
+    ]
+    for (const sentence of GOVERNANCE_COPY) {
+      for (const word of banned) {
+        expect(sentence.toLowerCase()).not.toContain(word)
+      }
+    }
+  })
+
+  it("the banned-word check is a REAL control — it finds each planted term", () => {
+    const banned = [
+      ["prov", "en"].join(""),
+      ["un", "governed"].join(""),
+      ["un", "checked"].join(""),
+      ["not ", "applicable"].join(""),
+      ["trace", "able"].join(""),
+    ]
+    for (const word of banned) {
+      expect(`This step is ${word}.`.toLowerCase()).toContain(word)
+    }
+  })
+
+  it("D-185-02: the attached-gate sentence does not borrow the deliverable path's claim", () => {
+    // The emit-path wording is computable only over a structured leaf set. Its two
+    // signature phrases are assembled from parts here so this guard reads the CONSTANT,
+    // never a literal somebody could satisfy by editing a docblock.
+    const emitPathClaims = [
+      ["every value ", "trace", "able"].join(""),
+      ["everything it says is ", "checked"].join(""),
+    ]
+    for (const claim of emitPathClaims) {
+      expect(GROUNDING_ATTACHED_GATE.toLowerCase()).not.toContain(claim)
+    }
+    // What it DOES claim: retrieved, and pointed at.
+    expect(GROUNDING_ATTACHED_GATE).toContain("retrieved")
+    expect(GROUNDING_ATTACHED_GATE).toContain("point at what it used")
+  })
+
+  it("the refusal names what switching the tools off COSTS (lobotomy, not loophole)", () => {
+    expect(GROUNDING_LOCK_REFUSAL).toContain("does not loosen the step")
+    expect(GROUNDING_LOCK_REFUSAL).toContain("stops it opening your files")
+  })
+
+  it("the armed note promises a wait, never a timeout that advances on its own", () => {
+    expect(ACTION_RISK_ARMED_NOTE).toContain("waits for your answer")
+    expect(ACTION_RISK_ARMED_NOTE).toContain("will not continue on its own")
+  })
+
+  it("every sentence is a distinct string — no constant is an alias of another", () => {
+    expect(new Set(GOVERNANCE_COPY).size).toBe(GOVERNANCE_COPY.length)
   })
 })
 

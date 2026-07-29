@@ -68,6 +68,25 @@ export interface PhaseSpecJSON {
   name?: string | null
   config: PhaseConfigJSON
   validators?: ValidatorJSON[]
+  // ── Phase 185 (D-185-08) — the two governance intents ───────────────────────
+  // Additive-optional, mirroring `name?: string | null`; pre-185 definition rows
+  // read with both absent and the backend's `PhaseSpec` supplies `false`.
+  //
+  // THE AUTHOR'S INTENT ONLY (D-185-07). Of the three grounding causes only
+  // `escalated` is authored: `detected` is a pure function of
+  // `config.available_tools ∩ kb_tools` and `already-set` a pure function of
+  // `config.citation_policy`, so both are DERIVED at read time and NEVER stored.
+  // That is what makes "a detected step set back to free to think" unrepresentable
+  // rather than a rule somebody must keep defending.
+  //
+  // ROUND TRIP: no serializer work is owed for these. `fromCanvas` carries phases
+  // through BY REFERENCE (`canvasModel.ts:413-421`) — it hands back the SAME objects
+  // `toCanvas` was given — so SPEC acceptance criterion 3 holds BY CONSTRUCTION and
+  // is pinned by a `toBe` assertion in `canvasModel.roundtrip.test.ts`.
+  /** The author escalated an otherwise-loose step to "must prove it". */
+  grounding_escalated?: boolean
+  /** The author armed an action-risk checkpoint: the run stops here and waits. */
+  action_risk_armed?: boolean
 }
 
 // ── The skip_to_phase parse ─────────────────────────────────────────────────────

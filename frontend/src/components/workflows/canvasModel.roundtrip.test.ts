@@ -182,6 +182,39 @@ describe("R2 regressions — the two shapes that break a naive serializer", () =
     expect(round).toHaveLength(indexGap.length)
   })
 
+  it("Phase 185: the two governance booleans survive the trip with reference identity", () => {
+    // SPEC acceptance criterion 3. `toCanvas` reads six things off a phase and these two
+    // are not among them — which is exactly why the assertion is `toBe` and not a field
+    // comparison: a serializer that rebuilt phases field by field would drop them
+    // silently, and no deep compare over the six modelled fields would notice.
+    const governed: PhaseSpecJSON[] = [
+      {
+        slug: "search",
+        phase_index: 0,
+        config: { phase_type: "llm_agent", prompt: "Find the risks", available_tools: ["search_documents"] },
+        grounding_escalated: true,
+        action_risk_armed: true,
+      },
+      {
+        slug: "deliver",
+        phase_index: 1,
+        config: { phase_type: "llm_emit", prompt: "Write it up" },
+        grounding_escalated: true,
+        action_risk_armed: true,
+      },
+    ]
+
+    const round = roundTrip(governed)
+
+    expect(round).toHaveLength(2)
+    round.forEach((phase, i) => expect(phase).toBe(governed[i]))
+    // The readable backstop: the values are still there and still `true`.
+    expect(round.map((p) => p.grounding_escalated)).toEqual([true, true])
+    expect(round.map((p) => p.action_risk_armed)).toEqual([true, true])
+    // And neither boolean leaked into the canvas payload as a layout key.
+    expect(forbiddenKeysIn(round)).toEqual([])
+  })
+
   it("a duplicate-slug source is handed back untouched — the fail-safe, never lossy", () => {
     const shape = GENERATED.find((s) => s.name.includes("duplicate-slug"))
     if (!shape) throw new Error("the duplicate-slug shape is missing from generatedShapes()")
