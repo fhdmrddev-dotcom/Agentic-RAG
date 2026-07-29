@@ -76,6 +76,11 @@ const RAIL_MARKERS = [
   "Order is locked",
   "Runs as step",
   "Checks that run on this step",
+  // Phase 185-07 — the governance section rides the SAME `rails` gate, so its markers
+  // belong in the same list. A new branch that forgot the gate would show up here first.
+  "rail-governance",
+  "How strictly this step is held",
+  "governance-arm",
 ]
 
 // ── 1. THE D-14 ASSERTION ─────────────────────────────────────────────────────────────
@@ -120,6 +125,52 @@ describe("PhaseFormPanel — WITHOUT rails, the panel is today's panel (D-14 / D
     const without = renderPanel(AGENT).container.innerHTML
     const withRails = renderPanel(AGENT, railsOf({ toolOptions: ["search_documents"] })).container.innerHTML
     expect(without).not.toBe(withRails)
+  })
+})
+
+// ── 1b. THE PHASE-185 MOUNT POINT (G-5 honoured by construction) ──────────────────────
+
+/**
+ * The panel gained a MOUNT POINT, not a feature. These three cases pin the only three
+ * things the panel itself owes the governance section: the `rails` gate, its position in
+ * the reading order, and tolerance of an unwired caller. Everything the section RENDERS is
+ * asserted in `GovernanceSection.test.tsx` — testing it twice, through two different prop
+ * paths, is how a 1078-line file grows a second home for the same rule.
+ */
+describe("PhaseFormPanel — the governance section is a mount point (Phase 185-07)", () => {
+  it("reads 'how strictly this step is held' BEFORE 'the checks that run on it'", () => {
+    const { container } = renderPanel(AGENT, railsOf())
+
+    const governance = screen.getByTestId("rail-governance")
+    const gates = screen.getByTestId("rail-gates")
+    expect(governance).toBeInTheDocument()
+    // `compareDocumentPosition` is the honest reading of "before" — a class or an index
+    // into `querySelectorAll` would both survive a reorder this assertion exists to catch.
+    expect(governance.compareDocumentPosition(gates) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(container.querySelectorAll('[data-rail="governance"]')).toHaveLength(1)
+  })
+
+  it("renders read-only with `onGovernanceChange` omitted — visible, never silent", () => {
+    // 185-08 wires the page handler. Until then an unwired panel must still SHOW the
+    // section (a disappearing surface is how a dropped wiring goes unnoticed) and must
+    // not throw when a control is pressed.
+    renderPanel(AGENT, railsOf())
+    const arm = screen.getByTestId("governance-arm")
+    expect(() => fireEvent.click(arm)).not.toThrow()
+    expect(screen.getByTestId("rail-governance")).toBeInTheDocument()
+  })
+
+  it("the KB list comes from the rails, and an absent one marks NOTHING", () => {
+    // Absent: the palette could not be read. The step is still an `llm_agent` naming
+    // `search_documents`, and it is NOT marked — the safe direction (D-185-09).
+    const absent = renderPanel(AGENT, railsOf())
+    expect(screen.getByTestId("rail-governance").getAttribute("data-cause")).toBe("none")
+    absent.unmount()
+
+    const supplied = renderPanel(AGENT, railsOf({ kbTools: ["search_documents"] }))
+    expect(
+      within(supplied.container).getByTestId("rail-governance").getAttribute("data-cause"),
+    ).toBe("detected")
   })
 })
 

@@ -44,8 +44,8 @@
  * render today's panel byte-for-byte or a flag-off user's surface drifts (D-14 /
  * D-181-01). Every rail branch in this file is therefore gated on `rails` being present.
  * Phase 184 does NOT invent an authored grounding field — the gates are DERIVED by the
- * caller exactly as `groundingFor()` derives grounding today; Phase 185 is what replaces
- * that derivation, and it plugs into `rails.gates` rather than into new layout.
+ * caller; Phase 185-07 mounts the governance section beside them as ONE gated line — the
+ * dial, its refusal and the arming switch all live in that file, never in this one (G-5).
  *
  * THE PANEL IS DISMISSED FROM ITS OWN HEADER, and `onClose` is REQUIRED so it can
  * never mount unclosable. For one shipped revision the only exit was re-activating the
@@ -54,6 +54,7 @@
  * than outside the tests: the parent owns the selection, this header owns the ask.
  */
 import { useId } from "react"
+import { GovernanceSection } from "./GovernanceSection"
 import type { PhaseSpecJSON } from "./phaseVocabulary"
 
 /** A partial config patch the form emits on each edit. */
@@ -96,13 +97,17 @@ export type PhaseGateRow =
  *   to prevent.
  * - `gates` — derived exactly as the shipped `groundingFor()` derives grounding today
  *   (`citation_policy` plus the presence of a `citations_required` validator). Phase 185
- *   replaces that derivation with an authored per-node grounding mode and plugs into THIS
- *   array; designing the container for it now is the point, inventing the field is not.
+ *   plugs its own 🔒 row into THIS array; the shipped derivation retires in plan 185-08.
+ * - `kbTools` — the SERVER's knowledge-base tool names (D-185-09), read off
+ *   `useGroundingBundle`. Absent or empty marks NOTHING, which is the safe direction: the
+ *   run-time gate is server-side and unconditional, so a failed palette read can only cost
+ *   a mark, never un-govern a step. Plan 185-08 supplies it from the page.
  */
 export interface PhaseFormRails {
   order: { index: number; total: number }
   toolOptions: string[] | "degraded"
   gates: PhaseGateRow[]
+  kbTools?: readonly string[]
 }
 
 export interface PhaseFormPanelProps {
@@ -137,6 +142,11 @@ export interface PhaseFormPanelProps {
    *  than by review. `revertByteIdentical.test.tsx` never renders this component, so the
    *  guard lives in `PhaseFormPanel.rails.test.tsx` instead. */
   rails?: PhaseFormRails
+  /** D-185-10 — the PhaseSpec-level governance write. Caller-owned for the same reason
+   *  `PhaseGateRow.onRemove` is: these fields are siblings of `validators`, and this panel's
+   *  only write seam (`onChange`) patches `config`. ABSENT ⇒ the section renders READ-ONLY
+   *  rather than disappearing, so a dropped wiring is visible on screen, not silent. */
+  onGovernanceChange?: (patch: { grounding_escalated?: boolean; action_risk_armed?: boolean }) => void
 }
 
 const CITATION_POLICIES = ["strict", "flag", "partial", "draft"] as const
@@ -685,6 +695,7 @@ export function PhaseFormPanel({
   onPersist,
   onClose,
   rails,
+  onGovernanceChange,
 }: PhaseFormPanelProps) {
   // RESTING rail — the parent grid collapses this column to 44px; show a thin hint.
   if (!open || !phase) {
@@ -1029,6 +1040,9 @@ export function PhaseFormPanel({
           )}
         </div>
 
+        {rails && <GovernanceSection phaseType={pt} availableTools={asList(cfg.available_tools)} kbTools={rails.kbTools ?? []}
+          citationPolicy={asStr(cfg.citation_policy)} groundingEscalated={phase.grounding_escalated === true}
+          actionRiskArmed={phase.action_risk_armed === true} onGovernanceChange={onGovernanceChange} />}
         {rails && <GatesRail gates={rails.gates} />}
       </div>
     </aside>
