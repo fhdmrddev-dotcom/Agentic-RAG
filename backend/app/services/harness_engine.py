@@ -876,8 +876,18 @@ def _ask_user_choices_from_finding(error_message: str) -> list[str]:
     if msg.startswith("freshness:staleness|"):
         return ["Proceed anyway", "Abort"]
     if msg.startswith("action_risk:approval|"):
-        return ["Approve and run this step", "Do not run it"]
+        return [_ACTION_RISK_APPROVE_CHOICE, "Do not run it"]
     return ["Proceed anyway", "Abort"]
+
+
+# T-185-04-01 (quick-260731-3y4) — THE ONE HOME for the armed checkpoint's approve
+# label. It is BOTH what the armed pair above presents AND the only string the armed
+# disposition accepts as consent (the allow-list in ``_resolve_failure_with_ask_user``),
+# so a change here changes what counts as approval for an irreversible action. Written
+# once for the same reason ``_ABORT_LIKE_CHOICES`` below writes the decline phrase as
+# the literal the function returns: a rename must not be able to separate the label
+# from the gate that reads it.
+_ACTION_RISK_APPROVE_CHOICE = "Approve and run this step"
 
 
 # Phase 185 (GOVERN-03 / RESEARCH L-4) — the set of chosen texts that mean "do NOT
@@ -1146,6 +1156,45 @@ async def _resolve_failure_with_ask_user(
     if _is_abort_choice(choice):
         return PhaseOutcome(
             "fail_run", None, None, f"{reason_base} — aborted by user"
+        )
+
+    # ── T-185-04-01 — THE ARMED PROCEED SIDE IS AN ALLOW-LIST ────────────────────
+    # ``_is_abort_choice`` is a DENY-list, and a deny-list cannot be made fail-closed
+    # by extension: there is no finite set of ways to say no. Phase 185 extended it and
+    # added an invariant guard over the PRESENTED BUTTON LABELS, but the shipped
+    # ``PendingAskCard`` does not restrict the person to those labels — its free-text
+    # ``<textarea>`` is unconditional (the choice buttons are gated on
+    # ``options.length > 0``; the textarea is gated on nothing), and ``api/runs.py``
+    # accepts ``response_text`` without validating it against the prompt's options. So a
+    # typed "no", "nope", "stop it" or "Do not run it." (trailing period) fell straight
+    # through this deny-list into the receipt write below, RAN the risky step and
+    # recorded the person who refused as having authorised it.
+    #
+    # The engine's own words, four branches up at the ``payload is None`` case: "a
+    # payload we could not read is not consent, and the only safe reading of 'we don't
+    # know what they said' is 'do not run it'." An answer we cannot read AS THE APPROVAL
+    # OPTION is the identical epistemic situation, so it gets the identical reading.
+    #
+    # Exact equality against the presented label, on the value already ``.strip()``ed
+    # above — not casefold, not prefix, not substring. Case-insensitive matching would be
+    # strictly MORE permissive for zero benefit: the click path resolves ``choices[0]`` to
+    # this exact literal, so every string a looser rule newly accepts is one only the
+    # typed path can produce. And the two errors are not symmetric — refusing an
+    # oddly-cased approval fails a run the person re-triggers with a click; accepting one
+    # sends the email.
+    #
+    # ORDERING IS LOAD-BEARING. ``_is_abort_choice`` stays FIRST so "Do not run it" and
+    # "Abort" keep the byte-identical "— aborted by user" reason on every path including
+    # this one. And the branch is gated on ``is_action_risk`` (computed once, above), so
+    # on the three non-armed choice pairs it is dead code and their routing — free-text
+    # fall-through included — is unmoved. The distinct reason below is deliberate: the
+    # ledger must not claim the person "aborted" when the truth is that the engine could
+    # not read their answer as consent. The raw answer is NOT interpolated — it reaches
+    # the durable prompt row, not the run's failure reason.
+    if is_action_risk and choice != _ACTION_RISK_APPROVE_CHOICE:
+        return PhaseOutcome(
+            "fail_run", None, None,
+            f"{reason_base} — not approved: the answer did not match the approval option",
         )
 
     # Proceed — write the governance receipt, then continue.
