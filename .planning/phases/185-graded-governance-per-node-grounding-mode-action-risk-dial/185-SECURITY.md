@@ -1,22 +1,31 @@
 ---
 phase: 185
 slug: graded-governance-per-node-grounding-mode-action-risk-dial
-status: blocked
-threats_open: 1
+status: verified
+threats_open: 0
 asvs_level: 2
 created: 2026-07-31
+updated: 2026-07-31
 ---
 
 # Phase 185 — Security
 
 > Per-phase security contract: threat register, accepted risks, and audit trail.
 
-**Verdict: BLOCKED.** 48 of 49 plan-time threats verified CLOSED against the implementation.
-One BLOCKER open: **T-185-04-01** — a typed refusal on an armed action-risk checkpoint executes
-the action and writes a false approval receipt.
+**Verdict: SECURED.** 49 of 49 plan-time threats CLOSED against the implementation.
+
+The 2026-07-31 first pass closed 48 and left **T-185-04-01** open as a BLOCKER — a typed refusal on
+an armed action-risk checkpoint executed the action and wrote a false approval receipt. The operator
+elected to fix rather than accept. Quick task `260731-3y4` landed the fix (commit `417728bd`) and a
+targeted re-audit the same day verified it closed. See the T-185-04-01 section below for both the
+original finding and its closure evidence.
 
 Register origin: `register_authored_at_plan_time: true` — all 13 plans carried a `<threat_model>`
 block. The auditor verified mitigations against source; no SUMMARY claim was accepted as evidence.
+
+One adjacent weakness surfaced during the re-audit's adversarial probing and is recorded — but NOT
+folded into this phase's verdict — as **SEED-137** (armed-checkpoint precedence bypass). It is a
+distinct structural defect, currently fenced by two upstream gates. See "Adjacent finding" below.
 
 ---
 
@@ -49,7 +58,7 @@ block. The auditor verified mitigations against source; no SUMMARY claim was acc
 | T-185-03-03 | Repudiation | gate audit trail | accept | `validators.py:225-228, 230` — `idx` is the full-list index, `validator_index` stays correct | closed |
 | T-185-03-04 | Denial of service | retry loop on a permanently uncited step | accept | `grounding.py:946` `max_retries=2` + shipped consecutive-identical short-circuit | closed |
 | T-185-03-05 | Tampering | persistence of a synthesized gate | mitigate | Attachment at the RUN seam `harness_engine.py:1287-1290` only; 185 added no `@model_validator` (git-diff confirmed). See Observation 2 — the acceptance grep as written is imprecise | closed |
-| **T-185-04-01** | **Elevation of privilege** | **`_is_abort_choice` / armed approval** | **mitigate** | **Declared mitigation present but does not close the threat — see BLOCKER below** | **OPEN** |
+| T-185-04-01 | Elevation of privilege | `_is_abort_choice` / armed approval | mitigate | **Closed by quick task `260731-3y4` (`417728bd`).** The armed PROCEED side is now an ALLOW-LIST: `harness_engine.py:1194` — `if is_action_risk and choice != _ACTION_RISK_APPROVE_CHOICE: return PhaseOutcome("fail_run", …)`, placed after `_is_abort_choice` (`:1156`) and before the receipt write (`:1216`). Label written once at `:890`, shared with the presenter at `:879`. Re-audit evidence below | closed |
 | T-185-04-02 | Denial of service | indefinite pub/sub wait | accept | Pure asyncio poll `ask_user_service.py:114-140` — one suspended coroutine + one pub/sub connection, not a thread | closed |
 | T-185-04-03 | Repudiation | approval receipt | accept | `harness_engine.py:1167-1171` shipped `validator_ask_user_approved` row unchanged | closed |
 | T-185-04-04 | Denial of service | un-Stoppable >1h wait | mitigate | `ask_user_service.py:55` `_CHANNELS_TTL_REFRESH_SECONDS=300`; re-arm inside the poll loop `:119-131` | closed |
@@ -93,7 +102,85 @@ block. The auditor verified mitigations against source; no SUMMARY claim was acc
 
 ---
 
-## 🔴 BLOCKER — T-185-04-01
+## ✓ T-185-04-01 — CLOSED 2026-07-31 (was BLOCKER)
+
+**Closed by:** quick task `260731-3y4`, commit `417728bd` (fix) + `4aa58d5f` (docs).
+**Re-audit:** targeted second pass, `## SECURED`. The original finding is preserved below in full —
+a closed threat whose evidence is deleted cannot be re-checked.
+
+### The fix
+
+`_ACTION_RISK_APPROVE_CHOICE = "Approve and run this step"` (`harness_engine.py:890`) is now the one
+home for the armed approve label, shared by the presenter (`:879`) and the gate that reads it — the
+same anti-drift pattern `_ABORT_LIKE_CHOICES` already used for the decline phrase. On the armed path
+only, exactly one string proceeds:
+
+```python
+if is_action_risk and choice != _ACTION_RISK_APPROVE_CHOICE:      # :1194
+    return PhaseOutcome("fail_run", None, None,
+        f"{reason_base} — not approved: the answer did not match the approval option")
+```
+
+Four properties, each verified in source rather than inferred:
+
+| Property | Evidence |
+|---|---|
+| It is an ALLOW-LIST, not a deny-list extension | `:1194` compares `!=` against a single constant. `_ABORT_LIKE_CHOICES` was not widened |
+| No receipt on a decline | The `return` at `:1195-1198` precedes `write_audit(… "validator_ask_user_approved" …)` at `:1216`. Ordering read directly, not inferred. Probe: `receipts=0` on all 30+ blocked inputs |
+| Aborts keep their byte-identical reason | `_is_abort_choice` stays FIRST at `:1156`, so `"Do not run it"` / `"Abort"` still return `"— aborted by user"` |
+| Non-armed paths unmoved | The branch is gated on `is_action_risk` (computed once at `:991`), so it is dead code on the three non-armed pairs |
+
+The failure reason does **not** interpolate the user's answer — `reason_base` is built from the
+validator-composed `error_message`. The raw answer reaches the durable prompt row, not the run's
+failure reason.
+
+**The fix is server-side, and deliberately so.** The frontend was left untouched: `PendingAskCard`'s
+unconditional `<textarea>` is still at `:412-424`. A UI-only fix would have left `api/runs.py` open.
+
+### Closure evidence
+
+- **The defect was reproduced before it was fixed.** An 18-row refusal table was observed **RED**
+  against the pre-fix code at `319a814c`: every row — `"no"`, `"nope"`, `"decline"`, `"stop it"`,
+  `"cancel it"`, `"Do not run it."` (trailing period) — PROCEEDed with exactly one approval receipt.
+  Only the two exact literals routed safely. A green-on-first-run test would have proved nothing.
+- **Falsification, run twice independently.** Removing the `is_action_risk` guard reddens 4 tests —
+  including **three shipped tests the quick task never opened**
+  (`test_ask_user_proceed_continues_with_receipt`,
+  `test_ask_user_proceed_post_gate_returns_completed_output`,
+  `test_version_ambiguity_proceed_records_v1_cut_note`). Reproduced by both the verifier and the
+  re-auditor, each reverting to a clean `git diff --stat`. Neutering the guard alone reddens
+  `test_armed_typed_refusal_is_never_approval`. The tests are not vacuous.
+- **Adversarial probing beyond the shipped table** (re-auditor, read-only scratchpad scripts): NBSP
+  separators, zero-width-space injection, full-width forms, Cyrillic homoglyph `А`, double internal
+  space, trailing period, casefold, title case, bare prefix, label+suffix, containing sentence — all
+  `fail_run`, 0 receipts. There is no NFKC or casefold step anywhere on the path, so the equality is
+  genuinely code-point exact. `choice_index` of `1`/`None`/`-1`/`99`/`"abc"` blocked; `0` proceeds
+  (the intended click). `response_text=None`, missing `kind`, `kind=cancel`, empty dict, `payload=None`
+  all blocked. POST-gate (`is_pre=False`) armed refusal → `fail_run`, 0 receipts.
+- **No second consumer.** The resume sweep's armed branch (`harness_engine.py:2056-2073`) only
+  re-subscribes and re-emits, discarding `resume_pending_prompt`'s return; routing re-enters
+  `_resolve_failure_with_ask_user`. `_exec_llm_human_input` (`phase_types.py:798-814`) stores the
+  answer as phase output and routes no approval decision.
+- **Tests:** `test_ask_user_disposition.py` 18/18. Themed sweep 282 passed. Full unit suite
+  62 failed / 1626 passed vs the 62/1616 baseline — failure count byte-identical.
+- **Scope:** exactly 2 files. D-14 Deep fence (`agent_loop.py`, `tool_dispatcher.py`,
+  `openai_service.py`, `anthropic_service.py`) 0 · `api/runs.py` 0 · `frontend/` 0 ·
+  `supabase/migrations` 0 (head stays 114).
+
+### Residual — recorded, not accepted
+
+The defence is **single-layer**. `PendingAskCard.tsx:412-424`'s textarea is still unconditional and
+`runs.py:492-500` still accepts any `response_text`. Not exploitable now that the engine is
+fail-closed. **Re-open trigger:** any future approval consumer that does not route through
+`_resolve_failure_with_ask_user` — Phase 186 / 188 / 189 are the named candidates — must gate the
+textarea on `options.length === 0` and validate `response_text` server-side.
+
+**Operator-visible behaviour change:** typing a refusal on an armed checkpoint now fails the run with
+*"— not approved: the answer did not match the approval option"* instead of running the step.
+
+---
+
+### The original finding (preserved)
 
 **Threat as registered:** *An unrecognised decline phrase must NOT read as PROCEED.*
 
@@ -175,7 +262,8 @@ rather than unmitigated gaps. Each cites the source location that makes the acce
 | R-185-16 | T-185-12-02 | Marker-shaped prose is why half (a) exists and reads `citations` off `ToolResult`; half (b) alone was never the security property | operator | 2026-07-31 |
 | R-185-17 | T-185-13-03 | Brief ACCESS EXCLUSIVE lock during `DROP`+`ADD CONSTRAINT`; belongs to the standing cloud migration-parity window where migs 099→114 land together, not mid-traffic | operator | 2026-07-31 |
 
-**T-185-04-01 is NOT in this log.** The operator elected to block and fix rather than accept.
+**T-185-04-01 is NOT in this log.** The operator elected to block and fix rather than accept — and the
+fix shipped (`417728bd`). It is closed on evidence, not accepted on rationale.
 
 ### Carried residuals (recorded, not accepted risks)
 
@@ -211,7 +299,51 @@ net-new surface.
 
 ---
 
+## Adjacent Finding — NOT part of this phase's verdict
+
+**SEED-137 — armed-checkpoint precedence bypass.** Severity **Low** (latent / defence-in-depth).
+Planted at `.planning/seeds/SEED-137-armed-checkpoint-precedence-bypass.md`.
+
+Surfaced by the re-auditor while probing whether the new allow-list could be reached with
+`is_action_risk` False. It can — not by defeating the allow-list, but by never asking the armed gate
+at all:
+
+- `grounding.py:951-953` **appends** the armed spec (`[*phase.validators, *extra]`)
+- `validators.py:230` returns the **first** failing gate
+- `harness_engine.py:737-739` — on an ask_user Proceed, falls through to the body **without
+  re-running the remaining pre-gates**
+
+So an author-declared `timing="pre"` / `on_failure="ask_user"` validator that fails first owns the
+pause. The person sees that validator's choices, not the armed pair; proceeding runs the body;
+`action_risk_pending` is never emitted. Reproduced against the real engine, real `run_gates` and real
+`grounding.effective_phase`.
+
+**This is a distinct defect from T-185-04-01**, not a reopening of it. That one was a decline *read
+as* a proceed and is closed. This is the gate never being *asked*, and the allow-list cannot address
+it (it is gated on `is_action_risk`, False by construction on this path).
+
+**Why it is not folded into Phase 185's verdict:** it is not in the phase's plan-time register, it is
+not reachable through any shipped path, and its durable fix touches the D-185-05 attachment seam
+rather than the disposition. Two upstream gates fence it — `publish_service.py:464-503` refuses to
+publish any phase carrying an author-declared `on_failure == "ask_user"` validator, and
+`workflow_kickoff.py:205-219` refuses to run anything unpublished — so reaching it today requires a
+direct DB write to `workflow_definitions`.
+
+**Primary re-open trigger:** the deferred Phase-103 background-job publish, whose explicit purpose is
+to let interactive phases through publish (named in `publish_service.py:478-479`). That single change
+removes the only fence currently holding this closed, and the bypass emits no distinguishing audit
+event, so nothing would notice. **The fix should land before that rework, not after.** Suggested home:
+Phase 188, alongside the `action_risk_pending` consumer that `harness_engine.py:721` already names.
+
+Minor, informational: `harness_engine.py:1150`'s `int(_ci)` coerces `0.9`, `"0"` and `False` to index
+0 (→ approve). Not reachable through the Pydantic-typed endpoint (`choice_index: int | None`) — noted
+only so a future loosening of that field is not assumed safe.
+
+---
+
 ## Test Evidence Executed
+
+**First pass (2026-07-31, 49-threat audit):**
 
 | Suite | Result |
 |---|---|
@@ -219,7 +351,19 @@ net-new surface.
 | 6 workflow frontend suites | 383 tests pass |
 | `governanceVocabulary.test.ts` | 30 tests pass |
 
-Implementation files were **not modified** during this audit — read-only throughout.
+**Re-audit (2026-07-31, T-185-04-01 closure):**
+
+| Suite | Result |
+|---|---|
+| `test_ask_user_disposition.py` | 18/18 pass (4 net-new) |
+| Themed ask_user / harness / validator sweep | 282 passed |
+| Phase 185 suites (orchestrator spot-check) | 123/123 pass |
+| Full backend unit suite | 62 failed / 1626 passed vs the 62/1616 baseline — failure count byte-identical; +10 accounted (+6 plan 185-13, +4 this fix) |
+| Falsification (guard removed) | 4 RED incl. 3 shipped tests the fix never opened; reverted clean |
+| Adversarial probe (unicode / homoglyph / zero-width / malformed payload / POST-gate) | all `fail_run`, 0 receipts |
+
+Implementation files were **not modified** during either audit — read-only throughout, with every
+temporary falsification edit reverted and proven clean via `git diff --stat`.
 
 ---
 
@@ -227,15 +371,17 @@ Implementation files were **not modified** during this audit — read-only throu
 
 | Audit Date | Threats Total | Closed | Open | Run By |
 |------------|---------------|--------|------|--------|
-| 2026-07-31 | 49 | 48 | 1 | gsd-security-auditor (opus) |
+| 2026-07-31 | 49 | 48 | 1 | gsd-security-auditor (opus) — first pass; T-185-04-01 raised as BLOCKER |
+| 2026-07-31 | 49 | 49 | 0 | gsd-security-auditor (opus) — targeted re-audit after `417728bd`; `## SECURED`. Adjacent finding planted as SEED-137 |
 
 ---
 
 ## Sign-Off
 
 - [x] All threats have a disposition (mitigate / accept / transfer)
-- [x] Accepted risks documented in Accepted Risks Log
-- [ ] `threats_open: 0` confirmed — **1 open (T-185-04-01, BLOCKER)**
-- [ ] `status: verified` set in frontmatter — currently `blocked`
+- [x] Accepted risks documented in Accepted Risks Log (17 entries)
+- [x] `threats_open: 0` confirmed — 49/49 closed
+- [x] `status: verified` set in frontmatter
+- [x] Adjacent finding recorded with a concrete re-open trigger (SEED-137), not silently absorbed
 
-**Approval:** pending — blocked on T-185-04-01
+**Approval:** verified 2026-07-31
