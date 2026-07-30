@@ -8,8 +8,8 @@ created: 2026-07-29
 updated: 2026-07-31
 ---
 
-> **`nyquist_compliant: false` is a DELIBERATE reading, not an unfilled default.** Thirty of the
-> thirty-one tasks in the map below carry an `<automated>` command, and no three consecutive tasks
+> **`nyquist_compliant: false` is a DELIBERATE reading, not an unfilled default.** Thirty-three of the
+> thirty-four tasks in the map below carry an `<automated>` command, and no three consecutive tasks
 > lack one — the sampling architecture is sound. The one that does not is **11-3**, the blocking
 > `checkpoint:human-verify`, and it is the task that owns criterion **17** (a colour-stripped render
 > — jsdom computes no paint) and criterion **22** (the cross-provider scoreboard — needs four live
@@ -227,7 +227,7 @@ four at phase verification. **Wire format + screenshot are insufficient.**
 | # | Scenario | Requirement | Failure condition | Result (2026-07-31) |
 |---|---|---|---|---|
 | 1 | **Watch a step lock in front of you.** Switch on *Search your documents*; three things move at once with no reload — the loose side strikes through, pressing it prints the refusal reason as readable text, the canvas card grows its corner seal. | GOVERN-01, GOVERN-02 | Any of the three lags behind the chip, flickers, or only appears after a refresh | **PASS — with one wording deviation, see below** |
-| 2 | **The seal survives a live run.** Launch a run; watch a grounded card go idle → running → needs-you → failed. | GOVERN-02 | The seal dims, hides, shifts, or is swallowed by the status colour — at exactly the moment it matters most | ⬜ not run |
+| 2 | **The seal survives a live run.** Launch a run; watch a grounded card go idle → running → needs-you → failed. | GOVERN-02 | The seal dims, hides, shifts, or is swallowed by the status colour — at exactly the moment it matters most | **NOT OBSERVABLE IN THIS PHASE → deferred to Phase 188** — see below |
 | 3 | **Arm it and walk away.** Arm an outbound step, launch, close the tab, come back much later. | GOVERN-03 | The run advanced on its own (today's behaviour), or the prompt survived but is unreachable | ⬜ not run — **operator-only** (needs a real absence) |
 | 4 | **The detour reads as a detour.** Armed: the connector visibly leaves the flow and returns through the person-point, with NO straight line past it. Unarmed: faint dashed ghost with the line through. | GOVERN-03 | Armed and unarmed are indistinguishable at a glance, or the arc collides with the ✕ or ＋ | **PASS — measured** |
 
@@ -268,7 +268,39 @@ one-tab-stop-per-node contract holds. Armed label reads **"you say yes"**, chara
 exported const. Unarmed-**absent** renders as the ordinary connector (0 circles, 0 dashed), which is
 the three-state model `185-10` established (absent / `false` / `true`).
 
-> **Clearance — measured, and 1 px tighter than the sketch.** Sampling the rendered cubic at 4000
+**G-4 #2 — NOT OBSERVABLE IN PHASE 185. Deferred to Phase 188 with a concrete trigger, not skipped.**
+
+Attempting to drive this row surfaced the reason it cannot be driven: **the canvas has no run states
+to show yet.** Verified in source, not inferred —
+
+- `PhaseNodeCard.tsx:204` declares `status?: NodeRunStatus`, but it is an **extensibility seam**, and
+  the card's own docblock (`:18`) names its consumers as "185 / 188 / 189 ADD DATA, NOT LAYOUT".
+- `PhaseNode.tsx:183` states it outright: *"`status`, `technicalLine` and `stepNumber` are still
+  deliberately NOT passed"*.
+- `grep -n status canvasModel.ts` returns **nothing** — the projection does not carry run status at all.
+
+So there is no idle → running → needs-you → failed transition to watch on a card in this phase. Live
+run state on the canvas is **RUNVIZ-01, Phase 188's** deliverable. Scoring this row PASS today would
+be scoring a surface that does not exist; scoring it FAIL would blame 185 for not shipping 188.
+
+**What holds the invariant in the meantime is stronger than a screenshot would have been.** The
+guarantee is *structural*: the seal's markup cannot express a dependency on run state, so it cannot
+regress into one. `PhaseNodeCard.test.tsx:987-1007` extracts the seal's own JSX block — asserting the
+extractor really carved a slice (`< source.length / 4`, contains the testid, `aria-hidden`, `sr-only`)
+rather than matching nothing — then asserts that block never names the run-state prop, with the prop
+name **assembled from fragments** so the guard cannot be satisfied by editing the docblock that
+explains it (the D-ITEM-183-02 trap). Critically it carries a **POSITIVE CONTROL**: a planted seal
+that *does* read run state turns the fence red. Paired with the four-value render asserting identical
+class list and text, and the `outerHTML` comparison `185-09` strengthened it to after finding the
+original assertion passed under a planted `data-run={props.status}`.
+
+> **Re-open trigger (carry into Phase 188):** the first commit that passes `status` into
+> `PhaseNodeCard` — i.e. when `canvasModel` or `PhaseNode` starts carrying run state — MUST drive this
+> row: launch a run and confirm the corner seal is byte-identical in position, size and brightness at
+> idle, running, needs-you and failed. That is the moment the visual claim becomes checkable, and the
+> moment the status colour first overwrites the border the seal is designed to outlive.
+
+**G-4 #4 clearance — measured, and 1 px tighter than the sketch.** Sampling the rendered cubic at 4000
 > points and mapping through the screen CTM, the arc's minimum clearance below the ＋ box is
 > **7.17 px** (＋ box measured at exactly 26 px). `entersBox: false` — the curve never enters the
 > button, so the scenario's failure condition does not fire and the row is a genuine PASS. But sketch
@@ -390,9 +422,12 @@ fact anywhere until reproduced.
 - [x] Wave 0 covers all MISSING references (incl. the vitest count-gate baseline) — see the ticked list above
 - [x] No watch-mode flags — every command in the map is `vitest run` or `pytest`, none is `--watch`
 - [x] Feedback latency < 30 s — quick runs measured at ~3–6 s (the new sweep: 5.27 s cold)
-- [ ] **All 4 G-4 scenarios executed via Chrome MCP** — **2 of 4 recorded 2026-07-31** (#1 PASS with a
-      wording deviation, #4 PASS with measured geometry). **#2 and #3 still owed.** #3 is
-      operator-only: it requires a real absence long enough that the old timeout would have fired.
+- [ ] **All 4 G-4 scenarios executed via Chrome MCP** — **3 of 4 dispositioned 2026-07-31**: #1 PASS
+      (wording deviation recorded), #4 PASS (geometry measured), **#2 deferred to Phase 188 with a
+      re-open trigger** — the canvas carries no run status in this phase, so the row is not observable
+      here; the invariant is held structurally by the props fence + its positive control. **Only #3
+      remains owed, and it is operator-only** — it requires a real absence long enough that the
+      pre-185 timeout would have fired.
 - [ ] **SC#10 scoreboard complete — 4 providers + 3 axes + the negative row** — **1 of 8 recorded**
       (Google ✅ on `gemini-3.6-flash`, run `ced8005d`, judged 82 by `gpt-5.5`). OpenAI, Anthropic,
       OpenRouter, multi-tool, parallel-thread, long-message and the negative row still owed. **All
