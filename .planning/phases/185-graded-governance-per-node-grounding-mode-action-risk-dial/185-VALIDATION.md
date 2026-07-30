@@ -5,7 +5,7 @@ status: awaiting-operator-gate
 nyquist_compliant: false
 wave_0_complete: true
 created: 2026-07-29
-updated: 2026-07-30
+updated: 2026-07-31
 ---
 
 > **`nyquist_compliant: false` is a DELIBERATE reading, not an unfilled default.** Thirty of the
@@ -131,11 +131,20 @@ tests. **Re-open trigger:** the next phase that touches the frontend workflow su
 
 ## Per-Task Verification Map
 
-Thirty-one tasks across eleven plans. Filled by plan `185-11` Task 2 once every wave had landed —
+Thirty-four tasks across twelve plans. Filled by plan `185-11` Task 2 once every wave had landed —
 the criterion column is derived from the "Where" column of the criteria table above cross-read
 against each plan's task names and `must_haves`, not lifted from planner output. `G-4 #n` and
 `D-185-18` name the manual rows in §"Manual-Only Verifications"; those tasks are green on their
 automated half and their lived-experience half belongs to 11-3.
+
+> **Amended 2026-07-31 — Wave 7 (`185-12`) postdates this map's first filling.** The map was written
+> by `185-11` Task 2 on 2026-07-30, when the phase was eleven plans. `185-12` is a **gap-closure**
+> plan that exists because the operator gate itself found a blocker: **BUG-260730-01** — the
+> auto-attached `retrieved_and_cited` gate demanded inline `[1]` / `(doc-N)` markers that nothing in
+> the step prompt, the attachment seam, or the retry feedback ever instructed the model to write, so
+> a detected grounded step that retrieved *correctly* still burned all three attempts
+> (`workflow_runs.id = ded89703-44c4-4e40-b5fe-9af35a44a54d`). Its three tasks are appended below.
+> Leaving them out would make this file understate what shipped.
 
 | Task ID | Plan | Wave | Requirement | Criterion | Test Type | Automated Command | Status |
 |---------|------|------|-------------|-----------|-----------|-------------------|--------|
@@ -169,9 +178,16 @@ automated half and their lived-experience half belongs to 11-3.
 | 10-3 | 185-10 | 5 | GOVERN-02, GOVERN-03 | 24 · D-185-18 | vitest (ordinary-edge regression guard) | `cd frontend && npx vitest run src/components/workflows && cd .. && node scripts/vitest-count-gate.cjs` | ✅ |
 | 11-1 | 185-11 | 6 | GOVERN-01, GOVERN-02 | 14, 15 · D-185-02 | vitest (source sweep, parser-scoped) | `cd frontend && npx vitest run src/components/workflows/governanceVocabulary.test.ts && cd .. && node scripts/vitest-count-gate.cjs` | ✅ |
 | 11-2 | 185-11 | 6 | GOVERN-01, GOVERN-02, GOVERN-03 | 2, 11, 20, 21 | git-diff fences + grep | `git diff --stat 59c32a06..HEAD -- supabase/migrations backend/app/services/agent_loop.py backend/app/services/tool_dispatcher.py backend/app/services/openai_service.py backend/app/services/anthropic_service.py backend/app/services/harness/phase_types.py` | ✅ |
-| 11-3 | 185-11 | 6 | GOVERN-01, GOVERN-02, GOVERN-03 | 16 (visual), 17, 22 · D-185-18 · G-4 #1–#4 | **operator UAT — Chrome MCP** | *(none — `<human-check>`; this is the one task with no automated half, and the reason `nyquist_compliant` is still `false`)* | ⬜ |
+| 11-3 | 185-11 | 6 | GOVERN-01, GOVERN-02, GOVERN-03 | 16 (visual), 17, 22 · D-185-18 · G-4 #1–#4 | **operator UAT — Chrome MCP** | *(none — `<human-check>`; this is the one task with no automated half, and the reason `nyquist_compliant` is still `false`)* | 🟨 |
+| 12-1 | 185-12 | 7 | GOVERN-01 | BUG-260730-01 | pytest (validator remedy + one-home constant) | `cd backend && venv/Scripts/python -m pytest tests/unit/test_validator_kinds.py -q` | ✅ |
+| 12-2 | 185-12 | 7 | GOVERN-01 | BUG-260730-01 · D-14 | pytest (prompt suffix on BOTH agent executors; `''` when no gate) | `cd backend && venv/Scripts/python -m pytest tests/unit -q -k "phase_types or detection or harness"` | ✅ |
+| 12-3 | 185-12 | 7 | GOVERN-01 | BUG-260730-01 | pytest (drift pin: instructed example must match the compiled pattern) | `cd backend && venv/Scripts/python -m pytest tests/unit/test_185_detection.py tests/unit/test_validator_kinds.py -q` | ✅ |
 
-*Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
+*Status: ⬜ pending · 🟨 partly recorded · ✅ green · ❌ red · ⚠️ flaky*
+
+**11-3 is 🟨, not ✅.** Six of its fourteen rows are now recorded (G-4 #1, G-4 #4, criterion 17, the
+SC#10 Google row, and the end-to-end publish); G-4 #2, G-4 #3, D-185-18's screenshot diff and seven
+scoreboard rows remain. It flips to ✅ only when every row below carries a result.
 
 **Sampling continuity holds:** the longest run of consecutive tasks without an automated verify is
 **one** (11-3, the terminal checkpoint). Criteria with NO automated row anywhere — 17, 22, the visual
@@ -208,19 +224,81 @@ half of 16, and D-185-18 — are all owned by 11-3 by design, not by omission.
 Operator-defined at scope time; carried verbatim from `185-CONTEXT.md` §specifics. Chrome MCP drives all
 four at phase verification. **Wire format + screenshot are insufficient.**
 
-| # | Scenario | Requirement | Failure condition |
-|---|---|---|---|
-| 1 | **Watch a step lock in front of you.** Switch on *Search your documents*; three things move at once with no reload — the loose side strikes through, pressing it prints the refusal reason as readable text, the canvas card grows its corner seal. | GOVERN-01, GOVERN-02 | Any of the three lags behind the chip, flickers, or only appears after a refresh |
-| 2 | **The seal survives a live run.** Launch a run; watch a grounded card go idle → running → needs-you → failed. | GOVERN-02 | The seal dims, hides, shifts, or is swallowed by the status colour — at exactly the moment it matters most |
-| 3 | **Arm it and walk away.** Arm an outbound step, launch, close the tab, come back much later. | GOVERN-03 | The run advanced on its own (today's behaviour), or the prompt survived but is unreachable |
-| 4 | **The detour reads as a detour.** Armed: the connector visibly leaves the flow and returns through the person-point, with NO straight line past it. Unarmed: faint dashed ghost with the line through. | GOVERN-03 | Armed and unarmed are indistinguishable at a glance, or the arc collides with the ✕ or ＋ |
+| # | Scenario | Requirement | Failure condition | Result (2026-07-31) |
+|---|---|---|---|---|
+| 1 | **Watch a step lock in front of you.** Switch on *Search your documents*; three things move at once with no reload — the loose side strikes through, pressing it prints the refusal reason as readable text, the canvas card grows its corner seal. | GOVERN-01, GOVERN-02 | Any of the three lags behind the chip, flickers, or only appears after a refresh | **PASS — with one wording deviation, see below** |
+| 2 | **The seal survives a live run.** Launch a run; watch a grounded card go idle → running → needs-you → failed. | GOVERN-02 | The seal dims, hides, shifts, or is swallowed by the status colour — at exactly the moment it matters most | ⬜ not run |
+| 3 | **Arm it and walk away.** Arm an outbound step, launch, close the tab, come back much later. | GOVERN-03 | The run advanced on its own (today's behaviour), or the prompt survived but is unreachable | ⬜ not run — **operator-only** (needs a real absence) |
+| 4 | **The detour reads as a detour.** Armed: the connector visibly leaves the flow and returns through the person-point, with NO straight line past it. Unarmed: faint dashed ghost with the line through. | GOVERN-03 | Armed and unarmed are indistinguishable at a glance, or the arc collides with the ✕ or ＋ | **PASS — measured** |
+
+**Recorded 2026-07-31**, driven in Chrome against `http://localhost:5173/` on the
+`compliance-gap-report-3qh9oe` draft. Measurements are DOM/geometry reads in a real browser (which,
+unlike jsdom, computes paint), not wire format and not screenshots alone.
+
+**G-4 #1 — PASS, exercised in BOTH directions.** One click on *Search documents*, three marks moved
+together with no reload:
+
+| | tool ON | tool OFF |
+|---|---|---|
+| canvas seals rendered | 2 | **1** |
+| `○ Free to think` text-decoration | `line-through` | **`none`** |
+| `○ Free to think` opacity | `0.42` | **`1`** |
+| `○ Free to think` selectable | `disabled` / `aria-disabled=true` / `cursor: not-allowed` | **enabled** |
+
+Toggling back restored all three, so the transition is symmetric, not one-way. The seal itself
+measures 21 px with its OWN background `rgba(255,255,255,.1)` and OWN border `1px
+rgba(255,255,255,.34)`, `pointer-events: none`, **no `role`, no `tabIndex`, no handler**, screen-reader
+text **"Must prove it"** — and white-alpha only, so governance spends no colour (SPEC Req 6).
+
+> **DEVIATION, recorded rather than smoothed over.** The scenario as authored says *"pressing it
+> prints the refusal reason"*. It does not work that way: the loose side is a genuinely `disabled`
+> button, so pressing it fires nothing. The refusal reason is instead **always rendered** beneath the
+> dial — *"Because this step reads your documents. Reading your files is what this step is for, so it
+> has to show where its answers came from. You can switch off the document tools below — but that
+> does not loosen the step, it stops it opening your files at all."* The scenario's INTENT (a
+> readable refusal, not a dead greyed-out button) is satisfied, arguably better than press-to-reveal.
+> The literal wording is not what shipped. Scored PASS on intent, with the discrepancy stated so the
+> next reader is not misled.
+
+**G-4 #4 — PASS, geometry measured rather than eyeballed.** Arming the target step moved its incoming
+edge from **2 paths / 0 circles** to **3 paths / 1 circle**, with **0 straight-line paths** through
+the gap — i.e. the arc IS the path and nothing runs past it. Arrowhead preserved; **0 focusables** on
+the edge subtree (`role`, `tabIndex`, click handler all absent), so the mark is a signal and the
+one-tab-stop-per-node contract holds. Armed label reads **"you say yes"**, character-identical to the
+exported const. Unarmed-**absent** renders as the ordinary connector (0 circles, 0 dashed), which is
+the three-state model `185-10` established (absent / `false` / `true`).
+
+> **Clearance — measured, and 1 px tighter than the sketch.** Sampling the rendered cubic at 4000
+> points and mapping through the screen CTM, the arc's minimum clearance below the ＋ box is
+> **7.17 px** (＋ box measured at exactly 26 px). `entersBox: false` — the curve never enters the
+> button, so the scenario's failure condition does not fire and the row is a genuine PASS. But sketch
+> 147 computed **8.2 px** and `FlowEdge.test.tsx` asserts **≥ 8 px**. The unit test passes because it
+> measures against the nominal box in its own frame; the *rendered* margin is tighter. **The test is
+> not measuring what ships.** Not a defect — no collision — but it is a soft spot worth a follow-up,
+> and it is recorded here rather than in a SUMMARY so it does not rot.
 
 ### Other manual-only
 
-| Behavior | Criterion | Why manual | Instructions |
-|---|---|---|---|
-| Colour-stripped render still distinguishes grounded from open | 17 | jsdom computes no paint | Screenshot the canvas with `filter: grayscale(1)` applied; a grounded and an open card must remain tellable apart |
-| Ordinary (unarmed, non-risky) flow edges render identically after the `edgeTypes` switch | D-185-18 | Every edge changes renderer; only a visual diff catches regression | Screenshot a 5-step unarmed workflow before and after the `FlowEdge` landing; edges must be indistinguishable |
+| Behavior | Criterion | Why manual | Instructions | Result (2026-07-31) |
+|---|---|---|---|---|
+| Colour-stripped render still distinguishes grounded from open | 17 | jsdom computes no paint | Screenshot the canvas with `filter: grayscale(1)` applied; a grounded and an open card must remain tellable apart | **PASS — and structurally, not just visually** |
+| Ordinary (unarmed, non-risky) flow edges render identically after the `edgeTypes` switch | D-185-18 | Every edge changes renderer; only a visual diff catches regression | Screenshot a 5-step unarmed workflow before and after the `FlowEdge` landing; edges must be indistinguishable | ⬜ not run — needs a pre-`FlowEdge` reference capture |
+
+**Criterion 17 — PASS.** Captured with `filter: grayscale(1)` applied to the document root, one step
+open and one grounded. The two cards remain plainly tellable apart. The stronger reading is that this
+holds **by construction, not by luck**: the seal's two load-bearing carriers are its own background
+`rgb(255,255,255)` @ .1 and its own border `rgb(255,255,255)` @ .34 — both perfectly achromatic, so
+greyscale is a mathematical **no-op** on them. And the grounded/open distinction is
+*presence-vs-absence of a shape*, which cannot depend on hue at all. The glyph fill is
+`rgb(243,245,252)`, very slightly cool but within ~3.5% of neutral — it greyscales to a near-identical
+value and stays legible. Screenshot retained at
+`claude-chrome-screenshots-XG0OW4/screenshot-1785419139087-0.jpg`.
+
+**D-185-18 — deliberately NOT scored.** It requires a *before* capture from a tree that predates
+`FlowEdge`, which no longer exists in the working tree. Honest options: capture it from a checkout of
+`53e6e683` (the Wave-4 tip), or accept `FlowEdge.test.tsx`'s mechanical baseline as the proof and
+downgrade this row from "visual diff" to "recorded as covered by test". Left open rather than
+silently marked done.
 
 ---
 
@@ -248,7 +326,7 @@ node's citation enforcement rides the provider-sensitive retrieval/agent path, s
 |---|---|---|---|---|
 | **Cross-provider** | OpenAI | *(representative)* | grounded `llm_agent` w/ `search_documents`, no declared validator ⇒ `citations` non-empty ⇒ gate passes | ⬜ |
 | **Cross-provider** | Anthropic (native) | *(representative)* | same definition — the native tool-use path populates citations identically | ⬜ |
-| **Cross-provider** | Google | *(representative)* | **highest-risk row** — the model may answer without calling the KB tool (RESEARCH L-3) | ⬜ |
+| **Cross-provider** | Google | `gemini-3.6-flash` | **highest-risk row** — the model may answer without calling the KB tool (RESEARCH L-3) | **✅ PASS** — see below |
 | **Cross-provider** | OpenRouter | *(representative)* | experimental path; fix only if native-safe and low-complexity | ⬜ |
 | **Multi-tool** | one prompt exercising `search_documents` **+** `execute_code` on a detected step | — | the KB tool is still called when it competes with another | ⬜ |
 | **Parallel-thread** | Thread A mid-armed-wait while Thread B launches a second run | — | one indefinite pub/sub subscriber does not starve the other; verify with `WORKER_COUNT=2` | ⬜ |
@@ -259,18 +337,69 @@ node's citation enforcement rides the provider-sensitive retrieval/agent path, s
 documentation before being attributed to our code, and any fix stays at the service boundary — never on the
 shared path.
 
+### Google row — recorded 2026-07-31
+
+**PASS, and it is the strongest single piece of GOVERN-01 evidence the phase has.** Golden run
+`ced8005d-24b9-413b-8edc-56beb8743298`, `llm_model = gemini-3.6-flash`, on the published
+`compliance-gap-report` definition. The `retrieve` phase is a detected grounded `llm_agent` with
+`search_documents` and no author-declared validator — exactly the row's definition. It **completed**:
+the model called the KB tool, `citations` came back non-empty, and the engine-synthesized
+`retrieved_and_cited` gate passed. The highest-risk row did not fire its risk.
+
+The independent publish judge (`gpt-5.5`, OpenAI — a *different provider from the run*, so this row
+doubles as genuine cross-provider evidence) scored it **82 / passed**:
+
+> "…six obligation rows, each with source_clause, current_state, gap, severity, and owner, **every
+> populated cell carrying a citation to a named knowledge-base document**, and the one unsupported
+> field (`report_title`) **correctly nulled rather than invented** … it is legitimately cited, so
+> **grounding holds**."
+
+That sentence is GOVERN-01's whole contract — retrieved, pointed-at, and refusing to invent —
+confirmed by a model that did not run the workflow. `publish_succeeded`, version 1.
+
+**Two caveats kept attached to this row, so it is not over-read:**
+
+1. **It only passed after BUG-260730-01 was fixed.** The same definition on the same path failed three
+   consecutive golden runs before `185-12` landed. A green Google row here is evidence about the
+   *fixed* engine, not about the engine as `185-11` Task 2 found it.
+2. **`gemini-3.6-flash` is NOT in `MODEL_CAPABILITIES`**, so it resolved `capability_source=inferred`
+   with `emit_tier=None` and the `emit` phase silently ran at tier **`coerce`** instead of `force`
+   (`harness_audit.emit_rendered.tier` on run `da5541c0`). It succeeded anyway — but this row was
+   scored on a model running with *weaker* emission guarantees than the registry would have given it,
+   and nothing warned. Captured as [[SEED-040]] scope item (e) and [[SEED-135]].
+
+**Judge-on-Google is a separate, still-open finding.** With `harness_judge_model = gemini-3.5-flash`
+the publish judge returned `failure: "provider_error"`, `overall_score: null`, no verdict at all
+(run `da5541c0`) — while the *same Google model ran the workflow itself fine*. Switching the judge to
+`gpt-5.5` cleared it immediately. So a tenant standardised on Google can execute workflows but
+**cannot publish one**, and the only way to discover that today is a burned golden run. Suspected
+cause: `JudgeVerdict.model_json_schema()` carries `$defs` + a `$ref` for its nested `criteria` array,
+and `google_service.py`'s `_GOOGLE_UNSUPPORTED_SCHEMA_KEYS` strips both — leaving `criteria.items` as
+a content-free `{}`. **HIGH confidence the wire schema loses `criteria`'s shape; MEDIUM that this is
+what surfaces as `provider_error`; never live-verified.** Tracked in [[SEED-135]]; do not state it as
+fact anywhere until reproduced.
+
 ---
 
 ## Validation Sign-Off
 
-- [x] All tasks have an `<automated>` verify or a Wave 0 dependency — **30 of 31**. The exception is
-      `11-3`, the blocking `checkpoint:human-verify`, which is manual by construction.
+- [x] All tasks have an `<automated>` verify or a Wave 0 dependency — **33 of 34** (Wave 7's `12-1`,
+      `12-2`, `12-3` each carry one). The exception is `11-3`, the blocking `checkpoint:human-verify`,
+      which is manual by construction.
 - [x] Sampling continuity: no 3 consecutive tasks without an automated verify — longest gap is **one**
 - [x] Wave 0 covers all MISSING references (incl. the vitest count-gate baseline) — see the ticked list above
 - [x] No watch-mode flags — every command in the map is `vitest run` or `pytest`, none is `--watch`
 - [x] Feedback latency < 30 s — quick runs measured at ~3–6 s (the new sweep: 5.27 s cold)
-- [ ] **All 4 G-4 scenarios executed via Chrome MCP** — **owed by task 11-3; the operator gate has not run**
-- [ ] **SC#10 scoreboard complete — 4 providers + 3 axes + the negative row** — **owed by task 11-3**
+- [ ] **All 4 G-4 scenarios executed via Chrome MCP** — **2 of 4 recorded 2026-07-31** (#1 PASS with a
+      wording deviation, #4 PASS with measured geometry). **#2 and #3 still owed.** #3 is
+      operator-only: it requires a real absence long enough that the old timeout would have fired.
+- [ ] **SC#10 scoreboard complete — 4 providers + 3 axes + the negative row** — **1 of 8 recorded**
+      (Google ✅ on `gemini-3.6-flash`, run `ced8005d`, judged 82 by `gpt-5.5`). OpenAI, Anthropic,
+      OpenRouter, multi-tool, parallel-thread, long-message and the negative row still owed. **All
+      provider keys are present in the env-backed settings** (openai · anthropic · google · openrouter
+      · deepseek · moonshot · zhipu · minimax · tavily all resolve non-empty), so no row is blocked on
+      credentials — the empty `app_settings.*_api_key` columns are an unused DB overlay, not the
+      source of truth (`user_settings.llm_api_key or settings.llm_api_key`).
 - [ ] `nyquist_compliant: true` set in frontmatter — deliberately still `false`; see the note under the
       frontmatter for exactly what must land first
 
