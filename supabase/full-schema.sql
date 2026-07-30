@@ -1121,7 +1121,7 @@ CREATE TABLE public.harness_audit (
     metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
     org_id uuid NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT harness_audit_event_type_check CHECK ((event_type = ANY (ARRAY['phase_started'::text, 'phase_completed'::text, 'phase_transition'::text, 'gate_passed'::text, 'gate_failed'::text, 'tool_refused'::text, 'run_started'::text, 'run_completed'::text, 'run_failed'::text, 'emit_forced'::text, 'emit_recovered'::text, 'emit_validated'::text, 'emit_rejected'::text, 'emit_rendered'::text, 'emit_integrity_failed'::text, 'emit_failed'::text, 'judge_verdict'::text, 'publish_attempted'::text, 'publish_blocked'::text, 'publish_succeeded'::text, 'policy_applied'::text, 'validator_ask_user_approved'::text])))
+    CONSTRAINT harness_audit_event_type_check CHECK ((event_type = ANY (ARRAY['phase_started'::text, 'phase_completed'::text, 'phase_transition'::text, 'gate_passed'::text, 'gate_failed'::text, 'tool_refused'::text, 'run_started'::text, 'run_completed'::text, 'run_failed'::text, 'emit_forced'::text, 'emit_recovered'::text, 'emit_validated'::text, 'emit_rejected'::text, 'emit_rendered'::text, 'emit_integrity_failed'::text, 'emit_failed'::text, 'judge_verdict'::text, 'publish_attempted'::text, 'publish_blocked'::text, 'publish_succeeded'::text, 'policy_applied'::text, 'validator_ask_user_approved'::text, 'action_risk_pending'::text])))
 );
 
 
