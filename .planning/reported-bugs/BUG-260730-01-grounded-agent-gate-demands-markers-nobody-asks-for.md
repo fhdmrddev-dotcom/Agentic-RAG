@@ -4,9 +4,9 @@ title: The auto-attached grounded-agent citation gate demands inline markers not
 reported: 2026-07-30
 surface: Agentic-RAG
 severity: blocking
-status: open
+status: folded
 affected_areas: [backend/harness, governance/GOVERN-01, workflows/publish-gauntlet]
-folded_into: null
+folded_into: "185"
 verified_closed_by: null
 related_seeds: []
 re_open_trigger: null
