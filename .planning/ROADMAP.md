@@ -271,7 +271,7 @@ Plans:
 **Wave 5** *(blocked on Wave 4 completion)*
 
 - [x] 185-09-PLAN.md — the corner seal at the CLAIMED top-right, never conditional on run state, with a props fence and a four-mark zone check
-- [ ] 185-10-PLAN.md — the detour edge: FlowEdge, the net-new edgeTypes map, edge.type on flow edges, and a no-visible-change guard on ordinary edges (D-185-18)
+- [x] 185-10-PLAN.md — the detour edge: FlowEdge, the net-new edgeTypes map, edge.type on flow edges, and a no-visible-change guard on ordinary edges (D-185-18)
 
 **Wave 6** *(blocked on Wave 5 completion)*
 

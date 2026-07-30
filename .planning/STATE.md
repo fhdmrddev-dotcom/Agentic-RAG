@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
 status: executing
-last_updated: "2026-07-30T03:20:00.000Z"
-last_activity: 2026-07-30 -- Phase 185 plan 09 complete (the governance seal on the canvas card)
+last_updated: "2026-07-30T07:35:00.000Z"
+last_activity: 2026-07-30 -- Phase 185 plan 10 complete (the armed action-risk checkpoint drawn as a detour edge)
 progress:
   total_phases: 19
   completed_phases: 4
   total_plans: 50
-  completed_plans: 48
-  percent: 21
+  completed_plans: 49
+  percent: 22
 ---
 
 # Project State
@@ -45,11 +45,50 @@ Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 op
 ## Current Position
 
 Phase: 185 (graded-governance-per-node-grounding-mode-action-risk-dial) — EXECUTING
-Plan: 9 of 11 complete
-(Summaries on disk: 01, 02, 03, 04, 05, 06, 07, 08, 09. Next sequential work is **185-10** — the
-armed detour EDGE, which is net-new canvas infrastructure: `edgeTypes` does not exist in this tree,
-and `CanvasEdgeData` still carries only `{kind}`, so 185-10 must read `armed` off the TARGET node or
-add the field.)
+Plan: 10 of 11 complete
+(Summaries on disk: 01, 02, 03, 04, 05, 06, 07, 08, 09, 10. Next sequential work is **185-11**.)
+
+**Plan 185-10 COMPLETE (`94a89425` the projection → `6badaa6e` FlowEdge + the edgeTypes map →
+`7c3f8b7c` the suite → `79354c6e` SUMMARY). THE ARMED CHECKPOINT IS A DETOUR: THE CONNECTOR
+INTO THE RISKY STEP LEAVES THE FLOW AND COMES BACK THROUGH A POINT THAT REPRESENTS THE PERSON.**
+`FlowEdge.tsx` is the **first custom `@xyflow/react` edge in this tree** — D-185-18 held exactly
+as written: `grep -rn edgeTypes frontend/src` returned ONE hit at execution start and it was the
+comment asserting none is registered. Four net-new pieces shipped (the component, the module-scope
+`edgeTypes` map, `edge.type` in `toCanvas`, `markerEnd` re-rendered inside the edge), and only
+`flow` is registered — `skip`, the unresolvable-skip stub and the `end` cap set no `type` and keep
+the built-in renderer, which is what holds the blast radius. **D-185-10-A — `CanvasEdgeData.armed`
+is THREE states, not two**, and that is the plan's one structural correction: ABSENT (no checkpoint
+⇒ the ordinary connector, byte-identical to today), `false` (declared and OPEN ⇒ ghost arc + line
+through), `true` (armed ⇒ the arc IS the path, no straight line past it). A plain boolean cannot
+satisfy the plan's own two truths at once — "an ordinary unarmed flow edge renders identically to
+today" AND "unarmed shows a ghost, present and open, never absent" — and sketch 147
+(`index.html:459`) already models it this way, gating the whole mark on `step.risky`. **`armed:
+false` is rendered and tested but NOT PRODUCIBLE today; Phase 189's external-action node is the
+named producer** (`checkpointOnTarget` returns only `true | undefined` because Req 8 arms nothing
+by default). **D-185-10-B — `FlowEdge` derives `GAP`/`INSERT_Y` from `CANVAS_LAYOUT` in its own
+`DETOUR` table rather than importing `EDIT_AFFORDANCE`**, because `WorkflowCanvas` imports
+`FlowEdge`'s VALUE at module scope for `edgeTypes` and importing back would close a live ESM cycle
+(`FlowEdge.test.tsx` reaches it first ⇒ TDZ). `EDIT_AFFORDANCE` is now **exported** and the two
+tables are pinned equal by a test — that pin is load-bearing, and it was falsified RED. **The "no
+visible change" guard captures the BEFORE from the shipped default rendering in the same run** (one
+probe harness rendered twice: no `type` ⇒ `builtinEdgeTypes.default`, then `type:"flow"`), never
+from a hand-typed `d`. **A plan claim was corrected in our favour:** `defaultEdgeOptions` STILL
+merges once `type` is set — the library just hands the resolved `url('#…')` to the component and
+draws nothing itself, so the conclusion (re-render `markerEnd`) stands on a different mechanism.
+**Both falsifications observed RED and reverted** (a planted `LINE` in the armed branch; `DETOUR.GAP
++ 4`, which reds the pin AND collapses clearance 8.19 → 4.97px). Clearance is COMPUTED by parsing
+the exported `ARC`: **8.1941px** vs the sketch's 8.2. Three acceptance greps were comment-only false
+positives (docblocks spelling the very tokens they forbade — the D-ITEM-183-02 trap); reworded, guard
+not weakened, all three now **0**. Gates: snapshot **21 insertions / 0 deletions** with one unique
+added line (`"type": "flow"`), `src/components/workflows` **27 files / 1514 passed**, `FlowEdge.test.tsx`
+**22 passed**, tsc **33** (= baseline, 0 naming a touched file), `vite build` exit 0 with the canvas
+still its own lazy chunk, **count gate OK** (0 failing this run — the `PublishGauntlet` flake did not
+fire — no `[count-decrease]`, total 1628; `FlowEdge.test.tsx` reports `new` and was correctly NOT
+added to `BASELINE`), **0** react-flow "new edgeTypes object" warnings, `backend/` **0 files**,
+migrations **0 files** (head stays 113). **G-5 flagged on `WorkflowCanvas.tsx`** — `PlaneEditingLayer`
++ `EDIT_AFFORDANCE` named as the extraction for Phase 188. **GOVERN-02 / GOVERN-03 stay `Pending`**
+(the 185-02/03/05/06/08/09 precedent): the canvas half is real and pinned, but VALIDATION criterion 4
+and the D-185-18 manual before/after screenshot row are operator UAT that has not run.
 
 **Plan 185-09 COMPLETE (`6bdc658a` the seal + the sealed edge → `59c54ba0` the props fence, the
 four-mark zone check and the tab-stop walk → `6713a0fc` SUMMARY). THE CANVAS NOW SHOWS WHICH STEPS
