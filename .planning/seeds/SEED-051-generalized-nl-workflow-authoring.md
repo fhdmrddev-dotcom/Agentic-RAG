@@ -102,6 +102,8 @@ right place) — the reliability-from-grounding lever; search is whole-KB today.
   - **Execution = in a thread** (Run → opens/redirects to a normal chat-style thread, streams
     there; shares run SSE/lock/anchor). NO separate execution route. Operator is explicitly fine
     running in the existing thread UI "without any risk or architectural changes."
+    **⚠ SUPERSEDED 2026-07-31 by RUNVIZ-03 — see the dated note at the end of this seed before
+    treating this bullet as governing.**
   - Reconciliation with D-092-UX: that decision rejected a separate route for where a workflow
     *runs/lives* (must stay thread-bound) — it never rejected a library/builder PAGE. So this is
     the missing piece, NOT a conflict (D-092-AUTHOR Phase A/B/C authoring always implied a
@@ -171,3 +173,42 @@ Promote at **/gsd:new-milestone v2.9** (sweep open seeds), OR when **D-092-AUTHO
 enters scope, OR whenever a phase proposes changing `WorkflowDefinition`'s input/asset shape.
 First action when promoted: run the spike (companion todo), then design the `inputs` + `assets`
 schema from what it teaches.
+
+## SUPERSEDED IN PART (2026-07-31) — "Execution = in a thread … NO separate execution route"
+
+**What is superseded:** the "Two surfaces, cleanly split" bullet above that reads *"Execution = in a
+thread (Run → opens/redirects to a normal chat-style thread…). NO separate execution route."* That
+position no longer governs. **Everything else in this seed stands** — the NL→workflow generation
+vision, the three sharpenings, the skill-vs-workflow distinction, and "Library + builder = the page"
+are all unchanged.
+
+**What replaces it:** **RUNVIZ-03** (`.planning/REQUIREMENTS.md`, mapped to **Phase 188** in
+`.planning/ROADMAP.md`, status **Pending** — nothing is built yet) — *a workflow run and its finished
+deliverable have their own home: launching stops redirecting into Chat, a run is retrievable after the
+fact, and the artefact is reachable from the run rather than only from a live panel.*
+
+**Why (operator call, 2026-07-31, after Phase 185 UAT):** *"a workflow that is RUNNING, and its
+output, should have their own place — not be dumped into chat."* The seed's original reasoning was
+that thread-bound execution costs nothing architecturally; the operator now rejects the **product**
+outcome, not the architecture.
+
+**Verified in code today, not assumed:** `frontend/src/pages/WorkflowsPage.tsx` owns no run route — it
+calls `onLaunch` = `ChatLayout.doRun` (`ChatLayout.tsx:233`, wired at `:596`), which creates a thread,
+kicks off the server-side run, and redirects into Chat. The page docblock says so verbatim
+(`WorkflowsPage.tsx:9-13`). So the shipped behaviour matches this seed exactly — which is the point:
+it is what the operator asked to change.
+
+**The distinction a future planner MUST keep:** the D-14 red line forbids a second **runtime**, not a
+second **view**. The harness engine stays the ONLY executor and a run stays thread-backed
+(`active_workflow_run_id`). RUNVIZ-03 changes *where the user stands* and *how a finished run and its
+artefact are reached* — it does not fork execution. Reading this bullet as "execution belongs in chat"
+would rebuild the thing the operator just rejected.
+
+**Design evidence (NOT a commitment — its author says so explicitly):**
+`.planning/sketches/145-the-review-moment/README.md` — a dedicated run surface with its own header and
+its own spine, **no message list and no composer**; the sketch frames itself as *"evidence for Phase
+188 … not a commitment inside Phase 185."*
+
+**Sibling note:** SEED-038's D-094-UNIFY ("workflow artefacts live in the chat-thread panel FILES
+section, NOT a separate place") is re-opened for the workflow-run case by the same call — see the
+dated note at the end of that seed.

@@ -47,6 +47,7 @@
 
 - [ ] **RUNVIZ-01**: A non-technical user can watch a workflow run on the canvas — each node shows live state (pending / active / passed / failed / skipped / waiting-for-you) painted from the same `usePhases(threadId)` run stream the developer `PhaseTimeline` uses (one run stream, two views; no new Redis events, no new demux).
 - [ ] **RUNVIZ-02**: The canvas run view is honest — node state is a total function over the FULL event set (never shows "done" on a `gate_failed` / `run_failed`) and reconciles-on-fetch at every reconnect (Realtime is a hint, not truth — D-v2.5-03).
+- [ ] **RUNVIZ-03**: A workflow run and its finished deliverable have **their own home** — launching a workflow stops redirecting into Chat, a run stays retrievable *after the fact* (not only while it streams), and the produced artefact is reachable **from the run** rather than only from a live panel. *(Added 2026-07-31 from the operator call after Phase 185 UAT: "a workflow that is RUNNING, and its output, should have their own place — not be dumped into chat." Verified 2026-07-31 in code, not assumed: `frontend/src/pages/WorkflowsPage.tsx` never owns a run route — it calls `onLaunch` = `ChatLayout.doRun` (`ChatLayout.tsx:233`, wired at `:596`), which creates a thread, kicks the run, and redirects into Chat; the page's own docblock states it verbatim — "Run creates a NEW chat thread + kicks off a REAL server-side run … + redirects into Chat" (`WorkflowsPage.tsx:9-13`). This is NOT already covered by RUNVIZ-01/02: those govern the run VIEW's live per-node state (`usePhases(threadId)`, total-function state, reconcile-on-fetch, cross-provider parity) and none of their success criteria mentions the launch redirect, the message list, the composer, or where the finished deliverable lands. Design evidence — explicitly disclaimed as a commitment by its author: `.planning/sketches/145-the-review-moment/README.md` proposes a dedicated run surface with its own header and spine, **no message list and no composer**. Supersedes SEED-051's "Execution = in a thread … NO separate execution route" and re-opens D-094-UNIFY for workflow-run artefacts — see the dated notes appended to both seeds.)*
 
 ### CONCUR — safe co-edit (v3.4 made workflows org-shareable)
 
@@ -116,17 +117,19 @@ Which phases cover which requirements. Filled at roadmap creation 2026-07-24, re
 | VOCAB-03 | Phase 187 | Pending |
 | RUNVIZ-01 | Phase 188 | Pending |
 | RUNVIZ-02 | Phase 188 | Pending |
+| RUNVIZ-03 | Phase 188 | Pending |
 | CONN-01 | Phase 189 | Pending |
 | CONN-02 (STRETCH) | Phase 190 | Pending |
 | CONN-03 (STRETCH) | Phase 190 | Pending |
 | SCALE-01 (STRETCH) | Phase 191 | Pending |
 
 **Coverage:**
-- CORE requirements: 20 total (REVERT ×2, VALID ×3, CANVAS ×4, GOVERN ×3, CONCUR ×2, VOCAB ×3, RUNVIZ ×2, CONN-01 ×1) → Phases 181-189
+- CORE requirements: 21 total (REVERT ×2, VALID ×3, CANVAS ×4, GOVERN ×3, CONCUR ×2, VOCAB ×3, RUNVIZ ×3, CONN-01 ×1) → Phases 181-189
 - STRETCH requirements: 3 total (CONN-02, CONN-03, SCALE-01) → Phases 190-191
-- Mapped to phases: 23 ✓
+- Mapped to phases: 24 ✓
 - Unmapped: 0 — every requirement maps to exactly one phase; no duplicates.
 
 ---
 *Requirements defined: 2026-07-24 (after research-first domain study — 4 dimensions + synthesis)*
 *Last updated: 2026-07-24 — GOVERN category added after the deep competitor crawl (Beam/Glean/n8n); traceability re-mapped to Phases 181-191 (11 phases, 23 reqs)*
+*Amended 2026-07-31 — RUNVIZ-03 added to Phase 188 (operator call after Phase 185 UAT: a running workflow and its output need their own place, not chat). CORE 20 → 21 reqs, 23 → 24 mapped. No phase renumbered; no other requirement changed.*

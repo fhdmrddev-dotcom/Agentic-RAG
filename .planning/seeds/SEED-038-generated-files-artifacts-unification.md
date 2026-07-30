@@ -66,10 +66,51 @@ v2.9 builder add **two more file moments** the unified model must cover:
 **Locked design answer for where files live (sketch 094 direction):** ONE FILES home = the workspace
 panel FILES section (sketch 004/005) for **all** produced files — Deep `execute_code` outputs +
 workflow artifacts + `workspace_write` files — each with **download + preview**; chat keeps a quiet
-pointer; the harness answer card links its deliverables. KB `documents` stay their own store (read by
+pointer; the harness answer card links its deliverables. **⚠ RE-OPENED 2026-07-31 for the
+workflow-run case (row 5) — "locked" no longer holds there; see the dated note at the end of this
+seed.** KB `documents` stay their own store (read by
 `search_documents`), surfaced read-only. This makes SEED-037's download wire-up + this seed's
 unification a **094/095 confirm-at-planning item**, with the sub-agent-file-threading gap as the
 backend prerequisite.
+
+## D-094-UNIFY RE-OPENED for workflow runs (2026-07-31) — settled → workflow-run-scoped-OPEN
+
+**What changed status:** D-094-UNIFY's answer for **row 5, workflow FINAL artifacts** — *"the panel
+FILES section (the single execution+artifact home) … NOT a separate place"*, and the "Locked design
+answer" paragraph that generalises it — is **no longer settled for a workflow run**. It is now an
+**OPEN design question owned by Phase 188**, to be decided there.
+
+**Still settled, unchanged:** D-094-UNIFY continues to govern **Deep/chat** artefacts — rows 1-4 and
+row 6 (builder-owned assets). The three-surface problem this seed was planted for is untouched, and so
+is the backend BLOCKER below (sub-agent `execute_code` artefacts never threaded up to the harness
+producer stream) — that gap is a **prerequisite either way**, since an artefact that never reaches the
+producer stream has no home in *any* surface.
+
+**Why it re-opened (operator call, 2026-07-31, after Phase 185 UAT):** *"a workflow that is RUNNING,
+and its output, should have their own place — not be dumped into chat."* That was recorded as
+**RUNVIZ-03** (`.planning/REQUIREMENTS.md` → **Phase 188**, status **Pending** — nothing built yet):
+a run and its finished deliverable get their own home; the artefact must be reachable **from the run**
+rather than only from a live panel. "Only from a live panel" is precisely what D-094-UNIFY's locked
+answer prescribes, so the two now collide for workflow runs.
+
+**The sharp edge D-094-UNIFY did not consider:** its home is the **chat-thread workspace panel** —
+which only exists while you are standing in that thread, alongside a live run. It has no answer for
+*"the run finished last Tuesday; where is the report?"* RUNVIZ-03 makes after-the-fact retrievability
+a requirement, and that is the part D-094-UNIFY cannot satisfy as written.
+
+**What Phase 188 must decide (do NOT pre-empt it here):** whether the run surface *hosts* its own
+artefact home, or *reuses* the existing panel components (`FilePreview` / `CsvTablePreview` /
+`FilesSection`) mounted in the run surface — a re-parenting, not a second file store. The storage
+model is not in question; only where a finished workflow artefact is *reached from*.
+
+**Design evidence (explicitly NOT a commitment — the sketch says so itself):**
+`.planning/sketches/145-the-review-moment/README.md` draws both shapes for the review moment —
+variant A "the document is the surface" vs variant B "steps left, document right, reusing the shipped
+preview components" — on a dedicated run surface with no message list and no composer. Unpicked;
+input to Phase 188, not a decision.
+
+**Sibling note:** SEED-051's "Execution = in a thread … NO separate execution route" is **superseded**
+by the same call — see the dated note at the end of that seed.
 
 ## Related
 
