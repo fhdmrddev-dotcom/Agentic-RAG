@@ -347,7 +347,7 @@ original assertion passed under a planted `data-run={props.status}`.
 | Behavior | Criterion | Why manual | Instructions | Result (2026-07-31) |
 |---|---|---|---|---|
 | Colour-stripped render still distinguishes grounded from open | 17 | jsdom computes no paint | Screenshot the canvas with `filter: grayscale(1)` applied; a grounded and an open card must remain tellable apart | **PASS — and structurally, not just visually** |
-| Ordinary (unarmed, non-risky) flow edges render identically after the `edgeTypes` switch | D-185-18 | Every edge changes renderer; only a visual diff catches regression | Screenshot a 5-step unarmed workflow before and after the `FlowEdge` landing; edges must be indistinguishable | ⬜ not run — needs a pre-`FlowEdge` reference capture |
+| Ordinary (unarmed, non-risky) flow edges render identically after the `edgeTypes` switch | D-185-18 | ~~Every edge changes renderer; only a visual diff catches regression~~ **DOWNGRADED 2026-07-31** — the claim is provable by CONSTRUCTION, which is stronger than a screenshot pair | ~~Screenshot a 5-step unarmed workflow before and after~~ → the by-construction argument + the live A/B guard below | **✅ PASS — downgraded from "visual diff" to "proven by construction + live A/B", operator decision** |
 
 **Criterion 17 — PASS.** Captured with `filter: grayscale(1)` applied to the document root, one step
 open and one grounded. The two cards remain plainly tellable apart. The stronger reading is that this
@@ -359,11 +359,57 @@ greyscale is a mathematical **no-op** on them. And the grounded/open distinction
 value and stays legible. Screenshot retained at
 `claude-chrome-screenshots-XG0OW4/screenshot-1785419139087-0.jpg`.
 
-**D-185-18 — deliberately NOT scored.** It requires a *before* capture from a tree that predates
-`FlowEdge`, which no longer exists in the working tree. Honest options: capture it from a checkout of
-`53e6e683` (the Wave-4 tip), or accept `FlowEdge.test.tsx`'s mechanical baseline as the proof and
-downgrade this row from "visual diff" to "recorded as covered by test". Left open rather than
-silently marked done.
+**D-185-18 — PASS, by construction. Row downgraded from "visual diff" (operator decision, 2026-07-31).**
+
+The row was written assuming only a pixel comparison could prove it. Reading the shipped code shows a
+stronger proof exists. For an **ordinary connector** — `armed === undefined`, the state every shipped
+canvas is in — `FlowEdge` does this (`FlowEdge.tsx:280-300`):
+
+```js
+const [path, labelX, labelY] = getBezierPath({ sourceX, sourceY, sourcePosition,
+                                               targetX, targetY, targetPosition,
+                                               curvature: pathOptions?.curvature })
+if (armed === undefined) {
+  return <BaseEdge path={path} labelX={labelX} labelY={labelY} label={label} … />
+}
+```
+
+`getBezierPath` is **the library's own path function** — the one `BezierEdgeInternal` (the default
+renderer) uses — and `BaseEdge` is **the library's own edge component**, carrying
+`react-flow__edge-path`, the invisible interaction path, and the marker. `style`, `markerEnd`,
+`markerStart` and `interactionWidth` are passed straight through from the props the library hands in.
+
+So an ordinary edge is not a reimplementation that happens to resemble the default: **it is the
+default rendering, reached one function call earlier.** A screenshot pair would have proven two images
+matched at one zoom, one theme, one workflow shape. This proves they cannot differ.
+
+**Corroborated by the live A/B already in the suite** (`FlowEdge.test.tsx:174-215`), which is itself
+better than the "hand-typed baseline" the row feared: it renders the same harness twice in one run —
+once with **no** `edge.type` (literally the pre-185-10 edge, routing through `builtinEdgeTypes.default`)
+and once through `FlowEdge` — and asserts `d`, inline `style` and `marker-end` are identical, with
+non-vacuity guards on `d` and `marker-end`. Two sibling cases pin that the interaction path count stays
+`1 → 1` (hit-testing unchanged) and that an ordinary connector draws **neither** `ARC` nor `LINE`.
+
+> **What is knowingly given up, recorded as the cost of the downgrade.** No check exercises real
+> computed paint, production-scale coordinates, or composition with real `PhaseNode` cards at five
+> steps. If a regression were ever CSS-stacking- or marker-definition-shaped, nothing here would catch
+> it. That residue is accepted because the ordinary path delegates wholesale to the library — there is
+> no bespoke drawing code for a stylesheet to diverge from. **Re-open trigger:** any change that makes
+> `FlowEdge` stop delegating to `BaseEdge`/`getBezierPath` for the `armed === undefined` branch — at
+> that moment the construction argument dies and the row reverts to needing a real visual diff.
+
+**Attempted first, and abandoned honestly:** a live production-scale parity read (comparing a `flow`
+edge against a `skip`/`end` edge, which still use the default renderer). It could not be taken — see
+the render anomaly noted below.
+
+> **Unexplained observation, logged not diagnosed.** Draft `compliance-gap-report-y2o5gu` rendered
+> **3 nodes and 0 edges** on the canvas across repeated settle waits and a fit-view nudge, while
+> `compliance-gap-report-3qh9oe` — verified structurally IDENTICAL in the DB (same two phases, same
+> `phase_index`, no explicit links on either) — rendered its `seq:retrieve->emit` edge earlier in the
+> same session. Not enough evidence to call it a defect (navigation timing and the known
+> `measured`-drop blink are both live hypotheses) and it did not block anything, so it is recorded
+> here rather than filed. **Worth a look in Phase 188**, which paints run state onto these same edges
+> and would inherit any edge-render fragility.
 
 ---
 
