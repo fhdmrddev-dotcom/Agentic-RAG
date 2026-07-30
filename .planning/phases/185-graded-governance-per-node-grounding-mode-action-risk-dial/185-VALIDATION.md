@@ -178,7 +178,7 @@ automated half and their lived-experience half belongs to 11-3.
 | 10-3 | 185-10 | 5 | GOVERN-02, GOVERN-03 | 24 · D-185-18 | vitest (ordinary-edge regression guard) | `cd frontend && npx vitest run src/components/workflows && cd .. && node scripts/vitest-count-gate.cjs` | ✅ |
 | 11-1 | 185-11 | 6 | GOVERN-01, GOVERN-02 | 14, 15 · D-185-02 | vitest (source sweep, parser-scoped) | `cd frontend && npx vitest run src/components/workflows/governanceVocabulary.test.ts && cd .. && node scripts/vitest-count-gate.cjs` | ✅ |
 | 11-2 | 185-11 | 6 | GOVERN-01, GOVERN-02, GOVERN-03 | 2, 11, 20, 21 | git-diff fences + grep | `git diff --stat 59c32a06..HEAD -- supabase/migrations backend/app/services/agent_loop.py backend/app/services/tool_dispatcher.py backend/app/services/openai_service.py backend/app/services/anthropic_service.py backend/app/services/harness/phase_types.py` | ✅ *(criterion-2 half SUPERSEDED 2026-07-31 — accurate when taken; migration 114 lands via plan `185-13`, see fence 1b)* |
-| 11-3 | 185-11 | 6 | GOVERN-01, GOVERN-02, GOVERN-03 | 16 (visual), 17, 22 · D-185-18 · G-4 #1–#4 | **operator UAT — Chrome MCP** | *(none — `<human-check>`; this is the one task with no automated half, and the reason `nyquist_compliant` is still `false`)* | 🟨 |
+| 11-3 | 185-11 | 6 | GOVERN-01, GOVERN-02, GOVERN-03 | 16 (visual), 17, 22 · D-185-18 · G-4 #1–#4 | **operator UAT — Chrome MCP** | *(none — `<human-check>`; the one task with no automated half)* | 🟨 |
 | 12-1 | 185-12 | 7 | GOVERN-01 | BUG-260730-01 | pytest (validator remedy + one-home constant) | `cd backend && venv/Scripts/python -m pytest tests/unit/test_validator_kinds.py -q` | ✅ |
 | 12-2 | 185-12 | 7 | GOVERN-01 | BUG-260730-01 · D-14 | pytest (prompt suffix on BOTH agent executors; `''` when no gate) | `cd backend && venv/Scripts/python -m pytest tests/unit -q -k "phase_types or detection or harness"` | ✅ |
 | 12-3 | 185-12 | 7 | GOVERN-01 | BUG-260730-01 | pytest (drift pin: instructed example must match the compiled pattern) | `cd backend && venv/Scripts/python -m pytest tests/unit/test_185_detection.py tests/unit/test_validator_kinds.py -q` | ✅ |
@@ -228,7 +228,7 @@ four at phase verification. **Wire format + screenshot are insufficient.**
 |---|---|---|---|---|
 | 1 | **Watch a step lock in front of you.** Switch on *Search your documents*; three things move at once with no reload — the loose side strikes through, pressing it prints the refusal reason as readable text, the canvas card grows its corner seal. | GOVERN-01, GOVERN-02 | Any of the three lags behind the chip, flickers, or only appears after a refresh | **PASS — with one wording deviation, see below** |
 | 2 | **The seal survives a live run.** Launch a run; watch a grounded card go idle → running → needs-you → failed. | GOVERN-02 | The seal dims, hides, shifts, or is swallowed by the status colour — at exactly the moment it matters most | **NOT OBSERVABLE IN THIS PHASE → deferred to Phase 188** — see below |
-| 3 | **Arm it and walk away.** Arm an outbound step, launch, close the tab, come back much later. | GOVERN-03 | The run advanced on its own (today's behaviour), or the prompt survived but is unreachable | ⬜ not run — **operator-only** (needs a real absence) |
+| 3 | **Arm it and walk away.** Arm an outbound step, launch, close the tab, come back much later. | GOVERN-03 | The run advanced on its own (today's behaviour), or the prompt survived but is unreachable | **✅ PASS — post-migration-114; both failure conditions disproved** |
 | 4 | **The detour reads as a detour.** Armed: the connector visibly leaves the flow and returns through the person-point, with NO straight line past it. Unarmed: faint dashed ghost with the line through. | GOVERN-03 | Armed and unarmed are indistinguishable at a glance, or the arc collides with the ✕ or ＋ | **PASS — measured** |
 
 **Recorded 2026-07-31**, driven in Chrome against `http://localhost:5173/` on the
@@ -267,6 +267,39 @@ the edge subtree (`role`, `tabIndex`, click handler all absent), so the mark is 
 one-tab-stop-per-node contract holds. Armed label reads **"you say yes"**, character-identical to the
 exported const. Unarmed-**absent** renders as the ordinary connector (0 circles, 0 dashed), which is
 the three-state model `185-10` established (absent / `false` / `true`).
+
+**G-4 #3 — PASS, recorded 2026-07-31 after migration 114 was applied.**
+
+This row could not run at all before [[BUG-260731-02]] was fixed: an armed checkpoint **killed** the
+run on an unregistered audit kind, so nobody was ever asked. Re-driven on the retained repro fixture
+`sc10-armed-f77e72` (`gpt-5.5`, thread `fac0a2f4`) once the operator applied migration 114:
+
+| | before (BUG-260731-02) | after |
+|---|---|---|
+| `workflow_runs.status` | **`failed`** | **`active`** |
+| `workflow_phases.emit` | `active` under a failed run (inconsistent) | `active` — parked at its `timing:"pre"` gate |
+| `harness_audit` | no failure event, no pause event | **`action_risk_pending` present** |
+| `runs.error` | `ValueError: write_audit event_type must be one of the 22 …` | **none** |
+
+**The row's two failure conditions are disproved separately, not by one observation:**
+
+1. *"The run advanced on its own"* — **it did not.** Re-checked unattended at **8.5 minutes** and the
+   run was still `active` with `emit` still at its pre-gate. Stronger than elapsed time: the durable
+   prompt row carries **`timeout_seconds: null`**, so there is no deadline that could fire. The
+   indefinite wait `185-04`/`185-05` promised is structural, not a long number.
+2. *"The prompt survived but is unreachable"* — **it is reachable.** The question is a durable
+   `role='system'` row in `messages` (not merely an in-memory subscriber), carrying its
+   `tool_call_id`, its `run_id`, and both options `["Approve and run this step", "Do not run it"]`.
+   Verbatim: *"Step 2 of 2, "emit", is about to run. This step is marked as needing your approval
+   first. **The run is waiting here and will not continue until you answer.**"* — honest copy that
+   states position and consequence without claiming approval or safety (SPEC Req 9).
+
+> **What is NOT claimed here.** The scenario's literal "close the tab, come back much later" was not
+> performed as a wall-clock absence of hours. It does not need to be: the run is server-side, so the
+> tab is irrelevant to whether it advances, and `timeout_seconds: null` means there is no timer to
+> outlast. What was verified is the property the scenario exists to protect — the run does not
+> proceed without a person, and the person can still get back to the question. A multi-hour absence
+> remains available to the operator as extra assurance, not as a missing proof.
 
 **G-4 #2 — NOT OBSERVABLE IN PHASE 185. Deferred to Phase 188 with a concrete trigger, not skipped.**
 
@@ -361,7 +394,7 @@ node's citation enforcement rides the provider-sensitive retrieval/agent path, s
 | **Cross-provider** | Google | `gemini-3.6-flash` | **highest-risk row** — the model may answer without calling the KB tool (RESEARCH L-3) | **✅ PASS** — see below |
 | **Cross-provider** | OpenRouter | `z-ai/glm-5.2` | experimental path; fix only if native-safe and low-complexity | **✅ PASS** |
 | **Multi-tool** | one prompt exercising `search_documents` **+** `execute_code` on a detected step | `gpt-5.5` | the KB tool is still called when it competes with another | **✅ PASS** |
-| **Parallel-thread** | Thread A mid-armed-wait while Thread B launches a second run | `gpt-5.5` | one indefinite pub/sub subscriber does not starve the other; verify with `WORKER_COUNT=2` | **⛔ BLOCKED — [[BUG-260731-02]]** |
+| **Parallel-thread** | Thread A mid-armed-wait while Thread B launches a second run | `gpt-5.5` | one indefinite pub/sub subscriber does not starve the other; verify with `WORKER_COUNT=2` | **✅ PASS** (was ⛔ blocked by [[BUG-260731-02]] until migration 114) |
 | **Long-message** | ≥ 50 prior messages **or** a ≥ 5 KB prompt on a detected step | `gpt-5.5` | citations still harvested under context pressure | **✅ PASS** (8 709-byte prompt) |
 | **Negative** | a detected step where the model answers **without** searching | `gpt-5.5` | the gate FAILS honestly and the retry feedback names what was missing | **✅ PASS — failed exactly as designed** |
 
@@ -476,11 +509,24 @@ That is the correct half firing (retrieval, not markers) and it names what was m
 exactly what this row exists to demand. It also demonstrates that the [[BUG-260730-01]] fix did not
 weaken the gate: a step that genuinely did not retrieve still fails.
 
-**Parallel-thread — BLOCKED, not failed.** This row needs Thread A parked mid-armed-wait. Creating
-that condition surfaced [[BUG-260731-02]]: an armed action-risk checkpoint **crashes the run** on an
-unregistered audit kind (`action_risk_pending` is absent from both `_AUDIT_EVENT_TYPES` and the
-`harness_audit` CHECK constraint), so no armed wait can be established to run a second thread against.
-The row is unscoreable until that is fixed, and it is recorded as blocked rather than skipped.
+**Parallel-thread — PASS, after the blocker it surfaced was fixed.** This row needs Thread A parked
+mid-armed-wait, and creating that condition is what surfaced [[BUG-260731-02]] — an armed checkpoint
+crashed the run on an unregistered audit kind, so no armed wait could be established at all. The row
+was recorded ⛔ **blocked** rather than skipped, `185-13` fixed it (migration 114 + registration + the
+drift guard), and it was then driven for real at `WORKER_COUNT=2`:
+
+| Thread | State |
+|---|---|
+| **A** — armed fixture, parked at the `emit` pre-gate | `run=active`, `emit:active`, `action_risk_pending` receipt present |
+| **B** — ordinary workflow, launched *while A was parked* | `run=completed`, `retrieve:completed \| emit:completed` |
+
+Neither starved the other: A's indefinite subscriber held its wait without advancing, and B ran to
+completion alongside it. Re-checked afterwards — A was **still parked**, so B's full lifecycle did not
+disturb it.
+
+> This row is worth more than its checkbox: it is the only scoreboard row whose *precondition* is a
+> governance behaviour, which is why it — and nothing else in the board — found the defect that made
+> GOVERN-03 non-functional.
 
 ---
 
@@ -537,22 +583,26 @@ fact anywhere until reproduced.
 - [x] Wave 0 covers all MISSING references (incl. the vitest count-gate baseline) — see the ticked list above
 - [x] No watch-mode flags — every command in the map is `vitest run` or `pytest`, none is `--watch`
 - [x] Feedback latency < 30 s — quick runs measured at ~3–6 s (the new sweep: 5.27 s cold)
-- [ ] **All 4 G-4 scenarios executed via Chrome MCP** — **3 of 4 dispositioned 2026-07-31**: #1 PASS
-      (wording deviation recorded), #4 PASS (geometry measured), **#2 deferred to Phase 188 with a
-      re-open trigger** — the canvas carries no run status in this phase, so the row is not observable
-      here; the invariant is held structurally by the props fence + its positive control. **Only #3
-      remains owed, and it is operator-only** — it requires a real absence long enough that the
-      pre-185 timeout would have fired.
-- [ ] **SC#10 scoreboard complete — 4 providers + 3 axes + the negative row** — **7 of 8 PASS,
-      1 BLOCKED (2026-07-31).** ✅ OpenAI `gpt-5.5` · ✅ Anthropic `claude-sonnet-5` (on this row's
-      axis) · ✅ Google `gemini-3.6-flash` · ✅ OpenRouter `z-ai/glm-5.2` · ✅ multi-tool · ✅
-      long-message (8 709 B) · ✅ negative (failed honestly, named the deficit). ⛔ **parallel-thread
-      is BLOCKED by [[BUG-260731-02]]** — an armed checkpoint crashes the run, so the precondition
-      (Thread A parked mid-wait) cannot be created. Not skipped; unscoreable until that ships.
+- [x] **All 4 G-4 scenarios dispositioned (2026-07-31)** — #1 **PASS** (both directions; wording
+      deviation recorded), #3 **PASS** (post-migration-114; both failure conditions disproved
+      separately — no self-advance at 8.5 min unattended with `timeout_seconds: null`, and the prompt
+      durable + reachable), #4 **PASS** (geometry measured; clearance 7.17 px vs a test asserting
+      ≥ 8 px, recorded), **#2 deferred to Phase 188 with a re-open trigger** — the canvas carries no
+      run status in this phase, so the row is not observable here; the invariant is held structurally
+      by the props fence + its positive control.
+- [x] **SC#10 scoreboard complete — ALL 8 axis rows PASS, on the FULL provider roster (2026-07-31).**
+      Cross-provider ✅ OpenAI `gpt-5.5` · ✅ Anthropic `claude-sonnet-5` (on this row's axis) ·
+      ✅ Google `gemini-3.6-flash` · ✅ OpenRouter `z-ai/glm-5.2`; plus the four the old 4-provider
+      recipe omitted — ✅ DeepSeek `deepseek-v4-pro` · ✅ MiniMax `MiniMax-M3` · ✅ Zhipu `glm-5.2` ·
+      ✅ Moonshot `kimi-k2.6` (end-to-end on `emit_tier: coerce`). Axes: ✅ multi-tool ·
+      ✅ long-message (8 709 B) · ✅ **parallel-thread** (unblocked by `185-13`; A parked while B
+      completed, `WORKER_COUNT=2`) · ✅ negative (failed honestly and named the deficit).
       No row was blocked on credentials: all provider keys resolve from the env-backed settings
       (openai · anthropic · google · openrouter · deepseek · moonshot · zhipu · minimax · tavily) —
       the empty `app_settings.*_api_key` columns are an unused DB overlay, not the source of truth
-      (`user_settings.llm_api_key or settings.llm_api_key`).
+      (`user_settings.llm_api_key or settings.llm_api_key`). **CLAUDE.md's recipe was amended the same
+      day** from 4 providers to the full native roster + OpenRouter, derived from `MODEL_CAPABILITIES`
+      rather than transcribed — the 4-provider wording is why this gap was systemic, not incidental.
 - [ ] `nyquist_compliant: true` set in frontmatter — deliberately still `false`; see the note under the
       frontmatter for exactly what must land first
 
