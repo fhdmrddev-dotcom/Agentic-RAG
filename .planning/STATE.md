@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
 status: executing
-last_updated: "2026-07-30T07:35:00.000Z"
-last_activity: 2026-07-30 -- Phase 185 plan 10 complete (the armed action-risk checkpoint drawn as a detour edge)
+last_updated: "2026-07-30T08:10:00.000Z"
+last_activity: 2026-07-30 -- Phase 185 plan 11 tasks 1-2 complete; BLOCKED at the task-3 operator gate (G-4 x4 + the SC#10 scoreboard)
 progress:
   total_phases: 19
   completed_phases: 4
@@ -44,9 +44,80 @@ Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 op
 
 ## Current Position
 
-Phase: 185 (graded-governance-per-node-grounding-mode-action-risk-dial) — EXECUTING
-Plan: 10 of 11 complete
-(Summaries on disk: 01, 02, 03, 04, 05, 06, 07, 08, 09, 10. Next sequential work is **185-11**.)
+Phase: 185 (graded-governance-per-node-grounding-mode-action-risk-dial) — EXECUTING, BLOCKED ON THE OPERATOR GATE
+Plan: 10 of 11 complete; **185-11 tasks 1-2 done, task 3 is a blocking `checkpoint:human-verify` that has NOT run**
+(Summaries on disk: 01, 02, 03, 04, 05, 06, 07, 08, 09, 10, 11. Next work is **the operator UAT**, not another plan.)
+
+**⛔ PHASE 185 IS NOT COMPLETE AND MUST NOT BE MARKED SO. GOVERN-01 / GOVERN-02 / GOVERN-03 ALL
+STAY `Pending`.** Every automated gate in the phase is green and every fence is recorded, but the
+phase's acceptance bar is the G-4 lived-experience gate, and it has not been driven. What is owed,
+authored in `185-VALIDATION.md` and nowhere else: the **four G-4 scenarios** (watch a step lock in
+front of you · the seal survives a live run · arm it and walk away · the detour reads as a detour),
+the **two other manual-only rows** (the greyscale render for criterion 17, and the before/after
+screenshot diff on ordinary flow edges for D-185-18), and the **eight-row SC#10 scoreboard**
+(OpenAI / Anthropic / Google / OpenRouter + multi-tool + parallel-thread + long-message + the
+negative row). `nyquist_compliant` is deliberately still `false` for exactly this reason.
+
+**Plan 185-11 TASKS 1-2 COMPLETE (`3864d962` the vocabulary sweep as a test → `<summary>` the
+fences and the guardrail records). THE PHASE'S CROSS-CUTTING CRITERIA ARE NOW MACHINE-ENFORCED
+RATHER THAN GREPPED ONCE BY HAND.** `governanceVocabulary.test.ts` (30 tests) sweeps the 25
+non-test modules of `src/components/workflows` plus `WorkflowBuilderPage.tsx` and asserts criteria
+14, 15 and the D-185-02 overclaim guard. **The match is scoped to string literals and JSX text via
+the TypeScript PARSER, never a comment-stripping regex** — a file-wide grep flags two hits in this
+tree (`definitionOps.ts:362`, which spells out why *Traceable* is deferred to the review moment,
+and `WorkflowBuilderPage.tsx:18`, which records that one-shot emission is proven by spike-097) and
+both are correct prose about engineering facts, not copy. That is the **D-ITEM-183-02 trap** that
+cost 185-09 and 185-10 three false positives each — **and it bit this plan too**: fence 4 caught
+the new test file naming the very symbol it forbade, in its OWN docblock, and the docblock was
+reworded without weakening the guard. **Three plants observed RED against the real tree and
+reverted** (a banned past participle in a real string literal → the banned half red naming
+`./definitionOps.ts`; an overclaim phrase → THREE guards red at once; a reworded
+`GOVERNANCE_SEAL_LABEL` → the drift lock red). Gates: tsc **33** (= baseline, 0 naming a touched
+file), count gate per the VALIDATION posture (no `[count-decrease]`, no `[total-below-baseline]`,
+no `[missing-file]`; total 1628 → **1658**, exactly +30; all **8** failures in
+`PublishGauntlet.test.tsx` (6) and `WorkflowCanvas.test.tsx` (2, axe under parallel load — the file
+passes 35/35 in isolation), both named in VALIDATION's pre-existing table at 10 and 4 and both
+files this plan never opened).
+
+**⚑ G-5 — THE FIRE ON `PhaseFormPanel.tsx` IS RECORDED AS HONOURED BY CONSTRUCTION.** The file was
+the real hot one (1095 L, touched by 140 / 183 / 184). Phase 185 added a **mount point, not another
+200 lines**, and the evidence is measured, not asserted:
+`git diff --stat 59c32a06..HEAD -- frontend/src/components/workflows/PhaseFormPanel.tsx` reports
+**23 insertions / 6 deletions**, of which **16 ins / 6 del are docblock prose only**, 2 ins are type
+declarations (`kbTools?: readonly string[]`, `onGovernanceChange?`), 1 ins is the import, and only
+**4 insertions reach the render body** — one destructure line plus the 3-line
+`{rails && <GovernanceSection … />}` mount. Criterion 21 asked for ≤ ~4 and got 4.
+**`GovernanceSection.tsx` is the own-component half**: the dial, its refusal copy and the arming
+switch all live there, never in the panel. The ledger row in `CLAUDE.md` now carries this, so the
+next phase that opens the panel reads the shape it is expected to keep. **`WorkflowCanvas.tsx` is
+the file that now FIRES G-5** (1574 L, 9 plans across 183 / 184 / 185) — extraction due in Phase
+188, seam named by 185-10 (`PlaneEditingLayer` + `EDIT_AFFORDANCE`, mind the live ESM cycle).
+
+**⚑ D-185-17 — THE ONE SCOPE DECISION TAKEN WITHOUT THE OPERATOR IN THE ROOM, AND ITS
+REVERSIBILITY NOTE, VERBATIM.** The 137-B card rebuild was made Wave 1 (`185-01`) because computed
+geometry showed no left verdict placement passes acceptance criterion 23 on the shipped 137-D, and
+the operator accepted the visible canvas restyle. **It is the single most reversible thing in the
+phase — drop the Wave-1 plan file and Wave 2+ still build, with acceptance criterion 23 failing
+until the rebuild lands separately.** Nothing downstream reads the 137-B geometry as a contract;
+185-09's corner seal asserts an **11px CLEARANCE from the card's right border**, never a composite
+pixel offset, so it survives a geometry revert.
+
+**⚑ PUBLISH BEHAVIOUR CHANGED (D-185-11's publish half) — recorded because it is a real behaviour
+delta, not a bug.** The gauntlet gains **no new stage**, but its golden run drives the enforcement
+seam (`_drive_golden_run` reaches the engine only via `run_workflow`), so **a detected step whose
+golden run retrieves nothing now FAILS the golden-run stage and blocks publish**. This is accepted:
+every `workflow_definitions` row is throwaway test data, so there is nothing to grandfather. Expect
+it during the operator UAT — a blocked publish on a detected step is the gate working, not a
+regression.
+
+**⚑ `_exec_llm_human_input` IS UNCHANGED, AND THE GLOBAL TIMEOUT-ADVANCES-SILENTLY BEHAVIOUR
+REMAINS OPEN — DELIBERATELY, SCOPED OUT BY SPEC.** Criterion 20 is a measured 0-file git-diff over
+`backend/app/services/harness/phase_types.py`. An UNARMED human-input step still behaves exactly as
+it did before 185: its bounded `ask_user` timeout expires and the run advances on its own, with no
+one told. 185 made the wait indefinite **only** for ARMED action-risk checkpoints. Closing the
+global case is not a bug fix, it is a behaviour change SPEC deliberately did not authorise; it needs
+its own scope. Related residue already carried in this phase's `deferred-items.md`: answering an
+armed checkpoint DURING a resume produces one further ask.
 
 **Plan 185-10 COMPLETE (`94a89425` the projection → `6badaa6e` FlowEdge + the edgeTypes map →
 `7c3f8b7c` the suite → `79354c6e` SUMMARY). THE ARMED CHECKPOINT IS A DETOUR: THE CONNECTOR
@@ -561,6 +632,7 @@ Last activity: 2026-07-29 -- Phase 185 execution started
 
 - **✅ SCOPE DECISION RATIFIED BY OPERATOR 2026-07-29 — D-185-17 / Phase 185** (proposed at plan-phase unattended; operator ratified explicitly, together with the environment confirmations Docker up / `WORKER_COUNT=2` / KB has ingested documents). The operator accepted that ratifying **visibly restyles every node on the canvas** (137-D → 137-B: 248px centred card, 62px 3D icon floating above the top edge at `top:-26px`, `pt-[42px]`, `NODE_MIN_HEIGHT` 104) rather than take any of the three lock-amending alternatives. Original proposal follows. — the deferred **137-D → 137-B `PhaseNodeCard` geometry rebuild is pulled into Phase 185 as plan `185-01`, Wave 1**, reversing the 2026-07-29 "its own task, out of scope for 185" note. Forced by a computed fact the research pass found: on the **shipped** card (`ml-6` body offset, icon well `left-0 top-1/2 h-14 w-14`, 260×96) SPEC Req 6's amended verdict position `-left-2 top-1.5` **overlaps the icon well by 14×8 px**, and `-left-2` does not even straddle the card's left border (border at x=24). **No left placement satisfies acceptance criterion 23 on 137-D.** The SPEC's own sentence — *"185 places its marks against 137-B"* — is only true if 137-B exists first. It keeps its "own task" status as a standalone, separately-committed plan file: **deleting `185-01` leaves waves 2–6 buildable, with only criterion 23 failing.** Rejected alternatives: moving the seal to top-left (amends Req 6's CLAIMED corner — a lock); weakening criterion 23 (the operator added it after a computed occupancy audit); an ad-hoc y-offset on 137-D (invents a third geometry nobody approved). **Operator: ratify or drop `185-01` before executing Wave 1.**
 - **G-5 / Phase 185 (2026-07-29, plan-phase) — honoured by construction, no override needed:** `PhaseFormPanel.tsx` (1078 L) is the real hot file; 185 adds a **mount point only** (pinned by acceptance criterion: `git diff --stat` ≤ ~4 lines) and the governance section ships as its own component. Noted for the ledger: `WorkflowCanvas.tsx` (1505 L) is now the largest workflow file and D-185-18's net-new `edgeTypes`/`FlowEdge` work adds to it — **G-5 should be audited against `WorkflowCanvas.tsx` before Phase 188.**
+  - **✅ CLOSED at execution 2026-07-30 (plan `185-11` Task 2) — the prediction held and is now MEASURED, not asserted.** `git diff --stat 59c32a06..HEAD -- frontend/src/components/workflows/PhaseFormPanel.tsx` = **23 insertions / 6 deletions**, of which 16 ins / 6 del are docblock prose, 2 ins are type declarations, 1 ins is the import, and **4 insertions reach the render body** (one destructure + the 3-line `{rails && <GovernanceSection … />}` mount). `GovernanceSection.tsx` shipped as the own-component half. Both files now carry ledger rows in `CLAUDE.md`, together with the `WorkflowCanvas.tsx` row the note above asked for — it measures **1574 L across 9 plans in 183 / 184 / 185, and it FIRES**: extraction due in Phase 188, seam named by `185-10` (`PlaneEditingLayer` + the exported `EDIT_AFFORDANCE`; mind the live ESM cycle — `WorkflowCanvas` imports `FlowEdge`'s value at module scope).
 - **G-5 / Phase 167 (2026-07-21, plan-phase):** `backend/app/api/threads.py` (ledger: "G-5 fires — extraction due") is touched by plan 167-04 with a single additive line — the VIS-02 per-user model-default overlay guard at the send-path model-resolution call site. Accepted at plan verification: the plan-checker traced every smaller-footprint alternative (baking the overlay into `load_user_settings` leaks the chat user's personal default into 7 unrelated harness/workflow/publish call sites — a real regression; extending `resolve_run_model`'s signature or making `load_user_settings` async still needs a threads.py call-site edit) and confirmed the one-line guard is the minimal correct placement. Guard only — no new endpoint, no file growth beyond the guard, no per-provider fork, Deep byte-identical when unset (D-14). Mirrors the operator-approved 147/149 override shape. The threads.py extraction refactor remains due.
 - **G-5 / Phase 163 (2026-07-18, roadmap-approval — v3.4 crux):** `backend/app/api/threads.py` is the most-fired G-5 hot file (ledger: "G-5 fires — extraction due") and Phase 163 (the atomic RLS + user-JWT-client crux) threads `org_id` through its ~1850-LOC `send_message`. G-5's letter wants a *dedicated* refactor phase before the feature; the roadmap instead sequences the extraction as **Wave 0 of 163** (operator-approved at roadmap sign-off) to keep the 160–168 numbering, with a HARD gate: **no `org_id` touches `send_message` until the extraction lands + proves Deep byte-identical.** The split-vs-bundle call (promote to a standalone phase 163.x if the extraction proves large) is **deliberately deferred to `/gsd:plan-phase 163`**, where the extraction's true size is measurable — the more rigorous point to decide it than blind at roadmap time. Safety property holds either way. Recommendation on record was the dedicated phase; operator chose bundle-now / decide-at-plan-time. Mirrors the 147/149 override shape; the extraction refactor is finally being done (not deferred again), just co-located with the crux.
 - **G-5 / Phase 149 (2026-07-12, plan-phase):** `backend/app/api/threads.py` (ledger: "G-5 fires — extraction due") is touched by plan 149-06 Task 3 with a minimal in-place fallback-notice guard at the single shared model-resolution point for the locked D-149-10 enabled-enforcement decision. Accepted at plan verification (operator-confirmed): guard only, no new endpoint, no file growth beyond the guard, no per-provider fork, shared SSE emitter untouched — all new operator endpoints live in `admin.py`. Mirrors the Phase-147 override shape. The threads.py extraction refactor remains due.
