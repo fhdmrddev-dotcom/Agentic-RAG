@@ -54,6 +54,12 @@ from app.services.ask_user_service import subscribe_for_response
 from app.services.forced_emit import forced_emit
 from app.services.harness.emitters import resolve_emitter
 from app.services.harness.programmatic import PROGRAMMATIC_PHASE_REGISTRY
+
+# BUG-260730-01 — the ONE home of the citation marker format, read here so the
+# instruction the producer sees and the pattern the gate compiles cannot drift. Safe at
+# module top: ``validator_kinds`` imports only ``harness.validators`` (import-light, and
+# already a package dependency), never back into ``phase_types``.
+from app.services.harness.validator_kinds import CITATION_MARKER_GUIDANCE
 from app.services.openai_service import RENDER_TEMPLATE_TOOL, apply_tool_budget, get_tools
 from app.services.task_service import _stream_one_iteration, run_task_sub_agent
 from app.services.template_asset_service import resolve_template_source
@@ -173,6 +179,70 @@ def _retry_suffix(ctx) -> str:
     """
     feedback = getattr(ctx, "retry_feedback", None)
     return ("\n\n" + feedback) if feedback else ""
+
+
+def _citation_instruction(phase) -> str:
+    """BUG-260730-01 — TELL THE PRODUCER what its attached citation gate will look for.
+
+    The third additive suffix, with the same ``''``-when-inactive discipline as
+    ``_retry_suffix`` and ``_skill_block``: a phase that carries no
+    ``retrieved_and_cited`` gate gets the empty string, so its system prompt is
+    BYTE-IDENTICAL to pre-185 (D-14, asserted by prompt EQUALITY in
+    ``test_185_detection.py`` — not by a substring absence).
+
+    WHY IT EXISTS. The engine auto-attaches a ``citations_required`` gate to a DETECTED
+    step (``grounding.effective_phase``) and used to announce it NOWHERE: not in the step
+    prompt (the author's), not at the attachment seam (it appends a ValidatorSpec and no
+    prose), and not in the retry feedback (which only echoed the gate's deficit). So a
+    detected step that retrieved correctly still failed all 3 attempts on the marker count
+    — the exact author-side burden the auto-attachment exists to REMOVE. The gate is right
+    and stays exactly this strict; what was missing is this sentence.
+
+    WHY IT READS THE ATTACHED SPEC AND NEVER RE-RUNS DETECTION. This is the load-bearing
+    design point, not a style preference. Reading the spec means the instruction and the
+    judge are driven by THE SAME OBJECT, so they cannot disagree. Re-deriving the cause here
+    would be a second copy of "which steps are governed" — which ``grounding.py``'s own
+    docblock names as a safety hole rather than a duplication smell — and it would silently
+    do the wrong thing for the author-declared case, where a spec is present without
+    detection. So THIS MODULE CALLS NOTHING IN ``grounding``, and the detection function's
+    name is deliberately not spelled anywhere in this file: the guard is a literal
+    file-level grep pinned to zero occurrences (``test_185_detection.py``), and a prose
+    mention would defeat it exactly as the D-ITEM-183-02 trap describes.
+
+    SCOPE, deliberately narrow:
+      * only ``mode: "retrieved_and_cited"`` — ``deterministic``/``emit`` gates a
+        ``field_map`` (a different obligation, already instructed by the emit path) and a
+        ``presence`` author opted in and wrote their own marker instructions;
+      * a spec carrying its OWN ``config["pattern"]`` is skipped: that pattern is not the
+        format ``CITATION_MARKER_GUIDANCE`` describes, so advertising it would be a lie;
+      * ``min_markers`` is taken as the MAX across matching specs (D-185-05 lets an
+        author's spec and the engine's BOTH run), so the instruction can never ask for
+        fewer markers than the strictest gate requires.
+
+    Never raises: a prompt helper that threw would kill a run over a malformed config.
+    """
+    need = 0
+    for spec in getattr(phase, "validators", None) or []:
+        if getattr(spec, "kind", None) != "citations_required":
+            continue
+        cfg = getattr(spec, "config", None) or {}
+        if cfg.get("mode") != "retrieved_and_cited" or cfg.get("pattern"):
+            continue
+        try:
+            need = max(need, int(cfg.get("min_markers", 1)))
+        except (TypeError, ValueError):
+            need = max(need, 1)  # the gate's own default when the value is junk
+    if need <= 0:
+        # No gate, or a gate satisfied by zero markers — nothing to announce.
+        return ""
+    markers = "marker" if need == 1 else "markers"
+    return (
+        "\n\n## Citations (required — this step reads the knowledge base)\n"
+        f"Your answer is checked automatically before it is accepted: "
+        f"{CITATION_MARKER_GUIDANCE}. At least {need} such {markers} must appear in your "
+        "final answer, and the answer must rest on passages you actually retrieved. An "
+        "answer with no marker is rejected and the step is retried."
+    )
 
 
 def _skill_block(phase, ctx=None, *, with_files: bool | None = None) -> str:
@@ -458,7 +528,19 @@ async def _exec_llm_agent(phase, accumulated_outputs: dict, ctx) -> dict:
     # 099 WFSKILL-01 (D-05/D-06): compose the skill framing (instructions + file
     # manifest — read_skill_file is auto-whitelisted below) BEFORE the retry suffix.
     # '' when no snapshot => byte-identical to pre-099.
-    system_prompt = phase.config.prompt + _skill_block(phase, ctx) + _retry_suffix(ctx)
+    # BUG-260730-01: _citation_instruction announces the citation gate the engine
+    # ATTACHED to this phase but never told the model about — a detected step that
+    # retrieved correctly still failed 3/3 attempts on a marker format nothing named. Do
+    # not "simplify" it away: the gate is checked either way, so removing this only makes
+    # the requirement invisible again. Placed BEFORE the retry suffix so feedback about a
+    # failed attempt stays last, closest to the model's next turn. '' for every phase with
+    # no such gate => byte-identical (D-14).
+    system_prompt = (
+        phase.config.prompt
+        + _skill_block(phase, ctx)
+        + _citation_instruction(phase)
+        + _retry_suffix(ctx)
+    )
     # F8 (092-07): the sub-agent's USER turn is its `description` (task_service.py:351
     # — messages=[system_prompt_override, {"role":"user","content":description}]).
     # Pre-F8 it was just the slug label `f"Phase: {phase.slug}"` — so the FIRST phase's
@@ -529,7 +611,17 @@ async def _exec_llm_batch_agents(phase, accumulated_outputs: dict, ctx) -> dict:
     # 099 WFSKILL-01 (D-05/D-06): each parallel branch shares the same composed skill
     # framing (instructions + file manifest); read_skill_file is auto-whitelisted on
     # every branch's ToolContext below. '' when no snapshot => byte-identical.
-    base_prompt = phase.config.prompt + _skill_block(phase, ctx) + _retry_suffix(ctx)
+    # BUG-260730-01: the SAME citation announcement as _exec_llm_agent, because
+    # `llm_batch_agents` also carries `available_tools` and is therefore equally
+    # DETECTABLE — a fix on the single-agent path alone would leave every batch step
+    # failing a gate nothing told it about. Do not "simplify" it away. Before the retry
+    # suffix; '' when this phase has no such gate => byte-identical (D-14).
+    base_prompt = (
+        phase.config.prompt
+        + _skill_block(phase, ctx)
+        + _citation_instruction(phase)
+        + _retry_suffix(ctx)
+    )
     sem = asyncio.Semaphore(phase.config.max_parallel_agents)
 
     # F8 (092-07): the overall topic context — the user's kickoff question — so each
