@@ -1,23 +1,22 @@
 ---
 phase: 185
 slug: graded-governance-per-node-grounding-mode-action-risk-dial
-status: awaiting-operator-gate
-nyquist_compliant: false
+status: operator-gate-passed
+nyquist_compliant: true
 wave_0_complete: true
 created: 2026-07-29
 updated: 2026-07-31
 ---
 
-> **`nyquist_compliant: false` is a DELIBERATE reading, not an unfilled default.** Thirty-three of the
-> thirty-four tasks in the map below carry an `<automated>` command, and no three consecutive tasks
-> lack one — the sampling architecture is sound. The one that does not is **11-3**, the blocking
-> `checkpoint:human-verify`, and it is the task that owns criterion **17** (a colour-stripped render
-> — jsdom computes no paint) and criterion **22** (the cross-provider scoreboard — needs four live
-> providers), plus the visual half of criterion **16** and the D-185-18 screenshot diff. Those four
-> have no automatable proof and never will. **Flip this to `true` when 11-3's rows are recorded** —
-> at that point every task carries either an automated verify or a recorded operator result. Setting
-> it `true` before the operator has driven a single row would be the false-completion pattern this
-> project has flagged twice.
+> **`nyquist_compliant: true` — FLIPPED 2026-07-31, after the operator gate ran.** Thirty-three of
+> the thirty-four tasks carry an `<automated>` command; the one that does not is **11-3**, the blocking
+> `checkpoint:human-verify`, and every row it owns is now dispositioned with a recorded result: G-4 #1
+> PASS (both directions), #3 PASS (post-migration-114), #4 PASS (geometry measured), #2 **deferred to
+> Phase 188** with a concrete re-open trigger (the canvas carries no run status in this phase, so the
+> row is not observable here), criterion **17** PASS, **D-185-18** PASS by construction (row downgraded
+> from "visual diff" — operator decision), and criterion **22**'s scoreboard **8/8** across the full
+> provider roster. It was `false` for the whole of execution on purpose; it is `true` now because the
+> rows exist, not because the phase wanted to close.
 
 # Phase 185 — Validation Strategy
 
@@ -649,8 +648,10 @@ fact anywhere until reproduced.
       (`user_settings.llm_api_key or settings.llm_api_key`). **CLAUDE.md's recipe was amended the same
       day** from 4 providers to the full native roster + OpenRouter, derived from `MODEL_CAPABILITIES`
       rather than transcribed — the 4-provider wording is why this gap was systemic, not incidental.
-- [ ] `nyquist_compliant: true` set in frontmatter — deliberately still `false`; see the note under the
-      frontmatter for exactly what must land first
+- [x] `nyquist_compliant: true` set in frontmatter (2026-07-31) — every task now carries either an
+      automated verify or a recorded operator result. `11-3`'s rows are all dispositioned: G-4 #1/#3/#4
+      PASS, #2 deferred to Phase 188 with a trigger, criterion 17 PASS, D-185-18 PASS by construction,
+      and the SC#10 board 8/8 across the full provider roster.
 
 ### Phase-level fences — recorded by plan `185-11` Task 2 (2026-07-30)
 
@@ -666,5 +667,5 @@ commit before any 185 code), 48 commits back from the reading.
 | 3 | **Criterion 21 / G-5 — `PhaseFormPanel.tsx`** | `git diff --stat 59c32a06..HEAD -- frontend/src/components/workflows/PhaseFormPanel.tsx` | **23 insertions, 6 deletions.** Split: **16 ins / 6 del are docblock prose only**; **2 ins are type declarations** (`kbTools?: readonly string[]`, `onGovernanceChange?: …`); **1 ins is the import**; **4 ins are the render body** — one destructure line plus the 3-line `{rails && <GovernanceSection … />}` mount point. The render-body portion is **≤ 4 lines** as criterion 21 requires, and the whole dial, its refusal and the arming switch live in `GovernanceSection.tsx`, a file of their own. |
 | 4 | **Req 6 — the retired grounding symbols** | `grep -rn "groundingFor\|GROUNDINGS" frontend/src \| wc -l` | **0.** |
 
-**Approval:** pending — blocked on task 11-3 (G-4 ×4 + the two other manual rows + the 8-row SC#10
+**Approval:** GRANTED 2026-07-31 — task 11-3 dispositioned in full; see the recorded rows above (G-4 ×4 + the two other manual rows + the 8-row SC#10
 scoreboard). Every automated gate is green; nothing else is owed.

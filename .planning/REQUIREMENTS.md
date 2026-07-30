@@ -33,9 +33,9 @@
 
 *Deep competitor crawl (Beam / Glean / n8n) confirmed NONE grade strictness by KB-grounding — category white-space, buildable directly on the existing validation-gate library. The concrete "governed ↔ flexible" reconciliation SEED-123 names: **KB-retrieval is what turns strictness ON.***
 
-- [ ] **GOVERN-01**: Each node carries a **grounding mode** — *Grounded / strict* auto-attaches the immutable `citations_required` **coverage** gate (every value traceable to a retrieved source, zero invented citations, else fail / route to HITL) vs *Open / flexible* (an open agentic / reasoning / tool step, NOT gated on KB citation). A single workflow can freely MIX strict-grounded and open nodes; on a grounded node the strict gate is structurally enforced and NOT author-loosenable-away. Additive to the engine — Deep byte-identical when unset (D-14). *(Amended 2026-07-28 at `/gsd:spec-phase 185`: the original wording said "`citations_required` + confidence gate … above the confidence threshold". The engine has no confidence concept — no threshold, no score, no source of a score (`grep -rn confidence backend/app/services/harness/ backend/app/models/harness.py` → nothing). The shipped gate is deterministic coverage via `check_coverage`. Operator decision: drop the word rather than invent the concept. See `185-SPEC.md`.)*
-- [ ] **GOVERN-02**: The canvas visibly marks each node's governance state (grounded-strict-cited vs open-flexible), so a business user can see which steps are trustworthy/cited vs exploratory; the "can't draw an unsafe workflow" rails apply **graded** — enforced on grounded nodes, relaxed on open ones.
-- [ ] **GOVERN-03**: Each node can carry an **action-risk** checkpoint — an outbound / write / external-action node gets an approval / human-in-the-loop gate before it executes, built on the existing `llm_human_input` phase-type substrate (the second orthogonal dial, adopted from Beam's per-node consent pattern).
+- [x] **GOVERN-01**: Each node carries a **grounding mode** — *Grounded / strict* auto-attaches the immutable `citations_required` **coverage** gate (every value traceable to a retrieved source, zero invented citations, else fail / route to HITL) vs *Open / flexible* (an open agentic / reasoning / tool step, NOT gated on KB citation). A single workflow can freely MIX strict-grounded and open nodes; on a grounded node the strict gate is structurally enforced and NOT author-loosenable-away. Additive to the engine — Deep byte-identical when unset (D-14). *(Amended 2026-07-28 at `/gsd:spec-phase 185`: the original wording said "`citations_required` + confidence gate … above the confidence threshold". The engine has no confidence concept — no threshold, no score, no source of a score (`grep -rn confidence backend/app/services/harness/ backend/app/models/harness.py` → nothing). The shipped gate is deterministic coverage via `check_coverage`. Operator decision: drop the word rather than invent the concept. See `185-SPEC.md`.)*
+- [x] **GOVERN-02**: The canvas visibly marks each node's governance state (grounded-strict-cited vs open-flexible), so a business user can see which steps are trustworthy/cited vs exploratory; the "can't draw an unsafe workflow" rails apply **graded** — enforced on grounded nodes, relaxed on open ones.
+- [x] **GOVERN-03**: Each node can carry an **action-risk** checkpoint — an outbound / write / external-action node gets an approval / human-in-the-loop gate before it executes, built on the existing `llm_human_input` phase-type substrate (the second orthogonal dial, adopted from Beam's per-node consent pattern).
 
 ### VOCAB — approachability for business users
 
@@ -107,9 +107,9 @@ Which phases cover which requirements. Filled at roadmap creation 2026-07-24, re
 | CANVAS-02 | Phase 184 | Complete |
 | CANVAS-03 | Phase 184 | Complete |
 | CANVAS-04 | Phase 184 | Complete |
-| GOVERN-01 | Phase 185 | Pending |
-| GOVERN-02 | Phase 185 | Pending |
-| GOVERN-03 | Phase 185 | Pending |
+| GOVERN-01 | Phase 185 | Complete |
+| GOVERN-02 | Phase 185 | Complete |
+| GOVERN-03 | Phase 185 | Complete |
 | CONCUR-01 | Phase 186 | Pending |
 | CONCUR-02 | Phase 186 | Pending |
 | VOCAB-01 | Phase 187 | Pending |

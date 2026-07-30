@@ -275,7 +275,7 @@ Plans:
 
 **Wave 6** *(blocked on Wave 5 completion)*
 
-- [ ] 185-11-PLAN.md — the vocabulary sweep as a test, the four phase-level fences, the G-5 / D-185-17 / publish-behaviour records, and the G-4 + SC#10 gate
+- [x] 185-11-PLAN.md — the vocabulary sweep as a test, the four phase-level fences, the G-5 / D-185-17 / publish-behaviour records, and the G-4 + SC#10 gate
 
 **Wave 7** *(gap closure — found by operator UAT, blocks 185-11 Task 3)*
 
@@ -283,7 +283,7 @@ Plans:
 
 **Wave 8** *(gap closure — found by the SC#10 scoreboard; blocks G-4 #3 and the parallel-thread row)*
 
-- [ ] 185-13-PLAN.md — BUG-260731-02: the armed action-risk checkpoint CRASHES the run (`action_risk_pending` is emitted but unregistered in BOTH the Python allow-list and the Postgres CHECK). **Migration 114** + registration + a Python-set == SQL-CHECK-set guard; **amends this phase's zero-migration contract in the open** (operator decision, 2026-07-31)
+- [x] 185-13-PLAN.md — BUG-260731-02: the armed action-risk checkpoint CRASHES the run (`action_risk_pending` is emitted but unregistered in BOTH the Python allow-list and the Postgres CHECK). **Migration 114** + registration + a Python-set == SQL-CHECK-set guard; **amends this phase's zero-migration contract in the open** (operator decision, 2026-07-31)
 
 **UI hint**: yes
 **Flags**: HEADLINE differentiator (no competitor grades by KB-grounding — the Beam/Glean/n8n deep-crawl white-space; `.planning/research/deep-dive/`); ENGINE-ADDITIVE (an optional per-node `grounding_mode` field on the phase-config model that AUTO-ATTACHES the EXISTING immutable `citations_required` + confidence gate on grounded nodes — reuses the shipped validation-gate library; open nodes ungated); GOVERN-03 reuses the existing `llm_human_input` phase-type for the action-risk/approval checkpoint; Deep byte-identical when unset (D-14 load-bearing); G-2 sketch (governance state on the canvas — grounded-strict vs open-flexible badges + the mode toggle — is a "feels like" surface); SC#10 (a grounded node's citation/confidence enforcement rides the provider-sensitive retrieval/agent path — verify graded strictness holds cross-provider); G-5 ledger (`PhaseNode.tsx` node model, ~3rd touch after 183/184 → apply refactor-before-3rd-touch PROACTIVELY + the validation seam); no full threat model (reuses the enforced gate library; the structural "not author-loosenable-away" property is verified in-phase; the connector threat model lands at 190); ~~NO migration (additive optional field in the WorkflowDefinition JSONB, not a column)~~ — AMENDED 2026-07-31 (operator decision, plan `185-13`): EXACTLY ONE migration, `114_harness_audit_action_risk_pending.sql`, adding one literal (`action_risk_pending`, 22 → 23) to the `harness_audit` event_type CHECK and no other schema object; superseded wording preserved, not deleted. Reason: the zero-migration promise was a scoping convenience; the honest-pause vocabulary is a correctness property, and the alternative knowingly ships the defect the phase existed to fix (BUG-260731-02). The grounding field + action-risk dial themselves stay additive-optional JSONB, not columns.
