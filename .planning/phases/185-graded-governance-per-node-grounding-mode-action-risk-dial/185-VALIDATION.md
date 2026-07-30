@@ -356,18 +356,87 @@ node's citation enforcement rides the provider-sensitive retrieval/agent path, s
 
 | Axis | Row | Model | What it proves | Result |
 |---|---|---|---|---|
-| **Cross-provider** | OpenAI | *(representative)* | grounded `llm_agent` w/ `search_documents`, no declared validator ⇒ `citations` non-empty ⇒ gate passes | ⬜ |
-| **Cross-provider** | Anthropic (native) | *(representative)* | same definition — the native tool-use path populates citations identically | ⬜ |
+| **Cross-provider** | OpenAI | `gpt-5.5` | grounded `llm_agent` w/ `search_documents`, no declared validator ⇒ `citations` non-empty ⇒ gate passes | **✅ PASS** |
+| **Cross-provider** | Anthropic (native) | `claude-sonnet-5` | same definition — the native tool-use path populates citations identically | **✅ PASS on this axis** (emit failed separately — see below) |
 | **Cross-provider** | Google | `gemini-3.6-flash` | **highest-risk row** — the model may answer without calling the KB tool (RESEARCH L-3) | **✅ PASS** — see below |
-| **Cross-provider** | OpenRouter | *(representative)* | experimental path; fix only if native-safe and low-complexity | ⬜ |
-| **Multi-tool** | one prompt exercising `search_documents` **+** `execute_code` on a detected step | — | the KB tool is still called when it competes with another | ⬜ |
-| **Parallel-thread** | Thread A mid-armed-wait while Thread B launches a second run | — | one indefinite pub/sub subscriber does not starve the other; verify with `WORKER_COUNT=2` | ⬜ |
-| **Long-message** | ≥ 50 prior messages **or** a ≥ 5 KB prompt on a detected step | — | citations still harvested under context pressure | ⬜ |
-| **Negative** | a detected step where the model answers **without** searching | any | the gate FAILS honestly and the retry feedback names what was missing | ⬜ |
+| **Cross-provider** | OpenRouter | `z-ai/glm-5.2` | experimental path; fix only if native-safe and low-complexity | **✅ PASS** |
+| **Multi-tool** | one prompt exercising `search_documents` **+** `execute_code` on a detected step | `gpt-5.5` | the KB tool is still called when it competes with another | **✅ PASS** |
+| **Parallel-thread** | Thread A mid-armed-wait while Thread B launches a second run | `gpt-5.5` | one indefinite pub/sub subscriber does not starve the other; verify with `WORKER_COUNT=2` | **⛔ BLOCKED — [[BUG-260731-02]]** |
+| **Long-message** | ≥ 50 prior messages **or** a ≥ 5 KB prompt on a detected step | `gpt-5.5` | citations still harvested under context pressure | **✅ PASS** (8 709-byte prompt) |
+| **Negative** | a detected step where the model answers **without** searching | `gpt-5.5` | the gate FAILS honestly and the retry feedback names what was missing | **✅ PASS — failed exactly as designed** |
 
 **Provider-docs-first:** any divergence found here must be researched against that provider's OWN tool-use
 documentation before being attributed to our code, and any fix stays at the service boundary — never on the
 shared path.
+
+### Rows driven 2026-07-31 — method, and what each one actually showed
+
+**Method.** Each row was launched as a real run via `POST /threads/{id}/messages` with a **per-request**
+`model` + `provider` against the published `compliance-gap-report` definition
+(`fd6f35a5-2f48-4d01-a405-a9214fee6971`) — so **no global setting was mutated to score the board**.
+Verdicts are read from `workflow_runs.status`, `workflow_phases.status` / `_failure_reason` and
+`harness_audit`, not from the UI. Two fixtures were created for the axes the published definition
+cannot express (`sc10-multitool-*` adds `execute_code` beside `search_documents`; `sc10-armed-*` sets
+`action_risk_armed` on `emit`).
+
+> **Both fixtures are RETAINED, deliberately.** They are FK-referenced by the `workflow_runs` rows
+> that back the verdicts above, so deleting them would delete the evidence for a recorded result —
+> and `sc10-armed-*` is the standing reproduction for [[BUG-260731-02]]. They are throwaway test data
+> (every `workflow_definitions` row in this project is), safe to remove once that bug is closed and
+> these rows are no longer the live proof.
+
+**OpenAI — `gpt-5.5` — PASS.** Both phases completed. Clean.
+
+**OpenRouter — `z-ai/glm-5.2` — PASS, and more informative than expected.** Every OpenRouter row in
+`MODEL_CAPABILITIES` carries `native_tools: False`, so this row exercised the **non-native** tool
+path — and the detected step still called the KB tool, still returned non-empty `citations`, and
+still cleared the gate. The "experimental path" caveat did not bite here.
+
+**Anthropic — `claude-sonnet-5` — PASS on the axis this row measures, with a separate finding.** The
+row's contract is the *retrieve* step ("grounded `llm_agent` w/ `search_documents`, no declared
+validator ⇒ citations non-empty ⇒ gate passes") and it **completed**. The run then failed one step
+later, at `emit`, on the **author-declared** `citations_required` validator:
+
+```
+Phase 2 (emit) gate failed after 3 attempt(s): citations_required: uncited=0 invented=24 offending=[]
+```
+
+> **Recorded as a separate observation, not scored against this row.** `uncited=0` with
+> `invented=24` says every cell carried a citation and 24 of them pointed at ids the model was never
+> shown — a real, correct rejection. But **`offending=[]` is empty while the count is 24**, so the
+> message states a quantity and then names nothing. That is the same shape as [[BUG-260730-02]]: the
+> gate knows precisely what is wrong and the surfaced string does not carry it. Worth folding into
+> that report rather than opening a third.
+
+**Multi-tool — `gpt-5.5` — PASS.** On a fixture whose detected step whitelists `search_documents`
+**and** `execute_code`, with a prompt that explicitly demanded both, the run completed — the KB tool
+was still called when it had competition. (`execute_code` is not a `KB_TOOLS` member, so adding it
+leaves the step *detected*, which is what makes this a valid probe rather than a different test.)
+
+**Long-message — `gpt-5.5` — PASS.** Kickoff prompt of **8 709 bytes** (≥ 5 KB bar) on the detected
+step; citations were still harvested under context pressure and both phases completed.
+
+**Negative — `gpt-5.5` — PASS, and this is the row that proves the gate is real.** Given a kickoff
+that explicitly forbade searching (*"Do NOT search or open any documents… answer purely from your own
+general knowledge"*), the model complied, retrieved nothing, and the gate **failed honestly** after 3
+attempts with half (a)'s message:
+
+```
+citations_required: nothing was retrieved (0 sources) — this step reads your documents
+and must show where its answer came from
+```
+
+That is the correct half firing (retrieval, not markers) and it names what was missing — which is
+exactly what this row exists to demand. It also demonstrates that the [[BUG-260730-01]] fix did not
+weaken the gate: a step that genuinely did not retrieve still fails.
+
+**Parallel-thread — BLOCKED, not failed.** This row needs Thread A parked mid-armed-wait. Creating
+that condition surfaced [[BUG-260731-02]]: an armed action-risk checkpoint **crashes the run** on an
+unregistered audit kind (`action_risk_pending` is absent from both `_AUDIT_EVENT_TYPES` and the
+`harness_audit` CHECK constraint), so no armed wait can be established to run a second thread against.
+The row is unscoreable until that is fixed, and it is recorded as blocked rather than skipped.
+
+---
 
 ### Google row — recorded 2026-07-31
 
@@ -428,13 +497,16 @@ fact anywhere until reproduced.
       here; the invariant is held structurally by the props fence + its positive control. **Only #3
       remains owed, and it is operator-only** — it requires a real absence long enough that the
       pre-185 timeout would have fired.
-- [ ] **SC#10 scoreboard complete — 4 providers + 3 axes + the negative row** — **1 of 8 recorded**
-      (Google ✅ on `gemini-3.6-flash`, run `ced8005d`, judged 82 by `gpt-5.5`). OpenAI, Anthropic,
-      OpenRouter, multi-tool, parallel-thread, long-message and the negative row still owed. **All
-      provider keys are present in the env-backed settings** (openai · anthropic · google · openrouter
-      · deepseek · moonshot · zhipu · minimax · tavily all resolve non-empty), so no row is blocked on
-      credentials — the empty `app_settings.*_api_key` columns are an unused DB overlay, not the
-      source of truth (`user_settings.llm_api_key or settings.llm_api_key`).
+- [ ] **SC#10 scoreboard complete — 4 providers + 3 axes + the negative row** — **7 of 8 PASS,
+      1 BLOCKED (2026-07-31).** ✅ OpenAI `gpt-5.5` · ✅ Anthropic `claude-sonnet-5` (on this row's
+      axis) · ✅ Google `gemini-3.6-flash` · ✅ OpenRouter `z-ai/glm-5.2` · ✅ multi-tool · ✅
+      long-message (8 709 B) · ✅ negative (failed honestly, named the deficit). ⛔ **parallel-thread
+      is BLOCKED by [[BUG-260731-02]]** — an armed checkpoint crashes the run, so the precondition
+      (Thread A parked mid-wait) cannot be created. Not skipped; unscoreable until that ships.
+      No row was blocked on credentials: all provider keys resolve from the env-backed settings
+      (openai · anthropic · google · openrouter · deepseek · moonshot · zhipu · minimax · tavily) —
+      the empty `app_settings.*_api_key` columns are an unused DB overlay, not the source of truth
+      (`user_settings.llm_api_key or settings.llm_api_key`).
 - [ ] `nyquist_compliant: true` set in frontmatter — deliberately still `false`; see the note under the
       frontmatter for exactly what must land first
 
