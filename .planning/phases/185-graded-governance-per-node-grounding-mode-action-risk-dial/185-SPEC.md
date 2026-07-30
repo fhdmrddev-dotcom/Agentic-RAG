@@ -58,7 +58,12 @@ The `/validate` + `/grounding-bundle` seam (Phase 182) already returns per-node 
      `escalated`)
    - Acceptance: a pre-185 `workflow_definitions` JSONB row with no such field `model_validate()`s
      without error; a definition carrying the field round-trips `toCanvas` → `fromCanvas` → save with
-     reference identity preserved; `git diff -- supabase/migrations` is **0 lines**
+     reference identity preserved; ~~`git diff -- supabase/migrations` is **0 lines**~~
+     **AMENDED 2026-07-31 — see "Zero migrations" under Constraints.** The struck clause is preserved
+     as the original promise. It now reads: `git diff -- supabase/migrations` contains **exactly one
+     file, `114_harness_audit_action_risk_pending.sql`**, which adds one literal to the `harness_audit`
+     event_type CHECK and nothing else. The *grounding field itself* remains zero-migration — the
+     migration is owed by GOVERN-03's armed checkpoint, not by this requirement.
 
 2. **Detection is a named list, never a judgement call**: A step is detected as grounded iff its
    `available_tools` intersects a fixed 5-name KB tool list.
@@ -260,12 +265,35 @@ The `/validate` + `/grounding-bundle` seam (Phase 182) already returns per-node 
   (`PhaseNodeCard.tsx:287`, `WorkflowCanvas.tsx:502-504`) already justify real placements by reasoning
   from 137-B on a component that renders 137-D; correcting them belongs to the same task.
 - **A run-state shape for the canvas** (run status does not survive a colour-blind read). → **Phase 188**
-- **Any database migration.** Live head stays at 113.
+- ~~**Any database migration.** Live head stays at 113.~~ **AMENDED 2026-07-31** — head moves to **114**.
+  See "Zero migrations" immediately below for the decision and the reason.
 
 ## Constraints
 
-- **Zero migrations.** The grounding field and the action-risk checkpoint are additive-optional fields in
-  the `WorkflowDefinition` JSONB, not columns. `git diff -- supabase/migrations` must be 0 lines.
+- ~~**Zero migrations.** The grounding field and the action-risk checkpoint are additive-optional fields in
+  the `WorkflowDefinition` JSONB, not columns. `git diff -- supabase/migrations` must be 0 lines.~~
+
+  **AMENDED 2026-07-31 (operator decision) — ONE migration: `114_harness_audit_action_risk_pending.sql`.**
+  The superseded wording above is preserved verbatim, not deleted, so the phase's record reads honestly.
+
+  **Reason (the same one-sentence reason recorded in 185-VALIDATION.md and ROADMAP.md): the
+  zero-migration promise was a scoping convenience; the honest-pause vocabulary is a correctness
+  property, and the alternative knowingly ships the defect the phase existed to fix.**
+
+  Detail: BUG-260731-02 — GOVERN-03's armed action-risk checkpoint does not park, it **kills the run**.
+  `action_risk_pending` is emitted at `harness_engine.py:712-716` but is absent from BOTH layers that
+  admit an audit kind (the Python `_AUDIT_EVENT_TYPES` allow-list and the Postgres
+  `harness_audit_event_type_check` CHECK). Registering only the Python literal converts a `ValueError`
+  into a Postgres `23514` mid-run, so the CHECK must be extended too. The alternative — reusing an
+  already-registered kind for the armed pause — works today but re-introduces exactly the dishonesty
+  plan `185-05` existed to remove (announcing `gate_failed` when nothing failed).
+
+  Scope of the exception: **one literal, no other schema change.** The grounding field and the
+  action-risk dial themselves remain additive-optional `WorkflowDefinition` JSONB fields, not columns —
+  that half of the constraint is unamended and still holds. Migration 114 touches no table, column,
+  index, grant or policy; the INSERT-only RLS on `harness_audit` is untouched, so receipt immutability
+  holds. A structural guard (`backend/tests/unit/test_audit_event_registration.py`) now pins the Python
+  set equal to the SQL CHECK set so this class cannot recur.
 - **D-14 (red line) — Deep byte-identical when unset.** The Deep chat path must be untouched. The harness
   path changes deliberately and only for detected phases / armed checkpoints.
 - **`extra="forbid"` is load-bearing.** New fields must be added the way the existing 6 union members
@@ -296,7 +324,11 @@ The `/validate` + `/grounding-bundle` seam (Phase 182) already returns per-node 
 ## Acceptance Criteria
 
 - [ ] A pre-185 `workflow_definitions` JSONB row with no grounding field `model_validate()`s without error
-- [ ] `git diff -- supabase/migrations` is 0 lines; live migration head is still 113
+- [ ] ~~`git diff -- supabase/migrations` is 0 lines; live migration head is still 113~~
+      **AMENDED 2026-07-31** (superseded wording preserved above; reason under Constraints →
+      "Zero migrations"). Now: `git diff -- supabase/migrations` contains **exactly one file**,
+      `114_harness_audit_action_risk_pending.sql`; live migration head is **114**; that file adds
+      exactly one CHECK literal (`action_risk_pending`, 22 → 23) and no other schema object
 - [ ] A definition carrying the grounding field round-trips `toCanvas` → `fromCanvas` with reference
       identity preserved
 - [ ] Each of the 5 `KB_TOOLS` names, in isolation, detects a step as *must prove it* with cause `detected`
