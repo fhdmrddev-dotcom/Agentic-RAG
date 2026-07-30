@@ -23,6 +23,19 @@
  *      additionally requires the caller to supply a `session` (184-13, see R12 below).
  * Everything in the read-only opt-out block stays off in BOTH modes.
  *
+ * ⚠ WHAT 185-10 CHANGED, and a G-5 flag with it. This file now registers a module-scope
+ * `edgeTypes` map (`{ flow: FlowEdge }`) beside `nodeTypes`, and the `DEFAULT_EDGE_OPTIONS`
+ * docblock below was REWRITTEN because it asserted the opposite of the new truth
+ * (D-185-18). Both changes are additive to the read-only surface: `edgeTypes` is passed in
+ * BOTH modes, and an edge whose target step declares no action-risk checkpoint renders
+ * exactly as the library's built-in bezier renderer drew it.
+ *
+ * ⚑ G-5 (CLAUDE.md hot-file ledger): `WorkflowCanvas.tsx` is the largest file in the
+ * workflow tree and this plan adds to it again. `PlaneEditingLayer` and the `EDIT_AFFORDANCE`
+ * geometry table are the natural extraction — they are already self-contained, and 185-10
+ * had to export the table for a cross-module drift pin, which is the seam asking to be a
+ * module. Flagged for **Phase 188**, whose run-state work touches this file next.
+ *
  * ── D-184-12 — DELETE IS IMMEDIATE, AND THE REFUSAL IS NOT A CONFIRM ──────────────
  *
  * The `✕` does not open a modal. It asks the page, the page asks
@@ -193,6 +206,7 @@ import {
 } from "@/components/workflows/canvasModel"
 import { CanvasToolbar, type ToolbarSaveState } from "@/components/workflows/CanvasToolbar"
 import { resolveDrop, type PhaseTypeId } from "@/components/workflows/definitionOps"
+import { FlowEdge } from "@/components/workflows/FlowEdge"
 import type { VerdictMarkKind } from "@/components/workflows/nodePresentation"
 import { EndCapNode, PhaseNode, UnresolvedSkipNode } from "@/components/workflows/PhaseNode"
 import type { PhaseSpecJSON } from "@/components/workflows/phaseVocabulary"
@@ -274,10 +288,37 @@ const ARIA_LABELS_EDITABLE = {
 }
 
 /**
- * The arrow marker every edge wears. Edge CLASSIFICATION rides on `data.kind`, not
- * on `edge.type` — setting `edge.type` would make the library look up an
- * `edgeTypes` entry named `flow` and fall back with a warning, since 183 registers
- * none. Per-kind styling is applied below, off that same `data.kind`.
+ * MODULE SCOPE for the same Pattern-4 reason as `nodeTypes` above — declared in the
+ * render body this object is new on every parent render, which makes React Flow warn
+ * ("It looks like you have created a new edgeTypes object") and re-render every edge.
+ * The keys are exactly `CANVAS_EDGE_KINDS`, as `nodeTypes`' keys are exactly
+ * `CANVAS_NODE_TYPES`.
+ *
+ * ONLY `flow` IS REGISTERED, and that is the whole blast radius of 185-10 (D-185-18):
+ * `canvasModel` sets `edge.type` on the sequential push alone, so `skip`, the
+ * unresolvable-skip stub edge and the `end` cap keep the library's built-in `default`
+ * renderer and `DEFAULT_EDGE_OPTIONS` below. A `skip`/`end` entry here would be dead
+ * code — worse, it would look like a promise the projection does not make.
+ */
+const edgeTypes = {
+  [CANVAS_EDGE_KINDS.flow]: FlowEdge,
+} as const
+
+/**
+ * The arrow marker every edge wears.
+ *
+ * ⚠ REWRITTEN BY 185-10 — this docblock previously claimed that setting `edge.type` would
+ * make the library look up a `flow` entry, find nothing registered by 183, and fall back
+ * with a warning. That is no longer true, and the correction is the point of D-185-18:
+ * `flow` edges now DO carry `edge.type` and render through
+ * `FlowEdge`, which re-renders `markerEnd` itself, because the library hands a custom
+ * edge the resolved `url('#…')` and draws nothing unless the component passes it
+ * through. `skip` and `end` set no `type`, keep the default renderer, and are the
+ * edges these options still reach on their own.
+ *
+ * Edge CLASSIFICATION still rides on `data.kind` — that is what `EDGE_STYLE` below is
+ * keyed on, for all three kinds, and `FlowEdge` receives the resolved `style` as a prop
+ * rather than deciding it.
  */
 const DEFAULT_EDGE_OPTIONS: DefaultEdgeOptions = {
   markerEnd: {
@@ -310,8 +351,15 @@ const EDGE_STYLE: Record<string, CSSProperties> = {
  * `＋` — lives. `INSERT_Y` is the connector's own height: `canvasModel` anchors every
  * edge at `EDGE_ANCHOR_Y` from the node top (never 50%), so the `＋` sits ON the drawn
  * line rather than merely near it, which is sketch 138-A's whole finding.
+ *
+ * EXPORTED BY 185-10, for a test and for nothing else. `FlowEdge.tsx` draws the armed
+ * detour inside the SAME gap and derives `GAP` / `INSERT_Y` from `CANVAS_LAYOUT` in its
+ * own `DETOUR` table, because importing this one would close a value-level ESM cycle
+ * (this module needs `FlowEdge` at module scope for `edgeTypes`). `FlowEdge.test.tsx`
+ * therefore imports BOTH tables and pins them equal, so the two derivations of one
+ * number cannot drift apart without a red test.
  */
-const EDIT_AFFORDANCE = {
+export const EDIT_AFFORDANCE = {
   /** The `＋` circle, `canvas-184.css` `.conn .ins`. */
   INSERT_SIZE: 26,
   /** The `✕` square, `canvas-184.css` `.acts button`. */
@@ -1445,6 +1493,10 @@ export function WorkflowCanvas({
           nodes={nodes}
           edges={edges}
           nodeTypes={nodeTypes}
+          // 185-10 — the module-scope map above, beside `nodeTypes` and for the same
+          // Pattern-4 reason. `flow` edges render through `FlowEdge`; `skip` and `end`
+          // carry no `type` and keep the built-in renderer.
+          edgeTypes={edgeTypes}
           defaultEdgeOptions={DEFAULT_EDGE_OPTIONS}
           // 184-10 — REQUIRED with a controlled `nodes` prop, and deliberately narrow:
           // only `position` changes are applied (see `handleNodesChange`).
