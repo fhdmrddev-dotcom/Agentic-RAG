@@ -202,6 +202,39 @@ def _judge_graded_text(output) -> str:
     return graded
 
 
+# ── the marker format: ONE home, read by the CHECKER and the INSTRUCTION ──────
+#
+# BUG-260730-01. Half (b) of ``retrieved_and_cited`` counts markers matching
+# ``CITATION_MARKER_PATTERN``, and NOTHING used to tell the producer what a marker looks
+# like: the auto-attachment (``grounding.py``) appends a ValidatorSpec and no prose, the
+# step prompt belongs to the author, and the retry feedback (``harness_engine.py``) only
+# echoes this module's own ``error_message``. So a detected step that retrieved correctly
+# still failed 3/3 attempts on the operator's publish golden run.
+#
+# The fix is on the PRODUCER, never the checker — the gate is exactly as strict as it was.
+# What changed is that the format it enforces is now STATED, once, here:
+#
+#   * ``CITATION_MARKER_PATTERN`` is the regex the gate compiles (the ``config["pattern"]``
+#     default below READS it, so an author-supplied pattern still wins and the default has
+#     exactly one definition);
+#   * ``CITATION_MARKER_EXAMPLES`` are concrete markers the pattern accepts;
+#   * ``CITATION_MARKER_GUIDANCE`` is the human phrasing, COMPOSED from the examples so the
+#     words and the regex cannot be edited apart.
+#
+# Both the failure message below and ``phase_types._citation_instruction`` (the system-prompt
+# suffix a detected step now carries) read ``CITATION_MARKER_GUIDANCE``. Do not re-type the
+# format and do not compose a second phrasing of it anywhere else.
+# ``test_185_detection.py`` COMPILES the pattern and asserts every advertised example matches
+# it, so drifting the phrasing away from the regex — in either direction — turns a test red.
+CITATION_MARKER_PATTERN = r"\[\d+\]|\(doc[^)]*\)"
+CITATION_MARKER_EXAMPLES = ("[1]", "(doc-2)")
+CITATION_MARKER_GUIDANCE = (
+    "cite inline right after each claim you make, using a marker of the form "
+    + " or ".join(CITATION_MARKER_EXAMPLES)
+    + ", pointing at the passages you retrieved"
+)
+
+
 # ── 1. citations_required (wraps check_coverage; D-14 two modes) ──────────────
 @register_validator("citations_required")
 async def _validate_citations_required(output: dict, config: dict, ctx) -> GateResult:
@@ -231,6 +264,17 @@ async def _validate_citations_required(output: dict, config: dict, ctx) -> GateR
     into existence. The sibling ``source_refs`` list can be populated by a non-KB
     tool, so reading it would weaken the gate to something a step that never touched
     the knowledge base could satisfy. It is deliberately not an input here.
+
+    THE PRODUCER IS TOLD — DO NOT REMOVE THE INSTRUCTION AND LEAVE THE CHECK
+    (BUG-260730-01). Half (b) is only fair because the step that must satisfy it is now
+    told the format BEFORE attempt 1: ``phase_types._citation_instruction`` reads
+    ``CITATION_MARKER_GUIDANCE`` (defined just above) off the ATTACHED ValidatorSpec and
+    appends it to the phase's system prompt on both agent paths. As originally shipped the
+    gate was attached automatically (``grounding.py``) and announced nowhere, so a detected
+    step that retrieved correctly still failed 3/3 attempts on the marker count — the
+    author-side burden the auto-attachment exists to REMOVE. Deleting that suffix while
+    leaving this branch in place re-opens the bug; the fix belongs on the producer, and the
+    gate itself must stay exactly this strict.
     """
     mode = config.get("mode", "deterministic")
 
@@ -255,7 +299,7 @@ async def _validate_citations_required(output: dict, config: dict, ctx) -> GateR
         # Half (b) — the marker count, the SAME code path as ``presence``: same
         # default pattern literal, same re.error guard, same ``min_markers`` default.
         text = _output_text(output)
-        pattern = config.get("pattern", r"\[\d+\]|\(doc[^)]*\)")
+        pattern = config.get("pattern", CITATION_MARKER_PATTERN)
         try:
             n = len(re.findall(pattern, text))
         except re.error as e:
@@ -264,10 +308,20 @@ async def _validate_citations_required(output: dict, config: dict, ctx) -> GateR
         if n >= need:
             return GateResult(True, None)
         if mode == "retrieved_and_cited":
+            # BUG-260730-01 — the message states the REMEDY, not just the deficit. The
+            # engine interpolates this verbatim into ctx.retry_feedback
+            # (harness_engine.py), so naming the format here makes attempt 2 better
+            # informed than attempt 1 with no engine change. The
+            # "{n}/{need} citation markers in the answer" substring is preserved for the
+            # shipped assertion and for log greps.
             return GateResult(
                 False,
-                f"citations_required: {n}/{need} citation markers in the answer",
+                f"citations_required: {n}/{need} citation markers in the answer"
+                f" — {CITATION_MARKER_GUIDANCE}",
             )
+        # ``presence`` — BYTE-UNCHANGED (the docstring's standing claim). The remedy
+        # clause is deliberately NOT added here: a ``presence`` author opted in and wrote
+        # their own marker instructions, so they were never the ones left uninformed.
         return GateResult(False, f"citations_required: only {n}/{need} citation markers")
 
     # deterministic / emit mode — wrap check_coverage.

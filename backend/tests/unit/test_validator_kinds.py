@@ -220,10 +220,21 @@ def test_retrieved_and_cited_fails_when_nothing_was_retrieved():
 
 def test_retrieved_and_cited_fails_when_the_answer_points_at_nothing():
     """D-185-01 half (b): real retrieval but ZERO citation markers in the text fails,
-    with the marker reason (not the retrieval one)."""
+    with the marker reason (not the retrieval one).
+
+    BUG-260730-01 — and the message must now name the REMEDY, not just the deficit. The
+    engine interpolates ``gate.error_message`` verbatim into ``ctx.retry_feedback``
+    (``harness_engine.py``), so a message that states the format is what makes attempt 2
+    better informed than attempt 1. The shipped ``in``-style substring assertion below is
+    kept EXACTLY as it was, which is the proof the clause is APPENDED rather than a
+    rewrite."""
     import asyncio
 
     import app.services.harness.validator_kinds  # noqa: F401
+    from app.services.harness.validator_kinds import (
+        CITATION_MARKER_EXAMPLES,
+        CITATION_MARKER_GUIDANCE,
+    )
     from app.services.harness.validators import VALIDATOR_REGISTRY
 
     validator = VALIDATOR_REGISTRY["citations_required"]
@@ -239,6 +250,12 @@ def test_retrieved_and_cited_fails_when_the_answer_points_at_nothing():
     assert result.passed is False
     assert "citation markers in the answer" in result.error_message
     assert "nothing was retrieved" not in result.error_message
+
+    # The remedy clause: the guidance, from its one home, and a concrete example marker.
+    assert CITATION_MARKER_GUIDANCE in result.error_message
+    assert CITATION_MARKER_EXAMPLES[0] in result.error_message
+    # One line — this string is logged and interpolated into a prompt.
+    assert "\n" not in result.error_message
 
 
 def test_retrieved_and_cited_passes_when_both_halves_hold():
