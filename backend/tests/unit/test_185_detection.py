@@ -617,3 +617,475 @@ async def test_the_tools_field_keeps_its_shipped_string_list_shape():
 
     assert response.tools, "the healthy control must actually carry a tool palette"
     assert all(isinstance(t, str) for t in response.tools)
+
+
+# ══ BUG-260730-01 — the attached gate is ANNOUNCED to the step that must satisfy it ══
+#
+# Detection earning a gate is only half a promise. As first shipped, a detected step got its
+# `citations_required` validator attached automatically and was told about it NOWHERE — not by
+# the step prompt (the author's), not by the attachment seam (it appends a ValidatorSpec and no
+# prose), not by the retry feedback (which echoed the deficit without naming the format). The
+# operator's publish golden run (`workflow_runs.id = ded89703-44c4-4e40-b5fe-9af35a44a54d`,
+# `deepseek-v4-flash`) died on it:
+#
+#   Phase 1 (retrieve) gate failed after 3 attempt(s): citations_required: 0/1 citation
+#   markers in the answer
+#
+# Half (a) — the "nothing was retrieved (0 sources)" branch — did NOT fire, which is the proof
+# retrieval SUCCEEDED and the loss was purely the missing marker.
+#
+# What these guard, in the order they matter:
+#
+#   1. the gate is NO LESS STRICT (the fix is on the producer; loosening the checker is the
+#      tempting wrong turn, so an unmarked answer must still FAIL);
+#   2. the instruction and the checker cannot DRIFT (the advertised example is compiled
+#      against the gate's own pattern);
+#   3. D-14 byte-identity survives a prompt-composition edit in a shared module (asserted by
+#      EQUALITY, not by a substring absence);
+#   4. BOTH agent executors carry it (a one-path fix leaves every batch step failing);
+#   5. the instruction is derived from the ATTACHED spec, never from a second detection call.
+
+
+def _cited_output(text: str, citations: list | None = None) -> dict:
+    """The documented `_exec_llm_agent` output shape. Note the absence of `field_map`."""
+    return {
+        "text": text,
+        "sub_run_id": "sub-1",
+        "source_refs": [{"document_id": "d1"}],
+        "citations": [{"chunk_id": "c1"}] if citations is None else citations,
+        "similarity_scores": [0.71],
+    }
+
+
+def _gate(output: dict, **cfg):
+    """Run the REAL registered `citations_required` validator (never a stand-in)."""
+    import asyncio
+
+    import app.services.harness.validator_kinds  # noqa: F401 — registration side-effect
+    from app.services.harness.validators import VALIDATOR_REGISTRY
+
+    return asyncio.run(VALIDATOR_REGISTRY["citations_required"](output, cfg, None))
+
+
+# ── guard 2: the drift pin (the strongest one) ────────────────────────────────
+
+
+def test_every_advertised_marker_example_matches_the_pattern_the_gate_compiles():
+    """THE DRIFT PIN. "The instruction and the checker agree" as a TEST, not a comment.
+
+    The gate counts markers matching `CITATION_MARKER_PATTERN`; the prompt suffix tells the
+    model to write `CITATION_MARKER_EXAMPLES`. If someone rephrases the guidance to advertise
+    a form the regex rejects, or tightens the regex past an advertised example, this reds —
+    which is the only thing standing between a future edit and a silent return of
+    BUG-260730-01, where the producer was asked for one thing and judged on another.
+    """
+    import re as _re
+
+    from app.services.harness.validator_kinds import (
+        CITATION_MARKER_EXAMPLES,
+        CITATION_MARKER_GUIDANCE,
+        CITATION_MARKER_PATTERN,
+    )
+
+    compiled = _re.compile(CITATION_MARKER_PATTERN)
+
+    assert CITATION_MARKER_EXAMPLES, "the format must advertise at least one example"
+    for example in CITATION_MARKER_EXAMPLES:
+        assert compiled.search(example), (
+            f"the guidance advertises {example!r} but the gate's own pattern "
+            f"{CITATION_MARKER_PATTERN!r} does not accept it — a model that obeyed the "
+            "instruction to the letter would still fail the gate"
+        )
+        assert example in CITATION_MARKER_GUIDANCE, (
+            f"{example!r} is not in the human phrasing — the guidance must be COMPOSED from "
+            "the examples, so the words and the regex cannot be edited apart"
+        )
+
+    # POSITIVE CONTROL: the assertion above can go RED. A marker shape the pattern rejects
+    # is what the falsification of this pin substitutes, and it must not slip through.
+    assert not compiled.search("<<1>>"), (
+        "the control failed — this pattern accepts anything, so the pin proves nothing"
+    )
+
+
+def test_the_gate_default_pattern_has_exactly_one_home():
+    """The constant IS the default the validator compiles — not a hopeful copy of it.
+
+    Proven behaviourally: an output carrying an advertised marker passes with NO `pattern` in
+    the config, so the default really is the shared constant. A second literal in
+    `validator_kinds.py` would leave this green while drifting, which is why the pin above
+    compiles the constant the instruction reads.
+    """
+    from app.services.harness.validator_kinds import CITATION_MARKER_EXAMPLES
+
+    for example in CITATION_MARKER_EXAMPLES:
+        result = _gate(_cited_output(f"Revenue grew 4% {example}."), mode="retrieved_and_cited")
+        assert result.passed is True, f"the default pattern rejected its own example {example!r}"
+
+
+# ── guard 1: the gate is no less strict, and now says what it wants ───────────
+
+
+def test_a_retrieved_but_unmarked_answer_STILL_FAILS_and_now_names_the_format():
+    """The bug reproduction, end to end at the gate — and the anti-regression for the FIX.
+
+    This plan fixed the PRODUCER, never the checker. The whole point is that this case still
+    fails: half (b) is the "point at what you read" half, and making it optional would trade a
+    blocked publish for a dishonest citation claim. What changed is only that the message now
+    carries the remedy, which the engine interpolates verbatim into `ctx.retry_feedback`.
+    """
+    from app.services.harness.validator_kinds import (
+        CITATION_MARKER_EXAMPLES,
+        CITATION_MARKER_GUIDANCE,
+    )
+
+    result = _gate(_cited_output("Revenue grew last quarter."), mode="retrieved_and_cited")
+
+    assert result.passed is False, (
+        "the gate was LOOSENED — an answer that points at nothing must still fail "
+        "(T-185-12-01); the fix belongs on the producer"
+    )
+    # The production message, still recognisable (log greps + the shipped assertion).
+    assert "0/1 citation markers in the answer" in result.error_message
+    assert "nothing was retrieved" not in result.error_message, "half (a) must not have fired"
+    # ... and now the remedy, from its one home.
+    assert CITATION_MARKER_GUIDANCE in result.error_message
+    assert CITATION_MARKER_EXAMPLES[0] in result.error_message
+    assert "\n" not in result.error_message, "one line — this string is logged and re-prompted"
+
+
+def test_the_same_answer_passes_once_it_carries_the_advertised_marker():
+    """The other side of the reproduction: obeying the instruction satisfies the gate.
+
+    Same output, same config, one marker added. Before this plan a model could only get here
+    by GUESSING the format — which is why the failure looked like provider flakiness.
+    """
+    from app.services.harness.validator_kinds import CITATION_MARKER_EXAMPLES
+
+    marked = _gate(
+        _cited_output(f"Revenue grew 4% {CITATION_MARKER_EXAMPLES[0]}."),
+        mode="retrieved_and_cited",
+    )
+    assert marked.passed is True
+    assert marked.error_message is None
+
+
+def test_half_a_still_owns_the_nothing_retrieved_case():
+    """The control for the claim this whole bug rests on: the two halves stay distinguishable.
+
+    A marker-stuffed answer with an EMPTY `citations` list must still fail on retrieval, not on
+    the marker count — otherwise "half (a) did not fire" would not have been evidence that the
+    operator's step really did retrieve.
+    """
+    from app.services.harness.validator_kinds import CITATION_MARKER_EXAMPLES
+
+    result = _gate(
+        _cited_output(f"A claim {CITATION_MARKER_EXAMPLES[0]} and another [2].", []),
+        mode="retrieved_and_cited",
+    )
+    assert result.passed is False
+    assert "nothing was retrieved" in result.error_message
+
+
+# ── the instruction helper: derived from the ATTACHED spec ────────────────────
+
+
+def _instruction(phase) -> str:
+    from app.services.harness.phase_types import _citation_instruction
+
+    return _citation_instruction(phase)
+
+
+def _effective(phase_dict: dict, total: int = 1):
+    """The phase AS THE EXECUTOR SEES IT — through the engine's one synthesis seam."""
+    from app.services.harness.grounding import effective_phase
+
+    return effective_phase(_spec(phase_dict), total_phases=total)
+
+
+def test_a_detected_step_is_told_the_format_before_attempt_1():
+    """The fix, at its narrowest: detection attaches the gate, and the gate is announced."""
+    from app.services.harness.validator_kinds import CITATION_MARKER_EXAMPLES
+
+    text = _instruction(_effective(_llm_agent(tools=["search_documents"])))
+
+    assert text, "a detected step must carry the instruction"
+    assert CITATION_MARKER_EXAMPLES[0] in text
+    assert text.startswith("\n\n"), "an additive SUFFIX, appended to the author's prompt"
+
+
+def test_the_instruction_reads_the_attached_spec_not_a_second_detection_call():
+    """The load-bearing design point (T-185-12-03).
+
+    Proven behaviourally in both directions:
+
+      * a phase carrying the spec but NO KB tool — the author-declared shape — is still told,
+        because the spec is what the judge will run;
+      * a phase with a KB tool whose spec was NOT attached is silent, because nothing will
+        judge it.
+
+    A helper that re-derived the cause would answer both of these backwards.
+    """
+    from app.models.harness import ValidatorSpec
+
+    spec = ValidatorSpec(
+        kind="citations_required", timing="post", on_failure="fail_run", max_retries=2,
+        config={"mode": "retrieved_and_cited"},
+    )
+
+    # Spec present, detection absent -> instructed (the judge is what matters).
+    declared = _spec(_llm_agent(tools=["execute_code"]))
+    declared = declared.model_copy(update={"validators": [spec]})
+    assert _instruction(declared), "an attached spec must be announced even without detection"
+
+    # Detection present, spec absent (the RAW parsed phase, before the engine's seam) -> silent.
+    raw = _spec(_llm_agent(tools=["search_documents"]))
+    assert raw.validators == []  # the positive control for the claim below
+    assert _instruction(raw) == "", (
+        "the helper announced a gate that is not attached — it is re-deciding governance "
+        "instead of reading the spec the engine synthesized"
+    )
+
+
+@pytest.mark.parametrize("mode", ["deterministic", "emit", "presence"])
+def test_the_instruction_is_silent_for_every_other_citation_mode(mode):
+    """Scope, asserted. `deterministic`/`emit` gate a `field_map` (a different obligation the
+    emit path already instructs); a `presence` author opted in and wrote their own marker
+    instructions — they were never the ones left uninformed."""
+    from app.models.harness import ValidatorSpec
+
+    phase = _spec(_llm_agent(tools=["search_documents"])).model_copy(
+        update={"validators": [ValidatorSpec(kind="citations_required", config={"mode": mode})]}
+    )
+    assert _instruction(phase) == ""
+
+
+def test_the_instruction_never_asks_for_fewer_markers_than_the_strictest_gate():
+    """D-185-05 lets an author's spec AND the engine's both run, so `min_markers` is the MAX.
+
+    An instruction that quoted the FIRST spec it found could tell the model "1 marker" while a
+    sibling gate demanded 3 — the same asked-one-thing-judged-on-another shape as the bug.
+    """
+    from app.models.harness import ValidatorSpec
+
+    weak = ValidatorSpec(kind="citations_required", config={"mode": "retrieved_and_cited", "min_markers": 0})
+    strong = ValidatorSpec(kind="citations_required", config={"mode": "retrieved_and_cited", "min_markers": 3})
+    phase = _spec(_llm_agent(tools=["search_documents"])).model_copy(
+        update={"validators": [weak, strong]}
+    )
+
+    text = _instruction(phase)
+    assert "At least 3" in text and "markers" in text
+
+    # A gate satisfied by zero markers alone has nothing to announce.
+    only_weak = _spec(_llm_agent(tools=["search_documents"])).model_copy(
+        update={"validators": [weak]}
+    )
+    assert _instruction(only_weak) == ""
+
+
+def test_a_spec_with_its_own_pattern_is_not_given_the_shared_guidance():
+    """Honesty over coverage: `CITATION_MARKER_GUIDANCE` describes the DEFAULT pattern only.
+
+    Advertising `[1]` for a gate compiling some other author-supplied regex would instruct the
+    model to fail. Such a spec is author-declared, so its prompt is the author's job (the
+    pre-185 contract) — and a junk `min_markers` must never raise out of a prompt builder.
+    """
+    from app.models.harness import ValidatorSpec
+
+    custom = _spec(_llm_agent(tools=["search_documents"])).model_copy(
+        update={"validators": [ValidatorSpec(
+            kind="citations_required",
+            config={"mode": "retrieved_and_cited", "pattern": r"SRC-\d+"},
+        )]}
+    )
+    assert _instruction(custom) == ""
+
+    junk = _spec(_llm_agent(tools=["search_documents"])).model_copy(
+        update={"validators": [ValidatorSpec(
+            kind="citations_required",
+            config={"mode": "retrieved_and_cited", "min_markers": "lots"},
+        )]}
+    )
+    assert _instruction(junk), "a malformed config must degrade to the gate's default, not raise"
+
+
+# ── guard 3: D-14 byte-identity, by EQUALITY ──────────────────────────────────
+
+
+@pytest.mark.parametrize(
+    "phase_dict",
+    [
+        _llm_agent(tools=["execute_code"]),          # ungoverned agent
+        _llm_agent(tools=[]),                        # no tools at all
+        _llm_single(),                               # no available_tools field
+        _llm_emit(citation_policy="strict"),         # already-set, gate NOT synthesized
+        _llm_batch_agents(tools=["web_search"]),     # ungoverned batch
+    ],
+)
+@pytest.mark.parametrize("feedback", [None, "Previous output failed validation: x. Fix it."])
+def test_a_phase_that_earns_no_citation_gate_gets_a_byte_identical_prompt(phase_dict, feedback):
+    """D-14 (T-185-12-04) — the fence a prompt-composition edit in a SHARED module needs.
+
+    EQUALITY, not `not in`: the composed prompt must equal the pre-plan composition
+    (`prompt + _skill_block + _retry_suffix`) exactly, so the new helper is proven to have
+    contributed the empty string rather than merely "nothing recognisable". Run with the retry
+    suffix both absent and present, because the helper sits between the two shipped suffixes
+    and an ordering slip would show up only when both are live.
+    """
+    from app.services.harness.phase_types import (
+        _citation_instruction,
+        _retry_suffix,
+        _skill_block,
+    )
+
+    phase = _effective(phase_dict, total=4)
+    ctx = SimpleNamespace(retry_feedback=feedback)
+
+    pre_plan = phase.config.prompt + _skill_block(phase, ctx) + _retry_suffix(ctx)
+    composed = (
+        phase.config.prompt
+        + _skill_block(phase, ctx)
+        + _citation_instruction(phase)
+        + _retry_suffix(ctx)
+    )
+
+    assert composed == pre_plan
+    assert _citation_instruction(phase) == ""
+
+
+# ── guard 4: BOTH agent executors ─────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "executor_name,phase_dict",
+    [
+        ("_exec_llm_agent", _llm_agent(tools=["search_documents"])),
+        ("_exec_llm_batch_agents", _llm_batch_agents(tools=["search_documents"])),
+    ],
+)
+async def test_both_agent_executors_carry_the_instruction_into_the_system_prompt(
+    monkeypatch, executor_name, phase_dict
+):
+    """The one-path-fix failure mode, guarded.
+
+    Both `llm_agent` and `llm_batch_agents` carry `available_tools`, so BOTH are detectable and
+    both earn the gate. Fixing only the single-agent path would leave every detected batch step
+    failing a gate nothing announced — the original bug, narrowed rather than closed.
+
+    Driven OFFLINE (the suite's standing posture): the sub-agent call, the tool-budget build and
+    the ToolContext build are stubbed, and what is captured is the real
+    `system_prompt_override` the executor composed.
+    """
+    from app.services.harness import phase_types as pt
+    from app.services.harness.validator_kinds import CITATION_MARKER_EXAMPLES
+
+    captured: list[str] = []
+
+    async def _fake_sub_agent(**kwargs):
+        captured.append(kwargs["system_prompt_override"])
+        return {
+            "summary": "done",
+            "sub_run_id": "sub-1",
+            "source_refs": [],
+            "citations": [{"chunk_id": "c1"}],
+            "similarity_scores": [0.7],
+        }
+
+    monkeypatch.setattr(pt, "run_task_sub_agent", _fake_sub_agent)
+    monkeypatch.setattr(pt, "_phase_tools_override", lambda *a, **k: [])
+    monkeypatch.setattr(pt, "_build_phase_tool_context", lambda phase, ctx: object())
+
+    ctx = SimpleNamespace(
+        model="deepseek-v4-flash",
+        retry_feedback=None,
+        inputs={"kickoff_prompt": "Where are our compliance gaps?"},
+    )
+
+    await getattr(pt, executor_name)(_effective(phase_dict, total=2), {}, ctx)
+
+    assert len(captured) == 1, f"{executor_name} did not reach the stubbed sub-agent"
+    prompt = captured[0]
+    assert CITATION_MARKER_EXAMPLES[0] in prompt, (
+        f"{executor_name} composed a prompt with no citation instruction — a detected step on "
+        "this path is judged on a format it was never told"
+    )
+    # The author's prompt still leads; the instruction is a SUFFIX, not a replacement.
+    assert prompt.startswith(_spec(phase_dict).config.prompt)
+
+
+@pytest.mark.asyncio
+async def test_the_retry_feedback_stays_last_after_the_instruction(monkeypatch):
+    """Ordering, asserted where it matters: feedback about a FAILED attempt is closest to the
+    model's next turn, so the instruction cannot bury it. Both suffixes present at once."""
+    from app.services.harness import phase_types as pt
+    from app.services.harness.validator_kinds import CITATION_MARKER_EXAMPLES
+
+    captured: list[str] = []
+
+    async def _fake_sub_agent(**kwargs):
+        captured.append(kwargs["system_prompt_override"])
+        return {"summary": "done", "sub_run_id": "s", "source_refs": [], "citations": [],
+                "similarity_scores": []}
+
+    monkeypatch.setattr(pt, "run_task_sub_agent", _fake_sub_agent)
+    monkeypatch.setattr(pt, "_phase_tools_override", lambda *a, **k: [])
+    monkeypatch.setattr(pt, "_build_phase_tool_context", lambda phase, ctx: object())
+
+    feedback = "Previous output failed validation: citations_required: 0/1. Fix it."
+    ctx = SimpleNamespace(model="gpt-5.5", retry_feedback=feedback, inputs={})
+    await pt._exec_llm_agent(
+        _effective(_llm_agent(tools=["search_documents"]), total=1), {}, ctx
+    )
+
+    prompt = captured[0]
+    assert prompt.endswith(feedback), "the retry feedback must be the LAST thing the model reads"
+    assert prompt.index(CITATION_MARKER_EXAMPLES[0]) < prompt.index(feedback)
+
+
+# ── guard 5: the instruction module re-derives nothing ────────────────────────
+
+
+def test_the_prompt_module_never_re_derives_which_steps_are_governed():
+    """The one-home rule, machine-checked — the same idiom as criterion 8 above.
+
+    `phase_types.py` must reach the citation obligation through the ATTACHED spec ONLY. A second
+    detection call there would be a second copy of "which steps are governed", which
+    `grounding.py`'s own docblock names as a safety hole: the two copies could disagree about a
+    step, and the disagreement would surface as a run that is judged on a rule it was not told.
+
+    The needle is ASSEMBLED FROM PARTS (rule 1 of the criterion-8 block) so this guard cannot be
+    satisfied by editing a neighbouring docblock. Both the flattened CODE and the raw source are
+    checked: code catches a call or an import, raw catches a prose mention that would defeat the
+    literal grep this criterion is written as.
+    """
+    from app.services.harness import phase_types as pt
+
+    source = pathlib.Path(pt.__file__).read_text(encoding="utf-8")
+
+    assert _CAUSE_FIELD not in _code_only(source), (
+        f"`phase_types.py` references {_CAUSE_FIELD!r} in CODE — the instruction must be "
+        "derived from the attached ValidatorSpec, never from a second detection call"
+    )
+    assert _CAUSE_FIELD not in source, (
+        f"{_CAUSE_FIELD!r} appears in `phase_types.py` (prose or code) — the guard for this "
+        "invariant is a literal file grep pinned to zero"
+    )
+
+    # POSITIVE CONTROL: both halves DO fire on planted source.
+    planted = f"from app.services.harness.grounding import {_CAUSE_FIELD}\n"
+    assert _CAUSE_FIELD in _code_only(planted)
+    assert _CAUSE_FIELD in planted
+
+
+def test_the_prompt_module_still_reads_the_shared_marker_format():
+    """The other half of one-home: `phase_types.py` must not re-type or re-phrase the format.
+
+    Behavioural, not textual — the instruction it composes CONTAINS the guidance string from
+    `validator_kinds.py` verbatim, so a locally-worded copy would red here.
+    """
+    from app.services.harness.validator_kinds import CITATION_MARKER_GUIDANCE
+
+    text = _instruction(_effective(_llm_agent(tools=["search_documents"])))
+    assert CITATION_MARKER_GUIDANCE in text
