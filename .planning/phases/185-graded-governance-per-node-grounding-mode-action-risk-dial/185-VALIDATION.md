@@ -369,6 +369,52 @@ node's citation enforcement rides the provider-sensitive retrieval/agent path, s
 documentation before being attributed to our code, and any fix stays at the service boundary — never on the
 shared path.
 
+### Roster amendment — the board was 4 providers wide and the product is 8
+
+**Raised by the operator, 2026-07-31, and it is a defect in the STANDARD, not in one execution:**
+*"What about the other providers — DeepSeek, MiniMax, Z[hipu], Moonshot? Why do you always test those
+four main providers, ignoring the others? We should make it resistant for the future."*
+
+Correct. CLAUDE.md's §"UAT scoreboard recipe" said verbatim *"Cross-provider | OpenAI, Anthropic,
+Google, OpenRouter (4 providers)"*, so every scoreboard in this project has tested four of the eight
+providers the app actually ships and called the axis covered. That under-specification is why it
+recurs. **CLAUDE.md has been amended** (2026-07-31): the required set is now the full native roster +
+OpenRouter (8 rows), the roster must be **derived from `MODEL_CAPABILITIES` by grouping on
+`provider`** rather than transcribed, representatives must be registry-backed (an inferred id
+silently loses `emit_tier`), and a row that cannot run is recorded ⛔ with its blocker — never dropped.
+
+**The four missing rows, driven 2026-07-31 on the same definition and method:**
+
+| Provider | Model | `retrieve` (the axis this row measures) | Full run |
+|---|---|---|---|
+| DeepSeek | `deepseek-v4-pro` | **✅ completed** | emit still running at time of writing |
+| MiniMax | `MiniMax-M3` | **✅ completed** | emit failed — see below |
+| Zhipu / GLM | `glm-5.2` | **✅ completed** | emit still running at time of writing |
+| Moonshot / Kimi | `kimi-k2.6` | **✅ completed** | **✅ completed end-to-end** |
+
+**All four passed the grounded-retrieval axis** — the detected step called the KB tool, `citations`
+came back non-empty, and the engine-synthesized gate cleared. So the graded-governance path is
+**8-for-8 across the entire provider roster** on the property GOVERN-01 actually claims.
+
+Two findings worth keeping:
+
+1. **Moonshot completed the whole workflow on `emit_tier: coerce`.** `kimi-k2.6` carries the weakest
+   emission guarantee in the registry (the only native `coerce` rows) and still produced a valid
+   field-map and rendered the deliverable. That is evidence the coerce ladder is genuinely functional,
+   not a paper fallback — relevant to [[SEED-135]], which flags those rows as judge-ineligible.
+2. **`offending` is populated for MiniMax and empty for Anthropic, from the same validator.** MiniMax:
+   `uncited=8 invented=25 offending=['scalar.report_date', 'scalar.report_title', 'scalar.scope', …]`.
+   Anthropic earlier: `invented=24 offending=[]`. So the empty-list case is **conditional**, not a
+   validator that never populates it — which makes [[BUG-260730-02]] sharper than first written: the
+   surfaced message *can* name what is wrong and sometimes does not. Fold this evidence into that
+   report rather than opening a new one.
+
+> **Two rows remain in flight** (`deepseek-v4-pro`, `glm-5.2` — both on `emit`) and are recorded here
+> as retrieve-PASS / emit-pending rather than being held back. They are markedly slower than the
+> big-four on forced structured emission, which is itself the honest observation.
+
+---
+
 ### Rows driven 2026-07-31 — method, and what each one actually showed
 
 **Method.** Each row was launched as a real run via `POST /threads/{id}/messages` with a **per-request**

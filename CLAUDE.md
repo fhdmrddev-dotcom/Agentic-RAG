@@ -91,10 +91,44 @@ Phase 075.4 Plan 05 (D-075.4-H1 Wave 0) — closes the assumption-driven-UAT gap
 
 | Axis | Required coverage |
 |------|-------------------|
-| Cross-provider | OpenAI, Anthropic, Google, OpenRouter (4 providers — pick one representative model per axis) |
+| Cross-provider | **The FULL native roster + OpenRouter — 8 rows, not 4.** See the roster rule below. |
 | Multi-tool | At least 1 row exercising 2+ tools in one prompt (e.g., `search_documents` + `execute_code`) |
 | Parallel-thread | At least 1 row with Thread A streaming while Thread B accepts a new prompt |
 | Long-message | At least 1 row with ≥ 50 prior messages OR a ≥ 5 KB user prompt |
+
+**The cross-provider roster rule (amended 2026-07-31 — operator, during Phase 185 UAT).** This table
+previously said *"OpenAI, Anthropic, Google, OpenRouter (4 providers)"*, and that under-specification
+is why every scoreboard in this project has silently skipped half the product. The app ships **seven
+native providers** plus OpenRouter; testing four and calling it "cross-provider" tests the four we
+happen to think of first. The operator's standing direction is the **full native roster** — so the
+required set is:
+
+| | Provider | Note |
+|---|---|---|
+| 1 | OpenAI | |
+| 2 | Anthropic | native SDK |
+| 3 | Google | historically the highest-risk row for tool-call emission |
+| 4 | DeepSeek | `strict_json_schema` is **inert** (DEMOTED — no `/beta` base_url, D-122-04) |
+| 5 | Zhipu / GLM | |
+| 6 | MiniMax | |
+| 7 | Moonshot / Kimi | **the only `emit_tier: coerce` native rows** — the weakest emission guarantee in the registry |
+| 8 | OpenRouter | every OpenRouter row is `native_tools: False` — it is the non-native tool path, not a fifth flavour of the native one |
+
+**Derive the roster, never re-type it.** `MODEL_CAPABILITIES` is the source of truth — group by
+`provider` and take one representative per group, rather than transcribing the list above (which will
+rot the moment a provider is added). Prefer the **newest** model per provider, and prefer a
+**registry-backed** id: an id absent from `MODEL_CAPABILITIES` resolves `capability_source=inferred`
+and silently loses `emit_tier`, so the row would measure a weaker configuration than the one that
+ships (see SEED-040 §2026-07-31, and SEED-135).
+
+**Rows may be blocked, but never silently omitted.** A provider with no key configured, or one blocked
+by a known defect, is recorded as ⛔ with the reason and the blocking issue id — never dropped from the
+table. A scoreboard that lists only what passed is not a scoreboard.
+
+**Cheapest honest method** (proven in Phase 185): drive each row as a real run with a **per-request**
+`model` + `provider` on `POST /threads/{id}/messages`, and read verdicts from `workflow_runs` /
+`workflow_phases` / `harness_audit`. That scores the whole board **without mutating any global
+setting**, so the operator's environment is untouched and rows cannot contaminate each other.
 
 UAT rows MUST be authored under VALIDATION.md, NOT in PLAN.md tasks. Phase verification only passes when all 4 axes are exercised — Plan 05 E2E backstop covers 1-3 automated; long-message stays manual per provider.
 
