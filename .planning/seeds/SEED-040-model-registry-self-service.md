@@ -89,3 +89,52 @@ Phase 175 (Cross-Provider Streaming Fidelity) is a **textbook instance of this s
 - Acceptance bar (operator's words): discovering + adding a new reasoning model is a **UI action, not a code change**.
 
 Breadcrumbs added this update: `config.py:700` (`get_model_capability_async` overlay field list — the 5-field allow-list to extend), `config.py:529` (sync `get_model_capability` — no DB tier; used by the routing seams), `openai_service.py:1662` (`resolve_calling_mode` reads sync), `config.py:253` (`MODEL_CAPABILITIES` static dict — where `reasoning_first`/`reasoning_off` are hardcoded today), Phase 175 (`.planning/phases/175-cross-provider-streaming-fidelity/`). Related: [[SEED-034]], the `project_dynamic_settings_direction` + `project_admin_panel_plan` memories ("everything dynamic → admin UI, except secrets").
+
+---
+
+## 2026-07-31 update — a THIRD capability flag is registry-only, and it silently downgrades the deliverable
+
+Operator raised this again verbatim during Phase 185 UAT: *"any model I add from the APIs is not
+registered in the model registry, which is an issue because I will not see it in the settings, I will
+not see it in the other places — this has to be fully from the UI, so not every time I want to
+discover a new model I have to go back to the code."* Same ask as 2026-05-30 and 2026-07-22; this
+update adds the concrete harm, which is worse than "the model is invisible".
+
+**New evidence — `emit_tier` / `forced_emission` are registry-only, and a miss degrades output quality
+silently.** The operator set `app_settings.llm_model = gemini-3.6-flash`, which is NOT in
+`MODEL_CAPABILITIES` (the registry has `gemini-3.5-flash`, `gemini-3.1-flash-lite`,
+`gemini-3-flash-preview`, `gemini-3.1-pro-preview`, and the 2.5 family — no 3.6):
+
+```
+gemini-3.6-flash  → capability_source=inferred  forced_emission=None  emit_tier=None
+gemini-3.5-flash  → capability_source=registry  forced_emission=True  emit_tier=force
+```
+
+`emit_tier` decides how `_exec_llm_emit` forces a structured field-map out of the model. The
+registry miss dropped the workflow's emit phase from **`force` to `coerce`** — visible in
+`harness_audit.emit_rendered.tier: "coerce"` on run `da5541c0`. It happened to succeed there, so
+**nothing warned anyone**: no error, no banner, just a quieter guarantee on the step that produces
+the actual deliverable. On a weaker model the same downgrade is the difference between a rendered
+document and a narrated failure.
+
+So the overlay allow-list gap from the 2026-07-22 update is now **three** flags deep and counting:
+`reasoning_first`, `reasoning_off`, and now **`emit_tier` / `forced_emission`**. This is the pattern
+the update above predicted — each new capability flag added to `ModelCapability` is registry-only by
+default, so the debt grows every phase that adds one. It is the argument for making the overlay
+**schema-driven off the `ModelCapability` TypedDict** rather than a hand-maintained field list: an
+allow-list that must be remembered will keep being forgotten.
+
+**Add to the sharpened scope:**
+- (d) `emit_tier` / `forced_emission` join the UI-editable set — and the fix should be structural
+  (derive the editable field set from `ModelCapability`), not another hand-added row.
+- (e) **Surface `capability_source=inferred` in the UI.** Today the only signal is a
+  once-per-process log line (`model_capability_unknown model_id=… safe_defaults_applied=True`). An
+  operator choosing a model in Settings has no way to know they picked one running on inferred
+  defaults with weaker guarantees. A badge on the model picker ("inferred capabilities — not
+  verified") converts a silent downgrade into an informed choice, and is cheap next to (a)-(d).
+
+Breadcrumbs: `config.py:339` (`MODEL_CAPABILITIES` google rows — no 3.6), `config.py:529`
+(`get_model_capability` inference fallback), `phase_types.py` `_exec_llm_emit` (the `emit_tier`
+consumer), `harness_audit` rows for run `da5541c0-a786-4ab0-b5fe-bea8b1850bbf` (`tier: "coerce"`).
+Related: [[SEED-088]] (dynamic model registry / live discovery — the same operator ask from the
+discovery angle).
