@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
 status: executing
-last_updated: "2026-07-30T08:10:00.000Z"
-last_activity: 2026-07-30 -- Phase 185 plan 11 tasks 1-2 complete; BLOCKED at the task-3 operator gate (G-4 x4 + the SC#10 scoreboard)
+last_updated: "2026-07-30T14:21:20.230Z"
+last_activity: 2026-07-29 -- Phase 185 execution started
 progress:
   total_phases: 19
-  completed_phases: 4
-  total_plans: 50
-  completed_plans: 49
-  percent: 22
+  completed_phases: 5
+  total_plans: 51
+  completed_plans: 50
+  percent: 26
 ---
 
 # Project State
@@ -45,8 +45,28 @@ Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 op
 ## Current Position
 
 Phase: 185 (graded-governance-per-node-grounding-mode-action-risk-dial) — EXECUTING, BLOCKED ON THE OPERATOR GATE
-Plan: 10 of 11 complete; **185-11 tasks 1-2 done, task 3 is a blocking `checkpoint:human-verify` that has NOT run**
-(Summaries on disk: 01, 02, 03, 04, 05, 06, 07, 08, 09, 10, 11. Next work is **the operator UAT**, not another plan.)
+Plan: 11 of 12 complete; **185-11 tasks 1-2 done, task 3 is a blocking `checkpoint:human-verify` that has NOT run**
+(Summaries on disk: 01, 02, 03, 04, 05, 06, 07, 08, 09, 10, 11, 12. Next work is **the operator UAT**, not another plan.)
+
+**⚑ WAVE 7 / PLAN 185-12 LANDED (2026-07-30) — BUG-260730-01 IS CLOSED IN CODE, AND IT WAS A
+BLOCKER FOR 185-11 TASK 3.** The auto-attached `retrieved_and_cited` gate demanded inline `[1]`
+markers that *nothing* ever asked the model to write: not the step prompt, not the attachment seam
+(`grounding.py` appends a ValidatorSpec and no prose), not the retry feedback (which echoed the
+deficit without naming the format). The operator's publish golden run
+(`workflow_runs.id = ded89703-44c4-4e40-b5fe-9af35a44a54d`, `deepseek-v4-flash`) burned all 3
+attempts on it — with half (a) NOT firing, which proves retrieval succeeded and the loss was purely
+the missing marker. Fixed on the **producer, never the checker**: one home for the format
+(`CITATION_MARKER_PATTERN` / `_EXAMPLES` / `_GUIDANCE`), the remedy appended to the failure message
+the engine already interpolates into `ctx.retry_feedback`, and an additive `_citation_instruction`
+suffix composed on **both** agent paths (`_exec_llm_agent` + `_exec_llm_batch_agents`). The gate is
+**no less strict** — a retrieved-but-unmarked answer still FAILS, asserted. D-14 held by prompt
+**equality** across 10 ungoverned-phase cases; the Deep 4-file fence and the migrations/frontend
+fence both report 0 files; `grep -c "grounding_cause" phase_types.py` == 0 (the instruction reads the
+ATTACHED spec, so the judge and the instruction cannot disagree). Drift pin falsified RED and
+reverted. Touched suites **51 → 78**; full unit suite **62 failed (baseline-identical), 1589 → 1616
+passed** — no new failure. Commits `7c7d8b84` → `46f773ff` → `6c85a5e4`, summary `9dbec02a`.
+**GOVERN-01 stays `Pending`: the operator UAT that would justify Complete has not run, and re-running
+it is the next step.**
 
 **⛔ PHASE 185 IS NOT COMPLETE AND MUST NOT BE MARKED SO. GOVERN-01 / GOVERN-02 / GOVERN-03 ALL
 STAY `Pending`.** Every automated gate in the phase is green and every fence is recorded, but the
@@ -147,7 +167,9 @@ from a hand-typed `d`. **A plan claim was corrected in our favour:** `defaultEdg
 merges once `type` is set — the library just hands the resolved `url('#…')` to the component and
 draws nothing itself, so the conclusion (re-render `markerEnd`) stands on a different mechanism.
 **Both falsifications observed RED and reverted** (a planted `LINE` in the armed branch; `DETOUR.GAP
+
 + 4`, which reds the pin AND collapses clearance 8.19 → 4.97px). Clearance is COMPUTED by parsing
+
 the exported `ARC`: **8.1941px** vs the sketch's 8.2. Three acceptance greps were comment-only false
 positives (docblocks spelling the very tokens they forbade — the D-ITEM-183-02 trap); reworded, guard
 not weakened, all three now **0**. Gates: snapshot **21 insertions / 0 deletions** with one unique
@@ -157,7 +179,9 @@ still its own lazy chunk, **count gate OK** (0 failing this run — the `Publish
 fire — no `[count-decrease]`, total 1628; `FlowEdge.test.tsx` reports `new` and was correctly NOT
 added to `BASELINE`), **0** react-flow "new edgeTypes object" warnings, `backend/` **0 files**,
 migrations **0 files** (head stays 113). **G-5 flagged on `WorkflowCanvas.tsx`** — `PlaneEditingLayer`
+
 + `EDIT_AFFORDANCE` named as the extraction for Phase 188. **GOVERN-02 / GOVERN-03 stay `Pending`**
+
 (the 185-02/03/05/06/08/09 precedent): the canvas half is real and pinned, but VALIDATION criterion 4
 and the D-185-18 manual before/after screenshot row are operator UAT that has not run.
 
@@ -1141,6 +1165,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 185 P05 | 40 | 3 tasks | 7 files |
 | Phase 185 P08 | 57min | 3 tasks | 17 files |
 | Phase 185 P09 | 42min | 2 tasks | 5 files |
+| Phase 185 P12 | 12min | 3 tasks | 4 files |
 
 ## Decisions
 
