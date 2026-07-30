@@ -57,5 +57,9 @@ def test_audit_accepts_102_kinds():
     ):
         assert kind in _AUDIT_EVENT_TYPES
 
-    # 16 prior + 6 new = 22 total kinds.
-    assert len(_AUDIT_EVENT_TYPES) == 22
+    # 16 prior + 6 new = 22 total kinds at Phase 102.
+    # Phase 185 / migration 114 (BUG-260731-02) adds the armed action-risk pause kind
+    # `action_risk_pending` → 23. This pin is bumped in lockstep with the
+    # _AUDIT_EVENT_TYPES extension; the drift guard that keeps the Python set equal to
+    # the SQL CHECK lives in tests/unit/test_audit_event_registration.py.
+    assert len(_AUDIT_EVENT_TYPES) == 23

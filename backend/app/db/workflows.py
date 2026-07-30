@@ -49,10 +49,18 @@ import asyncpg
 from app.models.harness import WorkflowDefinition
 
 # harness_audit.event_type CHECK (migration 059 = 9 kinds; migration 069 = +7 emit
-# kinds → 16; migration 070 = +6 judge/publish/policy/ask_user-approval kinds → 22
-# total). Validate in code so a typo fails fast in tests, not as a Postgres 23514
-# mid-run (Pitfall 6). MUST stay IN LOCKSTEP with the 069 + 070 CHECK — a mismatch is
-# the exact fail-fast this set exists for (Phase 101.1 D-12 / Phase 102 D-12).
+# kinds → 16; migration 070 = +6 judge/publish/policy/ask_user-approval kinds → 22;
+# migration 114 = +1 armed action-risk pause kind → 23 total). Validate in code so a
+# typo fails fast in tests, not as a Postgres 23514 mid-run (Pitfall 6). MUST stay IN
+# LOCKSTEP with the 069 + 070 + 114 CHECK — a mismatch is the exact fail-fast this set
+# exists for (Phase 101.1 D-12 / Phase 102 D-12).
+#
+# BUG-260731-02 (Phase 185): registering a kind HERE is only half the fix. This set
+# raises a ValueError before the INSERT; the Postgres CHECK raises a 23514 during it.
+# A kind present here but absent from the CHECK moves the failure, it does not remove
+# it. ``backend/tests/unit/test_audit_event_registration.py`` now pins this set EQUAL
+# to the highest-numbered migration's CHECK body, in both directions — add a kind to
+# one layer without the other and that test goes red instead of a live run dying.
 _AUDIT_EVENT_TYPES = frozenset(
     {
         # 059 — the 9 original harness lifecycle/gate kinds:
@@ -80,6 +88,8 @@ _AUDIT_EVENT_TYPES = frozenset(
         "publish_succeeded",
         "policy_applied",
         "validator_ask_user_approved",
+        # 114 (Phase 185 GOVERN-03 / BUG-260731-02) — the armed action-risk pause:
+        "action_risk_pending",
     }
 )
 
@@ -933,12 +943,23 @@ async def write_audit(
     to a NULL ``run_id`` and carry the definition id in ``metadata`` instead. A
     keyed receipt (run created) passes the real run id; both are valid.
 
-    ``event_type`` MUST be one of the 22 kinds in the 059 + 069 + 070 CHECK (9
+    ``event_type`` MUST be one of the kinds in the 059 + 069 + 070 + 114 CHECK (9
     harness lifecycle/gate kinds + 7 Phase-101.1 emit-transition kinds + 6
-    Phase-102 judge/publish/policy/ask_user-approval receipt kinds) — asserted
-    here against ``_AUDIT_EVENT_TYPES`` so a typo fails fast in tests (ValueError),
-    not as a Postgres 23514 mid-run (Pitfall 6). The ``harness_audit`` table's
-    own foreign-key column IS ``run_id`` — this predicate is correct.
+    Phase-102 judge/publish/policy/ask_user-approval receipt kinds + the 1
+    Phase-185 armed-action-risk-pause kind) — asserted here against
+    ``_AUDIT_EVENT_TYPES`` so a typo fails fast in tests (ValueError), not as a
+    Postgres 23514 mid-run (Pitfall 6). The count is deliberately NOT written out
+    as a number anywhere it could go stale: the error message below derives it from
+    ``len(_AUDIT_EVENT_TYPES)``. The ``harness_audit`` table's own foreign-key
+    column IS ``run_id`` — this predicate is correct.
+
+    Phase 185 BUG-260731-02: ``action_risk_pending`` was emitted by
+    ``harness_engine`` while registered in NEITHER this set NOR the Postgres CHECK,
+    so an armed action-risk checkpoint did not park — it killed the run on its own
+    audit write (``workflow_runs.id = 80c8823d``). Both layers were extended; the
+    hardcoded "22" that made this docstring and the ValueError below go stale was
+    replaced with a derived count; and
+    ``tests/unit/test_audit_event_registration.py`` now guards the whole class.
 
     Phase 092-05 F1: ``harness_audit.user_id`` is NOT NULL, but this INSERT
     previously OMITTED it — the first audit write of any live run raised
@@ -949,9 +970,13 @@ async def write_audit(
     omission silently.
     """
     if event_type not in _AUDIT_EVENT_TYPES:
+        # Count derived, never hardcoded — a stale literal number here is what made
+        # BUG-260731-02's own error message misleading (it said "22" while the set
+        # was the thing that needed changing).
         raise ValueError(
-            f"write_audit event_type must be one of the 22 harness_audit kinds "
-            f"(059 + 069 + 070), got {event_type!r}"
+            f"write_audit event_type must be one of the "
+            f"{len(_AUDIT_EVENT_TYPES)} harness_audit kinds "
+            f"(059 + 069 + 070 + 114), got {event_type!r}"
         )
     await pool.execute(
         "INSERT INTO harness_audit (run_id, user_id, event_type, metadata) "
