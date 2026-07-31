@@ -128,9 +128,6 @@ export type DegradedCause = { kind: "422" | "network" } | null
 /** The page's four-state composition machine, moved off `useState<BuilderState>`. */
 export type BuilderPhase = "empty" | "composing" | "drafted" | "error"
 
-/** The explicit-save affordance's transient feedback state. */
-export type SaveState = "idle" | "saving" | "saved" | "error"
-
 /**
  * THE LOCKED SAVE WORDING (184-CONTEXT `<specifics>`), and why it lives in this module
  * rather than in the page that first declared it.
@@ -140,9 +137,15 @@ export type SaveState = "idle" | "saving" | "saved" | "error"
  * the code-split canvas chunk must not reach back into a page module to read a string
  * (that would pull the whole page into the canvas chunk and undo D-183-03). Re-typing the
  * literal in the toolbar was the other option, and *"two spellings of a locked string is
- * how a locked string stops being locked"* (184-11's own words). So it moves HERE, next to
- * the `SaveState` type and the untracked `saveState` slot this store already reserves for
- * the toolbar, and the page RE-EXPORTS it under the same name for every existing caller.
+ * how a locked string stops being locked"* (184-11's own words). So it moves HERE — the
+ * module both save surfaces already import — and the page RE-EXPORTS it under the same
+ * name for every existing caller.
+ *
+ * ⚠ 186-04 UPDATE: this string is now the ONLY save-related symbol this module carries;
+ * the untracked save slot it used to sit beside is retired (the block further down says
+ * why). The string itself is unaffected — its reason for living here was never that slot,
+ * it was that a leaf on the code-split canvas chunk must not reach back into a page
+ * module to read a literal.
  *
  * The sentence itself: the surface says the draft is SAVED and, in the same breath, that
  * it is still a draft. No word in it may imply published — publishing is a separate act
@@ -189,16 +192,31 @@ export interface BuilderStoreState extends TrackedSlice {
   /** The in-memory definition differs from what was last PATCHed. Untracked, and
    *  re-armed by an undo (D-184-03) via the subscription in the factory below. */
   dirty: boolean
-  /** Transient save feedback. Untracked, and STILL UNREAD by anything in the app.
+
+  /*
+   * ── THE RETIRED SAVE SLOT (186-04 — the call 184-04 left open, now ANSWERED) ──────
    *
-   *  ⚠ 184-04 reserved this slot "for the canvas toolbar (141-B)". 184-13 built that
-   *  toolbar and did NOT use it, so the reservation is retired rather than left standing
-   *  as a promise nothing keeps. The toolbar's reading is joined on the page from the
-   *  page's own `saveState` and this store's `dirty` — because persistence lives on the
-   *  page (D-184-05) and mirroring it here would be a second copy of a state whose one
-   *  writer is `onSaveDraft`. Phase 186, which rewrites that seam for autosave, is the
-   *  plan that gets to decide whether this slot earns its keep. */
-  saveState: SaveState
+   * 184-04 reserved a `saveState` field here "for the canvas toolbar (141-B)"; 184-13
+   * built that toolbar and did not use it; 184-13's own note then handed the keep-or-cut
+   * decision to this phase. 186-04 CUT IT, for four reasons worth keeping written down so
+   * nobody re-adds it:
+   *
+   *   1. Zero production readers. Its only call site in the whole repo was one assertion
+   *      in `builderStore.test.ts` — a slot exercised solely by the test that guards it.
+   *   2. Two enums, one concept. Its `"idle" | "saving" | "saved" | "error"` was strictly
+   *      NARROWER than the union the app actually renders (the toolbar's own, in
+   *      `CanvasToolbar.tsx`, which carries a fifth `"dirty"` reading) — the same failure
+   *      mode the locked-save-wording docblock names one screen up: two spellings is how
+   *      a locked thing stops being locked.
+   *   3. The real persistence state is wider still. It has to represent HELD (for two
+   *      distinct reasons) and CONFLICT, which no flat enum can carry and no boolean pair
+   *      can carry honestly. `useDraftPersistence` models it as a discriminated union.
+   *   4. This module may not name the API client (the fence above). State whose one
+   *      writer is a network call therefore cannot live in the undo store.
+   *
+   * `dirty` above stays: it is a fact about the DEFINITION, not about a request, and
+   * `markSaved()` — still the only thing that clears it — writes nothing.
+   */
 
   // ── Actions. Every one is immutable and every structural one delegates to a pure
   //    `definitionOps` op — this store owns NO mutation logic of its own. ──
@@ -233,7 +251,6 @@ export interface BuilderStoreState extends TrackedSlice {
   setVerdicts: (verdicts: readonly ServerVerdict[]) => void
   setChecking: (checking: boolean) => void
   setDegraded: (cause: DegradedCause) => void
-  setSaveState: (saveState: SaveState) => void
   /** The ONLY thing that clears `dirty`. Never writes anything. */
   markSaved: () => void
   /** Commit a coalescing run of config edits NOW (a field blur, a view change). */
@@ -318,7 +335,6 @@ export function createBuilderStore(initial: BuilderDefinition | null): BuilderSt
         checking: false,
         degraded: null as DegradedCause,
         dirty: false,
-        saveState: "idle" as SaveState,
 
         // ── document transitions ──
         setDrafted: (definition) => {
@@ -518,7 +534,6 @@ export function createBuilderStore(initial: BuilderDefinition | null): BuilderSt
         setVerdicts: (verdicts) => set({ verdicts }),
         setChecking: (checking) => set({ checking }),
         setDegraded: (degraded) => set({ degraded }),
-        setSaveState: (saveState) => set({ saveState }),
         markSaved: () => set({ dirty: false }),
         flushHistory: () => flushCoalesced(),
       }),

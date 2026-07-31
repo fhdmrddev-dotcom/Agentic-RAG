@@ -68,12 +68,19 @@ import { SAVED_STILL_A_DRAFT } from "@/components/workflows/builderStore"
 import { cn } from "@/lib/utils"
 
 /**
- * The five readings the toolbar can be in.
+ * The five readings the toolbar can be in — and, since 186-04, the ONE enum for this
+ * concept anywhere in the app.
  *
- * Wider than the store's `SaveState` by exactly one member: `dirty`. The store keeps
- * `dirty` as its own boolean (D-184-03 re-arms it on an undo), and the page joins the two
- * into this one union so the toolbar has a single thing to render rather than a boolean
- * and an enum it would have to combine itself.
+ * It used to be described here as "wider by exactly one member than the builder store's
+ * own save enum". That sentence no longer has a referent: 186-04 retired that slot
+ * precisely BECAUSE it was a second, narrower spelling of this one, and the store now
+ * mirrors nothing. What the store still owns is `dirty` — a fact about the
+ * definition rather than about a request, re-armed on an undo (D-184-03) — and the caller
+ * joins that boolean with its own persistence reading into this single union, so the
+ * toolbar has one thing to render rather than a boolean and an enum it would have to
+ * combine itself.
+ *
+ * If a sixth reading is ever needed, it is added HERE and nowhere else.
  */
 export type ToolbarSaveState = "idle" | "dirty" | "saving" | "saved" | "error"
 

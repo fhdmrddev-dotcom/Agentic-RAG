@@ -334,9 +334,19 @@ describe("builderStore — a server verdict is not undoable", () => {
     expect(store.getState().degraded).toEqual({ kind: "network" })
   })
 
-  it("setSaveState and markSaved leave the undo stack untouched", () => {
+  /**
+   * RETARGETED, NOT DELETED (186-04 · the Phase 177 count lesson). This case was written
+   * against the store's transient save-state setter, and 186-04 retired the slot that half
+   * of it drove (four reasons, recorded at the tombstone in `builderStore.ts`). The
+   * PROPERTY under test — an untracked setter never reaches the undo stack — outlives the
+   * particular setter that happened to demonstrate it, so
+   * the case is re-pointed at `setChecking` + `markSaved` with the same assertion shape
+   * rather than dropped. Deleting it would have quietly lowered this file's assertion
+   * count while every remaining test stayed green.
+   */
+  it("an untracked setter followed by markSaved leaves the undo stack untouched", () => {
     const store = createBuilderStore(draft())
-    store.getState().setSaveState("saving")
+    store.getState().setChecking(true)
     store.getState().markSaved()
 
     expect(past(store)).toHaveLength(0)
