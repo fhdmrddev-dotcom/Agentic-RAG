@@ -1,10 +1,11 @@
 ---
 seed_id: SEED-137
 title: "The engine-appended armed action-risk gate can be preempted by an author-declared pre-gate that fails first — run_gates returns on the first failure and an ask_user Proceed falls through to the body without re-running the remaining pre-gates, so the armed approval is never asked and action_risk_pending is never emitted"
-status: open
+status: folded
 planted: 2026-07-31
+folded: 2026-07-31
 phase_origin: "Phase 185 security re-audit (/gsd:secure-phase 185, second pass after quick task 260731-3y4 closed BLOCKER T-185-04-01). Surfaced by the auditor while adversarially probing whether the new armed allow-list could be reached with is_action_risk False. Deliberately NOT folded into 185: the phase's registered threat is closed, this is a distinct structural weakness in gate PRECEDENCE, and the durable fix touches the attachment seam (D-185-05) rather than the disposition."
-folded_into: null
+folded_into: 187
 category: "Governance enforcement / gate precedence — the armed checkpoint's guarantee is positional, not structural. Not currently exploitable (two upstream gates fence it), but the fence is a publish-time refusal that is explicitly slated for relaxation, and when it relaxes this becomes a silent governance bypass with no audit trace."
 related_seeds: [SEED-131, SEED-132]
 related_decisions:
@@ -31,7 +32,7 @@ re_open_triggers:
   - "Any phase that makes the armed dial available on a phase type that already carries author-declared pre-gates, or that lets authors add validators to an armed phase through the canvas — the canvas currently has no such affordance, which is part of why this is Low today."
   - "Any proposal to change the attachment order at `grounding.py:951-953`. If someone reaches for that seam for an unrelated reason, this seed's Option A is already half-done and should be decided deliberately rather than as a side effect."
 priority: medium
-suggested_phase: "Phase 188 (the workflow run surface), alongside the action_risk_pending consumer — the surface that renders 'waiting for a person' and the guarantee that the wait actually happens belong in the same phase. If Phase-103's background-job publish is scheduled BEFORE 188, this must move ahead of it: that rework removes the only fence currently holding this closed."
+suggested_phase: "**FOLDED INTO PHASE 187 as SC#6 on 2026-07-31** (operator direction: plan it ahead, land it in any phase before 188). Originally suggested for 188 alongside the `action_risk_pending` consumer; the operator moved it EARLIER deliberately. Phase 187 is the right home on merit, not just on timing: its SC#3 claims the AI seed is 'safe-by-construction' and that a seeded grounded node auto-gets its gate — this seed is precisely the case where a governance gate is silently NOT applied, so shipping 187's claim over an unfixed precedence bypass would make that claim false in the one direction that matters. Phase 186 (Concurrency & Autosave) was the alternative on earliest-lands grounds and was NOT chosen: folding a governance-precedence fix into an autosave phase is off-topic scope-add, and there is no race between 186 and 187 because the re-open trigger (the Phase-103 background-job publish) is not scheduled in this milestone at all."
 ---
 
 # SEED-137 — the armed checkpoint's guarantee is positional, not structural
