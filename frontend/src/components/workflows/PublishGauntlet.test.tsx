@@ -271,12 +271,15 @@ describe("PublishGauntlet — form + verbatim verdict + judge hard wall", () => 
     expect(screen.getByText(/could not produce a verdict|treated as a block/i)).toBeInTheDocument()
   })
 
-  it("the 8 server-fixed stages render (the gauntlet spine)", async () => {
+  it("the server-fixed stages render (the gauntlet spine) — the eight checks plus the publish commit", async () => {
     render(<PublishGauntlet definitionId="def-1" />)
     await openModal()
     const spine = screen.getByTestId("gauntlet-spine")
     // Match the short human-readable stage labels (sketch 051-A UX labels — full
     // technical descriptions live in the node title= tooltip, not the visible text).
+    // "Commit" is the flip itself (Phase 186-05): sketch 020-B D2 has always carried it
+    // as its own row, and the spine gained a node for it when the publish commit began
+    // refusing a draft that moved mid-gauntlet.
     for (const label of [
       "Owner",
       "Valid",
@@ -286,6 +289,7 @@ describe("PublishGauntlet — form + verbatim verdict + judge hard wall", () => 
       "Golden run",
       "Citations",
       "Judge",
+      "Commit",
     ]) {
       expect(within(spine).getByText(label)).toBeInTheDocument()
     }
@@ -576,5 +580,120 @@ describe("PublishGauntlet — an unrecognised blocked_stage never renders a pass
     //     renders VERBATIM inside the raw-verdict disclosure — that honesty contract is
     //     untouched; what is forbidden is a machine code leading the surface.
     expect.soft(screen.getByTestId("verdict-headline")).not.toHaveTextContent(UNKNOWN_STAGE)
+  })
+
+  it("still renders the unfamiliar stage VERBATIM in the raw-verdict grid — demoted, never removed", async () => {
+    mockedPublish.mockResolvedValue({
+      kind: "verdict",
+      verdict: {
+        published: false,
+        version: null,
+        golden_run_id: null,
+        blocked_stage: UNKNOWN_STAGE,
+        named_failures: [],
+      },
+    } satisfies PublishOutcome)
+    render(<PublishGauntlet definitionId="def-1" />)
+    await doPublish()
+
+    // Closing the headline leak must not have closed the honesty contract with it: the
+    // server's own string is still there, byte for byte, one click away.
+    const raw = await screen.findByTestId("raw-verdict")
+    expect(within(raw).getByTestId("verdict-blocked_stage")).toHaveTextContent(UNKNOWN_STAGE)
+  })
+})
+
+// --- Phase 186-05 (CONCUR-02, D-186-11) — the publish-commit refusal ----------------
+//
+// `draft_changed` is the refusal Phase 186-02 shipped: the gauntlet passed, but the draft
+// moved while it was being checked, so the flip was refused rather than publishing a
+// definition that never passed. It is the FIRST stage to reach the client that the spine
+// had no node for — which is how the fail-open above was found — and it is now the ninth
+// row, after the grader rather than inside it.
+describe("PublishGauntlet — a draft that moved mid-gauntlet blocks at the Commit node", () => {
+  /** The server's verdict for a publish-commit refusal, verbatim from 186-02's contract:
+   *  HTTP 200, `published: false`, and the golden run PRESERVED as the record of what was
+   *  actually checked. `named_failures` carries the server's own sentence. */
+  const draftChangedBlock: PublishOutcome = {
+    kind: "verdict",
+    verdict: {
+      published: false,
+      version: null,
+      golden_run_id: "a7f3c1d2-run",
+      blocked_stage: "draft_changed",
+      named_failures: [
+        "the draft changed while it was being checked — re-publish to check the new version",
+      ],
+    },
+  }
+
+  /** The node box for a spine row, found by its visible label. The label sits beside the
+   *  box inside the row's column, so the box is the label's preceding sibling. */
+  function nodeBoxFor(label: string): HTMLElement {
+    const spine = screen.getByTestId("gauntlet-spine")
+    const labelEl = within(spine).getByText(label)
+    const box = labelEl.previousElementSibling
+    expect(box).not.toBeNull()
+    return box as HTMLElement
+  }
+
+  it("blocks AT the Commit node, passes the eight checks before it, and leads with a plain sentence", async () => {
+    mockedPublish.mockResolvedValue(draftChangedBlock)
+    render(<PublishGauntlet definitionId="def-1" />)
+    await doPublish()
+
+    await waitFor(() => expect(screen.getByTestId("publish-block")).toBeInTheDocument())
+
+    // The Commit node is the blocked one — red, and NOT wearing a ✓.
+    const commit = nodeBoxFor("Commit")
+    expect(commit.className).toContain("border-destructive/60")
+    expect(within(commit).queryByText("✓")).not.toBeInTheDocument()
+
+    // The grader passed, and the spine says so. Placing this code on the Judge row would
+    // have told the author the opposite.
+    const judge = nodeBoxFor("Judge")
+    expect(judge.className).toContain(PASSED_NODE_TONE)
+    expect(within(judge).getByText("✓")).toBeInTheDocument()
+    // Eight checks passed, the ninth row is the block: exactly eight badges.
+    const spine = screen.getByTestId("gauntlet-spine")
+    expect(within(spine).queryAllByText("✓")).toHaveLength(8)
+
+    // The headline is a sentence and carries no machine token; the server's own words
+    // render underneath, verbatim, as the block message.
+    const headline = screen.getByTestId("verdict-headline")
+    expect(headline).toHaveTextContent(/the draft changed while it was being checked/i)
+    expect(headline).not.toHaveTextContent("draft_changed")
+    expect(screen.getByText(/re-publish to check the new version/i)).toBeInTheDocument()
+
+    // The golden run really happened and is preserved — the run affordance still gates on
+    // golden_run_id, and this refusal has one.
+    expect(screen.getByTestId("run-link")).toBeInTheDocument()
+  })
+
+  it("renders a real glyph on the Commit node — an unverified icon slug cannot ship as an invisible node", async () => {
+    render(<PublishGauntlet definitionId="def-1" />)
+    await openModal()
+
+    // unplugin-icons resolves an unknown fluent-emoji slug to an EMPTY <svg> rather than
+    // failing the build, so presence alone proves nothing. Assert the drawing.
+    const svg = nodeBoxFor("Commit").querySelector("svg")
+    expect(svg).not.toBeNull()
+    expect((svg as SVGSVGElement).childNodes.length).toBeGreaterThan(0)
+  })
+
+  it("keeps the running highlight on the Golden run row — appending the ninth stage moved nothing", async () => {
+    const user = userEvent.setup()
+    mockedPublish.mockReturnValue(new Promise<PublishOutcome>(() => {})) // never resolves
+    render(<PublishGauntlet definitionId="def-1" />)
+    await openModal()
+    await user.type(screen.getByLabelText(/golden_input/i), "a representative kickoff")
+    await user.click(screen.getByRole("button", { name: /run the gauntlet/i }))
+
+    // The running node is addressed by INDEX in the component, so a stage inserted rather
+    // than appended would silently move the amber aura onto the wrong row.
+    await waitFor(() => expect(nodeBoxFor("Golden run").className).toContain("border-amber-500"))
+    expect(nodeBoxFor("Commit").className).not.toContain("border-amber-500")
+    // And nothing is claimed as passed while the run is still in flight.
+    expect(within(screen.getByTestId("gauntlet-spine")).queryAllByText("✓")).toHaveLength(0)
   })
 })

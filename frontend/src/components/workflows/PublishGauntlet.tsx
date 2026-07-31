@@ -47,15 +47,21 @@ import { publishWorkflow, type PublishOutcome, type PublishVerdict } from "@/lib
 // is WUX-03 / Phase 127). The definition is threaded from the Builder's renderPublish.
 import { WorkflowSoul } from "@/components/workflows/WorkflowSoul"
 import type { DefShape } from "@/components/workflows/soulData"
+// Phase 186-05 (CONCUR-02, D-186-11) — the worded refusal. The map + its total resolver
+// live in the pure verdict module, next to the other sentences a surface says about a
+// check; see that module's docblock for why a component file cannot own them.
+import { blockedSentence } from "@/components/workflows/verdictModel"
 // Phase 127-02 Task 1 (WUX-03, sketch 051-A) — the engized gauntlet re-skin.
 // The engine chip mirrors RunCard's providerLogo()→Bot fallback (icon-convention
 // §1); the 8 stage glyphs are the bundled 3D fluent-emoji set (icon-convention §3).
 import { Bot } from "lucide-react"
 import { providerLogo } from "@/lib/providerLogo"
-// The 8 gauntlet-stage 3D glyphs, bundled at build time by unplugin-icons. Only
-// API-verified-present fluent-emoji slugs are used (icon-convention §3 / RESEARCH
-// §Pitfall 2; aligned 1:1 with the STAGES order below). The empty-render traps
-// (`direct-hit` / `no-entry-sign`) are NEVER referenced.
+// The gauntlet-node 3D glyphs, bundled at build time by unplugin-icons — one per row of
+// the STAGES table below, in the same order and the same count. Only API-verified-present
+// fluent-emoji slugs are used (icon-convention §3 / RESEARCH §Pitfall 2). The empty-render
+// traps (`direct-hit` / `no-entry-sign`) are NEVER referenced — and because an unverified
+// slug renders as an EMPTY svg rather than failing to build, the newest addition here is
+// pinned by a render assertion in the suite, not by this comment.
 import Shield from "~icons/fluent-emoji/shield"
 import CheckMarkButton from "~icons/fluent-emoji/check-mark-button"
 import Bullseye from "~icons/fluent-emoji/bullseye"
@@ -64,6 +70,7 @@ import RaisedHand from "~icons/fluent-emoji/raised-hand"
 import Rocket from "~icons/fluent-emoji/rocket"
 import Locked from "~icons/fluent-emoji/locked"
 import BalanceScale from "~icons/fluent-emoji/balance-scale"
+import ChequeredFlag from "~icons/fluent-emoji/chequered-flag"
 
 /** An unplugin-icons bundled 3D SVG component (accepts standard SVG attrs + size). */
 type StageIcon = ComponentType<SVGProps<SVGSVGElement> & { size?: number | string }>
@@ -103,11 +110,19 @@ export interface PublishGauntletProps {
 }
 
 /**
- * The 8 server-fixed stages (sketch 020-B D2 / publish_service.py `STAGES`). The
- * client DISPLAYS them in order — it does not invent or reorder them. The
- * `code` is the verbatim `blocked_stage` a block at that stage emits; the spine
- * highlight (passed-up-to / blocked-at) is a VISUAL derivation only — the PASS/BLOCK
- * truth comes from the server verdict, never re-computed here.
+ * The server-fixed gauntlet, row by row (sketch 020-B D2 / publish_service.py `STAGES`).
+ * The client DISPLAYS them in order — it does not invent or reorder them. The `codes`
+ * are the verbatim `blocked_stage` values a block at that row emits; the spine highlight
+ * (passed-up-to / blocked-at) is a VISUAL derivation only — the PASS/BLOCK truth comes
+ * from the server verdict, never re-computed here.
+ *
+ * The first eight rows are the eight CHECKS. The last row is the publish COMMIT — the
+ * flip itself, which sketch 020-B D2 has always carried as its own row and which the
+ * spine had no node for until Phase 186-05. It is appended rather than inserted, on
+ * purpose and in two senses: a refusal there happened AFTER the grader passed, so
+ * folding its code into the Judge row would tell an author the grader stopped them,
+ * which is false; and appending leaves the golden-run row at the same index the running
+ * highlight below points at.
  */
 const STAGES: { label: string; what: string; codes: string[]; Icon: StageIcon }[] = [
   { label: "Owner", what: "Owner check — RLS-resolve + you own it", codes: ["not_found"], Icon: Shield },
@@ -118,6 +133,7 @@ const STAGES: { label: string; what: string; codes: string[]; Icon: StageIcon }[
   { label: "Golden run", what: "Golden run — a REAL harness run against the project KB", codes: ["golden_run_timeout", "golden_run_error"], Icon: Rocket },
   { label: "Citations", what: "Structural gate — citations / integrity checked during the run", codes: ["structural_gate"], Icon: Locked },
   { label: "Judge", what: "Independent judge — an independent model grades the deliverable", codes: ["judge"], Icon: BalanceScale },
+  { label: "Commit", what: "Publish commit — the draft must not have changed while we were checking it", codes: ["draft_changed"], Icon: ChequeredFlag },
 ]
 
 /** The HTTP status surfaced for each discriminated outcome kind (for the badge). */
@@ -315,31 +331,56 @@ function HardWall({ onFix }: { onFix: () => void }) {
 }
 
 /**
- * The 8-stage energy-spine. `blockedStage` (server-truth) drives the highlight.
+ * The gauntlet energy-spine. `blockedStage` (server-truth) drives the highlight.
  *
- * Phase 127-02 Task 1 (WUX-03, sketch 051-A): the eight wrapping boxes become a
- * compact horizontal spine of 3D icon nodes joined by energy connectors — passed
- * nodes glow green with a ✓ badge, the running golden-run node (i===5) pulses an
- * amber aura with an energy comet flowing into it, a blocked node turns red. The
- * pass/block TRUTH is unchanged: `blockedIndex` / `isPassed` / `running && i===5`
- * are byte-identical to the shipped derivation — this is markup + tone only, never
- * a recompute of pass/block. All motion is gated behind prefers-reduced-motion
- * (colour + glyph + ✓ badge carry the state without any animation).
+ * Phase 127-02 Task 1 (WUX-03, sketch 051-A): the wrapping boxes become a compact
+ * horizontal spine of 3D icon nodes joined by energy connectors — passed nodes glow
+ * green with a ✓ badge, the running golden-run node (i===5) pulses an amber aura with
+ * an energy comet flowing into it, a blocked node turns red. All motion is gated behind
+ * prefers-reduced-motion (colour + glyph + ✓ badge carry the state without any
+ * animation).
+ *
+ * ── PHASE 186-05: THE SPINE FAILS CLOSED ON A STAGE IT CANNOT PLACE (F7) ──
+ * `findIndex` answers -1 for a stage this client has never seen, which is the SAME value
+ * it answers when nothing was blocked at all. Both per-node reads below used to branch
+ * straight off that single -1, so the two cases collapsed and a refusal painted every
+ * node passed: a full green spine with ✓ badges underneath a "Blocked" headline. A green
+ * indicator scoped to the wrong thing is the T-185-04-01 pattern, and it became reachable
+ * in production the moment the publish commit began refusing a draft that moved.
+ *
+ * The repair is a PROPERTY, not a special case for the code that exposed it: the -1
+ * sentinel is now interpreted exactly once, into two named states with opposite meanings,
+ * and every future `blocked_stage` the backend adds inherits the closed behaviour with no
+ * edit here. There is deliberately NO client-side list of acceptable stages — the server
+ * owns the verdict vocabulary (D-182-06 / VALID-03, stated on `Verdict.code` in the API
+ * client), so the client renders what arrives and fails closed on what it has not seen.
  */
 function GauntletSpine({ blockedStage, running }: { blockedStage: string | null; running: boolean }) {
   // Find the FIRST stage whose codes contain the server's blocked_stage (visual only).
   const blockedIndex = blockedStage
     ? STAGES.findIndex((s) => s.codes.includes(blockedStage))
     : -1
+  // A block HAPPENED — `blockedStage != null` is the server saying so — but we could not
+  // place it on the spine. The missing index carries BOTH meanings, and this is the line
+  // that separates them: everything after it may read the remaining -1 as "no block".
+  // Derived ONCE, above the map, so the two per-node reads cannot drift apart again.
+  const unknownBlock = blockedStage != null && blockedIndex === -1
   return (
     <div data-testid="gauntlet-spine" className="flex items-start overflow-x-auto py-4">
       {STAGES.map((stage, i) => {
         const isBlocked = blockedIndex === i
-        const isPassed = blockedIndex === -1 ? !running : i < blockedIndex
+        // Unplaceable block first, placed block second, no block last. Only in that order
+        // is the fail-closed case unreachable by falling through anything — and the tail
+        // is honest precisely BECAUSE the guard ran first: a missing index that is not an
+        // unknown block can only be "nothing blocked", which still waits for the run.
+        const isPassed = unknownBlock ? false : blockedIndex >= 0 ? i < blockedIndex : !running
         const isRunning = running && i === 5
         const Icon = stage.Icon
         // The connector LEADING INTO this node is "reached" up to (and incl.) the block.
-        const connReached = blockedIndex === -1 ? !running : i <= blockedIndex
+        // The SAME guard in the SAME order, because this is a SECOND, independent read of
+        // the same index: repairing only the line above left the connectors lighting green
+        // under a refusal, which is exactly the half-fix the suite pins separately.
+        const connReached = unknownBlock ? false : blockedIndex >= 0 ? i <= blockedIndex : !running
         const nodeTone = isBlocked
           ? "border-destructive/60 bg-destructive/10"
           : isPassed
@@ -517,12 +558,17 @@ function GauntletContent({
   // it NEVER re-derives pass/block (T-127-03). Lead-with-words: a business user reads a
   // pass/block in ~3 seconds; the verbatim 5-field grid is demoted behind the <details>
   // below (one click away, never removed).
+  //
+  // Phase 186-05: the refusal arm no longer interpolates the server's stage token into
+  // the sentence a business user reads. `blockedSentence` is total — it answers a
+  // SENTENCE for a stage it has never seen — so no machine code can reach this line,
+  // while the verbatim token keeps rendering inside the raw-verdict disclosure below.
+  // The wording lives in the pure module because a component file may not export shared
+  // constants (`react-refresh/only-export-components`).
   const wordedHeadline = verdict
     ? isSuccess
       ? `Published — v${verdict.version ?? "—"} is live`
-      : verdict.blocked_stage === "judge"
-        ? "Blocked by the grader — the run finished, but the independent grader would not pass the result"
-        : `Blocked early — ${verdict.blocked_stage ?? "unknown"}`
+      : blockedSentence(verdict.blocked_stage)
     : ""
 
   return (

@@ -97,6 +97,64 @@ export const DEGRADED_SENTENCE: Record<DegradedValidationCause, string> = {
   unreachable: "We couldn't reach the check.",
 }
 
+/**
+ * The sentence the publish surface LEADS a refusal with (D-186-11).
+ *
+ * ── THIS IS WORDING, NOT THE TABLE THE RED LINE FORBIDS ──
+ * It is keyed on the publish STAGE the server refused at — the same server-fixed
+ * sequence the gauntlet already draws as a row of nodes — and it classifies nothing. No
+ * severity is derived, no refusal is turned into a pass or a pass into a refusal, and
+ * nothing is filtered: a stage missing from this map is still a refusal, because
+ * `blockedSentence` below answers a sentence for EVERY input. That totality is the whole
+ * point. An allow-list that silently dropped an unfamiliar stage would be the client
+ * owning a vocabulary it does not own, which is the rule stated on the wire type in the
+ * API client and the one this map is deliberately built not to break.
+ *
+ * ── A MACHINE TOKEN MAY NEVER LEAD THIS SURFACE ──
+ * The shipped headline interpolated the server's raw stage string for anything it had no
+ * special case for, so an author read a refusal whose one load-bearing word was the one
+ * word they could do nothing with. The verbatim string is still rendered, byte for byte,
+ * inside the raw-verdict disclosure — it is DEMOTED, never removed. Only two stages earn
+ * their own line here: the grader, whose refusal means something a generic line cannot
+ * convey, and the publish-commit refusal, whose cause is entirely invisible from the
+ * spine. Everything else leads with the fallback and names its cause underneath, where
+ * the server's own words already render.
+ *
+ * They live in this module, and not beside the component that says them, for the same
+ * mechanical reason as the two sentences above: a component file may not export shared
+ * constants (`react-refresh/only-export-components`). It is also the right home — every
+ * word a surface says about a check now sits in one pure module.
+ */
+export const BLOCKED_SENTENCE: Record<string, string> = {
+  judge:
+    "Blocked by the grader — the run finished, but the independent grader would not pass the result",
+  draft_changed:
+    "Blocked at the last step — the draft changed while it was being checked",
+}
+
+/**
+ * What a refusal says when its stage is not one of the two above — including a stage
+ * this client has never seen, which is the case that matters. It is a SENTENCE, and it
+ * is honest in both directions: it claims a refusal happened (server truth), and it
+ * claims nothing at all about where, because we do not know. "We could not place it" is
+ * not "it was fine", and it is not a code either.
+ */
+export const BLOCKED_FALLBACK_SENTENCE =
+  "Publish was blocked — nothing was published. What stopped it is named below."
+
+/**
+ * The one resolver, total by construction.
+ *
+ * Guarded on the RESULT being a string rather than merely present, because a lookup on a
+ * plain object answers for inherited keys too — a stage named after something on the
+ * prototype would otherwise hand a non-string back to a renderer. A canvas must not go
+ * blank over a shape surprise, and neither must this.
+ */
+export function blockedSentence(code: string | null | undefined): string {
+  const known = code == null ? undefined : BLOCKED_SENTENCE[code]
+  return typeof known === "string" ? known : BLOCKED_FALLBACK_SENTENCE
+}
+
 /** The grouped, counted view of one server response. */
 export interface VerdictGroups {
   /**
