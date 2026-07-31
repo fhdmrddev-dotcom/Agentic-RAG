@@ -4,12 +4,12 @@ title: A workflow's knowledge base can only be chosen on the pre-draft describe 
 reported: 2026-07-31
 surface: Agentic-RAG
 severity: blocking
-status: open
+status: folded
 affected_areas: [frontend/workflow-builder, backend/harness/scope, workflows/publish-gauntlet, RAG/retrieval-scope]
-folded_into: null
+folded_into: "186 (control) / 187 (verdict)"
 verified_closed_by: null
 related_seeds: [SEED-132, SEED-136]
-re_open_trigger: null
+re_open_trigger: "SPLIT ROUTING at /gsd:discuss-phase 186 (2026-07-31), D-186-14. Phase 186 folds the MINIMUM fix: project_folder_id as an editable workflow-level control on the built canvas (the display-only header chip promoted into the existing picker, D-186-15) plus a neutral unbound INVITATION with no severity/code/tray row (D-186-16, EMPTY_DRAFT_INVITATION precedent — D-182-06 stays intact). Phase 187 keeps the NECESSARY half: the deterministic build-time POST /workflows/validate `incomplete` verdict for an unbound retrieval workflow (SEED-132 envelope; the bug is a direct counterexample to 187's SC#3 safe-by-construction claim). Do NOT flip to closed when 186 ships — 186 closes only the repair path. Close only when BOTH halves are verified: an author can re-bind from any of the three creation paths AND an unbound retrieval workflow is caught deterministically on the canvas before a golden run is spent."
 reproduces_on:
   branch: develop
   commit: 97d3a9ff
