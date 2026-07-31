@@ -429,10 +429,14 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
             // Phase 184-11 (D-184-16 debt 1): the Builder registers its unsaved-work
             // predicate here; the breadcrumb above consults it.
             registerCanLeave={registerCanLeave}
-            renderPublish={(_def, draftId, blockedReason) =>
+            renderPublish={(_def, draftId, blockedReason, onPublishRunning) =>
               draftId ? (
                 <PublishGauntlet
                   definitionId={draftId}
+                  // Phase 186-07 (D-186-12): the gauntlet reports its in-flight flag back
+                  // to the Builder, which HOLDS autosave while it is set. Forwarded, never
+                  // interpreted — this page adds no publish state of its own.
+                  onRunningChange={onPublishRunning}
                   // Phase 184-11 (R12): the reason publish is blocked, straight from the
                   // Builder's live verdict. `undefined` on every other call site, which is
                   // what keeps their trigger byte-identical.

@@ -86,6 +86,20 @@ export interface PublishGauntletProps {
   /** Fired on a PASS so the parent (Plan 06) can auto-return to the Workflows page. */
   onPublished?: (version: number) => void
   /**
+   * Phase 186-07 (D-186-12) — a BOOLEAN report of whether the gauntlet is running.
+   *
+   * The Builder holds its autosave writes while a publish is in flight: a stray keystroke
+   * mid-gauntlet costs minutes of golden run and real provider spend, and the stage-5
+   * token guard would then honestly refuse the publish. Edits accumulate as dirty and
+   * flush when this goes false.
+   *
+   * OPTIONAL AND ADDITIVE, in the `blockedReason` shape: absent ⇒ today's behaviour, byte
+   * for byte. This component already owns the `loading` flag (it blocks the close
+   * affordances with it); this prop only lets a parent observe the flag it already keeps,
+   * and adds no state, no request and no rendered element.
+   */
+  onRunningChange?: (running: boolean) => void
+  /**
    * Phase 184-11 (R12, sketch 141-B) — WHY publish cannot be attempted yet, in the
    * author's own words, or absent/null when it can.
    *
@@ -745,6 +759,7 @@ export function PublishGauntlet({
   definition,
   onPublished,
   blockedReason,
+  onRunningChange,
 }: PublishGauntletProps) {
   const [open, setOpen] = useState(false)
   // Phase 184-11 (R12): the reason's id, so `aria-describedby` can point at it. `useId`
@@ -771,6 +786,18 @@ export function PublishGauntlet({
   useEffect(() => {
     if (open) goldenInputRef.current?.focus()
   }, [open])
+
+  /**
+   * Phase 186-07 (D-186-12) — report the in-flight flag this component already keeps, and
+   * report `false` on unmount so a Builder cannot be left holding its writes forever
+   * because the gauntlet was closed while a request was outstanding. No-ops entirely when
+   * no parent asked, which is every call site outside the Builder.
+   */
+  useEffect(() => {
+    if (!onRunningChange) return
+    onRunningChange(loading)
+    return () => onRunningChange(false)
+  }, [loading, onRunningChange])
 
   // Escape-to-close + simple Tab focus containment — mirrors RunModal's contract.
   useEffect(() => {

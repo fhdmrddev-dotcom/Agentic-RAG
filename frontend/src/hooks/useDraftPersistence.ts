@@ -141,6 +141,25 @@ export const HOLD_UNREADABLE = "Not saved — we can't read this shape yet"
 export const SAVE_FAILED_SENTENCE = "Not saved — we couldn't complete the save"
 
 /**
+ * The published-row refusal (D-184-16 debt 3, MOVED HERE BY 186-07).
+ *
+ * IT LIVED ON `WorkflowBuilderPage` AND HAD TO MOVE, because the branch that chooses it
+ * moved. 184-11 classified the 409 in the page's own `onSaveDraft` catch; 186-07 deleted
+ * that catch when the write seam became this hook, and a sentence whose only chooser lives
+ * here cannot be declared a module away — the page would have had to re-classify the error
+ * it no longer sees, or this module would have had to mint a SECOND spelling of a locked
+ * string, which is the failure 186-04 retired the store's parallel save enum for.
+ *
+ * ONE HOME, and the page re-exports the name so every existing caller and every existing
+ * grep still finds it there — the `SAVED_STILL_A_DRAFT` precedent, applied a second time.
+ *
+ * It is business-plain and it NAMES THE WAY OUT (Tweak), because a bare "couldn't save" on
+ * a frozen row sends a person back to press the same button again.
+ */
+export const PUBLISHED_CONFLICT_MESSAGE =
+  "This version is published and can't be edited — use Tweak to start a new draft"
+
+/**
  * The loop's distinguished states, in the `ValidationState` / `PublishOutcome`
  * discriminated-union idiom whose docblock states the rule this inherits: *a binary
  * ok/error handler is FORBIDDEN*. A boolean pair could represent "saved AND refused"; this
@@ -213,11 +232,19 @@ function nameOf(err: unknown): string {
 }
 
 /**
- * Which honest state a refused write lands in. TWO named branches — the stale token, which
- * is a conflict the person resolves, and the 422, which is a cause they can act on — plus a
- * genuine catch-all. A 404, a dropped connection, a timeout and a refusal minted after this
- * client shipped all mean "we could not complete it", and none of them may borrow a
- * specific wording they did not earn.
+ * Which honest state a refused write lands in. THREE named branches — the stale token,
+ * which is a conflict the person resolves; the 422, which is a cause they can act on; and
+ * the published row, which has a way out the generic line cannot name — plus a genuine
+ * catch-all. A 404, a dropped connection, a timeout and a refusal minted after this client
+ * shipped all mean "we could not complete it", and none of them may borrow a specific
+ * wording they did not earn.
+ *
+ * ⚠ THE PUBLISHED BRANCH IS 186-07's, AND IT CLOSES A DEBT 186-06 RECORDED RATHER THAN
+ * GUESSED AT. 186-06 left `WorkflowConflictError` in the catch-all deliberately, because
+ * its sentence still had exactly one home on the page and minting a second spelling here
+ * would have been the two-enums failure. 186-07 moved the constant instead, so the branch
+ * and the string now live together. Without it, a published-row save would have silently
+ * lost the sentence 184-11 shipped for it.
  *
  * Module-level and pure, so the write loop's closure cannot capture a stale copy of it.
  */
@@ -234,6 +261,9 @@ function refusalOf(
   }
   if (name === "WorkflowDraftUnreadableError") {
     return { kind: "error", sentence: HOLD_UNREADABLE }
+  }
+  if (name === "WorkflowConflictError") {
+    return { kind: "error", sentence: PUBLISHED_CONFLICT_MESSAGE }
   }
   return { kind: "error", sentence: SAVE_FAILED_SENTENCE }
 }

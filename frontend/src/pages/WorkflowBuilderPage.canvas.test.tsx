@@ -73,7 +73,13 @@ vi.mock("@/lib/api", () => ({
   validateWorkflow: mockValidate,
   getGroundingBundle: mockBundle,
   publishWorkflow: mockPublish,
+  // Phase 186-07: `useDraftPersistence` reaches one more symbol — the drafts read its
+  // Reload exit reuses. Enumerated here rather than left undefined, because a whole-module
+  // factory mock that omits a symbol the composed tree can reach fails far from its cause
+  // (the shipped mock-completeness rule this file's own docblock states).
+  listDraftWorkflows: mockListDrafts,
 }))
+const { mockListDrafts } = vi.hoisted(() => ({ mockListDrafts: vi.fn() }))
 // The R12 publish-handoff block below mounts the real gauntlet, whose own module reaches
 // one more api symbol. Declared as its own hoisted block so the diff stays additive.
 const { mockPublish } = vi.hoisted(() => ({ mockPublish: vi.fn() }))
@@ -113,6 +119,12 @@ beforeEach(() => {
   vi.clearAllMocks()
   mockListFolders.mockResolvedValue([])
   mockListSkills.mockResolvedValue([])
+  // Phase 186-07: the write seam reads the PATCH response's token, so a mock that resolves
+  // `undefined` would land every autosave in the loop's refusal branch. These are DEFAULTS;
+  // the rows that pin call counts still pin them.
+  mockListDrafts.mockResolvedValue([])
+  mockCreate.mockResolvedValue({ id: "created-1", version: 1, token: "tok-created" })
+  mockUpdate.mockResolvedValue({ id: "draft-1", version: 1, token: "tok-patched" })
   // Phase 184-11 defaults: a complete, empty palette and a clean verdict. Neither is
   // REACHED by any assertion above — the loop stays silent until the first edit
   // (D-184-15) — but a factory-mocked module must still hand back a thenable.
@@ -1589,5 +1601,145 @@ describe("WorkflowBuilderPage 185-08 — the client-synthesized locked gate row"
     expect(latest().phases).toHaveLength(2)
     expect(latest().phases.map((p) => p.phase_index)).toEqual([0, 1])
     expect(latest().phases[1]).toBe(untouched)
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Plan 186-07 (CONCUR-01 / CONCUR-02 · D-186-03 / D-186-08) — the two surfaces the
+// composed write loop earns, asserted on the PAGE because the page is where they mount.
+//
+// Appended; nothing above this line was edited except the module mock's completeness and
+// the two write-response defaults in `beforeEach`.
+//
+// WHY HERE AND NOT IN THE HOOK'S SUITE. `useDraftPersistence.test.tsx` owns the LOOP —
+// single-flight, the token chain, the hold, the halt. What it cannot see is whether the
+// header says anything true about any of that, or whether the flag-off surface stays the
+// one that shipped. That is this file's half, and it is the same where-the-behaviour-lives
+// split 184-12 and 184-13 recorded before it.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe("WorkflowBuilderPage 186-07 — the quiet autosave line", () => {
+  const FLAG_ON_186 = { features: { visual_workflow_canvas: true }, loading: false }
+
+  it("says NOTHING at rest — a draft nobody has touched makes no claim", async () => {
+    renderBuilder(FLAG_ON_186)
+    await screen.findByTestId("builder-view-toggle")
+
+    expect(screen.queryByTestId("builder-autosave-status")).toBeNull()
+    expect(screen.queryByTestId("builder-conflict-banner")).toBeNull()
+    expect(screen.queryByTestId("builder-save-confirm")).toBeNull()
+  })
+
+  it("reports a CONFIRMED autosave, and the receipt is retired by the next edit", async () => {
+    renderBuilder(FLAG_ON_186)
+    await screen.findByTestId("builder-view-toggle")
+
+    fireEvent.click(screen.getByTestId("spine-node-research"))
+    const field = await screen.findByLabelText(/instructions/i)
+    fireEvent.change(field, { target: { value: "an edit nobody pressed Save for" } })
+
+    const line = await screen.findByTestId("builder-autosave-status", undefined, { timeout: 4000 })
+    expect(line.getAttribute("role")).toBe("status")
+    await waitFor(() => expect(line.textContent).toBe("Saved · just now"))
+    expect(mockUpdate).toHaveBeenCalledTimes(1)
+
+    // The receipt is not a clock — the next change retires it, which is what makes the
+    // shipped `Saved · still a draft` unable to sit there while the author types.
+    fireEvent.change(field, { target: { value: "and then another one" } })
+    await waitFor(() => expect(screen.queryByTestId("builder-save-confirm")).toBeNull())
+  })
+
+  it("the line is FLAG-GATED — with the canvas off the header is the one that shipped", async () => {
+    // D-181-01. The explicit Save still works with the flag off (its own row above proves
+    // that); what must not appear is the autosave voice, because the loop it describes is
+    // not running. `header.test.tsx` pins the same promise as literal markup.
+    renderBuilder({ features: {}, loading: false })
+    await screen.findByTestId("builder-save-draft")
+
+    fireEvent.click(screen.getByTestId("spine-node-research"))
+    const field = await screen.findByLabelText(/instructions/i)
+    fireEvent.change(field, { target: { value: "an edit on the flag-off surface" } })
+
+    await new Promise((resolve) => setTimeout(resolve, 2200))
+    expect(screen.queryByTestId("builder-autosave-status")).toBeNull()
+    expect(mockUpdate).toHaveBeenCalledTimes(0)
+  })
+})
+
+describe("WorkflowBuilderPage 186-07 — the conflict banner (D-186-08)", () => {
+  const FLAG_ON_186 = { features: { visual_workflow_canvas: true }, loading: false }
+
+  class StaleToken extends Error {
+    currentToken: string | null
+    constructor(currentToken: string | null) {
+      super("this draft changed somewhere else")
+      this.name = "WorkflowStaleTokenError"
+      this.currentToken = currentToken
+    }
+  }
+
+  async function conflicted() {
+    mockUpdate.mockRejectedValue(new StaleToken("newer-token"))
+    renderBuilder(FLAG_ON_186)
+    await screen.findByTestId("builder-view-toggle")
+    fireEvent.click(screen.getByTestId("spine-node-research"))
+    const field = await screen.findByLabelText(/instructions/i)
+    fireEvent.change(field, { target: { value: "the losing tab's edit" } })
+    return screen.findByTestId("builder-conflict-banner", undefined, { timeout: 4000 })
+  }
+
+  it("offers Reload FIRST and Overwrite SECOND, in DOM order", async () => {
+    const banner = await conflicted()
+
+    const controls = [...banner.querySelectorAll("button")]
+    const reload = screen.getByTestId("builder-conflict-reload")
+    const overwrite = screen.getByTestId("builder-conflict-overwrite")
+    expect(controls).toHaveLength(2)
+    expect(controls[0]).toBe(reload)
+    expect(controls[1]).toBe(overwrite)
+    expect(
+      reload.compareDocumentPosition(overwrite) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+  })
+
+  it("states the cause in real DOM text and files no receipt", async () => {
+    const banner = await conflicted()
+
+    expect(banner.getAttribute("role")).toBe("alert")
+    expect(banner.textContent).toContain("changed somewhere else")
+    // The reason is TEXT, not a tooltip — a `title` is unreachable by keyboard and by
+    // most reading modes (the shipped refusal-copy rule).
+    expect(banner.getAttribute("title")).toBeNull()
+    expect(screen.queryByTestId("builder-save-confirm")).toBeNull()
+  })
+
+  it("it does NOT add a header band — the merged row still has its TWO children", async () => {
+    await conflicted()
+
+    // The 184-13 pin, re-measured while the alert is on screen: it mounts INSIDE the
+    // existing action group, so the header's structure is untouched and no band appeared.
+    //
+    // (Measured on `builder-header-bar` rather than on the banner ROLE, because reaching
+    // a conflict requires opening the form panel and that panel contributes a `<header>`
+    // of its own. The subject here is the Builder's row, not how many headers a panel
+    // brings with it.)
+    const bar = screen.getByTestId("builder-header-bar")
+    expect(bar.children).toHaveLength(2)
+    expect(bar.contains(screen.getByTestId("builder-conflict-banner"))).toBe(true)
+    expect(bar.contains(screen.getByTestId("builder-save-state"))).toBe(true)
+    // …and the alert is a sibling of the save cluster, not a wrapper around it.
+    expect(screen.getByTestId("builder-conflict-banner").contains(screen.getByTestId("builder-save-state"))).toBe(false)
+  })
+
+  it("RELOAD re-reads the owner-scoped drafts list rather than adding a route", async () => {
+    mockListDrafts.mockResolvedValue([
+      { id: "draft-1", slug: "vendor-brief", version: 1, name: "Vendor brief", definition, token: "server-token" },
+    ])
+    await conflicted()
+    expect(mockListDrafts).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByTestId("builder-conflict-reload"))
+    await waitFor(() => expect(mockListDrafts).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(screen.queryByTestId("builder-conflict-banner")).toBeNull())
   })
 })

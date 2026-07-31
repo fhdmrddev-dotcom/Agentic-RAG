@@ -96,6 +96,23 @@ vi.mock("@/lib/api", () => {
       this.name = "WorkflowNotFoundError"
     }
   }
+  /** Phase 186-07: the stale-token refusal, same shape as the shipped class — the NAME
+   *  the hook branches on plus the `currentToken` Overwrite adopts. Declared here for the
+   *  same reason the two above are: a module mock cannot close over a top-level import. */
+  class WorkflowStaleTokenError extends Error {
+    currentToken: string | null
+    constructor(currentToken: string | null = null) {
+      super("this draft changed somewhere else")
+      this.name = "WorkflowStaleTokenError"
+      this.currentToken = currentToken
+    }
+  }
+  class WorkflowDraftUnreadableError extends Error {
+    constructor() {
+      super("the draft's shape could not be read")
+      this.name = "WorkflowDraftUnreadableError"
+    }
+  }
   return {
     generateWorkflow: mockGenerate,
     createWorkflowDraft: mockCreate,
@@ -112,6 +129,8 @@ vi.mock("@/lib/api", () => {
     deleteWorkflowCascade: mockDeleteCascade,
     WorkflowConflictError,
     WorkflowNotFoundError,
+    WorkflowStaleTokenError,
+    WorkflowDraftUnreadableError,
   }
 })
 
@@ -137,7 +156,15 @@ vi.mock("@/components/workflows/builderStore", async (importOriginal) => {
   }
 })
 
-import { WorkflowBuilderPage, type BuilderDefinition } from "./WorkflowBuilderPage"
+import {
+  WorkflowBuilderPage,
+  PUBLISHED_CONFLICT_MESSAGE,
+  type BuilderDefinition,
+} from "./WorkflowBuilderPage"
+// 186-07: the cause-neutral refusal now has ONE home, in the hook that chooses it. The
+// suite reads the constant rather than a copied literal, so a re-wording cannot leave a
+// green test asserting a sentence the product no longer says.
+import { SAVE_FAILED_SENTENCE } from "@/hooks/useDraftPersistence"
 import { WorkflowsPage } from "./WorkflowsPage"
 import { EffectiveFeaturesProvider } from "@/providers/EffectiveFeaturesProvider"
 
@@ -303,7 +330,20 @@ describe("WorkflowBuilderPage session — R6: exactly one POST, then PATCH", () 
     expect(callLog.filter((c) => c === "createWorkflowDraft")).toHaveLength(1)
   })
 
-  it("a STRUCTURAL edit alone issues ZERO persistence calls — there is no autosave", async () => {
+  /**
+   * 186-07 RETARGET — the NAME changed, the assertions did not.
+   *
+   * 184-11 read this as *"there is no autosave"*, and that was true of 184. 186-07 makes
+   * one edit burst issue ONE write about a second after the author stops (D-186-01), so
+   * the sentence this row can still honestly prove is the other half of the same rule:
+   * three structural edits in a burst produce ZERO writes WHILE the window is open. The
+   * burst is not written per-edit, and it is not written per-keystroke.
+   *
+   * The half that used to be missing — that the write does eventually happen, on its own
+   * — is asserted in the 186-07 autosave block further down. Deleting this row instead
+   * would have removed the only guard on the coalescing side of the rule.
+   */
+  it("three structural edits in a burst issue ZERO writes while the window is open", async () => {
     renderBuilder()
     await screen.findByTestId("spine-node-research")
 
@@ -311,7 +351,7 @@ describe("WorkflowBuilderPage session — R6: exactly one POST, then PATCH", () 
     act(() => storeRef.current!.getState().reorderPhase("summarize", 0))
     act(() => storeRef.current!.getState().removePhaseBySlug("summarize"))
 
-    // Well past the config-coalescing window, so this is not merely "not yet".
+    // Well past the config-coalescing window, and inside the autosave one.
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 700))
     })
@@ -597,7 +637,19 @@ describe("WorkflowBuilderPage session — the 409 is told honestly (D-184-16)", 
     expect(screen.queryByTestId("builder-save-confirm")).toBeNull()
   })
 
-  it("any OTHER failure keeps today's generic line — a 404 is not a publish", async () => {
+  /**
+   * 186-07 RETARGET, recorded here as well as in the SUMMARY.
+   *
+   * The expected LITERAL moved from `Couldn't save` to the write loop's own cause-neutral
+   * sentence, and nothing else did. `GENERIC_SAVE_ERROR` was retired when the seam moved:
+   * `useDraftPersistence` already ships a cause-neutral line, chosen by the same branch
+   * that chooses the other two, and keeping both would have left ONE situation with TWO
+   * spellings — the failure 186-04 retired the store's parallel save enum for.
+   *
+   * The assertion's PURPOSE is unchanged and still measured, in both halves: a 404 or a
+   * dead network reads as itself, and it is never told the workflow is published.
+   */
+  it("any OTHER failure keeps a generic line — a 404 is not a publish", async () => {
     mockUpdate.mockRejectedValue(new Error("network down"))
 
     const { default: userEvent } = await import("@testing-library/user-event")
@@ -607,7 +659,168 @@ describe("WorkflowBuilderPage session — the 409 is told honestly (D-184-16)", 
 
     await user.click(screen.getByTestId("builder-save-draft"))
     const error = await screen.findByTestId("builder-save-error")
-    expect(error.textContent).toBe("Couldn't save")
+    expect(error.textContent).toBe(SAVE_FAILED_SENTENCE)
     expect(error.textContent).not.toMatch(/published/i)
+    // …and the two sentences really are different strings, so the row above measures a
+    // branch rather than a constant that happens to be shared.
+    expect(SAVE_FAILED_SENTENCE).not.toBe(PUBLISHED_CONFLICT_MESSAGE)
+  })
+})
+
+// ── 9. 186-07 — the token reaches the wire from the route that carries one ────────
+
+describe("WorkflowBuilderPage session 186-07 — the concurrency token rides every write", () => {
+  it("an OPENED draft echoes the drafts-row token VERBATIM on its first PATCH", async () => {
+    // The whole seam end to end and the reason Task 1 exists: `WorkflowsPage` reads the
+    // token off the drafts row, carries it through `BuilderInitial`, and the write loop
+    // echoes it as-is. Drop `token` from the pass-through cast in `WorkflowsPage` and this
+    // goes red with `undefined` — which is a Builder autosaving with NO guard at all, the
+    // failure mode that has no visible symptom until it clobbers something.
+    const ROW_TOKEN = "2026-08-01 12:00:00.123456+00"
+    mockListDrafts.mockResolvedValue([
+      {
+        id: "draft-1",
+        slug: "vendor-brief",
+        version: 1,
+        name: "Vendor brief",
+        definition,
+        token: ROW_TOKEN,
+      },
+    ])
+
+    render(
+      <EffectiveFeaturesProvider value={{ ...FLAG_ON, refetch: vi.fn() }}>
+        <div style={{ width: 1200, height: 800 }}>
+          <WorkflowsPage folders={[]} onLaunch={vi.fn()} />
+        </div>
+      </EffectiveFeaturesProvider>,
+    )
+
+    fireEvent.click(await screen.findByTestId("draft-open"))
+    await screen.findByTestId("door-govern")
+
+    const field = await openPanel()
+    fireEvent.change(field, { target: { value: "an edit worth guarding" } })
+    fireEvent.click(screen.getByTestId("builder-save-draft"))
+
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1))
+    expect(mockUpdate.mock.calls[0][0]).toBe("draft-1")
+    expect(mockUpdate.mock.calls[0][2]).toBe(ROW_TOKEN)
+    // Echoed as BYTES. The microsecond tail is exactly what a parsed-and-re-rendered
+    // token would lose, and a truncated token matches zero rows.
+    expect(mockUpdate.mock.calls[0][2]).toContain(".123456")
+  })
+
+  it("the token is CHAINED — the second write carries what the first one returned", async () => {
+    mockUpdate.mockImplementation(async () => {
+      callLog.push("updateWorkflowDraft")
+      return { id: "draft-1", version: 1, token: "tok-after-first-patch" }
+    })
+
+    const { default: userEvent } = await import("@testing-library/user-event")
+    const user = userEvent.setup()
+    renderBuilder({ initial: { definition, draftId: "draft-1", token: "tok-seeded" } })
+    const field = await openPanel()
+
+    fireEvent.change(field, { target: { value: "first" } })
+    await user.click(screen.getByTestId("builder-save-draft"))
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1))
+
+    fireEvent.change(field, { target: { value: "second" } })
+    await user.click(screen.getByTestId("builder-save-draft"))
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(2))
+
+    expect(mockUpdate.mock.calls[0][2]).toBe("tok-seeded")
+    // A write that ignored the response's token would re-send the seeded one and be
+    // refused as stale against the person's OWN change.
+    expect(mockUpdate.mock.calls[1][2]).toBe("tok-after-first-patch")
+  })
+})
+
+// ── 10. 186-07 — autosave is live, and the two surfaces it earns ──────────────────
+
+describe("WorkflowBuilderPage session 186-07 — autosave writes without being asked", () => {
+  it("a structural edit PATCHes on its own about a second later — no button pressed", async () => {
+    renderBuilder()
+    await screen.findByTestId("spine-node-research")
+
+    act(() => storeRef.current!.getState().addPhaseOfType("llm_single"))
+
+    // Nothing yet: the burst is still coalescing, which is the D-186-01 rule.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 300))
+    })
+    expect(mockUpdate).toHaveBeenCalledTimes(0)
+
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1), { timeout: 4000 })
+    expect(mockUpdate.mock.calls[0][0]).toBe("draft-1")
+    // …and it clears the guard, which is the observable consequence of `dirty`.
+    await waitFor(() => expect(canLeave!()).toBe(true))
+  })
+
+  it("MOUNTING a draft and touching nothing writes NOTHING at all", async () => {
+    // The dirty gate. Without it, merely opening a draft would PATCH it — bumping the row
+    // and invalidating the token every other open tab holds, manufacturing exactly the
+    // conflict this phase exists to prevent.
+    renderBuilder()
+    await screen.findByTestId("spine-node-research")
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 2200))
+    })
+    expect(mockUpdate).toHaveBeenCalledTimes(0)
+    expect(mockCreate).toHaveBeenCalledTimes(0)
+  })
+
+  it("a stale-token refusal raises the banner, offers Reload BEFORE Overwrite, and stops writing", async () => {
+    const { WorkflowStaleTokenError } = await import("@/lib/api")
+    mockUpdate.mockRejectedValue(new WorkflowStaleTokenError("newer-token"))
+
+    renderBuilder()
+    const field = await openPanel()
+    fireEvent.change(field, { target: { value: "the losing tab's edit" } })
+
+    const banner = await screen.findByTestId("builder-conflict-banner", undefined, {
+      timeout: 4000,
+    })
+    expect(banner.getAttribute("role")).toBe("alert")
+    // It states what happened in real DOM text, never a title attribute.
+    expect(banner.textContent).toContain("changed somewhere else")
+
+    // D-186-08 — RELOAD FIRST, OVERWRITE SECOND, in DOM order. Asserted positionally
+    // rather than by looks: reading order and tab order are the recommendation.
+    const reload = screen.getByTestId("builder-conflict-reload")
+    const overwrite = screen.getByTestId("builder-conflict-overwrite")
+    expect(
+      reload.compareDocumentPosition(overwrite) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+    const controls = [...banner.querySelectorAll<HTMLElement>("button")]
+    expect(controls.indexOf(reload)).toBeLessThan(controls.indexOf(overwrite))
+
+    // …and the loop is HALTED: further edits issue nothing at all, and no receipt exists.
+    const callsAtConflict = mockUpdate.mock.calls.length
+    fireEvent.change(field, { target: { value: "another edit while conflicted" } })
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 2200))
+    })
+    expect(mockUpdate.mock.calls.length).toBe(callsAtConflict)
+    expect(screen.queryByTestId("builder-save-confirm")).toBeNull()
+  })
+
+  it("NEITHER exit is taken by itself — the banner waits for the person", async () => {
+    const { WorkflowStaleTokenError } = await import("@/lib/api")
+    mockUpdate.mockRejectedValue(new WorkflowStaleTokenError("newer-token"))
+
+    renderBuilder()
+    const field = await openPanel()
+    fireEvent.change(field, { target: { value: "the losing tab's edit" } })
+    await screen.findByTestId("builder-conflict-banner", undefined, { timeout: 4000 })
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 2200))
+    })
+    // Reload re-reads the drafts list; Overwrite re-enters the writer. Neither happened.
+    expect(mockListDrafts).not.toHaveBeenCalled()
+    expect(screen.getByTestId("builder-conflict-banner")).toBeInTheDocument()
   })
 })

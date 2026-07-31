@@ -82,13 +82,14 @@
  * would leave those edits outside the history. The undo/redo AFFORDANCES stay
  * canvas-only and flag-gated; the HISTORY is complete.
  *
- * WHAT DELIBERATELY DID NOT MOVE (D-184-05): persistence. `draftIdRef`,
- * `creatingRef`, `onPersist` and `onSaveDraft` are unchanged and stay on this
- * page, because Phase 186 rewrites exactly that seam for autosave — extracting it
- * now would be churn against a seam about to move. Selection (`selectedSlug`, the
- * Escape release) also stays here: it is the D-183-05 one-selection contract, not
- * definition state. This was a STATE-HOME refactor, gated on every shipped
- * assertion passing unmodified (D-184-08).
+ * WHAT DID NOT MOVE IN 184, AND HAS NOW MOVED (D-184-05 → D-186-05). 184-04 kept
+ * persistence here because Phase 186 was going to rewrite exactly that seam, and it did:
+ * the create-once-then-PATCH body, the debounce, the concurrency token, the hold
+ * conditions and every refusal branch now live in `useDraftPersistence`
+ * (`frontend/src/hooks/useDraftPersistence.ts`), which this page COMPOSES the way it
+ * already composes `useLiveValidation`. Updated rather than left standing —
+ * `builderStore.ts` carries the same correction (186-04) and two docblocks describing one
+ * seam must agree. Selection still stays here: D-183-05, not definition state.
  *
  * ── Phase 184-11 (CANVAS-02 / CANVAS-03 · D-184-15 / D-184-16) — the session ────
  *
@@ -116,9 +117,18 @@
  *  3. The 409 — a published row's conflict gets its own honest sentence instead of
  *     the generic "Couldn't save".
  *
- * WHAT IS STILL NOT AUTOSAVE. `onPersist` / `onSaveDraft` below are untouched in
- * their create-once-then-PATCH shape: a session issues exactly ONE create and then
- * PATCHes. Phase 186 owns autosave and this plan deliberately does not pre-empt it.
+ * ── Phase 186-07 (CONCUR-01 / CONCUR-02 · D-186-01 … D-186-12) — autosave ───────
+ *
+ * AUTOSAVE IS LIVE, AND IT IS ONE HOOK CALL. An edit schedules one guarded PATCH about a
+ * second after the author stops; at most one write is outstanding; a write that cannot
+ * safely happen is HELD with its reason said out loud; a row that moved elsewhere HALTS the
+ * loop and hands the person both exits. None of that logic is here, and neither is any of
+ * the copy — `BuilderSaveRegion` owns what the header says. No new band, and
+ * `WorkflowCanvas.tsx` is not opened (G-5; its extraction is Phase 188's). The third 184
+ * debt's sentence moved with the branch that picks it; the leave guard and the dismissal
+ * contract stay, because neither is part of the write. And a cosmetic drag still reaches
+ * the network ZERO times (D-186-02) — `canvasNudge.ts` imports neither the store, the
+ * canvas model nor the API client, so CONCUR-01 is true BY CONSTRUCTION.
  *
  * ── Phase 184-13 (D-184-04 / R12) — the keys, and the one bottom region ─────────
  *
@@ -136,7 +146,7 @@
  */
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useStore } from "zustand"
-import { generateWorkflow, createWorkflowDraft, updateWorkflowDraft, listFolders, listSkills } from "@/lib/api"
+import { generateWorkflow, listFolders, listSkills } from "@/lib/api"
 import { PhaseSpineGraph } from "@/components/workflows/PhaseSpineGraph"
 import {
   groundingCauseOf,
@@ -156,11 +166,22 @@ import {
   SAVED_STILL_A_DRAFT,
 } from "@/components/workflows/builderStore"
 import { BuilderStoreProvider } from "@/components/workflows/BuilderStoreProvider"
+// 186-07 (G-5): the header's save region — four sentences and three controls — has its own
+// file, so composing autosave into this page did not grow it.
+import { BuilderSaveRegion } from "@/components/workflows/BuilderSaveRegion"
+import { BuilderHeaderBar } from "@/components/workflows/BuilderHeaderBar"
 import { useEffectiveFeaturesOptional } from "@/providers/EffectiveFeaturesProvider"
 import { cn } from "@/lib/utils"
 // ── Phase 184-11: the composition seams. Every one of these is a HOOK or a PURE
 //    module; none of them is reachable from the canvas or the panel themselves. ──
 import { useLiveValidation } from "@/hooks/useLiveValidation"
+// Phase 186-07 (D-186-05): the write seam, composed in exactly the shape `useLiveValidation`
+// arrives in — one call, the result held as a plain value and passed down as props.
+import {
+  useDraftPersistence,
+  PUBLISHED_CONFLICT_MESSAGE,
+  type PersistState,
+} from "@/hooks/useDraftPersistence"
 import { useGroundingBundle } from "@/hooks/useGroundingBundle"
 import { DEGRADED_SENTENCE, groupVerdicts } from "@/components/workflows/verdictModel"
 import { clearNudges, readNudges, writeNudge } from "@/components/workflows/canvasNudge"
@@ -228,25 +249,30 @@ export function useCanvasGate(): boolean {
  * ⚠ 184-13 MOVED THE DECLARATION, not the name or the value. Two surfaces now say it —
  * this header and the canvas toolbar — and the toolbar lives on the code-split canvas
  * chunk, so it cannot reach back into this page module to read a string without dragging
- * the whole page in with it. The literal therefore lives beside the `SaveState` type in
- * `builderStore.ts`, and this line re-exports it so every existing caller (and every
- * existing grep) still finds it here.
+ * the whole page in with it. The literal therefore lives in `builderStore.ts`, beside the
+ * locked-save-wording note, and this line re-exports it so every existing caller (and
+ * every existing grep) still finds it here.
  */
 export { SAVED_STILL_A_DRAFT }
 
 /**
- * The 409 sentence (D-184-16 debt 3). `updateWorkflowDraft` already throws a typed
- * `WorkflowConflictError` when the row is published/frozen; until this plan the page
- * flattened it into the generic error. It is business-plain and it names the WAY OUT
- * (Tweak), because "couldn't save" on a published row sends a person back to press the
- * same button again.
+ * The 409 sentence (D-184-16 debt 3), RE-EXPORTED — its declaration and its docblock moved
+ * to `useDraftPersistence` in 186-07, because the branch that CHOOSES it moved there when
+ * this page's explicit-save catch was deleted. A locked string belongs beside the code that
+ * picks it, or the two drift. The name stays exported here so every existing caller and
+ * every existing grep still resolves — the same thing the line above does for the wording.
  */
-export const PUBLISHED_CONFLICT_MESSAGE =
-  "This version is published and can't be edited — use Tweak to start a new draft"
+export { PUBLISHED_CONFLICT_MESSAGE }
 
-/** The generic failure line, unchanged: a 404 / network failure is still never
- *  swallowed as a success and still reads as itself. */
-export const GENERIC_SAVE_ERROR = "Couldn't save"
+/**
+ * ⚠ TOMBSTONE — `GENERIC_SAVE_ERROR` ("Couldn't save") was RETIRED in 186-07 and the four
+ * strings the save surface says now live in `BuilderSaveRegion.tsx`. `useDraftPersistence`
+ * already ships a cause-neutral failure line, chosen by the same branch that chooses the
+ * other two, so keeping this one would have left ONE situation with TWO spellings — the
+ * failure 186-04 retired the store's parallel save enum for, one wave earlier in this same
+ * phase. Recorded rather than deleted silently, because "why is there no generic save
+ * constant here" otherwise gets re-answered by re-adding one.
+ */
 
 /**
  * The empty draft's publish reason (D-184-15). An INVITATION, not a claimed verdict:
@@ -257,8 +283,16 @@ export const GENERIC_SAVE_ERROR = "Couldn't save"
  */
 export const EMPTY_DRAFT_INVITATION = "Add a step to get started"
 
-/** The unsaved-work prompt (D-184-16 debt 1). Named, because a session can now be five
- *  structural edits deep with no autosave until Phase 186. */
+/**
+ * The unsaved-work prompt (D-184-16 debt 1). Named in 184-11 because a session could then
+ * be five structural edits deep with no autosave at all.
+ *
+ * ⚠ 186-07 KEPT THE GUARD AND CHANGED WHAT IT MEANS (D-186-03). Same words, same code, still
+ * keyed on `dirty` — but autosave clears `dirty` continuously now, so what it asks moved
+ * from *"you forgot to save"* (the 184 common case, the kind of prompt people learn to click
+ * through) to *"a write genuinely failed or is being held"*. A guard that fires only on a
+ * real refusal is worth more than one that fires on every exit; that is why it stayed.
+ */
 export const UNSAVED_LEAVE_PROMPT =
   "This draft has unsaved changes. Leave without saving?"
 
@@ -339,58 +373,6 @@ function gatesFor(phase: PhaseSpecJSON | null, kbTools: readonly string[]): Phas
     : []
 }
 
-/**
- * Phase 184.1-01 (D-184.1-01 … D-184.1-03) — THE MERGED HEADER ROW.
- *
- * Operator-reported in the Phase 184 UAT: *"the canvas space is very narrow because the
- * header above is taking too much space… especially with the smaller screens."* Measured
- * on a 639 px window: 275 px of chrome above a 288 px canvas — the flow got 45 % of the
- * screen, and 146 px of that was three stacked bands doing one band's job.
- *
- * IT OWNS LAYOUT AND NOTHING ELSE (D-184.1-02). `lead` and `trail` arrive as opaque nodes
- * from the two ANCESTOR band owners; every control in them keeps its original owner, its
- * original handler and its original state. `← Workflows` still closes over `WorkflowsPage`'s
- * `backToLibrary`, `‹ both doors` still closes over `WorkflowDoorSwitch`'s `goBoth`. This is
- * a re-flow of where things are drawn, not a move of what owns them — which is also why
- * nothing here needs to know what it is rendering.
- *
- * NOTHING IS REMOVED. Every control, badge and label from all three bands survives and keeps
- * its accessible name, including the `🔧 Author & govern` label that the plan's illustrative
- * row sketch omitted.
- *
- * IT WRAPS RATHER THAN TRUNCATES. `flex-wrap` lets the trailing group fall to a second line
- * on a narrow window instead of overflowing or eliding a control — two rows is still one
- * band better than the three this replaces, which is the point at ~900 px where the
- * operator's complaint actually lives.
- */
-function BuilderHeaderBar({
-  lead,
-  trail,
-  identity,
-  actions,
-}: {
-  lead?: React.ReactNode
-  trail?: React.ReactNode
-  identity?: React.ReactNode
-  actions?: React.ReactNode
-}) {
-  return (
-    <header
-      data-testid="builder-header-bar"
-      className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-border px-4 py-2"
-    >
-      <div className="flex min-w-0 flex-wrap items-center gap-2">
-        {lead}
-        {identity}
-      </div>
-      <div className="ml-auto flex shrink-0 items-center gap-2">
-        {trail}
-        {actions}
-      </div>
-    </header>
-  )
-}
-
 /** The Builder's working definition shape (a refinement of the opaque
  *  `WorkflowDefinitionJSON` the api layer returns). */
 export interface BuilderDefinition {
@@ -409,25 +391,21 @@ export interface BuilderInitial {
   definition: BuilderDefinition
   draftId: string
   /**
-   * Phase 186-07 (D-186-07 / CONCUR-02) — the OPAQUE concurrency token for the row
-   * `draftId` names, exactly as the server last minted it.
+   * Phase 186-07 (D-186-07) — the OPAQUE concurrency token for the row `draftId` names.
    *
-   * IT IS BYTES, AND NOTHING HERE MAY LOOK INSIDE THEM. It is echoed verbatim on the
-   * next write and never inspected, normalised, re-rendered or turned into a JS date
-   * value — Postgres keeps microseconds that a millisecond-precision date value would
-   * silently truncate, and a truncated token matches zero rows, so every save would
-   * refuse as stale. `useDraftPersistence` carries the same fence in code and a source
-   * grep in its suite enforces it.
+   * IT IS BYTES. Echoed verbatim on the next write and never inspected, normalised or
+   * turned into a JS date value: Postgres keeps microseconds a millisecond-precision date
+   * value truncates, and a truncated token matches zero rows, so every save would then
+   * refuse as stale. `useDraftPersistence` carries the same fence in code, enforced by a
+   * source grep in its suite.
    *
-   * ABSENT OR `null` MEANS THE FIRST WRITE GOES UNGUARDED — the 186-01 optional-`If-Match`
-   * posture, which is what keeps a call site that has no token (a fresh build, where no
-   * row exists yet) working exactly as it did. It is optional here for the same reason:
-   * every existing construction of this interface stays valid.
+   * ABSENT / `null` ⇒ the first write goes UNGUARDED (the 186-01 optional-`If-Match`
+   * posture), which is the honest reading for a route where no row exists yet. Optional
+   * for the same reason: every existing construction of this interface stays valid.
    *
-   * A DRAFT REACHES THE BUILDER BY FOUR ROUTES — fresh build, fork a starter, Tweak a
-   * published version, open an existing draft — and each of them must carry (or knowingly
-   * lack) a token. A route that quietly dropped it would autosave with no guard at all,
-   * with no visible symptom until it clobbered something.
+   * FOUR ROUTES REACH THE BUILDER — fresh, fork a starter, Tweak, open a draft — and each
+   * must carry or knowingly lack one. A route that quietly dropped it would autosave with
+   * no guard and no symptom, until it clobbered something.
    */
   token?: string | null
 }
@@ -450,16 +428,25 @@ export interface WorkflowBuilderPageProps {
    *  is still assignable and still behaves exactly as it did, which is what keeps the
    *  flag-off surface unchanged (this page passes `null` whenever the canvas flag is off).
    *  It rides the EXISTING seam on purpose: 141-B's operator correction is that publish
-   *  stays in the header it already has, so the mount does not move and no band is added. */
+   *  stays in the header it already has, so the mount does not move and no band is added.
+   *
+   *  Phase 186-07 (D-186-12): a FOURTH argument that points the other way — how the publish
+   *  surface tells this page a gauntlet is running, so the write loop HOLDS rather than
+   *  landing an edit mid-golden-run (minutes and real provider spend). A BOOLEAN reporter
+   *  and nothing more: the publish contract is not widened into a state channel, a
+   *  three-parameter implementation is still assignable, and it rides this EXISTING seam
+   *  rather than a new context for the same reason the third argument did. */
   renderPublish?: (
     def: BuilderDefinition,
     draftId: string | null,
     blockedReason?: string | null,
+    onPublishRunning?: (running: boolean) => void,
   ) => React.ReactNode
   /** Phase 103-ux OPEN/TWEAK: when present, the Builder starts DIRECTLY in the
    *  "drafted" editing view on this existing definition — it SKIPS the
-   *  describe/composing screen entirely. `draftId` seeds both state + the
-   *  draftIdRef so every edit PATCHes the SAME row (never a duplicate create):
+   *  describe/composing screen entirely. `draftId` seeds the rendered id AND the write
+   *  loop's synchronous mirror, so every edit PATCHes the SAME row (never a duplicate
+   *  create); 186-07 adds `token`, which guards that first PATCH:
    *   - Open a draft → the draft's own id (edit-in-place).
    *   - Tweak a published workflow → the freshly-forked v(N+1) draft id (the
    *     frozen published row is never touched).
@@ -547,25 +534,15 @@ export function WorkflowBuilderPage({
   const [folderNames, setFolderNames] = useState<IdNameMap>({})
   const [folderOptions, setFolderOptions] = useState<Array<{ id: string; name: string }>>([])
   const [skillNames, setSkillNames] = useState<IdNameMap>({})
-  // The persisted draft id (null until the first save for a fresh build; pre-seeded
-  // from `initial.draftId` for Open/Tweak). A generated draft is persisted via
-  // createWorkflowDraft on the FIRST edit/save, then PATCHed.
+  // The persisted draft id as a RENDERED value (null until the first save on a fresh build;
+  // pre-seeded for Open/Tweak). The write loop keeps its own synchronous mirror — that is
+  // what collapses the first save to exactly one create — and reports the id it minted here
+  // through `onDraftCreated`, so the nudge key, "Tidy up" and the publish trigger all read
+  // one value React actually re-renders on.
   const [draftId, setDraftId] = useState<string | null>(initial?.draftId ?? null)
-  // Synchronous mirrors of the persist state. setDraftId is async, so several
-  // onPersist calls can fire while draftId is still null and each would re-run
-  // createWorkflowDraft → a UniqueViolation storm on (slug, version). The refs
-  // collapse the first save to EXACTLY ONE create (UAT-103 save-loop fix). For
-  // Open/Tweak the ref is pre-seeded → every save PATCHes the existing row.
-  const draftIdRef = useRef<string | null>(initial?.draftId ?? null)
-  const creatingRef = useRef(false)
-  // Phase 103-ux SAVE button: transient feedback for the explicit "Save draft"
-  // affordance ("idle" → "saving" → "saved" | "error"). Belt-and-suspenders over
-  // the implicit on-blur autosave (onPersist) — the user gets a visible "Saved ✓".
-  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle")
-  // Phase 184-11 (D-184-16 debt 3): WHICH failure the error state is reporting. `null`
-  // keeps today's generic line; a 409 replaces it with the published-row sentence.
-  const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null)
-  const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // D-186-12 — is a publish gauntlet running? Reported by the publish surface through the
+  // `renderPublish` seam; the ONLY reader is the write loop's hold gate.
+  const [publishInFlight, setPublishInFlight] = useState(false)
 
   const canDraft = describe.trim().length > 0 && builderPhase !== "composing"
   const panelOpen = selectedSlug !== null
@@ -776,6 +753,32 @@ export function WorkflowBuilderPage({
         break
     }
   }, [validation, store])
+
+  /**
+   * ── Phase 186-07 (D-186-05) — the WRITE loop, composed exactly like the READ loop ──
+   *
+   * `enabled` is DRAFTED + CANVAS-ENABLED and deliberately NOT `hasEdited`: the loop's own
+   * `dirty` gate is what keeps a freshly-opened draft from writing, and gating on
+   * `hasEdited` as the read loop does would leave a draft opened and edited once before
+   * that flag flips silently un-autosaved. The canvas flag is in it because autosave is new
+   * behaviour and D-181-01 promises a flag-off surface identical to the shipped one — the
+   * explicit Save button still works there, because `saveNow` is not gated on `enabled`.
+   * `validationCause` is derived HERE as a primitive, per the hook's caller contract: the
+   * read loop emits a new object every beat, and the hold gate must not churn on beats that
+   * did not change the answer.
+   */
+  const validationCause = validation.kind === "degraded" ? validation.cause : null
+  const persistence = useDraftPersistence({
+    definition,
+    enabled: canvasEnabled && builderPhase === "drafted",
+    initialDraftId: initial?.draftId ?? null,
+    initialToken: initial?.token ?? null,
+    store,
+    publishInFlight,
+    validationCause,
+    onDraftCreated: setDraftId,
+  })
+  const persistState: PersistState = persistence.state
 
   const verdicts = useStore(store, (s) => s.verdicts)
   const verdictGroups = useMemo(() => groupVerdicts(verdicts), [verdicts])
@@ -1062,9 +1065,11 @@ export function WorkflowBuilderPage({
     if (text.length === 0) return
     store.getState().setComposing()
     setSelectedSlug(null)
+    // 186-07: only the RENDERED id resets. The loop's own mirror needs none — this callback
+    // is reachable only from the describe screen, which a session can be on only before any
+    // row exists (a save requires the drafted view, and the sole way back is a generate
+    // failure, which creates nothing).
     setDraftId(null)
-    draftIdRef.current = null
-    creatingRef.current = false
     try {
       const result = await generateWorkflow({
         describe: text,
@@ -1136,78 +1141,17 @@ export function WorkflowBuilderPage({
     [selectedSlug, store],
   )
 
-  // Persist the working draft. First save → createWorkflowDraft (then keep the id);
-  // subsequent saves → updateWorkflowDraft (PATCH). For Open/Tweak the ref is
-  // pre-seeded so this ALWAYS PATCHes the loaded row (never a duplicate create).
-  // Returns true on a confirmed write so the explicit Save button can show "Saved ✓"
-  // (and false / throw so it can show an honest error). The implicit on-blur
-  // autosave still calls this and ignores the result (belt-and-suspenders).
-  //
-  // Phase 184-04 (D-184-05): the create-once-then-PATCH guard below is UNCHANGED.
-  // The only edit is where the definition comes from — a side-effect `getState()`
-  // read of the store instead of a closure over component state, which is what
-  // keeps this callback referentially stable across every edit.
-  const onPersist = useCallback(async (): Promise<boolean> => {
-    const snapshot = store.getState()
-    if (snapshot.builderPhase !== "drafted") return false
-    const def = selectDefinition(snapshot) as unknown as Record<string, unknown>
-    if (draftIdRef.current === null) {
-      // First save: create EXACTLY ONCE. If a create is already in flight,
-      // skip — re-running it would collide on UNIQUE(slug, version) → 500.
-      if (creatingRef.current) return false
-      creatingRef.current = true
-      try {
-        const created = await createWorkflowDraft(def)
-        draftIdRef.current = created.id // synchronous: subsequent calls PATCH
-        setDraftId(created.id)
-      } finally {
-        creatingRef.current = false
-      }
-    } else {
-      await updateWorkflowDraft(draftIdRef.current, def)
-    }
-    // Phase 184-11: a CONFIRMED write is the only thing that clears `dirty` — the store's
-    // `markSaved()` is its one setter and it writes nothing itself. Without this the
-    // leave guard would prompt after every successful save, which is how a guard teaches
-    // a person to click through it. Undo re-arms `dirty` immediately afterwards
-    // (D-184-03), because stepping back past a save point really does make the in-memory
-    // definition differ from what was PATCHed.
-    store.getState().markSaved()
-    return true
-  }, [store])
-
-  // Phase 103-ux SAVE button: an EXPLICIT, obvious save with visible feedback.
-  // Drives the persist path (create-once-then-PATCH) and surfaces "Saved ✓" on
-  // success or an honest error state on failure (409/404/network). The implicit
-  // on-blur autosave (onPersist) stays; this is the user-facing affordance.
-  const onSaveDraft = useCallback(async () => {
-    if (savedTimerRef.current) {
-      clearTimeout(savedTimerRef.current)
-      savedTimerRef.current = null
-    }
-    setSaveState("saving")
-    setSaveErrorMessage(null)
-    try {
-      const ok = await onPersist()
-      setSaveState(ok ? "saved" : "error")
-    } catch (err) {
-      // A 409 (published/frozen) / 404 / network failure is surfaced honestly —
-      // never silently swallowed as a success.
-      //
-      // Phase 184-11 (D-184-16 debt 3): the 409 gets its OWN sentence. The branch reads
-      // the error's NAME rather than using `instanceof WorkflowConflictError`, which is
-      // the idiom `useLiveValidation.causeOf` already shipped and states its reason for:
-      // a rejection that crossed a module or realm boundary still classifies, and the
-      // page needs no value import from the API client to recognise it. Everything else
-      // keeps today's generic state — a 404 or a network failure is a different thing
-      // and must not be told the workflow is published.
-      const name = err && typeof err === "object" && "name" in err ? (err as { name: string }).name : ""
-      setSaveErrorMessage(name === "WorkflowConflictError" ? PUBLISHED_CONFLICT_MESSAGE : null)
-      setSaveState("error")
-    }
-    if (savedTimerRef.current) clearTimeout(savedTimerRef.current)
-    savedTimerRef.current = setTimeout(() => setSaveState("idle"), 2500)
-  }, [onPersist])
+  /**
+   * The panel's blur commit — `saveNow` behind a `dirty` check, and the check is the point.
+   * `saveNow` bypasses the loop's dirty gate because a person who presses Save means it,
+   * but a blur is not a press: every field is CONTROLLED, so the value already reached the
+   * store on the keystroke and a blur adds only immediacy. An unconditional write here
+   * would bump a row nobody changed, invalidating the token every other open tab holds —
+   * this phase's own conflict, manufactured by the surface that prevents it.
+   */
+  const onFieldCommit = useCallback(() => {
+    if (store.getState().dirty) void persistence.saveNow()
+  }, [store, persistence])
 
   // ── D-184-16 debt 1 — the unsaved-work leave guard, both halves ────────────────
 
@@ -1241,15 +1185,33 @@ export function WorkflowBuilderPage({
   const storeDegraded = useStore(store, (s) => s.degraded)
 
   /**
-   * The toolbar's five-state reading, joined HERE from the two states that actually carry
-   * it: the page's transient `saveState` (the explicit save's own feedback) and the
-   * store's `dirty` (which an undo re-arms, D-184-03). The toolbar renders one union
-   * rather than combining a boolean and an enum itself.
-   *
-   * `idle` therefore means "clean, and nothing has been saved this second" — and the
-   * toolbar deliberately says nothing at all in that state.
+   * The toolbar's five-state reading, joined HERE from the write loop's state and the
+   * store's `dirty` (which an undo re-arms, D-184-03). `CanvasToolbar.tsx` is NOT opened —
+   * only the value it is handed changes. TWO deliberate collapses: `held` and `conflict`
+   * are readings its five-value vocabulary has no word for, so both map to `error` and the
+   * header says WHICH (a chip is not where a refusal gets explained); and `dirty` OUTRANKS
+   * a receipt, which it did not have to before — the old page state fell back to `idle` on
+   * a 2.5 s timer, while the loop's `saved` has no timer.
    */
-  const toolbarSaveState = saveState === "idle" && dirty ? "dirty" : saveState
+  const toolbarSaveState =
+    persistState.kind === "saving"
+      ? "saving"
+      : persistState.kind === "error" ||
+          persistState.kind === "conflict" ||
+          persistState.kind === "held"
+        ? "error"
+        : dirty
+          ? "dirty"
+          : persistState.kind === "saved"
+            ? "saved"
+            : "idle"
+
+  /** The sentence a refusal carries into the toolbar, or `null`. ONE source — the loop
+   *  picked it. A CONFLICT deliberately passes `null` so the toolbar falls back to its own
+   *  shipped "not saved" label: that reading's real sentence is the banner's, and on the
+   *  canvas view both are on screen at once. */
+  const saveRefusalSentence =
+    persistState.kind === "error" || persistState.kind === "held" ? persistState.sentence : null
 
   /**
    * The bottom region's whole payload, or `undefined` when the canvas flag is off — in
@@ -1260,8 +1222,8 @@ export function WorkflowBuilderPage({
     if (!canvasEnabled) return undefined
     return {
       saveState: toolbarSaveState,
-      saveErrorMessage: saveState === "error" ? (saveErrorMessage ?? GENERIC_SAVE_ERROR) : null,
-      onSaveDraft: () => void onSaveDraft(),
+      saveErrorMessage: saveRefusalSentence,
+      onSaveDraft: () => void persistence.saveNow(),
       onTidyUp,
       // The toolbar steps the history itself; this is how it reports that it did, so the
       // notice can be retired on that path too (see `canvasNotice`'s docblock).
@@ -1279,9 +1241,8 @@ export function WorkflowBuilderPage({
   }, [
     canvasEnabled,
     toolbarSaveState,
-    saveState,
-    saveErrorMessage,
-    onSaveDraft,
+    saveRefusalSentence,
+    persistence,
     onTidyUp,
     verdictGroups,
     storeDegraded,
@@ -1309,6 +1270,10 @@ export function WorkflowBuilderPage({
    * listener exists while the draft is clean, so it costs nothing at rest and a saved
    * session never gets the browser's "leave site?" dialog. `preventDefault()` plus the
    * legacy `returnValue` assignment is what every engine still requires to show it.
+   *
+   * 186-07 (D-186-03): UNCHANGED CODE, CHANGED MEANING — see `UNSAVED_LEAVE_PROMPT`. With
+   * autosave live it is armed almost only when a write was refused or is held, which is
+   * the case it was always for.
    */
   useEffect(() => {
     if (!dirty) return
@@ -1319,13 +1284,6 @@ export function WorkflowBuilderPage({
     window.addEventListener("beforeunload", onBeforeUnload)
     return () => window.removeEventListener("beforeunload", onBeforeUnload)
   }, [dirty])
-
-  // Clean up the transient-confirmation timer on unmount.
-  useEffect(() => {
-    return () => {
-      if (savedTimerRef.current) clearTimeout(savedTimerRef.current)
-    }
-  }, [])
 
   /**
    * Phase 184.1-01 — does the PRE-DRAFT screen have to host the merged row?
@@ -1574,44 +1532,25 @@ export function WorkflowBuilderPage({
 
   const actionGroup = (
     <>
-      {/* Phase 103-ux: explicit Save draft + transient confirmation.
-          Phase 184-11 (R6): this region is the ONLY place the page says anything
-          about the save, and what it says is `Saved · still a draft`. */}
-      <div data-testid="builder-save-state" className="flex items-center gap-2">
-        <button
-          type="button"
-          data-testid="builder-save-draft"
-          onClick={() => void onSaveDraft()}
-          disabled={saveState === "saving"}
-          className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-[13px] font-medium text-foreground transition-opacity hover:bg-accent/40 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {saveState === "saving" ? (
-            <>
-              <span
-                aria-hidden="true"
-                className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent"
-              />
-              Saving…
-            </>
-          ) : (
-            "Save draft"
-          )}
-        </button>
-        {saveState === "saved" && (
-          <span data-testid="builder-save-confirm" role="status" className="text-[13px] font-medium text-success">
-            {SAVED_STILL_A_DRAFT}
-          </span>
-        )}
-        {saveState === "error" && (
-          <span data-testid="builder-save-error" role="alert" className="text-[13px] font-medium text-destructive">
-            {saveErrorMessage ?? GENERIC_SAVE_ERROR}
-          </span>
-        )}
-      </div>
+      {/* 186-07 — everything the header says about saving, and the three controls that act
+          on it, in ONE component (see its docblock for the state→sentence mapping and for
+          why the quiet line is flag-gated while the conflict banner is not). The page
+          composes; it authors no save copy and narrows no state. */}
+      <BuilderSaveRegion
+        state={persistState}
+        dirty={dirty}
+        autosaveEnabled={canvasEnabled}
+        onSaveNow={() => void persistence.saveNow()}
+        onReload={() => void persistence.reload()}
+        onOverwrite={() => void persistence.overwrite()}
+      />
       {/* R12 — publish lives in the header that ALREADY EXISTS (sketch 141-B, the
           operator's correction). No net-new band: the reason travels through the
-          shipped `renderPublish` seam as a third argument so the mount does not move. */}
-      {renderPublish && definition && <div>{renderPublish(definition, draftId, blockedReason)}</div>}
+          shipped `renderPublish` seam as a third argument so the mount does not move.
+          186-07 adds the fourth argument — the in-flight reporter D-186-12's hold reads. */}
+      {renderPublish && definition && (
+        <div>{renderPublish(definition, draftId, blockedReason, setPublishInFlight)}</div>
+      )}
     </>
   )
 
@@ -1653,7 +1592,10 @@ export function WorkflowBuilderPage({
           folderNames={folderNames}
           skillNames={skillNames}
           onChange={onPhaseChange}
-          onPersist={onPersist}
+          // The prop's NAME is `PhaseFormPanel`'s and is not this plan's to rename; what
+          // it receives is the dirty-gated commit above, not a persist callback this page
+          // declares. See `onFieldCommit`.
+          onPersist={onFieldCommit}
           onClose={clearSelection}
           // D-14 — SPREAD-CONDITIONAL, never `rails={canvasEnabled ? rails : undefined}`.
           // With the flag off the prop must be genuinely ABSENT from the element, not

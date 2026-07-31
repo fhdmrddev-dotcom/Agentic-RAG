@@ -51,6 +51,10 @@ export interface WorkflowDoorSwitchProps {
     /** Phase 184-11 (R12): the publish-blocking reason, or null. Passed straight
      *  through — this shell neither derives it nor reads it. */
     blockedReason?: string | null,
+    /** Phase 186-07 (D-186-12): the publish-in-flight reporter the Builder's write loop
+     *  holds on. Passed straight through, same as the reason above — the shell neither
+     *  calls it nor observes it. */
+    onPublishRunning?: (running: boolean) => void,
   ) => React.ReactNode
   /** The describe-CTA handler — the loose door forwards the describe text to the
    *  EXISTING draft/generate path (the shell adds no new sink; D-01/T-124-08). */

@@ -31,12 +31,14 @@ import {
   HOLD_PUBLISHING,
   HOLD_UNREADABLE,
   SAVE_FAILED_SENTENCE,
+  PUBLISHED_CONFLICT_MESSAGE,
   type PersistState,
 } from "./useDraftPersistence"
 import {
   createWorkflowDraft,
   listDraftWorkflows,
   updateWorkflowDraft,
+  WorkflowConflictError,
   WorkflowDraftUnreadableError,
   WorkflowNotFoundError,
   WorkflowStaleTokenError,
@@ -391,6 +393,26 @@ describe("useDraftPersistence — F8: a refusal never files a receipt", () => {
 
     expect(stateOf(h.view)).toEqual({ kind: "error", sentence: SAVE_FAILED_SENTENCE })
     expect(h.markSaved).not.toHaveBeenCalled()
+  })
+
+  it("a PUBLISHED row keeps the sentence that names the way out (186-07 closes 186-06's debt)", async () => {
+    // The 184-11 / D-184-16-debt-3 line. It lived on the page until 186-07 moved the write
+    // seam here; if this branch were missing, a published-row save would fall into the
+    // cause-neutral arm and a person on a frozen row would be told nothing they could act
+    // on. Falsifiable by deleting the `WorkflowConflictError` branch in `refusalOf`.
+    mockedUpdate.mockRejectedValue(new WorkflowConflictError())
+
+    const h = harness()
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+    await flush()
+
+    expect(stateOf(h.view)).toEqual({ kind: "error", sentence: PUBLISHED_CONFLICT_MESSAGE })
+    // …and it is NOT the generic line, which is the whole point of the branch.
+    expect(PUBLISHED_CONFLICT_MESSAGE).not.toBe(SAVE_FAILED_SENTENCE)
+    // A refusal is still a refusal: no receipt, still dirty.
+    expect(h.markSaved).not.toHaveBeenCalled()
+    expect(h.store.getState().dirty).toBe(true)
   })
 
   it("a dropped connection gets the generic sentence too", async () => {

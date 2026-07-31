@@ -269,8 +269,11 @@ describe("WorkflowBuilderPage — OPEN existing (initial) boots into the editing
 describe("WorkflowBuilderPage — fresh build Save (no initial) creates ONCE then PATCHes", () => {
   it("first Save on a freshly-generated draft calls createWorkflowDraft, second Save PATCHes", async () => {
     mockGenerate.mockResolvedValue({ ok: true, definition: draft3 })
-    mockCreate.mockResolvedValue({ id: "created-1", version: 1 })
-    mockUpdate.mockResolvedValue({})
+    // 186-07: the create response carries the row's OPAQUE concurrency token, and the
+    // second save must echo THAT value — not the one the session started with (there
+    // was none) and not a re-derived one.
+    mockCreate.mockResolvedValue({ id: "created-1", version: 1, token: "tok-from-create" })
+    mockUpdate.mockResolvedValue({ id: "created-1", version: 1, token: "tok-from-patch" })
     const { default: userEvent } = await import("@testing-library/user-event")
     const user = userEvent.setup()
     render(<WorkflowBuilderPage />)
@@ -282,8 +285,16 @@ describe("WorkflowBuilderPage — fresh build Save (no initial) creates ONCE the
     await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1))
     expect(await screen.findByTestId("builder-save-confirm")).toBeInTheDocument()
     // Second Save → PATCH the now-known id, no second create.
+    //
+    // 186-07 RETARGET, not a relaxation: the call now carries a THIRD argument, so the
+    // shipped two-argument matcher could no longer describe a correct call. The assertion
+    // is STRENGTHENED rather than widened — the id is still pinned, and the token the
+    // create minted is pinned alongside it, which is the guard that the write is
+    // concurrency-checked at all.
     await user.click(screen.getByTestId("builder-save-draft"))
-    await waitFor(() => expect(mockUpdate).toHaveBeenCalledWith("created-1", expect.anything()))
+    await waitFor(() =>
+      expect(mockUpdate).toHaveBeenCalledWith("created-1", expect.anything(), "tok-from-create"),
+    )
     expect(mockCreate).toHaveBeenCalledTimes(1)
   })
 })
