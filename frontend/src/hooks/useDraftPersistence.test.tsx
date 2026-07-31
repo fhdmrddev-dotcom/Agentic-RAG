@@ -35,9 +35,12 @@ import {
 } from "./useDraftPersistence"
 import {
   createWorkflowDraft,
+  listDraftWorkflows,
   updateWorkflowDraft,
   WorkflowDraftUnreadableError,
   WorkflowNotFoundError,
+  WorkflowStaleTokenError,
+  type WorkflowDraftRow,
   type WorkflowDraftWriteResult,
 } from "@/lib/api"
 import { createBuilderStore, selectDefinition } from "@/components/workflows/builderStore"
@@ -56,6 +59,7 @@ vi.mock("@/lib/api", async () => {
 
 const mockedCreate = vi.mocked(createWorkflowDraft)
 const mockedUpdate = vi.mocked(updateWorkflowDraft)
+const mockedList = vi.mocked(listDraftWorkflows)
 
 // ── Local infrastructure (the analog's three helpers) ─────────────────────────
 
@@ -218,6 +222,7 @@ beforeEach(() => {
   vi.useFakeTimers()
   mockedCreate.mockReset()
   mockedUpdate.mockReset()
+  mockedList.mockReset()
   warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
 })
 
@@ -464,6 +469,143 @@ describe("useDraftPersistence — F11: writes hold while a publish runs, and flu
     await advance(AUTOSAVE_DEBOUNCE_MS)
 
     expect(stateOf(h.view)).toEqual({ kind: "held", sentence: HOLD_PUBLISHING })
+  })
+})
+
+// ── F10 — a conflict halts the loop, and both exits exist ─────────────────────
+
+describe("useDraftPersistence — F10: a stale token halts the loop dead", () => {
+  it("issues nothing across three further edits after the refusal", async () => {
+    mockedUpdate.mockRejectedValueOnce(new WorkflowStaleTokenError("T-SERVER"))
+    mockedUpdate.mockResolvedValue(write("T-SHOULD-NEVER-BE-SENT"))
+
+    const h = harness()
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+    await flush()
+
+    expect(stateOf(h.view)).toEqual({ kind: "conflict", currentToken: "T-SERVER" })
+    const atConflict = mockedUpdate.mock.calls.length
+
+    for (let i = 0; i < 3; i += 1) {
+      h.edit()
+      await advance(AUTOSAVE_DEBOUNCE_MS * 3)
+      await flush()
+    }
+
+    expect(mockedUpdate).toHaveBeenCalledTimes(atConflict)
+    expect(h.markSaved).not.toHaveBeenCalled()
+  })
+
+  it("overwrite is ONE deliberate PATCH carrying the token the refusal returned", async () => {
+    mockedUpdate
+      .mockRejectedValueOnce(new WorkflowStaleTokenError("T-SERVER"))
+      .mockResolvedValueOnce(write("T-NEXT"))
+
+    const h = harness()
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+    await flush()
+    expect(stateOf(h.view).kind).toBe("conflict")
+
+    await act(async () => {
+      await h.view.result.current.overwrite()
+    })
+
+    expect(mockedUpdate).toHaveBeenCalledTimes(2)
+    expect(mockedUpdate.mock.calls[1][2]).toBe("T-SERVER")
+    expect(stateOf(h.view)).toEqual({ kind: "saved", at: expect.any(Number) })
+    expect(h.markSaved).toHaveBeenCalledTimes(1)
+  })
+
+  it("an overwrite that loses a SECOND race stays in conflict, with the NEWER token", async () => {
+    mockedUpdate
+      .mockRejectedValueOnce(new WorkflowStaleTokenError("T-SERVER"))
+      .mockRejectedValueOnce(new WorkflowStaleTokenError("T-NEWER"))
+
+    const h = harness()
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+    await flush()
+
+    await act(async () => {
+      await h.view.result.current.overwrite()
+    })
+
+    expect(stateOf(h.view)).toEqual({ kind: "conflict", currentToken: "T-NEWER" })
+    expect(h.markSaved).not.toHaveBeenCalled()
+  })
+
+  it("the hook never decides to overwrite by itself", async () => {
+    mockedUpdate.mockRejectedValue(new WorkflowStaleTokenError("T-SERVER"))
+
+    const h = harness()
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+    await flush()
+
+    // Everything a person could do EXCEPT choosing an exit: more edits, more time.
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS * 20)
+    await flush()
+
+    expect(mockedUpdate).toHaveBeenCalledTimes(1)
+    expect(stateOf(h.view).kind).toBe("conflict")
+  })
+
+  it("reload adopts the server's row AND its token; the next autosave carries the reloaded one", async () => {
+    mockedUpdate.mockRejectedValueOnce(new WorkflowStaleTokenError("T-SERVER"))
+    mockedUpdate.mockResolvedValue(write("T-AFTER"))
+
+    const h = harness()
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+    await flush()
+    expect(stateOf(h.view).kind).toBe("conflict")
+
+    const serverRow: WorkflowDraftRow = {
+      id: DRAFT_ID,
+      slug: "risk-register",
+      version: 1,
+      name: "Risk register",
+      definition: { ...draft(), phases: [phase("server-side", 0)] },
+      token: "T-RELOADED",
+    }
+    mockedList.mockResolvedValue([serverRow])
+
+    await act(async () => {
+      await h.view.result.current.reload()
+    })
+
+    expect(mockedList).toHaveBeenCalledTimes(1)
+    expect(h.store.getState().phases).toHaveLength(1)
+    expect(h.store.getState().dirty).toBe(false)
+    expect(stateOf(h.view)).toEqual({ kind: "idle" })
+
+    // The loop resumes, guarded by the token the reload adopted — not the pre-conflict one.
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+    await flush()
+
+    const calls = mockedUpdate.mock.calls
+    expect(calls).toHaveLength(2)
+    expect(calls[1][2]).toBe("T-RELOADED")
+  })
+
+  it("a reload whose row is gone lands in an honest error, never silently", async () => {
+    mockedUpdate.mockRejectedValueOnce(new WorkflowStaleTokenError("T-SERVER"))
+
+    const h = harness()
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+    await flush()
+
+    mockedList.mockResolvedValue([])
+    await act(async () => {
+      await h.view.result.current.reload()
+    })
+
+    expect(stateOf(h.view).kind).toBe("error")
   })
 })
 

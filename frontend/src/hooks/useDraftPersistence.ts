@@ -1,6 +1,6 @@
 /**
  * Phase 186-06 (CONCUR-01 / CONCUR-02 · D-186-01 · D-186-03 · D-186-04 · D-186-05 ·
- * D-186-12) — the draft-persistence loop.
+ * D-186-08 · D-186-12) — the draft-persistence loop.
  *
  * THIS HOOK OWNS THE WHOLE WRITE SEAM: create-once-then-PATCH, the debounce timer, the
  * dirty/saved state, the concurrency token, and the honest refusal branches.
@@ -63,6 +63,18 @@
  * minutes, and a re-arming timer would burn one per second for the whole gauntlet while
  * still writing nothing.
  *
+ * ── A CONFLICT HALTS THE LOOP, AND THE PERSON PICKS THE EXIT (D-186-08) ──────────
+ *
+ * The instant the server refuses a write because the row moved, this loop stops writing
+ * and stays stopped. No retry, no back-off, no re-send with a fresher token — a retry storm
+ * against a row somebody else is writing is how an optimistic guard becomes a livelock, and
+ * a silent re-send is precisely the clobber this phase exists to prevent.
+ *
+ * Two exits are RETURNED and neither is ever invoked from inside this hook: Reload (the
+ * default — discard what is local, take the server's copy) and Overwrite (a deliberate
+ * second click — keep what is on screen and force it through). Nothing here decides to
+ * discard somebody's work. The person does.
+ *
  * ── NEVER A FALSE RECEIPT (D-186-04, the T-185-04-01 lesson) ─────────────────────
  *
  * The store's receipt action has exactly ONE caller in this file and it sits on the
@@ -75,6 +87,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
 import {
   createWorkflowDraft,
+  listDraftWorkflows,
   updateWorkflowDraft,
   type WorkflowDefinitionJSON,
 } from "@/lib/api"
@@ -138,17 +151,22 @@ export const SAVE_FAILED_SENTENCE = "Not saved — we couldn't complete the save
  *   idle    — nothing is claimed. The resting state.
  *   saving  — a request is outstanding. At most one, ever.
  *   saved   — a CONFIRMED write, with nothing newer queued behind it.
- *   held    — the write is deliberately NOT being attempted, and `sentence` says why.
- *             Distinct from `error` on purpose: nothing was refused, and the person is
- *             not being asked to do anything except wait.
- *   error   — the write was attempted and refused. It carries no `ok` field BY
- *             CONSTRUCTION, so no path can turn a refusal into a clean reading.
+ *   held     — the write is deliberately NOT being attempted, and `sentence` says why.
+ *              Distinct from `error` on purpose: nothing was refused, and the person is
+ *              not being asked to do anything except wait.
+ *   conflict — the row moved somewhere else. The loop is halted and the person picks an
+ *              exit. `currentToken` is what the server holds NOW, carried so that
+ *              Overwrite costs ONE request rather than a re-read plus a request. It is
+ *              opaque here exactly as everywhere else.
+ *   error    — the write was attempted and refused. It carries no `ok` field BY
+ *              CONSTRUCTION, so no path can turn a refusal into a clean reading.
  */
 export type PersistState =
   | { kind: "idle" }
   | { kind: "saving" }
   | { kind: "saved"; at: number }
   | { kind: "held"; sentence: string }
+  | { kind: "conflict"; currentToken: string | null }
   | { kind: "error"; sentence: string }
 
 export interface DraftPersistenceArgs {
@@ -176,6 +194,10 @@ export interface DraftPersistence {
   draftId: string | null
   /** The explicit Save-draft button (D-186-03). Resolves true on a confirmed write. */
   saveNow: () => Promise<boolean>
+  /** The conflict escape hatch the banner offers FIRST (D-186-08). */
+  reload: () => Promise<void>
+  /** The conflict escape hatch that costs a deliberate SECOND click (D-186-08). */
+  overwrite: () => Promise<void>
 }
 
 /**
@@ -191,16 +213,26 @@ function nameOf(err: unknown): string {
 }
 
 /**
- * Which honest state a refused write lands in. ONE named branch — the 422, which is the
- * one refusal this client can attribute to a cause a person can act on — and a genuine
- * catch-all for everything else. A 404, a dropped connection, a timeout and a refusal
- * minted after this client shipped all mean "we could not complete it", and none of them
- * may borrow the unreadable-shape wording it did not earn.
+ * Which honest state a refused write lands in. TWO named branches — the stale token, which
+ * is a conflict the person resolves, and the 422, which is a cause they can act on — plus a
+ * genuine catch-all. A 404, a dropped connection, a timeout and a refusal minted after this
+ * client shipped all mean "we could not complete it", and none of them may borrow a
+ * specific wording they did not earn.
  *
  * Module-level and pure, so the write loop's closure cannot capture a stale copy of it.
  */
-function refusalOf(err: unknown): Extract<PersistState, { kind: "error" }> {
-  if (nameOf(err) === "WorkflowDraftUnreadableError") {
+function refusalOf(
+  err: unknown,
+): Extract<PersistState, { kind: "conflict" } | { kind: "error" }> {
+  const name = nameOf(err)
+  if (name === "WorkflowStaleTokenError") {
+    const carried =
+      err && typeof err === "object" && "currentToken" in err
+        ? (err as { currentToken: string | null }).currentToken
+        : null
+    return { kind: "conflict", currentToken: carried ?? null }
+  }
+  if (name === "WorkflowDraftUnreadableError") {
     return { kind: "error", sentence: HOLD_UNREADABLE }
   }
   return { kind: "error", sentence: SAVE_FAILED_SENTENCE }
@@ -243,6 +275,13 @@ export function useDraftPersistence(args: DraftPersistenceArgs): DraftPersistenc
   const pendingRef = useRef(false)
   const tokenRef = useRef<string | null>(initialToken)
 
+  // D-186-08 — set the instant a stale-token refusal arrives, and cleared only by one of
+  // the two exits the person chooses. While it is set this loop issues NOTHING: no timer
+  // matures into a request, no follow-up drains, no explicit save goes through.
+  // `conflictTokenRef` holds what the server said it has NOW, so Overwrite is one request.
+  const haltedRef = useRef(false)
+  const conflictTokenRef = useRef<string | null>(null)
+
   // Hold conditions are read at FIRE time from refs, never from a dependency array — see
   // the autosave effect for why. `heldPendingRef` is the accumulated "there is unsent work"
   // flag that the release flushes.
@@ -282,6 +321,8 @@ export function useDraftPersistence(args: DraftPersistenceArgs): DraftPersistenc
    * after the timer that queued it matured.
    */
   const performWrite = useCallback(async (): Promise<boolean> => {
+    if (haltedRef.current) return false
+
     inFlightRef.current = true
     let ok = false
     try {
@@ -320,7 +361,12 @@ export function useDraftPersistence(args: DraftPersistenceArgs): DraftPersistenc
             tokenRef.current = written.token
           }
         } catch (err) {
-          setState(refusalOf(err))
+          const refusal = refusalOf(err)
+          if (refusal.kind === "conflict") {
+            haltedRef.current = true
+            conflictTokenRef.current = refusal.currentToken
+          }
+          setState(refusal)
           break
         }
 
@@ -328,6 +374,7 @@ export function useDraftPersistence(args: DraftPersistenceArgs): DraftPersistenc
           // A newer edit landed mid-flight, so this confirmed write is already superseded
           // and no receipt may be filed for it — clearing `dirty` here would tell the
           // person their latest change is safe when it has not been sent.
+          if (haltedRef.current) break
           if (holdRef.current !== null) {
             // A hold began while this write was outstanding. The queued edit becomes held
             // work rather than a second request.
@@ -362,8 +409,11 @@ export function useDraftPersistence(args: DraftPersistenceArgs): DraftPersistenc
    */
   useEffect(() => {
     if (!enabled || definition === null) return
+    // A halted loop schedules nothing at all — not even a timer that would decline to fire.
+    if (haltedRef.current) return
 
     const timer = setTimeout(() => {
+      if (haltedRef.current) return
       if (holdRef.current !== null) {
         // Flush-on-release, not retry-on-a-timer: a publish runs for minutes and re-arming
         // a timer for it would burn one per second for the whole gauntlet.
@@ -398,6 +448,7 @@ export function useDraftPersistence(args: DraftPersistenceArgs): DraftPersistenc
     const previous = holdRef.current
     holdRef.current = holdReason
     if (previous === null || holdReason !== null) return
+    if (haltedRef.current) return
     if (!heldPendingRef.current && !store.getState().dirty) return
     heldPendingRef.current = false
     if (inFlightRef.current) {
@@ -413,6 +464,7 @@ export function useDraftPersistence(args: DraftPersistenceArgs): DraftPersistenc
    *  rule: the hold exists because the write cannot safely happen, and a button press does
    *  not change that. It reports the hold rather than pretending a save occurred. */
   const saveNow = useCallback(async (): Promise<boolean> => {
+    if (haltedRef.current) return false
     if (holdRef.current !== null) {
       heldPendingRef.current = true
       setState({ kind: "held", sentence: holdRef.current })
@@ -425,5 +477,55 @@ export function useDraftPersistence(args: DraftPersistenceArgs): DraftPersistenc
     return performWrite()
   }, [performWrite])
 
-  return { state, draftId, saveNow }
+  /**
+   * The DEFAULT exit (D-186-08). Re-reads the owner-scoped drafts list — the EXACT read the
+   * shipped Open-a-draft path already performs — rather than adding a new route, hands the
+   * row to `setDrafted` (which clears the undo history and `dirty`, which is precisely what
+   * "reload discards local changes" means), and adopts the row's token so the loop resumes
+   * guarded by the value the server holds now.
+   *
+   * One call site, and no new function was added to the API client for it.
+   */
+  const reload = useCallback(async (): Promise<void> => {
+    const id = draftIdRef.current
+    try {
+      const rows = id === null ? [] : await listDraftWorkflows()
+      const row = rows.find((r) => r.id === id)
+      if (!row || !row.definition) {
+        // Deleted somewhere else, or never persisted. Land honestly, never silently — a
+        // reload that quietly did nothing would look identical to one that worked.
+        setState({ kind: "error", sentence: SAVE_FAILED_SENTENCE })
+        return
+      }
+      store.getState().setDrafted(row.definition as unknown as BuilderDefinition)
+      tokenRef.current = row.token
+      conflictTokenRef.current = null
+      haltedRef.current = false
+      heldPendingRef.current = false
+      pendingRef.current = false
+      setState({ kind: "idle" })
+    } catch {
+      setState({ kind: "error", sentence: SAVE_FAILED_SENTENCE })
+    }
+  }, [store])
+
+  /**
+   * The SECOND click (D-186-08). Adopts the token the refusal carried — the server's
+   * disambiguating re-read already fetched it, so this costs ONE request and no extra round
+   * trip — clears the halt, and re-enters the one writer rather than opening a second write
+   * path (which is also why the receipt action still has exactly one caller).
+   *
+   * If that write is itself refused, the same catch puts the loop back into conflict with
+   * the NEWER token, so an overwrite that lost a second race cannot silently do nothing.
+   *
+   * NEITHER EXIT IS EVER INVOKED FROM INSIDE THIS HOOK — no effect calls them, no catch
+   * calls them. They are returned, and the person chooses.
+   */
+  const overwrite = useCallback(async (): Promise<void> => {
+    tokenRef.current = conflictTokenRef.current
+    haltedRef.current = false
+    await performWrite()
+  }, [performWrite])
+
+  return { state, draftId, saveNow, reload, overwrite }
 }
