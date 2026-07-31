@@ -3343,6 +3343,50 @@ export class WorkflowNotFoundError extends Error {
   }
 }
 
+/**
+ * The draft moved since this session read it → HTTP 409 coded `stale_token`
+ * (Phase 186 / D-186-09). Another tab, another device, or the same author's older
+ * window wrote first; this write matched 0 rows and was refused rather than applied.
+ *
+ * `currentToken` is the token the server holds NOW. It exists so that "overwrite with
+ * what's on screen" costs ONE more PATCH instead of a re-read followed by a PATCH.
+ * Returning it leaks nothing: the server's disambiguating re-read is owner-scoped, so
+ * this is a token for a row the caller already owns. It is `null` when the refusal
+ * carried no token, and it is opaque here exactly as everywhere else — echo it, never
+ * inspect it.
+ */
+export class WorkflowStaleTokenError extends Error {
+  readonly currentToken: string | null
+  constructor(currentToken: string | null = null) {
+    super("this draft was changed somewhere else since you loaded it")
+    this.name = "WorkflowStaleTokenError"
+    this.currentToken = currentToken
+  }
+}
+
+/**
+ * `PATCH /workflows/{id}` answered HTTP 422 — the draft's SHAPE was rejected before the
+ * handler ran, so nothing was written (Phase 186 / D-186-04). A mid-edit definition can
+ * legitimately reach this state, and the honest answer is "not saved, and here is why",
+ * never a false `Saved ✓`.
+ *
+ * THE RAW BODY IS LOGGED HERE AND CARRIED NO FURTHER — the
+ * `WorkflowValidateUnreadableError` precedent, copied deliberately. The constructor
+ * writes it to the console once, at this boundary, and this error's `message` is a FIXED
+ * business-plain sentence with nothing interpolated into it. A validation body is a list
+ * of internal field paths and framework phrasing; pretty-printing it onto an authoring
+ * surface aimed at business users would leak implementation detail and still not say what
+ * to do. The class exists so the hook can branch on `name` rather than parse a string.
+ */
+export class WorkflowDraftUnreadableError extends Error {
+  constructor(rawBody?: unknown) {
+    super("the draft's shape could not be read, so nothing was saved")
+    this.name = "WorkflowDraftUnreadableError"
+    // Logged, never shown. One line, at the boundary that received it.
+    console.warn("PATCH /workflows/{id} → 422 (shape rejected before the handler):", rawBody)
+  }
+}
+
 /** POST /workflows — create a draft. Returns {id, version, token} (Phase 186: the
  *  token seeds the session, because three of the Builder's four entry routes create). */
 export async function createWorkflowDraft(
@@ -3403,7 +3447,28 @@ export async function updateWorkflowDraft(
     body: JSON.stringify(def),
     signal,
   })
-  if (res.status === 409) throw new WorkflowConflictError()
+  if (res.status === 409) {
+    // Phase 186: this arm used to throw the body away, which made a second 409 cause
+    // invisible. Read it, and branch on the machine `code` — NEVER on the prose, and
+    // never on a narrowed union: `code` stays `string` because the SERVER owns the
+    // refusal vocabulary (the `Verdict.code` rule below, VALID-03 / D-182-06). A client
+    // allow-list would make this a second, drifting copy of a one-owner vocabulary.
+    const body = (await res.json().catch(() => ({}))) as {
+      detail?: { code?: string; token?: string }
+    }
+    const code = body.detail?.code
+    if (code === "stale_token") throw new WorkflowStaleTokenError(body.detail?.token ?? null)
+    // EVERY other value lands here: a missing body, a body that would not parse, a body
+    // with no `detail`, and a code minted after this client shipped. That is today's
+    // behaviour, kept deliberately — a refusal we cannot classify must never become a
+    // success (the WR-02 malformed-body rule, `publishWorkflow` below).
+    throw new WorkflowConflictError()
+  }
+  if (res.status === 422) {
+    // Read the body for the LOG only; a body that will not parse must not mask the 422.
+    const rawBody = await res.json().catch(() => null)
+    throw new WorkflowDraftUnreadableError(rawBody)
+  }
   if (res.status === 404) throw new WorkflowNotFoundError()
   if (!res.ok) throw new Error(`Failed to update workflow draft (status ${res.status})`)
   return (await res.json()) as WorkflowDraftWriteResult

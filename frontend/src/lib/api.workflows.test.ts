@@ -32,6 +32,8 @@ import {
   publishWorkflow,
   WorkflowConflictError,
   WorkflowNotFoundError,
+  WorkflowStaleTokenError,
+  WorkflowDraftUnreadableError,
   type PublishVerdict,
 } from "@/lib/api"
 
@@ -272,5 +274,122 @@ describe("the concurrency token — every seeding response carries it, the PATCH
     // leave the next one guarded by a token the server has already superseded.
     expect(out.token).toBe(TOKEN_B)
     expect(out.version).toBe(1)
+  })
+})
+
+// ── Phase 186-03 (D-186-04 / D-186-09) — the two refusals the 409 arm used to throw
+//    away, and the 422 arm that did not exist at all ───────────────────────────────
+describe("updateWorkflowDraft — a refusal is classified by machine code, never by prose", () => {
+  it("a 409 coded stale_token throws WorkflowStaleTokenError carrying the CURRENT token", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        jsonRes(409, {
+          detail: {
+            code: "stale_token",
+            message: "this draft was changed somewhere else since you loaded it",
+            token: "T-current",
+          },
+        }),
+      ),
+    )
+    const err = await updateWorkflowDraft("wf-1", { slug: "wf", phases: [] }, "T-stale").catch(
+      (e: unknown) => e,
+    )
+    expect(err).toBeInstanceOf(WorkflowStaleTokenError)
+    // The token the server holds NOW, so "overwrite with what's on screen" is ONE
+    // more PATCH rather than a re-read followed by a PATCH.
+    expect((err as WorkflowStaleTokenError).currentToken).toBe("T-current")
+    // Consumers branch on the NAME (a rejection that crossed a module boundary still
+    // classifies), so the name is part of the contract.
+    expect((err as Error).name).toBe("WorkflowStaleTokenError")
+  })
+
+  it("a 409 coded already_published throws WorkflowConflictError (today's sentence, unchanged)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        jsonRes(409, {
+          detail: { code: "already_published", message: "workflow is published and cannot be modified" },
+        }),
+      ),
+    )
+    await expect(
+      updateWorkflowDraft("wf-1", { slug: "wf", phases: [] }, "T-any"),
+    ).rejects.toBeInstanceOf(WorkflowConflictError)
+  })
+
+  it("WR-02: a 409 whose body will not parse REJECTS — it never resolves as a save", async () => {
+    // The failure mode this guards is a refusal quietly becoming a success receipt.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 409,
+        json: async () => {
+          throw new SyntaxError("Unexpected end of JSON input")
+        },
+      }),
+    )
+    await expect(
+      updateWorkflowDraft("wf-1", { slug: "wf", phases: [] }, "T-any"),
+    ).rejects.toBeInstanceOf(WorkflowConflictError)
+
+    // A body that parses but carries no `detail` is the same unclassifiable case.
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonRes(409, {})))
+    await expect(
+      updateWorkflowDraft("wf-1", { slug: "wf", phases: [] }, "T-any"),
+    ).rejects.toBeInstanceOf(WorkflowConflictError)
+  })
+
+  it("a 409 carrying a code this client has never seen falls back to WorkflowConflictError", async () => {
+    // The SERVER owns the refusal vocabulary. An unknown code fails CLOSED here rather
+    // than being narrowed away by a client-side allow-list.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        jsonRes(409, { detail: { code: "a_cause_invented_after_this_client_shipped" } }),
+      ),
+    )
+    await expect(
+      updateWorkflowDraft("wf-1", { slug: "wf", phases: [] }, "T-any"),
+    ).rejects.toBeInstanceOf(WorkflowConflictError)
+  })
+
+  it("a 422 throws WorkflowDraftUnreadableError whose message leaks NONE of the raw body", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
+    const rawBody = {
+      detail: [
+        {
+          loc: ["body", "phases", 0, "config", "reticulation_prompt"],
+          msg: "Field required",
+          type: "missing",
+        },
+      ],
+    }
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonRes(422, rawBody)))
+
+    const err = await updateWorkflowDraft("wf-1", { slug: "wf", phases: [] }, "T-any").catch(
+      (e: unknown) => e,
+    )
+    expect(err).toBeInstanceOf(WorkflowDraftUnreadableError)
+
+    // A validation body is internal field paths and framework phrasing. It is logged
+    // ONCE at this boundary and carried no further — never onto an authoring surface
+    // aimed at business users.
+    const message = (err as Error).message
+    for (const leak of [
+      "loc",
+      "body",
+      "phases",
+      "config",
+      "reticulation_prompt",
+      "Field required",
+      "missing",
+    ]) {
+      expect(message).not.toContain(leak)
+    }
+    expect(warnSpy).toHaveBeenCalledTimes(1)
+    warnSpy.mockRestore()
   })
 })
