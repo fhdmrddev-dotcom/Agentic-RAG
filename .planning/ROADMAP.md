@@ -311,8 +311,8 @@ Plans:
 
 **Wave 2**
 
-- [ ] 186-02-PLAN.md — carry the stage-0 token through the gauntlet and refuse on drift: `publish_definition` gains the `-2` sentinel, `publish_service` gains the `draft_changed` block, and the golden-run receipt survives by construction (SC#3)
-- [ ] 186-03-PLAN.md — the transport client: `token` on the draft wire types, `If-Match` on the PATCH, and the two named refusals the 409 arm has always thrown away (`WorkflowStaleTokenError`, `WorkflowDraftUnreadableError`)
+- [x] 186-02-PLAN.md — carry the stage-0 token through the gauntlet and refuse on drift: `publish_definition` gains the `-2` sentinel, `publish_service` gains the `draft_changed` block, and the golden-run receipt survives by construction (SC#3)
+- [x] 186-03-PLAN.md — the transport client: `token` on the draft wire types, `If-Match` on the PATCH, and the two named refusals the 409 arm has always thrown away (`WorkflowStaleTokenError`, `WorkflowDraftUnreadableError`)
 
 **Wave 3**
 
