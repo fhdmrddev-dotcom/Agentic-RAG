@@ -657,6 +657,75 @@ describe("builderStore — commitCanvasNodes runs through fromCanvas into the ON
   })
 })
 
+// ── 12. F14 — binding a knowledge base ARMS the guard (186-04 · D-186-15) ───────
+//
+// APPENDED, never edited, and deliberately still ABOVE the whole-suite network
+// tripwire so the "exactly 0 calls" claim covers these too.
+//
+// WHY THIS FILE HAS TO ASSERT `dirty` AT ALL. The D-184-03 subscription in the
+// factory arms `dirty` on a **phases** reference change and on nothing else. A
+// knowledge-base binding lives on `meta`, so without an explicit arm it would be a
+// real definition edit that the leave guard never noticed: a new `definition` memo
+// identity on the page (autosave fires), no `dirty` (no beforeunload, no canLeave
+// prompt, the toolbar never reads "Not saved yet"). That is Pitfall 4, and these
+// four cases are what keep it closed.
+
+describe("builderStore — setProjectFolder writes and arms in ONE act (F14)", () => {
+  it("binding writes meta.project_folder_id AND arms dirty in the same act", () => {
+    const store = createBuilderStore(draft())
+    // The arming is only meaningful if the store was clean immediately before.
+    expect(store.getState().dirty).toBe(false)
+
+    store.getState().setProjectFolder("folder-1")
+
+    expect(store.getState().meta.project_folder_id).toBe("folder-1")
+    expect(store.getState().dirty).toBe(true)
+  })
+
+  it("UNBINDING arms dirty too — clearing a binding is a definition edit as well", () => {
+    const store = createBuilderStore({ ...draft(), project_folder_id: "folder-1" })
+    expect(store.getState().dirty).toBe(false)
+
+    store.getState().setProjectFolder(null)
+
+    expect(store.getState().meta.project_folder_id).toBeNull()
+    expect(store.getState().dirty).toBe(true)
+  })
+
+  it("leaves the undo stack untouched — a re-bind is undone by re-picking, not by ⌘Z", () => {
+    const store = createBuilderStore(draft())
+    store.getState().addPhaseOfType("llm_single")
+    const depthBefore = past(store).length
+
+    store.getState().setProjectFolder("folder-1")
+
+    expect(past(store)).toHaveLength(depthBefore)
+  })
+
+  it("carries no other meta field away with it", () => {
+    const store = createBuilderStore(draft())
+
+    store.getState().setProjectFolder("folder-1")
+
+    const meta = store.getState().meta
+    expect(meta.slug).toBe("risk-register")
+    expect(meta.version).toBe(1)
+    expect(meta.business_requirement).toBe("Summarise the week's risks.")
+  })
+
+  it("a non-drafted builder is a NO-OP — meta unchanged by reference, still clean", () => {
+    const store = createBuilderStore(draft())
+    store.getState().setComposing()
+    const metaBefore = store.getState().meta
+    expect(store.getState().dirty).toBe(false)
+
+    store.getState().setProjectFolder("folder-1")
+
+    expect(store.getState().meta).toBe(metaBefore)
+    expect(store.getState().dirty).toBe(false)
+  })
+})
+
 describe("builderStore — zero network calls across the entire suite (D-184-03)", () => {
   it("the fetch spy recorded exactly 0 calls", () => {
     expect(fetchSpy).not.toHaveBeenCalled()

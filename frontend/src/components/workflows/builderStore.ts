@@ -44,12 +44,22 @@
  * undo). An undo that auto-PATCHed is exactly the surprise a no-autosave phase exists to
  * prevent. `markSaved()` is the only thing that clears `dirty`.
  *
- * ── WHAT STAYS ON THE PAGE (D-184-05) ─────────────────────────────────────────────
+ * ── WHERE PERSISTENCE LIVES, AND WHY NOT HERE (D-184-05 → D-186-05) ───────────────
  *
- * Persistence. `draftIdRef` / `creatingRef` / `onPersist` / `onSaveDraft` are NOT here
- * and must not move here: Phase 186 rewrites exactly that seam for autosave, and
- * extracting it now would be churn against a seam about to move. This store owns the
- * definition STATE; the page owns the WRITE.
+ * Persistence. `draftIdRef` / `creatingRef` / the create-once-then-PATCH body and the
+ * debounce that drives them are NOT here and must not move here.
+ *
+ * 184-05 phrased this as the page owning the write, which was true then and is not any
+ * more: the same note promised that 186 would rewrite exactly that seam, and 186 did. The
+ * write now lives in the `useDraftPersistence` hook (`frontend/src/hooks/useDraftPersistence.ts`,
+ * D-186-05) — one home for the timer, the concurrency token, the hold conditions and the
+ * honest refusal branches — and `WorkflowBuilderPage` composes it the way it already
+ * composes `useLiveValidation`. Updated here rather than left standing, because a docblock
+ * that describes a seam which has moved is the trap this codebase names elsewhere.
+ *
+ * THE RULE ITSELF IS UNCHANGED AND IS NOT NEGOTIABLE: this store owns the definition
+ * STATE and nothing in this module may name the API client or open a request of any
+ * kind. Which module holds the write is a detail; that it is never THIS one is the fence.
  */
 import { createStore, type StoreApi } from "zustand/vanilla"
 import { temporal, type TemporalState } from "zundo"
@@ -251,6 +261,10 @@ export interface BuilderStoreState extends TrackedSlice {
   setVerdicts: (verdicts: readonly ServerVerdict[]) => void
   setChecking: (checking: boolean) => void
   setDegraded: (cause: DegradedCause) => void
+  /** Bind (or unbind, with `null`) the workflow's knowledge base. Untracked, and the one
+   *  action that arms `dirty` itself — `setProjectFolder`'s docblock in the factory below
+   *  says why a `meta`-only edit has to. */
+  setProjectFolder: (id: string | null) => void
   /** The ONLY thing that clears `dirty`. Never writes anything. */
   markSaved: () => void
   /** Commit a coalescing run of config edits NOW (a field blur, a view change). */
@@ -534,6 +548,47 @@ export function createBuilderStore(initial: BuilderDefinition | null): BuilderSt
         setVerdicts: (verdicts) => set({ verdicts }),
         setChecking: (checking) => set({ checking }),
         setDegraded: (degraded) => set({ degraded }),
+
+        /**
+         * Phase 186-04 (D-186-15 · F14) — bind, re-bind or unbind the workflow's
+         * knowledge base. A WORKFLOW-LEVEL definition edit, and the one repair path
+         * `BUG-260731-03` needs: today the choice exists only on the pre-draft describe
+         * screen, so two of the three creation paths never offer it at all.
+         *
+         * WHY IT SETS `dirty` EXPLICITLY, rather than relying on the subscription below.
+         * That subscription arms `dirty` on a change to the **`phases`** reference and on
+         * nothing else. `project_folder_id` lives on `meta`, so a binding would otherwise
+         * be a genuine definition change that the leave guard never noticed: the page's
+         * `definition` memo would take a new identity (its deps include `meta`, so a save
+         * would even be scheduled) while `dirty` stayed false — no `beforeunload`, no
+         * leave prompt, and a toolbar that reads clean. Writing and arming in ONE `set()`
+         * is what makes that impossible to forget at a second call site.
+         *
+         * WHY IT IS UNTRACKED. `partialize` narrows the undo stack to `phases` plus the
+         * two edit discriminators, so an undo restores STEPS, never the workflow's
+         * identity — the rule the `meta` field's own docblock states. A re-bind is undone
+         * by re-picking, not by `⌘Z`, and F14 pins the stack depth to prove it.
+         *
+         * WHY IT TOUCHES NEITHER `suppressDirty` NOR `temporalRef`. Those bracket a set
+         * that replaces the DOCUMENT (`setDrafted` / `setComposing`), where "the phases
+         * reference changed" must not read as "the user edited something" and the previous
+         * document must not be reachable by undo. Binding a knowledge base is an EDIT to
+         * the document in hand, not a transition to a different one.
+         *
+         * The `builderPhase !== "drafted"` bail is the shipped guard shape every
+         * document-scoped action carries, and it keeps a binding out of the composing beat
+         * where `meta` is deliberately empty.
+         *
+         * `hasEdited` is the page's half of the same question and is flipped at the chip's
+         * call site (186-08), not by widening the subscription — that exclusion exists so
+         * generate/open do not start the live-validation loop, and it stays.
+         */
+        setProjectFolder: (id) => {
+          const s = get()
+          if (s.builderPhase !== "drafted") return
+          set({ meta: { ...s.meta, project_folder_id: id }, dirty: true })
+        },
+
         markSaved: () => set({ dirty: false }),
         flushHistory: () => flushCoalesced(),
       }),
