@@ -316,8 +316,8 @@ Plans:
 
 **Wave 3**
 
-- [ ] 186-05-PLAN.md — the publish spine's fail-open: an unrecognised `blocked_stage` currently paints all 8 stages green under a refusal headline. Fix the PROPERTY (both `-1` reads), add the 9th `Commit` stage, and word the verdict. **F7 is the highest-value single test in the phase**
-- [ ] 186-06-PLAN.md — `useDraftPersistence`: the whole persistence seam D-184-05 pre-authorised — debounce, single-flight token chain, one hold mechanism with two sentences, and a conflict that halts writing and offers Reload then Overwrite
+- [x] 186-05-PLAN.md — the publish spine's fail-open: an unrecognised `blocked_stage` currently paints all 8 stages green under a refusal headline. Fix the PROPERTY (both `-1` reads), add the 9th `Commit` stage, and word the verdict. **F7 is the highest-value single test in the phase**
+- [x] 186-06-PLAN.md — `useDraftPersistence`: the whole persistence seam D-184-05 pre-authorised — debounce, single-flight token chain, one hold mechanism with two sentences, and a conflict that halts writing and offers Reload then Overwrite
 
 **Wave 4**
 
