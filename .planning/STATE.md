@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
 status: executing
-last_updated: "2026-07-31T20:51:46.868Z"
+last_updated: "2026-07-31T22:34:27.654Z"
 last_activity: 2026-07-31 -- Phase 186 execution started
 progress:
   total_phases: 19
   completed_phases: 5
   total_plans: 60
-  completed_plans: 51
+  completed_plans: 56
   percent: 26
 ---
 
@@ -112,7 +112,7 @@ on the next keystroke.
 containing the literal ``new Date(``. Unsatisfiable together — the prose was reworded (all facts
 kept) so the fence stays a real guard. Also: the plan's "209-test clean subset" measures **200**
 for the six files it names, on both sides of the change.
-Resume file: `.planning/phases/186-concurrency-autosave/186-03-SUMMARY.md`.
+Resume file: None
 
 Both owed items are now ROUTED at the discuss-phase touchpoint:
 
@@ -1263,6 +1263,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 185 P08 | 57min | 3 tasks | 17 files |
 | Phase 185 P09 | 42min | 2 tasks | 5 files |
 | Phase 185 P12 | 12min | 3 tasks | 4 files |
+| Phase 186 P05 | 15min | 2 tasks | 3 files |
 
 ## Decisions
 
@@ -1508,6 +1509,9 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase 185]: 185-09: criterion 16's identity assertion compares the seal's outerHTML, not className+textContent — the falsification proved the plan's wording leaves a hole (a planted data-run={props.status} kept the className/text form GREEN while the props fence caught it), so the two criterion-16 guards were not the complementary pair they were meant to be. Falsify a guard PAIR, not each guard.
 - [Phase 185]: 185-09: the plan's stated zone-check falsification (seal at the verdict's OLD -right-2 top-1.5) is INERT — 185-01 vacated that corner, so a seal parked there collides with nothing. The meaningful plant is the verdict's CURRENT corner (-left-2 top-1.5), which reds at 'verdict × governance seal = 441px²'. Both facts are now live tests, and the class of mistake the inert plant represents is caught by the 11px clearance assertion, not by a zone check.
 - [Phase 185]: 185-09: the seal's sr-only label is definitionOps.GOVERNANCE_SEAL_LABEL (a 5th file, outside the plan's files_modified), not a literal in the card's JSX — Req 7's vocabulary is a LOCK and GROUNDING_DIAL_STRICT_LABEL already lives there, so a card-local literal would be a second copy of a locked word free to drift from the panel's. Pinned by GROUNDING_DIAL_STRICT_LABEL.endsWith(GOVERNANCE_SEAL_LABEL).
+- [Phase ?]: 186-05: the 9th publish-spine row is Commit, APPENDED after Judge — a draft-moved refusal happens after the grader passed, and appending keeps the golden-run row at the index the running highlight addresses
+- [Phase ?]: 186-05: unknownBlock is the SINGLE load-bearing fail-closed guard — a first draft derived a second value that closed the same hole, making the guard deletable with F7 still green
+- [Phase ?]: 186-05: BLOCKED_SENTENCE carries two keys because verdictModel.test.ts's FORBIDDEN_CODES fence bars several real stage identifiers from that module entirely; the total resolver's sentence fallback carries the rest
 
 ## Operator Next Steps
 
