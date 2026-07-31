@@ -356,7 +356,9 @@ async def get_definition(
     return dict(row) if row is not None else None
 
 
-async def publish_definition(pool: asyncpg.Pool, definition_id: UUID) -> int:
+async def publish_definition(
+    pool: asyncpg.Pool, definition_id: UUID, *, token: str | None = None
+) -> int:
     """Flip a definition ``status`` draft -> published (D-07), RETURNING the version.
 
     The ONLY draft->published flip site. Mirrors ``finish_run``'s
@@ -366,19 +368,68 @@ async def publish_definition(pool: asyncpg.Pool, definition_id: UUID) -> int:
     a published->edit), so the draft->published flip is the allowed path while a
     published row stays frozen (T-102-05-05 / the 091 immutability invariant).
 
-    The ``status='draft'`` WHERE guard makes a double-publish a no-op (idempotent):
-    a re-flip finds 0 matching rows and returns ``-1``. The caller (publish_service)
-    has already owner-checked + state-checked, so ``-1`` here means "not a draft /
-    already published / not found" — a defensive sentinel, not the happy path.
+    TWO SENTINELS, NEVER ONE (Phase 186 / D-186-10):
 
-    Returns the published ``version`` (for the D-08 success verdict), or ``-1``.
+      ``-1``  UNCHANGED, the WR-03 case — not a draft / already published / not found.
+              The ``status='draft'`` WHERE guard makes a double-publish a no-op
+              (idempotent): a re-flip finds 0 matching rows. The caller
+              (``publish_service`` stage 0) has already owner-checked + state-checked,
+              so this is a defensive sentinel, not the happy path.
+      ``-2``  NEW — the row is STILL a draft, but it MOVED since the caller's stage-0
+              read: the concurrency-token conjunct matched 0 rows.
+
+    WHAT A COLLAPSED ``-1``/``-2`` WOULD LIE ABOUT — this is the whole reason there are
+    two. ``-1`` is *"someone already published this"*. ``-2`` is *"the thing we spent a
+    golden run checking is not the thing we were about to publish"*. They are different
+    sentences to the author and different receipts in the governance trail: routing a
+    ``-2`` to ``already_published`` would tell an author that somebody else published
+    their workflow, which did not happen (the T-185-04-01 false-receipt rule).
+
+    ``token`` IS OPTIONAL, AND THAT IS A COMPATIBILITY DECISION, NOT AN ACCIDENT. When it
+    is ``None`` the statement is BYTE-IDENTICAL to the pre-186 one and ``-2`` is
+    unreachable — which is what keeps the shipped POSITIONAL two-argument callers
+    (``test_103_tweak_fork.py:89,101``) correct with zero edits, and mirrors the route's
+    optional ``If-Match``: an absent token means "no opinion about which version I am
+    flipping", exactly as it did before this phase. ``publish_service`` supplies one via
+    ``row.get("token")``, so a caller whose stage-0 read predates the token degrades to
+    the old behaviour rather than raising.
+
+    NOT WRAPPED IN A TRANSACTION WITH ANY OTHER UPDATE — see ``CONCURRENCY_TOKEN_SQL``'s
+    docblock (Pitfall 9): ``now()`` is TRANSACTION time, so a sibling UPDATE in the same
+    transaction would render an identical token and silently disable this guard.
+
+    Returns the published ``version`` (for the D-08 success verdict), or ``-1`` / ``-2``.
     """
+    if token is None:
+        row = await pool.fetchrow(
+            "UPDATE workflow_definitions SET status = 'published' "
+            "WHERE id = $1 AND status = 'draft' RETURNING version",
+            definition_id,
+        )
+        # No token was supplied, so the token conjunct is absent and -2 is unreachable:
+        # a 0-row flip can only be the WR-03 case. Today's answer, unchanged.
+        return row["version"] if row is not None else -1
+
     row = await pool.fetchrow(
-        "UPDATE workflow_definitions SET status = 'published' "
-        "WHERE id = $1 AND status = 'draft' RETURNING version",
+        f"UPDATE workflow_definitions SET status = 'published' "
+        f"WHERE id = $1 AND status = 'draft' AND {CONCURRENCY_TOKEN_SQL} = $2 "
+        f"RETURNING version",
+        definition_id,
+        token,
+    )
+    if row is not None:
+        return row["version"]
+    # 0 rows — WHICH conjunct failed? One probe. It needs NO owner clause, and the reason
+    # is worth stating rather than leaving to inference: the CALLER (``publish_service``
+    # stage 0) has already owner-checked via ``get_definition``, this function is not
+    # reachable from any un-owner-checked path, and the probe returns a bare ``1`` — never
+    # a row's contents — so it discloses nothing a caller who reached here does not have
+    # (T-186-02-02, accepted).
+    still_a_draft = await pool.fetchval(
+        "SELECT 1 FROM workflow_definitions WHERE id = $1 AND status = 'draft'",
         definition_id,
     )
-    return row["version"] if row is not None else -1
+    return -2 if still_a_draft else -1
 
 
 # ── draft CRUD (Phase 103 / REQ-1 / WFAUTH-01) ───────────────────────────────
