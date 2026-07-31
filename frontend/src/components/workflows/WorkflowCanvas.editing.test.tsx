@@ -38,9 +38,10 @@
  * provider — is the genuine article, so every other assertion in this file runs against
  * a really-rendered plane rather than against a stub.
  */
-import { createElement } from "react"
+import { createElement, useMemo } from "react"
 import { describe, it, expect, vi, beforeAll, afterAll, beforeEach, type MockInstance } from "vitest"
 import { act, fireEvent, render, screen } from "@testing-library/react"
+import { useStore } from "zustand"
 
 // FILE-LOCAL, never setupTests.ts — the helper mutates HTMLElement.prototype and a
 // global install would perturb all ~205 suites (WorkflowCanvas.test.tsx:26-28).
@@ -54,6 +55,29 @@ import type { CanvasNotice } from "./WorkflowCanvas"
 import { STRANDING_REASON, type PhaseTypeId } from "./definitionOps"
 import { VERDICT_DESTRUCTIVE_TOKEN, VERDICT_MARK } from "./nodePresentation"
 import { evalCoverage, unresolvableSkip } from "./__fixtures__/canvasFixtures"
+// Plan 186-07 (F12), on their OWN lines so this file's diff stays 0-deletion: the write
+// loop, the store it watches, the browser-local nudge module the gesture really writes to,
+// and the debounce constant — IMPORTED, never retyped, so the fence tracks the loop.
+import { createBuilderStore, selectDefinition } from "./builderStore"
+import { readNudges, writeNudge } from "./canvasNudge"
+import { useDraftPersistence, AUTOSAVE_DEBOUNCE_MS } from "@/hooks/useDraftPersistence"
+import { createWorkflowDraft, updateWorkflowDraft } from "@/lib/api"
+import type { BuilderDefinition } from "@/pages/WorkflowBuilderPage"
+
+/**
+ * F12's OTHER half. `fetchSpy` alone cannot falsify the claim in this environment: the api
+ * client's auth-header step rejects before it ever reaches `fetch` when no session exists,
+ * so a nudge wrongly routed into the write path would raise no fetch and the fence would
+ * stay green while the property was false. Spying on the two draft mutations closes that,
+ * and the REAL module is spread so every other symbol the composed tree touches is the
+ * genuine article (the mock-completeness idiom this file's own docblock states).
+ */
+vi.mock("@/lib/api", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api")
+  return { ...actual, createWorkflowDraft: vi.fn(), updateWorkflowDraft: vi.fn() }
+})
+const mockedCreate = vi.mocked(createWorkflowDraft)
+const mockedUpdate = vi.mocked(updateWorkflowDraft)
 
 /** The captured `ReactFlow` props. `vi.hoisted` because `vi.mock` is hoisted above
  *  every other statement in this file. */
@@ -991,5 +1015,133 @@ describe("WorkflowCanvas 184-12 — the insert menu is clickable, not merely vis
     fireEvent.click(rows[0])
     // index 0 — the boundary the ＋ above was opened at.
     expect(onInsertAt).toHaveBeenCalledWith(0, expect.any(String))
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Plan 186-07 (CONCUR-01 · D-186-02) — F12, EXTENDED FOR THE AUTOSAVE ERA.
+//
+// Appended; not one assertion above this line was edited or removed.
+//
+// WHAT THE 184-07 SPY PROVED, AND WHY IT IS NO LONGER ENOUGH. The whole-suite `fetchSpy`
+// showed that a cosmetic nudge issues no request — at a time when the Builder issued no
+// requests at all without a button press. Phase 186 adds a loop that writes ON ITS OWN a
+// second after any definition change, so the property worth pinning now is stronger: a
+// nudge issues nothing WHILE AN AUTOSAVE LOOP IS LIVE AND WATCHING.
+//
+// D-186-02 is what makes that true, and it is true BY CONSTRUCTION rather than by a rule
+// someone has to defend: `canvasNudge.ts` imports neither the builder store, the canvas
+// model, nor the API client, so a nudge has no path to a definition change. Neither that
+// module NOR `WorkflowCanvas.tsx` is opened by this plan — the evidence is added here, in
+// the test file. If a nudge ever did reach the write path, that is D-186-02 broken and the
+// fix belongs in the wiring, never in this fence.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe("WorkflowCanvas 186-07 — F12: a cosmetic nudge writes nothing WITH autosave live", () => {
+  /** The page's own composition, reduced to the two parts this claim is about: the write
+   *  loop watching a real store, and the editable canvas that emits the nudge. The
+   *  `definition` memo mirrors `WorkflowBuilderPage`'s — identity changes once per EDIT —
+   *  because that identity IS the loop's change signal. */
+  function NudgeHarness({
+    store,
+    onNudge,
+  }: {
+    store: ReturnType<typeof createBuilderStore>
+    onNudge: (slug: string, dy: number) => void
+  }) {
+    const phases = useStore(store, (s) => s.phases)
+    const meta = useStore(store, (s) => s.meta)
+    const definition = useMemo(() => selectDefinition({ meta, phases }), [meta, phases])
+
+    useDraftPersistence({
+      definition: definition as unknown as BuilderDefinition,
+      enabled: true,
+      initialDraftId: "draft-1",
+      initialToken: "tok-1",
+      store,
+      publishInFlight: false,
+      validationCause: null,
+      onDraftCreated: () => {},
+    })
+
+    return (
+      <div style={{ width: 1200, height: 800 }}>
+        <WorkflowCanvas
+          phases={phases}
+          selectedSlug={null}
+          onSelectNode={vi.fn()}
+          onClearSelection={vi.fn()}
+          editable
+          onNudge={onNudge}
+          onCommitNodes={vi.fn()}
+        />
+      </div>
+    )
+  }
+
+  /** Past the loop's own window, so "zero" is not "not yet". The constant is IMPORTED from
+   *  the hook rather than retyped: a fence that hard-codes the number it is testing stops
+   *  being a fence the first time the number moves. */
+  const PAST_THE_WINDOW = AUTOSAVE_DEBOUNCE_MS + 400
+
+  it("a nudge-only drag issues ZERO requests and ZERO draft writes across the whole window", async () => {
+    const store = createBuilderStore({
+      slug: "nudge-harness",
+      version: 1,
+      status: "draft",
+      phases: evalCoverage,
+    } as unknown as BuilderDefinition)
+
+    // The page's real nudge handler: `canvasNudge.ts` and nothing else.
+    const onNudge = (slug: string, dy: number) => writeNudge("draft-1", slug, dy)
+
+    render(<NudgeHarness store={store} onNudge={onNudge} />)
+    drag({ x: LANE_X[1], y: 0 }, { x: LANE_X[1], y: 120 })
+
+    // The offset really was recorded — so the "zero writes" below is measured against a
+    // nudge that HAPPENED, not against a gesture that silently did nothing.
+    expect(readNudges("draft-1").fanout).toBe(120)
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, PAST_THE_WINDOW))
+    })
+
+    expect(mockedCreate).not.toHaveBeenCalled()
+    expect(mockedUpdate).not.toHaveBeenCalled()
+    expect(fetchSpy).not.toHaveBeenCalled()
+    // …and the definition is untouched: a nudge is not an edit, so nothing arms `dirty`.
+    expect(store.getState().dirty).toBe(false)
+  })
+
+  it("the loop in that harness IS live — a real edit does write (the positive control)", async () => {
+    // Without this row the one above is compatible with a harness whose loop never runs at
+    // all, which would make "zero writes" a statement about nothing.
+    const store = createBuilderStore({
+      slug: "nudge-harness-control",
+      version: 1,
+      status: "draft",
+      phases: evalCoverage,
+    } as unknown as BuilderDefinition)
+
+    render(<NudgeHarness store={store} onNudge={vi.fn()} />)
+    act(() => store.getState().patchConfig("fanout", { prompt: "a real edit" }))
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, PAST_THE_WINDOW))
+    })
+
+    expect(mockedUpdate).toHaveBeenCalledTimes(1)
+    // The nudge row's silence is therefore about the NUDGE, not about a dead loop.
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+})
+
+// ── The accumulated belt, declared LAST so it runs LAST (the `canvasNudge.test.ts:391-394`
+//    shape). Every assertion site above checks the spy at its own moment; this one checks
+//    the total across every path this file drives, including the ones that never mention
+//    the network at all.
+describe("WorkflowCanvas — the whole file reached the network zero times", () => {
+  it("accumulated fetch call count is 0", () => {
+    expect(fetchSpy).toHaveBeenCalledTimes(0)
   })
 })
