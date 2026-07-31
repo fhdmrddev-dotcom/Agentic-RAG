@@ -277,6 +277,11 @@ affected, so `scripts/check-deploy-drift.sh` is unmoved.
 - **No blockers.** The `PublishGauntlet.test.tsx` parallel-load flake is pre-existing and out of
   scope.
 
+## Self-Check: PASSED
+
+All 3 claimed files exist on disk; all 3 claimed commit hashes (`b2d7e7b5`, `5a37e910`,
+`9daeb629`) resolve in `git log`.
+
 ---
 *Phase: 186-concurrency-autosave*
 *Completed: 2026-08-01*
