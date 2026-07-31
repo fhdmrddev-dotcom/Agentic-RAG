@@ -509,3 +509,72 @@ describe("PublishGauntlet — worded verdict leads + raw 5-field grid on-demand 
     expect(screen.getByText(/grounded_in_evidence/)).toBeInTheDocument()
   })
 })
+
+// --- Phase 186-05 (CONCUR-02, F7) — a refusal is never painted as a pass ------------
+//
+// THE PROPERTY, NOT THE PATCH. `GauntletSpine` locates the blocked node with
+// `STAGES.findIndex(...)`, which answers -1 for a stage this client has never seen —
+// the SAME value it uses for "no block happened at all". Both spine reads then took the
+// no-block branch, so a refusal carrying an unfamiliar stage rendered every node passed:
+// a full green spine underneath a "Blocked" headline that printed the server's raw
+// machine token to a business user. That is the T-185-04-01 class exactly — a green
+// indicator scoped to the wrong thing — and it became reachable in production the moment
+// Phase 186-02 shipped its `draft_changed` refusal.
+//
+// The stage this suite drives is DELIBERATELY BOGUS rather than the code 186-02 added.
+// Keying the guard on the stage that happens to exist today would make it a patch test;
+// keyed on a code no server will ever send, it holds for EVERY blocked_stage the backend
+// adds after this phase, with no edit here.
+const UNKNOWN_STAGE = "a-stage-this-client-has-never-heard-of"
+
+/** The passed-node tone, read out of `nodeTone` in `PublishGauntlet.tsx:346` in this
+ *  session (`isPassed → "border-success/50 bg-success/10"`) rather than retyped from
+ *  memory — a re-skin that renames the token fails here instead of going quietly green. */
+const PASSED_NODE_TONE = "bg-success/10"
+
+/** The reached-connector tone, from the connector div at `PublishGauntlet.tsx:360`
+ *  (`connReached ? "bg-success/50" : "bg-border"`). A DIFFERENT literal from the node's,
+ *  which is precisely what lets the two independent reads be pinned independently: a fix
+ *  applied to only one of them still fails one of the two assertions below. */
+const REACHED_CONNECTOR_TONE = "bg-success/50"
+
+describe("PublishGauntlet — an unrecognised blocked_stage never renders a pass (F7)", () => {
+  it("paints no passed node, no reached connector and no ✓ badge, and keeps the raw code out of the headline", async () => {
+    mockedPublish.mockResolvedValue({
+      kind: "verdict",
+      verdict: {
+        published: false,
+        version: null,
+        golden_run_id: "run-unknown",
+        blocked_stage: UNKNOWN_STAGE,
+        named_failures: ["publish was refused"],
+      },
+    } satisfies PublishOutcome)
+    render(<PublishGauntlet definitionId="def-1" />)
+    await doPublish()
+
+    await waitFor(() => expect(screen.getByTestId("publish-block")).toBeInTheDocument())
+    const spine = screen.getByTestId("gauntlet-spine")
+
+    // The four claims are SOFT so one run reports all four numbers instead of stopping
+    // at the first. That is not leniency — a soft failure still fails the test — it is
+    // what makes a HALF-fix visible: the two spine reads below are separate expressions
+    // in the component, and repairing one of them must not be able to hide the other.
+    //
+    // (1) Not one ✓ badge anywhere on the spine — counted across the WHOLE spine, not
+    //     on the one node we happened to think of.
+    expect.soft(within(spine).queryAllByText("✓")).toHaveLength(0)
+
+    // (2) Not one node carries the passed tone.
+    expect.soft(spine.querySelectorAll(`[class*="${PASSED_NODE_TONE}"]`)).toHaveLength(0)
+
+    // (3) The connectors are their OWN read of the same missing index, so they get their
+    //     own expect. Folding this into (2) would let a half-fix pass.
+    expect.soft(spine.querySelectorAll(`[class*="${REACHED_CONNECTOR_TONE}"]`)).toHaveLength(0)
+
+    // (4) The headline a business user reads is a sentence. The server's token still
+    //     renders VERBATIM inside the raw-verdict disclosure — that honesty contract is
+    //     untouched; what is forbidden is a machine code leading the surface.
+    expect.soft(screen.getByTestId("verdict-headline")).not.toHaveTextContent(UNKNOWN_STAGE)
+  })
+})
