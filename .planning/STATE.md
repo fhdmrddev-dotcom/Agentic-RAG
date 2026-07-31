@@ -63,7 +63,32 @@ route), SUMMARY `e1e0f3fe`. The wire contract every later plan is written agains
 failures are pre-existing rot, proven by an identical failing set against baseline `a4c4eb86`.
 ⚠ **One consumer-visible change to carry forward:** a published-row PATCH now answers **409
 `already_published`**, not the pre-186 404 (deliberate D-186-09 consequence).
-Resume file: `.planning/phases/186-concurrency-autosave/186-01-SUMMARY.md`.
+
+**Execution progress — Plan 186-02 COMPLETE (2026-08-01).** Wave 2's publish-race guard (SC#3,
+the highest-value item in the phase) shipped in 3 atomic commits (`7fa42425` RED suite →
+`b4288727` two-sentinel `publish_definition` → `7fb4eeb3` stage-0 capture + `draft_changed`
+branch), SUMMARY `90e543c8`. "We published what we validated" is now **structural** — a WHERE
+conjunct on the stage-0 token, not a cooperative client hold. `publish_definition` gained an
+**OPTIONAL** `token` keyword with **two sentinels, never one**: `-1` unchanged ("someone already
+published this") and `-2` new ("the draft moved since we started checking it"); collapsing them
+would file a receipt for an event that did not happen (T-185-04-01). The service captures the
+token with `row.get("token")` — five shipped test files mock `get_definition` with token-less
+dicts and a subscript would KeyError every one of them. A refused publish answers **HTTP 200**
+`{published: false, blocked_stage: "draft_changed", golden_run_id}` and the golden run + its
+`harness_audit` rows survive untouched (`_block` only ADDS). **No route branch was added** — the
+publish route's own docstring already routes unrecognised stages to the 200 + structured verdict;
+the only `api/workflows.py` change is that docstring. F5/F5b/F6 observed RED then GREEN (F5c is a
+deliberate compatibility CONTROL, green both sides — it pins the token-free positional call that
+keeps `test_103_tweak_fork.py` edit-free). **Zero migrations — head stays 114**; zero frontend
+files; zero shipped test files edited. Backend collected 3461 → **3465**; full-suite failures
+**211, unchanged**.
+⚠ **Carry-forward for 186-05:** the `PublishGauntlet` fail-open is live and `draft_changed` is the
+first stage that triggers it in production — `findIndex` → `-1` for an unrecognised stage makes
+`isPassed` true for all eight nodes (8/8 GREEN on a refusal) while `wordedHeadline` prints the raw
+machine token. **Both** `-1` reads must be fixed, not just the first.
+The exact server sentence 186-05 must not contradict: *"the draft changed while it was being
+checked — re-publish to check the new version"*.
+Resume file: `.planning/phases/186-concurrency-autosave/186-02-SUMMARY.md`.
 
 Both owed items are now ROUTED at the discuss-phase touchpoint:
 
