@@ -10,6 +10,14 @@ UPDATE/DELETE; the route catches ``asyncpg.exceptions.CheckViolationError`` -> H
 409, never a silent overwrite or a 500. The re-read after the 409 must show the
 published row's ``definition`` JSONB UNCHANGED.
 
+PHASE 186 (F4 / D-186-09) — EXTENDED, NEVER REPLACED. Two things changed and both are
+asserted below: (1) a published-row PATCH now answers **409 already_published** instead
+of 404, because the route disambiguates a 0-row write with an owner-scoped probe rather
+than collapsing it to "not found"; (2) the PATCH 409's detail is an OBJECT carrying
+``code``, so the client stops matching prose. The shipped SENTENCE is byte-identical, the
+DELETE 409 stays a bare string on purpose, and the no-mutation assertions — the actual
+security outcome — are untouched.
+
 Live :54322 via psycopg2 / asyncpg (module-level skip-guard).
 CONVENTION (Phase 102 posture): imports INSIDE the test bodies; the DB connect is
 guarded.
@@ -78,10 +86,18 @@ def _published_definition(slug: str) -> dict:
 
 
 @pytest.mark.asyncio
-async def test_patch_published_row_is_immutable_via_route_404_and_no_mutation():
-    """LIVE: a PATCH against the OWNER's published row matches 0 draft rows -> 404,
-    and the published ``definition`` is UNCHANGED (the published-row freeze — the
-    draft routes can never mutate a published workflow)."""
+async def test_patch_published_row_is_immutable_via_route_409_and_no_mutation():
+    """LIVE: a PATCH against the OWNER's published row matches 0 draft rows and the
+    published ``definition`` is UNCHANGED (the published-row freeze — the draft routes
+    can never mutate a published workflow).
+
+    PHASE 186 (F4 / D-186-09) — THE STATUS MOVED, THE FREEZE DID NOT. Before 186 the
+    0-row write collapsed to ``None`` -> 404. Now the route runs an OWNER-SCOPED probe to
+    name the real cause, finds ``status='published'``, and answers **409
+    ``already_published``** — the same sentence the publish route has always used, now
+    object-shaped so the client branches on a code instead of matching prose. The
+    load-bearing assertion is unchanged and still below: the row did not move.
+    """
     import asyncpg
     from fastapi import HTTPException
 
@@ -109,8 +125,17 @@ async def test_patch_published_row_is_immutable_via_route_404_and_no_mutation():
                     body=WorkflowDefinition.model_validate(patched),
                     current_user={"id": str(owner)},
                 )
-            # The draft-only guard refuses the published row -> 404 (no mutation):
-            assert exc.value.status_code == 404
+            # The draft-only guard refuses the published row -> 409 (no mutation):
+            assert exc.value.status_code == 409
+            # F4: object-shaped, machine-readable, and the shipped sentence intact.
+            assert isinstance(exc.value.detail, dict)
+            assert exc.value.detail["code"] == "already_published"
+            assert (
+                exc.value.detail["message"]
+                == "workflow is published and cannot be modified"
+            )
+            # A published refusal carries NO token — there is nothing to retry against.
+            assert "token" not in exc.value.detail
             async with pool.acquire() as con:
                 after = await con.fetchval(
                     "SELECT definition->>'name' FROM workflow_definitions WHERE id = $1", def_id
@@ -195,6 +220,12 @@ async def test_patch_route_maps_check_violation_to_409():
                 current_user={"id": str(__import__("uuid").uuid4())},
             )
     assert exc.value.status_code == 409  # 23514 -> 409
+    # F4 (Phase 186): the race backstop answers with the SAME object shape as the
+    # ``already_published`` cause — one concept, one body, so the client never has to
+    # know which of the two paths produced it.
+    assert isinstance(exc.value.detail, dict)
+    assert exc.value.detail["code"] == "already_published"
+    assert exc.value.detail["message"] == "workflow is published and cannot be modified"
 
 
 @pytest.mark.asyncio
@@ -222,3 +253,8 @@ async def test_delete_route_maps_check_violation_to_409():
                 current_user={"id": str(__import__("uuid").uuid4())},
             )
     assert exc.value.status_code == 409  # 23514 -> 409
+    # Phase 186: the DELETE 409 keeps its BARE STRING detail, deliberately — a delete is
+    # not on the autosave path and has no stale-vs-published ambiguity to resolve. Pinned
+    # so the asymmetry with the PATCH 409 above reads as a decision, not as drift.
+    assert isinstance(exc.value.detail, str)
+    assert exc.value.detail == "workflow is published and cannot be modified"

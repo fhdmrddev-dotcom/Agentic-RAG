@@ -12,12 +12,12 @@ itself is a pure read (no writes).
 from __future__ import annotations
 
 import logging
-from typing import Literal
+from typing import Annotated, Literal
 from uuid import UUID
 
 import asyncpg
 import redis.asyncio as aioredis
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from pydantic import BaseModel, Field
 
 from app.config import settings
@@ -130,10 +130,22 @@ class PublishedWorkflow(BaseModel):
 
 # ── Phase 103 (REQ-1 / WFAUTH-01) — draft CRUD response shapes ────────────────
 class DraftCreateResponse(BaseModel):
-    """The create/PATCH return — the new (or updated) draft id + its version."""
+    """The create/PATCH return — the new (or updated) draft id + its version.
+
+    Phase 186 (CONCUR-02 / D-186-07): ``token`` is the ADDITIVE opaque optimistic
+    concurrency token of the row AS OF THIS RESPONSE. On a PATCH it is the POST-write
+    value, so the client chains its next autosave with no extra read. Old callers that
+    ignore the field stay valid — nothing about ``id``/``version`` changed.
+
+    TYPED ``str``, NEVER ``datetime``, AND THAT IS BINDING. A ``datetime``-typed field
+    re-serializes through Pydantic, which DROPS the fractional part when microseconds are
+    0 — the token width would then vary with the clock and a save could compare unequal to
+    itself. The client echoes this string VERBATIM and must never parse it (a JS ``Date``
+    truncates to milliseconds; probed, it matches 0 rows)."""
 
     id: UUID
     version: int
+    token: str
 
 
 class DraftRow(BaseModel):
@@ -141,13 +153,19 @@ class DraftRow(BaseModel):
 
     Phase 103-06 (REQ-7 D9/D10): ``definition`` is ADDITIVE so the drafts-shelf
     card can derive the tier badge + phase chain client-side; optional to keep the
-    pre-103 id/slug/version/name shelf shape valid."""
+    pre-103 id/slug/version/name shelf shape valid.
+
+    Phase 186 (D-186-07): ``token`` is ADDITIVE too — the Open-a-draft path needs a
+    concurrency token in hand before its first autosave, or that save would have to write
+    unguarded. Same binding typing rule as ``DraftCreateResponse.token``: ``str``, never
+    ``datetime``, never parsed."""
 
     id: UUID
     slug: str
     version: int
     name: str | None = None
     definition: dict | None = None
+    token: str
 
 
 # Phase 148 (VIS-01) — RUN CARVE-OUT: DO NOT gate /published or /starters. They are the Run
@@ -831,6 +849,18 @@ def _coerce_user_id(current_user: dict) -> UUID:
     return UUID(user_id) if isinstance(user_id, str) else user_id
 
 
+# Phase 186 (D-186-09): the published-row 409 keeps its shipped, operator-verified
+# SENTENCE and its shipped STATUS; only its SHAPE changes, from a bare string to an
+# object, so the client can branch on a machine code instead of matching prose. One
+# constant because the same refusal is raised from two places (the ``already_published``
+# cause and the CheckViolationError race backstop) and two spellings of one locked string
+# is how a locked string stops being locked.
+_ALREADY_PUBLISHED_DETAIL = {
+    "code": "already_published",
+    "message": "workflow is published and cannot be modified",
+}
+
+
 # DRAFT ROUTES ARE DELIBERATELY NOT GROUNDING-GATED (Phase 182 plan 06 — a DECISION, not an
 # oversight). Neither ``create_draft`` below nor ``update_draft`` further down runs the
 # grounding-fidelity checks: a work-in-progress draft must stay storable while incomplete, or
@@ -896,6 +926,7 @@ async def list_drafts(
             version=r["version"],
             name=r.get("name"),
             definition=_coerce_definition(r.get("definition")),
+            token=r["token"],  # Phase 186 — the shelf hands the builder a token
         )
         for r in rows
     ]
@@ -912,30 +943,92 @@ async def update_draft(
     definition_id: UUID,
     body: WorkflowDefinition,
     current_user: dict = Depends(get_current_user),
+    # ``Annotated[...] = None``, NOT ``= Header(default=None, ...)``, and the difference is
+    # load-bearing HERE: this repo's shipped route tests call route functions DIRECTLY
+    # (``test_workflows_routes.py:111-144``), and with the ``= Header(...)`` form FastAPI
+    # never runs, so the parameter arrives as the unresolved ``Header`` FieldInfo object
+    # itself — truthy, not ``None``, and passed straight to asyncpg as the token bind
+    # (observed: ``DataError: expected str, got Header``). The Annotated form makes the
+    # DEFAULT a plain ``None``, so a direct call takes the unguarded branch exactly as an
+    # absent header does over HTTP.
+    if_match: Annotated[str | None, Header(alias="If-Match")] = None,
 ) -> DraftCreateResponse:
-    """Update a DRAFT (REQ-1 PATCH) — returns ``{id, version}``.
+    """Update a DRAFT (REQ-1 PATCH) — returns ``{id, version, token}``.
 
-    A published-row PATCH hits the immutability trigger (Postgres ``23514``); we catch
-    ``asyncpg.exceptions.CheckViolationError`` -> HTTP 409 (mirroring the
-    ``already_published`` -> 409 mapping), never a silent overwrite or a 500
-    (T-103-01-02). A not-owned / non-draft / missing id returns ``None`` -> 404 (no
-    existence leak). ``definition_id`` is a path ``UUID`` -> FastAPI 422 on a malformed id.
+    THE CONCURRENCY TOKEN RIDES IN ``If-Match``, NOT IN THE BODY (Phase 186 / D-186-07).
+    ``WorkflowDefinition`` is ``extra='forbid'`` and the token is TRANSPORT METADATA, not
+    part of the definition (D-14 — no second source of truth): a token key in the body
+    would 422 today and would be persisted into the ``definition`` JSONB if it did not.
+    A wrapper body model was the alternative and was rejected — it is a breaking shape
+    change to every caller and every test that PATCHes a bare definition.
+
+    ``If-Match`` IS OPTIONAL FOR ONE RELEASE, DELIBERATELY. An absent header means exactly
+    today's unguarded behaviour. Requiring it would break every browser tab that was open
+    across the deploy on its very next save. The client always sends one, so the unguarded
+    path is reachable only by a pre-deploy tab or a non-browser caller. THIS IS A DATED
+    CONCESSION, NOT THE END STATE — the header is expected to become required once no
+    pre-186 client can still be running.
+
+    Three named refusals (D-186-09), and the 404 is deliberately the dullest of them:
+      - ``not_found`` (missing OR not-owned) -> **404** with the UNCHANGED string detail
+        ``draft not found``. It gets NO machine code: a coded 404 would let a caller
+        tell "no such workflow" from "someone else's workflow", i.e. an existence oracle
+        (T-186-01-03). Not-found and not-owned must stay byte-identical.
+      - ``already_published`` -> **409**, today's sentence, now object-shaped so the
+        client can stop string-matching prose. NOTE this is a deliberate STATUS change
+        from the pre-186 404: the 0-row write is now disambiguated by an owner-scoped
+        probe instead of collapsing to "not found" (test_103_published_409.py pins it).
+      - ``stale_token`` -> **409** with the CURRENT token attached, so D-186-08's
+        "overwrite with what's on screen" is ONE more PATCH rather than a re-read plus a
+        PATCH. Disclosing it leaks nothing: the disambiguating probe is owner-scoped, so
+        the caller already owns the row (T-186-01-04, accepted).
+
+    A published-row PATCH also hits the immutability trigger (Postgres ``23514``) when the
+    ``status='draft'`` conjunct loses a race with a concurrent publish; we still catch
+    ``asyncpg.exceptions.CheckViolationError`` -> HTTP 409, never a silent overwrite or a
+    500 (T-103-01-02 / T-186-01-06). ``definition_id`` is a path ``UUID`` -> FastAPI 422 on
+    a malformed id.
     """
     pool = await get_pg_pool()
     user_id = _coerce_user_id(current_user)
     body = body.model_copy(update={"status": "draft"})
     try:
         row = await update_workflow_definition(
-            pool, definition_id, definition=body, user_id=user_id
+            pool, definition_id, definition=body, user_id=user_id, token=if_match
         )
     except asyncpg.exceptions.CheckViolationError:
+        # Same concept, same shape as the ``already_published`` refusal below — one
+        # object for one meaning, so the client branches on ``code`` in both cases.
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="workflow is published and cannot be modified",
+            detail=_ALREADY_PUBLISHED_DETAIL,
         )
-    if row is None:
+
+    if not row.get("ok"):
+        cause = row.get("cause")
+        if cause == "already_published":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=_ALREADY_PUBLISHED_DETAIL,
+            )
+        if cause == "stale_token":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                # THE CLIENT BRANCHES ON ``code``, NEVER ON THIS PROSE. The message is
+                # for a human reading a log; rewording it must never change behaviour.
+                detail={
+                    "code": "stale_token",
+                    "message": "this draft was changed somewhere else since you loaded it",
+                    "token": row.get("token"),
+                },
+            )
+        # ``not_found`` — and any cause this route does not recognise — fails closed to
+        # the dullest answer there is. A new refusal cause must be mapped deliberately.
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="draft not found")
-    return DraftCreateResponse(**row)
+
+    # Constructed FIELD BY FIELD, never ``DraftCreateResponse(**row)``: the refusal-aware
+    # dict carries an ``ok`` key that has no business reaching the wire model.
+    return DraftCreateResponse(id=row["id"], version=row["version"], token=row["token"])
 
 
 @router.delete(
@@ -955,6 +1048,12 @@ async def delete_draft(
 
     No return-type annotation (the delete_folder 204 precedent): a ``-> None`` makes
     FastAPI build a response body field, which the 204 status forbids.
+
+    THIS 409's DETAIL STAYS A BARE STRING, ON PURPOSE (Phase 186). A delete is not on the
+    autosave path, so it has no concurrency token and no stale-vs-published ambiguity to
+    resolve — object-shaping it would be churn for a distinction that does not exist here.
+    The client's defensive default covers the asymmetry: a 409 whose body has no ``code``
+    falls back to today's ``WorkflowConflictError``. Read as a DECISION, not an oversight.
     """
     pool = await get_pg_pool()
     user_id = _coerce_user_id(current_user)
