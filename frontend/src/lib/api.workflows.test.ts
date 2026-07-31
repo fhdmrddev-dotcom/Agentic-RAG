@@ -201,3 +201,76 @@ describe("draft CRUD — typed conflict / not-found errors (never a silent overw
     await expect(deleteWorkflowDraft("wf-1")).resolves.toBeUndefined()
   })
 })
+
+// ── Phase 186-03 (CONCUR-02 · D-186-07) — the opaque concurrency token ────────────
+//
+// The token must ride EVERY response that seeds a builder session, because a draft
+// reaches the Builder by FOUR routes: fresh build (create), fork a starter (create),
+// Tweak (create) and open-a-draft (the drafts LIST). Miss one and that path autosaves
+// with no guard at all. These cases pin all three origins plus the request header.
+describe("the concurrency token — every seeding response carries it, the PATCH echoes it", () => {
+  // A realistic server token: microsecond precision, which is exactly why the client
+  // must treat it as an opaque string and never round-trip it through a JS date type.
+  const TOKEN_A = "2026-08-01 12:00:00.123456+00"
+  const TOKEN_B = "2026-08-01 12:00:07.987654+00"
+
+  function headersOf(fetchMock: ReturnType<typeof vi.fn>): Record<string, string> {
+    const init = fetchMock.mock.calls[0][1] as RequestInit
+    return (init.headers ?? {}) as Record<string, string>
+  }
+
+  it("createWorkflowDraft returns the token from a 201 body", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(jsonRes(201, { id: "wf-new", version: 1, token: TOKEN_A })),
+    )
+    const out = await createWorkflowDraft({ slug: "wf", phases: [] })
+    expect(out).toEqual({ id: "wf-new", version: 1, token: TOKEN_A })
+  })
+
+  it("listDraftWorkflows returns rows carrying the token", async () => {
+    const rows = [{ id: "wf-1", slug: "wf", version: 1, name: "My WF", token: TOKEN_A }]
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonRes(200, rows)))
+    const out = await listDraftWorkflows()
+    expect(out[0].token).toBe(TOKEN_A)
+  })
+
+  it("updateWorkflowDraft sends the token VERBATIM as the If-Match request header", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonRes(200, { id: "wf-1", version: 1, token: TOKEN_B }))
+    vi.stubGlobal("fetch", fetchMock)
+
+    await updateWorkflowDraft("wf-1", { slug: "wf", phases: [] }, TOKEN_A)
+
+    // VERBATIM: byte-for-byte what the server handed us, microseconds intact.
+    expect(headersOf(fetchMock)["If-Match"]).toBe(TOKEN_A)
+  })
+
+  it("updateWorkflowDraft sends NO If-Match header when it has no token", async () => {
+    // An absent header is today's unguarded write — the deliberate one-release
+    // concession for a tab that was already open when the guard shipped.
+    const fetchMock = vi.fn().mockResolvedValue(jsonRes(200, { id: "wf-1", version: 1, token: TOKEN_B }))
+    vi.stubGlobal("fetch", fetchMock)
+
+    await updateWorkflowDraft("wf-1", { slug: "wf", phases: [] })
+
+    expect(headersOf(fetchMock)).not.toHaveProperty("If-Match")
+
+    // …and a null token is the same case (the hook holds `null` before its first read).
+    const nullMock = vi.fn().mockResolvedValue(jsonRes(200, { id: "wf-1", version: 1, token: TOKEN_B }))
+    vi.stubGlobal("fetch", nullMock)
+    await updateWorkflowDraft("wf-1", { slug: "wf", phases: [] }, null)
+    expect(headersOf(nullMock)).not.toHaveProperty("If-Match")
+  })
+
+  it("updateWorkflowDraft returns the response's token, so writes chain", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(jsonRes(200, { id: "wf-1", version: 1, token: TOKEN_B })),
+    )
+    const out = await updateWorkflowDraft("wf-1", { slug: "wf", phases: [] }, TOKEN_A)
+    // The value the NEXT PATCH must send — a write that returned no fresh token would
+    // leave the next one guarded by a token the server has already superseded.
+    expect(out.token).toBe(TOKEN_B)
+    expect(out.version).toBe(1)
+  })
+})

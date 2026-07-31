@@ -3268,6 +3268,38 @@ export interface WorkflowDraftRow {
   version: number
   name: string | null
   definition?: WorkflowDefinitionJSON | null
+  /**
+   * OPAQUE concurrency token (Phase 186 / D-186-07). Echo it VERBATIM on the next
+   * PATCH and treat it as bytes with no internal structure.
+   *
+   * NEVER PARSE IT INTO A JS DATE VALUE — not with the `Date` constructor, not with
+   * `Date.parse`, not with any library that wraps either. Postgres keeps microseconds
+   * and a JS date value keeps only milliseconds, so a parsed-and-re-rendered token is
+   * truncated and matches ZERO rows: every save would then refuse as stale (probed
+   * against the live database, 2026-08-01). The server renders it and the server
+   * compares it; this client only carries it.
+   */
+  token: string
+}
+
+/**
+ * What a draft WRITE answers with — the create (201) and the PATCH (200) return the
+ * identical shape, so both share this type (Phase 186 / D-186-07).
+ *
+ * `token` is the value the NEXT write must echo. A save that dropped it would leave the
+ * following one guarded by a token the server has already superseded, which is a
+ * self-inflicted stale refusal on the second keystroke.
+ *
+ * NOTE ON THE PATCH's RETURN TYPE. `updateWorkflowDraft` was declared as returning
+ * `WorkflowDefinitionJSON`; that was a type lie from the start — the route has always
+ * answered `DraftCreateResponse` (`api/workflows.py`), and nothing read the result, so
+ * nothing noticed. It is corrected here rather than left, because the autosave hook now
+ * genuinely reads the response to chain the next write.
+ */
+export interface WorkflowDraftWriteResult {
+  id: string
+  version: number
+  token: string
 }
 
 /** The structured result of POST /workflows/generate. The route returns HTTP 200
@@ -3311,11 +3343,12 @@ export class WorkflowNotFoundError extends Error {
   }
 }
 
-/** POST /workflows — create a draft. Returns {id, version}. */
+/** POST /workflows — create a draft. Returns {id, version, token} (Phase 186: the
+ *  token seeds the session, because three of the Builder's four entry routes create). */
 export async function createWorkflowDraft(
   def: WorkflowDefinitionJSON,
   signal?: AbortSignal,
-): Promise<{ id: string; version: number }> {
+): Promise<WorkflowDraftWriteResult> {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_BASE}/workflows`, {
     method: "POST",
@@ -3324,7 +3357,7 @@ export async function createWorkflowDraft(
     signal,
   })
   if (!res.ok) throw new Error(`Failed to create workflow draft (status ${res.status})`)
-  return (await res.json()) as { id: string; version: number }
+  return (await res.json()) as WorkflowDraftWriteResult
 }
 
 /** GET /workflows/drafts — the caller's own draft rows (owner-scoped server-side). */
@@ -3335,15 +3368,35 @@ export async function listDraftWorkflows(signal?: AbortSignal): Promise<Workflow
   return (await res.json()) as WorkflowDraftRow[]
 }
 
-/** PATCH /workflows/{id} — update a draft. Throws WorkflowConflictError on 409
- *  (the row is published/frozen) and WorkflowNotFoundError on 404 — a 409/404 is
- *  NEVER swallowed as success (T-103-03-04). */
+/**
+ * PATCH /workflows/{id} — update a draft. Throws WorkflowConflictError on 409
+ * (the row is published/frozen) and WorkflowNotFoundError on 404 — a 409/404 is
+ * NEVER swallowed as success (T-103-03-04).
+ *
+ * `token` is the opaque concurrency token from the response that seeded this session
+ * (Phase 186 / D-186-07). When present it travels as the conditional-request header,
+ * and the server refuses the write if the row moved since that token was minted. When
+ * absent NO header is sent and the server runs today's unguarded UPDATE — the
+ * deliberate one-release concession for a tab that was already open when the guard
+ * shipped, recorded on the route as well.
+ *
+ * The token is inserted BEFORE `signal` in the argument list. That is safe because no
+ * call site passed a third argument (verified by grep across `frontend/src`, 186-03).
+ */
 export async function updateWorkflowDraft(
   id: string,
   def: WorkflowDefinitionJSON,
+  token?: string | null,
   signal?: AbortSignal,
-): Promise<WorkflowDefinitionJSON> {
-  const headers = await getAuthHeaders()
+): Promise<WorkflowDraftWriteResult> {
+  const authHeaders = (await getAuthHeaders()) as Record<string, string>
+  // The header is ADDED, never substituted: a missing token must send no header at
+  // all, not an empty one (an empty conditional value would guard against nothing
+  // while still reading as guarded).
+  const headers: Record<string, string> =
+    typeof token === "string" && token.length > 0
+      ? { ...authHeaders, "If-Match": token }
+      : authHeaders
   const res = await fetch(`${API_BASE}/workflows/${id}`, {
     method: "PATCH",
     headers,
@@ -3353,7 +3406,7 @@ export async function updateWorkflowDraft(
   if (res.status === 409) throw new WorkflowConflictError()
   if (res.status === 404) throw new WorkflowNotFoundError()
   if (!res.ok) throw new Error(`Failed to update workflow draft (status ${res.status})`)
-  return (await res.json()) as WorkflowDefinitionJSON
+  return (await res.json()) as WorkflowDraftWriteResult
 }
 
 /** DELETE /workflows/{id} — delete a draft (204). Throws WorkflowConflictError on
