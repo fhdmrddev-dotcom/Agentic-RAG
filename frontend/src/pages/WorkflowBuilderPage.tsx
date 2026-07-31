@@ -408,6 +408,28 @@ export interface BuilderDefinition {
 export interface BuilderInitial {
   definition: BuilderDefinition
   draftId: string
+  /**
+   * Phase 186-07 (D-186-07 / CONCUR-02) — the OPAQUE concurrency token for the row
+   * `draftId` names, exactly as the server last minted it.
+   *
+   * IT IS BYTES, AND NOTHING HERE MAY LOOK INSIDE THEM. It is echoed verbatim on the
+   * next write and never inspected, normalised, re-rendered or turned into a JS date
+   * value — Postgres keeps microseconds that a millisecond-precision date value would
+   * silently truncate, and a truncated token matches zero rows, so every save would
+   * refuse as stale. `useDraftPersistence` carries the same fence in code and a source
+   * grep in its suite enforces it.
+   *
+   * ABSENT OR `null` MEANS THE FIRST WRITE GOES UNGUARDED — the 186-01 optional-`If-Match`
+   * posture, which is what keeps a call site that has no token (a fresh build, where no
+   * row exists yet) working exactly as it did. It is optional here for the same reason:
+   * every existing construction of this interface stays valid.
+   *
+   * A DRAFT REACHES THE BUILDER BY FOUR ROUTES — fresh build, fork a starter, Tweak a
+   * published version, open an existing draft — and each of them must carry (or knowingly
+   * lack) a token. A route that quietly dropped it would autosave with no guard at all,
+   * with no visible symptom until it clobbered something.
+   */
+  token?: string | null
 }
 
 export interface WorkflowBuilderPageProps {

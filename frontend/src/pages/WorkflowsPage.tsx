@@ -130,8 +130,18 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
   //                     view (Open a draft = edit-in-place; Tweak a published =
   //                     edit the freshly-forked copy). `draftId` is the row every
   //                     save PATCHes; `label` is the header caption.
+  //
+  // Phase 186-07 (D-186-07): `token` rides along — the OPAQUE concurrency token for the
+  // row `draftId` names. It is carried at every seeding site below and echoed verbatim by
+  // `useDraftPersistence`; nothing on this page reads inside it. `null` means "no token
+  // yet", which is the honest reading for a route that has not created a row.
   const [builderInitial, setBuilderInitial] = useState<
-    { definition: WorkflowDefinitionJSON; draftId: string; label: string } | null
+    {
+      definition: WorkflowDefinitionJSON
+      draftId: string
+      label: string
+      token: string | null
+    } | null
   >(null)
   // The post-publish Run CTA (sketch 023-A): set on a gauntlet PASS.
   const [runCta, setRunCta] = useState<{ slug: string; version: number } | null>(null)
@@ -226,6 +236,8 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
           definition: forked,
           draftId: created.id,
           label: `Tweak · ${wf.slug} v${nextVersion}`,
+          // 186-07: the create response's own token guards the fork's first PATCH.
+          token: created.token,
         })
         setPageView("builder")
       } catch (e) {
@@ -262,6 +274,8 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
             definition: forked,
             draftId: created.id,
             label: `From starter · ${starter.name}`,
+            // 186-07: same as Tweak — the fresh copy's create response carries it.
+            token: created.token,
           })
           setPageView("builder")
           return
@@ -283,10 +297,18 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
       definition: (draft.definition ?? {}) as WorkflowDefinitionJSON,
       draftId: draft.id,
       label: `Edit · ${draft.name ?? draft.slug} v${draft.version}`,
+      // 186-07: the ONE route that does not create — the drafts list itself now serves
+      // the token (186-03), so an edit-in-place session is guarded from its first write.
+      // `?? null` because a shelf row read before that field shipped simply has none, and
+      // an unguarded first write is the honest fallback rather than a crash.
+      token: draft.token ?? null,
     })
     setPageView("builder")
   }, [])
 
+  // 186-07: a TRUE fresh build seeds nothing at all — no row exists yet, so there is no
+  // token to carry. `useDraftPersistence` creates the row on the first write and adopts
+  // the token that create returns, which is the same posture as `token: null`.
   const openBuilderFresh = useCallback(() => {
     setBuilderInitial(null)
     setPageView("builder")
@@ -389,9 +411,19 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
             {...(canvasEnabled ? { inline: true, headerLead: breadcrumbGroup } : {})}
             // OPEN/TWEAK: the existing definition + its real row id flows straight
             // through to the Builder's `initial` (saves PATCH it). Absent → fresh build.
+            //
+            // 186-07: `token` is listed EXPLICITLY here, and that is the whole point of
+            // the line. This is a hand-built object, not a spread — a token added to the
+            // state above but forgotten here would produce a Builder that autosaves with
+            // no guard at all, and the symptom would be a silent clobber rather than a
+            // type error.
             initial={
               builderInitial
-                ? ({ definition: builderInitial.definition, draftId: builderInitial.draftId } as BuilderInitial)
+                ? ({
+                    definition: builderInitial.definition,
+                    draftId: builderInitial.draftId,
+                    token: builderInitial.token,
+                  } as BuilderInitial)
                 : undefined
             }
             // Phase 184-11 (D-184-16 debt 1): the Builder registers its unsaved-work
