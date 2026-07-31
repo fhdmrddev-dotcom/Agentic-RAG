@@ -50,13 +50,34 @@ Security found one real fail-open BLOCKER — T-185-04-01, a **typed** refusal o
 the step and filed a false approval receipt — fixed by quick task `260731-3y4` (`417728bd`) and
 **confirmed live in the browser** on run `5d3a4707` (run failed, step never ran, zero receipts).
 
-**Next:** roadmap says **Phase 186 — Concurrency & Autosave**. Two items are owed first:
+**Next:** **Phase 186 — Concurrency & Autosave** — CONTEXT gathered 2026-07-31 (`0a200d51`),
+17 decisions (D-186-01..17). Resume file:
+`.planning/phases/186-concurrency-autosave/186-CONTEXT.md`. Next command: `/gsd:plan-phase 186`.
 
-- `BUG-260731-03` (**blocking**, unrouted) — no author-time UI to bind a workflow's knowledge base;
-  three creation paths can all produce an unbound workflow. Needs a home before 186 planning.
+Both owed items are now ROUTED at the discuss-phase touchpoint:
 
-- `SEED-138` (definition jsonb double-encoded, 118/145 rows) — unassigned, medium, no live impact.
+- `BUG-260731-03` (**blocking**) → `status: folded`, **SPLIT** `folded_into: "186 (control) /
+  187 (verdict)"` (D-186-14). 186 gets the author-time KB-binding control (the display-only header
+  chip promoted into the existing picker) + a neutral unbound invitation; 187 keeps the
+  deterministic build-time `/validate` verdict. Its `re_open_trigger` states it must NOT flip to
+  `closed` when 186 ships.
+
+- `SEED-138` (definition jsonb double-encoded, 118/145 rows) — **reviewed, not folded.** Autosave
+  heals-on-write (`update_workflow_definition` already writes correctly); all rows are test
+  fixtures. Re-open trigger: first non-fixture production rows.
 - `SEED-137` is already folded → **Phase 187 SC#6**.
+
+**Three scouting findings that reframe 186's roadmap wording** (verified in code; full detail in
+CONTEXT.md `<domain>`): (1) CONCUR-01's *"a cosmetic drag never mints a version"* is **already true
+by construction** — `update_workflow_definition` never bumps `version`, and 184-07's `canvasNudge`
+is browser-local at 0 network calls; (2) *"two people editing the same org-shared workflow"* is
+**NOT reachable** — mig 111 gave `workflow_definitions` `is_system_global` (a platform flag), not
+`is_org_shared`, and UPDATE is `created_by`-only at both the RLS and service layers, so the real
+conflict is one user across two tabs; (3) the publish/dirty-draft race is **real and unguarded** —
+stage 5 flips on `status='draft'` only, so an autosave landing mid-gauntlet publishes a definition
+that never passed the gauntlet. **Zero migrations confirmed:** the concurrency token rides the
+existing `updated_at` column, and the new `blocked_stage` is free-form metadata on the
+already-registered `publish_blocked` event type (unlike 185-13's `action_risk_pending`).
 
 *(Historical, superseded — the 185 execution detail below was accurate when written:)*
 Plan: 11 of 12 complete; 185-11 tasks 1-2 done, task 3 was the blocking `checkpoint:human-verify`
