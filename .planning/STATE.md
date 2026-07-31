@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
 status: executing
-last_updated: "2026-07-30T14:21:20.230Z"
-last_activity: 2026-07-29 -- Phase 185 execution started
+last_updated: "2026-07-31T19:44:38.251Z"
+last_activity: "2026-07-31 -- Completed quick task 260731-3y4: allow-list the armed PROCEED branch — closes security BLOCKER T-185-04-01 (Phase 185 now 49/49 threats closed)"
 progress:
   total_phases: 19
   completed_phases: 5
-  total_plans: 51
-  completed_plans: 50
+  total_plans: 52
+  completed_plans: 51
   percent: 26
 ---
 
@@ -51,8 +51,10 @@ the step and filed a false approval receipt — fixed by quick task `260731-3y4`
 **confirmed live in the browser** on run `5d3a4707` (run failed, step never ran, zero receipts).
 
 **Next:** roadmap says **Phase 186 — Concurrency & Autosave**. Two items are owed first:
+
 - `BUG-260731-03` (**blocking**, unrouted) — no author-time UI to bind a workflow's knowledge base;
   three creation paths can all produce an unbound workflow. Needs a home before 186 planning.
+
 - `SEED-138` (definition jsonb double-encoded, 118/145 rows) — unassigned, medium, no live impact.
 - `SEED-137` is already folded → **Phase 187 SC#6**.
 
