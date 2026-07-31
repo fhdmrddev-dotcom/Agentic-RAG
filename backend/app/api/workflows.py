@@ -807,9 +807,16 @@ async def publish_workflow(
       - any other block -> 200 ``{published: False, blocked_stage, named_failures, golden_run_id}``
       - success -> 200 ``{published: True, version, golden_run_id}``
 
-    ``grounding_fidelity`` (like ``lint`` and ``interactive_phase``) is an UNRECOGNISED
-    ``blocked_stage`` for the branches above, so it falls through to the 200 + structured
-    verdict — a new pre-run stage needs NO route branch here, only this docstring.
+    ``grounding_fidelity`` and ``draft_changed`` (like ``lint`` and ``interactive_phase``)
+    are UNRECOGNISED ``blocked_stage`` values for the branches above, so they fall through
+    to the 200 + structured verdict — a new stage needs NO route branch here, only this
+    docstring. The newest of them (Phase 186 / D-186-10) means the draft was edited while
+    the gauntlet was running, so the token captured at stage 0 no longer matched and the
+    flip was refused. It is deliberately NOT folded into the ``already_published`` 409:
+    that would tell the author somebody else published their workflow, which is false, and
+    would hide the one fact that tells them what to do next — their own newer edit. 200 +
+    ``{published: False, blocked_stage, golden_run_id}`` is the honest answer, and the
+    golden run stays browsable.
 
     ``definition_id`` is a path ``UUID`` -> FastAPI 422 on a malformed id (V5).
     """

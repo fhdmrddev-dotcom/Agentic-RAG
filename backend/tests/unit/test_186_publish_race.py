@@ -261,9 +261,12 @@ async def test_the_golden_run_receipt_survives_a_draft_changed_refusal():
       1. the verdict is an honest refusal — ``published is False``, ``draft_changed``;
       2. ``golden_run_id`` is the REAL run id, not ``None`` — the refusal is attributed to
          the run that was actually performed, so the receipt is browsable;
-      3. the audit trail GREW. The ``judge_verdict`` row written before the flip is still
-         there, at the same index, with a ``publish_blocked`` row appended after it — and
-         no ``publish_succeeded``. ``_block`` only ADDS.
+      3. the audit trail GREW. The ``publish_attempted`` and ``judge_verdict`` rows
+         written before the flip are still there, in order and at the same indices, with a
+         ``publish_blocked`` row appended AFTER them — and no ``publish_succeeded``.
+         ``_block`` only ADDS. The whole ordered list is asserted rather than a membership
+         check, because "the golden-run record survived" is a claim about what is STILL
+         there, and a set/`in` assertion cannot tell a preserved row from a rewritten one.
 
     The row this test hands ``get_definition`` carries a ``token``, which the service must
     thread to ``publish_definition``; that call is asserted on directly, because a stage-0
@@ -358,9 +361,9 @@ async def test_the_golden_run_receipt_survives_a_draft_changed_refusal():
 
     # 3. The trail GREW; nothing was removed or rewritten.
     kinds = [event for event, _ in audit_events]
-    assert kinds == ["judge_verdict", "publish_blocked"], kinds
+    assert kinds == ["publish_attempted", "judge_verdict", "publish_blocked"], kinds
     assert "publish_succeeded" not in kinds  # no false governance row
-    blocked_metadata = audit_events[1][1]
+    blocked_metadata = audit_events[-1][1]
     assert blocked_metadata["blocked_stage"] == "draft_changed"
     # The receipt attributes the refusal to the run that really happened.
     assert blocked_metadata["golden_run_id"] == str(golden_run_id)

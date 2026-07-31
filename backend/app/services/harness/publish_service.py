@@ -112,6 +112,15 @@ async def publish_workflow(
             "golden_run_id": None,
         }
 
+    # Phase 186 (D-186-10) — the draft AS IT WAS WHEN WE STARTED CHECKING IT. Captured
+    # here, spent at stage 5, minutes of golden run later. ``row.get`` and NEVER a
+    # SUBSCRIPT: at least five shipped test files patch ``get_definition`` with
+    # hand-built dicts that carry no ``token`` key, and a subscript would turn every one
+    # of them into a KeyError. A missing token degrades to ``None``, which
+    # ``publish_definition`` defines as today's unguarded flip — the same graceful shape
+    # as the route's optional ``If-Match``.
+    stage0_token = row.get("token")
+
     if row.get("status") != "draft":
         return await _block(
             pool,
@@ -356,7 +365,11 @@ async def publish_workflow(
         )
 
     # ── stage 5: flip (all passed) ───────────────────────────────────────────────
-    version = await publish_definition(pool, definition_id)
+    # Phase 186 (D-186-10): the flip is guarded on the STAGE-0 token, so what we publish
+    # is what we spent the golden run checking. NOT wrapped in a transaction with any
+    # other UPDATE — ``now()`` is transaction time and a sibling write would render an
+    # identical token, silently disabling the guard (CONCURRENCY_TOKEN_SQL, Pitfall 9).
+    version = await publish_definition(pool, definition_id, token=stage0_token)
     # WR-03 (T-102-09-02): publish_definition returns -1 when its ``status='draft'``
     # WHERE guard matched 0 rows — a concurrent double-publish (the race loser) or a
     # row no longer a draft. Without this check the caller returned a FALSE
@@ -371,6 +384,29 @@ async def publish_workflow(
             definition_id=definition_id,
             stage="already_published",
             named_failures=["the draft was published concurrently or is no longer a draft"],
+            golden_run_id=golden_run_id,
+        )
+    # D-186-10: publish_definition returns -2 when the row is STILL an owned draft but
+    # its token no longer matches the one captured at stage 0 — the draft was edited
+    # while the gauntlet was running (autosave makes this routine, not exotic). The
+    # sentinel is kept SEPARATE from -1 for the same reason -1 exists at all: a receipt
+    # must describe what happened. A -2 routed to ``already_published`` would tell the
+    # author that someone else published their workflow — false, and worse than useless,
+    # because the true cause (their own newer edit) is the one thing that tells them what
+    # to do next. The golden run and every harness_audit row it wrote are PRESERVED: this
+    # is a ``_block``, which only ADDS a publish_blocked receipt, and ``golden_run_id`` is
+    # carried through so the refusal stays attributable to the run that really happened.
+    if version == -2:
+        return await _block(
+            pool,
+            run_id=golden_run_id,
+            user_id=user_id,
+            definition_id=definition_id,
+            stage="draft_changed",
+            named_failures=[
+                "the draft changed while it was being checked — "
+                "re-publish to check the new version"
+            ],
             golden_run_id=golden_run_id,
         )
     await _safe_audit(
