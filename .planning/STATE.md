@@ -22,7 +22,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-20 — Phase 163 THE ATOMIC CRUX complete; membership RLS enforced)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 185 — graded-governance-per-node-grounding-mode-action-risk-dial
+**Current focus:** Phase 185 is **COMPLETE** (verified 12/12, operator gate PASSED, SECURED 49/49, live UAT 2026-07-31). Next roadmap phase is **186 — Concurrency & Autosave**, but see the routing decision owed on `BUG-260731-03` (severity `blocking`, `folded_into: null`).
 
 ## Deferred Items
 
@@ -44,9 +44,21 @@ Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 op
 
 ## Current Position
 
-Phase: 185 (graded-governance-per-node-grounding-mode-action-risk-dial) — EXECUTING, BLOCKED ON THE OPERATOR GATE
-Plan: 11 of 12 complete; **185-11 tasks 1-2 done, task 3 is a blocking `checkpoint:human-verify` that has NOT run**
-(Summaries on disk: 01, 02, 03, 04, 05, 06, 07, 08, 09, 10, 11, 12. Next work is **the operator UAT**, not another plan.)
+Phase: 185 — **COMPLETE AND CLOSED** (2026-07-31). Verified 12/12 (`0edb3920`), operator gate PASSED
+(`3713a716`), GOVERN-01/02/03 all `Complete`, `nyquist_compliant` true, SECURED 49/49 (`a00b1cc5`).
+Security found one real fail-open BLOCKER — T-185-04-01, a **typed** refusal on an armed checkpoint ran
+the step and filed a false approval receipt — fixed by quick task `260731-3y4` (`417728bd`) and
+**confirmed live in the browser** on run `5d3a4707` (run failed, step never ran, zero receipts).
+
+**Next:** roadmap says **Phase 186 — Concurrency & Autosave**. Two items are owed first:
+- `BUG-260731-03` (**blocking**, unrouted) — no author-time UI to bind a workflow's knowledge base;
+  three creation paths can all produce an unbound workflow. Needs a home before 186 planning.
+- `SEED-138` (definition jsonb double-encoded, 118/145 rows) — unassigned, medium, no live impact.
+- `SEED-137` is already folded → **Phase 187 SC#6**.
+
+*(Historical, superseded — the 185 execution detail below was accurate when written:)*
+Plan: 11 of 12 complete; 185-11 tasks 1-2 done, task 3 was the blocking `checkpoint:human-verify`
+(Summaries on disk: 01, 02, 03, 04, 05, 06, 07, 08, 09, 10, 11, 12.)
 
 **⚑ WAVE 7 / PLAN 185-12 LANDED (2026-07-30) — BUG-260730-01 IS CLOSED IN CODE, AND IT WAS A
 BLOCKER FOR 185-11 TASK 3.** The auto-attached `retrieved_and_cited` gate demanded inline `[1]`
