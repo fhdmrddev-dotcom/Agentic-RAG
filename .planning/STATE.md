@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
 status: executing
-last_updated: "2026-07-31T22:34:27.654Z"
-last_activity: 2026-07-31 -- Phase 186 execution started
+last_updated: "2026-08-01T03:10:00.000Z"
+last_activity: 2026-08-01 -- Phase 186 Plan 06 complete (useDraftPersistence)
 progress:
   total_phases: 19
   completed_phases: 5
@@ -112,6 +112,30 @@ on the next keystroke.
 containing the literal ``new Date(``. Unsatisfiable together — the prose was reworded (all facts
 kept) so the fence stays a real guard. Also: the plan's "209-test clean subset" measures **200**
 for the six files it names, on both sides of the change.
+
+**Execution progress — Plan 186-06 COMPLETE (2026-08-01).** Wave 3's `useDraftPersistence` shipped
+in 3 atomic commits (`e7fa55cb` core → `49b4982e` the hold → `696791a2` the halt), SUMMARY
+`5bb6ad93`. **Two new files only** — the D-184-05 seam extraction 186-04's fence promised, with
+`WorkflowBuilderPage.tsx` **untouched** (186-07 owns it). 531-line hook: single-flight queue (≤ 1
+request outstanding, each carrying the previous write's token), `AUTOSAVE_DEBOUNCE_MS = 1000` with
+its limit stated honestly, **no cancellation of any kind** on the write path, a 6-arm discriminated
+`PersistState`, one hold mechanism with two sentences that flushes on release, and a `haltedRef`
+conflict stop with Reload/Overwrite returned but never self-invoked. Tests 0 → **22** (8 → 16 → 22
+across the three tasks); `tsc -b` **33 == baseline**, 0 naming a touched file; `vite build` exit 0;
+the 7-file builder subset **219 passed** (non-decreasing).
+⚠ **Three carry-forwards for 186-07:** (1) the **published-row 409 currently lands in the
+cause-neutral branch** — `PUBLISHED_CONFLICT_MESSAGE` still has one home on the page and this hook
+deliberately did not mint a second spelling, so 186-07 must either move that constant into the hook
+or add a discriminator, or a **shipped sentence (184-11 / D-184-16 debt 3) regresses**; (2) pass
+`validationCause` as a **primitive** (`validation.kind === "degraded" ? validation.cause : null`) —
+handing the object in defeats the whole reason the hold gate is value-stable; (3) `enabled` is
+*drafted + canvas-enabled*, **not** `hasEdited` — the hook's own `dirty` gate is what stops a
+freshly opened draft from writing.
+⚠ **Measurement note (the counting-criterion lesson, now FIVE plans running):** three of this
+plan's acceptance greps were unsatisfiable as literally written — `AbortController`/`instanceof`
+must count 0 *while the docblock explains why*; `grep "\], \[definition, enabled\])"` cannot match a
+`useEffect` (which ends in a brace); `grep -c "listDraftWorkflows"` cannot be 1 because the import
+line counts. Each was replaced by a measurement of the property, never by obfuscating the code.
 Resume file: None
 
 Both owed items are now ROUTED at the discuss-phase touchpoint:
@@ -1264,6 +1288,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 185 P09 | 42min | 2 tasks | 5 files |
 | Phase 185 P12 | 12min | 3 tasks | 4 files |
 | Phase 186 P05 | 15min | 2 tasks | 3 files |
+| Phase 186 P06 | 55min | 3 tasks | 2 files |
 
 ## Decisions
 
@@ -1512,6 +1537,11 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase ?]: 186-05: the 9th publish-spine row is Commit, APPENDED after Judge — a draft-moved refusal happens after the grader passed, and appending keeps the golden-run row at the index the running highlight addresses
 - [Phase ?]: 186-05: unknownBlock is the SINGLE load-bearing fail-closed guard — a first draft derived a second value that closed the same hole, making the guard deletable with F7 still green
 - [Phase ?]: 186-05: BLOCKED_SENTENCE carries two keys because verdictModel.test.ts's FORBIDDEN_CODES fence bars several real stage identifiers from that module entirely; the total resolver's sentence fallback carries the rest
+- [Phase 186]: 186-06 [Rule 2]: the autosave effect needs a **`dirty` gate on the fire path**. Without it the timer matures ~1 s after the Builder MOUNTS with no edit at all and writes — bumping `updated_at`, minting a new token and invalidating the one every other open tab holds. The hook would manufacture the exact stale-token conflict the phase exists to prevent, on every draft open. `saveNow` deliberately bypasses it.
+- [Phase 186]: 186-06 [Rule 1]: the single-flight drain's **first turn must not file a receipt**. Written naively, a confirmed write whose follow-up is already queued still calls the receipt action — clearing `dirty` while the newer edit is unsent, so the leave guard stops firing and the toolbar reads clean for work that never left the browser. T-185-04-01 in a shape the plan text does not name. The receipt line is reached only when `pendingRef` is clear.
+- [Phase 186]: 186-06: `overwrite` **re-enters the ONE writer** (adopt the 409's token → clear the halt → `performWrite`) instead of issuing its own request. That is what keeps the receipt action at exactly one caller AND makes a second-race refusal fall back into `conflict` with the newer token for free.
+- [Phase 186]: 186-06: the hook **deliberately does not classify the published-row 409**. Minting a second spelling of the page's `PUBLISHED_CONFLICT_MESSAGE` is the two-enums failure 186-04 just retired; **186-07 must close this or a shipped sentence regresses.**
+- [Phase 186]: 186-06 (method): the strongest RED is a **planted-defect run, not an unresolvable import**. The hook was first written with the in-flight guard removed and a date parse planted, so F9/F15 failed on real assertions. An absent module proves the file is missing; it proves nothing about whether the assertion can tell a correct hook from a broken one.
 
 ## Operator Next Steps
 
