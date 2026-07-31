@@ -5,6 +5,12 @@ precedent): an asyncpg pool, parameterized ``$N`` placeholders only (no f-string
 on SQL — T-073-02 / T-091-03), and small return shapes the Phase 091 engine
 (``harness_engine.run_workflow``) consumes.
 
+  ONE NAMED EXCEPTION TO "no f-strings on SQL" (Phase 186 / D-186-07):
+  ``CONCURRENCY_TOKEN_SQL`` below is a module-level CODE LITERAL — no user input
+  ever reaches it — spliced into the f-strings of the four draft queries. Every
+  VALUE still travels as ``$N``. See the constant's own docblock for why the token
+  must be rendered in SQL rather than compared as a bare timestamp column.
+
 COLUMN-NAME CONTRACT (BLOCKER fix — migration 058:16, full-schema.sql:716):
   On ``workflow_phases`` the run foreign-key column is ``workflow_run_id`` (NOT a
   bare ``run_id``). Every RUN-KEYED read against ``workflow_phases`` therefore
@@ -47,6 +53,43 @@ from uuid import UUID
 import asyncpg
 
 from app.models.harness import WorkflowDefinition
+
+# ── Phase 186 (CONCUR-02 / D-186-07) — the optimistic concurrency token ───────
+# ONE canonical expression, referenced by every read AND by the guard, so the value the
+# client is handed and the value the WHERE clause compares can never drift apart.
+#
+# WHY THIS EXPRESSION AND NOT ``updated_at = $N`` (what D-186-07 originally proposed):
+#   asyncpg REFUSES to bind a ``str`` to a ``timestamptz`` parameter — with AND without
+#   an explicit ``$N::timestamptz`` cast. Probed against the live local stack 2026-08-01:
+#   ``DataError: invalid input for query argument $2: '...' (expected a datetime.date or
+#   datetime.datetime instance, got 'str')``, identically for both forms. The naive shape
+#   is a runtime 500 on the first stale check, not a subtle precision bug. Comparing in
+#   TEXT space keeps the token a ``str`` from Postgres to the browser and back, which is
+#   what makes "echo it verbatim" ENFORCEABLE rather than merely requested.
+# WHY ``AT TIME ZONE 'UTC'`` AND NOT ``updated_at::text``:
+#   a bare cast renders in the SESSION ``TimeZone``. Probed: the same row renders
+#   ``...19:55:38.363036+00`` under UTC and ``...01:25:38.363036+05:30`` under IST, so a
+#   pooled connection that picked up a different TimeZone would 409 every save. This form
+#   pins UTC and was proven byte-identical across both sessions.
+# WHY ``.US`` AND NOT Python's ``isoformat()``:
+#   ``US`` always emits 6 fractional digits. Python's ``.isoformat()`` and Pydantic's
+#   datetime serializer BOTH DROP the fractional part when microseconds == 0, so the token
+#   width would vary with the clock. Constant width means one shape to compare.
+# PITFALL 9 — ``now()`` IS TRANSACTION TIME:
+#   the ``set_updated_at`` trigger (migration 056) sets ``NEW.updated_at = now()``, and
+#   ``now()`` is the TRANSACTION timestamp. Two UPDATEs wrapped in ONE transaction produce
+#   an IDENTICAL token (probed) — which would silently disable this guard. Both production
+#   writers are single-statement autocommit today; keep them that way, or the guard stops
+#   guarding without any test going red.
+# NOT ABSOLUTE, AND SAY SO: two writes landing in the SAME microsecond would render the
+#   same token. Measured spacing on five back-to-back autocommit UPDATEs was ~1.4-3 ms, so
+#   this is negligible — but it is a probability, not a proof.
+#
+# ``$N``-ONLY DISCIPLINE IS PRESERVED: this is a module-level CODE LITERAL containing no
+# user input, spliced into an f-string. Every VALUE still travels as ``$N``.
+CONCURRENCY_TOKEN_SQL = (
+    "to_char(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"')"
+)
 
 # harness_audit.event_type CHECK (migration 059 = 9 kinds; migration 069 = +7 emit
 # kinds → 16; migration 070 = +6 judge/publish/policy/ask_user-approval kinds → 22;
@@ -293,14 +336,20 @@ async def get_definition(
     non-owned-draft id are indistinguishable (no existence leak — T-102-05-06 /
     T-102-09-01, the 101.1-09 404-collapse precedent). ``$N`` placeholders only.
 
-    Returns ``{id, slug, version, name, status, definition, created_by}`` or
+    Returns ``{id, slug, version, name, status, definition, created_by, token}`` or
     ``None``. ``definition`` is the JSONB the caller ``model_validate``s into a
     ``WorkflowDefinition`` (asyncpg's pool codec decodes it to a dict).
+
+    ``token`` (Phase 186 / D-186-07) is the ADDITIVE opaque concurrency token — the
+    same ``CONCURRENCY_TOKEN_SQL`` expression the guarded UPDATE compares against, so a
+    caller that reads here and writes there can never be comparing two renderings. It is
+    a ``str``; nothing may parse it. Publish stage 0 captures it here (186-02).
     """
     row = await pool.fetchrow(
-        "SELECT id, slug, version, name, status, definition, created_by "
-        "FROM workflow_definitions "
-        "WHERE id = $1 AND (created_by = $2 OR (is_system_global = true AND status = 'published'))",
+        f"SELECT id, slug, version, name, status, definition, created_by, "
+        f"{CONCURRENCY_TOKEN_SQL} AS token "
+        f"FROM workflow_definitions "
+        f"WHERE id = $1 AND (created_by = $2 OR (is_system_global = true AND status = 'published'))",
         definition_id,
         user_id,
     )
@@ -338,6 +387,13 @@ async def publish_definition(pool: asyncpg.Pool, definition_id: UUID) -> int:
 # list_published_workflows / create_workflow_run). The service-role engine bypasses
 # RLS, so EVERY query self-scopes ``created_by = $N`` (a second user's draft is
 # absent — T-103-01-01). ``$N`` placeholders only (no f-string on SQL).
+#
+# AMENDED, Phase 186 (D-186-07) — the ONE exception, stated here so a source grep for
+# "no f-string on SQL" lands on the amendment rather than on a rule that now reads as
+# violated: ``CONCURRENCY_TOKEN_SQL`` is a MODULE-LEVEL CODE LITERAL containing no user
+# input, spliced into these queries' f-strings. It is not an interpolated value, and
+# every VALUE below still travels as ``$N`` — including the token itself, which is bound
+# as ``$5`` in the guarded UPDATE. Nothing about the injection posture changed.
 async def create_workflow_definition(
     pool: asyncpg.Pool, *, definition: WorkflowDefinition, user_id: UUID
 ) -> dict:
@@ -354,12 +410,14 @@ async def create_workflow_definition(
     row is NEVER UPDATEd. ``UNIQUE(slug, version)`` (migration 056) keeps versions
     distinct.
 
-    Returns ``{id, version}``.
+    Returns ``{id, version, token}`` — ``token`` is the Phase 186 (D-186-07) opaque
+    concurrency token of the row as just inserted, so the client can chain its first
+    autosave PATCH without a re-read.
     """
     row = await pool.fetchrow(
-        "INSERT INTO workflow_definitions (slug, version, name, status, definition, created_by, is_system_global) "
-        "VALUES ($1, $2, $3, 'draft', $4::jsonb, $5, false) "
-        "RETURNING id, version",
+        f"INSERT INTO workflow_definitions (slug, version, name, status, definition, created_by, is_system_global) "
+        f"VALUES ($1, $2, $3, 'draft', $4::jsonb, $5, false) "
+        f"RETURNING id, version, {CONCURRENCY_TOKEN_SQL} AS token",
         definition.slug,
         definition.version,
         definition.name,
@@ -381,45 +439,119 @@ async def list_draft_workflows(pool: asyncpg.Pool, *, user_id: UUID) -> list[dic
         # Phase 103-06 (REQ-7 D9/D10): also return ``definition`` so the drafts
         # shelf card can derive the tier badge + phase chain client-side (additive;
         # the pre-103 id/slug/version/name shelf callers ignore the extra column).
-        "SELECT id, slug, version, name, definition FROM workflow_definitions "
-        "WHERE status = 'draft' AND created_by = $1 "
-        "ORDER BY name",
+        # Phase 186 (D-186-07): and ``token``, so the Open-a-draft path arrives in the
+        # builder already holding a concurrency token — otherwise the first autosave
+        # would have to guess one, or write unguarded.
+        f"SELECT id, slug, version, name, definition, {CONCURRENCY_TOKEN_SQL} AS token "
+        f"FROM workflow_definitions "
+        f"WHERE status = 'draft' AND created_by = $1 "
+        f"ORDER BY name",
         user_id,
     )
     return [dict(r) for r in rows]
 
 
 async def update_workflow_definition(
-    pool: asyncpg.Pool, definition_id: UUID, *, definition: WorkflowDefinition, user_id: UUID
-) -> dict | None:
-    """UPDATE a DRAFT's ``name`` + ``definition`` JSONB (REQ-1 PATCH), RETURNING
-    ``{id, version}`` or ``None``.
+    pool: asyncpg.Pool,
+    definition_id: UUID,
+    *,
+    definition: WorkflowDefinition,
+    user_id: UUID,
+    token: str | None = None,
+) -> dict:
+    """UPDATE a DRAFT's ``name`` + ``definition`` JSONB (REQ-1 PATCH), returning a
+    REFUSAL-AWARE dict that always names what happened.
+
+    ``{"ok": True, "id", "version", "token"}`` on success, or
+    ``{"ok": False, "cause": "not_found" | "already_published" | "stale_token", "token"?}``.
+
+    WHY NOT ``None`` ANY MORE (Phase 186 / D-186-09): once a token conjunct exists, a
+    0-row UPDATE conflates FOUR causes, and the shipped ``None`` -> 404 mapping would tell
+    an author their own open draft does not exist. That is a lie, and it is the specific
+    lie this signature exists to prevent. The caller maps ``cause`` to HTTP; it no longer
+    has to infer one from an absence.
+
+    THE TOKEN CLAUSE IS A THIRD CONJUNCT, ADDED ALONGSIDE THE OWNER SCOPE AND NEVER IN
+    PLACE OF IT (T-186-01-01). ``created_by = $2`` is the ONLY authorization boundary on
+    this table for the service-role pool (it bypasses RLS), so the token is a CONCURRENCY
+    check and never an AUTHORIZATION check — a forger holding a perfect token still
+    matches 0 rows on somebody else's draft.
+
+    OPTIONAL FOR ONE RELEASE (D-186-07 posture): ``token=None`` omits the conjunct
+    entirely and runs today's byte-identical unguarded UPDATE, so a browser tab open
+    across the deploy does not break on its next save. This is a dated concession, not the
+    end state — the client always sends one.
 
     Owner-scoped + draft-only (``id = $1 AND created_by = $2 AND status = 'draft'``):
-    a row not owned by the caller, not a draft, or not found matches 0 rows -> ``None``
-    (the route maps ``None`` -> 404; no existence leak — the get_definition precedent).
+    a row not owned by the caller, not a draft, or not found matches 0 rows and the
+    owner-scoped probe below collapses "missing" and "not yours" to the SAME
+    ``not_found`` (no existence leak — the get_definition precedent).
 
     PUBLISHED-ROW FREEZE (T-103-01-02): the immutability trigger
     ``workflow_definitions_block_published`` raises Postgres ``23514`` on a published-row
     UPDATE. The ``status='draft'`` WHERE guard makes the normal published-row PATCH a
-    0-row no-op (-> ``None`` -> 404). The trigger is NOT caught here — it is left to
-    PROPAGATE as ``asyncpg.exceptions.CheckViolationError`` so the route maps it to HTTP
-    409 (mirroring ``publish_definition``'s draft->published trigger note: the trigger is
-    the source of truth; the route maps the exception, never a silent overwrite or a 500).
-    ``$N`` placeholders only.
+    0-row no-op (-> ``already_published`` -> 409). The trigger is NOT caught here — it is
+    left to PROPAGATE as ``asyncpg.exceptions.CheckViolationError`` so the route maps it
+    to HTTP 409 (mirroring ``publish_definition``'s draft->published trigger note: the
+    trigger is the source of truth; the route maps the exception, never a silent overwrite
+    or a 500). The ``status='draft'`` conjunct usually pre-empts the trigger — but not in
+    a race, which is why BOTH still exist (T-186-01-06).
 
-    Returns ``{id, version}`` or ``None``.
+    ``$N`` placeholders only for every VALUE; ``CONCURRENCY_TOKEN_SQL`` is a code literal
+    (see the amended section comment above).
     """
-    row = await pool.fetchrow(
-        "UPDATE workflow_definitions SET name = $3, definition = $4::jsonb "
-        "WHERE id = $1 AND created_by = $2 AND status = 'draft' "
-        "RETURNING id, version",
+    # The token conjunct is included ONLY when a token was supplied. Two statements, not
+    # one with a "$5 IS NULL OR" escape hatch: an OR'd-away guard is one refactor away
+    # from being permanently disabled, and it would read as guarded when it is not.
+    if token is not None:
+        row = await pool.fetchrow(
+            f"UPDATE workflow_definitions SET name = $3, definition = $4::jsonb "
+            f"WHERE id = $1 AND created_by = $2 AND status = 'draft' "
+            f"AND {CONCURRENCY_TOKEN_SQL} = $5 "
+            f"RETURNING id, version, {CONCURRENCY_TOKEN_SQL} AS token",
+            definition_id,
+            user_id,
+            definition.name,
+            json.dumps(definition.model_dump(mode="json")),
+            token,
+        )
+    else:
+        row = await pool.fetchrow(
+            f"UPDATE workflow_definitions SET name = $3, definition = $4::jsonb "
+            f"WHERE id = $1 AND created_by = $2 AND status = 'draft' "
+            f"RETURNING id, version, {CONCURRENCY_TOKEN_SQL} AS token",
+            definition_id,
+            user_id,
+            definition.name,
+            json.dumps(definition.model_dump(mode="json")),
+        )
+    if row is not None:
+        # The RETURNING reads the NEW row: the BEFORE UPDATE ``set_updated_at`` trigger
+        # has already stamped ``NEW.updated_at``, so this is the POST-write token and the
+        # client can chain the next autosave with no extra read.
+        return {"ok": True, **dict(row)}
+
+    # 0 rows — up to four causes are conflated. Disambiguate with ONE owner-scoped read.
+    # THE ``created_by = $2`` HERE IS LOAD-BEARING (T-186-01-02): a probe WITHOUT it would
+    # answer "that row exists but isn't yours", which is exactly the existence leak the
+    # 404-collapse closes. This query can only ever describe a row the caller ALREADY OWNS.
+    probe = await pool.fetchrow(
+        f"SELECT status, {CONCURRENCY_TOKEN_SQL} AS token FROM workflow_definitions "
+        f"WHERE id = $1 AND created_by = $2",
         definition_id,
         user_id,
-        definition.name,
-        json.dumps(definition.model_dump(mode="json")),
     )
-    return dict(row) if row is not None else None
+    if probe is None:
+        return {"ok": False, "cause": "not_found"}  # missing OR not-owned -> one 404
+    if probe["status"] == "published":
+        return {"ok": False, "cause": "already_published"}  # -> 409, today's sentence
+    if token is None:
+        # DEFENSIVE COLLAPSE TO TODAY'S BEHAVIOUR, never a stale_token for a request that
+        # carried no token: an UNGUARDED update cannot match 0 rows on an owned draft, so
+        # this branch is unreachable. If it is ever reached the row is in a state this
+        # function does not model, and the honest answer is the pre-186 one.
+        return {"ok": False, "cause": "not_found"}
+    return {"ok": False, "cause": "stale_token", "token": probe["token"]}
 
 
 async def delete_workflow_definition(
