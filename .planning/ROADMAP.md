@@ -300,7 +300,33 @@ Plans:
   3. Publish is guarded against reading a dirty draft (mirrors the shipped `publish_definition` WR-03 draft-status guard).
   4. The two-editor / parallel path is exercised in UAT (SC#10 parallel axis) — a second editor gets an honest read-only banner or a merge-safe outcome, never a silent overwrite.
 
-**Plans**: TBD
+**Plans**: 8 plans in 5 waves
+
+Plans:
+
+**Wave 1** *(no shared files — run in parallel)*
+
+- [ ] 186-01-PLAN.md — the optimistic-concurrency token in SQL (`CONCURRENCY_TOKEN_SQL` over `updated_at`), the guarded UPDATE, and the honest three-way refusal (404 / 409 `already_published` / 409 `stale_token`). Fixes the wire contract every later plan builds against. **Zero migrations** — head stays 114
+- [ ] 186-04-PLAN.md — `builderStore`: retire the unread `saveState` slot (the call 184-13 handed to 186), add `setProjectFolder` so a `meta`-only KB edit arms `dirty` (F14), and correct the two docblocks that would otherwise lie about where the write lives
+
+**Wave 2**
+
+- [ ] 186-02-PLAN.md — carry the stage-0 token through the gauntlet and refuse on drift: `publish_definition` gains the `-2` sentinel, `publish_service` gains the `draft_changed` block, and the golden-run receipt survives by construction (SC#3)
+- [ ] 186-03-PLAN.md — the transport client: `token` on the draft wire types, `If-Match` on the PATCH, and the two named refusals the 409 arm has always thrown away (`WorkflowStaleTokenError`, `WorkflowDraftUnreadableError`)
+
+**Wave 3**
+
+- [ ] 186-05-PLAN.md — the publish spine's fail-open: an unrecognised `blocked_stage` currently paints all 8 stages green under a refusal headline. Fix the PROPERTY (both `-1` reads), add the 9th `Commit` stage, and word the verdict. **F7 is the highest-value single test in the phase**
+- [ ] 186-06-PLAN.md — `useDraftPersistence`: the whole persistence seam D-184-05 pre-authorised — debounce, single-flight token chain, one hold mechanism with two sentences, and a conflict that halts writing and offers Reload then Overwrite
+
+**Wave 4**
+
+- [ ] 186-07-PLAN.md — compose the hook into the page: the token reaches all four Builder entry paths, the quiet status line and the conflict banner mount in the header, and `WorkflowBuilderPage.tsx` is measurably smaller (G-5 honoured by construction)
+
+**Wave 5**
+
+- [ ] 186-08-PLAN.md — the folded `BUG-260731-03` **control** half: the display-only header chip promoted into the existing picker, with a neutral unbound invitation and no verdict. The `/validate` verdict half stays in Phase 187
+
 **UI hint**: yes
 **Flags**: autosave-in-place (never mint a version / re-arm the gauntlet — CONCUR-01, the autosave version-explosion trap); soft-lock / optimistic-token co-edit guard (mirrors `publish_definition` WR-03); parallel-editor UAT row (SC#10 parallel axis) — the two-editor org-shared clobber; concurrency mechanism (block vs warn vs merge) = sketch/discuss call (research left it open); red line D-14; no full SC#10 (not cross-provider streamed); no threat model (v3.4 org RLS already enforces the share boundary); no migration.
 
