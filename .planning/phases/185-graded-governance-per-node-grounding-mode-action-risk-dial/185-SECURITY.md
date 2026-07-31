@@ -166,6 +166,24 @@ unconditional `<textarea>` is still at `:412-424`. A UI-only fix would have left
 - **Scope:** exactly 2 files. D-14 Deep fence (`agent_loop.py`, `tool_dispatcher.py`,
   `openai_service.py`, `anthropic_service.py`) 0 · `api/runs.py` 0 · `frontend/` 0 ·
   `supabase/migrations` 0 (head stays 114).
+- **LIVE OPERATOR UAT — 2026-07-31, run `5d3a4707-0de7-4831-955b-c935e84c2a0f`.** Driven in
+  Chrome against the running app (workflow `sc10-armed-f77e72`, armed `emit` phase). The
+  approval card rendered its two buttons, an `OR` divider, and the unconditional free-text box
+  — the defect surface visible in one frame. **Both buttons were deliberately ignored** and the
+  word `no` was typed into the box and submitted. Result:
+
+  | Signal | Observed |
+  |---|---|
+  | Run status | `failed` |
+  | `emit` phase | `failed` — **the risky step body never ran** |
+  | `validator_ask_user_approved` receipts | **0** |
+  | Audit vocabulary | `action_risk_pending {phase: emit, timing: pre}` — never `gate_failed` (T-185-05-01 confirmed live) |
+  | `run_failed` reason | `… — not approved: the answer did not match the approval option` |
+  | UI | `emit ✕ Failed — "Validation gate failed; run halted"`, panel records "You answered no" |
+
+  Pre-fix this exact interaction ran the step, completed the run, and filed an approval receipt
+  naming the person who refused. This is the G-4 lived-experience confirmation for T-185-04-01;
+  the unit tests and the re-audit are no longer the only evidence.
 
 ### Residual — recorded, not accepted
 

@@ -195,6 +195,60 @@ This does not impugn the judge. Judging "did it cite the *right* things" from ou
 is genuinely hard, and it caught the problem once. The point is that the cheap deterministic
 check upstream was never run.
 
+### 3. Two corrections and a third entry point (browser session, same day)
+
+Driving the app in Chrome to apply the mitigation surfaced three refinements to the original
+write-up. Recording them so the report stays accurate:
+
+- **CORRECTION — the binding IS displayed, in one place.** The builder header shows a
+  `📁 Project Meridian — Risks` chip for a bound workflow. It is *display-only* and appears
+  nowhere else: not on any Workflows-page card (published or draft), and there is still no
+  control to set or change it. The original claim that nothing surfaces the binding was too
+  strong; the accurate claim is that it is visible only after opening the builder, and is never
+  editable.
+- **CORRECTION — a per-run scope override DOES exist.** The Run dialog has a "Knowledge base"
+  picker (defaulting to "All documents"), which is the `run_inputs["folder_id"]` override in
+  `scope.py:201`. So an operator can scope a *run*. It does **not** help publishing: the
+  gauntlet's golden run takes its scope from the definition (`publish_service.py:739`), so an
+  unbound workflow still publishes against the whole KB. The gap is specifically the
+  **author-time** binding.
+- **A THIRD unbound entry point.** Forking a starter ("Use this →" on the Risk Register
+  starter) creates a draft and drops straight into the builder, **bypassing the describe screen
+  and its KB picker entirely**. The forked draft is unbound with no opportunity to have chosen
+  otherwise. So all three creation paths — NL generate with the dropdown left at default,
+  authoring a new workflow, and forking a starter — can produce an unbound workflow, and two of
+  them never offer the choice at all.
+
+### 4. What the fix actually bought (evidence the diagnosis was right)
+
+Re-publishing the **bound** compliance workflow (`qqvfwd`, golden run `1b678d5a`):
+
+| | Unbound | Bound to Meridian |
+|---|---|---|
+| Files retrieved | 11 files / 5 folders | **2 files, both Meridian** |
+| `Citations` gauntlet pip | — | **✓ green** |
+| `grounded_in_evidence` | ✕ 55.00 | **no longer a named failure** |
+
+Judge, verbatim: *"The deliverable is honestly cited and fully populated (it did the work and
+correctly nulled the one unsupported cell)."*
+
+It was still blocked — on `answers_business_requirement` (25.00) — because the Meridian folder
+holds project-management documents (charter, risk workshop notes, Week-09 status report) and
+**no compliance obligations at all**. The judge: *"the requirement cannot actually be satisfied
+from these sources… the correct action was to surface that the report cannot be grounded, not
+to repurpose risk items as compliance gaps."*
+
+**This is the most important line in the whole investigation.** The earlier attempts looked
+*closer* to passing only because unscoped retrieval smuggled in a compliance-flavoured SOPs
+deck. Fixing the scope did not break anything — it removed the camouflage and revealed that the
+workflow was never satisfiable against this corpus. An unbound workflow does not just risk
+citing the wrong documents; it can make an **impossible task look achievable**, which is
+strictly worse than failing.
+
+Confirmed by the converse: the **Risk Register** starter, bound to the same Meridian folder,
+cited all three Meridian documents and **passed the judge** (golden run `de04dcd2`, published).
+Right workflow + right corpus + author-time binding = honest pass.
+
 ### Severity rationale for `blocking`
 
 An operator can author, publish and ship a compliance deliverable built from unrelated
