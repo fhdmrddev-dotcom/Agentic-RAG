@@ -306,8 +306,8 @@ Plans:
 
 **Wave 1** *(no shared files — run in parallel)*
 
-- [ ] 186-01-PLAN.md — the optimistic-concurrency token in SQL (`CONCURRENCY_TOKEN_SQL` over `updated_at`), the guarded UPDATE, and the honest three-way refusal (404 / 409 `already_published` / 409 `stale_token`). Fixes the wire contract every later plan builds against. **Zero migrations** — head stays 114
-- [ ] 186-04-PLAN.md — `builderStore`: retire the unread `saveState` slot (the call 184-13 handed to 186), add `setProjectFolder` so a `meta`-only KB edit arms `dirty` (F14), and correct the two docblocks that would otherwise lie about where the write lives
+- [x] 186-01-PLAN.md — the optimistic-concurrency token in SQL (`CONCURRENCY_TOKEN_SQL` over `updated_at`), the guarded UPDATE, and the honest three-way refusal (404 / 409 `already_published` / 409 `stale_token`). Fixes the wire contract every later plan builds against. **Zero migrations** — head stays 114
+- [x] 186-04-PLAN.md — `builderStore`: retire the unread `saveState` slot (the call 184-13 handed to 186), add `setProjectFolder` so a `meta`-only KB edit arms `dirty` (F14), and correct the two docblocks that would otherwise lie about where the write lives
 
 **Wave 2**
 
