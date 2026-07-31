@@ -3,7 +3,7 @@ id: BUG-260731-03
 title: A workflow's knowledge base can only be chosen on the pre-draft describe screen — an unbound workflow searches the WHOLE KB and cannot be re-bound without regenerating
 reported: 2026-07-31
 surface: Agentic-RAG
-severity: major
+severity: blocking
 status: open
 affected_areas: [frontend/workflow-builder, backend/harness/scope, workflows/publish-gauntlet, RAG/retrieval-scope]
 folded_into: null
@@ -136,3 +136,69 @@ This is an unblock, not a fix — the product gap stands.
 Related: the same investigation surfaced [[SEED-138]] (definition jsonb double-encoding),
 which is why `definition->'project_folder_id'` returns NULL for most rows and why this
 condition is hard to audit in SQL.
+
+---
+
+## UPDATE 2026-07-31 (same day) — severity raised `major` → `blocking`
+
+Two further observations within ~1 hour of the original report. Both make this worse than
+first written.
+
+### 1. The bug reproduced immediately, on the same operator, in under 10 minutes
+
+After the mitigation patch bound draft `compliance-gap-report-qqvfwd` (13:53 created,
+14:05 patched), the operator authored a **new** workflow rather than publishing the patched
+one, and left the knowledge-base dropdown at its default again:
+
+| slug | created | `project_folder_id` | status |
+|---|---|---|---|
+| `compliance-gap-report-qqvfwd` | 13:53 | `75755ec9…` (Meridian) — patched | **draft, never published** |
+| `compliance-gap-report-hhe4ar` | 14:10 | **`None`** | **published 14:13, and run** |
+
+This is the failure mode the original report predicted, occurring unprompted: the default
+is silently wrong, nothing at author time flags it, and the operator had no reason to
+suspect the new workflow differed from the fixed one. It also means the mitigation does not
+generalise — **patching one row does not help, because the next workflow starts unbound
+again.**
+
+Note also that `hhe4ar` is now **published and therefore frozen** (the
+`workflow_definitions_block_published_update` immutability trigger, T-103-01-02), so the
+same DB mitigation cannot be applied to it. The only routes are publishing the bound draft
+or forking to a new version.
+
+### 2. The judge PASSED a *worse* deliverable than the one it failed
+
+This is the more serious finding. Comparing the two golden runs:
+
+| Golden run | Definition | Judge | Files cited by `retrieve` |
+|---|---|---|---|
+| `0d1eb209` | `qqvfwd` (unbound) | **FAIL — `grounded_in_evidence` 55.00** | 3 files / 3 folders |
+| `58fee9d9` | `hhe4ar` (unbound) | **PASS → published** | **11 files / 5+ folders** |
+
+The run that passed drew from `CS SOPs final_29 Oct 2025_Billing Team Comments.pptx`
+(SOPs), `Chapter_5_Full_Draft (4).docx` (Test Wasim), `rag_corpus_documents.csv` (Hybrid
+Search), `kb_doc2_team_highlights.md` (Weekly reports), plus the Meridian and PM-Demo files
+— **more corpus contamination than the run the judge rejected**. The shipped `emit` output
+still carries the foreign `CS SOPs…pptx` row that the earlier judge explicitly named as
+disqualifying.
+
+**Implication for the fix direction.** The original report suggested making an unbound
+retrieval workflow a build-time `incomplete` verdict as the *better* option. This
+observation upgrades that from "better" to **necessary**: the publish-gauntlet judge is
+probabilistic and has now been shown to admit a worse instance of the exact defect it
+rejected an hour earlier. A hard wall that fails open under variance is not a control for
+this failure mode. Scope-boundness is a **structural, deterministic** property of the
+definition — it should be checked by `/validate` on the canvas, where the answer is the same
+every time, not inferred by a judge from the shape of the output.
+
+This does not impugn the judge. Judging "did it cite the *right* things" from output alone
+is genuinely hard, and it caught the problem once. The point is that the cheap deterministic
+check upstream was never run.
+
+### Severity rationale for `blocking`
+
+An operator can author, publish and ship a compliance deliverable built from unrelated
+corpora, with no author-time warning, and with the one gate designed to stop it having
+non-deterministically waved it through. The output is a plausible, well-formatted,
+correctly-cited report about the wrong documents — the hardest class of wrong to notice
+downstream.
