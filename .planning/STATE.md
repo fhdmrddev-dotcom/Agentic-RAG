@@ -88,7 +88,31 @@ first stage that triggers it in production — `findIndex` → `-1` for an unrec
 machine token. **Both** `-1` reads must be fixed, not just the first.
 The exact server sentence 186-05 must not contradict: *"the draft changed while it was being
 checked — re-publish to check the new version"*.
-Resume file: `.planning/phases/186-concurrency-autosave/186-02-SUMMARY.md`.
+
+**Execution progress — Plan 186-03 COMPLETE (2026-08-01).** Wave 2's transport client shipped in
+2 atomic commits (`7adb5291` the token + the `If-Match` header → `4c78c688` the two named
+refusals), SUMMARY `000fbd82`. `frontend/src/lib/api.ts` + its test only — **zero backend files,
+zero migrations, zero packages**. The token now rides all three seeding responses (create, drafts
+list, PATCH) as an opaque `string`; `updateWorkflowDraft(id, def, token?, signal?)` sends the
+conditional header when it has one and **no header at all** when it does not. The 409 arm now
+READS the body it used to discard: `stale_token` → `WorkflowStaleTokenError` (carrying
+`currentToken`, so D-186-08's "overwrite with what's on screen" is ONE more PATCH); **every**
+other value — missing body, unparseable body, no `detail`, unknown code — falls back to today's
+`WorkflowConflictError`, asserted by three `.rejects` cases. New `WorkflowDraftUnreadableError`
+for 422 with a fixed message and the raw body logged once at the boundary. `detail.code` stays
+`string` — no client-side union (VALID-03 / D-182-06). Tests 14 → **24**; `tsc -b` **33 == baseline**
+with 0 naming `api.ts`; the 6-file builder subset **200 → 200**.
+⚠ **Two carry-forwards for 186-06:** (1) classify by `err.name`, never `instanceof`, never prose —
+the three names are `WorkflowStaleTokenError` / `WorkflowConflictError` /
+`WorkflowDraftUnreadableError`; (2) chain the token from the **PATCH response**, not the create
+alone — every successful write returns a fresh one and ignoring it self-inflicts a stale refusal
+on the next keystroke.
+⚠ **Measurement note (the counting-criterion lesson, third time this phase):** the plan required
+`grep -c "new Date(" api.ts` to stay 0 *and* told the executor to copy a RESEARCH docblock
+containing the literal ``new Date(``. Unsatisfiable together — the prose was reworded (all facts
+kept) so the fence stays a real guard. Also: the plan's "209-test clean subset" measures **200**
+for the six files it names, on both sides of the change.
+Resume file: `.planning/phases/186-concurrency-autosave/186-03-SUMMARY.md`.
 
 Both owed items are now ROUTED at the discuss-phase touchpoint:
 
