@@ -28,11 +28,16 @@ import hookSource from "./useDraftPersistence?raw"
 import {
   useDraftPersistence,
   AUTOSAVE_DEBOUNCE_MS,
+  HOLD_PUBLISHING,
+  HOLD_UNREADABLE,
+  SAVE_FAILED_SENTENCE,
   type PersistState,
 } from "./useDraftPersistence"
 import {
   createWorkflowDraft,
   updateWorkflowDraft,
+  WorkflowDraftUnreadableError,
+  WorkflowNotFoundError,
   type WorkflowDraftWriteResult,
 } from "@/lib/api"
 import { createBuilderStore, selectDefinition } from "@/components/workflows/builderStore"
@@ -111,11 +116,34 @@ function write(token: string): WorkflowDraftWriteResult {
   return { id: DRAFT_ID, version: 1, token }
 }
 
+/** The internals a rejected shape-check carries. NONE of this may reach a rendered value. */
+const RAW_422_BODY = {
+  detail: [
+    {
+      loc: ["body", "phases", 0, "config", "grounding_zzz"],
+      msg: "PYDANTIC-INTERNAL-MARKER-DO-NOT-RENDER",
+      type: "extra_forbidden",
+    },
+  ],
+}
+
+/** Every string reachable from the state, so "the raw body is not shown" is checked over
+ *  the whole reachable graph rather than over the two fields we happened to think of. */
+function reachableStrings(value: unknown, out: string[] = []): string[] {
+  if (typeof value === "string") out.push(value)
+  else if (Array.isArray(value)) for (const v of value) reachableStrings(v, out)
+  else if (value && typeof value === "object")
+    for (const v of Object.values(value)) reachableStrings(v, out)
+  return out
+}
+
 // ── The mount harness ─────────────────────────────────────────────────────────
 
 interface Props {
   definition: BuilderDefinition | null
   enabled: boolean
+  publishInFlight: boolean
+  validationCause: "unreadable" | "unreachable" | null
 }
 
 function harness(opts: { draftId?: string | null; token?: string | null } = {}) {
@@ -137,6 +165,8 @@ function harness(opts: { draftId?: string | null; token?: string | null } = {}) 
   const initialProps: Props = {
     definition: selectDefinition(store.getState()),
     enabled: true,
+    publishInFlight: false,
+    validationCause: null,
   }
 
   const view = renderHook(
@@ -147,6 +177,8 @@ function harness(opts: { draftId?: string | null; token?: string | null } = {}) 
         initialDraftId: opts.draftId === undefined ? DRAFT_ID : opts.draftId,
         initialToken: opts.token === undefined ? TOKEN_0 : opts.token,
         store,
+        publishInFlight: p.publishInFlight,
+        validationCause: p.validationCause,
         onDraftCreated: created,
       }),
     { initialProps },
@@ -320,6 +352,121 @@ describe("useDraftPersistence — F15: the source fence (the `?raw` house idiom)
   })
 })
 
+// ── F8 — never a false receipt ────────────────────────────────────────────────
+
+describe("useDraftPersistence — F8: a refusal never files a receipt", () => {
+  it("a 422 leaves the draft dirty, calls no receipt action, and shows none of the raw body", async () => {
+    mockedUpdate.mockRejectedValue(new WorkflowDraftUnreadableError(RAW_422_BODY))
+
+    const h = harness()
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+    await flush()
+
+    expect(stateOf(h.view)).toEqual({ kind: "error", sentence: HOLD_UNREADABLE })
+    expect(stateOf(h.view).kind).not.toBe("saved")
+    // The receipt action itself was never reached — not merely "the state is not saved".
+    expect(h.markSaved).not.toHaveBeenCalled()
+    expect(h.store.getState().dirty).toBe(true)
+
+    const shown = reachableStrings(stateOf(h.view)).join("   ")
+    expect(shown).toContain(HOLD_UNREADABLE)
+    for (const internal of reachableStrings(RAW_422_BODY)) {
+      expect(shown).not.toContain(internal)
+    }
+  })
+
+  it("a 404 gets the generic sentence — a missing row is not an unreadable shape", async () => {
+    mockedUpdate.mockRejectedValue(new WorkflowNotFoundError())
+
+    const h = harness()
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+    await flush()
+
+    expect(stateOf(h.view)).toEqual({ kind: "error", sentence: SAVE_FAILED_SENTENCE })
+    expect(h.markSaved).not.toHaveBeenCalled()
+  })
+
+  it("a dropped connection gets the generic sentence too", async () => {
+    mockedUpdate.mockRejectedValue(new TypeError("Failed to fetch"))
+
+    const h = harness()
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+    await flush()
+
+    expect(stateOf(h.view)).toEqual({ kind: "error", sentence: SAVE_FAILED_SENTENCE })
+    expect(h.store.getState().dirty).toBe(true)
+  })
+})
+
+// ── F11 — one hold mechanism, two sentences ───────────────────────────────────
+
+describe("useDraftPersistence — F11: writes hold while a publish runs, and flush on release", () => {
+  it("issues nothing while publishing, says why, then flushes EXACTLY ONE write carrying the latest definition", async () => {
+    mockedUpdate.mockResolvedValue(write("T1"))
+
+    const h = harness()
+    h.set({ publishInFlight: true })
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS * 5)
+
+    expect(mockedUpdate).not.toHaveBeenCalled()
+    expect(stateOf(h.view)).toEqual({ kind: "held", sentence: HOLD_PUBLISHING })
+
+    // A second edit accumulates as dirty while held — no timer is burned for it.
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS * 5)
+    expect(mockedUpdate).not.toHaveBeenCalled()
+
+    h.set({ publishInFlight: false })
+    await flush()
+
+    expect(mockedUpdate).toHaveBeenCalledTimes(1)
+    // BOTH edits, not the one that was current when the first timer matured.
+    expect(sentDefinition(0).phases).toHaveLength(4)
+    expect(h.markSaved).toHaveBeenCalledTimes(1)
+  })
+
+  it("holds on an `unreadable` verdict with the OTHER sentence — one mechanism, two words", async () => {
+    mockedUpdate.mockResolvedValue(write("T1"))
+
+    const h = harness()
+    h.set({ validationCause: "unreadable" })
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS * 3)
+
+    expect(mockedUpdate).not.toHaveBeenCalled()
+    expect(stateOf(h.view)).toEqual({ kind: "held", sentence: HOLD_UNREADABLE })
+
+    h.set({ validationCause: null })
+    await flush()
+    expect(mockedUpdate).toHaveBeenCalledTimes(1)
+  })
+
+  it("does NOT hold on `unreachable` — an unreachable check must not stall autosave", async () => {
+    mockedUpdate.mockResolvedValue(write("T1"))
+
+    const h = harness()
+    h.set({ validationCause: "unreachable" })
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+    await flush()
+
+    expect(mockedUpdate).toHaveBeenCalledTimes(1)
+  })
+
+  it("publishing outranks unreadable — one reason is shown, and it is the publish one", async () => {
+    const h = harness()
+    h.set({ publishInFlight: true, validationCause: "unreadable" })
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+
+    expect(stateOf(h.view)).toEqual({ kind: "held", sentence: HOLD_PUBLISHING })
+  })
+})
+
 // ── The explicit Save-draft affordance (D-186-03) ─────────────────────────────
 
 describe("useDraftPersistence — saveNow, the deliberate commit-now", () => {
@@ -335,5 +482,20 @@ describe("useDraftPersistence — saveNow, the deliberate commit-now", () => {
     expect(ok).toBe(true)
     expect(mockedUpdate).toHaveBeenCalledTimes(1)
     expect(h.markSaved).toHaveBeenCalledTimes(1)
+  })
+
+  it("refuses to pretend while held — it reports the hold instead of a save", async () => {
+    mockedUpdate.mockResolvedValue(write("T1"))
+
+    const h = harness()
+    h.set({ publishInFlight: true })
+    let ok = true
+    await act(async () => {
+      ok = await h.view.result.current.saveNow()
+    })
+
+    expect(ok).toBe(false)
+    expect(mockedUpdate).not.toHaveBeenCalled()
+    expect(stateOf(h.view)).toEqual({ kind: "held", sentence: HOLD_PUBLISHING })
   })
 })
