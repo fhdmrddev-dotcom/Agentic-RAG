@@ -543,3 +543,175 @@ async def test_a_published_row_check_violation_is_the_same_409_as_already_publis
 
     assert exc.status_code == 409
     assert exc.detail == wf_api._ALREADY_PUBLISHED_DETAIL
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# DB-FREE — the DB TIER: where the three causes are DISAMBIGUATED, and the
+# token's text-space contract. Driven through a mocked ``pool.fetchrow``, so the
+# refusal that the route above maps is itself checkable with no Postgres.
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+def _mock_pool(*fetchrow_results):
+    """A pool whose ``fetchrow`` yields the given results in order.
+
+    The F6 idiom from ``test_186_publish_race.py``: every boundary patched, nothing real
+    behind it. ``update_workflow_definition`` makes at most TWO ``fetchrow`` calls — the
+    guarded UPDATE, then the owner-scoped probe — so the tuple reads as the two branches.
+    Rows are plain dicts because the function only ever does ``dict(row)`` and
+    ``probe["status"]``, both of which a dict satisfies exactly.
+    """
+    from unittest.mock import AsyncMock
+
+    pool = AsyncMock()
+    pool.fetchrow = AsyncMock(side_effect=list(fetchrow_results))
+    return pool
+
+
+def _definition():
+    from app.models.harness import WorkflowDefinition
+
+    return WorkflowDefinition.model_validate(_draft_definition("p186-dbtier"))
+
+
+@pytest.mark.asyncio
+async def test_a_matching_update_returns_ok_and_never_runs_the_probe():
+    """The happy path stays ONE statement (D-186-09).
+
+    The disambiguating probe is a FAILURE-PATH cost. Autosave turns one deliberate save
+    into a save every second, so a second round trip on every successful beat is a real
+    price — and a refactor that hoisted the probe would not change any behaviour, only the
+    cost, which is exactly the kind of regression no behavioural test would catch.
+    """
+    import uuid
+
+    from app.db.workflows import update_workflow_definition
+
+    def_id, user_id = uuid.uuid4(), uuid.uuid4()
+    pool = _mock_pool({"id": def_id, "version": 1, "token": "T-NOW"})
+
+    result = await update_workflow_definition(
+        pool, def_id, definition=_definition(), user_id=user_id, token="T-OLD"
+    )
+
+    assert result == {"ok": True, "id": def_id, "version": 1, "token": "T-NOW"}
+    assert pool.fetchrow.await_count == 1
+
+
+@pytest.mark.asyncio
+async def test_zero_rows_and_no_owned_row_is_not_found():
+    """Missing OR not-owned — the probe is owner-scoped, so both look identical here, and
+    that is the whole point: they must collapse to ONE 404 at the route (T-186-01-03)."""
+    import uuid
+
+    from app.db.workflows import update_workflow_definition
+
+    pool = _mock_pool(None, None)
+
+    result = await update_workflow_definition(
+        pool, uuid.uuid4(), definition=_definition(), user_id=uuid.uuid4(), token="T-OLD"
+    )
+
+    assert result == {"ok": False, "cause": "not_found"}
+    assert pool.fetchrow.await_count == 2  # the probe DID run — the 0-row path
+
+
+@pytest.mark.asyncio
+async def test_zero_rows_against_a_published_row_is_already_published():
+    """The ``status='draft'`` conjunct made this a 0-row no-op; the probe names why."""
+    import uuid
+
+    from app.db.workflows import update_workflow_definition
+
+    pool = _mock_pool(None, {"status": "published", "token": "T-NOW"})
+
+    result = await update_workflow_definition(
+        pool, uuid.uuid4(), definition=_definition(), user_id=uuid.uuid4(), token="T-OLD"
+    )
+
+    assert result == {"ok": False, "cause": "already_published"}
+
+
+@pytest.mark.asyncio
+async def test_a_tokenless_call_can_never_produce_a_stale_token():
+    """The DEFENSIVE COLLAPSE, which is the one branch with no live-DB cover at all.
+
+    An unguarded UPDATE cannot match 0 rows on an owned draft, so this branch is meant to
+    be unreachable — which is precisely why it can rot unnoticed. If it ever returned
+    ``stale_token`` the route would raise a 409 with a token attached for a request that
+    carried NO precondition, telling a caller their draft moved under them on a write that
+    never asked about the draft's state.
+
+    It also pins the TWO-STATEMENT shape: with no token the conjunct is ABSENT from the
+    WHERE rather than OR'd away, because an OR'd-away guard is one refactor from being
+    permanently disabled and reads as guarded when it is not.
+    """
+    import uuid
+
+    from app.db.workflows import CONCURRENCY_TOKEN_SQL, update_workflow_definition
+
+    pool = _mock_pool(None, {"status": "draft", "token": "T-NOW"})
+
+    result = await update_workflow_definition(
+        pool, uuid.uuid4(), definition=_definition(), user_id=uuid.uuid4(), token=None
+    )
+
+    assert result == {"ok": False, "cause": "not_found"}
+    unguarded_sql = pool.fetchrow.await_args_list[0].args[0]
+    where_clause = unguarded_sql.split("RETURNING")[0]
+    assert CONCURRENCY_TOKEN_SQL not in where_clause
+    # …and no token was bound at all: five positional args, not six.
+    assert len(pool.fetchrow.await_args_list[0].args) == 5
+
+
+@pytest.mark.asyncio
+async def test_the_token_is_a_third_conjunct_and_every_bind_travels_as_text():
+    """The two SQL properties the verification report established BY READING, pinned so
+    they survive without a reader.
+
+    1. T-186-01-01 — the token clause is a THIRD conjunct, added alongside ``created_by =
+       $2`` and never in place of it. ``created_by`` is the ONLY authorization boundary on
+       this table for the service-role pool (it bypasses RLS), so a refactor that swapped
+       the owner scope for the token would turn a concurrency check into the authorization
+       check, and a forger holding a valid token would reach somebody else's draft.
+       The owner scope is asserted on the PROBE too (T-186-01-02): a probe without it would
+       answer "that row exists but isn't yours", which is the existence leak the
+       404-collapse closes.
+
+    2. D-186-07 — every token crosses the boundary as a ``str``, never a ``datetime``.
+       Live-probed and not negotiable: asyncpg REFUSES a ``str`` bind against a
+       ``timestamptz``, and a parsed-and-re-rendered token loses Postgres microseconds, so
+       a truncated token matches zero rows. Comparison happens in TEXT space through the
+       single ``CONCURRENCY_TOKEN_SQL`` rendering — this is the server-side sibling of the
+       client's F15 source fence, which forbids parsing on the other end of the same wire.
+    """
+    import uuid
+    from datetime import datetime
+
+    from app.db.workflows import CONCURRENCY_TOKEN_SQL, update_workflow_definition
+
+    pool = _mock_pool(None, {"status": "draft", "token": "T-NOW"})
+
+    result = await update_workflow_definition(
+        pool, uuid.uuid4(), definition=_definition(), user_id=uuid.uuid4(), token="T-OLD"
+    )
+
+    # The probe's token is carried through VERBATIM — the route hands it to the client as
+    # the Overwrite precondition, so a re-render here would break D-186-08's one-PATCH exit.
+    assert result == {"ok": False, "cause": "stale_token", "token": "T-NOW"}
+
+    guarded_sql = pool.fetchrow.await_args_list[0].args[0]
+    probe_sql = pool.fetchrow.await_args_list[1].args[0]
+
+    assert "created_by = $2" in guarded_sql
+    assert "status = 'draft'" in guarded_sql
+    assert f"AND {CONCURRENCY_TOKEN_SQL} = $5" in guarded_sql
+    assert f"RETURNING id, version, {CONCURRENCY_TOKEN_SQL} AS token" in guarded_sql
+    assert "created_by = $2" in probe_sql
+    assert CONCURRENCY_TOKEN_SQL in probe_sql
+
+    # The token really is the $5 bind, and it went as the opaque string it arrived as.
+    assert pool.fetchrow.await_args_list[0].args[5] == "T-OLD"
+    for call_ in pool.fetchrow.await_args_list:
+        for bind in call_.args[1:]:
+            assert not isinstance(bind, datetime)
