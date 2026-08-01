@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
 status: executing
-last_updated: "2026-08-01T06:57:46.066Z"
+last_updated: "2026-08-01T08:49:10.790Z"
 last_activity: 2026-08-01 -- Phase 186 execution started
 progress:
   total_phases: 19
   completed_phases: 5
   total_plans: 65
-  completed_plans: 59
+  completed_plans: 63
   percent: 26
 ---
 
@@ -1759,6 +1759,9 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase 186]: 186-07 (G-5): the net-negative on WorkflowBuilderPage.tsx (194 ins / 230 del; 1656 -> 1620 L) was earned by EXTRACTION, not by trimming reasons out of docblocks. Composing the hook first produced +356/-148; two components then left the page — BuilderSaveRegion.tsx (net-new: the four save sentences + the three controls) and BuilderHeaderBar.tsx (moved VERBATIM, zero DOM change, so the flag-off markup pin passes unedited).
 - [Phase 186]: 186-07 (D-186-12): publishInFlight is threaded through the EXISTING renderPublish seam as an optional 4th argument plus one optional PublishGauntlet prop (onRunningChange) — a boolean reporter, never a state channel, and no new context. A three-parameter renderPublish is still assignable, so every call site outside the Builder is byte-identical.
 - [Phase 186]: 186-07 (F12 lesson): a fetch-only zero-network fence could NOT go red — the api client throws at getAuthHeaders before fetch is reached under jsdom, so a nudge wrongly routed into the write path would have left the shipped spy green. The fence now names the two draft mutations as well, and the planted-nudge falsification was observed RED before it was trusted.
+- [Phase 186]: 186-12 (GAP-2 / WR-01): single flight is enforced INSIDE `performWrite`, not by each caller — an invariant every caller must remember is not an invariant. The three caller-side `inFlightRef` checks (timer, hold release, `saveNow`) were deleted; `overwrite`/`reload` had never had one, which is how a double-click on Overwrite issued two same-token PATCHes and manufactured a `stale_token` conflict that did not exist.
+- [Phase 186]: 186-12: the two conflict exits carry a SEPARATE re-entrancy guard (`reloadingRef`), placed ABOVE the `tokenRef` assignment in `overwrite`. Guarding only the request would trade a duplicate PATCH for a corrupted token — F19d is the test that discriminates that half-fix (it reds on a late-settling racing write, not on the request count).
+- [Phase 186]: 186-12: `resolving` is a plain boolean on `DraftPersistence`, NOT a sixth `PersistState` member — the union describes the write loop's OUTCOME and a resolution under way is not an outcome. The banner's render condition needed `|| resolving` because `overwrite()` flips the loop to `saving` synchronously; falsified in place (removing the clause reds exactly one of the five net-new `BuilderSaveRegion.test.tsx` tests).
 
 ## Operator Next Steps
 
