@@ -1,8 +1,8 @@
 ---
 phase: 186-concurrency-autosave
 verified: 2026-08-01T21:15:00Z
-status: human_needed
-score: 8/9 must-haves verified
+status: passed
+score: 9/9 must-haves verified
 overrides_applied: 0
 re_verification:
   previous_status: gaps_found
@@ -188,11 +188,38 @@ with each SUMMARY's own clean sweep).
 
 ### Human Verification Required
 
-Eight items (unchanged in count from the prior verification; content of the last row updated to
-reflect the shipped CR-03 fix rather than the pre-fix symptom). All eight rows in
-`186-VALIDATION.md`'s Manual-Only Verifications table are STILL `to run` — no operator session has
-occurred between the last verification and this one. **SC#4 is not inferable from any automated
-evidence** — G-4 makes live Chrome-driven observation the acceptance bar.
+~~Eight items … all eight rows STILL `to run`~~ — **RESOLVED 2026-08-01T21:55Z, five minutes after
+this report was written.** The operator session this section was waiting for ran between
+21:20Z and 21:55Z and is recorded in `186-HUMAN-UAT.md` (`status: complete`) and on the
+`186-VALIDATION.md` board (commit `4d446670`). The superseded wording is preserved above rather
+than deleted.
+
+**Result: 6 passed, 0 issues, 2 skipped-with-reason.** SC#4 is no longer UNCERTAIN — it was driven
+live in Chrome, which is exactly what G-4 demands.
+
+| # | Row | Result |
+|---|---|---|
+| 1 | Two tabs — edit in A, then edit in B | ✅ banner verbatim, both exits, "Not saved yet", A intact |
+| 2 | Stale tab — return minutes later and type | ✅ same path; 6 s network watch post-conflict showed **zero** requests (no retry storm) |
+| 3 | Publish race — edit in B mid-gauntlet | ✅ full gauntlet incl. real golden run + judge, refused at the last stage with the worded `draft_changed` verdict; receipt browsable; row still `draft` |
+| 5 | Conflict-exit failure (186-14 / GAP-4) — go offline, press Reload | ✅ backend stopped live: banner stayed, both exits pressable, verbatim second line; restarted: Reload adopted the server copy and cleared |
+| 6 | KB re-bind, three paths | ✅ NL-seeded, starter fork and Tweak fork all live; DB-confirmed; validator flags step-scope mismatch honestly |
+| 8 | Chosen save then publish, flag OFF | ✅ **this is the CR-03 surface, driven live** — the guard fires on the flag-off branch |
+
+**The two skips are unreachable-by-design, not undone work** — each carries its reason on the row:
+
+- **#4 (publish hold, in-tab edit)** — `build_needed`. The publish modal pins the Builder until the
+  verdict; ✕ and Escape both refuse (observed live). No edit can occur in the publishing tab, so
+  the scenario has no live expression. Its observable core — the worded wait sentence holding the
+  header while a write is outstanding, then leaving without a phantom write — was observed inside
+  test 8's cycle. Micro-states stay unit-proven (WR-12/13 REDs, F19–F21).
+- **#7 (force a 422 mid-edit)** — `server_blocked`. A live 422 is not producible through the UI:
+  an empty draft is *valid* (saves 200; Publish correctly dims to the empty-draft invitation), and
+  even `max_steps: -3` was accepted with a 200 and persisted (DB-verified, then restored to 12).
+  Draft PATCH is permissive by design — the gauntlet is the enforcement point. The 422 rendering
+  path is covered by the F8 unit row with a mocked 422.
+  **Observation filed for a later phase:** the draft PATCH accepting a negative `max_steps` wants a
+  server-side sanity clamp. Not a 186 defect — draft PATCH validation shipped in 183/184.
 
 ### Gaps Summary
 
@@ -218,20 +245,48 @@ triggers before the next phase-186 touch, matching the treatment already given t
 these two are consciously scheduled rather than merely unmentioned. This does not gate phase
 completion — no observable truth backing CONCUR-01 or CONCUR-02 depends on them.
 
-**All 8 automated must-haves now pass.** Score moved from 7/9 to 8/9. The single remaining
-UNCERTAIN item — SC#4's live two-editor UAT — was uncertain in the prior verification and remains
-uncertain now for the same reason: no operator session has run the `186-VALIDATION.md` board.
-This routes the phase to `human_needed`, not `passed` — per the verification decision tree, a
-non-empty human-verification section takes priority over an otherwise-complete automated score.
+~~**All 8 automated must-haves now pass.** Score moved from 7/9 to 8/9. The single remaining
+UNCERTAIN item — SC#4's live two-editor UAT — … routes the phase to `human_needed`, not `passed`.~~
 
-**This is now a human-verification gate, not a task-completion or goal problem.** All twenty
-plans' tasks are done and committed; every measurement re-run in this session is green; the one
-remaining blocker from the last round is closed and independently confirmed. What remains is
-exactly what the phase goal's closing clause asks for — "closed before real usage, not discovered
-live" — which requires the eight `186-VALIDATION.md` rows to actually be driven live before the
-phase can be marked `passed`.
+**SUPERSEDED 2026-08-01T21:55Z — score 8/9 → 9/9, `human_needed` → `passed`.** The gate this
+paragraph described was the operator UAT board, and it has since been driven live (see the
+Human Verification section above: 6 passed, 0 issues, 2 skipped-with-reason). The phase goal's
+closing clause — *"closed before real usage, not discovered live"* — is satisfied by observation,
+not by inference.
 
 ---
 
-_Verified: 2026-08-01T21:15:00Z_
-_Verifier: Claude (gsd-verifier)_
+## Post-verification addenda (2026-08-01, after this report was first written)
+
+Three things landed after the 21:15Z verification and are recorded here so the file is not read as
+the final word on a phase that kept moving:
+
+**1. Security audit — `## SECURED`, 112/112 threats closed, 0 open** (`186-SECURITY.md`, commit
+`74ccd224`). Verified by re-derivation rather than by inheriting the SUMMARY "Threat Flags: None"
+claims. Load-bearing confirmations: the RLS-bypassing service-role write path keeps `created_by = $N`
+as a conjunct on the guarded UPDATE (`backend/app/db/workflows.py:560`), the un-tokened UPDATE
+(`:572`) **and** the D-186-09 disambiguating probe (`:591`) — the probe conjunct is what stops it
+answering *"that row exists but isn't yours"*. The token is a `$5` bind (`:567`) and the f-strings
+interpolate only `CONCURRENCY_TOKEN_SQL`, a module constant (`:90-92`). `PublishGauntlet`'s
+8/8-green fail-open is fixed as a *property*, not patched: `unknownBlock` is derived once at `:428`
+and consumed first by both `:437` and `:444`.
+
+**2. The per-task verification map was measured, not assumed.** All 20 rows in `186-VALIDATION.md`'s
+Per-Task Verification Map had sat at `⬜ pending` for the whole phase — the executors never flipped
+the column. Re-run at HEAD: **frontend 443/443**, **backend 46/46**. One frontend failure in the
+parallel run (`PublishGauntlet.test.tsx > the 4 HTTP outcomes each render distinctly`, 5 000 ms
+`testTimeout` under 44 659 ms of contention) passes 46/46 in isolation with
+`--fileParallelism=false` — a scheduler flake, named as one. The live-DB rows genuinely executed:
+under `pytest -rs`, `test_186_concurrent_patch.py` + `test_186_publish_race.py` report
+**17 passed, 0 skipped** — the `_LIVE_DB_REASON` guards did not fire, so this is not green-by-skip.
+`nyquist_compliant` moved `false` → `true` on that measurement.
+
+**3. WR-19 / WR-20 remain the only open residuals, and still do not gate this phase.** Both are
+hold-release *honesty* gaps, not write-safety gaps: `markSaved` is never called and `dirty` stays
+true, so no false receipt is possible. They still lack `deferred-items.md` entries with re-open
+triggers — the recommendation above stands, unchanged and unactioned.
+
+---
+
+_Verified: 2026-08-01T21:15:00Z · reconciled 2026-08-01T22:15Z (operator UAT + security audit + map measurement)_
+_Verifier: Claude (gsd-verifier), reconciled by orchestrator_

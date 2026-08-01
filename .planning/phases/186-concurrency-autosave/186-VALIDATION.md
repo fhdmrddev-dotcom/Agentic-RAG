@@ -1,8 +1,8 @@
 ---
 phase: 186
 slug: concurrency-autosave
-status: planned
-nyquist_compliant: false
+status: measured
+nyquist_compliant: true
 wave_0_complete: true    # all 6 files verified present on disk by `ls` 2026-08-01 (plan 186-20, Task 2) — the flag was stale, not the tree
 created: 2026-08-01
 ---
@@ -83,28 +83,54 @@ The Phase 185 lesson is binding: *verify the PROPERTY, not the PATCH; observe fa
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| 186-01-T1 | 186-01 | 1 | CONCUR-01/02 | T-186-01-01/02/03 | stale write refused; 404-collapse intact; no version minted | unit (live DB) | `cd backend && ./venv/Scripts/python.exe -m pytest tests/unit/test_186_concurrent_patch.py -q` | ❌ Wave 0 | ⬜ pending |
-| 186-01-T2 | 186-01 | 1 | CONCUR-02 | T-186-01-01/02/05 | token is a 3rd conjunct; owner-scoped probe; `$N`-only values | unit (live DB) | `cd backend && ./venv/Scripts/python.exe -m pytest tests/unit/test_103_draft_crud.py -q` | ✅ | ⬜ pending |
-| 186-01-T3 | 186-01 | 1 | CONCUR-02 | T-186-01-03/04/06 | F2/F3/F4 — coded 409s, code-less 404 | unit (live DB) | `cd backend && ./venv/Scripts/python.exe -m pytest tests/unit/test_186_concurrent_patch.py tests/unit/test_103_published_409.py -q` | ❌ Wave 0 / ✅ extend | ⬜ pending |
-| 186-02-T1 | 186-02 | 2 | CONCUR-02 | T-186-02-01/04/05 | F5/F6 — publish refuses a drifted draft, receipt preserved | unit (live DB) | `cd backend && ./venv/Scripts/python.exe -m pytest tests/unit/test_186_publish_race.py -q` | ❌ Wave 0 | ⬜ pending |
-| 186-02-T2 | 186-02 | 2 | CONCUR-02 | T-186-02-01/02 | two sentinels, never collapsed | unit (live DB) | `cd backend && ./venv/Scripts/python.exe -m pytest tests/unit/test_186_publish_race.py tests/unit/test_103_tweak_fork.py -q` | ❌ Wave 0 | ⬜ pending |
-| 186-02-T3 | 186-02 | 2 | CONCUR-02 | T-186-02-03/04/05 | stage-0 capture via `row.get`; no route branch added | unit | `cd backend && ./venv/Scripts/python.exe -m pytest tests/unit/test_186_publish_race.py tests/unit/test_publish_service.py -q` | ❌ Wave 0 / ✅ | ⬜ pending |
-| 186-03-T1 | 186-03 | 2 | CONCUR-02 | T-186-03-04 | token on the wire; If-Match sent only when held | unit | `cd frontend && npx vitest run src/lib/api.workflows.test.ts` | ✅ extend | ⬜ pending |
-| 186-03-T2 | 186-03 | 2 | CONCUR-02 | T-186-03-01/02/03 | unclassifiable refusal never becomes success; 422 body not leaked | unit | `cd frontend && npx vitest run src/lib/api.workflows.test.ts` | ✅ extend | ⬜ pending |
-| 186-04-T1 | 186-04 | 1 | CONCUR-01 | T-186-04-03 | assertion retargeted, not deleted (count guard) | unit | `cd frontend && npx vitest run src/components/workflows/builderStore.test.ts src/components/workflows/CanvasToolbar.test.tsx` | ✅ extend | ⬜ pending |
-| 186-04-T2 | 186-04 | 1 | CONCUR-01 | T-186-04-01/02 | **F14** — binding arms `dirty`; store names no API client | unit | `cd frontend && npx vitest run src/components/workflows/builderStore.test.ts` | ✅ extend | ⬜ pending |
-| 186-05-T1 | 186-05 | 3 | CONCUR-02 | T-186-05-01 | **F7 RED** — bogus stage renders 8 ✓ badges | unit | `cd frontend && npx vitest run src/components/workflows/PublishGauntlet.test.tsx` | ✅ extend | ⬜ pending |
-| 186-05-T2 | 186-05 | 3 | CONCUR-02 | T-186-05-01/02/03/04 | **F7 GREEN** — unknown stage never green, on BOTH `-1` reads | unit | `cd frontend && npx vitest run src/components/workflows/PublishGauntlet.test.tsx` | ✅ extend | ⬜ pending |
-| 186-06-T1 | 186-06 | 3 | CONCUR-01/02 | T-186-06-02/04 | **F9/F15** — single-flight, token chained, never parsed | unit | `cd frontend && npx vitest run src/hooks/useDraftPersistence.test.tsx` | ❌ Wave 0 | ⬜ pending |
-| 186-06-T2 | 186-06 | 3 | CONCUR-02 | T-186-06-01/05 | **F8/F11** — no false `Saved ✓`; held write flushes once | unit | `cd frontend && npx vitest run src/hooks/useDraftPersistence.test.tsx` | ❌ Wave 0 | ⬜ pending |
-| 186-06-T3 | 186-06 | 3 | CONCUR-02 | T-186-06-03/06 | **F10** — conflict halts the loop; no auto-overwrite | unit | `cd frontend && npx vitest run src/hooks/useDraftPersistence.test.tsx` | ❌ Wave 0 | ⬜ pending |
-| 186-07-T1 | 186-07 | 4 | CONCUR-02 | T-186-07-05 | the token reaches all four Builder entry paths | unit | `cd frontend && npx vitest run src/pages/WorkflowBuilderPage.session.test.tsx` | ✅ extend | ⬜ pending |
-| 186-07-T2 | 186-07 | 4 | CONCUR-01/02 | T-186-07-01/03/04/05 | status line + conflict banner; Reload before Overwrite; G-5 net-negative | unit | `cd frontend && npx vitest run src/pages/WorkflowBuilderPage.test.tsx src/pages/WorkflowBuilderPage.session.test.tsx src/pages/WorkflowBuilderPage.canvas.test.tsx src/pages/WorkflowBuilderPage.header.test.tsx` | ✅ extend | ⬜ pending |
-| 186-07-T3 | 186-07 | 4 | CONCUR-01 | T-186-07-02 | **F12** — cosmetic drag = 0 network calls across the autosave debounce | unit | `cd frontend && npx vitest run src/components/workflows/WorkflowCanvas.editing.test.tsx src/components/workflows/canvasNudge.test.ts` | ✅ extend | ⬜ pending |
-| 186-08-T1 | 186-08 | 5 | CONCUR-01 (BUG-260731-03 control) | T-186-08-01/03/04 | the promoted picker + the unbound invitation | unit | `cd frontend && npx vitest run src/pages/WorkflowBuilderPage.header.test.tsx` | ✅ extend | ⬜ pending |
-| 186-08-T2 | 186-08 | 5 | CONCUR-01 (BUG-260731-03 control) | T-186-08-01/02 | **F16** — invitation, never a verdict; unbind premise pinned | unit | `cd frontend && npx vitest run src/pages/WorkflowBuilderPage.header.test.tsx` | ✅ extend | ⬜ pending |
+| 186-01-T1 | 186-01 | 1 | CONCUR-01/02 | T-186-01-01/02/03 | stale write refused; 404-collapse intact; no version minted | unit (live DB) | `cd backend && ./venv/Scripts/python.exe -m pytest tests/unit/test_186_concurrent_patch.py -q` | ❌ Wave 0 | ✅ green |
+| 186-01-T2 | 186-01 | 1 | CONCUR-02 | T-186-01-01/02/05 | token is a 3rd conjunct; owner-scoped probe; `$N`-only values | unit (live DB) | `cd backend && ./venv/Scripts/python.exe -m pytest tests/unit/test_103_draft_crud.py -q` | ✅ | ✅ green |
+| 186-01-T3 | 186-01 | 1 | CONCUR-02 | T-186-01-03/04/06 | F2/F3/F4 — coded 409s, code-less 404 | unit (live DB) | `cd backend && ./venv/Scripts/python.exe -m pytest tests/unit/test_186_concurrent_patch.py tests/unit/test_103_published_409.py -q` | ❌ Wave 0 / ✅ extend | ✅ green |
+| 186-02-T1 | 186-02 | 2 | CONCUR-02 | T-186-02-01/04/05 | F5/F6 — publish refuses a drifted draft, receipt preserved | unit (live DB) | `cd backend && ./venv/Scripts/python.exe -m pytest tests/unit/test_186_publish_race.py -q` | ❌ Wave 0 | ✅ green |
+| 186-02-T2 | 186-02 | 2 | CONCUR-02 | T-186-02-01/02 | two sentinels, never collapsed | unit (live DB) | `cd backend && ./venv/Scripts/python.exe -m pytest tests/unit/test_186_publish_race.py tests/unit/test_103_tweak_fork.py -q` | ❌ Wave 0 | ✅ green |
+| 186-02-T3 | 186-02 | 2 | CONCUR-02 | T-186-02-03/04/05 | stage-0 capture via `row.get`; no route branch added | unit | `cd backend && ./venv/Scripts/python.exe -m pytest tests/unit/test_186_publish_race.py tests/unit/test_publish_service.py -q` | ❌ Wave 0 / ✅ | ✅ green |
+| 186-03-T1 | 186-03 | 2 | CONCUR-02 | T-186-03-04 | token on the wire; If-Match sent only when held | unit | `cd frontend && npx vitest run src/lib/api.workflows.test.ts` | ✅ extend | ✅ green |
+| 186-03-T2 | 186-03 | 2 | CONCUR-02 | T-186-03-01/02/03 | unclassifiable refusal never becomes success; 422 body not leaked | unit | `cd frontend && npx vitest run src/lib/api.workflows.test.ts` | ✅ extend | ✅ green |
+| 186-04-T1 | 186-04 | 1 | CONCUR-01 | T-186-04-03 | assertion retargeted, not deleted (count guard) | unit | `cd frontend && npx vitest run src/components/workflows/builderStore.test.ts src/components/workflows/CanvasToolbar.test.tsx` | ✅ extend | ✅ green |
+| 186-04-T2 | 186-04 | 1 | CONCUR-01 | T-186-04-01/02 | **F14** — binding arms `dirty`; store names no API client | unit | `cd frontend && npx vitest run src/components/workflows/builderStore.test.ts` | ✅ extend | ✅ green |
+| 186-05-T1 | 186-05 | 3 | CONCUR-02 | T-186-05-01 | **F7 RED** — bogus stage renders 8 ✓ badges | unit | `cd frontend && npx vitest run src/components/workflows/PublishGauntlet.test.tsx` | ✅ extend | ✅ green |
+| 186-05-T2 | 186-05 | 3 | CONCUR-02 | T-186-05-01/02/03/04 | **F7 GREEN** — unknown stage never green, on BOTH `-1` reads | unit | `cd frontend && npx vitest run src/components/workflows/PublishGauntlet.test.tsx` | ✅ extend | ✅ green |
+| 186-06-T1 | 186-06 | 3 | CONCUR-01/02 | T-186-06-02/04 | **F9/F15** — single-flight, token chained, never parsed | unit | `cd frontend && npx vitest run src/hooks/useDraftPersistence.test.tsx` | ❌ Wave 0 | ✅ green |
+| 186-06-T2 | 186-06 | 3 | CONCUR-02 | T-186-06-01/05 | **F8/F11** — no false `Saved ✓`; held write flushes once | unit | `cd frontend && npx vitest run src/hooks/useDraftPersistence.test.tsx` | ❌ Wave 0 | ✅ green |
+| 186-06-T3 | 186-06 | 3 | CONCUR-02 | T-186-06-03/06 | **F10** — conflict halts the loop; no auto-overwrite | unit | `cd frontend && npx vitest run src/hooks/useDraftPersistence.test.tsx` | ❌ Wave 0 | ✅ green |
+| 186-07-T1 | 186-07 | 4 | CONCUR-02 | T-186-07-05 | the token reaches all four Builder entry paths | unit | `cd frontend && npx vitest run src/pages/WorkflowBuilderPage.session.test.tsx` | ✅ extend | ✅ green |
+| 186-07-T2 | 186-07 | 4 | CONCUR-01/02 | T-186-07-01/03/04/05 | status line + conflict banner; Reload before Overwrite; G-5 net-negative | unit | `cd frontend && npx vitest run src/pages/WorkflowBuilderPage.test.tsx src/pages/WorkflowBuilderPage.session.test.tsx src/pages/WorkflowBuilderPage.canvas.test.tsx src/pages/WorkflowBuilderPage.header.test.tsx` | ✅ extend | ✅ green |
+| 186-07-T3 | 186-07 | 4 | CONCUR-01 | T-186-07-02 | **F12** — cosmetic drag = 0 network calls across the autosave debounce | unit | `cd frontend && npx vitest run src/components/workflows/WorkflowCanvas.editing.test.tsx src/components/workflows/canvasNudge.test.ts` | ✅ extend | ✅ green |
+| 186-08-T1 | 186-08 | 5 | CONCUR-01 (BUG-260731-03 control) | T-186-08-01/03/04 | the promoted picker + the unbound invitation | unit | `cd frontend && npx vitest run src/pages/WorkflowBuilderPage.header.test.tsx` | ✅ extend | ✅ green |
+| 186-08-T2 | 186-08 | 5 | CONCUR-01 (BUG-260731-03 control) | T-186-08-01/02 | **F16** — invitation, never a verdict; unbind premise pinned | unit | `cd frontend && npx vitest run src/pages/WorkflowBuilderPage.header.test.tsx` | ✅ extend | ✅ green |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
+
+### Map measurement receipt — 2026-08-01, post-security-audit
+
+The 20 rows above sat at `⬜ pending` through the whole phase: the executors never flipped the
+column, and the "File Exists" column still carries its Wave-0 reading. **The flip below is a
+measurement taken in one session, not an inherited claim.** Both commands were run at HEAD
+`74ccd224`:
+
+| Surface | Command | Result |
+|---|---|---|
+| Frontend — all 12 phase-186 suites | `npx vitest run` over `api.workflows` · `builderStore` · `CanvasToolbar` · `PublishGauntlet` · `BuilderSaveRegion` · `WorkflowCanvas.editing` · `canvasNudge` · `useDraftPersistence` · `WorkflowBuilderPage` {`.test`,`.session`,`.canvas`,`.header`} | **443 / 443** |
+| Backend — all 6 phase-186 suites | `pytest tests/unit/test_186_concurrent_patch.py test_186_publish_race.py test_103_published_409.py test_103_draft_crud.py test_103_tweak_fork.py test_publish_service.py -q` | **46 / 46** |
+
+Two things worth recording rather than smoothing over:
+
+1. **One frontend failure was a flake, and is named as one.** In the parallel run,
+   `PublishGauntlet.test.tsx > the 4 HTTP outcomes each render distinctly` hit the 5 000 ms
+   `testTimeout` (the file took 44 659 ms under parallel load). Re-run in isolation with
+   `--fileParallelism=false` it passes **46 / 46** in 34.9 s. The failure is scheduler contention,
+   not a defect — same class as the 186-15 precedent that introduced `--fileParallelism=false`.
+2. **The live-DB rows genuinely ran.** `test_186_concurrent_patch.py` and `test_186_publish_race.py`
+   carry 5 and 4 `_LIVE_DB_REASON` skip guards respectively. Re-run under `pytest -rs` (which prints
+   every skip reason) they report **17 passed, 0 skipped** — the guards did not fire, so these rows
+   are real live-Postgres coverage and not a green-by-skip reading.
+
+`nyquist_compliant` moved `false` → `true` on this measurement.
 
 **Requirements → test map (from research):**
 

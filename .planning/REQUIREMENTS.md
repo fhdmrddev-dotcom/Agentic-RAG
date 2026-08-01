@@ -51,8 +51,8 @@
 
 ### CONCUR — safe co-edit (v3.4 made workflows org-shareable)
 
-- [ ] **CONCUR-01**: Editing a draft on the canvas autosaves by updating the draft row in place — a cosmetic node drag never mints a new definition version or re-arms the golden-run gauntlet.
-- [ ] **CONCUR-02**: Two people editing the same org-shared workflow cannot silently clobber each other — a concurrency guard (soft-lock / optimistic-concurrency token) protects the shared draft; publish is guarded against reading a dirty draft.
+- [x] **CONCUR-01**: Editing a draft on the canvas autosaves by updating the draft row in place — a cosmetic node drag never mints a new definition version or re-arms the golden-run gauntlet.
+- [x] **CONCUR-02**: Two people editing the same org-shared workflow cannot silently clobber each other — a concurrency guard (soft-lock / optimistic-concurrency token) protects the shared draft; publish is guarded against reading a dirty draft.
 
 ### CONN — external-integration node model (operator HARD gate #3, CORE half)
 
@@ -110,8 +110,8 @@ Which phases cover which requirements. Filled at roadmap creation 2026-07-24, re
 | GOVERN-01 | Phase 185 | Complete |
 | GOVERN-02 | Phase 185 | Complete |
 | GOVERN-03 | Phase 185 | Complete |
-| CONCUR-01 | Phase 186 | Pending |
-| CONCUR-02 | Phase 186 | Pending |
+| CONCUR-01 | Phase 186 | Complete |
+| CONCUR-02 | Phase 186 | Complete |
 | VOCAB-01 | Phase 187 | Pending |
 | VOCAB-02 | Phase 187 | Pending |
 | VOCAB-03 | Phase 187 | Pending |

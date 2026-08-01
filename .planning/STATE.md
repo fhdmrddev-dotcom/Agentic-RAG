@@ -4,10 +4,10 @@ milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
 status: executing
 last_updated: "2026-08-01T15:31:49.573Z"
-last_activity: 2026-08-01 -- Phase 186 execution started
+last_activity: 2026-08-01 -- Phase 186 COMPLETE (verified 9/9, UAT passed, secured 112/112)
 progress:
   total_phases: 19
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 72
   completed_plans: 68
   percent: 26
@@ -22,7 +22,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-20 — Phase 163 THE ATOMIC CRUX complete; membership RLS enforced)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 186 — concurrency-autosave
+**Current focus:** Phase 187 — business-vocabulary-ai-seeded-canvas (186 closed 2026-08-01)
 
 ## Deferred Items
 
@@ -44,18 +44,44 @@ Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 op
 
 ## Current Position
 
-Phase: 186 (concurrency-autosave) — EXECUTING
+Phase: 186 (concurrency-autosave) — COMPLETE. Next: Phase 187 (business vocabulary + AI-seeded canvas) — not yet scoped.
 (`3713a716`), GOVERN-01/02/03 all `Complete`, `nyquist_compliant` true, SECURED 49/49 (`a00b1cc5`).
 Security found one real fail-open BLOCKER — T-185-04-01, a **typed** refusal on an armed checkpoint ran
 the step and filed a false approval receipt — fixed by quick task `260731-3y4` (`417728bd`) and
 **confirmed live in the browser** on run `5d3a4707` (run failed, step never ran, zero receipts).
 
-**Next:** **Phase 186 — ALL 17 PLANS EXECUTED (waves 1-10 complete as of 2026-08-01).** The second
-gap-closure round (186-14..17) landed in full; every item the 2026-08-01 re-verification raised —
-GAP-4 / CR-02 and WR-06..WR-11 — now has a landed plan. **The phase is NOT complete:** the seven
-operator-driven rows in `186-VALIDATION.md` (1, 2, 3, 3b, 5, 6, 7) are still `to run`, and SC#4 (the
-two-editor parallel axis) is satisfied only by rows 1-3 being driven live. Candidate next steps are
-a re-verification pass or the operator UAT — **no requirement status has been advanced**.
+**Next: Phase 187 — Business Vocabulary + AI-Seeded Canvas.** Phase 186 is **CLOSED** as of
+2026-08-01 (superseded wording preserved below rather than deleted).
+
+**⚠ G-2 FIRES ON 187 — sketch before spec/discuss.** ROADMAP lists 187 in the sketch-first set
+(plain-language node verbs + the Technical-names reveal + the NL-seeded canvas are all "feels like"
+surfaces). The operator-approved mockup is the acceptance bar, so `/gsd:sketch 187` precedes
+`/gsd:spec-phase 187`. Also inherited: **SEED-137 is folded in as 187's SC#6** — an armed
+action-risk checkpoint can today be preempted by an author-declared `timing="pre"` validator, so the
+gate is never asked and the step runs unapproved; it was folded here precisely because it falsifies
+SC#3's "safe-by-construction" claim. 187 therefore **carries a threat model** (the fix touches the
+D-185-05 attachment seam). Related open todo: `.planning/todos/pending/spike-nl-workflow-authoring.md`.
+
+**Phase 186 close-out record (2026-08-01):** 20/20 plans · verification **`passed` 9/9** ·
+operator UAT **6 passed, 0 issues, 2 skipped-with-reason** (`4d446670`) · **SECURED 112/112, 0 open**
+(`74ccd224`) · CONCUR-01/02 both `Complete` · `nyquist_compliant` **true**. The per-task map's 20
+rows had sat at `pending` the whole phase and were flipped on a **measured** re-run — frontend
+443/443, backend 46/46 — not on assumption; the single parallel-run failure is a named 5 s-timeout
+flake (46/46 in isolation under `--fileParallelism=false`) and `pytest -rs` shows the live-DB rows
+ran 17/17 with **0 skipped**. **CR-03 was REFUTED, not worked around:** plan `186-18` shipped the
+ordering fix, so the `saving` guard now sits ABOVE the flag gate (`WorkflowBuilderPage.tsx:1094` vs
+`:1095`) and UAT row 8 drove that exact flag-off surface live.
+
+**Carried forward from 186 (non-blocking, but unscheduled):**
+- **WR-19 / WR-20** — hold-release honesty gaps in `useDraftPersistence.ts` (`:915`, `:889-891`).
+  Not write-safety: `markSaved` is uncalled and `dirty` stays true, so no false receipt is possible.
+  They still owe `deferred-items.md` entries with concrete re-open triggers — the WR-14..18 treatment.
+- **Draft PATCH accepts a negative `max_steps`** (200 + persisted, DB-verified during UAT). Wants a
+  server-side sanity clamp. Not a 186 defect — draft PATCH validation shipped in 183/184.
+
+*(Superseded — accurate when written, preserved not deleted:)* ~~Phase 186 — ALL 17 PLANS EXECUTED
+… **The phase is NOT complete:** the seven operator-driven rows in `186-VALIDATION.md` (1, 2, 3, 3b,
+5, 6, 7) are still `to run` … **no requirement status has been advanced**.~~
 CONTEXT gathered 2026-07-31 (`0a200d51`), 17 decisions (D-186-01..17); PLAN committed 2026-08-01
 (`a4c4eb86`, 8 plans / 5 waves) — all 8 executed. Gap-closure plans 186-09..13 (waves 6-8) then
 executed 2026-08-01 — **13/13 plans complete, all tasks done, zero plans outstanding.**
