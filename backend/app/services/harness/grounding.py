@@ -840,19 +840,36 @@ def grounding_cause(phase) -> str | None:
 
 # ── Phase 185 (GOVERN-01 / GOVERN-03) — the ONE synthesis home ────────────────
 #
-# What the ENGINE runs is not always what the author wrote. Two gates are attached at
-# run time and NEVER stored: the citation gate a *detected* step earns (D-185-01/04)
-# and the approval pre-gate an *armed* step earns (D-185-12). Both live here, in the
-# D-182-06 one-rule-one-home module, for the same reason the KB list does — a second
-# copy of "which steps are governed" is a safety hole, not a duplication smell.
+# What the ENGINE runs is not always what the author wrote. ONE gate is attached at run
+# time and NEVER stored: the citation gate a *detected* step earns (D-185-01/04). It
+# lives here, in the D-182-06 one-rule-one-home module, for the same reason the KB list
+# does — a second copy of "which steps are governed" is a safety hole, not a duplication
+# smell.
+#
+# D-187-01 — THE ARMED APPROVAL GATE NO LONGER LIVES HERE. Phase 185 also synthesized a
+# ``timing="pre"`` ``action_risk_approval`` spec for an *armed* step (D-185-12). Because
+# ``run_gates`` is first-failure-wins and this module APPENDS, that put the armed gate
+# LAST — so any author-declared failing pre gate returned first and an ``ask_user``
+# Proceed ran the body with nobody asked (SEED-137). No ordering rule fixes that; the
+# guarantee simply cannot be a position in the author's list. "Armed ⇒ asked" is now a
+# PROPERTY OF THE PHASE, enforced by an explicit pre-body checkpoint in
+# ``harness_engine._run_phase_with_gates`` keyed on ``phase.action_risk_armed``. Only
+# ``_approval_sentence`` below stays here — the engine imports and calls it, so the
+# sentence still has exactly one author.
 
 
 def _approval_sentence(phase, total_phases: int) -> str:
     """The D-185-14 engine-generated approval prompt for an ARMED step.
 
-    There is NO new authored-message field. The sentence is composed here, at synthesis
-    time, because this is the one place where ``len(definition.phases)`` is in hand, and
-    it rides to the pause inside the synthesized spec's ``config["prompt"]``.
+    There is NO new authored-message field. The sentence is composed here so it has
+    exactly ONE author, and ``total_phases`` is passed in because the caller is the one
+    holding ``len(definition.phases)``.
+
+    D-187-01 — WHO CALLS THIS. Phase 185 called it from ``effective_phase`` below and let
+    the sentence ride to the pause inside a synthesized spec's ``config["prompt"]``. That
+    synthesis is gone; the armed guarantee is now an explicit pre-body checkpoint in
+    ``harness_engine._run_phase_with_gates``, which imports this function and calls it
+    directly. The composer did not move and its output did not change — only the caller.
 
     HONESTY RULES (SPEC Req 9). This copy MAY say the run waits — with plan 185-04's
     indefinite subscribe that is simply true, and a person deciding whether to answer
@@ -875,7 +892,16 @@ def _approval_sentence(phase, total_phases: int) -> str:
 
 
 def effective_phase(phase, *, total_phases: int):
-    """The phase the ENGINE runs: the authored validators PLUS any synthesized gates.
+    """The phase the ENGINE runs: the authored validators PLUS the synthesized gate.
+
+    SYNTHESIZES EXACTLY ONE GATE — the ``citations_required`` gate a *detected* step
+    earns (D-185-01/04). D-187-01 removed the second one: an *armed* step's approval
+    pre-gate is no longer a ValidatorSpec at all, because a gate that lives in the
+    author's list can be preempted by the author's list (see the module note above and
+    ``harness_engine._run_phase_with_gates``'s armed checkpoint). ``total_phases`` is
+    retained on this signature — the engine and the shipped tests pass it, and the
+    armed-sentence composer it used to feed (``_approval_sentence``) is now called by the
+    engine with the same value.
 
     **NEVER PERSISTED. Called from ``harness_engine.py``'s ``spec_by_slug`` seam ONLY.**
     Pure — no I/O, no pool, no clock. That seam sits downstream of every
@@ -916,21 +942,6 @@ def effective_phase(phase, *, total_phases: int):
     from app.models.harness import ValidatorSpec  # function-local (import-light module)
 
     extra: list[ValidatorSpec] = []
-
-    # D-185-12 — the armed action-risk checkpoint, a timing="pre" gate. It runs BEFORE
-    # the executor body and always fails, so the shipped ask_user disposition owns the
-    # pause. Arming therefore changes neither len(phases) nor any phase_index: no phase
-    # is added, one validator is.
-    if getattr(phase, "action_risk_armed", False):
-        extra.append(
-            ValidatorSpec(
-                kind="action_risk_approval",
-                timing="pre",
-                on_failure="ask_user",
-                max_retries=0,
-                config={"prompt": _approval_sentence(phase, total_phases)},
-            )
-        )
 
     # D-185-01/04 — the citation gate a DETECTED step earns. Only "detected": an
     # "already-set" step declared its own policy and an "escalated" one is the author's
