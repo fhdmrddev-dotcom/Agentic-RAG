@@ -157,6 +157,14 @@ function harness(
     draftId?: string | null
     token?: string | null
     /**
+     * F20's flag (186-13). Mounted, not flipped after the fact: the claim under test is
+     * about a session that runs with `visual_workflow_canvas` OFF from the first render,
+     * and a hook that starts enabled and is switched off later has already had one pass
+     * of every effect with the flag on. Defaulted to `true`, so every pre-existing call
+     * site of this harness is unchanged.
+     */
+    enabled?: boolean
+    /**
      * F17's receipt recorder (186-09). Invoked AT THE INSTANT the receipt is filed and
      * BEFORE the real action runs, so a test can record what the store held versus what
      * had actually been sent. Optional and defaulted away, so every pre-existing call
@@ -183,7 +191,7 @@ function harness(
   const created = vi.fn()
   const initialProps: Props = {
     definition: selectDefinition(store.getState()),
-    enabled: true,
+    enabled: opts.enabled ?? true,
     publishInFlight: false,
     validationCause: null,
   }
@@ -622,6 +630,153 @@ describe("useDraftPersistence — F11: writes hold while a publish runs, and flu
     await advance(AUTOSAVE_DEBOUNCE_MS)
 
     expect(stateOf(h.view)).toEqual({ kind: "held", sentence: HOLD_PUBLISHING })
+  })
+})
+
+// ── F20 — with the canvas flag OFF the loop writes NOTHING automatically ──────
+
+/**
+ * Phase 186-13 (GAP-3 / WR-03) — the flag-off write leak, and why it is not theoretical.
+ *
+ * D-181-01 is this milestone's HARD gate #1: with `visual_workflow_canvas` OFF the product
+ * is byte-identical to the one that shipped before the canvas existed. Autosave is net-new
+ * behaviour, so `enabled` carries the flag (`WorkflowBuilderPage.tsx:812` —
+ * `canvasEnabled && builderPhase === "drafted"`) and the debounce effect bails on it.
+ *
+ * THE HOLD-RELEASE EFFECT DID NOT READ IT, and the hold is reachable with the flag off:
+ *
+ *   • `renderPublish` — and therefore `setPublishInFlight`, which is the sole input to the
+ *     publish half of `holdReason` — is mounted UNCONDITIONALLY at
+ *     `WorkflowBuilderPage.tsx:1700-1702`. Publish is a pre-186 door and correctly is not
+ *     behind the canvas flag.
+ *   • `BuilderSaveRegion`'s Save-draft button is likewise unconditional, and `saveNow`
+ *     is not gated on `enabled` either (that is D-186-03 + D-186-08, and it is deliberate).
+ *     Only the quiet status LINE is hidden by the flag.
+ *
+ * So a flag-off session that edits and then publishes reaches `{kind:"held"}`, and when the
+ * gauntlet resolves the release fired `performWrite()` — an AUTOMATIC PATCH, in a session
+ * where the person had switched the whole feature off. That is a write past the revert
+ * switch, which is the one thing the revert switch exists to make impossible.
+ *
+ * THE RED NUMBERS, so a future reader can re-observe them by reverting the fix:
+ *   F20a — `updateWorkflowDraft` called 1 time where 0 are expected.
+ *   F20a (create variant) — `createWorkflowDraft` called 1 time where 0 are expected. The
+ *          claim is ZERO NETWORK CALLS, not zero PATCHes, and the create branch is reachable
+ *          whenever the session started without a draft row.
+ *   F20b — 1 where 0 are expected. Pressing Save while held arms `heldPendingRef`, which is
+ *          the OTHER trigger of the release flush, so it has to be driven separately.
+ *
+ * F20c is the contrast control, and it is the reason this describe cannot pass by simply
+ * breaking the flush: with the flag ON the identical drive must still produce exactly one
+ * write carrying both edits.
+ */
+describe("useDraftPersistence — F20: with the canvas flag OFF the loop writes nothing automatically (D-181-01)", () => {
+  /** The flag-off reachability drive: edit, publish, release. Verbatim the F11 arrangement,
+   *  so the only difference between this describe and that one is `enabled`. */
+  async function editThroughAPublish(h: ReturnType<typeof harness>): Promise<void> {
+    h.set({ publishInFlight: true })
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS * 5)
+
+    // A second edit accumulates while the gauntlet runs — the common shape.
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS * 5)
+
+    h.set({ publishInFlight: false })
+    await flush()
+    // Well past every timer the release could have armed.
+    await advance(AUTOSAVE_DEBOUNCE_MS * 5)
+    await flush()
+  }
+
+  it("F20a — flag off: edit, publish, release ⇒ ZERO network calls", async () => {
+    mockedUpdate.mockResolvedValue(write("T-SHOULD-NEVER-BE-SENT"))
+    mockedCreate.mockResolvedValue(write("T-SHOULD-NEVER-BE-CREATED"))
+
+    const h = harness({ enabled: false })
+    await editThroughAPublish(h)
+
+    expect(mockedUpdate).not.toHaveBeenCalled()
+    expect(mockedCreate).not.toHaveBeenCalled()
+    // The work is not lost, it is simply not SENT: the draft stays dirty, so the leave
+    // guard still fires and the explicit Save button still has something to do.
+    expect(h.store.getState().dirty).toBe(true)
+    expect(h.markSaved).not.toHaveBeenCalled()
+  })
+
+  it("F20a — the same claim on a session with no draft row yet: no CREATE either", async () => {
+    // `createWorkflowDraft` is the other half of "zero network calls", and it is reachable
+    // exactly when the session started without a row (three of the Builder's four entry
+    // routes create). Asserting only on PATCHes would leave this path unmeasured.
+    mockedUpdate.mockResolvedValue(write("T-SHOULD-NEVER-BE-SENT"))
+    mockedCreate.mockResolvedValue(write("T-SHOULD-NEVER-BE-CREATED"))
+
+    const h = harness({ enabled: false, draftId: null, token: null })
+    await editThroughAPublish(h)
+
+    expect(mockedCreate).not.toHaveBeenCalled()
+    expect(mockedUpdate).not.toHaveBeenCalled()
+    expect(h.created).not.toHaveBeenCalled()
+  })
+
+  it("F20b — flag off: Save pressed WHILE held, then release ⇒ still nothing automatic", async () => {
+    mockedUpdate.mockResolvedValue(write("T-SHOULD-NEVER-BE-SENT"))
+    mockedCreate.mockResolvedValue(write("T-SHOULD-NEVER-BE-CREATED"))
+
+    const h = harness({ enabled: false })
+    h.set({ publishInFlight: true })
+    h.edit()
+
+    // The press is the OTHER way `heldPendingRef` gets armed, and the release reads it as
+    // "there is unsent work" — so this path has to be driven separately from F20a's.
+    let ok = true
+    await act(async () => {
+      ok = await h.view.result.current.saveNow()
+    })
+    expect(ok).toBe(false)
+    expect(mockedUpdate).not.toHaveBeenCalled()
+
+    h.set({ publishInFlight: false })
+    await flush()
+    await advance(AUTOSAVE_DEBOUNCE_MS * 5)
+    await flush()
+
+    // A press the person made is honoured; a flush nobody asked for is not. The release
+    // must not turn the earlier press into a write the person did not authorise NOW.
+    expect(mockedUpdate).not.toHaveBeenCalled()
+    expect(mockedCreate).not.toHaveBeenCalled()
+    expect(h.store.getState().dirty).toBe(true)
+  })
+
+  it("F20c — the flag-ON behaviour is UNCHANGED: one write, carrying both edits", async () => {
+    // The contrast control. Without it, deleting the flush outright would pass F20a/F20b.
+    mockedUpdate.mockResolvedValue(write("T1"))
+
+    const h = harness()
+    await editThroughAPublish(h)
+
+    expect(mockedUpdate).toHaveBeenCalledTimes(1)
+    expect(sentDefinition(0).phases).toHaveLength(4)
+    expect(h.markSaved).toHaveBeenCalledTimes(1)
+  })
+
+  it("F20d — the hold READING is still reachable flag-off: Save reports it rather than saving", async () => {
+    // The half that must NOT be gated. `saveNow` is user-initiated, so it keeps working on
+    // the flag-off surface (D-186-03) — and when it cannot write, it says so. WR-04 is that
+    // this sentence never reached the DOM there; `BuilderSaveRegion.test.tsx` owns that half.
+    mockedUpdate.mockResolvedValue(write("T-SHOULD-NEVER-BE-SENT"))
+
+    const h = harness({ enabled: false })
+    h.set({ publishInFlight: true })
+
+    let ok = true
+    await act(async () => {
+      ok = await h.view.result.current.saveNow()
+    })
+
+    expect(ok).toBe(false)
+    expect(stateOf(h.view).kind).toBe("held")
+    expect(mockedUpdate).not.toHaveBeenCalled()
   })
 })
 
