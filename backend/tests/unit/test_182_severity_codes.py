@@ -135,6 +135,37 @@ def test_an_unrecognised_code_fails_loud_as_error_never_incomplete(caplog):
     assert workflows._severity("a_code_no_module_emits", phases_empty=True) == "error"
 
 
+def test_unbound_retrieval_classifies_incomplete_without_taking_the_loud_branch(caplog):
+    """Phase 187 / D-187-11 — the REGISTRATION proof, from the other direction.
+
+    The test above proves an UNregistered code fails loud. This one proves the new code is
+    not one: `unbound_retrieval` must reach the `_INCOMPLETE_CODES` branch, not the unknown
+    one. Both halves matter, and asserting the severity ALONE would not distinguish them —
+    a code registered in `_ROUTE_ASSIGNED_CODES` only (so `_KNOWN_CODES` contains it) but
+    NOT in `_INCOMPLETE_CODES` lands in the DERIVED `_ERROR_CODES` bucket and returns
+    "error" silently; a code registered in NEITHER also returns "error", but loudly, logging
+    a warning on EVERY canvas edit. The log assertion is what makes this a registration test
+    rather than a restatement of the pinned table.
+    """
+    import logging
+
+    from app.api import workflows
+
+    with caplog.at_level(logging.WARNING, logger="app.api.workflows"):
+        caplog.clear()
+        got = workflows._severity("unbound_retrieval", phases_empty=False)
+
+    assert got == "incomplete", (
+        "the D-187-11 verdict must paint grey 'still building' — an unbound retrieval "
+        "workflow is unfinished, not broken"
+    )
+    assert "unbound_retrieval" not in caplog.text, (
+        "the code reached the fail-loud UNKNOWN branch — it is not registered. Add it to "
+        "workflows._ROUTE_ASSIGNED_CODES (so _KNOWN_CODES contains it) AND to "
+        "workflows._INCOMPLETE_CODES (so the DERIVED _ERROR_CODES does not claim it)."
+    )
+
+
 # ── 3) the pinned code-to-severity table (D-182-03) ───────────────────────────
 
 
@@ -165,8 +196,15 @@ def test_every_known_code_classifies_exactly_as_the_pinned_table():
         ("input_unsatisfied", False, "incomplete"),
         ("business_requirement", False, "incomplete"),
         ("interactive_phase", False, "incomplete"),
+        # Phase 187 / D-187-11 — an unbound retrieval workflow is UNFINISHED, not broken:
+        # the author has not yet said which corpus this workflow is about. Grey "still
+        # building" is the correct paint, and it is a deliberate taxonomy addition.
+        ("unbound_retrieval", False, "incomplete"),
+        # ... and an empty draft does not change the answer — there is no phase to accuse,
+        # so the code cannot even be emitted, but the classifier must still be total.
+        ("unbound_retrieval", True, "incomplete"),
     ]
-    assert len(table) == 11, "10 codes + the second no_terminal condition"
+    assert len(table) == 13, "11 codes + the second no_terminal and unbound_retrieval conditions"
 
     for code, phases_empty, expected in table:
         assert workflows._severity(code, phases_empty=phases_empty) == expected, (
@@ -270,6 +308,20 @@ def test_known_codes_compose_from_the_owning_modules_with_no_orphan():
     }
     assert set(workflows._ROUTE_ASSIGNED_CODES).isdisjoint(owned), (
         "a route-minted code collided with an owning module's code — one of them must move"
+    )
+
+    # D-187-11, stated as its own falsifiable claim rather than left implicit in the
+    # disjointness above: `unbound_retrieval` is CANVAS-ONLY. It must appear in neither
+    # owning module's published set, because `grounding.grounding_verdicts` is shared with
+    # the publish gate (182-06 made publish enforcing through it) — a code that leaked into
+    # `GROUNDING_VERDICT_CODES` would silently start blocking publishes too, which Phase 187
+    # is explicitly not scoped to do.
+    assert "unbound_retrieval" in set(workflows._ROUTE_ASSIGNED_CODES)
+    assert "unbound_retrieval" not in set(reachability.LINT_CODES)
+    assert "unbound_retrieval" not in set(grounding.GROUNDING_VERDICT_CODES), (
+        "unbound_retrieval moved into the SHARED grounding collector — that makes it a hard "
+        "publish blocker as well as a canvas verdict (D-187-11 puts it in the ROUTE for "
+        "exactly that reason)"
     )
 
     # The DEGRADED bucket (round-2 gap closure — WR-01 / WR-02): an infrastructure-honesty
