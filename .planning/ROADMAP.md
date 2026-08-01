@@ -380,21 +380,36 @@ Plans:
 **Plans**: 15 plans in 4 waves
 
 Plans:
+**Wave 1**
+
 - [ ] 187-01-PLAN.md — SC#6 property test over author-declared validator sets, observed RED on HEAD (wave 1)
 - [ ] 187-02-PLAN.md — per-step `name` in AUTHORING_SYSTEM_PROMPT + the additive-optional provenance marker on PhaseSpec (wave 1)
 - [ ] 187-03-PLAN.md — D-187-11: the `unbound_retrieval` `incomplete` verdict in /validate + BUG-260731-03 frontmatter (wave 1)
 - [ ] 187-04-PLAN.md — the config-derived node-face tier in phaseVocabulary.ts (D-187-04 / D-187-05) (wave 1)
 - [ ] 187-05-PLAN.md — the D-181-01 flag-OFF describe-screen markup pin, captured before the template door (wave 1)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 187-06-PLAN.md — SC#6 fix shape C: the hoisted pre-body armed checkpoint + the closed Pitfall-4 fail-open (wave 2)
 - [ ] 187-07-PLAN.md — SC#10: the 8-provider authoring roster derived from MODEL_CAPABILITIES (wave 2)
 - [ ] 187-08-PLAN.md — thread the name context through toCanvas + WorkflowCanvas (wave 2)
 - [ ] 187-09-PLAN.md — Req 4: the reveal swaps the canvas subtitle; the spine keeps its plain title (wave 2)
 - [ ] 187-10-PLAN.md — Req 3 demote-on-identity-edit + the receipt/door copy constants in definitionOps (wave 2)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 187-11-PLAN.md — the SC#6 test census re-shape, the green property and the observed falsification (wave 3)
 - [ ] 187-12-PLAN.md — SC#5 checks 1 and 2 as pure-function sweeps over the shipped corpus (wave 3)
 - [ ] 187-13-PLAN.md — Req 5: the post-draft seed receipt (wave 3)
 - [ ] 187-14-PLAN.md — Req 6: the starter template door that seeds the describe box (wave 3)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
 - [ ] 187-15-PLAN.md — the two gated page mounts, the name-context thread and the phase gates (wave 4)
+
+**Cross-cutting constraints:**
+
+- ZERO migration files are added
 
 **UI hint**: yes
 **Flags**: G-2 sketch (node vocabulary "feels like"); SC#10 (VOCAB-02 AI-seed rides the provider-routed `POST /generate` NL generator — cross-provider); extends v3.3 LANG-01 + SEED-085 + Technical-names reveal; AI-seed structurally-safe (response schema IS the `extra="forbid"` union — Pitfall 7) + respects grounding mode (185); reuses the Starter Workflow Library; acceptance bar = PM pack + Starter Library + 4 canonical seed shapes; G-5 ledger (`PhaseNode.tsx` + NL-seed wiring into `WorkflowBuilderPage.tsx`); red line D-14; **SEED-137 folded → SC#6 (armed-gate precedence); this phase DOES now carry a threat-model item — the fix touches the D-185-05 attachment seam and must keep `test_185_engine_attachment.py:153-165` green or visibly re-shape it with reasoning recorded**; no migration.
