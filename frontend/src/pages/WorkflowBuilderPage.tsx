@@ -1048,20 +1048,38 @@ export function WorkflowBuilderPage({
    * R12 / D-184-15 — WHY publish is blocked, in the author's words, or `null` when it is
    * not blocked at all.
    *
-   * GATED ON THE FLAG, and that is load-bearing (D-14 / D-181-01): with
-   * `visual_workflow_canvas` off the publish trigger must be the control that shipped,
-   * for everyone including operators. A flag-off empty draft therefore still gets today's
-   * enabled `◆ Publish…`, exactly as before this plan.
+   * THE FLAG GATE HIDES VERDICTS, NOT THE CLIENT'S OWN WRITE (CR-03, 186-18). The
+   * distinction is the whole shape of this memo, and 186-16 got it wrong by putting the
+   * outstanding-write branch one line BELOW the gate, which made it dead code on exactly
+   * the surface where the write it guards against is still reachable:
+   *  - A VERDICT is a claim about the WORKFLOW. The server owns it (D-182-06) and the
+   *    reverted surface must never show it (D-14 / D-181-01): with `visual_workflow_canvas`
+   *    off the publish trigger must be the control that shipped, for everyone including
+   *    operators, so a flag-off empty draft still gets today's enabled `◆ Publish…`. Every
+   *    verdict branch therefore stays BELOW the `!canvasEnabled || builderPhase` line.
+   *  - AN OUTSTANDING WRITE is a fact about THIS CLIENT'S own write loop. It carries no
+   *    severity, no code and no tray row, never enters `verdicts`, and says nothing about
+   *    the workflow at all — so the flag has no jurisdiction over it. It is evaluated
+   *    ABOVE the gate, because the write itself is reachable above the gate: D-186-03
+   *    deliberately leaves `saveNow` ungated ("automatic writes obey the flag, chosen ones
+   *    obey the person"), and `actionGroup` mounts BOTH `builder-save-draft` and
+   *    `renderPublish` on BOTH header branches. A refusal that guards a write must be
+   *    reachable everywhere the write is.
+   *
+   * D-181-01 is untouched by that ordering, and it is measured rather than assumed: the
+   * flag-off RESTING header is unchanged (`WorkflowBuilderPage.header.test.tsx`'s two
+   * byte-for-byte pins pass without editing `FLAG_OFF_HEADER_MARKUP`), because this
+   * reading is reachable only while a write the person explicitly requested is still
+   * outstanding — a state that cannot exist at rest.
    *
    * The reason is chosen honestly, and two of the five branches are authored here:
    *  - A WRITE OUTSTANDING → `SAVING_PUBLISH_WAIT`, ranked FIRST because it is the nearest
    *    obstacle: fixing a verdict will not make Publish go until the PATCH has landed.
-   *    Still not the client computing a verdict (D-182-06) — it states a fact about THIS
-   *    client's own write loop, carries no severity, code or tray row, and never enters
-   *    `verdicts`. It needs no promise to be sound: `performWrite` sets
-   *    `{kind:"saving"}` SYNCHRONOUSLY before the request leaves, and every automatic
-   *    trigger runs from a timer callback or an effect — a different task from any later
-   *    click — so the reading a click observes has already rendered and is never stale.
+   *    Still not the client computing a verdict (D-182-06). It needs no promise to be
+   *    sound: `performWrite` sets `{kind:"saving"}` SYNCHRONOUSLY before the request
+   *    leaves, and every automatic trigger runs from a timer callback or an effect — a
+   *    different task from any later click — so the reading a click observes has already
+   *    rendered and is never stale.
    *  - EMPTY DRAFT → the INVITATION. Not a verdict, not a lint code, not a severity —
    *    just what to do next. The server is never asked about a workflow with no steps.
    *  - DEGRADED → the loop's own sentence for that cause. A check that did NOT RUN must
@@ -1073,8 +1091,8 @@ export function WorkflowBuilderPage({
    *    exactly as it does today.
    */
   const blockedReason = useMemo<string | null>(() => {
-    if (!canvasEnabled || builderPhase !== "drafted") return null
     if (persistState.kind === "saving") return SAVING_PUBLISH_WAIT
+    if (!canvasEnabled || builderPhase !== "drafted") return null
     if (phases.length === 0) return EMPTY_DRAFT_INVITATION
     if (validation.kind === "degraded") return DEGRADED_SENTENCE[validation.cause]
     if (validation.kind !== "verdicts" || validation.ok) return null
