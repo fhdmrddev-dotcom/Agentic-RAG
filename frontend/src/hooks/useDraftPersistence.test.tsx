@@ -435,12 +435,26 @@ describe("useDraftPersistence — F17: a receipt names the payload it actually w
     // effect has re-armed with a FRESH timer.
     h.edit()
 
-    // ★ THE LOAD-BEARING LINE OF THIS WHOLE SUITE. HALF the debounce, deliberately: the
-    //   second edit's own timer has NOT matured, so nothing anywhere arms `pendingRef`.
-    //   Advancing a full AUTOSAVE_DEBOUNCE_MS here would turn this back into F9.
+    // ★ THE LOAD-BEARING LINE OF THIS WHOLE SUITE, AND IT IS STILL THE POINT. HALF the
+    //   debounce, deliberately: the second edit's own timer has NOT matured, so nothing
+    //   anywhere arms `pendingRef`. Advancing a full AUTOSAVE_DEBOUNCE_MS here would turn
+    //   this back into F9.
     await advance(AUTOSAVE_DEBOUNCE_MS / 2)
 
     first.resolve(write("T1"))
+    await flush()
+
+    // 186-17 (WR-08) — THE NEW PROPERTY, STATED AT THE EXACT POINT THE OLD CODE VIOLATED IT.
+    // The confirmed write is superseded and `pendingRef` is clear, so the drain BREAKS: no
+    // beat was consumed, and the edit's own live timer owes the follow-up. Until then
+    // nothing is outstanding, so the reading must not claim one is.
+    expect(mockedUpdate).toHaveBeenCalledTimes(1)
+    expect(stateOf(h.view).kind).not.toBe("saving")
+
+    // The follow-up now arrives on the DEBOUNCE rather than instantly, which is WR-08's
+    // whole finding. Everything F17 claims about it — that it happens, what it carries, and
+    // which token guards it — is unchanged.
+    await advance(AUTOSAVE_DEBOUNCE_MS)
     await flush()
 
     return { h, receipts }
@@ -473,6 +487,204 @@ describe("useDraftPersistence — F17: a receipt names the payload it actually w
     await flush()
 
     expect(mockedUpdate).toHaveBeenCalledTimes(2)
+  })
+})
+
+// ── F22 — the drain owes the same quiet period the first write did (WR-08) ────
+
+/**
+ * Phase 186-17 (WR-08) — the write RATE, which is a concurrency property and not a
+ * performance one.
+ *
+ * THE MECHANISM, not the symptom. `PhaseFormPanel`'s fields call `onChange` into the store
+ * on EVERY KEYSTROKE, and 186-09 (CR-01) correctly widened the drain's supersede test from a
+ * queue flag to a payload-identity compare. Those two facts together turned the drain's
+ * `continue` into an unthrottled loop: while an author types, ANY store change during an
+ * outstanding request supersedes it, so every completed PATCH re-entered the loop
+ * IMMEDIATELY with no timer in between. The sustained write rate became one per ROUND TRIP
+ * instead of one per `AUTOSAVE_DEBOUNCE_MS` — a rate set by network latency, which is to say
+ * the faster the server the harder this hook hits it.
+ *
+ * TWO KNOCK-ONS, both real and neither cosmetic:
+ *   • every extra write mints a NEW `updated_at` token, and every minted token invalidates
+ *     the optimistic guard every other open tab holds. The loop was manufacturing exactly
+ *     the conflicts this phase exists to prevent.
+ *   • it widens WR-10's window (a publish racing an outstanding write) substantially, and
+ *     186-16's publish refusal is the guard that window sits behind.
+ *
+ * It also made two of the module's own docblocks false — `"Any change to the definition
+ * schedules ONE write"` and `AUTOSAVE_DEBOUNCE_MS`'s `"it also halves the write rate against
+ * a row that carries the golden-run history"`. The drain gave both back.
+ *
+ * THE FIX SPLITS TWO QUESTIONS THAT WERE BEING ANSWERED BY ONE TEST: whether a RECEIPT may
+ * be filed (payload identity alone — CR-01's property, unchanged), and whether the loop may
+ * issue ANOTHER request immediately (`pendingRef` alone, which is armed only where a MATURED
+ * timer, `saveNow` or the hold release met an in-flight write and therefore left no live
+ * timer behind). Everything else breaks, and the ordinary autosave beat writes it.
+ *
+ * THE RED NUMBERS, so a future reader can re-observe them by reverting the fix — recorded
+ * in `186-17-SUMMARY.md` verbatim:
+ *   F22a — `expected 11 to be less than or equal to 4`. Eleven PATCHes across 3000 ms of
+ *          simulated time, against a bound of four: one per round trip, exactly as the
+ *          finding predicted.
+ *   F22b — `expected 11 to be 12`. Pre-fix the storm had ALREADY sent everything by the time
+ *          the debounce beat came round, so the beat issued nothing — the same defect read
+ *          from the other side.
+ *   F22c — `updateWorkflowDraft` called 2 times where 1 is expected, and the state reads
+ *          `saving` where `idle` is expected.
+ *   F22d — 2 calls where 1 is expected: a Save press with NOTHING changed minted a second
+ *          PATCH purely because the queue flag was armed, bumping the token for no reason.
+ */
+describe("useDraftPersistence — F22: the drain owes the same quiet period the first write did (WR-08)", () => {
+  /**
+   * A FAST server, which is the WORST case for this defect rather than the kindest one: the
+   * shorter the round trip the tighter the unthrottled loop spins. 200 ms is a fifth of the
+   * debounce, so a bug that ties the rate to latency shows up as ~5 writes per quiet period.
+   */
+  const SERVER_LATENCY_MS = AUTOSAVE_DEBOUNCE_MS / 5
+
+  /**
+   * An author typing faster than the debounce — the shape that makes the timer reschedule
+   * rather than mature, so every write in the run has to come from the drain.
+   *
+   * DELIBERATELY SHORTER THAN THE ROUND TRIP. At 125 ms an edit lands inside EVERY request,
+   * so under the unthrottled `continue` the loop never runs out of supersessions and the
+   * storm is SUSTAINED. A cadence longer than the latency (e.g. 250 ms against a 200 ms
+   * server) lets the drain drift ahead of the typist and self-terminate after four or five
+   * writes — a real but muted measurement, which would understate the defect. Measured both
+   * ways before this constant was chosen (5 calls at 250 ms, 11 at 125 ms; both recorded in
+   * `186-17-SUMMARY.md`).
+   */
+  const EDIT_INTERVAL_MS = AUTOSAVE_DEBOUNCE_MS / 8
+  const ITERATIONS = 16
+
+  /** Every PATCH resolves on the clock, after `SERVER_LATENCY_MS`, carrying a token named
+   *  for its own call index — so a follow-up's guard can be checked against the value the
+   *  IMMEDIATELY preceding write returned. */
+  function fastServer(): void {
+    mockedUpdate.mockImplementation(() => {
+      const n = mockedUpdate.mock.calls.length // includes the call being made
+      return new Promise<WorkflowDraftWriteResult>((resolve) => {
+        setTimeout(() => resolve(write(`T${n}`)), SERVER_LATENCY_MS)
+      })
+    })
+  }
+
+  /** Put write #1 in flight, then type across it. Returns the elapsed clock time the test
+   *  actually advanced, so the bound is computed from the run rather than hardcoded. */
+  async function typeAcrossAFastServer(h: ReturnType<typeof harness>): Promise<number> {
+    let elapsedMs = 0
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+    elapsedMs += AUTOSAVE_DEBOUNCE_MS
+    expect(mockedUpdate).toHaveBeenCalledTimes(1)
+
+    for (let i = 0; i < ITERATIONS; i += 1) {
+      h.edit()
+      await advance(EDIT_INTERVAL_MS)
+      elapsedMs += EDIT_INTERVAL_MS
+    }
+    return elapsedMs
+  }
+
+  it("F22a — a typing author gets writes on the clock, not on the round trip", async () => {
+    fastServer()
+
+    const h = harness()
+    const elapsedMs = await typeAcrossAFastServer(h)
+
+    // THE BOUND IS OVER TIME, NOT OVER EDITS. `+ 1` because the run opens with a write that
+    // was already in flight before the first quiet period of the measured window elapsed.
+    const allowed = Math.ceil(elapsedMs / AUTOSAVE_DEBOUNCE_MS) + 1
+    expect(mockedUpdate.mock.calls.length).toBeLessThanOrEqual(allowed)
+  })
+
+  it("F22b — nothing is lost by the bound: the follow-up arrives on the ordinary beat", async () => {
+    fastServer()
+
+    const h = harness()
+    await typeAcrossAFastServer(h)
+    const duringTheRun = mockedUpdate.mock.calls.length
+
+    // The debounce timer the last edit re-armed is still live — that is the whole reason the
+    // drain is allowed to break.
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+    await flush()
+    expect(mockedUpdate.mock.calls.length).toBe(duringTheRun + 1)
+
+    // …and it is a real round trip, so the receipt waits for the server the same way the
+    // first write did.
+    await advance(SERVER_LATENCY_MS)
+    await flush()
+
+    expect(mockedUpdate.mock.calls.length).toBe(duringTheRun + 1)
+    const last = mockedUpdate.mock.calls.length - 1
+    // Stated over the STORE rather than over a literal: whatever the author has, the server
+    // was told about.
+    expect(sentDefinition(last).phases).toHaveLength(h.store.getState().phases.length)
+    // …guarded by the token the IMMEDIATELY preceding write returned, not the session's.
+    expect(mockedUpdate.mock.calls[last][2]).toBe(`T${last}`)
+    expect(h.store.getState().dirty).toBe(false)
+  })
+
+  it("F22c — a break never leaves the surface claiming a save is in progress", async () => {
+    // ⚠ THIS TEST GUARDS THE FIX'S OWN HAZARD, so its RED is not the defect's RED. Before the
+    // break existed the drain issued a second request here, and the `saving` reading was
+    // TRUE — a request really was outstanding. It becomes a false claim only once a break is
+    // introduced, which is why the state assertion is written with the break rather than
+    // after it. The call-count assertion beside it IS the defect's RED (2 where 1 is owed).
+    const first = deferred<WorkflowDraftWriteResult>()
+    const second = deferred<WorkflowDraftWriteResult>() // deliberately never resolved
+    mockedUpdate
+      .mockImplementationOnce(() => first.promise)
+      .mockImplementationOnce(() => second.promise)
+
+    const h = harness()
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+
+    // The author keeps typing; the second edit's OWN timer is left immature, so nothing
+    // anywhere arms `pendingRef` — the exact interleaving F17 drives.
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS / 2)
+
+    first.resolve(write("T1"))
+    await flush()
+
+    expect(mockedUpdate).toHaveBeenCalledTimes(1)
+    expect(stateOf(h.view).kind).not.toBe("saving")
+    expect(stateOf(h.view)).toEqual({ kind: "idle" })
+    // Nothing was lost by the break: the work is still unsent AND still claimed as unsent.
+    expect(h.store.getState().dirty).toBe(true)
+  })
+
+  it("F22d — an explicit Save with nothing changed mints no extra PATCH", async () => {
+    const first = deferred<WorkflowDraftWriteResult>()
+    mockedUpdate
+      .mockImplementationOnce(() => first.promise)
+      .mockImplementation(() => Promise.resolve(write("T-REDUNDANT")))
+
+    const h = harness()
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+    expect(mockedUpdate).toHaveBeenCalledTimes(1)
+
+    // The press arms `pendingRef` through the writer's single-flight guard (186-12) and
+    // changes NOTHING about the payload.
+    let ok = true
+    await act(async () => {
+      ok = await h.view.result.current.saveNow()
+    })
+    expect(ok).toBe(false)
+
+    first.resolve(write("T1"))
+    await flush()
+
+    // A queue flag is not evidence that the payload moved. The receipt the outstanding write
+    // earned is filed, and no second PATCH is minted to bump the token for nothing.
+    expect(mockedUpdate).toHaveBeenCalledTimes(1)
+    expect(h.markSaved).toHaveBeenCalledTimes(1)
+    expect(h.store.getState().dirty).toBe(false)
   })
 })
 

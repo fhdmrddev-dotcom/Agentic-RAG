@@ -51,6 +51,15 @@
  * and never reach here (D-186-02: `canvasNudge` is browser-local by construction and
  * imports neither this module, the store, nor the API client).
  *
+ * AND A FOLLOW-UP IS STILL AN AUTOSAVE BEAT, SO IT OWES THE SAME QUIET PERIOD (186-17,
+ * WR-08). The rule a reader can check: under sustained editing this loop issues at most one
+ * write per `AUTOSAVE_DEBOUNCE_MS`, measured over ELAPSED TIME rather than over edits or
+ * round trips. The queue drain re-enters only where `pendingRef` says a beat was consumed by
+ * an in-flight write; a supersession with a live timer behind it BREAKS and lets that timer
+ * do its job. This paragraph was false for two plans: the drain's unthrottled `continue`
+ * re-entered on every keystroke-driven supersession, so the rate was set by network latency.
+ * F22 in the co-located suite bounds it by the clock, so a regression reads as a number.
+ *
  * ── ONE HOLD MECHANISM, TWO SENTENCES (D-186-04 + D-186-12) ──────────────────────
  *
  * A write that cannot safely happen is HELD, not attempted and not silently dropped, and
@@ -124,6 +133,12 @@ import type { BuilderDefinition } from "@/pages/WorkflowBuilderPage"
  * on precisely the edit that needed it. At 1000 the check has had a full extra half-second
  * (its own debounce plus a round trip) to land. It also halves the write rate against a row
  * that carries the golden-run history.
+ *
+ * ⚠ THAT LAST SENTENCE ONLY BECAME TRUE AGAIN IN 186-17 (WR-08). This constant can only halve
+ * a rate the drain then respects: while the queue drain re-entered unthrottled on every
+ * keystroke-driven supersession, the sustained rate was one write per ROUND TRIP, so doubling
+ * this number changed nothing at all about the load on the row. The drain now breaks unless a
+ * beat was actually consumed, which is what puts this constant back in charge of the rate.
  *
  * BE HONEST ABOUT WHAT THIS BUYS: a probability improvement, NOT a guarantee. Nothing here
  * orders the two loops. The authoritative backstop is the write's own 422, which surfaces
@@ -629,16 +644,21 @@ export function useDraftPersistence(args: DraftPersistenceArgs): DraftPersistenc
           break
         }
 
-        // IS THIS CONFIRMED WRITE STILL THE TRUTH? Asked of WHAT WAS WRITTEN, never of a
-        // queue flag (GAP-1 / CR-01). `pendingRef` is now ONE of three reasons a turn can be
-        // superseded rather than the only one: it catches an edit whose own timer matured
-        // while this request was outstanding, but an edit that landed mid-flight and is
-        // still inside its 1000 ms debounce arms nothing at all, and that is the common
-        // shape — type, pause about a second, resume. The store having moved on is the
-        // property; the flag was only ever a proxy for it.
+        // TWO QUESTIONS, ASKED SEPARATELY (186-17, WR-08). They used to share one answer,
+        // and that is what turned this loop into a write storm.
         const now = store.getState()
-        const superseded =
-          pendingRef.current || now.phases !== writtenPhases || now.meta !== writtenMeta
+
+        // (1) MAY A RECEIPT BE FILED? Decided by WHAT WAS WRITTEN and by nothing else
+        // (GAP-1 / CR-01): the receipt is honest exactly when the `phases` and `meta`
+        // references the request carried are still the references the store holds.
+        //
+        // `pendingRef` IS DELIBERATELY ABSENT FROM THIS TEST. A queue flag is not evidence
+        // that the payload moved — it says only that somebody asked for a write while one
+        // was outstanding. Treating it as a supersession is what minted a redundant PATCH
+        // for a Save press that changed nothing (WR-08's second instance): the token was
+        // bumped for no reason, invalidating the optimistic guard every other open tab
+        // holds. An unchanged payload files the receipt the outstanding write earned.
+        const superseded = now.phases !== writtenPhases || now.meta !== writtenMeta
 
         if (superseded) {
           // A newer edit landed mid-flight, so this confirmed write is already superseded
@@ -652,7 +672,33 @@ export function useDraftPersistence(args: DraftPersistenceArgs): DraftPersistenc
             setState({ kind: "held", sentence: holdRef.current })
             break
           }
-          continue
+
+          // (2) MAY THE LOOP ISSUE ANOTHER REQUEST IMMEDIATELY? Decided by `pendingRef` and
+          // by nothing else — and the reason is re-derivable from its three arming sites,
+          // all of which mean the SAME thing. It is set only inside `performWrite`'s
+          // single-flight guard above, reached from the MATURED debounce timer, from
+          // `saveNow`, or from the hold release. Each of those had its beat CONSUMED by
+          // finding a write outstanding, so there is no live timer behind it and the
+          // follow-up it asked for is genuinely owed now.
+          //
+          // Every OTHER supersession is an edit that landed mid-flight and is still inside
+          // its own AUTOSAVE_DEBOUNCE_MS. Those have a LIVE timer by construction: an edit
+          // changes `definition`, and the debounce effect's deps are `[definition, enabled]`,
+          // so it reschedules. The ordinary autosave beat writes them.
+          if (pendingRef.current) continue
+
+          // A FOLLOW-UP IS OWED ON THE CLOCK, NOT NOW — so nothing is outstanding, and the
+          // reading must stop saying one is. `dirty` is still true (no receipt was filed),
+          // which is what the leave guards, `beforeunload` and the toolbar all key on.
+          //
+          // Without this break the drain re-entered on every keystroke-driven supersession
+          // and the sustained write rate became one per ROUND TRIP instead of one per
+          // AUTOSAVE_DEBOUNCE_MS (WR-08). Two knock-ons made that a correctness problem
+          // rather than a performance one: every extra write mints a new token, so the loop
+          // manufactured the very conflicts this phase exists to prevent, and it widened the
+          // publish-race window 186-16 guards.
+          setState({ kind: "idle" })
+          break
         }
 
         // A CONFIRMED write with nothing newer queued is the ONLY thing that clears `dirty`.
