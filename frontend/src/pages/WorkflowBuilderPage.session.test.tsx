@@ -548,6 +548,56 @@ describe("WorkflowBuilderPage session — every dismissal commits and none of th
     return currentPhases().find((p) => p.slug === slug)?.config.prompt
   }
 
+  /**
+   * WR-11 — MEASURE THE DISMISSAL, NOT THE CLOCK.
+   *
+   * Returns how many `updateWorkflowDraft` calls `run()` ADDED: the count is read
+   * immediately before the action and again once the surface has settled back to the rail —
+   * the same settle these rows already performed inline.
+   *
+   * ── WHY A DELTA, AND WHY ONLY HERE ───────────────────────────────────────────────
+   *
+   * The claim of these three rows is about the DISMISSAL: pressing ✕, Escape or the plane
+   * must not itself mint a write. It was encoded as `toHaveBeenCalledTimes(0)`, which is a
+   * claim about the WHOLE interval since the keystroke — and for the pane row those are not
+   * the same interval. That row alone leaves the spine, switches to the canvas and then
+   * waits up to `LAZY` (10 s) for a lazily-imported chunk, with a seeded `draftId:
+   * "draft-1"` and a store the typed sentence just made dirty. `AUTOSAVE_DEBOUNCE_MS` is
+   * 1000. Whenever that import outruns the debounce a perfectly legitimate autosave lands
+   * INSIDE the wait and the absolute count goes red for the product WORKING — a wall-clock
+   * claim the row never meant to make. The two sibling rows never leave the spine, never
+   * cross the debounce, and keep their absolute assertions; that contrast is what
+   * identified the cause, so it is deliberately preserved.
+   *
+   * ── WHAT WAS ACTUALLY MEASURED, because a SUMMARY already got this wrong once ─────
+   *
+   * `/gsd:verify-work` recorded this row RED on 2026-08-01 — 22 passed / 1 failed over
+   * three runs including full isolation, and 49 + 1 for the header+session pair — which
+   * itself FALSIFIED the 186-12 / 186-13 SUMMARY claim that the row "passes in isolation".
+   * Executing 186-15 the row was re-measured and came back GREEN in every configuration
+   * reachable on that machine: 23/23 three times in isolation, 50/50 for the header+session
+   * pair, and 260/260 with the whole 16-file `src/pages` directory running in parallel.
+   * BOTH numbers are real and neither is the row's "true" state. Together they say the row
+   * is TIMING-DEPENDENT rather than reliably anything, which is a stronger argument for
+   * removing the timing dependence than a deterministically red row would have been.
+   * Re-measure before quoting either figure; do not inherit one on trust.
+   *
+   * ── THE RESIDUAL WINDOW, STATED RATHER THAN HIDDEN ───────────────────────────────
+   *
+   * The settle cannot be made generous. The typed sentence armed a real 1000 ms timer
+   * before the measurement began, so a long settle would capture the very autosave this
+   * exists to exclude. It therefore waits only for the rail, which is already on screen by
+   * then and resolves on the first check. A debounce maturing inside those few milliseconds
+   * would still show a delta of 1. The window is milliseconds wide instead of seconds —
+   * that is the improvement, and it is not a proof.
+   */
+  async function patchDelta(run: () => Promise<void> | void): Promise<number> {
+    const before = mockUpdate.mock.calls.length
+    await run()
+    await waitFor(() => expect(screen.getByTestId("phase-form-rail")).toBeInTheDocument())
+    return mockUpdate.mock.calls.length - before
+  }
+
   it("✕ — the pending value is in the definition and ZERO PATCHes were issued", async () => {
     const { default: userEvent } = await import("@testing-library/user-event")
     const user = userEvent.setup()
@@ -576,20 +626,44 @@ describe("WorkflowBuilderPage session — every dismissal commits and none of th
     expect(mockCreate).toHaveBeenCalledTimes(0)
   })
 
-  it("pane click — the pending value is in the definition and ZERO PATCHes were issued", async () => {
+  it("pane click — the pending value is in the definition and the DISMISSAL ITSELF issues no PATCH (WR-11)", async () => {
     const { container } = renderBuilder()
     // The pane only exists on the canvas, so switch views first — the panel and its
     // selection survive the swap (the D-183-05 one-selection contract).
     const text = await typeWithoutBlurring("dismissed by a click on the plane")
     fireEvent.click(screen.getByTestId("builder-view-canvas"))
     await waitFor(() => expect(container.querySelector(".react-flow__pane")).not.toBeNull(), LAZY)
+    const pane = container.querySelector(".react-flow__pane")!
 
-    fireEvent.click(container.querySelector(".react-flow__pane")!)
-    await waitFor(() => expect(screen.getByTestId("phase-form-rail")).toBeInTheDocument())
+    // The claim, measured over the dismissal and nothing else (WR-11). Whatever the lazy
+    // import cost, and whether or not a legitimate autosave matured while it was resolving,
+    // the click on the plane adds no write of its own.
+    expect(
+      await patchDelta(() => {
+        fireEvent.click(pane)
+      }),
+    ).toBe(0)
 
     expect(promptOf("research")).toBe(text)
-    expect(mockUpdate).toHaveBeenCalledTimes(0)
+    // The create path is a DIFFERENT branch and stays ABSOLUTE: this harness seeds
+    // `draftId: "draft-1"`, so no create can ever be legitimate here and there is no
+    // interval to exclude.
     expect(mockCreate).toHaveBeenCalledTimes(0)
+
+    // ── THE POSITIVE CONTROL — the falsification of the zero above ─────────────────
+    // A delta helper that could not observe a PATCH would make that zero decoration: it
+    // would read as a measurement while measuring nothing. So the SAME helper is wrapped
+    // around a write that is guaranteed to happen. The explicit Save button bypasses both
+    // the debounce and the dirty gate (D-186-03), so this needs no clock and no timeout —
+    // if the arithmetic above were broken (snapshotting the calls ARRAY rather than its
+    // length, say, which always yields 0) this line goes red immediately.
+    const atSave = mockUpdate.mock.calls.length
+    expect(
+      await patchDelta(async () => {
+        fireEvent.click(screen.getByTestId("builder-save-draft"))
+        await waitFor(() => expect(mockUpdate.mock.calls.length).toBeGreaterThan(atSave))
+      }),
+    ).toBeGreaterThanOrEqual(1)
   })
 
   it("the ✕ suppresses the focus transfer — the MECHANISM that used to mint the PATCH", async () => {
