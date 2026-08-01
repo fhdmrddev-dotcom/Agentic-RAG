@@ -253,6 +253,15 @@ inside one function of one frontend hook.
 Both remain **not** independently re-verified — that is `/gsd:verify-work 186`'s job after waves
 7 and 8 (186-12, 186-13) land on this same file.
 
-## Self-Check
+## Self-Check: PASSED
 
-Verified after writing this summary — see the appended section below.
+| Claim | Result |
+|---|---|
+| `frontend/src/hooks/useDraftPersistence.ts` exists | FOUND (604 lines; artifact contract asked ≥ 180) |
+| `frontend/src/hooks/useDraftPersistence.test.tsx` exists | FOUND (contains `F17` — 10 occurrences) |
+| `.planning/phases/186-concurrency-autosave/186-09-SUMMARY.md` exists | FOUND |
+| commit `d1125fd9` (RED test) | FOUND |
+| commit `3ef3689b` (fix) | FOUND |
+| commit `e9319501` (summary) | FOUND |
+| key link — snapshot capture → `superseded` test above `markSaved()` | FOUND: `writtenPhases`/`writtenMeta` bound at `:376-377`, compared at `:444`, `markSaved()` at `:462` |
+| no file deletions in either code commit | CONFIRMED (`git diff --diff-filter=D HEAD~2 HEAD` empty) |

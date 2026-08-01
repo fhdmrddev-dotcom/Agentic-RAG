@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
 status: executing
-last_updated: "2026-08-01T00:16:13.112Z"
-last_activity: 2026-08-01 -- Phase 186 gap closure planned (186-09..13, waves 6-8)
+last_updated: "2026-08-01T06:57:46.066Z"
+last_activity: 2026-08-01 -- Phase 186 execution started
 progress:
   total_phases: 19
   completed_phases: 5
   total_plans: 65
-  completed_plans: 58
+  completed_plans: 59
   percent: 26
 ---
 
@@ -71,15 +71,20 @@ verify the PROPERTY, not the PATCH).
 **Gap-closure PLAN committed 2026-08-01 (`1c65b6a0`, 5 plans / 3 waves; plan-check PASSED first
 iteration, zero revisions).** Operator scope call: **all 3 blockers + all 4 warnings.**
 Waves 6→7→8 are strictly sequential because 186-09/12/13 all modify `useDraftPersistence.ts`.
+
 - **186-09** (W6) CR-01 — the receipt becomes a property of *what was written*: `performWrite` captures
   the payload's `phases`+`meta` identity at snapshot time and refuses `markSaved()` unless the store
   still holds it. Replaces the `pendingRef` queue-flag inference.
+
 - **186-10** (W6) WR-02 — the missing `grounding_fidelity` row on the gauntlet spine, running index
   derived not hard-coded, and a coverage test sourced from `publish_service.py` itself.
+
 - **186-11** (W6) WR-06 — the live-Postgres skip moves off the module onto the tests that need a DB, so
   the `draft_changed` invariant finally has DB-free CI coverage.
+
 - **186-12** (W7) WR-01 — single-flight moves *inside* `performWrite`, becoming a property of the writer;
   caller-side checks deleted; both banner controls disabled while saving.
+
 - **186-13** (W8) WR-03 + WR-04 + WR-05 — `if (!enabled) return` in the hold-release effect (D-181-01
   restored, proven by a flag-off test asserting **zero** network calls); the hold sentence stops promising
   a save the loop will not perform; a 404 halts the loop instead of retrying forever.
@@ -213,6 +218,43 @@ greps counted the executor's own docblock prose (`project-folder-picker` → 3, 
 → 1). Prose reworded to state the facts by description; counts became 2 and 0 honestly. And on the
 first: the number moved further than the property — the flag-off arm still hides the unbound
 state, by design, which is said plainly in the SUMMARY rather than left to the grep.
+
+**Execution progress — Plan 186-09 COMPLETE (2026-08-01), the first gap-closure plan.** Wave 6's
+CR-01 fix shipped in 2 atomic commits (`d1125fd9` F17 RED → `3ef3689b` the identity gate), SUMMARY
+`e9319501`. **GAP-1 is closed at the property, not at the patch:** `performWrite` now binds
+`writtenPhases = snapshot.phases` / `writtenMeta = snapshot.meta` before the request leaves, and
+the bare `if (pendingRef.current)` became
+`superseded = pendingRef.current || now.phases !== writtenPhases || now.meta !== writtenMeta`.
+The branch BODY is byte-unchanged (the `haltedRef` break, the `holdRef` → `heldPendingRef` arm,
+the trailing `continue`), so 186-12 and 186-13 open a function they still recognise;
+`markSaved()` and `setState({kind:"saved"})` keep exactly one call site each. Two identity
+compares and not a deep compare, because `selectDefinition` is `{ ...state.meta, phases:
+state.phases }` and every mutating action replaces one of those two references — stated in the
+code comment so the totality is argued, not assumed. Hook suite **23 → 26**, all green; `tsc -b`
+**33 == baseline** with 0 naming a touched file; `vite build` exit 0; zero backend files, zero
+migrations (head stays 114), zero packages.
+⚠ **F17 was observed RED first and one plan PREDICTION was corrected by the observation.** The
+recorded receipt pair read `[3]` vs `[4]` — the receipt named a payload the store had moved past —
+and `updateWorkflowDraft` was called 1 time where 2 are expected. The plan predicted F17c would be
+GREEN in RED; it is **red at 1**, because the orphaned timer found `dirty` already cleared and
+issued nothing at all. The test docblock records the observed number, not the predicted one.
+⚠ **The load-bearing line is the one that does LESS.** F17 advances `AUTOSAVE_DEBOUNCE_MS / 2`,
+deliberately: the shipped F9 advances a FULL debounce after its second edit, which matures that
+edit's own timer and arms `pendingRef` — the branch that already worked. Anyone who "tidies" that
+half into a whole silently deletes the regression test.
+⚠ **The frontend full-suite rot band is WIDER and UNSTABLE — 42/43 failures across two
+consecutive runs of the same tree, with a DIFFERENT failing set each time** (SEED-056 records
+"~14-17"). Proven not to be this plan's: the 8 genuinely-rotten files fail identically **in
+isolation** (21/144), `PublishGauntlet` (18) and `WorkflowCanvas` (2) **pass fully in isolation**
+(parallel-load flake), and all 5 suites importing the changed hook run **245/245**. Total
+collected is **3556 on every run** — non-decreasing. Recorded with a re-open trigger in
+`deferred-items.md`: the next gate that wants the frontend suite as a pass/fail signal must
+measure per-file in isolation, not as one whole-suite number.
+⚠ **Counters and requirement status deliberately NOT advanced by this executor.** `CONCUR-01` /
+`CONCUR-02` stay as they are — 186-09 closes one of three blockers, and 186-12 / 186-13 modify the
+same file in waves 7-8; marking either complete now would be exactly the false-completion record
+the SDK verbs produce. ROADMAP plan-progress left to the orchestrator.
+
 Resume file: None
 
 Both owed items are now ROUTED at the discuss-phase touchpoint:
@@ -242,7 +284,7 @@ existing `updated_at` column, and the new `blocked_stage` is free-form metadata 
 already-registered `publish_blocked` event type (unlike 185-13's `action_risk_pending`).
 
 *(Historical, superseded — the 185 execution detail below was accurate when written:)*
-Plan: 1 of 8
+Plan: 1 of 13
 (Summaries on disk: 01, 02, 03, 04, 05, 06, 07, 08, 09, 10, 11, 12.)
 
 **⚑ WAVE 7 / PLAN 185-12 LANDED (2026-07-30) — BUG-260730-01 IS CLOSED IN CODE, AND IT WAS A
@@ -836,7 +878,7 @@ Status: Executing Phase 186
 
 **G-2 sketch gate for Phase 183: SATISFIED (2026-07-25).** Sketches 134-137 committed (`01bb4c64`, `7b74d2b5`, `01d50bba`, `86f866c5`, `e35c7489`). Winners: **136-B** (horizontal left->right flow) + **137-D** (frosted-glass step cards, 3D icon floating at the left edge, plain language with technical names behind the Alt reveal, Alive-by-default motion). Locked rules the canvas phases inherit: **colour budget** (step-type colour is a tint behind the icon only — the strong colours belong to Phase 188 run status) and **motion keys off run state, never selection**. New reusable asset `.planning/sketches/themes/phase-icons-3d.js` (verified 3D fluent-emoji marks; NEVER text glyphs). Icon choices: `llm_agent` -> `compass`; `llm_batch_agents` gets a lighter icon well in-scope, with the cross-cutting `handshake` swap left open. **Two findings that must reach the 183 plan: (1) `skip_to_phase` is used ZERO times in all 95 live definitions — SC#1's branch edge needs a fixture; (2) 40 of 95 definitions have zero phases — the empty projection is the most common canvas state.**
 
-Last activity: 2026-07-31 -- Phase 186 execution started
+Last activity: 2026-08-01 -- Phase 186 execution started
 
 ### Quick Tasks Completed
 

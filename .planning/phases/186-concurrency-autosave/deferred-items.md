@@ -88,3 +88,44 @@ own binding control and the markup pin must be updated deliberately.
 ---
 
 *Recorded: 2026-08-01 · Phase 186-concurrency-autosave, plan 08*
+
+---
+
+## The frontend full-suite rot band is wider — and less STABLE — than SEED-056 records
+
+**Status:** deferred, out of scope (executor scope boundary — none of it is caused by, or in a
+file touched by, plan 186-09).
+
+**What was observed.** Two consecutive full `npx vitest run` passes on the same tree reported
+**43 failures / 12 files** and then **42 failures / 11 files**, and the failing SET differed
+between them (`MessageItem` in one only; `model-info` and `WorkflowBuilderPage.session` in the
+other only). SEED-056 records the band as "~14-17". The instability is the finding as much as the
+size: a phase-verification gate that compares a single failure count against a single remembered
+number will read as a regression or a fix at random.
+
+**What was proven, so a later reader does not re-derive it:**
+
+| Group | Failures | In isolation |
+|---|---|---|
+| 8 genuinely-rotten files (`streamsProvider`, `StreamsProvider.dedup`, `streamsProvider_075_9_clientkey`, `IngestionPage`, `MessageItem`, `Plan04.frontend`, `useMessages`, `model-info`) | 21 / 144 | **fail identically** — real rot, no parallel load needed |
+| `PublishGauntlet.test.tsx` | 18 | **passes fully** |
+| `WorkflowCanvas.test.tsx` | 2 | **passes fully** |
+| the 5 suites importing `useDraftPersistence` + `builderStore.test.ts` + `PublishGauntlet` | 0 | **245 passed / 245** |
+
+Total collected was **3556 on every run** — non-decreasing, so nothing was replaced or deleted
+(the Phase 177 lesson).
+
+**Why it is not fixed here.** Plan 186-09 changed three statements inside one function of
+`useDraftPersistence.ts`. No file in the failing set imports that hook. Fixing 21 unrelated rotten
+tests inside a gap-closure plan would bury the one change the phase's re-verification has to be
+able to see.
+
+**Re-open trigger:** the next `/gsd:verify-work 186` (or any phase gate) that wants to read the
+frontend suite as a pass/fail signal. At that point the band needs to be measured **per file in
+isolation**, not as a single whole-suite number — and `PublishGauntlet` / `WorkflowCanvas` need
+their parallel-load flake fixed or their concurrency pinned, because they alone account for 20 of
+the ~42 and are pure noise.
+
+---
+
+*Recorded: 2026-08-01 · Phase 186-concurrency-autosave, plan 09*
