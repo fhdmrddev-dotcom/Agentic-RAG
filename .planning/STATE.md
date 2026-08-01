@@ -4,7 +4,7 @@ milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
 status: executing
 last_updated: "2026-08-01T21:34:50.931Z"
-last_activity: 2026-08-02 -- Phase 187 plan 05 complete (flag-off describe-screen markup pin)
+last_activity: 2026-08-02 -- Phase 187 plan 07 complete (SC#10 8-provider generation roster, live)
 progress:
   total_phases: 19
   completed_phases: 6
@@ -170,6 +170,37 @@ RED signature returns).
 **Also carry forward:** a hand-declared `action_risk_approval` ValidatorSpec is now an **ordinary
 author gate** — nothing in the engine treats that `kind` specially. The Literal is kept (187-02) and
 0 stored rows name it, so no live data is affected.
+
+**Plan 187-07 COMPLETE (Wave 2, 2026-08-02, `9f530082` → `847f2374`).** SC#10 / VOCAB-02 — the
+**8-provider generation roster is DERIVED and MEASURED LIVE**.
+`backend/tests/integration/test_187_authoring_roster.py` imports `MODEL_CAPABILITIES`, groups on
+`provider` and picks one representative per group by version tuple (ties → timeout → max-output → id).
+**The heuristic needs no override map** — it independently picks the newest flagship in all 8 groups,
+so the file hand-types **zero** model ids and `grep -c monkeypatch` → **0**. Each row passes its own
+`SimpleNamespace(harness_authoring_model=…)` — `settings` is a **PARAMETER**
+(`workflow_authoring.py:221-231`), so there is zero global mutation and the SPEC's "must run serially"
+assumption is **SUPERSEDED**. Collection 3523 → **3533**; the default `pytest tests/ -q` skips all 8
+rows in 0.30 s with no network.
+**LIVE BOARD (718 s, all 8 rows, 0 ⛔): anthropic ✅ · deepseek ✅ · google ✅ · zhipu ✅ ·
+moonshot ✅ · minimax ❌ · openai ❌ · openrouter ❌.**
+**Carry forward — three findings, only ONE of which is about names:**
+(1) **OpenRouter drops the per-step `name` NON-DETERMINISTICALLY** — sample 1 emitted a valid
+definition with **5 of 5 phases unnamed**; sample 2, same prompt, named all 5. Non-native tool path
+(`native_tools: False`). The assertion was **not weakened**; Req 1's derived face is the graceful
+degradation. Re-sample with `-k openrouter`, never trust one generation.
+(2) **`MODEL_CAPABILITIES` OVER-CLAIMS for the whole `gpt-5.6-*` family.** Registry says
+`forced_emission: True` / `emit_tier: force_strict`, but OpenAI now refuses function tools for
+reasoning-first models on `/v1/chat/completions` outright (verbatim 400: *"…use /v1/responses or set
+reasoning_effort to 'none'"*). The ladder descends, gets a 200, emits nothing. **Do NOT "fix" this by
+editing the roster** — it is a registry/gateway change (Rule 4), adjacent to `BUG-260731-01`.
+Supplementary diagnostic: `gpt-5.5` (the fallback branch's own pick) names **5/5**, so **OpenAI's real
+SC#10 answer is GREEN**.
+(3) **`MiniMax-M3` never emits** — 4 × HTTP 200, no tool call, across 2 attempts (budget held at 2,
+never 3). Nothing measured about names because nothing was emitted.
+**The moonshot prediction was REFUTED and recorded** — the coerce-tier `kimi-k2.6` named all 5 phases,
+though `resolve_authoring_model` branch 1 still returns an explicitly-set model without validating
+`forced_emission`. No row was `xfail`-ed. **M7 (the env path reaching `resolve_authoring_model`)
+remains manual and uncovered** — this roster drives the service function, not the env knob.
 
 (`3713a716`), GOVERN-01/02/03 all `Complete`, `nyquist_compliant` true, SECURED 49/49 (`a00b1cc5`).
 Security found one real fail-open BLOCKER — T-185-04-01, a **typed** refusal on an armed checkpoint ran
