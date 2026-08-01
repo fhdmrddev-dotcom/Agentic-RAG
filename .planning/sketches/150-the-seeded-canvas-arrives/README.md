@@ -2,7 +2,8 @@
 sketch: 150
 name: the-seeded-canvas-arrives
 question: "What does the AI-seeded canvas arrival feel like, and how does the auto-applied grounding become legible?"
-winner: null
+winner: "B"
+winner_note: "All at once + seed receipt. The only variant that discharges SC#3 - it names what was locked and why. C's review-state is a separate question with an unresolved mark collision."
 tags: [canvas, ai-seed, arrival, governance, phase-187, VOCAB-02]
 phase: 187
 depends_on: 148

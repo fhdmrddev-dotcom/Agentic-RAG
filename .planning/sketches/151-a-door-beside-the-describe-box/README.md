@@ -2,7 +2,8 @@
 sketch: 151
 name: a-door-beside-the-describe-box
 question: "How does start-from-a-template sit beside the describe box without breaking the calm first screen?"
-winner: null
+winner: "C"
+winner_note: "Template seeds the describe box. Preserves the calm first screen AND keeps ONE forward path (describe then draft); the gallery stays on the Workflows page per decision #19."
 tags: [builder, templates, first-screen, phase-187, VOCAB-03]
 phase: 187
 ---

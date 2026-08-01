@@ -2,7 +2,8 @@
 sketch: 149
 name: what-the-reveal-costs
 question: "When ⌥ Technical-names is ON, what should the canvas card show?"
-winner: null
+winner: "C"
+winner_note: "Swap the SUBTITLE, not the title. Keeps 148-C's now-meaningful plain title, spends no slot, leaves technicalLine to Phase 188."
 tags: [canvas, vocabulary, technical-names, phase-187, VOCAB-01]
 phase: 187
 depends_on: 148
