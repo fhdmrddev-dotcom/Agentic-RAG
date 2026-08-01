@@ -284,6 +284,45 @@ export { PUBLISHED_CONFLICT_MESSAGE }
 export const EMPTY_DRAFT_INVITATION = "Add a step to get started"
 
 /**
+ * What the header says about a workflow bound to NO knowledge base (D-186-16).
+ *
+ * IT STATES THE CONSEQUENCE, NOT THE STATE. "Unbound", and the describe screen's own
+ * "No specific knowledge base", both sound harmless — and BUG-260731-03's live evidence
+ * is that they are not. With `project_folder_id` null, "the knowledge base" is
+ * *everything*: the reported run drew 11 files from 5+ folders into a compliance report,
+ * and the operator reproduced the same mistake on themselves within ten minutes because
+ * nothing on the canvas ever said so. The sentence has to name what actually happens.
+ *
+ * AN INVITATION, NOT A CLAIMED VERDICT — the rule `EMPTY_DRAFT_INVITATION` above states,
+ * for the same reason. The client is not validating anything here: no severity, no code
+ * and no lint rule is being computed, a null `project_folder_id` is not a finding, and
+ * D-182-06 stays intact because the server owns every verdict. The deterministic
+ * build-time `/validate` verdict for an unbound retrieval workflow is Phase 187's
+ * (D-186-14) and is deliberately NOT built here.
+ *
+ * WHERE IT IS ALLOWED TO TRAVEL: the header chip, and nowhere else. `UNBOUND_KB_INVITATION`
+ * must never join `blockedReason` (that would make an unbound workflow unpublishable —
+ * 187's call, not this phase's), never become a `Verdict`, never enter `verdicts` or
+ * `groupVerdicts`, never add a problems-tray row and never mark a node. A comment-stripped
+ * source fence in `WorkflowBuilderPage.header.test.tsx` asserts exactly that, in both
+ * directions.
+ */
+export const UNBOUND_KB_INVITATION = "No knowledge base · searches everything"
+
+/**
+ * What the picker calls a binding it cannot NAME — a folder that is not in the author's
+ * own list, because it was deleted or because the draft was forked from a workflow that
+ * bound someone else's.
+ *
+ * It exists so an unnameable binding cannot render as a blank control, which would read
+ * as *unbound* — the exact invisibility this whole plan is fixing. Still a neutral fact
+ * about configuration, with no severity and no code: the workflow IS bound, we simply
+ * cannot say to what. Not the raw id, because 103-ux's rule for this chip is that it
+ * shows a NAME and never a UUID. Module-local: nothing outside this file says it.
+ */
+const UNNAMED_KB_OPTION = "A knowledge base outside your folders"
+
+/**
  * The unsaved-work prompt (D-184-16 debt 1). Named in 184-11 because a session could then
  * be five structural edits deep with no autosave at all.
  *
@@ -1052,13 +1091,34 @@ export function WorkflowBuilderPage({
     }
   }, [])
 
-  // The bound project-folder NAME for the draft header (from the chosen picker id,
-  // or the definition's own project_folder_id if the AI bound one).
-  const boundFolderName = useMemo<string | null>(() => {
-    const id =
-      (builderPhase === "drafted" ? meta.project_folder_id : null) || projectFolderId || null
-    return id ? (folderNames[id] ?? null) : null
-  }, [builderPhase, meta, projectFolderId, folderNames])
+  /**
+   * The workflow's knowledge-base binding, as an ID.
+   *
+   * 186-08 CHANGED THE DRAFTED READING, deliberately. It used to be
+   * `meta.project_folder_id || projectFolderId` — the definition's binding with the
+   * describe screen's choice as a fallback. That fallback is unreachable on the way IN
+   * (`onDraft` stamps the chosen id onto the definition before `setDrafted`, and Open /
+   * Tweak / Use-this seed `projectFolderId` from the definition itself), and it is
+   * actively WRONG on the way out: now that the header can UNBIND, `meta.project_folder_id`
+   * going null would fall through to the describe screen's stale choice and the chip would
+   * keep showing the folder the author just cleared. In the drafted view the DEFINITION is
+   * the single source of truth for the binding — the D-14 rule, applied to `meta`.
+   */
+  const boundFolderId = useMemo<string>(() => {
+    if (builderPhase === "drafted") {
+      return typeof meta.project_folder_id === "string" ? meta.project_folder_id : ""
+    }
+    return projectFolderId
+  }, [builderPhase, meta, projectFolderId])
+
+  // The bound project-folder NAME for the draft header — a NAME, never a UUID (103-ux).
+  // Null when the id resolves to no folder the author can see: deleted, or inherited from
+  // a fork of someone else's binding. `folderNames` and `folderOptions` are built from the
+  // SAME `listFolders()` array, so "unnameable" and "not offered" are one condition.
+  const boundFolderName = useMemo<string | null>(
+    () => (boundFolderId ? (folderNames[boundFolderId] ?? null) : null),
+    [boundFolderId, folderNames],
+  )
 
   const onDraft = useCallback(async () => {
     const text = describe.trim()
@@ -1510,6 +1570,102 @@ export function WorkflowBuilderPage({
    * element, so the flag-off `<header>` below still renders the exact bytes Task 1's pin
    * captured from the unmodified page.
    */
+  /**
+   * D-186-15 — THE BINDING, PROMOTED FROM A LABEL INTO A CONTROL (BUG-260731-03).
+   *
+   * The shipped chip said `📁 <folder>` and could not be clicked. The knowledge base was
+   * choosable ONLY on the pre-draft describe screen, so of the four ways into this
+   * Builder, two (fork a starter, tweak a published workflow) never offered the choice at
+   * all and a third (open a draft) inherited a binding it could not change. The only
+   * in-product repair was regeneration, which discards the authored canvas.
+   *
+   * ONE CONTROL, TWO MOUNT POINTS. This is the same select the describe screen renders,
+   * under the same test id, over the same `folderOptions` (fetched unconditionally on
+   * mount, so nothing new is requested here). A net-new workflow-settings panel was
+   * rejected by D-186-15: it fires G-2 (sketch-first) and would blow this phase's UI
+   * budget of a status line plus a conflict banner.
+   *
+   * THE UNBOUND STATE RENDERS. The shipped bound-name gate hid it entirely, and the
+   * operator's evidence is that the failure is invisible *precisely* when nothing is
+   * shown. Unbound now reads `UNBOUND_KB_INVITATION` — a fact about configuration, never
+   * a verdict (see that constant's docblock for where it may and may not travel).
+   *
+   * ⚠ WHY IT IS GATED ON `canvasEnabled`, and what that costs. D-181-01 promises the
+   * flag-OFF Builder is byte-identical for everyone, operators included, and that promise
+   * is pinned as literal markup in `WorkflowBuilderPage.header.test.tsx`. A new affordance
+   * rendered unconditionally would break the v3.6 revert switch — the milestone's HARD
+   * gate #1 — for a control the reporting operator reaches with the flag ON. So flag-off
+   * keeps the shipped display-only chip, unchanged, and the repair path lands on the
+   * canvas surface. This is 186-07's rule applied a second time (the quiet autosave line
+   * is gated because it describes canvas-only machinery; the conflict banner is not,
+   * because a refusal is reachable from any surface and must always be seen). The cost is
+   * recorded in `deferred-items.md` with a concrete re-open trigger.
+   */
+  const kbAffordance = canvasEnabled ? (
+    <span
+      data-testid="builder-bound-folder"
+      className="flex min-w-0 shrink items-center gap-1 rounded border border-border bg-card px-1.5 py-0.5 text-[11px] text-muted-foreground"
+    >
+      <span aria-hidden="true">📁</span>
+      <select
+        data-testid="project-folder-picker"
+        aria-label="Knowledge base this workflow searches"
+        value={boundFolderId}
+        onChange={(e) => {
+          const id = e.target.value
+          // The store half: `setProjectFolder` writes `meta.project_folder_id` AND arms
+          // `dirty` in ONE `set()` (186-04), so the leave guard and the autosave loop
+          // cannot see a binding the other missed. The write itself is not this file's —
+          // it lands about a second later through `useDraftPersistence` (D-186-05).
+          store.getState().setProjectFolder(id || null)
+          // The page half, and the decision RESEARCH left open (#4), taken as option (a):
+          // flip `hasEdited` HERE. D-184-15's actual rule is "nothing is claimed before
+          // the author's first EDIT", and a deliberate re-bind is an author edit — on a
+          // bug whose whole story is a failure that surfaced too late, the wrong answer
+          // is the one where this edit produces no live check. It is flipped at the call
+          // site rather than by widening the subscription's `meta` exclusion: that
+          // exclusion exists so generate/open (which always replace `meta`) do not start
+          // the loop, and widening it would restart the loop on every document load. A
+          // call-site flip is precise; a subscription change is a blunt instrument.
+          setHasEdited(true)
+          // `projectFolderId` (the describe screen's own state) is deliberately NOT
+          // written: in the drafted view the definition is the single source of truth for
+          // the binding, and a second copy is the drift D-14 forbids.
+          //
+          // UNBINDING IS ALLOWED, AND ITS TRAP IS RECORDED RATHER THAN GUARDED. A phase
+          // declaring `folder_scope` on a workflow with no `project_folder_id` raises a
+          // raw 422 (`_folder_scope_requires_project`), which under D-186-04's
+          // hold-the-write rule would leave a permanently unsaveable draft. It is
+          // unreachable today — `folder_scope` is a read-only display in `PhaseFormPanel`
+          // and no authoring control writes it, pinned by a source assertion in the header
+          // suite. A client-side "you can't unbind" refusal was rejected: that is the
+          // client computing a validation rule, which is exactly what D-182-06 forbids.
+          // Carry-forward: `.planning/phases/186-concurrency-autosave/deferred-items.md`.
+        }}
+        className="min-w-0 max-w-[220px] truncate bg-transparent text-[11px] text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+      >
+        <option value="">{UNBOUND_KB_INVITATION}</option>
+        {folderOptions.map((f) => (
+          <option key={f.id} value={f.id}>
+            {f.name}
+          </option>
+        ))}
+        {boundFolderId !== "" && !folderOptions.some((f) => f.id === boundFolderId) && (
+          <option value={boundFolderId}>{UNNAMED_KB_OPTION}</option>
+        )}
+      </select>
+    </span>
+  ) : boundFolderName !== null ? (
+    // Phase 103-ux, UNCHANGED: the bound project (knowledge base) NAME, not a UUID. The
+    // flag-off surface keeps exactly what it shipped — including hiding when unbound.
+    <span
+      data-testid="builder-bound-folder"
+      className="shrink-0 truncate rounded border border-border bg-card px-1.5 py-0.5 text-[11px] text-muted-foreground"
+    >
+      📁 {boundFolderName}
+    </span>
+  ) : null
+
   const identityGroup = (
     <>
       <span className="min-w-0 truncate text-[14px] font-semibold text-foreground">
@@ -1518,15 +1674,7 @@ export function WorkflowBuilderPage({
       <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
         draft
       </span>
-      {/* Phase 103-ux: the bound project (knowledge base) NAME, not a UUID. */}
-      {boundFolderName && (
-        <span
-          data-testid="builder-bound-folder"
-          className="shrink-0 truncate rounded border border-border bg-card px-1.5 py-0.5 text-[11px] text-muted-foreground"
-        >
-          📁 {boundFolderName}
-        </span>
-      )}
+      {kbAffordance}
     </>
   )
 
