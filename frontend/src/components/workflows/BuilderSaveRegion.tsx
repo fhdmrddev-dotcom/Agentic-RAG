@@ -79,6 +79,12 @@ export interface BuilderSaveRegionProps {
    * header as literal markup. The explicit Save button is unaffected either way.
    */
   autosaveEnabled: boolean
+  /**
+   * 186-12 — an exit the person chose is in progress. It comes from the write loop, which
+   * is the only thing that knows; this component neither derives it nor infers it from
+   * `state`, because a `saving` reading is produced by ordinary autosave too.
+   */
+  resolving: boolean
   onSaveNow: () => void
   onReload: () => void
   onOverwrite: () => void
@@ -88,6 +94,7 @@ export function BuilderSaveRegion({
   state,
   dirty,
   autosaveEnabled,
+  resolving,
   onSaveNow,
   onReload,
   onOverwrite,
@@ -166,8 +173,15 @@ export function BuilderSaveRegion({
           reading order and tab order both reach the safe act first.
           NOT gated on `autosaveEnabled`, unlike the quiet line: a conflict is reachable
           through the explicit Save button on any surface, and a person who has hit one must
-          always be offered both ways out rather than left with a dead sentence. */}
-      {state.kind === "conflict" && (
+          always be offered both ways out rather than left with a dead sentence.
+
+          186-12 — `|| resolving` IS LOAD-BEARING, AND IT IS WHY THE DISABLE IS HONEST.
+          `overwrite` sets `{kind:"saving"}` synchronously, so a banner gated on `conflict`
+          alone unmounts on the very first click and the disabled state is never on screen —
+          which is exactly how a double-click stayed an ordinary thing to do. A control that
+          is doing something has to still be there, saying so. Disabling a control that has
+          already vanished protects nothing. */}
+      {(state.kind === "conflict" || resolving) && (
         <div
           data-testid="builder-conflict-banner"
           role="alert"
@@ -178,7 +192,8 @@ export function BuilderSaveRegion({
             type="button"
             data-testid="builder-conflict-reload"
             onClick={onReload}
-            className="shrink-0 rounded border border-border bg-card px-2 py-0.5 text-[12px] font-medium text-foreground hover:bg-accent/40"
+            disabled={resolving}
+            className="shrink-0 rounded border border-border bg-card px-2 py-0.5 text-[12px] font-medium text-foreground hover:bg-accent/40 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {CONFLICT_RELOAD_LABEL}
           </button>
@@ -186,7 +201,8 @@ export function BuilderSaveRegion({
             type="button"
             data-testid="builder-conflict-overwrite"
             onClick={onOverwrite}
-            className="shrink-0 rounded border border-destructive/40 px-2 py-0.5 text-[12px] font-medium text-destructive hover:bg-destructive/10"
+            disabled={resolving}
+            className="shrink-0 rounded border border-destructive/40 px-2 py-0.5 text-[12px] font-medium text-destructive hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {CONFLICT_OVERWRITE_LABEL}
           </button>

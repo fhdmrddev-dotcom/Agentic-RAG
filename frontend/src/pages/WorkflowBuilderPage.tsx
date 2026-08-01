@@ -1688,6 +1688,7 @@ export function WorkflowBuilderPage({
         state={persistState}
         dirty={dirty}
         autosaveEnabled={canvasEnabled}
+        resolving={persistence.resolving}
         onSaveNow={() => void persistence.saveNow()}
         onReload={() => void persistence.reload()}
         onOverwrite={() => void persistence.overwrite()}
