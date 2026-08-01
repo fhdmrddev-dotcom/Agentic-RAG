@@ -1,263 +1,276 @@
 ---
 phase: 186-concurrency-autosave
-verified: 2026-08-01T06:10:00Z
+verified: 2026-08-01T10:07:31Z
 status: gaps_found
-score: 4/7 must-haves verified
+score: 6/8 must-haves verified
 overrides_applied: 0
+re_verification:
+  previous_status: gaps_found
+  previous_score: 4/7
+  gaps_closed:
+    - "GAP-1 / CR-01 — never a false `Saved ✓`; the receipt is now gated on payload identity (`writtenPhases`/`writtenMeta`), not on a queue flag"
+    - "GAP-2 / WR-01 — single flight is now a property of `performWrite` itself; both conflict exits additionally carry a re-entrancy guard and the banner survives its own resolution"
+    - "GAP-3 / WR-03 — the hold-release effect now returns on `!enabled`, so no automatic write is reachable past the `visual_workflow_canvas` revert switch"
+  gaps_remaining: []
+  regressions:
+    - "None in product behaviour. One test regression measured: `WorkflowBuilderPage.session.test.tsx > pane click — … ZERO PATCHes` now fails deterministically (3/3 runs, including fully isolated) — the 186-12 and 186-13 SUMMARY claim that it 'passes in isolation' is falsified on this machine."
+  new_findings:
+    - "GAP-4 / CR-02 — a transient failure inside `reload()` unmounts the conflict banner while leaving `haltedRef` set, permanently stranding the draft"
 gaps:
-  - truth: "Never a false `Saved ✓`. A refusal — of any kind — leaves the draft dirty (D-186-04 / D-186-06 must_have; T-185-04-01 lesson)"
+  - truth: "D-186-08 — on conflict the loop halts and THE PERSON PICKS THE EXIT: Reload (default) and Overwrite (a deliberate second click) are always offered, and no control is ever a silent no-op (186-06 / 186-12 must_have; the WR-04 rule)"
     status: failed
+    id: GAP-4
+    closes_review_finding: CR-02
     reason: >
-      Independently reproduced by reading `useDraftPersistence.ts` (not just trusting
-      186-REVIEW.md's CR-01): the drain condition at line 403 (`if (pendingRef.current)`)
-      is the ONLY thing that stops a completed write from calling `markSaved()`. `pendingRef`
-      is set in exactly three places (debounce-timer-while-in-flight :458-460, `saveNow`
-      :503-505, hold-release :484-486) — all three require `inFlightRef.current` to already
-      be true AT THE MOMENT the edit is observed. An edit that lands during an in-flight
-      PATCH but BEFORE its own 1000ms debounce timer has matured sets none of them (the
-      timer is simply rescheduled via the effect's `[definition, enabled]` dependency
-      change, with no re-check of `inFlightRef` at reschedule time — only at fire time,
-      1000ms later). The in-flight write completes first (a PATCH round-trip is normally
-      far under 1000ms), finds `pendingRef.current === false`, and calls
-      `store.getState().markSaved()` — clearing `dirty` for a payload that predates the
-      edit. When the edit's own timer fires at t+1000ms, it reads `if (!store.getState().dirty) return`
-      (line 457) and silently discards the edit. This also disarms `beforeunload`, the
-      in-app leave guard, and the blur rescue, all of which key on `dirty`. This is the
-      common interleaving (type, pause ~1s, resume, stop), not an edge case, and it directly
-      falsifies the plan's own must_have wording ("NO false `Saved ✓` is ever filed").
+      Independently re-derived from source, not accepted from 186-REVIEW.md. `haltedRef.current`
+      is set to `true` when the `stale_token` refusal arrives (`useDraftPersistence.ts:574`) and
+      is cleared in exactly two places: `reload`'s SUCCESS branch (`:766`) and `overwrite` (`:803`).
+      `reload`'s `catch` (`:770-771`) sets `{kind:"error", sentence: SAVE_FAILED_SENTENCE}` and its
+      `finally` sets `resolving` back to false — it touches neither `haltedRef` nor
+      `conflictTokenRef`. The banner that carries BOTH exits renders on
+      `state.kind === "conflict" || resolving` (`BuilderSaveRegion.tsx:213`), and after the catch
+      both operands are false, so the two controls leave the DOM in the same commit that the halt
+      becomes permanent. Confirmed `BuilderSaveRegion` is the ONLY consumer of `onReload`/
+      `onOverwrite` in non-test source (`WorkflowBuilderPage.tsx:1693-1694`), so there is no second
+      surface offering an exit. From that state: `saveNow()` returns at `:711` without setting any
+      state (the Save-draft button is enabled — `disabled={saving}` — and is a completely silent
+      no-op, which is precisely the defect WR-04 was raised for and declared closed); the debounce
+      effect returns at `:636` so no future edit ever schedules a timer; `dirty` stays true so
+      `beforeunload` and the in-app leave guard both fire, telling the author they have unsaved
+      work while giving them no mechanism to save it; and the sentence on screen is
+      `SAVE_FAILED_SENTENCE`, which `DRAFT_GONE_SENTENCE`'s own docblock (`:189-197`) correctly
+      identifies as a sentence that INVITES a retry — here the retry is structurally impossible.
+      The trigger is ordinary and single-click: `listDraftWorkflows` throws on ANY non-2xx and on
+      a dropped connection (`api.ts:3411`), so one flaky request, one token refresh, or one backend
+      restart during a click on the RECOMMENDED DEFAULT exit is enough. The only recovery is
+      leaving the Builder, which discards the on-screen work. No test drives a rejecting
+      `listDraftWorkflows` — F19c (`useDraftPersistence.test.tsx:1184`) drives a double-click on
+      Reload against a RESOLVING mock only.
     artifacts:
       - path: "frontend/src/hooks/useDraftPersistence.ts"
-        issue: "Lines 403-422 (drain/receipt) + 440-466 (debounce reschedule) + 457 (dirty gate) — silent data loss + false receipt on the common in-flight-edit interleaving"
+        issue: "Lines 743-776 — `reload`'s catch leaves `haltedRef` set and abandons the conflict state, so the halt outlives the only affordances that can clear it"
+      - path: "frontend/src/components/workflows/BuilderSaveRegion.tsx"
+        issue: "Line 213 — the banner (and with it both exits) unmounts the instant the state leaves `conflict`, including on a FAILED exit"
     missing:
-      - "Stop inferring 'nothing newer' from a queue flag; compare what was actually written (capture phases/meta identity at snapshot time, compare against the store's current values before filing the receipt) OR have the debounce effect set pendingRef.current=true whenever it reschedules while inFlightRef.current is true."
-      - "A regression test whose second edit's timer does NOT mature during the first write's flight (the shipped F9 test only covers the timer maturing while held open, which already works)."
-  - truth: "At every instant at most ONE PATCH is outstanding per draft, and each carries the token returned by the immediately preceding successful write (186-06 must_have)"
-    status: failed
-    reason: >
-      Independently confirmed: `performWrite` (useDraftPersistence.ts:353) enforces only
-      `haltedRef.current`. The single-flight rule (checking `inFlightRef.current` before
-      calling `performWrite`) lives in the CALLERS — `saveNow` (:503), the debounce timer
-      (:458), and the hold-release effect (:484) all check it — but `overwrite()` (:554-558)
-      and `reload()` (:519-540) do not. `overwrite` calls `performWrite()` directly with no
-      guard. The conflict banner's Overwrite button is never disabled, so a double-click
-      issues two concurrent PATCHes carrying the same token; the loser is refused
-      `stale_token`, producing a conflict banner for a conflict that does not exist — the
-      exact user-facing lie the module's own docblock argues against.
-    artifacts:
-      - path: "frontend/src/hooks/useDraftPersistence.ts"
-        issue: "Lines 554-558 (overwrite) and 519-540 (reload) bypass the inFlightRef check that every other caller of performWrite respects"
-    missing:
-      - "Move the single-flight check inside performWrite itself so it's a property of the writer, not of each caller (per the review's suggested fix)."
-      - "Disable the Overwrite/Reload buttons while state.kind === 'saving'."
-  - truth: "With `visual_workflow_canvas` OFF, the product is provably byte-identical to today (D-181-01, milestone HARD gate #1, inherited by every later phase including 186)"
-    status: failed
-    reason: >
-      Independently traced: `enabled: canvasEnabled && builderPhase === "drafted"` is
-      passed into `useDraftPersistence` (WorkflowBuilderPage.tsx:812), and the debounce
-      effect correctly bails when `!enabled` (useDraftPersistence.ts:441). But the
-      hold-release effect (:477-490) does NOT read `enabled` anywhere — it fires purely off
-      `holdReason` transitioning non-null -> null. `renderPublish` (which supplies
-      `setPublishInFlight`, the thing that drives `holdReason`) is mounted unconditionally —
-      `{renderPublish && definition && (<div>{renderPublish(..., setPublishInFlight)}</div>)}`
-      at WorkflowBuilderPage.tsx:1699-1701, not gated on `canvasEnabled` — because Publish is
-      a pre-186 door that already worked with the canvas flag off. `BuilderSaveRegion`'s
-      explicit Save-draft button is also unconditionally rendered (only the quiet status
-      LINE is hidden via `autosaveEnabled={canvasEnabled}`), so `saveNow()` — which arms
-      `heldPendingRef` while held (:498-501) — is reachable with the flag off. So: flag off,
-      a user presses Save while a publish is in flight (or edits land while held, on
-      whatever pre-186 editing surface remains reachable with the flag off) -> the hold
-      resolves when publish finishes -> the hold-release effect fires an AUTOMATIC,
-      unrequested PATCH, a write behavior that did not exist pre-186 on the flag-off
-      surface. D-181-01 promises the flag-off product is provably byte-identical; this is
-      new write behaviour leaking through the revert switch.
-    artifacts:
-      - path: "frontend/src/hooks/useDraftPersistence.ts"
-        issue: "Lines 477-490 — the hold-release effect performs an automatic write without checking `enabled`"
-    missing:
-      - "Gate the automatic flush the same way the timer is gated: `if (!enabled) return` inside the hold-release effect, before calling performWrite() (saveNow/overwrite may stay ungated since they are user-initiated)."
-      - "A flag-off regression test that drives a publish-in-flight -> resolve transition and asserts zero network calls."
+      - "In `reload`'s catch, restore the conflict rather than replacing it: `setState({ kind: \"conflict\", currentToken: conflictTokenRef.current })`. A failed EXIT is not a failed WRITE — the row still moved, the loop is still halted, and both ways out must still be on screen."
+      - "If the surface should also say WHY the reload failed, that belongs as an extra line on the banner, never as a replacement for it."
+      - "A regression test that rejects `listDraftWorkflows` once and asserts (a) the state is still `conflict`, (b) a subsequent edit still issues nothing (the halt is intact), and (c) a second `reload()` is accepted and succeeds."
 deferred: []
 human_verification:
   - test: "Two tabs — same draft open in A and B; edit in A (let it autosave), then edit in B"
     expected: "B shows the honest banner, stops writing, offers Reload (default) then Overwrite. A's content intact."
-    why_human: "G-4 (CLAUDE.md workflow guardrails) mandates live Chrome-driven UAT for user-visible surfaces; wire format + screenshot are explicitly insufficient. 186-VALIDATION.md lists this as 'to run', not yet executed."
+    why_human: "SC#4 / the SC#10 parallel axis. G-4 mandates live Chrome-driven UAT for user-visible surfaces. `186-VALIDATION.md` row 1 status is still `to run`."
   - test: "Stale tab — leave B open, edit + save in A, return to B minutes later and type"
-    expected: "Same honest outcome as above. No silent overwrite, no retry storm."
-    why_human: "Same G-4 requirement; 186-VALIDATION.md row 2 status is 'to run'."
+    expected: "Same honest outcome. No silent overwrite, no retry storm."
+    why_human: "`186-VALIDATION.md` row 2 status is still `to run`."
   - test: "Publish race — start a publish in A, edit in B mid-gauntlet"
-    expected: "Publish refuses with the worded draft_changed verdict; the golden-run receipt still browsable; the spine shows a block, not 8 green pips."
-    why_human: "Same G-4 requirement; 186-VALIDATION.md row 3 status is 'to run'. Also the sharpest instance of the CR-01/WR-01 interleavings found above, since it spans a minutes-long server operation."
-  - test: "Publish hold — start a publish in A, then edit in A"
-    expected: "Status line reads 'Publishing — changes will save when it finishes'; the edit flushes on resolution."
-    why_human: "186-VALIDATION.md row 3b status is 'to run'; also the exact scenario WR-03 (flag-off leak) and CR-01 interact with."
+    expected: "Publish refuses with the worded `draft_changed` verdict; the golden-run receipt still browsable; the spine shows a block, not 8 green pips."
+    why_human: "`186-VALIDATION.md` row 3 status is still `to run`. It is the parallel axis's sharpest instance — it spans a minutes-long server operation, and it is where WR-08 and WR-10 interact."
+  - test: "Publish hold — start a publish in A, then edit in A (flag ON), and repeat with `visual_workflow_canvas` OFF pressing Save draft mid-publish"
+    expected: "Flag ON: 'Publishing — changes will save when it finishes', and the edit flushes on resolution. Flag OFF: 'Publishing — not saved; press Save draft again when it finishes' — and after the gauntlet ends that sentence must not still be on screen (see WR-09)."
+    why_human: "`186-VALIDATION.md` row 3b status is `to run`; the flag-off half is the live check for WR-09, which no automated test asserts."
+  - test: "Conflict-exit failure — reach the conflict banner, then click Reload with the network interrupted (DevTools offline, or stop the backend for one click)"
+    expected: "The banner is STILL on screen with both exits, and a second Reload after restoring the network succeeds."
+    why_human: "This is GAP-4 / CR-02 observed live. Confirms the code trace above against the real product before and after the fix."
   - test: "KB re-bind, three paths — bind/re-bind from NL-generated, forked starter, and Tweak fork"
-    expected: "The chip is a picker in all three; unbound state reads the invitation sentence with no severity/code/tray row; binding persists through autosave and survives reload."
-    why_human: "186-VALIDATION.md row 5 status is 'to run'; BUG-260731-03's own frontmatter explicitly requires live confirmation before closing even the control half ('shipped, pending live confirmation')."
+    expected: "The chip is a picker in all three; unbound reads the invitation sentence with no severity/code/tray row; binding persists through autosave and survives reload."
+    why_human: "`186-VALIDATION.md` row 5 status is `to run`; BUG-260731-03's frontmatter requires live confirmation before closing even the control half."
   - test: "Force a 422 mid-edit (invalid shape) and observe the save state"
-    expected: "'Not saved — ...'; the draft stays dirty; the leave guard fires on navigate-away."
-    why_human: "186-VALIDATION.md row 6 status is 'to run'. Automated unit coverage exists for this branch (F8), but the CR-01 finding above shows a DIFFERENT interleaving (concurrent edit, not shape-invalid) that the unit suite does not cover — live confirmation is still owed for the whole leave-guard chain end to end."
+    expected: "'Not saved — …'; the draft stays dirty; the leave guard fires on navigate-away."
+    why_human: "`186-VALIDATION.md` row 6 status is `to run`. F8 covers the branch in units; the whole leave-guard chain end to end is still owed live."
 ---
 
-# Phase 186: Concurrency & Autosave Verification Report
+# Phase 186: Concurrency & Autosave — Verification Report (RE-VERIFICATION)
 
 **Phase Goal:** Continuous canvas autosave is safe on org-shared workflows — a cosmetic drag never mints a definition version or re-arms the golden-run gauntlet, and two editors cannot silently clobber each other. Closed before real usage, not discovered live.
-**Verified:** 2026-08-01T06:10:00Z
+**Verified:** 2026-08-01T10:07:31Z
 **Status:** gaps_found
-**Re-verification:** No — initial verification
+**Re-verification:** Yes — after gap-closure plans 186-09 … 186-13 (previous: `gaps_found`, 4/7)
+
+Every claim below marked "re-derived" was established by reading the named source lines or by
+running the named command in this session. `186-REVIEW.md` was read as INPUT; each of its
+findings that affects the verdict was confirmed or refuted independently.
+
+## Gap-Closure Ledger (traceability preserved)
+
+| Id | Original finding | Resolution | Evidence re-derived this session |
+|----|------------------|------------|----------------------------------|
+| **GAP-1 / CR-01** | mid-flight edit silently dropped; false `Saved ✓` filed | ✅ **CLOSED** | `performWrite` captures `writtenPhases`/`writtenMeta` at snapshot time (`useDraftPersistence.ts:544-545`) and the supersede test is now an identity compare, with `pendingRef` demoted to one of three reasons (`:592-594`). The two references genuinely cover the payload: `selectDefinition` is `{...state.meta, phases: state.phases}`. F17a/b/c hold the immature-timer interleaving open. **40/40 green**, run in isolation. |
+| **GAP-2 / WR-01** | `overwrite`/`reload` bypass single flight | ✅ **CLOSED** | The guard has exactly one home, inside the writer (`:517-520`), above `inFlightRef.current = true`; no caller re-implements it. Both exits additionally carry `reloadingRef` (`:744`, `:798`) with the token assignment ordered AFTER the guard, and `resolving` keeps the banner mounted so the disabled state is visible (`BuilderSaveRegion.tsx:213`, `:224`, `:233`). F19a–d green. |
+| **GAP-3 / WR-03** | hold-release wrote with the canvas flag off | ✅ **CLOSED** | `if (!enabled) return` at `useDraftPersistence.ts:698`, positioned after the `holdRef` mirror (`:695`) and after the halted check, before `heldPendingRef` is cleared and before `performWrite()`. F20a/b/c green. |
+| **WR-02** | `grounding_fidelity` missing from `STAGES` | ✅ **CLOSED** | The row exists at its true pipeline position (`PublishGauntlet.tsx:165`) and `RUNNING_STAGE_INDEX` is derived (`:187`) rather than a literal. `unknownBlock` still guards BOTH `isPassed` (`:427`) and `connReached` (`:434`). 125/125 green across the four component suites. |
+| **WR-04** | `held` invisible on the flag-off surface | ✅ **CLOSED at the component** | `quietLine` evaluates `held` before the flag gate (`BuilderSaveRegion.tsx:139-141`), and `HOLD_PUBLISHING_MANUAL` is a third honest sentence selected on the same input that decides the flush. Residue: WR-09 below (the hook never resolves the state flag-off). |
+| **WR-05** | a deleted draft (404) neither halts nor exits | ✅ **CLOSED for 404** | `refusalOf` routes `WorkflowNotFoundError` to `DRAFT_GONE_SENTENCE` (`:350-352`) and `isTerminalRefusal` halts the loop (`:382-384`). Same class still open for the published-row 409 — WR-07 below. |
+| **WR-06** | backend tests all vanish without Postgres | ⚠️ **PARTIALLY CLOSED** | Measured directly: with `POSTGRES_DSN` pointed at an unreachable port the three files report **3 passed / 9 skipped, exit 0**; with the live DB they report **12 passed**. So DB-free coverage went 0 → 3 and nothing fails for want of a database. But `grep -rn "stale_token" backend/tests/` still matches exactly ONE file, and that file is entirely `pytestmark`-skipped — the 409 wire shape the whole client conflict UX branches on has zero DB-free coverage. |
+| **CR-02** *(new, this review)* | a failed `reload()` strands the draft permanently | 🛑 **CONFIRMED — new gap GAP-4** | See the gaps frontmatter. Re-derived line by line, including the sole-consumer check on the exits. |
 
 ## Goal Achievement
 
-This report does not repeat 186-REVIEW.md's findings uncritically. Every claim below marked
-"independently confirmed" was re-derived by reading the actual source files listed, not by
-trusting the review's prose.
-
 ### Observable Truths
 
-| # | Truth | Status | Evidence |
-|---|-------|--------|----------|
-| 1 | CONCUR-01: a cosmetic node drag never mints a version or reaches the write path | ✓ VERIFIED | `canvasNudge.ts:75` imports only `getCurrentUserIdSync` — no store, no API client. `update_workflow_definition` (`backend/app/db/workflows.py:552-560`) is `SET name = $3, definition = $4::jsonb` — no `version` column in the SET clause, confirmed by direct read. |
-| 2 | CONCUR-01: autosave updates the draft row in place, not via a new-version path | ✓ VERIFIED | Same query above is the only write path `useDraftPersistence` calls (`updateWorkflowDraft` → `PATCH /workflows/{id}`); no create-a-new-version branch exists in the autosave loop. |
-| 3 | CONCUR-02: a stale writer is refused with a machine-readable code, never a false 404 | ✓ VERIFIED | `update_workflow_definition` docblock + code confirms the `AND {CONCURRENCY_TOKEN_SQL} = $5` conjunct alongside `created_by = $2` (never replacing it), and the disambiguating re-read on 0 rows branches `not_found` / `already_published` / `stale_token` per D-186-09. Backend suites `test_186_concurrent_patch.py` / `test_186_publish_race.py` exist and were reported passing by the orchestrator (284/284). |
-| 4 | CONCUR-02: publish refuses a draft that drifted mid-gauntlet, preserving the golden-run receipt | ✓ VERIFIED | `publish_service.py` stage-5 flip carries the token (per plan + review); `blocked_stage` is free-form metadata on the already-registered `publish_blocked` event, no migration needed. Test `test_the_golden_run_receipt_survives_a_draft_changed_refusal` exists (though see WR-06 note below — it is DB-free but sits under a module-level `pytestmark` skip that also gates the seven live-DB tests, so it is silently absent in any CI without local Postgres — a coverage gap, not a functional failure. Not scored as a blocking gap here because the underlying behavior is independently traceable in code, but flagged as a real coverage risk). |
-| 5 | **Never a false `Saved ✓` — a refusal of any kind leaves the draft dirty** | ✗ FAILED | See gap #1. Independently reproduced by code trace: an edit landing mid-flight, before its own debounce timer matures, is silently dropped and the loop still files `{kind:"saved"}`. This is a direct falsification of the phase's central promise and of the plan's own must_have wording. |
-| 6 | **At most one PATCH outstanding per draft at any instant** | ✗ FAILED | See gap #2. `overwrite()` and `reload()` bypass the `inFlightRef` single-flight check that `saveNow`/the debounce timer/the hold-release effect all respect. A double-click on the never-disabled Overwrite button issues two concurrent PATCHes. |
-| 7 | **With `visual_workflow_canvas` OFF, the product is byte-identical to today (D-181-01, milestone HARD gate #1)** | ✗ FAILED | See gap #3. The hold-release effect in `useDraftPersistence.ts` does not check the `enabled` flag it is passed, and `renderPublish`/`setPublishInFlight`/the explicit Save button are all mounted unconditionally (pre-186 doors). This produces automatic PATCH behavior on the flag-off surface that did not exist before this phase. |
+| # | Truth (source) | Status | Evidence |
+|---|----------------|--------|----------|
+| 1 | **SC#1 / CONCUR-01** — editing a draft autosaves by UPDATING THE DRAFT ROW IN PLACE; a cosmetic node drag never mints a version or re-arms the gauntlet | ✓ VERIFIED | `update_workflow_definition`'s guarded UPDATE is `SET name = $3, definition = $4::jsonb` (`backend/app/db/workflows.py:559`, `:571`) — no `version` in either SET clause; F13 exercises it against the live DB. `canvasNudge.ts` imports exactly one symbol (`getCurrentUserIdSync`) — no store, no API client. F12 ("a cosmetic nudge writes nothing WITH autosave live") passes: `WorkflowCanvas.editing.test.tsx` + `WorkflowBuilderPage.canvas.test.tsx` = **141/141 green**. |
+| 2 | **SC#2 server half / CONCUR-02** — a stale writer is refused with a machine-readable code, never a false 404, and the owner scope is never replaced | ✓ VERIFIED | The token is a THIRD conjunct alongside `created_by = $2` (`db/workflows.py:560-561`), never in place of it; the disambiguating probe is owner-scoped (`:589-594`) and returns `not_found` / `already_published` / `stale_token` (`:596-605`); the route maps them to 404 / 409 / 409-with-token and the 404 carries NO machine code, so not-found and not-owned stay byte-identical (`api/workflows.py:1013-1035`). `CONCURRENCY_TOKEN_SQL` is the only rendering of the token — all 8 comparison sites go through the constant, none in datetime space. Backend: **12/12 pass** with the live DB. |
+| 3 | **SC#3** — publish is guarded against reading a dirty draft, and the golden-run receipt survives the refusal | ✓ VERIFIED | Stage 0 captures `stage0_token` (`publish_service.py:122`), stage 5 flips with it (`:372`), and `publish_definition` returns a SEPARATE `-2` sentinel (`db/workflows.py:432`) which the service routes to `_block(stage="draft_changed")` (`:405`) — a `_block` only ADDS a `publish_blocked` receipt and carries `golden_run_id` through. `-1` and `-2` are never collapsed. F5/F5b/F5c/F6 green. Zero migrations: head is still `114_harness_audit_action_risk_pending.sql`. |
+| 4 | **GAP-1 / D-186-04** — never a false `Saved ✓`; a refusal of any kind leaves the draft dirty | ✓ VERIFIED (was FAILED) | Receipt gated on payload identity, not on a queue flag. See the ledger above. |
+| 5 | **GAP-2 / 186-06 must_have** — at most ONE PATCH outstanding per draft at any instant, each carrying the token the preceding write returned | ✓ VERIFIED (was FAILED) | Single flight enforced inside `performWrite`. See the ledger above. |
+| 6 | **GAP-3 / D-181-01** — with `visual_workflow_canvas` OFF no AUTOMATIC write behaviour that did not exist pre-186 is reachable | ✓ VERIFIED (was FAILED) | `if (!enabled) return` in the hold-release effect. See the ledger above. Note the deliberate, documented asymmetry: `saveNow`/`reload`/`overwrite` stay ungated because a person pressed them. |
+| 7 | **D-186-08 / 186-12 must_have** — on conflict the loop halts and THE PERSON PICKS THE EXIT; both exits stay offered and no control is a silent no-op | ✗ **FAILED** | **GAP-4 / CR-02.** A transient failure inside `reload()` — the DEFAULT exit — unmounts the banner (and with it both exits) while leaving `haltedRef` set. Save draft then returns at `:711` with no state change, the debounce schedules nothing, `dirty` stays true so both leave guards fire, and the sentence on screen invites a retry that is structurally impossible. Re-derived from source; no test covers the path. |
+| 8 | **SC#4** — the two-editor / parallel path is exercised in UAT; a second editor gets an honest read-only banner or a merge-safe outcome, never a silent overwrite | ? **UNCERTAIN — human required** | `186-VALIDATION.md` rows 1, 2, 3, 3b, 5, 6 are all still `to run`. Row 4 (colleague clobber) is correctly recorded ⛔ BLOCKED-not-reachable with its reason rather than dropped — matching the CONTEXT landmine (mig 111 gave workflows `is_system_global`, and UPDATE is `created_by`-only, so the real conflict is one user with two tabs, which rows 1-3 cover). G-4 makes this non-substitutable by wire-format or unit evidence. |
 
-**Score:** 4/7 truths verified (57%)
-
-Two additional Success-Criteria-level truths were checked and found unable to be verified
-programmatically — they require live browser UAT per G-4 and are listed under Human
-Verification below, not scored as pass/fail here: "SC#4 — the two-editor / parallel path is
-exercised in UAT, a second editor gets an honest read-only banner or merge-safe outcome" and
-"BUG-260731-03's control half works across all three creation paths, live."
+**Score:** 6/8 truths verified · 1 FAILED (blocker) · 1 UNCERTAIN (human)
 
 ### Required Artifacts
 
 | Artifact | Expected | Status | Details |
 |----------|----------|--------|---------|
-| `backend/app/db/workflows.py` — `update_workflow_definition` | token conjunct alongside owner scope, no version bump | ✓ VERIFIED | Confirmed by direct read; `SET name, definition` only. |
-| `backend/app/db/workflows.py` — `publish_definition` | stage-5 token-guarded flip, `draft_changed` sentinel | ✓ VERIFIED (per review + plan cross-check; not independently re-derived line-by-line, backend suite green) |
-| `backend/app/api/workflows.py` — `update_draft` route | 404 / 409 `already_published` / 409 `stale_token` three-way | ✓ VERIFIED (per review's explicit confirmation, backend suite green) |
-| `frontend/src/hooks/useDraftPersistence.ts` | the whole persistence seam, single-flight, honest receipts | ⚠️ SUBSTANTIVE BUT NOT SAFE — exists, is wired, is exercised by tests, but independently confirmed to violate 2 of its own must_haves (CR-01, WR-01) |
-| `frontend/src/hooks/useDraftPersistence.test.tsx` | F8/F9/F10/F11/F15 coverage | ⚠️ PARTIAL — covers the RED/GREEN shapes it was written against, but the shipped F9 test advances the fake clock only in the branch that already works; it does not cover the interleaving CR-01 reproduces (edit arriving before its own timer matures, mid-flight). |
-| `frontend/src/components/workflows/PublishGauntlet.tsx` — `STAGES` table | superset of every `blocked_stage` the server can emit | ⚠️ ORPHANED GAP — the fail-open PROPERTY fix (`unknownBlock`) is real and correctly verified (F7 GREEN), but `grounding_fidelity` (`publish_service.py:239`) has no row in `STAGES` (confirmed: only 9 entries, no "Grounding" label/code). Not a false-green regression, but the single most likely real refusal renders as an unplaceable, fully-grey spine. |
-| `frontend/src/pages/WorkflowBuilderPage.tsx` — KB picker promotion (BUG-260731-03 control) | picker replaces the display-only chip, gated on `canvasEnabled` | ✓ VERIFIED as built; gating on `canvasEnabled` (rather than removing the old `boundFolderName &&` gate) is a deliberate, documented deviation from the plan's literal wording, made to protect D-181-01 — see Key Link Verification below. |
-| `.planning/phases/186-concurrency-autosave/deferred-items.md` | records the folder_scope trap + BUG-260731-03 verdict-half deferral with re-open triggers | ✓ VERIFIED — file exists, both deferrals have concrete re-open triggers. |
+| `backend/app/db/workflows.py` | `CONCURRENCY_TOKEN_SQL`, token-guarded UPDATE, owner-scoped probe, `-1`/`-2` pair | ✓ VERIFIED | Re-read in full. Owner scope never replaced; no version bump; both sentinels distinct. |
+| `backend/app/api/workflows.py` — `update_draft` | optional `If-Match`, three-way refusal, code-less 404 | ✓ VERIFIED | Re-read `:942-1036`. The `Annotated[...] = None` header form is deliberate and documented. |
+| `backend/app/services/harness/publish_service.py` | stage-0 capture → stage-5 guarded flip → `draft_changed` block | ✓ VERIFIED | Re-read `:122`, `:372-412`. |
+| `frontend/src/hooks/useDraftPersistence.ts` | the whole write seam: single flight, honest receipts, honest refusals, `enabled` gate | ⚠️ **SUBSTANTIVE, WIRED, BUT ONE EXIT PATH UNSAFE** | Three of its four prior defects are genuinely fixed as PROPERTIES (not patches). GAP-4 sits in `reload`'s catch. WR-07/WR-08/WR-09 are further warnings below. |
+| `frontend/src/hooks/useDraftPersistence.test.tsx` | F8/F9/F10/F11/F15 + F17/F19/F20 | ✓ VERIFIED (with a coverage hole) | **40/40 green in isolation.** F17 drives the immature-timer branch (`AUTOSAVE_DEBOUNCE_MS / 2`), which is the branch the old F9 missed. Hole: no test rejects `listDraftWorkflows` (GAP-4), and no test bounds the sustained write RATE (WR-08). |
+| `frontend/src/components/workflows/BuilderSaveRegion.tsx` (+ test) | four sentences, the banner, `resolving`-aware disable | ✓ VERIFIED | Re-read. `held` correctly evaluated before the flag gate. The `|| resolving` render clause is what makes the disable visible — and is also the clause GAP-4 falls through. |
+| `frontend/src/components/workflows/PublishGauntlet.tsx` (+ test) | a spine naming every server stage; fail-open closed as a property | ✓ VERIFIED | `grounding_fidelity` row present; `RUNNING_STAGE_INDEX` derived; F18 extracts the stage literals from the Python source at test time. |
+| `frontend/src/pages/WorkflowBuilderPage.tsx` — KB picker (BUG-260731-03 control) | picker replaces the display-only chip; unbound is an INVITATION | ✓ VERIFIED | `:1605-1663` — a real `<select>` calling `store.getState().setProjectFolder(...)` + `setHasEdited(true)`, `UNBOUND_KB_INVITATION` as the empty option. The `canvasEnabled` gate is a documented deviation taken to protect D-181-01, recorded in `deferred-items.md` §3 with a re-open trigger. |
+| `.planning/phases/186-concurrency-autosave/deferred-items.md` | folder_scope trap + BUG-260731-03 verdict half + the flag-off cost, each with a re-open trigger | ✓ VERIFIED | Four entries, all with concrete triggers. |
+| `.planning/reported-bugs/BUG-260731-03-…md` | honest status | ✓ VERIFIED | `status: folded`, `verified_closed_by: null`, `folded_into: "186 (control) / 187 (verdict)"`. Not prematurely closed. |
 
 ### Key Link Verification
 
 | From | To | Via | Status | Details |
 |------|-----|-----|--------|---------|
-| `WorkflowBuilderPage.tsx` (`kbAffordance`) | `updateWorkflowDraft` | `setProjectFolder` arms `dirty`, autosave PATCHes it | ✓ WIRED | Confirmed reachable: `setProjectFolder` writes `meta.project_folder_id` and arms `dirty` in one act (per 186-08-SUMMARY + `builderStore.ts` F14 test). |
-| `useDraftPersistence`'s `enabled` prop | the debounce effect | `if (!enabled ...) return` | ✓ WIRED (partial) | The debounce effect correctly respects it. The hold-release effect does NOT — see gap #3. This is a PARTIAL wiring: one of two write triggers respects the flag, the other does not. |
-| `renderPublish` / `setPublishInFlight` | `useDraftPersistence`'s `publishInFlight` arg | prop drilling, unconditional mount | ✓ WIRED, but this is exactly the leak — it is wired regardless of `canvasEnabled`, which is correct for the pre-186 Publish door but combines with the ungated hold-release effect to produce gap #3. |
-| Deferral for D-186-17 (folder_scope unbind trap) | `PhaseFormPanel` staying read-only | a source-fence test | ✓ WIRED | `deferred-items.md` names the exact test (`WorkflowBuilderPage.header.test.tsx` — "PhaseFormPanel renders folder_scope, and writes it nowhere") that pins the precondition; not independently re-run here but the deferral itself is honestly recorded with a concrete re-open trigger, which is what was asked to be checked. |
+| `update_draft` route | `update_workflow_definition` | `token=if_match` | ✓ WIRED | `api/workflows.py:1002-1004`. |
+| `db/workflows.py` | `workflow_definitions.updated_at` | `CONCURRENCY_TOKEN_SQL` in WHERE + RETURNING | ✓ WIRED | 8 sites, all via the constant; no bypass, no datetime-space compare. |
+| `publish_service` stage 0 | stage 5 | `stage0_token` → `publish_definition(token=…)` | ✓ WIRED | `:122` → `:372`. |
+| `useDraftPersistence` | `updateWorkflowDraft` | single-flight queue carrying `tokenRef.current` as `If-Match` | ✓ WIRED | `:564-569`; `api.ts:3440-3443` adds the header only when a token exists. |
+| a confirmed 200 | `store.markSaved()` | the identity-gated completion handler, and nothing else | ✓ WIRED | Exactly one `markSaved()` call site (`:612`), guarded by `:593-594`. |
+| `enabled` prop | BOTH write triggers | early return in the debounce effect AND in the hold release | ✓ WIRED | `:634` and `:698`. This was the PARTIAL wiring the previous report failed; it is now complete for automatic paths. |
+| `useDraftPersistence.resolving` | the banner's two buttons | prop through `WorkflowBuilderPage` | ✓ WIRED | `WorkflowBuilderPage.tsx:1687-1694` → `BuilderSaveRegion.tsx:213, 224, 233`. |
+| `reload()` failure | the conflict banner | *(nothing)* | ✗ **NOT WIRED — GAP-4** | The catch abandons `conflict` for `error`, and the banner's render condition drops both operands, so the only two exits leave the DOM on a failed exit. |
+| `setProjectFolder` | `dirty` → autosave PATCH | one `set()` writing `meta` and `dirty` together | ✓ WIRED | `builderStore.ts` F14 + the page call site `:1618-1621`. |
 
 ### Data-Flow Trace (Level 4)
 
-Not applicable in the usual sense (no dashboard/list rendering pipeline for this phase); the
-relevant "data flow" is the write path itself, which is what Steps 3-5 above traced end to
-end (edit → debounce/hold → PATCH → token adoption → receipt). That trace is what surfaced
-gaps #1-3.
+The "data" this phase moves is the write itself, so Level 4 is the write path traced end to
+end rather than a render pipeline: **edit → store mutation (`dirty` armed) → debounce timer →
+`performWrite` snapshot (`phases`/`meta` captured) → PATCH with `If-Match` → server guarded
+UPDATE (owner + draft + token) → new token adopted → identity re-compare → `markSaved()`**.
+Every hop was re-derived. The trace is real end to end and produces real data (the live-DB
+tests observe an actual row change and an actual token rotation). The trace surfaced GAP-4 at
+the EXIT of that path, not in the path itself.
 
 ### Behavioral Spot-Checks
 
 | Behavior | Command | Result | Status |
 |----------|---------|--------|--------|
-| `update_workflow_definition` never bumps version | direct source read of the SQL literal | `SET name = $3, definition = $4::jsonb` — no version | ✓ PASS |
-| `canvasNudge.ts` imports no store/API | `grep "^import" canvasNudge.ts` | single import, `getCurrentUserIdSync` only | ✓ PASS |
-| `grounding_fidelity` absent from client `STAGES` but present server-side | `grep "grounding_fidelity" PublishGauntlet.tsx publish_service.py` | present in `publish_service.py:239`, absent from `STAGES` (9 entries, no match) | ✓ PASS (confirms WR-02) |
-| `overwrite()`/`reload()` bypass single-flight | direct source read of `useDraftPersistence.ts:519-558` | neither checks `inFlightRef.current` before calling `performWrite()` | ✓ PASS (confirms WR-01) |
-| hold-release effect checks `enabled` | direct source read of `useDraftPersistence.ts:477-490` | no reference to `enabled` in the effect body or its dependency array | ✓ PASS (confirms WR-03 is reachable in code, not just theorized) |
+| The phase's own hook suite | `npx vitest run src/hooks/useDraftPersistence.test.tsx --testTimeout=30000` | **40 passed / 40**, 9.1 s | ✓ PASS |
+| The four component/transport suites | `npx vitest run …BuilderSaveRegion.test.tsx …PublishGauntlet.test.tsx …builderStore.test.ts src/lib/api.workflows.test.ts --testTimeout=30000` | **125 passed / 125** | ✓ PASS |
+| The canvas suites (F12) | `npx vitest run …WorkflowBuilderPage.canvas.test.tsx …WorkflowCanvas.editing.test.tsx --testTimeout=30000` | **141 passed / 141** | ✓ PASS |
+| The page suites | `npx vitest run …WorkflowBuilderPage.header.test.tsx …WorkflowBuilderPage.session.test.tsx --testTimeout=30000` | **49 passed, 1 FAILED** | ✗ FAIL — see WR-11 |
+| Same, session suite ALONE | `npx vitest run src/pages/WorkflowBuilderPage.session.test.tsx --testTimeout=30000` | **22 passed, 1 FAILED** (same test, 1785 ms) | ✗ FAIL — falsifies the SUMMARY claim |
+| Same, six-file consumer set | `npx vitest run …useDraftPersistence …BuilderSaveRegion …builderStore …session …canvas …header` | **233 passed, 1 FAILED** (same test) | ✗ FAIL — 3/3 configurations |
+| Backend, phase files, live DB | `pytest tests/unit/test_186_concurrent_patch.py test_186_publish_race.py test_103_published_409.py -q` | **12 passed** in 3.9 s | ✓ PASS |
+| Backend, phase files, DB UNREACHABLE | same with `POSTGRES_DSN=…:59999` | **3 passed, 9 skipped**, exit 0 | ✓ PASS (WR-06 half-closed; nine live tests, not seven) |
+| Zero migrations | `ls supabase/migrations \| tail -1` | `114_harness_audit_action_risk_pending.sql` | ✓ PASS |
+| Token never parsed (F15 property) | `grep -n "new Date\|Date.parse" useDraftPersistence.ts` | no matches | ✓ PASS |
+| Debt markers in the 10 touched source files | `grep -n "TBD\|FIXME\|XXX"` | no matches in any file | ✓ PASS |
+| `stale_token` wire shape has DB-free coverage | `grep -rn "stale_token" backend/tests/` | one file only, and it is fully `pytestmark`-skipped | ✗ FAIL — WR-06 residue |
+
+Per the established measurement conditions, the frontend full suite was NOT used as a
+single-number gate; every judgement above is per-file, in isolation, at a 30 s timeout.
 
 ### Probe Execution
 
-No `scripts/*/tests/probe-*.sh` conventions apply to this phase (frontend/backend unit-test
-phase, not a migration/CLI/tooling phase). Skipped per Step 7c's own scope guidance.
+Not applicable — no `scripts/*/tests/probe-*.sh` convention governs this phase, and neither
+the PLANs nor VALIDATION.md declare a probe. Skipped per the scope guidance.
 
 ### Requirements Coverage
 
-| Requirement | Source Plan(s) | Description | Status | Evidence |
-|-------------|----------------|--------------|--------|----------|
-| CONCUR-01 | 186-01, 186-04, 186-06, 186-07, 186-08 | Autosave updates the draft row in place; cosmetic drag never mints a version or re-arms the gauntlet | ✓ SATISFIED at the level the requirement literally describes (version-minting, gauntlet re-arm). The AUTOSAVE MECHANISM built to deliver it (186-06/07) has the CR-01/WR-01/WR-03 defects above, which are safety defects in the delivery vehicle, not in the version/re-arm property itself. |
-| CONCUR-02 | 186-01, 186-02, 186-03, 186-05, 186-06, 186-07 | Concurrency guard (soft-lock/optimistic token) protects the shared draft; publish guarded against a dirty draft | ⚠️ PARTIALLY SATISFIED. The server-side token mechanism (backend half) is solid and independently confirmed. The CLIENT half that is supposed to make the guard trustworthy in practice — "conflict halts writing, offers Reload/Overwrite, never a false Saved" — is undermined by CR-01 (false Saved receipt under a common interleaving) and WR-01 (the halt/overwrite mechanism itself is not single-flight-safe). SC#4 (live two-editor UAT) has not been run — see Human Verification. |
+| Requirement | Source Plans | Description | Status | Evidence |
+|-------------|--------------|--------------|--------|----------|
+| **CONCUR-01** | 186-01, 04, 06, 07, 08, 09, 12, 13 | Autosave updates the draft row in place; a cosmetic drag never mints a version or re-arms the gauntlet | ✓ **SATISFIED** | Truth 1 + truths 4/5/6. The version property is proven in SQL and by F13; the drag property by `canvasNudge`'s import list and F12. The delivery vehicle's three prior safety defects are closed. |
+| **CONCUR-02** | 186-01, 02, 03, 05, 06, 07, 09, 10, 11, 12, 13 | Concurrency guard protects the shared draft; publish is guarded against a dirty draft | ⚠️ **PARTIALLY SATISFIED** | The server guard (truth 2), the publish guard (truth 3) and the client's halt-and-offer-exits mechanism are all real and re-derived. What is NOT satisfied: the exits are not durable — a failed Reload removes them permanently (truth 7 / GAP-4) — and the live two-editor UAT that SC#4 requires has not been run (truth 8). |
 
-No orphaned requirements: `.planning/REQUIREMENTS.md:113-114` maps only CONCUR-01/CONCUR-02
-to Phase 186, and both are claimed across the 8 plans' frontmatter.
+No orphaned requirements: `.planning/REQUIREMENTS.md:113-114` maps only CONCUR-01 and CONCUR-02
+to Phase 186, and both are claimed in plan frontmatter. Both are still `Pending` in the
+requirements table, which is correct — neither should be flipped to Complete while GAP-4 and
+SC#4 are open.
 
 ### Anti-Patterns Found
 
 | File | Line | Pattern | Severity | Impact |
 |------|------|---------|----------|--------|
-| `frontend/src/hooks/useDraftPersistence.ts` | 403-422, 457 | Silent-loss-with-false-receipt (CR-01) | 🛑 Blocker | Direct falsification of the phase's core safety promise. |
-| `frontend/src/hooks/useDraftPersistence.ts` | 554-558, 519-540 | Missing single-flight guard in `overwrite`/`reload` (WR-01) | 🛑 Blocker | Concurrency guard's own escape hatches are not concurrency-safe. |
-| `frontend/src/hooks/useDraftPersistence.ts` | 477-490 | Flag-off write leak (WR-03) | 🛑 Blocker | Violates D-181-01, this milestone's HARD gate #1, inherited by every phase after 181. |
-| `frontend/src/components/workflows/PublishGauntlet.tsx` | 141-151 | Missing `grounding_fidelity` stage row (WR-02) | ⚠️ Warning | Not a false-green regression (F7 property holds), but the commonest real refusal renders uninformatively. |
-| `frontend/src/components/workflows/BuilderSaveRegion.tsx` | 103-112 | `held` state silent on flag-off surface (WR-04) | ⚠️ Warning | Save-draft button appears to do nothing during a publish, worse than pre-186 behavior. |
-| `frontend/src/hooks/useDraftPersistence.ts` | 251-269 | 404-on-deleted-draft never halts the loop (WR-05) | ⚠️ Warning | Permanently doomed retries against a row that no longer exists. |
-| `backend/tests/unit/test_186_publish_race.py` | 65-70 (module mark) | DB-free F6 guard skipped under the module-level live-Postgres skip (WR-06) | ⚠️ Warning | The phase's headline backend invariant (draft_changed refuses a stale publish) has no DB-free CI coverage. |
+| `frontend/src/hooks/useDraftPersistence.ts` | 743-776 | Failed exit destroys the only exits (GAP-4 / CR-02) | 🛑 **Blocker** | A single click on the recommended default exit, plus one flaky request, permanently strands the draft. Save becomes a silent no-op — the exact defect WR-04 was raised for. |
+| `frontend/src/pages/WorkflowBuilderPage.session.test.tsx` | 591 | Time-dependent assertion now red (WR-11, new) | ⚠️ Warning | `expect(mockUpdate).toHaveBeenCalledTimes(0)` fails deterministically (3/3 runs incl. fully isolated). Cause re-derived: the test types (arming a real 1000 ms debounce with `draftId: "draft-1"` seeded), then waits up to 10 s for the lazily-imported canvas pane; whenever that wait exceeds the debounce the autosave fires a legitimate PATCH. The two sibling rows (✕, Escape) assert the same thing, skip the lazy import, and pass. **This is a test defect, not a product defect** — but 186-12 and 186-13 both recorded "passes in isolation", and that claim is false on this machine. Fix: assert a call-count DELTA around the dismissal, or drive the dismissal under fake timers. |
+| `frontend/src/hooks/useDraftPersistence.ts` | 382-384 | A published-row 409 is not terminal (WR-07) | ⚠️ Warning | `isTerminalRefusal` names only `WorkflowNotFoundError`. A published row is frozen by the DB trigger and can never become a draft again, so every subsequent edit re-issues a doomed PATCH for the life of the session — WR-05's own argument applied to the other terminal cause. Confirmed by reading the predicate. |
+| `frontend/src/hooks/useDraftPersistence.ts` | 592-608 | The drain's `continue` defeats the debounce (WR-08) | ⚠️ Warning | Confirmed: the supersede test is now an identity compare, and `PhaseFormPanel`'s fields call `onChange` per keystroke into the store (which is exactly why the session test above PATCHes at all). So while an author types, each completed PATCH immediately re-enters the loop — write rate becomes one-per-round-trip, not one-per-1000 ms, contradicting the module's own `:50` and `:126` docblocks. Knock-on: every extra write mints a new token, so it manufactures the very conflicts this phase exists to prevent, and widens WR-10's window. No test bounds the rate (F17b asserts 2 calls for 2 edits — the right count for a single follow-up, silent about a sustained run). |
+| `frontend/src/hooks/useDraftPersistence.ts` | 693-704 | The flag-off gate suppresses the state resolution, not just the write (WR-09) | ⚠️ Warning | Confirmed: on `!enabled` the effect returns before anything clears `{kind:"held"}`, and `BuilderSaveRegion` renders that sentence unconditionally (deliberately, per the WR-04 fix). So flag-off, the header keeps claiming *"Publishing — not saved; press Save draft again when it finishes"* after the gauntlet has ended — a false claim about system state. `heldPendingRef` is also left armed. Mitigating: `holdRef` IS mirrored before the return, so a later Save press does succeed; only the sentence lies. F20b asserts zero calls and never asserts what the surface says afterwards. |
+| `frontend/src/components/workflows/PublishGauntlet.tsx` | 581-598, 878-892 | Publish is not gated on an outstanding autosave write (WR-10) | ⚠️ Warning | Confirmed by construction: the hold stops NEW writes once `publishInFlight` is true but cannot recall an outstanding one, and nothing on the client refuses a gauntlet while `state.kind === "saving"`. A PATCH committing after stage 0's token read burns a full golden run for a publish that can only end in `draft_changed`. WR-08 widens the window. |
+| `backend/tests/unit/test_186_concurrent_patch.py` | 52-55 | The `stale_token` 409 wire shape has no DB-free coverage (WR-06 residue) | ⚠️ Warning | Measured: `grep -rn "stale_token" backend/tests/` matches one file; that file is module-`pytestmark`-skipped. The client branches its ENTIRE conflict UX on `detail.code === "stale_token"` + `detail.token` (`api.ts:3459-3460`) and that half is covered only against a mock. The two halves can drift with every suite green. |
+| `frontend/src/hooks/useDraftPersistence.ts` | 547-552 | `creatingRef` branch is now unreachable dead code (IN-01) | ℹ️ Info | With single flight inside `performWrite`, `creatingRef` can only be true within the same synchronous region that set it. The `setState({kind:"saving"})` still precedes it, so if it were ever reached the button would stick disabled. |
+| `backend/app/api/workflows.py`, `frontend/src/lib/api.ts` | 961 / 3440-3443 | `If-Match` carries a bare non-entity-tag and a failed precondition answers 409, not 412 (IN-03) | ℹ️ Info | Off-spec use of a standard precondition header invites a proxy to normalise or strip it, at which point the guard silently disappears. |
+| `backend/app/db/workflows.py` | 428-432 | `publish_definition`'s probe has no owner clause (IN-04) | ℹ️ Info | Explicitly accepted and documented in-code (T-186-02-02) — but the file's own stated rule at `:439` ("EVERY query self-scopes `created_by = $N`") is now literally false, which is what a future grep finds. |
+| `frontend/src/pages/WorkflowsPage.tsx` | 297 | `definition: (draft.definition ?? {})` can seed `phases: undefined` (IN-06) | ℹ️ Info | Pre-existing, but it now sits on the autosave path, where the same value would be PATCHed straight back. |
 
-No unresolved `TBD`/`FIXME`/`XXX` debt markers found in the files reviewed (checked via
-186-REVIEW.md's file list cross-referenced with the above reads; none of the Blocker/Warning
-items above are debt-marker violations — they are logic defects in shipped code, which is a
-stronger finding, not a weaker one).
+No unresolved `TBD` / `FIXME` / `XXX` debt markers exist in any of the ten source files this
+phase modified — checked directly, file by file.
 
 ### Human Verification Required
 
-See YAML frontmatter `human_verification` — six items, all sourced directly from
-`186-VALIDATION.md`'s own "Manual-Only Verifications" table, which the phase's own
-validation strategy marks as **"to run"**, not run. None of rows 1-3, 3b, 5, or 6 have been
-executed. These are G-4-mandated (live Chrome-driven) and cannot be satisfied by wire-format
-or automated-suite evidence per the project's own workflow guardrails.
+Seven items, in the frontmatter. Six are `186-VALIDATION.md`'s own "Manual-Only Verifications"
+rows, every one of which is still marked `to run`; the seventh is the live observation of
+GAP-4. **SC#4 is not inferable from any automated evidence** — G-4 makes live Chrome-driven
+observation the acceptance bar for user-visible surfaces, and no wire-format or unit result
+substitutes for it. Row 4 of that table (the literal "colleague clobber") stays ⛔ BLOCKED with
+its reason recorded, which is the correct scoreboard behaviour and matches the CONTEXT
+landmine: the reachable conflict is one user with two tabs, which rows 1-3 cover.
 
 ### Gaps Summary
 
-The phase's backend half (the optimistic-concurrency token, the owner-scoped guarded UPDATE,
-the three-way honest refusal, the publish-stage token guard) is solid and independently
-verified — CONCUR-01's literal "no version mint" claim and the server-side half of CONCUR-02
-both hold up to direct code inspection, not just to the review's prose.
+**The three gaps this re-verification exists to check are genuinely closed, and closed as
+properties rather than as patches.** Each was re-derived from source, not accepted from the
+gap-closure SUMMARYs: the receipt now compares what was actually written; single flight now
+lives inside the writer where no future caller can forget it; and the automatic flush now
+reads the revert switch. WR-02, WR-04 and WR-05 are closed too. The backend half —
+owner-scoped guarded UPDATE, opaque token, three-way honest refusal, token-guarded publish
+flip with a preserved golden-run receipt, zero migrations — holds up to direct inspection and
+to a live-DB run.
 
-The phase's own reason for existing — closing autosave risk "before real usage, not
-discovered live" — is not met on the frontend. Three independently-reproduced defects sit in
-the exact hook (`useDraftPersistence.ts`) this phase built to be the trustworthy seam:
+**One new blocker replaces them.** GAP-4 (the review's CR-02) is the same failure mode this
+phase has now met three times, in a third place: a mechanism that is honest on its success
+path and silently destructive on its failure path. `reload()` is the DEFAULT exit the banner
+recommends. When it fails for any transport reason — one dropped connection, one token
+refresh, one backend restart — it replaces the conflict state with a generic error, the banner
+unmounts, and the halt it was supposed to clear becomes permanent. From there the Save-draft
+button is enabled and does nothing at all, no edit ever schedules a write again, and both
+leave guards fire to tell the author about work they now have no way to save. The sentence
+shown invites exactly the retry that is structurally impossible. The fix is three lines and is
+named in the review; the missing test is one rejecting `listDraftWorkflows`.
 
-1. **CR-01** — a common edit interleaving (type, pause ~1s, resume, stop) is silently
-   dropped while the surface reports `Saved ✓`, and every downstream leave-guard mechanism
-   (in-app prompt, `beforeunload`, blur rescue) is disarmed by the same false receipt. This
-   directly contradicts the plan's own must_have wording for 186-06 ("NO false Saved ✓ is
-   ever filed") and the phase's own docblock ("A refusal — of any kind — leaves the draft
-   dirty").
-2. **WR-01** — the conflict banner's own escape hatches (`overwrite`, `reload`) are not
-   single-flight-safe, so the mechanism built specifically to resolve a concurrency conflict
-   can itself manufacture a spurious one on an ordinary double-click.
-3. **WR-03** — the hold mechanism that gates writes on the `enabled`/`visual_workflow_canvas`
-   flag has a code path (hold-release) that ignores the flag entirely, producing new
-   automatic write behavior on the flag-off surface — a direct hit against D-181-01, the
-   milestone's HARD gate #1, which every phase after 181 is required to inherit unbroken.
+**Four warnings are worth reading before the next phase touches this file**, because two of
+them interact: WR-08 (the drain's `continue` gives back the debounce, so a typing author holds
+a PATCH outstanding far more of the time than 1000 ms implies) directly widens WR-10 (nothing
+stops a gauntlet from starting while a write is outstanding, which burns a full golden run for
+a publish that can only be refused). WR-07 leaves a doomed retry loop on the published-row
+409. WR-09 leaves a false "Publishing —" claim on the flag-off header after the gauntlet ends.
 
-None of these three were caught by the 1864/1864 frontend or 284/284 backend green suites —
-they are interleaving/ordering defects the shipped tests do not exercise, which is exactly
-why goal-backward code verification (rather than trusting suite-green + SUMMARY claims) was
-warranted here.
+**A measurement claim in the SUMMARYs is false and should not be inherited.**
+`WorkflowBuilderPage.session.test.tsx > pane click — … ZERO PATCHes` fails deterministically
+here in three separate configurations including full isolation, while 186-12 and 186-13 both
+record it as parallel-load flake that "passes in isolation". The product behaviour is correct
+(the PATCH is a legitimate autosave one second after the author typed); the TEST encodes its
+claim as an absolute call count over an interval that now routinely exceeds the debounce. It
+is a warning, not a blocker — but the next reader must not take "passes in isolation" on
+trust, because it does not.
 
-**This is not a task-completion problem.** All 8 plans' tasks are done, committed, and their
-individual unit tests pass. It is a goal problem: "safe" is the literal word in the phase
-goal, and three of the seven observable truths derived from the phase's own must_haves and
-success criteria are independently confirmed false in the shipped code.
-
-BUG-260731-03 was checked separately and found to be handled exactly as documented — `status:
-folded` (not `closed`), `verified_closed_by: null`, and the 2026-08-01 report update honestly
-states "NOT verified. No live browser run, no live DB row, no golden run, no judge." This is
-the honest state, not a gap.
-
-**This looks intentional in one place, not accepted here.** The 186-08 deviation (gating the
-KB picker on `canvasEnabled` instead of removing the `boundFolderName &&` gate as the plan's
-literal wording said) is a defensible, documented choice made specifically to protect
-D-181-01 — and it is recorded with a re-open trigger in `deferred-items.md`. No override is
-needed for it because it is not a failure to close; it is correctly scoped and does not
-appear in the gaps list above.
+**This is not a task-completion problem.** All thirteen plans' tasks are done and committed,
+and every suite that this phase owns is green except the one time-dependent row above. It is a
+goal problem, and a narrower one than last time: seven of the eight observable truths hold,
+the eighth (SC#4) is owed live, and the failed one is a single failure path inside the exit
+mechanism that CONCUR-02's client half depends on.
 
 ---
 
-_Verified: 2026-08-01T06:10:00Z_
+_Verified: 2026-08-01T10:07:31Z_
 _Verifier: Claude (gsd-verifier)_
