@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
 status: executing
-last_updated: "2026-08-01T03:10:00.000Z"
-last_activity: 2026-08-01 -- Phase 186 Plan 06 complete (useDraftPersistence)
+last_updated: "2026-08-01T00:16:13.112Z"
+last_activity: 2026-07-31 -- Phase 186 execution started
 progress:
   total_phases: 19
   completed_phases: 5
   total_plans: 60
-  completed_plans: 56
+  completed_plans: 58
   percent: 26
 ---
 
@@ -1289,6 +1289,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 185 P12 | 12min | 3 tasks | 4 files |
 | Phase 186 P05 | 15min | 2 tasks | 3 files |
 | Phase 186 P06 | 55min | 3 tasks | 2 files |
+| Phase 186 P07 | 65min | 3 tasks | 12 files |
 
 ## Decisions
 
@@ -1542,6 +1543,10 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase 186]: 186-06: `overwrite` **re-enters the ONE writer** (adopt the 409's token → clear the halt → `performWrite`) instead of issuing its own request. That is what keeps the receipt action at exactly one caller AND makes a second-race refusal fall back into `conflict` with the newer token for free.
 - [Phase 186]: 186-06: the hook **deliberately does not classify the published-row 409**. Minting a second spelling of the page's `PUBLISHED_CONFLICT_MESSAGE` is the two-enums failure 186-04 just retired; **186-07 must close this or a shipped sentence regresses.**
 - [Phase 186]: 186-06 (method): the strongest RED is a **planted-defect run, not an unresolvable import**. The hook was first written with the in-flight guard removed and a date parse planted, so F9/F15 failed on real assertions. An absent module proves the file is missing; it proves nothing about whether the assertion can tell a correct hook from a broken one.
+- [Phase 186]: 186-07: PUBLISHED_CONFLICT_MESSAGE MOVED into useDraftPersistence beside the branch that picks it (186-06's flagged debt), and the page re-exports the name — the SAVED_STILL_A_DRAFT precedent applied a second time. GENERIC_SAVE_ERROR was RETIRED with a tombstone: keeping it beside the hook's SAVE_FAILED_SENTENCE would leave ONE situation with TWO spellings, the failure 186-04 retired the store's parallel save enum for.
+- [Phase 186]: 186-07 (G-5): the net-negative on WorkflowBuilderPage.tsx (194 ins / 230 del; 1656 -> 1620 L) was earned by EXTRACTION, not by trimming reasons out of docblocks. Composing the hook first produced +356/-148; two components then left the page — BuilderSaveRegion.tsx (net-new: the four save sentences + the three controls) and BuilderHeaderBar.tsx (moved VERBATIM, zero DOM change, so the flag-off markup pin passes unedited).
+- [Phase 186]: 186-07 (D-186-12): publishInFlight is threaded through the EXISTING renderPublish seam as an optional 4th argument plus one optional PublishGauntlet prop (onRunningChange) — a boolean reporter, never a state channel, and no new context. A three-parameter renderPublish is still assignable, so every call site outside the Builder is byte-identical.
+- [Phase 186]: 186-07 (F12 lesson): a fetch-only zero-network fence could NOT go red — the api client throws at getAuthHeaders before fetch is reached under jsdom, so a nudge wrongly routed into the write path would have left the shipped spy green. The fence now names the two draft mutations as well, and the planted-nudge falsification was observed RED before it was trusted.
 
 ## Operator Next Steps
 
