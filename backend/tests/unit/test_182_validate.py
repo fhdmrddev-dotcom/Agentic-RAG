@@ -97,6 +97,23 @@ def _patch_bundle(monkeypatch, *, tool_names=(), skill_ids=()) -> None:
     monkeypatch.setattr(g, "assemble_grounding_bundle", _fake_assemble)
 
 
+def _patch_scope_clean(monkeypatch) -> None:
+    """Stub the ⊆ walk to CLEAN so a **bound** definition needs no DB.
+
+    ``folder_scope_violations`` short-circuits to ``[]`` for an unbound workflow, so every
+    pre-187 fixture reached it without touching ``supabase`` (which is ``object()`` here).
+    A definition that carries a ``project_folder_id`` resolves the project subtree for real,
+    so the bound fixtures D-187-11 needs stub the ONE walk — the same seam, and the same
+    monkeypatch posture, ``test_folder_scope_verdict_is_keyed_to_the_phase`` already uses.
+    """
+    import app.services.harness.scope as scope_mod
+
+    async def _no_violations(definition, *, supabase, user_id, restrict_org_ids=None):
+        return []
+
+    monkeypatch.setattr(scope_mod, "folder_scope_violations", _no_violations)
+
+
 async def _validate(definition: dict):
     """Call the route handler directly and return the ValidateResponse."""
     from app.api import workflows as wf
@@ -124,10 +141,20 @@ def _by_code(response, code: str):
 
 @pytest.mark.asyncio
 async def test_clean_definition_is_ok_with_no_verdicts(monkeypatch):
-    """The full static gauntlet clean -> `{ok: True, verdicts: []}` (the publishable-now signal)."""
-    _patch_bundle(monkeypatch, tool_names={"search_documents"})
+    """The full static gauntlet clean -> `{ok: True, verdicts: []}` (the publishable-now signal).
 
-    resp = await _validate(_definition([_llm_agent(tools=["search_documents"])]))
+    BOUND since Phase 187 (D-187-11). This fixture is a retrieval workflow — its phase carries
+    `search_documents` — so leaving `project_folder_id` unset would now (correctly) earn the
+    `unbound_retrieval` verdict and this test would be asserting that an unbound retrieval
+    workflow is publishable-now. Binding it is the honest fix: the clean case is a workflow
+    that is clean on EVERY rule, including the newest one.
+    """
+    _patch_bundle(monkeypatch, tool_names={"search_documents"})
+    _patch_scope_clean(monkeypatch)
+
+    resp = await _validate(
+        _definition([_llm_agent(tools=["search_documents"])], project_folder_id=_PROJECT)
+    )
 
     assert resp.verdicts == []
     assert resp.ok is True
@@ -385,3 +412,123 @@ def test_validate_route_gates_on_require_canvas_alone():
 
     assert any(q.startswith("require_canvas") for q in qualnames), qualnames
     assert not any(q.startswith("require_visible") for q in qualnames), qualnames
+
+
+# ── 7) D-187-11 — the unbound-retrieval verdict (BUG-260731-03, the verdict half) ─
+#
+# A phase whose ``available_tools`` intersects the KB tools while the DEFINITION carries no
+# ``project_folder_id`` means "the knowledge base" is EVERYTHING. `BUG-260731-03` recorded
+# exactly that shipping: the publish gauntlet's probabilistic judge PASSED a worse deliverable
+# (11 files / 5+ folders) than the one it FAILED (3 files / 3 folders) an hour apart, so a hard
+# wall that fails open under variance is not a control for this failure mode. Scope-boundness is
+# a STRUCTURAL property of the definition, so it is checked HERE, where the answer is the same
+# every time, before a golden run is spent.
+
+
+@pytest.mark.asyncio
+async def test_unbound_retrieval_verdict_is_incomplete_and_per_node(monkeypatch):
+    """Unbound + a KB-reading phase -> ONE `unbound_retrieval` verdict, keyed to that node."""
+    _patch_bundle(monkeypatch, tool_names={"search_documents"})
+
+    resp = await _validate(_definition([_llm_agent("retrieve", 0, tools=["search_documents"])]))
+
+    matching = [v for v in resp.verdicts if v.code == "unbound_retrieval"]
+    assert len(matching) == 1, sorted(_codes(resp))
+    verdict = matching[0]
+    assert verdict.phase == "retrieve"  # per-node keying (SC#4), like interactive_phase
+    assert verdict.severity == "incomplete"
+    assert resp.ok is False  # an "incomplete"-only verdict set still blocks publish
+
+
+@pytest.mark.asyncio
+async def test_a_bound_retrieval_workflow_earns_no_unbound_verdict(monkeypatch):
+    """The SAME definition with `project_folder_id` set is clean on this rule."""
+    _patch_bundle(monkeypatch, tool_names={"search_documents"})
+    _patch_scope_clean(monkeypatch)
+
+    resp = await _validate(
+        _definition(
+            [_llm_agent("retrieve", 0, tools=["search_documents"])],
+            project_folder_id=_PROJECT,
+        )
+    )
+
+    assert "unbound_retrieval" not in _codes(resp), sorted(_codes(resp))
+
+
+@pytest.mark.asyncio
+async def test_an_unbound_workflow_that_reads_nothing_earns_no_unbound_verdict(monkeypatch):
+    """Unbound is only a finding for a step that actually READS the knowledge base.
+
+    An `llm_single` has no `available_tools` at all, and an agent whose tools miss the KB set
+    reads nothing either — neither may be accused of searching everything. This is the same
+    reason `grounding_cause` (the ONE intersection home) refuses to read `folder_scope`.
+    """
+    _patch_bundle(monkeypatch, tool_names={"web_search"})
+
+    bare = await _validate(_definition([_llm_single("answer", 0)]))
+    assert "unbound_retrieval" not in _codes(bare), sorted(_codes(bare))
+
+    non_kb = await _validate(_definition([_llm_agent("browse", 0, tools=["web_search"])]))
+    assert "unbound_retrieval" not in _codes(non_kb), sorted(_codes(non_kb))
+
+
+@pytest.mark.asyncio
+async def test_every_unbound_kb_reading_phase_gets_its_own_verdict(monkeypatch):
+    """PER-NODE and PLURAL (WR-04 posture): two offending phases -> two keyed verdicts.
+
+    A short-circuited rule would leave the second node rendering CLEAN on the canvas and the
+    author would rediscover it one at a time.
+    """
+    _patch_bundle(monkeypatch, tool_names={"search_documents", "read_document"})
+
+    resp = await _validate(
+        _definition(
+            [
+                _llm_agent("retrieve", 0, tools=["search_documents"]),
+                _llm_agent("reread", 1, tools=["read_document"]),
+            ]
+        )
+    )
+
+    slugs = [v.phase for v in resp.verdicts if v.code == "unbound_retrieval"]
+    assert slugs == ["retrieve", "reread"], sorted(_codes(resp))
+
+
+@pytest.mark.asyncio
+async def test_the_unbound_check_reuses_the_one_kb_intersection_home(monkeypatch):
+    """The route calls `grounding.grounding_cause` — it does NOT carry a local KB-tool list.
+
+    The day a 6th KB tool lands in `grounding.KB_TOOLS`, this check must pick it up for free.
+    Proven by ADDING one to the frozenset and observing the verdict appear for a phase whose
+    only tool is that new name — impossible if `workflows.py` held its own copy.
+    """
+    from app.services.harness import grounding as g
+
+    _patch_bundle(monkeypatch, tool_names={"a_sixth_kb_tool"})
+    monkeypatch.setattr(g, "KB_TOOLS", frozenset(g.KB_TOOLS | {"a_sixth_kb_tool"}))
+
+    resp = await _validate(_definition([_llm_agent("retrieve", 0, tools=["a_sixth_kb_tool"])]))
+
+    assert "unbound_retrieval" in _codes(resp), sorted(_codes(resp))
+
+
+def test_severity_classifies_unbound_retrieval_as_incomplete_without_failing_loud(caplog):
+    """`incomplete`, and NOT via the fail-loud unknown branch (WR-05).
+
+    An unregistered code would still classify — as `error`, with a warning logged on EVERY
+    canvas edit. That is the opposite of D-187-11, which wants grey "still building".
+    """
+    import logging
+
+    from app.api import workflows
+
+    with caplog.at_level(logging.WARNING, logger="app.api.workflows"):
+        caplog.clear()
+        got = workflows._severity("unbound_retrieval", phases_empty=False)
+
+    assert got == "incomplete"
+    assert "unbound_retrieval" not in caplog.text, (
+        "the code reached the fail-loud unknown branch — register it in BOTH "
+        "workflows._ROUTE_ASSIGNED_CODES and workflows._INCOMPLETE_CODES"
+    )
