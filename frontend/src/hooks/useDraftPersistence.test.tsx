@@ -152,7 +152,19 @@ interface Props {
   validationCause: "unreadable" | "unreachable" | null
 }
 
-function harness(opts: { draftId?: string | null; token?: string | null } = {}) {
+function harness(
+  opts: {
+    draftId?: string | null
+    token?: string | null
+    /**
+     * F17's receipt recorder (186-09). Invoked AT THE INSTANT the receipt is filed and
+     * BEFORE the real action runs, so a test can record what the store held versus what
+     * had actually been sent. Optional and defaulted away, so every pre-existing call
+     * site of this harness is unchanged.
+     */
+    onReceipt?: (store: ReturnType<typeof createBuilderStore>) => void
+  } = {},
+) {
   const store = createBuilderStore(draft())
 
   // `markSaved` is replaced through `setState`, not through a property spy: zustand
@@ -163,6 +175,7 @@ function harness(opts: { draftId?: string | null; token?: string | null } = {}) 
   store.setState({
     markSaved: () => {
       markSaved()
+      opts.onReceipt?.(store)
       realMarkSaved()
     },
   })
@@ -331,6 +344,124 @@ describe("useDraftPersistence — F9: at most ONE PATCH is outstanding per draft
     await advance(AUTOSAVE_DEBOUNCE_MS * 5)
     expect(mockedUpdate).not.toHaveBeenCalled()
     expect(mockedCreate).not.toHaveBeenCalled()
+  })
+})
+
+// ── F17 — a receipt names the payload it actually wrote (GAP-1 / CR-01) ───────
+
+/**
+ * Phase 186-09 — the interleaving F9 above does NOT cover, and the reason it does not.
+ *
+ * F9's second edit MATURES ITS OWN TIMER while the first write is held open. That branch
+ * works and always did: a matured timer that finds `inFlightRef.current` true sets
+ * `pendingRef`, and the drain reads that flag before deciding whether to file a receipt.
+ *
+ * F17 drives the branch that did not work. The second edit's timer is deliberately left
+ * IMMATURE when the first write resolves — only `AUTOSAVE_DEBOUNCE_MS / 2` is advanced. An
+ * edit rescheduling the debounce effect (deps `[definition, enabled]`) arms nothing; the
+ * re-check of `inFlightRef` happens at FIRE time, a full second later, and a PATCH round
+ * trip is normally far shorter than that. So the completed write found a clear
+ * `pendingRef`, filed `Saved ✓` for a payload that predated the edit, and cleared `dirty` —
+ * after which the orphaned timer read `if (!store.getState().dirty) return` and dropped the
+ * edit on the floor. This is the common shape (type, pause about a second, resume, stop),
+ * not an edge case, and it also disarms `beforeunload`, the in-app leave guard and the blur
+ * rescue, all of which key on `dirty`.
+ *
+ * THE RED NUMBERS, so a future reader can re-observe them by reverting the fix:
+ *   F17a — the recorded pair is { storePhases: 4, sentPhases: 3 }: `[3]` where `[4]` is
+ *          expected. The receipt named a payload the store had already moved past.
+ *   F17b — `updateWorkflowDraft` was called 1 time where 2 are expected, and
+ *          `mock.calls[1]` does not exist. The second edit never reached the server.
+ *   F17c — also 1 where 2 are expected, for the SAME upstream reason: the orphaned timer
+ *          found `dirty` already cleared and issued nothing at all. Its real job is the
+ *          other direction — once the count reaches 2 it guards against over-correcting
+ *          into a third, duplicate write when the stale timer finally matures.
+ *
+ * The lesson is T-185-04-01's, a second time: an invariant guard scoped to the wrong thing
+ * is green and worthless. The old guard was scoped to a QUEUE FLAG; the property that
+ * matters is WHAT WAS WRITTEN.
+ */
+describe("useDraftPersistence — F17: a receipt names the payload it actually wrote (CR-01)", () => {
+  interface Receipt {
+    storePhases: number
+    sentPhases: number | null
+  }
+
+  /**
+   * The interleaving, driven once per assertion so each property fails on its own terms.
+   * `draft()` starts at 2 phases, so edit #1 leaves 3 and edit #2 leaves 4.
+   */
+  async function driveMidFlightEdit(): Promise<{
+    h: ReturnType<typeof harness>
+    receipts: Receipt[]
+  }> {
+    const receipts: Receipt[] = []
+    const first = deferred<WorkflowDraftWriteResult>()
+    mockedUpdate
+      .mockImplementationOnce(() => first.promise)
+      .mockImplementationOnce(() => Promise.resolve(write("T2")))
+
+    const h = harness({
+      onReceipt: (store) => {
+        const calls = mockedUpdate.mock.calls
+        const last = calls.length > 0 ? calls[calls.length - 1] : null
+        receipts.push({
+          storePhases: store.getState().phases.length,
+          sentPhases: last ? (last[1] as unknown as BuilderDefinition).phases.length : null,
+        })
+      },
+    })
+
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+
+    // Write #1 is issued and HELD OPEN by the deferred, carrying the 3-phase definition.
+    expect(mockedUpdate).toHaveBeenCalledTimes(1)
+    expect(mockedUpdate.mock.calls[0][2]).toBe(TOKEN_0)
+    expect(sentDefinition(0).phases).toHaveLength(3)
+
+    // The author keeps typing. The store now holds 4 phases and is dirty, and the debounce
+    // effect has re-armed with a FRESH timer.
+    h.edit()
+
+    // ★ THE LOAD-BEARING LINE OF THIS WHOLE SUITE. HALF the debounce, deliberately: the
+    //   second edit's own timer has NOT matured, so nothing anywhere arms `pendingRef`.
+    //   Advancing a full AUTOSAVE_DEBOUNCE_MS here would turn this back into F9.
+    await advance(AUTOSAVE_DEBOUNCE_MS / 2)
+
+    first.resolve(write("T1"))
+    await flush()
+
+    return { h, receipts }
+  }
+
+  it("F17a — at the instant the receipt is filed, the sent payload IS the store's payload", async () => {
+    const { receipts } = await driveMidFlightEdit()
+
+    expect(receipts).toHaveLength(1)
+    // Compared as lists so the failure output prints the pair: RED reads [3] vs [4].
+    expect(receipts.map((r) => r.sentPhases)).toEqual(receipts.map((r) => r.storePhases))
+  })
+
+  it("F17b — an edit made mid-flight, before its own timer matures, is written not discarded", async () => {
+    const { h } = await driveMidFlightEdit()
+
+    expect(mockedUpdate).toHaveBeenCalledTimes(2)
+    expect(sentDefinition(1).phases).toHaveLength(4)
+    // Stated over the STORE rather than over the literal 4: whatever the author has, the
+    // server was told about.
+    expect(sentDefinition(1).phases).toHaveLength(h.store.getState().phases.length)
+    // …and the follow-up is guarded by the token the first write returned, not the stale one.
+    expect(mockedUpdate.mock.calls[1][2]).toBe("T1")
+  })
+
+  it("F17c — the orphaned timer maturing later issues NO extra write", async () => {
+    await driveMidFlightEdit()
+
+    await advance(AUTOSAVE_DEBOUNCE_MS * 3)
+    await flush()
+
+    expect(mockedUpdate).toHaveBeenCalledTimes(2)
   })
 })
 
