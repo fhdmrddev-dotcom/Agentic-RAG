@@ -4,11 +4,11 @@ milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
 status: executing
 last_updated: "2026-08-01T00:16:13.112Z"
-last_activity: 2026-07-31 -- Phase 186 execution started
+last_activity: 2026-08-01 -- Phase 186 gap closure planned (186-09..13, waves 6-8)
 progress:
   total_phases: 19
   completed_phases: 5
-  total_plans: 60
+  total_plans: 65
   completed_plans: 58
   percent: 26
 ---
@@ -50,8 +50,56 @@ Security found one real fail-open BLOCKER — T-185-04-01, a **typed** refusal o
 the step and filed a false approval receipt — fixed by quick task `260731-3y4` (`417728bd`) and
 **confirmed live in the browser** on run `5d3a4707` (run failed, step never ran, zero receipts).
 
-**Next:** **Phase 186 — Concurrency & Autosave** — CONTEXT gathered 2026-07-31 (`0a200d51`),
-17 decisions (D-186-01..17); PLAN committed 2026-08-01 (`a4c4eb86`, 8 plans / 5 waves).
+**Next:** **Phase 186 — Concurrency & Autosave — EXECUTE THE GAP CLOSURE (186-09..13, waves 6-8).**
+CONTEXT gathered 2026-07-31 (`0a200d51`), 17 decisions (D-186-01..17); PLAN committed 2026-08-01
+(`a4c4eb86`, 8 plans / 5 waves) — all 8 executed, committed, suites green.
+
+**⚠ `/gsd:verify-work 186` returned `gaps_found` — 4/7 must-haves verified (`8113deea`).** All 8
+plans' tasks are done; this is a GOAL failure, not a task failure. Three blockers were independently
+re-derived from source (not merely trusted from `186-REVIEW.md`), all in the one hook the phase built
+to be the trustworthy seam, `frontend/src/hooks/useDraftPersistence.ts`:
+**CR-01** an edit landing mid-flight before its own debounce timer matures is silently dropped while
+the surface files `Saved ✓` — which also disarms `beforeunload`, the in-app leave guard and the blur
+rescue, all keyed on `dirty`; **WR-01** `overwrite()`/`reload()` bypass the `inFlightRef` single-flight
+check every other caller respects, so a double-click on the never-disabled Overwrite button manufactures
+a conflict that does not exist; **WR-03** the hold-release effect never reads `enabled`, firing an
+automatic unrequested PATCH on the **flag-off** surface — a direct hit against **D-181-01**, this
+milestone's HARD gate #1. None were caught by the 1864/1864 frontend or 284/284 backend green suites —
+they are interleaving/ordering defects the shipped tests do not exercise (the T-185-04-01 lesson again:
+verify the PROPERTY, not the PATCH).
+
+**Gap-closure PLAN committed 2026-08-01 (`1c65b6a0`, 5 plans / 3 waves; plan-check PASSED first
+iteration, zero revisions).** Operator scope call: **all 3 blockers + all 4 warnings.**
+Waves 6→7→8 are strictly sequential because 186-09/12/13 all modify `useDraftPersistence.ts`.
+- **186-09** (W6) CR-01 — the receipt becomes a property of *what was written*: `performWrite` captures
+  the payload's `phases`+`meta` identity at snapshot time and refuses `markSaved()` unless the store
+  still holds it. Replaces the `pendingRef` queue-flag inference.
+- **186-10** (W6) WR-02 — the missing `grounding_fidelity` row on the gauntlet spine, running index
+  derived not hard-coded, and a coverage test sourced from `publish_service.py` itself.
+- **186-11** (W6) WR-06 — the live-Postgres skip moves off the module onto the tests that need a DB, so
+  the `draft_changed` invariant finally has DB-free CI coverage.
+- **186-12** (W7) WR-01 — single-flight moves *inside* `performWrite`, becoming a property of the writer;
+  caller-side checks deleted; both banner controls disabled while saving.
+- **186-13** (W8) WR-03 + WR-04 + WR-05 — `if (!enabled) return` in the hold-release effect (D-181-01
+  restored, proven by a flag-off test asserting **zero** network calls); the hold sentence stops promising
+  a save the loop will not perform; a 404 halts the loop instead of retrying forever.
+
+**Two delegated decisions locked in 186-13:** WR-04 → an honest held sentence (`HOLD_PUBLISHING_MANUAL`),
+not a disabled button — because 186-02's stage-5 token guard is *not* flag-gated, so a flag-off write
+mid-gauntlet would cost the person their whole golden run. WR-05 → halt + terminal sentence, **no
+auto-recreate** — the 404-collapse is a deliberate existence-leak defence, so the client cannot
+distinguish "deleted elsewhere" from "not yours", and silently minting a new row on an unclassifiable
+refusal is worse than stopping.
+
+**Gates:** requirements coverage ✓ (CONCUR-01, CONCUR-02 both claimed). Decision-coverage gate reported
+*skipped — no trackable decisions*: the known parser quirk (CONTEXT.md uses `D-186-NN`, the gate matches
+literal `D-NN`) — coverage hand-verified, not gate-verified. UI-SPEC gate (5.6) fired and was
+**operator-overridden** (`--skip-ui`, 2026-08-01): gap closure on an already-shipped surface, no new UI
+designed. Zero migrations — head stays 114.
+
+**Still owed at re-verification:** the six G-4 manual UAT rows in `186-VALIDATION.md` are all still
+"to run" (two-tab edit, stale tab, publish race, publish hold, KB re-bind ×3 paths, forced 422). They are
+deliberately NOT plan tasks — per CLAUDE.md, UAT rows live in VALIDATION.md.
 
 **Execution progress — Plan 186-01 COMPLETE (2026-08-01).** Wave 1's backend concurrency spine
 shipped in 3 atomic commits (`42734175` RED suite → `684e63b2` SQL token + guard → `5cb1f5f7`
