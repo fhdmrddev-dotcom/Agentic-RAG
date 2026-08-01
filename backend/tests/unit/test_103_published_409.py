@@ -18,9 +18,17 @@ than collapsing it to "not found"; (2) the PATCH 409's detail is an OBJECT carry
 DELETE 409 stays a bare string on purpose, and the no-mutation assertions — the actual
 security outcome — are untouched.
 
-Live :54322 via psycopg2 / asyncpg (module-level skip-guard).
+Live :54322 via psycopg2 / asyncpg.
 CONVENTION (Phase 102 posture): imports INSIDE the test bodies; the DB connect is
-guarded.
+guarded, so nothing here ever FAILS for want of a database.
+
+WHICH TESTS SKIP WITHOUT POSTGRES — WR-06. The skip is a property of the tests that need a
+database, not of this file. The two published-row FREEZE tests open a real asyncpg pool and
+carry their own ``@pytest.mark.skipif``; the two ``*_maps_check_violation_to_409`` tests are
+mock-only (``get_pg_pool`` patched to an ``AsyncMock``) and run EVERYWHERE, including a CI
+with no Postgres. Until WR-06 a module-level ``pytestmark`` gated all four, so the 23514 ->
+409 mapping — the route contract in the T-103-01-02 threat model — was unproven wherever the
+local stack was down: a guard that hides the invariant it defends is not a guard.
 """
 
 from __future__ import annotations
@@ -48,9 +56,11 @@ def _pg_reachable(dsn: str = _DSN) -> bool:
 
 PG_AVAILABLE = _pg_reachable()
 
-pytestmark = pytest.mark.skipif(
-    not PG_AVAILABLE,
-    reason=f"Local Postgres on {_DSN} not reachable; skipping live published-row-409 tests",
+#: ONE home for the skip sentence, so the per-test decorators cannot drift apart. Byte
+#: identical to the module-level ``pytestmark`` reason it replaced (WR-06), so the skip
+#: report reads exactly as it did before.
+_LIVE_DB_REASON = (
+    f"Local Postgres on {_DSN} not reachable; skipping live published-row-409 tests"
 )
 
 
@@ -85,6 +95,7 @@ def _published_definition(slug: str) -> dict:
 #    by patching the DB fn to raise the real CheckViolationError.
 
 
+@pytest.mark.skipif(not PG_AVAILABLE, reason=_LIVE_DB_REASON)
 @pytest.mark.asyncio
 async def test_patch_published_row_is_immutable_via_route_409_and_no_mutation():
     """LIVE: a PATCH against the OWNER's published row matches 0 draft rows and the
@@ -148,6 +159,7 @@ async def test_patch_published_row_is_immutable_via_route_409_and_no_mutation():
         await pool.close()
 
 
+@pytest.mark.skipif(not PG_AVAILABLE, reason=_LIVE_DB_REASON)
 @pytest.mark.asyncio
 async def test_delete_published_row_is_immutable_via_route_404_and_row_survives():
     """LIVE: a DELETE against the OWNER's published row matches 0 draft rows -> 404,
@@ -193,7 +205,12 @@ async def test_patch_route_maps_check_violation_to_409():
     """T-103-01-02 / key_links: when the immutability trigger fires (the TOCTOU race
     the draft guard normally prevents), the PATCH route catches the real asyncpg
     ``CheckViolationError`` (23514) and maps it to HTTP 409 — never a 500 or a silent
-    overwrite. Driven by patching the DB fn to raise the genuine error."""
+    overwrite. Driven by patching the DB fn to raise the genuine error.
+
+    DELIBERATELY UNGUARDED (WR-06): the pool is an ``AsyncMock`` and no connection is ever
+    opened, so there is nothing for a ``skipif`` to guard. Adding one to match the two live
+    freeze tests above would delete this mapping's only proof from any CI without a local
+    database."""
     from unittest.mock import AsyncMock, patch
 
     import asyncpg
@@ -231,7 +248,9 @@ async def test_patch_route_maps_check_violation_to_409():
 @pytest.mark.asyncio
 async def test_delete_route_maps_check_violation_to_409():
     """T-103-01-02 / key_links: the DELETE route maps a genuine CheckViolationError
-    (23514) to HTTP 409 (the trigger-fires / race path)."""
+    (23514) to HTTP 409 (the trigger-fires / race path).
+
+    DELIBERATELY UNGUARDED (WR-06) — mock-only, same reasoning as the PATCH case above."""
     from unittest.mock import AsyncMock, patch
 
     import asyncpg

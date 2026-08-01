@@ -32,7 +32,18 @@ the ``version == -1`` check into the success path and the service returns
 
 Live :54322 (asyncpg for the work, psycopg2 for the module-level reachability probe).
 CONVENTION (Phase 102 posture): imports INSIDE the test bodies; the DB connect is guarded,
-so this file SKIPS cleanly when the local stack is down — it never fails for want of a DB.
+so nothing here ever FAILS for want of a database.
+
+WHICH TESTS SKIP WITHOUT POSTGRES — WR-06. The skip is a property of the tests that need a
+database, not of this file. F5/F5b/F5c open a real asyncpg pool and carry their own
+``@pytest.mark.skipif``; **F6 touches no database at all** (``pool=AsyncMock()``, every
+boundary patched) and therefore runs EVERYWHERE, including a CI with no Postgres. That
+matters because F6 is the only automated proof of this phase's headline backend invariant —
+a ``-2`` sentinel becomes a ``draft_changed`` refusal instead of ``{published: True,
+version: -2}`` plus a false ``publish_succeeded`` receipt. Until WR-06 a module-level
+``pytestmark`` gated F6 too, so the invariant was absent wherever the local stack was down
+and could regress under a green suite: a guard that hides the invariant it defends is not a
+guard.
 
 THE TOKEN IS A ``str`` AND NOTHING ELSE (D-186-07). No test here parses it into a
 ``datetime``; it is read from one call and echoed verbatim into the next.
@@ -64,10 +75,10 @@ def _pg_reachable(dsn: str = _DSN) -> bool:
 
 PG_AVAILABLE = _pg_reachable()
 
-pytestmark = pytest.mark.skipif(
-    not PG_AVAILABLE,
-    reason=f"Local Postgres on {_DSN} not reachable; skipping live publish-race tests",
-)
+#: ONE home for the skip sentence, so the per-test decorators cannot drift apart. Byte
+#: identical to the module-level ``pytestmark`` reason it replaced (WR-06), so the skip
+#: report reads exactly as it did before.
+_LIVE_DB_REASON = f"Local Postgres on {_DSN} not reachable; skipping live publish-race tests"
 
 
 def _draft_definition(slug: str, name: str = "Publish Race Test") -> dict:
@@ -94,6 +105,7 @@ def _draft_definition(slug: str, name: str = "Publish Race Test") -> dict:
 
 
 # ── F5 ────────────────────────────────────────────────────────────────────────
+@pytest.mark.skipif(not PG_AVAILABLE, reason=_LIVE_DB_REASON)
 @pytest.mark.asyncio
 async def test_a_draft_that_moved_is_refused_at_the_flip():
     """D-186-10: the flip is guarded on the STAGE-0 token, so a draft edited mid-gauntlet
@@ -150,6 +162,7 @@ async def test_a_draft_that_moved_is_refused_at_the_flip():
 
 
 # ── F5b ───────────────────────────────────────────────────────────────────────
+@pytest.mark.skipif(not PG_AVAILABLE, reason=_LIVE_DB_REASON)
 @pytest.mark.asyncio
 async def test_the_two_sentinels_are_distinguishable():
     """T-186-02-01: ``-1`` and ``-2`` are two different sentences and two different receipts.
@@ -204,6 +217,7 @@ async def test_the_two_sentinels_are_distinguishable():
 
 
 # ── F5c ───────────────────────────────────────────────────────────────────────
+@pytest.mark.skipif(not PG_AVAILABLE, reason=_LIVE_DB_REASON)
 @pytest.mark.asyncio
 async def test_an_absent_token_keeps_todays_unguarded_flip():
     """The COMPATIBILITY control — expected GREEN before AND after, deliberately.
@@ -271,6 +285,12 @@ async def test_the_golden_run_receipt_survives_a_draft_changed_refusal():
     The row this test hands ``get_definition`` carries a ``token``, which the service must
     thread to ``publish_definition``; that call is asserted on directly, because a stage-0
     capture that never reaches stage 5 guards nothing.
+
+    DELIBERATELY UNGUARDED (WR-06). This is the only test in the file with NO
+    ``skipif(not PG_AVAILABLE)`` — it opens no connection, so there is nothing to guard.
+    Adding one "for consistency" with its three live neighbours would delete this phase's
+    headline invariant from every environment without a local database, which is the exact
+    defect WR-06 recorded.
     """
     from unittest.mock import AsyncMock, patch
     from uuid import UUID, uuid4
