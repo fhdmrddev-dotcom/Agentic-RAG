@@ -231,6 +231,18 @@ export interface DraftPersistenceArgs {
 export interface DraftPersistence {
   state: PersistState
   draftId: string | null
+  /**
+   * An exit the person CHOSE is in progress (186-12). Deliberately NOT a member of
+   * `PersistState`: that union describes the write loop's OUTCOME, and a resolution being
+   * under way is not an outcome — `overwrite` is `saving` while it resolves, and `reload`
+   * is not writing at all.
+   *
+   * It exists so the conflict banner can disable its two controls AND stay mounted for the
+   * whole resolution. A banner gated on `conflict` alone unmounts the instant `overwrite`
+   * sets `{kind:"saving"}`, so the disabled state would never be visible and a double-click
+   * would stay an ordinary thing to do.
+   */
+  resolving: boolean
   /** The explicit Save-draft button (D-186-03). Resolves true on a confirmed write. */
   saveNow: () => Promise<boolean>
   /** The conflict escape hatch the banner offers FIRST (D-186-08). */
@@ -311,7 +323,8 @@ export function useDraftPersistence(args: DraftPersistenceArgs): DraftPersistenc
   const draftIdRef = useRef<string | null>(initialDraftId)
   const creatingRef = useRef(false)
 
-  // WRITES ARE SERIALIZED, NEVER CANCELLED, AND NEVER CONCURRENT.
+  // WRITES ARE SERIALIZED, NEVER CANCELLED, AND NEVER CONCURRENT — AND THAT IS A PROPERTY
+  // OF THE WRITER, NOT A RULE EACH CALLER REMEMBERS (186-12, GAP-2 / WR-01).
   //
   // Three refs and one rule: at most one write is in flight; a newer edit that arrives
   // while one is in flight sets `pendingRef` rather than issuing a second request; the
@@ -321,6 +334,22 @@ export function useDraftPersistence(args: DraftPersistenceArgs): DraftPersistenc
   // WHY NOT "just send both": two writes carrying the SAME token means one of them matches
   // 0 rows. The loser would raise a conflict banner for a conflict that never existed — the
   // person would be told their own draft moved under them while they typed.
+  //
+  // ⚠ THIS PARAGRAPH USED TO NAME THREE CALLERS, AND THAT FRAMING IS WHAT LET TWO MORE SKIP
+  // THE RULE. The `inFlightRef` check lived in the debounce timer, the hold release and
+  // `saveNow`; the two conflict exits — `overwrite` and `reload` — called `performWrite`
+  // with no check at all. An ordinary double-click on Overwrite therefore issued two
+  // concurrent PATCHes carrying the SAME token, the server refused the loser `stale_token`,
+  // and the loop raised a conflict banner for a conflict that had never happened. The
+  // mechanism built to RESOLVE a concurrency conflict was manufacturing them.
+  //
+  // The check now has exactly ONE home, inside `performWrite`, which is the one place that
+  // can enforce it for every caller including ones not yet written. An invariant each caller
+  // must remember is not an invariant — the "one home per concern" red line, applied to the
+  // write loop.
+  //
+  // The two exits additionally carry a re-entrancy guard (`reloadingRef`), which is a
+  // DIFFERENT concern with a different reason: see `reload` below.
   const inFlightRef = useRef(false)
   const pendingRef = useRef(false)
   const tokenRef = useRef<string | null>(initialToken)
@@ -331,6 +360,19 @@ export function useDraftPersistence(args: DraftPersistenceArgs): DraftPersistenc
   // `conflictTokenRef` holds what the server said it has NOW, so Overwrite is one request.
   const haltedRef = useRef(false)
   const conflictTokenRef = useRef<string | null>(null)
+
+  // 186-12 — THE EXIT RE-ENTRANCY GUARD, and it is not the same thing as single flight.
+  //
+  // Single flight says "at most one request". This says "at most one RESOLUTION": an exit
+  // may not be entered while a write is outstanding, nor while the other exit is running,
+  // because the token an exit adopts is about to be superseded by the outstanding write's
+  // response — and a second `reload` would call `setDrafted` twice, replacing the document
+  // (and discarding the undo history) once more than the person asked for.
+  //
+  // `resolving` is the same fact as rendered state, so the banner can disable its controls
+  // and stay on screen for the whole resolution.
+  const reloadingRef = useRef(false)
+  const [resolving, setResolving] = useState(false)
 
   // Hold conditions are read at FIRE time from refs, never from a dependency array — see
   // the autosave effect for why. `heldPendingRef` is the accumulated "there is unsent work"
@@ -372,6 +414,16 @@ export function useDraftPersistence(args: DraftPersistenceArgs): DraftPersistenc
    */
   const performWrite = useCallback(async (): Promise<boolean> => {
     if (haltedRef.current) return false
+
+    // SINGLE FLIGHT, ENFORCED HERE AND NOWHERE ELSE (186-12, WR-01). Every entry point —
+    // the debounce timer, `saveNow`, the hold release, both conflict exits, and any caller
+    // added later — passes through this line, so none of them can forget it. The semantics
+    // are exactly what the three caller-side checks used to do: arm the queue so the
+    // outstanding write's drain picks the work up, and report that nothing was written.
+    if (inFlightRef.current) {
+      pendingRef.current = true
+      return false
+    }
 
     inFlightRef.current = true
     let ok = false
@@ -498,10 +550,8 @@ export function useDraftPersistence(args: DraftPersistenceArgs): DraftPersistenc
       // draft would PATCH it — bumping the row and invalidating the token every other tab
       // holds, which manufactures exactly the conflict this phase exists to prevent.
       if (!store.getState().dirty) return
-      if (inFlightRef.current) {
-        pendingRef.current = true
-        return
-      }
+      // No `inFlightRef` check here: the writer owns that rule (186-12). A matured timer
+      // that finds a write outstanding still arms the queue — `performWrite` does it.
       void performWrite()
     }, AUTOSAVE_DEBOUNCE_MS)
 
@@ -524,11 +574,8 @@ export function useDraftPersistence(args: DraftPersistenceArgs): DraftPersistenc
     if (haltedRef.current) return
     if (!heldPendingRef.current && !store.getState().dirty) return
     heldPendingRef.current = false
-    if (inFlightRef.current) {
-      pendingRef.current = true
-      return
-    }
     // D-186-12 literally: edits accumulated as dirty, and EXACTLY ONE write flushes them.
+    // If one is already outstanding, `performWrite` arms the queue instead (186-12).
     void performWrite()
   }, [holdReason, store, performWrite])
 
@@ -543,10 +590,9 @@ export function useDraftPersistence(args: DraftPersistenceArgs): DraftPersistenc
       setState({ kind: "held", sentence: holdRef.current })
       return false
     }
-    if (inFlightRef.current) {
-      pendingRef.current = true
-      return false
-    }
+    // Single flight is the WRITER's rule, so this button does not re-implement it: with a
+    // write outstanding `performWrite` arms the queue and resolves false, which is exactly
+    // what the check that used to live here did (186-12).
     return performWrite()
   }, [performWrite])
 
@@ -558,8 +604,22 @@ export function useDraftPersistence(args: DraftPersistenceArgs): DraftPersistenc
    * guarded by the value the server holds now.
    *
    * One call site, and no new function was added to the API client for it.
+   *
+   * ── THE RE-ENTRANCY GUARD (186-12) ───────────────────────────────────────────────
+   *
+   * It returns WITHOUT MUTATING ANY REF while a write is outstanding or the other exit is
+   * running. Two reasons, and neither is the writer's single-flight rule:
+   *   • a second `setDrafted` replaces the document a second time, clearing the undo
+   *     history again — a double-click would discard more than the person chose to discard;
+   *   • the token this adopts is about to be superseded by the outstanding write's
+   *     response, so adopting it here would leave `tokenRef` holding the loser.
+   * The guard is the FIRST thing in the function, before the read: a `listDraftWorkflows`
+   * that is going to be thrown away is still a request.
    */
   const reload = useCallback(async (): Promise<void> => {
+    if (inFlightRef.current || reloadingRef.current) return
+    reloadingRef.current = true
+    setResolving(true)
     const id = draftIdRef.current
     try {
       const rows = id === null ? [] : await listDraftWorkflows()
@@ -579,6 +639,9 @@ export function useDraftPersistence(args: DraftPersistenceArgs): DraftPersistenc
       setState({ kind: "idle" })
     } catch {
       setState({ kind: "error", sentence: SAVE_FAILED_SENTENCE })
+    } finally {
+      reloadingRef.current = false
+      setResolving(false)
     }
   }, [store])
 
@@ -593,12 +656,27 @@ export function useDraftPersistence(args: DraftPersistenceArgs): DraftPersistenc
    *
    * NEITHER EXIT IS EVER INVOKED FROM INSIDE THIS HOOK — no effect calls them, no catch
    * calls them. They are returned, and the person chooses.
+   *
+   * ── THE RE-ENTRANCY GUARD SITS ABOVE THE TOKEN ASSIGNMENT (186-12) ───────────────
+   *
+   * Order is the whole fix. Leaving the guard to `performWrite` alone would still let the
+   * second click clobber `tokenRef` with the conflict token before the write was refused by
+   * the writer's own check — a half-fix that swaps a duplicate request for a corrupted
+   * token. Nothing is mutated until the exit is known to be takeable.
    */
   const overwrite = useCallback(async (): Promise<void> => {
-    tokenRef.current = conflictTokenRef.current
-    haltedRef.current = false
-    await performWrite()
+    if (inFlightRef.current || reloadingRef.current) return
+    reloadingRef.current = true
+    setResolving(true)
+    try {
+      tokenRef.current = conflictTokenRef.current
+      haltedRef.current = false
+      await performWrite()
+    } finally {
+      reloadingRef.current = false
+      setResolving(false)
+    }
   }, [performWrite])
 
-  return { state, draftId, saveNow, reload, overwrite }
+  return { state, draftId, resolving, saveNow, reload, overwrite }
 }
