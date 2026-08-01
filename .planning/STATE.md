@@ -652,6 +652,37 @@ stays at **eight** rows.
 and `CONCUR-02` stay as the orchestrator left them; plan counter, ROADMAP plan-progress and
 requirement completion are the orchestrator's.
 
+**▶ PLAN 186-20 EXECUTED 2026-08-01 — the round is CLOSED against a measured gate, and the five
+carried warnings are scheduled decisions rather than omissions.** 2 tasks, 2 commits (`5a1cc5c8`
+deferrals / `a72b1fd7` the gate). Two `.planning/` markdown files only — zero source files, zero
+migrations, zero package changes.
+**Task 1 — `deferred-items.md` gained WR-14..WR-18**, `Re-open trigger` count **6 → 11**, **175
+insertions / 0 deletions** (no pre-existing entry edited). WR-14 records the trade this round
+made: 186-18's CR-03 reorder lifted `SAVING_PUBLISH_WAIT` above the flag gate, so the wait reason
+now outranks the verdict branches — and disables the free outer trigger — on the **flag-off**
+Builder too. WR-18 records its containment: a null `detail.token` costs the **optimistic** guard,
+not an authorisation (owner scope + published-row guard are server-side and untouched).
+**Task 2 — the gate, all four commands run in-session.** Frontend consumer set (11 files,
+`--fileParallelism=false` per D-186-18-D) **429/429 green**; the delta is attributed **per file**
+against the pre-round tree `b417584d` — canvas 87→88 (186-18), hook 50→52 (186-19), the other nine
+**unchanged** — so 426 → 429 is exactly +3 and nothing was replaced invisibly (the Phase 177
+lesson). Backend `21 passed, 0 skipped` — **zero skips means live Postgres was present**, so the
+DB-guarded F-guards genuinely ran; whole-suite collection **3474** (≥ 3457 / 3465). `tsc` **33
+pre-existing errors across 19 files, 0 in any phase-186 file**. Zero migrations / packages in the
+working tree **and** across the whole round.
+⚠ **Two inherited plan claims measured FALSE and corrected:** (a) *"five entries already exist"* in
+`deferred-items.md` — there were **six**; (b) *"Command 3 reports zero errors"* — the achievable
+criterion is zero **in the phase's files**, matching what 186-19 found. Also: **five of the
+verification report's WR line references are stale** (it predates 186-18/186-19) — WR-18's site is
+`useDraftPersistence.ts:1058`, not `:980`; WR-16 `:988-1032`, not `:915-949`; WR-17 `:988-993`,
+not `:910-914`; WR-15's real sites are `:633`/`:638`, not `:605-610`; WR-14's saving branch is
+`WorkflowBuilderPage.tsx:1094`, not `:1077`. Every one re-derived from source.
+`wave_0_complete` flipped `false` → `true` against `ls` evidence (all six files were already on
+disk — a stale record, not a missing artifact). **`**Approval:** pending` untouched, all eight
+Manual-Only rows still unrun, row 4 still ⛔, `.planning/REQUIREMENTS.md` unmodified** — `CONCUR-01`
+and `CONCUR-02` stay **Pending** until the operator runs the board. **Phase 186 is now ready for
+`/gsd:verify-work 186`, with SC#4 the only thing no automated evidence can close.**
+
 Resume file: None
 
 Both owed items are now ROUTED at the discuss-phase touchpoint:
