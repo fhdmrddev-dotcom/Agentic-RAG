@@ -76,3 +76,21 @@ If C wins, does the starter's curated definition still have a home? Options: kee
 on the **Workflows page** (where it already lives, and where a gallery is appropriate) and let the
 first screen carry only C's sentence-seeding door. That would give both behaviours a home without
 either one crowding the calm screen — worth deciding at discuss-phase rather than assuming.
+
+## Lineage — what this inherits and what it feeds
+
+**Inherits.** #11 describe-box-only first screen, #12 the 3-second read, #13 tiered guidance —
+all three are the acceptance bar, not background. #19 the THREE-HOMES navigation contract is the
+one that decides this: **authoring = the Builder, library + launch = the Workflows page.** A template
+gallery is library work and #19 already gave it a home. #36 the workflow soul (glyph-dot phase spine)
+is what identifies a starter at any size. #37 the strict/loose two-door fork is the precedent for
+offering an alternative entry without cluttering the calm path.
+
+**Feeds.** Whichever variant wins, the *curated definition* path and the *describe* path must not
+both become first-class on the same screen — that is the second-forward-path risk this sketch names.
+
+**Icon convention (#43) — corrected during operator review.** An earlier draft gave each starter ONE
+phase-type glyph as a category icon. That misuses the shared map (`icon3d('llm_agent')` means "this
+STEP is an agent step", not "this WORKFLOW is about risk"), and this system has no category-icon
+vocabulary. Every starter is now identified by its **phase spine** per #36, at both sizes. Honest
+side effect: the chips wrap to two lines, which strengthens rather than softens B's density cost.

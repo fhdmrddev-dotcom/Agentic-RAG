@@ -136,7 +136,7 @@ body.tech .revealtoggle .sw::after { left: 14.5px; background: hsl(239 100% 82%)
 }
 .mark svg { position: relative; z-index: 2; filter: drop-shadow(0 9px 13px rgba(0,0,0,.8)); }
 .seal {
-  position: absolute; top: 11px; right: 17px; width: 20px; height: 20px;
+  position: absolute; top: 11px; right: 17px; width: 21px; height: 21px;
   border-radius: 50%; display: grid; place-items: center; z-index: 6;
   font-size: 10px; color: var(--color-text);
   background: hsl(220 30% 100% / .1); border: 1px solid hsl(220 30% 100% / .34);
@@ -330,7 +330,7 @@ function cardHTML(t, on, step) {
     +   (f.tline ? '<div class="techline">'+f.tline+'</div>' : '')
     + '</div>'
     + '<div class="mark" style="--t:'+(TINT[s.type]||'hsl(220 30% 100% / .22)')+'">'+icon3d(s.type, 34)+'</div>'
-    + (grounded ? '<div class="seal" title="Must prove it — this step reads your documents">◈</div>' : '')
+    + (grounded ? '<div class="seal" title="Must prove it — this step reads your documents">⛨</div>' : '')
     + '</div>';
 }
 

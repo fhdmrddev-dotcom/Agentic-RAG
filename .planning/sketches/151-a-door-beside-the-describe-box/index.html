@@ -132,8 +132,11 @@ body {
   color: var(--color-text-muted); transition: all .15s ease;
 }
 .chip:hover { border-color: hsl(239 100% 82% / .5); color: var(--color-text); transform: translateY(-1px); }
-.chip .g { display: grid; place-items: center; width: 20px; height: 20px; }
-.chip .g svg { width: 20px; height: 20px; }
+/* A starter is identified by its PHASE SPINE (decision #36), never by one borrowed
+   phase-type glyph — there is no category-icon vocabulary in this system. */
+.chip .spine.sm { display: inline-flex; gap: 3px; align-items: center; }
+.chip .spine.sm svg { width: 16px; height: 16px; }
+.chip .spine.sm i { width: 5px; height: 1px; background: var(--color-text-dim); display: block; }
 
 /* ── C · the picker sheet (A's destination) ──────────────────────────────── */
 .sheet {
@@ -263,17 +266,26 @@ body.ruler .rulertag { display: block; }
 <script src="../themes/phase-icons-3d.js"></script>
 <script>
 /* The three REAL curated starters — migration 094. Not invented, and not more than
-   three, because three is how many exist. */
+   three, because three is how many exist.
+
+   ICON CONVENTION (design decision #43 / #36 — corrected after operator review).
+   An earlier draft of this sketch gave each starter ONE phase-type glyph as if it
+   were a category icon. That is a misuse of the shared map: `icon3d('llm_agent')`
+   means "this STEP is an AI agent step", not "this WORKFLOW is about risk". There is
+   no category-icon vocabulary in this system and this sketch must not invent one.
+   Decision #36 already settled what represents a whole workflow — the glyph-dot
+   PHASE SPINE — so every starter is identified by its spine, at every size. The
+   `icon` field is gone rather than left unused. */
 const STARTERS = [
-  { name:'Risk Register', icon:'llm_agent',
+  { name:'Risk Register',
     blurb:'Finds risks across your documents and keeps a register up to date.',
     spine:['programmatic','llm_agent','llm_emit'],
     describe:'Review my documents for risks, score each one, and keep a risk register up to date.' },
-  { name:'Weekly Status Report', icon:'llm_emit',
+  { name:'Weekly Status Report',
     blurb:'Pulls the week’s activity together into a report you can send.',
     spine:['programmatic','llm_single','llm_emit'],
     describe:'Pull together what happened this week across my documents and write a status report I can send.' },
-  { name:'Compliance Gap Report', icon:'llm_batch_agents',
+  { name:'Compliance Gap Report',
     blurb:'Checks your documents against a policy and lists what’s missing.',
     spine:['programmatic','llm_batch_agents','llm_human_input','llm_emit'],
     describe:'Check my documents against our compliance policy and list every gap, then let me sign it off.' },
@@ -287,8 +299,8 @@ const LEADS = {
 
 let current = 'a';
 
-function spineHTML(types) {
-  return types.map(t => icon3d(t, 15)).join('<i></i>');
+function spineHTML(types, size) {
+  return types.map(t => icon3d(t, size ?? 15)).join('<i></i>');
 }
 
 function screenHTML(variant) {
@@ -306,7 +318,7 @@ function screenHTML(variant) {
           + '<span class="rulertag" style="right:-6px;top:-20px">4 extra elements</span>'
           + '<div class="cap">Or start from one of these:</div><div class="chips">'
           + STARTERS.map((s,i) => '<span class="chip" onclick="pick('+i+')">'
-              + '<span class="g">'+icon3d(s.icon,20)+'</span>'+s.name+'</span>').join('')
+              + '<span class="spine sm">'+spineHTML(s.spine,16)+'</span>'+s.name+'</span>').join('')
           + '</div></div>';
   }
   if (variant === 'c') {
@@ -343,9 +355,9 @@ function render() {
     document.getElementById('note-'+v).innerHTML = NOTES[v];
   });
   document.getElementById('tpls').innerHTML = STARTERS.map((s,i) =>
-      '<div class="tpl" onclick="pick('+i+')"><div class="g">'+icon3d(s.icon,34)+'</div>'
+      '<div class="tpl" onclick="pick('+i+')">'
     + '<div><b>'+s.name+'</b><span>'+s.blurb+'</span>'
-    + '<div class="spine">'+spineHTML(s.spine)+'</div></div></div>').join('');
+    + '<div class="spine">'+spineHTML(s.spine,22)+'</div></div></div>').join('');
   document.getElementById('lead').innerHTML = LEADS[current];
   renderRail();
 }

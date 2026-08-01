@@ -77,3 +77,17 @@ subtitles that genuinely add information, C's cost is real and worth naming per 
 Governance owns the card's top-right corner and spends no badge slot; both badge slots are
 committed to 188/189; a third badge is a typecheck error. None of the three treatments touches any
 of that — the whole question lives in the card's text block.
+
+## Lineage — what this inherits and what it feeds
+
+**Inherits.** Phase 154 / LANG-01 built `TechnicalNamesProvider` as ONE app-wide boolean precisely
+so two toggles can never disagree — the canvas must ride it, never add a second. #51/#59 established
+the **⌥ Technical-names two-audience reveal** as an operator-surface pattern; this is that same
+pattern on the canvas. D-183-08 named `technicalTitle` the reveal vocabulary, NOT the default face.
+148-C is the direct cause of the question.
+
+**Feeds.** **Phase 188** owns `technicalLine`, `status` and `stepNumber` (`PhaseNode.tsx:183`) —
+variant B spends one of them, so this pick is a 188 scope decision, not only a 187 one. **Phase 189**
+holds the second badge slot.
+
+**Icon convention (#43).** No new glyph. The seal is the shipped `⛨`; the reveal is type only.

@@ -110,11 +110,15 @@ body {
 }
 .sub { margin-top: 4px; font-size: 11px; line-height: 1.45; color: var(--color-text-muted); }
 .badges { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+/* THE SHIPPED BADGE IS WORD-ONLY AND TONE `primary` — `PhaseNode.tsx` builds the
+   `waitsForYou` slot with a label and NO `glyph`, and PhaseNodeCard's own docblock
+   says "The WORD carries the meaning; tone is decoration." An emoji here would spend
+   visual budget the shipped design deliberately withholds. */
 .badge {
   display: inline-flex; align-items: center; gap: 4px; border-radius: 999px;
   padding: 2px 9px; font-size: 10.5px; font-weight: 500; white-space: nowrap;
-  color: hsl(38 92% 68%); background: hsl(38 92% 60% / .14);
-  border: 1px solid hsl(38 92% 60% / .32);
+  color: hsl(239 100% 86%); background: hsl(239 84% 67% / .16);
+  border: 1px solid hsl(239 100% 82% / .34);
 }
 
 /* the floating 3D mark */
@@ -142,7 +146,7 @@ body {
 
 /* the governance corner seal — shape, no colour (185-09 / sketch 143-A) */
 .seal {
-  position: absolute; top: 11px; right: 17px; width: 20px; height: 20px;
+  position: absolute; top: 11px; right: 17px; width: 21px; height: 21px;
   border-radius: 50%; display: none; place-items: center; z-index: 6;
   font-size: 10px; color: var(--color-text);
   background: hsl(220 30% 100% / .1); border: 1px solid hsl(220 30% 100% / .34);
@@ -453,10 +457,10 @@ function nodeHTML(s, i, key) {
     + '<div class="card">'
     +   '<div class="ttl" title="'+face.t.replace(/"/g,'&quot;')+'">'+face.t+'</div>'
     +   '<div class="sub">'+face.s+'</div>'
-    +   (s.armed ? '<div class="badges"><span class="badge">✋ Waits for you</span></div>' : '')
+    +   (s.armed ? '<div class="badges"><span class="badge">Waits for you</span></div>' : '')
     + '</div>'
     + '<div class="mark">'+icon3d(s.type, 34)+'</div>'
-    + (g ? '<div class="seal" title="Must prove it — this step reads your documents">◈</div>' : '')
+    + (g ? '<div class="seal" title="Must prove it — this step reads your documents">⛨</div>' : '')
     + (isTwin ? '<div class="twinflag">⬆ identical to its neighbour</div>' : '')
     + '<div class="cfg">'+cfg+'</div>'
     + '</div>';

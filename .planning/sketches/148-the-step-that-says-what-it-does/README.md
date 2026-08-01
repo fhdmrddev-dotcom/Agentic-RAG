@@ -109,3 +109,18 @@ where the decision is actually made.
 If C wins, the staleness question does not disappear — it moves. C keeps author names on top, and
 an author name can go stale exactly as A's does. Decide deliberately: does a hand-written name that
 predates a config edit stay on the face, or get marked?
+
+## Lineage — what this inherits and what it feeds
+
+**Inherits.** #15 read-only phase-spine + side panel (019-D) established that the node face is the
+primary read. #36 workflow soul — purpose-led essence, phase spine, glyphs only. **137-B** is the
+card (185-01 rebuilt to it); D-183-06 set the plain-language sentence and D-183-07 the two badge
+slots. `phaseVocabulary.ts` is the ONE shared vocabulary module — 183-04 performed the hard cut,
+and `?raw` source guards fail the moment a second copy of the glyph map or the parse reappears.
+
+**Feeds.** 149 (a specific plain title is what makes the reveal's swap expensive). 150 (the seeded
+canvas is where the generic-face failure is most visible). **Phase 188** — the freed badge slot 1
+and the card's remaining lines are 188's budget; a layered title spends neither.
+
+**Icon convention (#43).** Phase-type marks come from the shared 3D map via `icon3d()`. This sketch
+adds no glyph: the layered title is text, and the ⛨ seal is the shipped one.

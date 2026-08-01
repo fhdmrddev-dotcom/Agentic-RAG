@@ -80,3 +80,21 @@ C introduces a per-node state that must eventually resolve. If a draft is publis
 still marked ✦ unreviewed, does anything care? Either it is decorative (fine, but say so) or it
 becomes a soft publish gate (a real scope addition, and one the 8-stage gauntlet has opinions
 about). Decide which before planning.
+
+## Lineage — what this inherits and what it feeds
+
+**Inherits.** #11 requirement-first describe box and #12 progressive disclosure set the pre-draft
+posture; this sketch governs the moment *after* the draft, which #11 says is where refinement
+belongs. #16 the publish gauntlet established that honesty surfaces render the real verdict
+verbatim, never re-derived — the seed receipt is the same discipline applied to grounding. Phase 185
+supplies the ⛨ seal, the "must prove it" vocabulary, and the one-way lock (detection wins,
+`groundingCauseOf`). 148-C supplies the titles.
+
+**Feeds.** SC#3's safe-by-construction claim is only discharged if something explains the seal —
+B is that something. **Phase 188** run state lands on these same nodes, so C's ✦/✓ marks compete
+with the run-status treatment as well as with the verdict slot. **Phase 189** external actions will
+add a second thing the seed applies without being asked, and will want the same receipt.
+
+**Icon convention (#43).** Phase-type marks via `icon3d()`; the seal is the shipped `⛨`. C's `✦`
+(drafted) and `✓` (reviewed) are **net-new and flagged as such** — they are proposals, not existing
+vocabulary, and they occupy the verdict slot's coordinates.
