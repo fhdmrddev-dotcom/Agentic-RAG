@@ -300,7 +300,7 @@ Plans:
   3. Publish is guarded against reading a dirty draft (mirrors the shipped `publish_definition` WR-03 draft-status guard).
   4. The two-editor / parallel path is exercised in UAT (SC#10 parallel axis) — a second editor gets an honest read-only banner or a merge-safe outcome, never a silent overwrite.
 
-**Plans**: 8 plans in 5 waves
+**Plans**: 13 plans in 8 waves (8 shipped + 5 gap-closure from `186-VERIFICATION.md`)
 
 Plans:
 
@@ -326,6 +326,20 @@ Plans:
 **Wave 5**
 
 - [x] 186-08-PLAN.md — the folded `BUG-260731-03` **control** half: the display-only header chip promoted into the existing picker, with a neutral unbound invitation and no verdict. The `/validate` verdict half stays in Phase 187
+
+**Wave 6** *(gap closure — `/gsd:verify-work 186` returned gaps_found 4/7; no shared files, run in parallel)*
+
+- [ ] 186-09-PLAN.md — GAP-1 / CR-01: the receipt becomes a property of WHAT WAS WRITTEN. `performWrite` captures the payload's `phases`+`meta` identity at snapshot time and refuses `markSaved()` unless the store still holds it, closing the silent-loss-with-false-receipt on the common type→pause→resume interleaving
+- [ ] 186-10-PLAN.md — WR-02: the gauntlet spine gains the missing `grounding_fidelity` row at its real pipeline position, the running-node index is derived rather than hard-coded, and a test sourced from `publish_service.py` pins the table to the server's own emission list
+- [ ] 186-11-PLAN.md — WR-06: the live-Postgres skip moves off the module and onto the tests that need a database, so the phase's headline backend invariant (`draft_changed` instead of a false `publish_succeeded`) has DB-free CI coverage
+
+**Wave 7** *(blocked on Wave 6 — shares `useDraftPersistence.ts` with 186-09)*
+
+- [ ] 186-12-PLAN.md — GAP-2 / WR-01: single-flight becomes a property of the WRITER rather than of each caller; `overwrite`/`reload` gain a re-entrancy guard, and the conflict banner survives its own resolution with both controls disabled
+
+**Wave 8** *(blocked on Wave 7 — shares `useDraftPersistence.ts` and `BuilderSaveRegion.tsx` with 186-12)*
+
+- [ ] 186-13-PLAN.md — GAP-3 / WR-03 (+ WR-04, WR-05): the hold-release effect obeys `enabled`, closing the flag-off automatic-PATCH leak against D-181-01; the publish hold sentence stops promising a save the loop will not perform and renders on both surfaces; a 404 on a deleted draft halts the loop instead of retrying forever
 
 **UI hint**: yes
 **Flags**: autosave-in-place (never mint a version / re-arm the gauntlet — CONCUR-01, the autosave version-explosion trap); soft-lock / optimistic-token co-edit guard (mirrors `publish_definition` WR-03); parallel-editor UAT row (SC#10 parallel axis) — the two-editor org-shared clobber; concurrency mechanism (block vs warn vs merge) = sketch/discuss call (research left it open); red line D-14; no full SC#10 (not cross-provider streamed); no threat model (v3.4 org RLS already enforces the share boundary); no migration.
