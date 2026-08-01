@@ -87,6 +87,7 @@ from __future__ import annotations
 import asyncio
 import os
 import re
+import sys
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -275,7 +276,14 @@ def _scoreboard_writer():
         out.write_text(table, encoding="utf-8")
     except OSError:  # pragma: no cover — never fail a run over the artifact
         pass
-    print("\n\n=== Phase 187 SC#10 roster scoreboard ===\n" + table + f"\n\n(written to {out})\n")
+    # The file (UTF-8, above) is the artifact of record. The echo below is a convenience
+    # and must never be able to fail the session: a Windows console is cp1252, and printing
+    # a verdict glyph there raises UnicodeEncodeError in TEARDOWN — which pytest reports as
+    # an ERROR on the last row, i.e. the scoreboard would corrupt the very board it prints.
+    # Measured on this box 2026-08-02. Re-encode with a replacement char instead.
+    banner = f"\n\n=== Phase 187 SC#10 roster scoreboard ===\n{table}\n\n(written to {out})\n"
+    encoding = getattr(sys.stdout, "encoding", None) or "utf-8"
+    print(banner.encode(encoding, errors="replace").decode(encoding, errors="replace"))
 
 
 # ══════════════════════════════════════════════════════════════════════════════

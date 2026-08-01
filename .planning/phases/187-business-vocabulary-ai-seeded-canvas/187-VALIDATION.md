@@ -174,6 +174,95 @@ Measured: all 8 provider keys are configured locally ⇒ **zero ⛔ rows expecte
 
 ---
 
+## SC#10 roster — recorded 2026-08-02
+
+**How it was measured.** `backend/tests/integration/test_187_authoring_roster.py` (plan 187-07),
+run live against the local Supabase with `RUN_187_AUTHORING_ROSTER=1`. Each row drives ONE real
+`generate_workflow_definition` call with its own `SimpleNamespace(harness_authoring_model=<id>)`
+stub — `settings` is a **parameter** of the service (`workflow_authoring.py:221-231`), so there is
+**zero global mutation**, zero contamination between rows, and no serialisation requirement. The
+operator's environment was not altered by any row. Full run: 8/8 rows executed, 718 s wall clock.
+
+**The roster is DERIVED, never re-typed.** `MODEL_CAPABILITIES` is imported, grouped on `provider`,
+and one representative is picked per group by the largest version tuple parsed out of the id (ties
+break on `llm_call_timeout_seconds` → `max_output_tokens` → id). Verified 2026-08-02: the heuristic
+needs **no override map** — it picks the newest flagship in all eight groups. Two always-on guards
+(`test_roster_is_derived_from_the_live_registry`, `test_every_roster_row_is_registry_backed`) run in
+the DEFAULT suite and fail if the group count drops below 8, if `deepseek`/`moonshot` disappear, or
+if any representative stops resolving `capability_source="registry"`.
+
+| Provider | Model id (derived) | `native_tools` | `emit_tier` | `forced_emission` | Key configured | Verdict | Evidence |
+|---|---|---|---|---|---|---|---|
+| anthropic | `claude-sonnet-5` | True | force | True | ✔ | ✅ | 4 phases, **every one named**, all 4 stamped `name_seeded_by_ai` — e.g. "Check the flagged churn-risk list with the accounts lead before finalizing" |
+| deepseek | `deepseek-v4-pro` | True | force | True | ✔ | ✅ | 5 phases, every one named ("Find upcoming renewals" … "Write the renewal-risk briefing") |
+| google | `gemini-3.5-flash` | True | force | True | ✔ | ✅ | 3 phases, every one named ("Identify Renewals & Churn Risks", "Approve Flagged Risks", "Generate Plain Text Email Briefing") |
+| minimax | `MiniMax-M3` | True | force | True | ✔ | ❌ | **Never emits.** Sample 1: no emission inside a 240 s ceiling. Sample 2 at the registry's own 600 s ceiling: 4 × HTTP 200 from `api.minimax.io` across 2 attempts, **no tool call in any of them** → `could_not_generate` / `model_failed_to_emit`. Not a name failure — an emission failure. |
+| moonshot | `kimi-k2.6` | True | **coerce** | **None** | ✔ | ✅ | **The predicted-risky row PASSED.** 5 phases, every one named. See "the moonshot prediction" below. |
+| openai | `gpt-5.6-sol` | True | force_strict | True | ✔ | ❌ | **HTTP 400 from the provider, twice** (once per attempt), then a descend-rung 200 that emitted nothing → `could_not_generate` / `model_failed_to_emit`. Verbatim provider message, captured directly: `Function tools with reasoning_effort are not supported for gpt-5.6-sol in /v1/chat/completions. To use function tools, use /v1/responses or set reasoning_effort to 'none'.` Not a name failure — an endpoint/registry defect (see below). |
+| openrouter | `z-ai/glm-5.2` | **False** | force | True | ✔ | ❌ | **NON-DETERMINISTIC name drop — the finding this roster exists to catch.** Sample 1: a fully valid `WorkflowDefinition` in which **5 of 5 phases carried no `name`** (`find_renewals`, `summarize_account_changes`, `flag_churn_risks`, `review_flagged_list`, `write_briefing`). Sample 2, identical prompt: 5 of 5 **named**. The instruction is not reliably honoured on the non-native tool path. |
+| zhipu | `glm-5.2` | True | force | True | ✔ | ✅ | 5 phases, every one named ("Identify Upcoming Renewals" … "Write Plain-Text Briefing") |
+
+**Derived group count: 8** (openai 17 models · anthropic 7 · google 7 · deepseek 2 · moonshot 3 ·
+minimax 8 · zhipu 8 · openrouter 9 = **61 models**). **Zero ⛔ rows** — all eight provider keys are
+configured in this environment, so no row was blocked and none was omitted.
+
+### SPEC refutations, re-measured 2026-08-02
+
+The 187-SPEC's `MODEL_CAPABILITIES` figures came from a crude parse. Re-derived at execution time:
+
+1. **DeepSeek IS present.** The registry carries `deepseek-v4-flash` and `deepseek-v4-pro`, both
+   `emit_tier: force`. The SPEC's "DeepSeek absent" claim is refuted, and the roster's shape test now
+   asserts the `deepseek` group key exists so the claim cannot be re-inherited.
+2. **Five models declare no `forced_emission`, not the SPEC's figure** — all three moonshot natives
+   (`kimi-k2.6`, `kimi-k2.5`, `moonshot-v1-8k`) plus the two OpenRouter moonshot rows, every one of
+   them `emit_tier: coerce`. `moonshot` is the second group key the shape test pins.
+3. **Superseded assumption (recorded so it is not re-inherited):** the SPEC concluded the rows must
+   drive an app setting and therefore run serially with global mutation. Measured, `settings` is a
+   plain parameter — the rows are independent and mutate nothing.
+
+### What the ❌ rows mean (and what they do NOT)
+
+Three rows are red; **only one of them is about names.**
+
+- **openrouter — a real VOCAB-02 finding.** The per-step `name` instruction added in 187-02 survived
+  every *native* provider's emission path but was dropped wholesale on one of two OpenRouter samples.
+  OpenRouter rows are `native_tools: False` — the non-native tool path — which is exactly where a
+  prompt-level instruction is weakest. Because it reproduces only intermittently, an assertion is the
+  right instrument and it was **not weakened**. Mitigating context: Req 1's derived node-face ladder
+  is precisely the graceful degradation for this — a phase with no `name` falls through to the
+  config-derived face rather than rendering blank — so the product degrades, it does not break.
+- **openai — an endpoint/registry defect, adjacent to `BUG-260731-01`, NOT a name failure.**
+  `MODEL_CAPABILITIES` marks `gpt-5.6-sol` `forced_emission: True` / `emit_tier: force_strict`, but
+  the provider now refuses function tools for reasoning-first models on `/v1/chat/completions`
+  outright. The registry therefore over-claims for the whole `gpt-5.6-*` family. **Supplementary
+  diagnostic run the same day** (not a roster row — the roster stays derived): the same describe
+  prompt through `gpt-5.5`, which is one of the two ids `resolve_authoring_model`'s *fallback* branch
+  picks, produced **5 phases, every one named and every one stamped**. So OpenAI's real answer to
+  SC#10 is ✅; the ❌ belongs to the model id, not the instruction.
+- **minimax — an emission failure.** Four HTTP 200s and no tool call. Nothing was measured about
+  names because nothing was emitted. Incidental confirmation of 187-02's budget contract: exactly
+  **two** `nl_generation_attempt` events, never a third, even on the all-fail path.
+
+### The moonshot prediction — recorded either way
+
+`resolve_authoring_model`'s branch 1 returns `settings.harness_authoring_model` **without checking
+`forced_emission` / `emit_tier`**; only the fallback branch validates. So an explicitly-set moonshot
+model hands an unforceable (`emit_tier: coerce`, `forced_emission: None`) model to
+`forced_emit(schema_model=WorkflowDefinition)`. The plan predicted this row would fail. **It passed** —
+5 phases, all named. The unvalidated branch remains a real property of the knob (an operator can point
+`HARNESS_AUTHORING_MODEL` at anything and the resolver will not object), but it did not bite here, and
+no row was `xfail`-ed to hide either outcome.
+
+### What this roster does NOT prove
+
+It proves the per-step `name` instruction survives each provider's **emission path**, driven through
+the service function. It does **not** prove that the `HARNESS_AUTHORING_MODEL` **env path** reaches
+`resolve_authoring_model` in a running backend — that knob is env-only (no Settings UI, no
+`app_settings` row, no sync) and needs a restart to observe. That remains manual row **M7** in the
+Manual-Only table above, unchanged.
+
+---
+
 ## Validation Sign-Off
 
 - [ ] All tasks have `<automated>` verify or a Wave 0 dependency
