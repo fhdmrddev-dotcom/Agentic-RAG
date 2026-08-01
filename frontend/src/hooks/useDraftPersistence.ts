@@ -566,18 +566,44 @@ export function useDraftPersistence(args: DraftPersistenceArgs): DraftPersistenc
    * `heldPendingRef` OR the store's `dirty` is the trigger, because either alone can be the
    * truth — a timer matured while held, or an edit landed while held whose timer was
    * cleared by the next edit. Both mean there is unsent work.
+   *
+   * ── THE FLAG GATE, AND WHY IT SITS EXACTLY WHERE IT SITS (186-13, GAP-3 / WR-03) ──
+   *
+   * This effect used not to read `enabled` at all, and the hold is REACHABLE with the flag
+   * off: `renderPublish` (and so `setPublishInFlight`, the sole input to the publish half of
+   * `holdReason`) is mounted unconditionally on the page, and the Save-draft button is too.
+   * So a flag-off session that edited and published got an AUTOMATIC, unrequested PATCH the
+   * moment the gauntlet resolved — a write past the revert switch, which is the one thing
+   * D-181-01 exists to make impossible.
+   *
+   * The position of the `enabled` guard is load-bearing four ways:
+   *   • AFTER the `holdRef.current = holdReason` mirror, which must run on every beat
+   *     whatever the flag says — the debounce timer and `saveNow` read `holdRef` at FIRE
+   *     time, and a stale mirror would let a write through mid-gauntlet on the flag-ON
+   *     surface;
+   *   • AFTER the `haltedRef` check, so a halted loop is still described as halted rather
+   *     than as merely disabled;
+   *   • BEFORE `heldPendingRef.current = false`, so work accumulated while the flag was off
+   *     is still found by a session where the flag is later turned on;
+   *   • BEFORE `performWrite()`, which is the leak itself.
+   *
+   * `saveNow`, `overwrite` and `reload` are deliberately NOT gated. They are things a person
+   * pressed, D-186-03 keeps the explicit save working on the flag-off surface, and D-186-08
+   * requires that somebody who has hit a conflict is offered BOTH exits on any surface. The
+   * asymmetry is the decision: automatic writes obey the flag, chosen ones obey the person.
    */
   useEffect(() => {
     const previous = holdRef.current
     holdRef.current = holdReason
     if (previous === null || holdReason !== null) return
     if (haltedRef.current) return
+    if (!enabled) return
     if (!heldPendingRef.current && !store.getState().dirty) return
     heldPendingRef.current = false
     // D-186-12 literally: edits accumulated as dirty, and EXACTLY ONE write flushes them.
     // If one is already outstanding, `performWrite` arms the queue instead (186-12).
     void performWrite()
-  }, [holdReason, store, performWrite])
+  }, [holdReason, enabled, store, performWrite])
 
   /** D-186-03 — the deliberate commit-now. It bypasses the debounce and the dirty gate (a
    *  person who presses Save means it), but never the hold and never the single-flight
