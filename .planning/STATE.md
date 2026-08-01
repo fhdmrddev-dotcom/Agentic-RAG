@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
 status: executing
-last_updated: "2026-08-01T09:21:54.000Z"
-last_activity: 2026-08-01 -- Phase 186 second gap closure PLANNED (186-14..17, waves 9-10); plan-check passed
+last_updated: "2026-08-01T10:55:08.780Z"
+last_activity: 2026-08-01 -- Phase 186 execution started
 progress:
   total_phases: 19
   completed_phases: 5
   total_plans: 69
-  completed_plans: 63
-  percent: 25
+  completed_plans: 64
+  percent: 26
 ---
 
 # Project State
@@ -69,6 +69,38 @@ plan-check PASSED (0 blockers, 1 warning applied inline).** Operator scoped the 
 
 **Wave 9 → 10 is sequential by construction:** 186-14 and 186-17 both own `useDraftPersistence.ts`.
 186-15 and 186-16 share no file with either, so they run beside 186-14 in wave 9.
+
+**▶ PLAN 186-14 EXECUTED 2026-08-01 — GAP-4 / CR-02 (the phase's only remaining BLOCKER) and
+WR-07 are CLOSED IN CODE.** 3 tasks, 3 commits (`ae19e5ca` fix / `67032b38` feat / `4f4574d0` fix)
+plus `293f1176` (SUMMARY). Zero migrations (head still `114_…`), zero dependency changes,
+`vite build` exit 0.
+- `reload()`'s catch now restores `{ kind: "conflict", currentToken, note: RELOAD_FAILED_NOTE }`
+  whenever `haltedRef.current` is still true, and mutates nothing else — a failed EXIT is not a
+  failed WRITE. Guarded on the halt, so a reload that failed OUTSIDE a conflict still keeps the
+  cause-neutral line (F21f is that falsification).
+- `builder-conflict-note` renders as a SECOND LINE inside the banner, under the locked sentence,
+  with both exits still mounted, enabled and in D-186-08 order.
+- `isTerminalRefusal` now halts on `WorkflowConflictError` too (RED: 4 PATCHes where 1 is
+  expected). No banner for it — a frozen row has no exits, and `PUBLISHED_CONFLICT_MESSAGE`
+  already names the way out (Tweak) and stays on screen for the session.
+- Tests: hook **40 → 46**, `BuilderSaveRegion` **8 → 11**; the 6-suite aggregate is **244/244**.
+  Both REDs observed and recorded verbatim in the SUMMARY, with the `haltedRef` write-site
+  enumeration (4 writes, 2 clears, both inside the two exits on the one surface) as the
+  goal-backward proof GAP-4 has no third home.
+- **Three MEASUREMENT deviations recorded, no code deviations:** (a) F21b/F21c passed in RED — the
+  loop was always recoverable at the HOOK level; GAP-4 was a *reachability* defect (the surface
+  lost both controls), so F21c is a regression guard, not the falsification; (b) the plan's
+  `grep -c 'kind: "conflict"' == 3` criterion overlooked the pre-existing `Extract<PersistState, …>`
+  annotation — the count is 3 → 4, with still exactly TWO producers; (c) **the WR-11 session row the
+  re-verification recorded as failing 3/3 "including full isolation" PASSED here** — the 4-suite
+  Task-2 command returned 145/145. 186-15 owns that row; do not assume either claim without
+  re-measuring.
+- **186-17 must RE-READ `useDraftPersistence.ts` before editing** — its `<interfaces>` line numbers
+  are now stale (the file grew ~75 lines: `reload` :795, its catch :845, `isTerminalRefusal` :424,
+  `performWrite`'s catch :614). This is exactly why waves 9 and 10 are sequential.
+- `186-VALIDATION.md` gained **manual row 7 — Conflict-exit failure** (`to run`): reach the banner,
+  go offline, press Reload, confirm the banner + both exits + the note survive, then restore the
+  network and confirm a second Reload succeeds. No existing row changed.
 
 ⚠ **Executor warning carried into 186-17 Task 1 as a machine-checked criterion (not prose):** the
 WR-08 fix must RETARGET `driveMidFlightEdit` — the shared driver behind F17a/b/c, whose
@@ -461,7 +493,7 @@ existing `updated_at` column, and the new `blocked_stage` is free-form metadata 
 already-registered `publish_blocked` event type (unlike 185-13's `action_risk_pending`).
 
 *(Historical, superseded — the 185 execution detail below was accurate when written:)*
-Plan: 1 of 13
+Plan: 1 of 17
 (Summaries on disk: 01, 02, 03, 04, 05, 06, 07, 08, 09, 10, 11, 12.)
 
 **⚑ WAVE 7 / PLAN 185-12 LANDED (2026-07-30) — BUG-260730-01 IS CLOSED IN CODE, AND IT WAS A
@@ -1852,6 +1884,11 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase 186]: 186-13: the hold sentence is selected on `enabled` — **the same input that decides whether the flush happens**, which is the only way the surface and the loop cannot disagree. `HOLD_UNREADABLE` is deliberately unchanged: it promises nothing about a future write, so it was already honest on both surfaces.
 - [Phase 186]: 186-13 (WR-05): a 404 halts on a PREDICATE over the cause (`isTerminalRefusal`), never on a comparison against the sentence — otherwise a copy edit becomes a behaviour change. It halts into `{kind:"error"}` and NOT `{kind:"conflict"}`: Reload would find nothing and Overwrite would PATCH a row that is not there, so the banner would offer two dead affordances. No auto-recreate — the 404-collapse (missing ≡ not-owned, T-103-01-01) means the client cannot classify the refusal, and minting a new row on one it cannot read is worse than stopping.
 - [Phase 186]: 186-13 (test lesson): a test asserting only the HIDING half of a gate certifies the silence it was meant to catch. `BuilderSaveRegion.test.tsx`'s `autosaveEnabled: false` case pinned that `saving`/`saved` render nothing and said nothing about `held` — which is exactly how a Save press that produced no visible outcome shipped. It now asserts both halves.
+- [Phase 186]: 186-14 (GAP-4 / CR-02): **a failed EXIT is not a failed WRITE, and it never takes the exits with it.** A resolution's `catch` must ask "is the thing I was resolving still true?" before choosing a state — `reload()` RESTORES `{kind:"conflict"}` (plus a note) while `haltedRef` is set, rather than replacing it with an `error` the banner does not render on. Rejected alternatives are recorded in source: widening the banner to render on `error` too would put Reload/Overwrite on screen for a 422 and a dead network, where neither exit means anything; clearing `haltedRef` in the catch would "recover" the loop into the silent clobber the phase exists to prevent.
+- [Phase 186]: 186-14: the restore is **guarded on `haltedRef`**, because manufacturing a conflict that never happened — telling a person their draft moved when nothing moved — is the same class of lie in the other direction. The guard has its own falsification (F21f), not just a comment.
+- [Phase 186]: 186-14: **a banner may gain LINES; the sentence that OFFERS the exits may never be replaced.** The failed-exit explanation is an additive `builder-conflict-note` under the locked `CONFLICT_BANNER_MESSAGE`, deliberately NOT the `builder-save-error` span — that span is for a refused WRITE and this is a failed READ during a chosen resolution. Two situations in one element is how a sentence stops meaning one thing.
+- [Phase 186]: 186-14 (WR-07): halting docblocks should state a **TAXONOMY, not a count** — `isTerminalRefusal` said "there are exactly TWO halting causes" and a third (a published row, frozen by the `workflow_definitions_block_published_update` trigger) had been retrying forever. The axis that matters is whether the person has an IN-APP exit and, if not, whether the sentence names an out-of-app one: stale token → conflict + two exits; gone row → error, no exit, "copy what you need"; published row → error, no exit, "use Tweak". No re-assertion machinery was added: nothing overwrites that state for the session, so the answer stays on screen beside the button.
+- [Phase 186]: 186-14 (measurement lesson): **two of the plan's predicted REDs came up GREEN, and that changed the diagnosis rather than the fix.** The loop was always recoverable at the hook level (`reloadingRef` resets in `finally`); GAP-4 was a *reachability* defect — the SURFACE lost both controls, so no person could ever reach the second reload. A predicted RED that does not appear is evidence about the defect's shape, not a test to weaken.
 
 ## Operator Next Steps
 
