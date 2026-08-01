@@ -645,6 +645,7 @@ async def _run_phase_with_gates(
     wall_clock: int,
     _audit_user_id: UUID | None,
     stream_run_id: UUID | None = None,
+    total_phases: int | None = None,
 ) -> PhaseOutcome:
     """Execute a phase under a bounded-retry gate loop (HARNESS-04 — the SC#3 bar).
 
@@ -659,6 +660,13 @@ async def _run_phase_with_gates(
     ``gate_failed`` SSE event (D-08 visible retries). On exhaustion the failing
     validator's ``on_failure`` routes: ``fail_run`` (D-07 baseline) or
     ``skip_to_phase:<slug>`` (D-09); an unknown value fails safe to ``fail_run``.
+
+    ARMED ACTION-RISK CHECKPOINT (D-187-01). An ``action_risk_armed`` phase gets an
+    explicit pre-body checkpoint below — see the block between the pre-gate pass and the
+    retry loop. ``total_phases`` exists solely to compose its sentence
+    (``grounding._approval_sentence`` needs ``len(definition.phases)``); it is optional
+    so the many direct unit callers stay valid, and the ONE production call site in
+    ``run_workflow`` always passes the real total.
 
     Returns a :class:`PhaseOutcome`; the caller (``run_workflow``) commits the
     durable side-effects (complete/skip/fail) so the 2-phase write stays in the
@@ -694,50 +702,103 @@ async def _run_phase_with_gates(
     # GateResult immediately → byte-identical (the existing default-post path).
     pre = await run_gates(phase, {"_phase_inputs": accumulated_outputs}, ctx, timing="pre")
     if not pre.passed:
-        # ── Phase 185 (GOVERN-03 / RESEARCH L-5) — WAITING IS NOT FAILING ────────
-        # An armed action-risk checkpoint reaches this block on its way to a PAUSE,
-        # not to a failure: ``action_risk_approval`` always "fails" precisely so the
-        # shipped ask_user disposition below owns the wait (D-185-12/13). Announcing
-        # ``gate_failed`` first would tell the ledger and the frontend that something
-        # went wrong when nothing did — and the audit ledger's own vocabulary rule
-        # (consequence ≠ receipt) makes that a correctness defect, not cosmetics.
-        # The reading comes from the ONE predicate the disposition also uses, so both
-        # call sites spell "this is an armed pause" identically.
-        if _is_action_risk_finding(pre.error_message):
-            # The ledger records the CONSEQUENCE (the run paused for a person). The
-            # RECEIPT is the separate ``validator_ask_user_approved`` row the approval
-            # itself writes. The raw finding is deliberately NOT carried here: it IS
-            # the user-facing prompt sentence, and it already reaches the browser on
-            # the durable ``ask_user_prompt`` row + emit below (T-185-05-04).
-            await write_audit(
-                pool, run_id, user_id=_audit_user_id,
-                event_type="action_risk_pending",
-                metadata={"phase": phase.slug, "timing": "pre"},
-            )
-            # ``phase`` only, for the same reason. No frontend handler is added in
-            # this plan: an unhandled event is inert, and the ``ask_user_prompt`` emit
-            # that follows immediately is what the person actually sees (D-185-13).
-            # THE CONSUMER IS PHASE 188's run surface.
-            await _emit(redis, stream_run_id, "action_risk_pending", phase=phase.slug)
-        else:
-            await write_audit(
-                pool, run_id, user_id=_audit_user_id, event_type="gate_failed",
-                metadata={"phase": phase.slug, "attempt": 0, "error": pre.error_message,
-                          "timing": "pre"},
-            )
-            await _emit(redis, stream_run_id, "gate_failed",
-                phase=phase.slug, attempt=0, error=pre.error_message,
-            )
+        # Every gate reachable here is an AUTHOR's gate. After D-187-01's hoist the
+        # armed action-risk checkpoint is not a member of ``phase.validators`` at all,
+        # so there is no armed finding to special-case and this is the plain
+        # ``gate_failed`` announce for every pre gate.
+        await write_audit(
+            pool, run_id, user_id=_audit_user_id, event_type="gate_failed",
+            metadata={"phase": phase.slug, "attempt": 0, "error": pre.error_message,
+                      "timing": "pre"},
+        )
+        await _emit(redis, stream_run_id, "gate_failed",
+            phase=phase.slug, attempt=0, error=pre.error_message,
+        )
         outcome = await _resolve_failure_with_ask_user(
             phase, pre.error_message, 0, pre.validator_index,
             run_id=run_id, pool=pool, redis=redis, ctx=ctx,
             _audit_user_id=_audit_user_id, stream_run_id=stream_run_id,
             is_pre=True,
-            is_action_risk=_is_action_risk_finding(pre.error_message),
         )
         if outcome is not None:
             return outcome  # fail_run / skip_to_phase / aborted ask_user
         # outcome is None → ask_user Proceed: fall through and run the body.
+
+    # ── D-187-01 — THE ARMED ACTION-RISK CHECKPOINT (SC#6 / SEED-137) ────────────
+    # "Armed ⇒ the person is asked before the body runs" is a PROPERTY OF THE PHASE,
+    # not a position in a list. Phase 185 shipped the guarantee as a synthesized
+    # ``timing="pre"`` ValidatorSpec appended to ``phase.validators``; because
+    # ``run_gates`` is first-failure-wins (``validators.py:248``) and the append put the
+    # armed spec LAST, any author-declared failing pre gate returned first and an
+    # ``ask_user`` Proceed fell straight through to the body with nobody asked. No
+    # ordering rule fixes that — the gate simply must not live in the author's list.
+    #
+    # PLACEMENT, both halves deliberate:
+    #   D-187-02 — AFTER the pre-gate pass, so a step an author's gate ``fail_run``s or
+    #     ``skip_to_phase``s away is never approved. An approval receipt for a step with
+    #     no body would violate the ledger's consequence ≠ receipt rule. Accepted cost:
+    #     an author ``ask_user`` Proceed followed by this checkpoint is two prompts in a
+    #     row. That is honest, not a defect.
+    #   D-187-17 — BEFORE the ``while True:`` retry loop, so one phase execution asks a
+    #     person exactly ONCE. Inside the loop, a 3-retry phase would ask three times for
+    #     one step.
+    #
+    # THERE ARE EXACTLY TWO PHASE-LEVEL ARMED READINGS, and they are deliberately
+    # INDEPENDENT: this one (run time, decides whether to pause) and
+    # ``_is_armed_action_risk`` (:2148 — boot-time resume sweep, decides whether a
+    # mid-flight row is re-driven or re-subscribed), which
+    # ``test_the_two_resume_predicates_are_independent`` pins. What D-187-03 actually
+    # deletes is the THIRD reading — the string-prefix sniff over a failing gate's error
+    # message. The engine no longer infers arming from a finding it parsed; it reads the
+    # boolean the author set.
+    if getattr(phase, "action_risk_armed", False):
+        # The sentence is NEVER re-authored here. ``grounding._approval_sentence`` is the
+        # one composer, its honesty rules (POSITION / IDENTITY / CONSEQUENCE, never
+        # "approved" / "safe" / "proven") are asserted character-identically by a shipped
+        # test, and it is the only thing needing ``len(definition.phases)``.
+        from app.services.harness.grounding import _approval_sentence
+
+        # ``total_phases`` is None only on a direct unit call that omitted the keyword;
+        # the single production call site in ``run_workflow`` always passes the real
+        # ``len(definition.phases)``. The fallback keeps the sentence well-formed rather
+        # than crashing — it degrades "Step 2 of 5" to "Step 2 of 2", never to a lie
+        # about what the step is or what happens next.
+        _total = total_phases if total_phases is not None else phase.phase_index + 1
+        sentence = _approval_sentence(phase, _total)
+
+        # WAITING IS NOT FAILING (Phase 185 / RESEARCH L-5). The ledger records the
+        # CONSEQUENCE (the run paused for a person); the RECEIPT is the separate
+        # ``validator_ask_user_approved`` row the approval itself writes. Announcing
+        # ``gate_failed`` would tell the ledger and the frontend something went wrong
+        # when nothing did. Both event types are already in the ``harness_audit`` CHECK
+        # constraint — this checkpoint introduces NO new one (Pitfall 6 /
+        # ``BUG-260731-02``, where an unlisted kind killed the run).
+        await write_audit(
+            pool, run_id, user_id=_audit_user_id,
+            event_type="action_risk_pending",
+            metadata={"phase": phase.slug, "timing": "pre"},
+        )
+        # ``phase`` only: the raw sentence is deliberately NOT carried here — it IS the
+        # user-facing prompt and already reaches the browser on the durable
+        # ``ask_user_prompt`` row + emit inside the helper (T-185-05-04). THE CONSUMER
+        # IS PHASE 188's run surface; an unhandled event is inert.
+        await _emit(redis, stream_run_id, "action_risk_pending", phase=phase.slug)
+
+        # ``_ACTION_RISK_FINDING_PREFIX`` is retained because DELTA 1 inside the helper
+        # splits the prompt back out of the finding on ``"|"``. ``failed_idx=None``: the
+        # checkpoint has no index into ``phase.validators`` — which is the whole point,
+        # and why ``is_action_risk=True`` short-circuits the disposition resolution
+        # (Pitfall 4) and writes ``validator: null`` on the receipt (D-187-18).
+        outcome = await _resolve_failure_with_ask_user(
+            phase, _ACTION_RISK_FINDING_PREFIX + sentence, 0, None,
+            run_id=run_id, pool=pool, redis=redis, ctx=ctx,
+            _audit_user_id=_audit_user_id, stream_run_id=stream_run_id,
+            is_pre=True, is_action_risk=True,
+        )
+        if outcome is not None:
+            # Refusal / abort / an answer we could not read as consent → the body NEVER
+            # runs. Only an approval returns None and falls through.
+            return outcome
 
     attempt = 0
     last_output = None
@@ -821,7 +882,8 @@ async def _run_phase_with_gates(
             run_id=run_id, pool=pool, redis=redis, ctx=ctx,
             _audit_user_id=_audit_user_id, stream_run_id=stream_run_id,
             produced_output=output, is_pre=False,
-            is_action_risk=_is_action_risk_finding(gate.error_message),
+            # Never armed: the checkpoint is hoisted out of ``phase.validators``, so no
+            # POST gate can be it (D-187-01).
         )
 
 
@@ -924,24 +986,14 @@ def _is_abort_choice(choice: str) -> bool:
     return (choice or "").strip().lower() in _ABORT_LIKE_CHOICES
 
 
-# Phase 185 (GOVERN-03 / RESEARCH L-5) — the structured finding prefix
-# ``validator_kinds._validate_action_risk_approval`` emits. Written ONCE so the two
-# readers below (the pre-gate announce block and the disposition) cannot drift apart.
+# Phase 185 (GOVERN-03 / RESEARCH L-5) — the structured finding prefix that carries the
+# armed approval sentence into ``_resolve_failure_with_ask_user``, whose DELTA 1 splits
+# the prompt back out on ``"|"``. Phase 187 (D-187-01) made the hoisted checkpoint its
+# ONLY producer, and the string-prefix SNIFF that used to read it back is DELETED —
+# the engine no longer infers "this phase is armed" from a message it parsed; the
+# checkpoint reads ``phase.action_risk_armed`` and tells the helper so with
+# ``is_action_risk=True``. The prefix is now a wire format, not a predicate.
 _ACTION_RISK_FINDING_PREFIX = "action_risk:approval|"
-
-
-def _is_action_risk_finding(error_message: str | None) -> bool:
-    """True when a failing gate is the ARMED action-risk checkpoint (GOVERN-03).
-
-    Read off the FINDING, at the CALL SITE. Phase 187 (D-187-01) made the armed
-    treatment an explicit ``is_action_risk`` parameter of
-    ``_resolve_failure_with_ask_user`` rather than a read inside it, because that helper
-    also serves the author's OWN ``ask_user`` gates on the same phase — an armed phase
-    can carry authored gates too, and only the armed one gets the armed treatment. This
-    predicate is what each call site passes. Every other finding (freshness, citations,
-    an authored regex) returns False and keeps byte-identical behaviour.
-    """
-    return (error_message or "").startswith(_ACTION_RISK_FINDING_PREFIX)
 
 
 async def _resolve_failure_with_ask_user(
@@ -1440,6 +1492,10 @@ async def run_workflow(
                 wall_clock=wall_clock,
                 _audit_user_id=_audit_user_id,
                 stream_run_id=stream_run_id,
+                # D-187-01 — the armed checkpoint's sentence needs the run's phase count
+                # (``_approval_sentence`` says "Step N of TOTAL"). This is the SAME
+                # ``len(definition.phases)`` ``effective_phase`` already receives above.
+                total_phases=_total,
             )
         except BaseException:
             # ── cancel/escape path (D-06 / BUG-260605-01) ─────────────────────
