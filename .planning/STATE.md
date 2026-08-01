@@ -4,7 +4,7 @@ milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
 status: executing
 last_updated: "2026-08-01T21:34:50.931Z"
-last_activity: 2026-08-02 -- Phase 187 plan 01 complete (SC#6 property observed RED on HEAD)
+last_activity: 2026-08-02 -- Phase 187 plan 02 complete (per-step name + provenance marker, zero migration)
 progress:
   total_phases: 19
   completed_phases: 6
@@ -56,6 +56,21 @@ the file's docblock: `effective_phase` APPENDS the armed spec, `run_gates` is fi
 (`validators.py:248`), `_is_action_risk_finding` is False, and **`harness_engine.py:739` falls through
 to the body**. The RED observation cannot now be retro-fitted. No production source was modified.
 Backend collection 3474 → 3504.
+
+**Plan 187-02 COMPLETE (Wave 1, 2026-08-02, `6a1661e6` + `b45675ef`).** VOCAB-01/02 backend half:
+`AUTHORING_SYSTEM_PROMPT` now instructs a short, specific, plain-language **per-phase `name`**
+(explicitly separate from the definition-level one), and `PhaseSpec` gains
+**`name_seeded_by_ai: bool = False`** — additive-optional, `grounding_escalated`'s spelling verbatim,
+**zero migrations**. `generate_workflow_definition` stamps it **server-side after validation** on the
+single success path via `model_copy`, so first-emit and retry-emit results are stamped identically and
+a model cannot launder a generated name into looking hand-typed (T-187-02-02, tested adversarially).
+Measured: `grep -c model_validator` on `harness.py` **4 → 4** (no validator hook added);
+`test_103_nl_generate` count **6 → 6** (the 1 / 2 / never-3 provider budget did not regress, and is now
+pinned by three explicit tests); `test_harness_models` **11 → 15**; backend collection **3504 → 3516**;
+`git diff --stat -- supabase/migrations` empty. `ValidatorSpec.kind`'s `"action_risk_approval"` Literal
+**deliberately RETAINED** (additive-only policy, `harness.py:10-21`). **Carry forward:** the D-187-07
+demote rule must clear `name` **and** the marker together, or a demoted phase keeps claiming AI
+provenance for a name it no longer has.
 
 (`3713a716`), GOVERN-01/02/03 all `Complete`, `nyquist_compliant` true, SECURED 49/49 (`a00b1cc5`).
 Security found one real fail-open BLOCKER — T-185-04-01, a **typed** refusal on an armed checkpoint ran
