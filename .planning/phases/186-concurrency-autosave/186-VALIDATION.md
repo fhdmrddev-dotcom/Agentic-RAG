@@ -154,6 +154,13 @@ Wire format + screenshot are **insufficient** per G-4.
 | 5 | **KB re-bind, three paths** — bind/re-bind from (a) NL-generated, (b) forked starter, (c) Tweak fork | BUG-260731-03 | The chip is a picker in all three; the unbound state reads *"No knowledge base · searches everything"* with **no** severity, code, or tray row; the binding persists through autosave and survives a reload. | to run |
 | 6 | **Never a false `Saved ✓`** — force a 422 (e.g. mid-edit invalid shape) | D-186-04 | `Not saved — …`; the draft stays dirty; the leave guard fires on navigate-away. | to run |
 | 7 | **Conflict-exit failure** (186-14, GAP-4) — reach the banner via row 1, then go offline (DevTools ▸ Network ▸ Offline) and press **Reload** | CONCUR-02 | The banner is **still on screen** with BOTH exits present and pressable, plus a second line reading *"We couldn't reach the server to reload — nothing has changed, and both options above still work."* Restore the network and press **Reload** again: it succeeds, the server's copy is adopted, and the banner clears. | to run |
+| 8 | **Chosen save then publish, flag OFF** (186-18, CR-03) — with `visual_workflow_canvas` **off**, open a draft, edit it, press **Save draft**, and within that same round trip open the Publish door and attempt the inner **Publish** click | CONCUR-02 / CR-03 | While the PATCH is outstanding the outer `◆ Publish…` trigger is **disabled** and carries the reason (`publish-blocked-reason`) reading *"Saving your last change — Publish will be ready in a moment"*; if the modal is already open, the inner **Publish** button is **disabled** and shows the same sentence (`publish-inner-blocked-reason`). **No golden run is spent.** The instant the save lands both controls become clickable again and the reason disappears. **A FAILURE looks like:** the gauntlet runs, burns a full golden run, and comes back with a `draft_changed` refusal for an edit made *before* Publish was clicked — that is the pre-fix behaviour. | to run |
+
+**On row 8 (CR-03):** it is the live confirmation of CR-03 — the flag-**OFF** twin of the flag-ON
+path already covered by unit tests (`WorkflowBuilderPage.canvas.test.tsx`, the 186-16 describe).
+The server's stage-0/stage-5 token guard remains the safety backstop and is untouched, so this row
+measures the **pre-flight refusal** — economics and honesty (a golden run not burned, a reason
+stated before the fact) — **not** data safety.
 
 **On SC#10 scope:** the roadmap scopes **no full cross-provider matrix** for this phase — *"Phase
 186 (Concurrency) carries the SC#10 parallel axis (two-editor UAT row) but not full cross-provider
