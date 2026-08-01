@@ -265,6 +265,12 @@ this plan changed one client-side string constant, one `setState` call and one r
 | 1 (WR-12) | `83a721fb` | `feat(186-19): the flag-off hold release says what happened instead of going silent (WR-12)` |
 | 2 (WR-13) | `a27e3e39` | `fix(186-19): a chosen exit leaves no stale arming for a later hold to flush (WR-13)` |
 
+## Self-Check: PASSED
+
+All three claimed files exist on disk; all three commits (`83a721fb`, `a27e3e39`, `4504daf1`)
+resolve in `git log`; `git status --short frontend/` is empty, so nothing this plan produced was
+left untracked and the throwaway probe is genuinely gone.
+
 ## What this executor deliberately did NOT do
 
 Requirement status (`CONCUR-01`, `CONCUR-02`), the plan counter, and ROADMAP plan-progress are
