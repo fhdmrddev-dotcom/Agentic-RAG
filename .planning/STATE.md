@@ -313,6 +313,41 @@ waves 7-8. ROADMAP plan-progress left to the orchestrator.
 *placed* block for a grounding refusal instead of an all-grey spine. Still to run — deliberately not
 a plan task.
 
+**Execution progress — Plan 186-11 COMPLETE (2026-08-01), the third gap-closure plan.** Wave 6's
+WR-06 fix shipped in 2 atomic commits (`4de772c3` the per-test skips → `c2c79c3b` the F6 row +
+re-measured count), SUMMARY `f1978240`. **The phase's headline backend invariant now has CI
+coverage without a database.** A module-level `pytestmark` in two files gated three tests that
+touch no database at all; the skip is now a property of the tests that need one. Same command,
+DSN at an unreachable port: **12 skipped / 0 passed → 3 passed / 9 skipped, exit 0** — the three
+being F6 (`test_the_golden_run_receipt_survives_a_draft_changed_refusal`, the only automated proof
+that a `-2` sentinel becomes a `draft_changed` block rather than `{published: True, version: -2}`
+plus a false `publish_succeeded` receipt) and the two `*_maps_check_violation_to_409` route-mapping
+guards. Each module binds ONE `_LIVE_DB_REASON`, byte-identical to the reason string it replaced,
+so the skip report reads exactly as before and the decorators cannot drift. Three-file collected
+count **12 → 12**; backend suite **3457 → 3465** with failures **211, byte-identical** to the band
+186-01/186-02 measured — this plan adds no test and removes none, which is the point: it changed
+reachability, not coverage. Zero source files, zero migrations (head stays 114), zero packages,
+zero frontend files.
+⚠ **`test_186_concurrent_patch.py` was left BYTE-UNCHANGED, deliberately.** All four of its tests
+open a real asyncpg pool, so its module mark gates nothing rescuable and churning it would be a
+change with no property behind it. Its docblock sentence stays literally true for that file.
+⚠ **`get_pg_pool` being patched is NOT a DB-free signal — carry this forward.** Four
+`test_186_concurrent_patch.py` tests patch `app.api.workflows.get_pg_pool`, and are nonetheless
+fully live, because the mock **returns a real pool created in the test body**. Any future sweep
+that widens this rescue by grepping for `patch(`/`AsyncMock` will mis-classify them; the criterion
+is what the body ultimately connects to, established only by reading it.
+⚠ **The plan's "seven live-DB tests" is NINE.** Twelve minus three DB-free is nine, confirmed by
+the observed `3 passed, 9 skipped`. The plan's acceptance criteria were stated correctly (`0 passed
+and 12 skipped` pre-task; "at least 3 PASSED, the remaining SKIPPED") and all are met — but
+re-verification should measure **nine** and not read the correct result as a shortfall.
+⚠ **One addition beyond the letter of the plan:** the three now-undecorated tests each carry a
+`DELIBERATELY UNGUARDED (WR-06)` docstring note. They are the only un-decorated functions among
+twelve siblings that all carry a `skipif`, and "adding the missing decorator for consistency"
+would silently restore the exact defect WR-06 recorded — with a green suite either way.
+⚠ **Counters and requirement status deliberately NOT advanced by this executor.** `CONCUR-02`
+stays as it is — WR-06 is one of three blockers plus four warnings, and 186-12 / 186-13 are still
+owed in waves 7-8. ROADMAP plan-progress left to the orchestrator.
+
 Resume file: None
 
 Both owed items are now ROUTED at the discuss-phase touchpoint:

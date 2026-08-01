@@ -206,5 +206,10 @@ change. No stubs were introduced.
 |---|---|---|
 | 1 | `4de772c3` | `test(186-11): move the live-Postgres skip off the module onto the tests that need a DB` |
 | 2 | `c2c79c3b` | `docs(186-11): record F6 as DB-free and re-measure the backend collected count` |
+
+## Self-Check: PASSED
+
+All three declared files exist on disk; all three commits (`4de772c3`, `c2c79c3b`,
+`f1978240`) resolve in `git log`.
 </content>
 </invoke>
