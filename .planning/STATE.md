@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
 status: executing
-last_updated: "2026-08-01T17:00:00.000Z"
-last_activity: 2026-08-01 -- Phase 186 plan 17 executed (WR-08 + WR-09 closed; all 17 plans landed, operator UAT still owed)
+last_updated: "2026-08-01T15:26:36.234Z"
+last_activity: 2026-08-01 -- Phase 186 planning complete
 progress:
   total_phases: 19
   completed_phases: 5
-  total_plans: 69
-  completed_plans: 64
+  total_plans: 72
+  completed_plans: 68
   percent: 26
 ---
 
@@ -79,19 +79,24 @@ plan-check PASSED (0 blockers, 1 warning applied inline).** Operator scoped the 
 WR-07 are CLOSED IN CODE.** 3 tasks, 3 commits (`ae19e5ca` fix / `67032b38` feat / `4f4574d0` fix)
 plus `293f1176` (SUMMARY). Zero migrations (head still `114_…`), zero dependency changes,
 `vite build` exit 0.
+
 - `reload()`'s catch now restores `{ kind: "conflict", currentToken, note: RELOAD_FAILED_NOTE }`
   whenever `haltedRef.current` is still true, and mutates nothing else — a failed EXIT is not a
   failed WRITE. Guarded on the halt, so a reload that failed OUTSIDE a conflict still keeps the
   cause-neutral line (F21f is that falsification).
+
 - `builder-conflict-note` renders as a SECOND LINE inside the banner, under the locked sentence,
   with both exits still mounted, enabled and in D-186-08 order.
+
 - `isTerminalRefusal` now halts on `WorkflowConflictError` too (RED: 4 PATCHes where 1 is
   expected). No banner for it — a frozen row has no exits, and `PUBLISHED_CONFLICT_MESSAGE`
   already names the way out (Tweak) and stays on screen for the session.
+
 - Tests: hook **40 → 46**, `BuilderSaveRegion` **8 → 11**; the 6-suite aggregate is **244/244**.
   Both REDs observed and recorded verbatim in the SUMMARY, with the `haltedRef` write-site
   enumeration (4 writes, 2 clears, both inside the two exits on the one surface) as the
   goal-backward proof GAP-4 has no third home.
+
 - **Three MEASUREMENT deviations recorded, no code deviations:** (a) F21b/F21c passed in RED — the
   loop was always recoverable at the HOOK level; GAP-4 was a *reachability* defect (the surface
   lost both controls), so F21c is a regression guard, not the falsification; (b) the plan's
@@ -100,9 +105,11 @@ plus `293f1176` (SUMMARY). Zero migrations (head still `114_…`), zero dependen
   re-verification recorded as failing 3/3 "including full isolation" PASSED here** — the 4-suite
   Task-2 command returned 145/145. 186-15 owns that row; do not assume either claim without
   re-measuring.
+
 - **186-17 must RE-READ `useDraftPersistence.ts` before editing** — its `<interfaces>` line numbers
   are now stale (the file grew ~75 lines: `reload` :795, its catch :845, `isTerminalRefusal` :424,
   `performWrite`'s catch :614). This is exactly why waves 9 and 10 are sequential.
+
 - `186-VALIDATION.md` gained **manual row 7 — Conflict-exit failure** (`to run`): reach the banner,
   go offline, press Reload, confirm the banner + both exits + the note survive, then restore the
   network and confirm a second Reload succeeds. No existing row changed.
@@ -118,25 +125,30 @@ green suite with a weakened F17 FAILS the task.
 (`165b3e0e` / `03841bd0` / `c4870806`) plus `19329bf2` (SUMMARY). Two test files only — measured
 `git diff --stat e9f9c2fd..HEAD` = 2 files, 422 ins / 8 del. Zero migrations (head still `114_…`),
 zero dependency changes in either stack.
+
 - **WR-11**: the pane-click row now measures a call-count DELTA bracketed around the dismissal, with
   its POSITIVE CONTROL in the same row (an explicit Save must show a delta ≥ 1). The ✕/Escape
   siblings and all three `mockCreate` zeros are untouched — `toHaveBeenCalledTimes(0)` still appears
   **12** times, and there is no `it.skip`/`xit` anywhere in the file. Count 23 → 23.
+
 - **WR-06 residue**: module `pytestmark` → four per-test `skipif(not PG_AVAILABLE, reason=
   _LIVE_DB_REASON)` (the 186-11 precedent, reason byte-identical), plus **9 new DB-free tests** —
   four at the route tier (`stale_token` / `already_published` / the codeless-404 collapse incl. an
   UNRECOGNISED cause / `CheckViolationError`) and five at the db tier (all four return shapes, the
   `token=None` defensive collapse, and the two SQL properties: `CONCURRENCY_TOKEN_SQL` in both the
   WHERE and the RETURNING, `created_by = $2` on the probe, no bind ever a `datetime`).
+
 - Numbers: file **4 → 13 passed** live; **0 passed / 4 skipped → 9 passed / 4 skipped** with
   `POSTGRES_DSN` unreachable. Verification trio **12 → 21 passed** live, **3 → 12 passed** no-DB.
   Collection **3465 → 3474** (+9 exactly). Full backend suite **211 failed** both before AND after
   (pre-plan baseline taken deliberately), passed **3228 → 3237**; no phase-186 file is among the
   211 pre-existing failures.
+
 - **All new backend tests were FALSIFIED against real source with no database**: renaming the 409
   detail's `token` key, giving the fail-closed 404 a machine code, and dropping `created_by = $2`
   from the owner-scoped probe each turned exactly one new test RED. Every injection reverted
   file-scoped; both source files verified clean.
+
 - ⚠ **THE PLAN'S REQUIRED RED DID NOT REPRODUCE, and was not fabricated.** The shipped WR-11 row
   PASSED here in every configuration: **23/23 three times in isolation, 50/50 paired, 260/260 under
   16-file parallel load** — matching 186-14's report and contradicting the re-verification's 22 + 1
@@ -153,26 +165,32 @@ zero dependency changes in either stack.
 **▶ PLAN 186-16 EXECUTED 2026-08-01 — WR-10 is CLOSED.** 2 tasks, 2 commits (`e7b2b237` /
 `3f06d112`) plus `f0384214` (SUMMARY). Four source/test files + `deferred-items.md`; 382 ins / 4 del.
 Zero migrations (head still `114_…`), zero dependency changes.
+
 - **The page half**: a new exported `SAVING_PUBLISH_WAIT` ("Saving your last change — Publish will
   be ready in a moment") and ONE branch in the `blockedReason` memo keyed on
   `persistState.kind === "saving"`, ranked **ahead of** the validation branches (the nearest
   obstacle is the one named). **+25 insertions exactly — the plan's cap** on this G-5 hot file; the
   memo body grew by 2 lines against a budget of 6, and the F16 fence anchor is byte-identical.
+
 - **The gauntlet half**: `canPublish` gains `&& !blocked`, so the INNER modal Publish — the click
   that actually spends money, and the one gated on nothing but the input and `loading` — is refused
   too. The reason renders INSIDE the modal (`publish-inner-blocked-reason`, `aria-describedby`),
   because the trigger's reason sits behind the backdrop and an unreachable explanation IS R12's
   greyed-in-silence failure. `blocked` is handed DOWN, so the emptiness test keeps one home.
+
 - Numbers, per file in isolation at 30 s: `PublishGauntlet.test.tsx` **41 → 46**; the canvas+header
   pair **111 → 114**; the 4-file acceptance set **183/183**, `vite build` exit 0.
+
 - **The gate was FALSIFIED, not just run green**: removing `&& !blocked` reds exactly the 3 gate
   rows (the 2 identity rows correctly stay green). The refusal row measures the mocked TRANSPORT —
   a golden run's cost is spent the moment the request leaves — with the cleared-reason click as its
   positive control.
+
 - **The review's preferred `flushPendingWrites()` was rejected on safety, and recorded**: the
   gauntlet mounts on BOTH branches of the flag gate, so a flush from `runGauntlet` is an unrequested
   PATCH on the flag-off surface — the D-181-01 leak 186-13 closed. In `deferred-items.md` with a
   re-open trigger, alongside the residual `conflict`/`error` case (bounded vs unbounded states).
+
 - ⚠ **Four plan claims were refuted by measurement** (recorded in the SUMMARY, do not inherit):
   `PublishGauntlet.test.tsx` had **no** R12 blocked-trigger cases at all (every one lives in the
   canvas suite); the prop docblock's "24 shipped assertions" is stale (41); the canvas-pair baseline
@@ -182,6 +200,7 @@ Zero migrations (head still `114_…`), zero dependency changes.
 round; all 17 plans of phase 186 have now landed.** 2 tasks, 2 commits (`4b02ed18` / `fa6c1a03`)
 plus `83b97669` (SUMMARY). Two source/test files + `186-VALIDATION.md`; zero migrations (head still
 `114_…`), zero dependency changes, `BuilderSaveRegion.tsx` diff **empty**.
+
 - **WR-08 — the drain asks TWO questions instead of using one answer twice.** Payload identity
   alone gates the RECEIPT (CR-01 preserved verbatim); `pendingRef` alone gates IMMEDIATE RE-ENTRY;
   every other supersession BREAKS after resolving `{kind:"saving"}` → `idle`, and the edit's own
@@ -189,6 +208,7 @@ plus `83b97669` (SUMMARY). Two source/test files + `186-VALIDATION.md`; zero mig
   (F22a), and a Save press with nothing changed stopped minting a redundant token-bumping PATCH
   (F22d, 2 → 1). No second timer was added — D-186-01 intact. Both module docblocks the drain had
   made false are now true and stated as checkable rules.
+
 - **WR-09 — the hold's reading resolves when the hold does, on BOTH surfaces.** The resolution sits
   above all three gates (halt, `enabled`, nothing-pending) because each is a reason not to WRITE
   and none is a reason to keep claiming a publish runs. RED was literally
@@ -196,12 +216,15 @@ plus `83b97669` (SUMMARY). Two source/test files + `186-VALIDATION.md`; zero mig
   `conflict` — the only reading carrying Reload/Overwrite — survives; F20h falsifies the wrong
   shape of the same fix. `heldPendingRef` on the flag-off path is set to the store's own `dirty`
   (F20f RED: a PATCH carrying the untouched 2-phase draft and the session's original token).
+
 - **D-181-01 spot-check recorded in the SUMMARY**: four `performWrite()` call sites, gates
   unchanged from 186-13's enumeration — the two automatic ones behind `enabled`, `saveNow` and
   `overwrite` deliberately ungated because a person pressed them.
+
 - Numbers, measured this session at 30 s: hook suite **46 → 53** in isolation; the 7-suite consumer
   set **270 → 277, zero failures**; canvas+session pair 110/110 (the WR-11 row did not fail);
   `vite build` exit 0.
+
 - ⚠ **Six plan claims refuted by measurement** (recorded in the SUMMARY, do not inherit): the
   "three `pendingRef` arming sites" have been **one statement + three call paths** since 186-12, so
   `grep -c "pendingRef.current = true"` is 1 not 3; the consumer-set baseline is **270/270**, not
@@ -210,6 +233,7 @@ plus `83b97669` (SUMMARY). Two source/test files + `186-VALIDATION.md`; zero mig
   the hazard (one `continue` STATEMENT); F22a's RED is **parameter-dependent — 5 or 11** (a typing
   cadence longer than the round trip lets the storm self-terminate), both recorded; and F22c's
   STATE assertion cannot go red pre-fix because a request genuinely WAS outstanding.
+
 - **`186-VALIDATION.md` row 3b was REWORDED, not added** (63 rows before and after): it now names
   both halves of the flag, including the flag-off requirement that the "Publishing —" sentence is
   GONE from the header once the gauntlet ends. Still `to run`.
@@ -1190,7 +1214,7 @@ the U-5 accessibility-tree + real-key-press pass, operator confirmed each checkp
 
 **Re-verification 2026-07-26 (`096a9e58`): `gaps_found` → `human_needed`, 4/4 must-haves verified.** The SC#3 blocker is closed for real (verifier read `WorkflowCanvas.tsx` directly, did not trust the SUMMARY). **Nothing code-side blocks the phase; the only thing between 183 and `passed` is operator-driven live UAT** — the four G-4 rows **U-1…U-4** plus a real-screen-reader pass on the newly-added keyboard path, persisted as `183-HUMAN-UAT.md` (5 items, all pending). `visual_workflow_canvas` cold-defaults to `"off"` — flip it **On in the Control Room first**; U-4 flips it back. **New Warning-level debt from the scoped gap-closure review `183-REVIEW-08.md` (0 Critical / 4 Warning / 4 Info), independently re-derived by the verifier and NOT auto-folded:** **WR-08-01** no `event.repeat` guard — a held Enter rapid-toggles the panel and can settle CLOSED, contradicting the ARIA promise (the new test can't see it: synthetic `fireEvent.keyDown` never sets `repeat`); **WR-08-02** the grounding/tier agreement docblock overclaims — three gate-carrying configs still disagree and the new pin (`deriveTier(policy, new Set())`) is scoped to hide them, so WR-01's contradiction stays reachable; **WR-08-03** `ARIA_LABELS` is untyped so a library key rename silently reverts WR-06 with a green build; **WR-08-04** the end cap + unresolved-skip stub — the two nodes the CR-01 guard keeps inert — still announce "Press enter or space to open this step's details". **Operator decision owed:** fold these into a `183-09` gap plan, or accept as debt alongside WR-02/03/04 and carry into Phase 184. Orchestrator note: `state.advance-plan` bumped `completed_phases` 2→3 in `1b9fad84`, falsely marking 183 complete — reverted in `b6ae96f7`.
 
-Status: Executing Phase 186
+Status: Ready to execute
 
 **Phase 184 — ALL 13 PLANS EXECUTED 2026-07-27** (`184-13-SUMMARY.md`, commits `dfee9500` / `e72b561e` / `42bd7533` / `728fc564`). The final plan mounted the problems tray, put undo/redo + the honest save state on the canvas in one bottom region with the tray's summary (R12: one region, two rows, at 900 px), and landed D-184-04's four key bindings behind a single gated window listener that yields to text fields. Count gate exit 0 at **1037 tests / 0 failing**, `tsc` differential held at **33**, `npx vite build` exit 0, canvas snapshot byte-unchanged, `revertByteIdentical.test.tsx` green at 7. **Phase-wide: zero `backend/` files and zero `supabase/migrations` files changed** — slot 114 stays RESERVED. **All 5 REQ-IDs (CANVAS-02/03/04, VALID-02/03) remain Pending — REQUIREMENTS.md is deliberately untouched and the orchestrator marks them at phase end after live verification.** Orchestrator note: `state.advance-plan` again bumped `completed_phases` 3→4, falsely marking 184 complete before verification — **reverted here**, exactly as it was for 183 in `b6ae96f7`. Owed to `/gsd:verify-work`: regenerate `__fixtures__/corpusDump.json` (184-05) and the live five-surface icon sweep (184-01), both needing Docker up; plus R12's visual half at 900 px and the two-save-entry-points read (184-13 Deviation 3).
 
@@ -1198,7 +1222,7 @@ Status: Executing Phase 186
 
 **G-2 sketch gate for Phase 183: SATISFIED (2026-07-25).** Sketches 134-137 committed (`01bb4c64`, `7b74d2b5`, `01d50bba`, `86f866c5`, `e35c7489`). Winners: **136-B** (horizontal left->right flow) + **137-D** (frosted-glass step cards, 3D icon floating at the left edge, plain language with technical names behind the Alt reveal, Alive-by-default motion). Locked rules the canvas phases inherit: **colour budget** (step-type colour is a tint behind the icon only — the strong colours belong to Phase 188 run status) and **motion keys off run state, never selection**. New reusable asset `.planning/sketches/themes/phase-icons-3d.js` (verified 3D fluent-emoji marks; NEVER text glyphs). Icon choices: `llm_agent` -> `compass`; `llm_batch_agents` gets a lighter icon well in-scope, with the cross-cutting `handshake` swap left open. **Two findings that must reach the 183 plan: (1) `skip_to_phase` is used ZERO times in all 95 live definitions — SC#1's branch edge needs a fixture; (2) 40 of 95 definitions have zero phases — the empty projection is the most common canvas state.**
 
-Last activity: 2026-08-01 -- Phase 186 execution started
+Last activity: 2026-08-01 -- Phase 186 planning complete
 
 ### Quick Tasks Completed
 
