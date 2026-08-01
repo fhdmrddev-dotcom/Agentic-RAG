@@ -4,12 +4,12 @@ milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
 status: executing
 last_updated: "2026-08-01T21:34:50.931Z"
-last_activity: 2026-08-02 -- Phase 187 plan 07 complete (SC#10 8-provider generation roster, live)
+last_activity: 2026-08-02 -- Phase 187 plan 08 complete (nameContext threaded to toCanvas + the tray)
 progress:
   total_phases: 19
   completed_phases: 6
   total_plans: 87
-  completed_plans: 71
+  completed_plans: 72
   percent: 32
 ---
 
@@ -201,6 +201,32 @@ never 3). Nothing measured about names because nothing was emitted.
 though `resolve_authoring_model` branch 1 still returns an explicitly-set model without validating
 `forced_emission`. No row was `xfail`-ed. **M7 (the env path reaching `resolve_authoring_model`)
 remains manual and uncovered** — this roster drives the service function, not the env knob.
+
+**Plan 187-08 COMPLETE (Wave 2, 2026-08-02, `a4cd1101` → `73d78491` → `9a48e1cd`).** VOCAB-01 /
+D-187-05 — the derived node face is now **reachable from the canvas**. `ToCanvasOptions` gained an
+OPTIONAL `nameContext` resolved against a new frozen module-scope
+`NO_NAME_CONTEXT = Object.freeze({})`, the `NO_KB_TOOLS` idiom verbatim; `buildPhaseData` threads it
+to **`nodeTitle` only** (`technicalTitle(phase)` keeps one argument — the reveal-ON line is the SLUG
+and must stay the slug). `toCanvas` stays PURE: the api-client / `fetch` / `useState` / `useEffect`
+greps are 0 and **no snapshot moved** (`git status --porcelain .../__snapshots__` empty).
+**G-5 was capped and the caps were hit exactly: `WorkflowCanvas.tsx` 7 insertions / 2 deletions,
+`ProblemsTray.tsx` 8 / 1, and 0 new function/state/effect lines** — extraction stays Phase 188's.
+The 4th line is the one that matters: `ProblemsTray` is mounted INSIDE `WorkflowCanvas`, so the tray
+half of RESEARCH Open Q6 closed for **zero lines in `WorkflowBuilderPage.tsx`** and cannot widen the
+D-187-14 page gate; a card and the row pointing at it now resolve one name through one object.
+Counts: `canvasModel.test.ts` 41 → **49**, `canvasModel.purity.test.ts` 79 → **143**,
+`ProblemsTray.test.tsx` 23 → **26**; fixtures 100 / roundtrip 517 / WorkflowCanvas 35 all unchanged.
+Set A **974 passed** (bar 863), Set B **384 passed** (bar 381), 0 failed. **Both halves were observed
+RED** — Task 1's tests committed failing 6/192, and Task 2's card↔row control was proved by reverting
+the tray thread and watching it go red before restoring it.
+**Carry forward:** (1) **`ctx.templateFilename` has no producer yet** — threaded end-to-end and
+covered by the purity fixtures, but `derivedFaceOf` deliberately does not read `assets` and this file
+holds `phases`, not the definition. **187-15 owes the page-level `assets[] where kind === "template"`
+→ `filename` resolution on the SAME prop this plan added.** (2) `tsc -b` re-measured independently:
+**33 errors, 0 in `components/workflows`, identical before and after** — D-ITEM-01's reading holds,
+inherited unmeasured. (3) One deviation, in the open: the tray leans on `nodeTitle`'s OWN default
+parameter instead of re-declaring `NO_NAME_CONTEXT` (187-04 kept it module-private) — the identical
+frozen reference, without a fourth copy or a needless export.
 
 (`3713a716`), GOVERN-01/02/03 all `Complete`, `nyquist_compliant` true, SECURED 49/49 (`a00b1cc5`).
 Security found one real fail-open BLOCKER — T-185-04-01, a **typed** refusal on an armed checkpoint ran
