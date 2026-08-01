@@ -27,7 +27,11 @@ import { render, screen } from "@testing-library/react"
 
 import { BuilderSaveRegion } from "./BuilderSaveRegion"
 import { SAVED_STILL_A_DRAFT } from "./builderStore"
-import { HOLD_PUBLISHING_MANUAL, type PersistState } from "@/hooks/useDraftPersistence"
+import {
+  HOLD_PUBLISHING_MANUAL,
+  RELOAD_FAILED_NOTE,
+  type PersistState,
+} from "@/hooks/useDraftPersistence"
 
 /**
  * Every prop, defaulted to REST. Each test overrides only what it is about, so a test that
@@ -120,6 +124,75 @@ describe("BuilderSaveRegion — the conflict banner (D-186-08 · 186-12)", () =>
 
     const controls = [...view.container.querySelectorAll("button")]
     expect(controls).toEqual([screen.getByTestId("builder-save-draft")])
+  })
+})
+
+/**
+ * 186-14 (GAP-4 / CR-02) — the banner explains a failed exit WITHOUT costing the exits.
+ *
+ * The defect this closes was never in this component's copy; it was in the pairing. A
+ * `reload()` that could not reach the server replaced the conflict with `{kind:"error"}`, and
+ * this banner renders on `conflict || resolving` — so both controls left the DOM in the same
+ * commit, while the loop's halt stayed set for the rest of the session. The hook now restores
+ * the conflict and carries a NOTE; the claim measured here is the other half of that: the
+ * note reaches the DOM and the two exits are still there, still enabled, still in order.
+ *
+ * The FIRST case below is the one that stops the note becoming furniture. A conflict without
+ * a note — the ordinary one, the one the server refused — must render exactly what it always
+ * rendered, because the locked sentence already says everything true about it.
+ */
+describe("BuilderSaveRegion — a failed exit says why, and keeps both exits (GAP-4)", () => {
+  const NOTED: PersistState = {
+    kind: "conflict",
+    currentToken: "T-SERVER",
+    note: RELOAD_FAILED_NOTE,
+  }
+
+  it("a conflict WITHOUT a note renders no note element at all", () => {
+    renderRegion({ state: CONFLICTED })
+
+    expect(screen.queryByTestId("builder-conflict-note")).toBeNull()
+    // The resting conflict is unchanged: one sentence, two controls.
+    expect(screen.getByTestId("builder-conflict-banner")).toBeInTheDocument()
+    expect(screen.getByTestId("builder-conflict-reload")).toBeEnabled()
+    expect(screen.getByTestId("builder-conflict-overwrite")).toBeEnabled()
+  })
+
+  it("a conflict WITH a note renders it AND keeps both exits mounted, enabled and in order", () => {
+    renderRegion({ state: NOTED })
+
+    const banner = screen.getByTestId("builder-conflict-banner")
+    const note = screen.getByTestId("builder-conflict-note")
+    const reload = screen.getByTestId("builder-conflict-reload")
+    const overwrite = screen.getByTestId("builder-conflict-overwrite")
+
+    // The words are the LOOP'S, verbatim — this component authors no copy.
+    expect(note).toHaveTextContent(RELOAD_FAILED_NOTE)
+    // ADDITIVE, never a replacement: the sentence that offers the exits is still there.
+    expect(banner).toHaveTextContent("Reload to get the newer version")
+
+    // The exits survived the failure of one of them. Both present, both PRESSABLE — a
+    // disabled exit here would be the same defect wearing a different mask.
+    expect(reload).toBeEnabled()
+    expect(overwrite).toBeEnabled()
+
+    // D-186-08 order, asserted positionally and never by a class name. The note must not
+    // have wedged itself between the two controls.
+    const controls = [...banner.querySelectorAll("button")]
+    expect(controls).toEqual([reload, overwrite])
+    expect(
+      reload.compareDocumentPosition(overwrite) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+    // …and the note precedes the recommended exit, so it is read before it is acted on.
+    expect(note.compareDocumentPosition(reload) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it("`resolving: true` with a note still disables BOTH controls (the 186-12 property is unaffected)", () => {
+    renderRegion({ state: NOTED, resolving: true })
+
+    expect(screen.getByTestId("builder-conflict-note")).toHaveTextContent(RELOAD_FAILED_NOTE)
+    expect(screen.getByTestId("builder-conflict-reload")).toBeDisabled()
+    expect(screen.getByTestId("builder-conflict-overwrite")).toBeDisabled()
   })
 })
 

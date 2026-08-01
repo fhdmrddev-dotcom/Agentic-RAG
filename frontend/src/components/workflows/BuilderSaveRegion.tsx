@@ -27,7 +27,12 @@
  *              the outcome of an explicit Save press as much as autosave's, so it is not
  *              part of what the canvas flag hides (186-13, WR-04).
  *   error    → the loop's refusal sentence, in the alert span beside the button
- *   conflict → the banner, which is the only reading that carries controls
+ *   conflict → the banner, which is the only reading that carries controls. It may also
+ *              carry an OPTIONAL second line — `state.note`, authored by the loop, today
+ *              produced only by a reload that could not reach the server (186-14). It is
+ *              rendered BESIDE the locked banner sentence and never instead of it: the
+ *              sentence that offers the two exits is the one thing on this surface that may
+ *              not be replaced, least of all at the moment an exit has just failed.
  *
  * ── THE CONSTANTS ARE MODULE-LOCAL, DELIBERATELY ─────────────────────────────────
  *
@@ -209,14 +214,34 @@ export function BuilderSaveRegion({
           alone unmounts on the very first click and the disabled state is never on screen —
           which is exactly how a double-click stayed an ordinary thing to do. A control that
           is doing something has to still be there, saying so. Disabling a control that has
-          already vanished protects nothing. */}
+          already vanished protects nothing.
+
+          186-14 (GAP-4 / CR-02) — THE NOTE IS ADDITIVE, AND THAT IS THE WHOLE POINT.
+          `CONFLICT_BANNER_MESSAGE` is the one sentence on this surface that may never be
+          replaced, because it is the sentence that OFFERS THE TWO EXITS — and a failed exit
+          is exactly the moment a person needs both of them most. So an explanation of the
+          failure is a SECOND LINE on the same banner, under the same `role="alert"`, with
+          both controls still mounted and still enabled. It is deliberately not put in the
+          `builder-save-error` span above: that span is for a refused WRITE, and this is a
+          failed READ during a resolution the person chose. Two situations in one element is
+          how a sentence stops meaning one thing. */}
       {(state.kind === "conflict" || resolving) && (
         <div
           data-testid="builder-conflict-banner"
           role="alert"
           className="flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive/5 px-2.5 py-1.5 text-[12px] text-foreground"
         >
-          <span className="max-w-[26rem]">{CONFLICT_BANNER_MESSAGE}</span>
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <span className="max-w-[26rem]">{CONFLICT_BANNER_MESSAGE}</span>
+            {state.kind === "conflict" && typeof state.note === "string" && state.note !== "" && (
+              <span
+                data-testid="builder-conflict-note"
+                className="max-w-[26rem] text-[11px] text-muted-foreground"
+              >
+                {state.note}
+              </span>
+            )}
+          </div>
           <button
             type="button"
             data-testid="builder-conflict-reload"
