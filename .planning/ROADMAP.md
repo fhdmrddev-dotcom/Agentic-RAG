@@ -321,7 +321,7 @@ Plans:
 
 **Wave 4**
 
-- [ ] 186-07-PLAN.md — compose the hook into the page: the token reaches all four Builder entry paths, the quiet status line and the conflict banner mount in the header, and `WorkflowBuilderPage.tsx` is measurably smaller (G-5 honoured by construction)
+- [x] 186-07-PLAN.md — compose the hook into the page: the token reaches all four Builder entry paths, the quiet status line and the conflict banner mount in the header, and `WorkflowBuilderPage.tsx` is measurably smaller (G-5 honoured by construction)
 
 **Wave 5**
 
