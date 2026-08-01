@@ -4,7 +4,7 @@ milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
 status: executing
 last_updated: "2026-08-01T21:34:50.931Z"
-last_activity: 2026-08-02 -- Phase 187 plan 04 complete (config-derived node face, 4-tier nodeTitle)
+last_activity: 2026-08-02 -- Phase 187 plan 05 complete (flag-off describe-screen markup pin)
 progress:
   total_phases: 19
   completed_phases: 6
@@ -118,6 +118,28 @@ The `llm_emit` gate already lives in the core, so callers inherit it.
 (owners: `SettingsPage`, `OrgProvider.test`, `StreamsProvider`, `streamsStore`). Every 187 plan
 inherits that gate from `187-RESEARCH.md:1769` and it has never been true. Logged as `D-ITEM-01` in
 the phase's new `deferred-items.md`; read the criterion as *no NEW error, none in the touched files*.
+
+**Plan 187-05 COMPLETE (Wave 1, 2026-08-02, `b9b58b39` → `8dbb3b03`).** VOCAB-03 / D-181-01 — the
+**flag-off describe-screen markup pin**, test-only, captured against the **UNMODIFIED** page before
+the template door exists (`git status --porcelain frontend/src/pages/WorkflowBuilderPage.tsx` empty
+is the plan's own acceptance criterion, T-187-05-03). New
+`frontend/src/pages/WorkflowBuilderPage.describe.test.tsx`, **7 tests**: a verbatim
+`FLAG_OFF_DESCRIBE_MARKUP` for the CTA flex column (`WorkflowBuilderPage.tsx:1450-1465`), the
+**operator-like** map asserted against the **same constant** (equality, not a second copy), a
+formatting-independent `/template|starter/i` negative guard over both `textContent` and attributes,
+and a **positive control** that plants the 187-15 door into the captured string so both guards are
+observed to bite. Measured: describe **7**; describe+header+canvas **122** (header+canvas baseline
+**115**, unchanged); the 5-file Builder set **161**; `tsc -b` **33 → 33** (0 in the touched file).
+**Carry forward — the reason this pin exists, and its exact reach:**
+(1) `describeScreen` is constructed on **BOTH** flag branches — only `preDraftHeaderHosted`
+(`:1399-1400`) consults `canvasEnabled` on this route — so anything 187-13/14/15 adds inside it
+**ships flag-OFF unless it carries its own `canvasEnabled` gate**.
+(2) The pin covers the **CTA column keyed to `describe-hint`**, i.e. the door's stated landing zone.
+A door mounted as a **sibling** of that column (above the CTA, or between the picker and the CTA)
+would NOT trip the byte pin — widen the region deliberately rather than assuming coverage.
+(3) The literal contains the CTA in its **`disabled`** state (empty describe box = the arrival
+state). A change to `canDraft`'s initial value reds this pin, and that would be a real product
+change, not a test artefact.
 
 (`3713a716`), GOVERN-01/02/03 all `Complete`, `nyquist_compliant` true, SECURED 49/49 (`a00b1cc5`).
 Security found one real fail-open BLOCKER — T-185-04-01, a **typed** refusal on an armed checkpoint ran
