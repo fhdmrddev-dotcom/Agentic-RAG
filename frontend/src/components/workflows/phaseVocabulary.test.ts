@@ -33,10 +33,13 @@ import {
   nodeTitle,
   technicalTitle,
   waitsForYou,
+  derivedFace,
+  derivedFaceOf,
   PHASE_TYPE_SENTENCES,
   PHASE_TYPE_SUBTITLES,
   PHASE_TYPE_LABELS,
   SKIP_PREFIX,
+  type NameContext,
   type PhaseSpecJSON,
 } from "./phaseVocabulary"
 
@@ -149,6 +152,209 @@ describe("phaseVocabulary.nodeTitle — the plain-language node face (D-183-06)"
     const p = phase({ slug: "probe", config: { phase_type: "llm_future_type" } })
     expect(() => nodeTitle(p)).not.toThrow()
     expect(nodeTitle(p)).toBe("llm_future_type")
+  })
+})
+
+// ── Phase 187-04 (VOCAB-01 / D-187-04, D-187-05) — the config-derived tier ───────
+//
+// Measured on the live corpus: 0 of 57 phases across the 27 well-formed
+// `workflow_definitions` rows carry a real `phase.name`, so `nodeTitle` falls
+// through its first tier 100% of the time and every node face on every workflow is
+// one of exactly six type sentences. These cases pin the tier that makes a step say
+// what THAT step does — its precedence (most-specific-first), its totality over the
+// LOOSE definition JSONB, and its never-fabricate floor.
+
+/** The two id→name maps D-187-05 injects, plus the definition-level template. */
+const SKILL_ID = "9f3c1e2a-7b64-4d0f-9a11-2c5e8d7b4a30"
+const FOLDER_ID = "1a2b3c4d-5e6f-4071-8293-a4b5c6d7e8f9"
+const OTHER_FOLDER_ID = "0badf00d-1111-4222-8333-444455556666"
+
+const CTX: NameContext = Object.freeze({
+  skillNames: { [SKILL_ID]: "pricing policy check" },
+  folderNames: { [FOLDER_ID]: "Supplier Contracts", [OTHER_FOLDER_ID]: "Board Papers" },
+  templateFilename: "Renewal Summary.pptx",
+})
+
+describe("phaseVocabulary.derivedFace — the flat core, most-specific-first (D-187-04)", () => {
+  it("(1) a bound skill wins over a template AND a folder on the same step", () => {
+    expect(
+      derivedFace({
+        phaseType: "llm_emit",
+        skillName: "pricing policy check",
+        templateFilename: "Renewal Summary.pptx",
+        folderName: "Supplier Contracts",
+      }),
+    ).toBe("Run the pricing policy check")
+  })
+
+  it("(2) the template tier is GATED on llm_emit — the template is definition-level", () => {
+    expect(derivedFace({ phaseType: "llm_emit", templateFilename: "Renewal Summary.pptx" })).toBe(
+      "Fill Renewal Summary.pptx",
+    )
+    expect(derivedFace({ phaseType: "llm_agent", templateFilename: "Renewal Summary.pptx" })).toBeNull()
+  })
+
+  it("(2 → 3) an ungated template would collapse distinct steps; the folder tier still resolves", () => {
+    expect(
+      derivedFace({
+        phaseType: "llm_agent",
+        templateFilename: "Renewal Summary.pptx",
+        folderName: "Supplier Contracts",
+      }),
+    ).toBe("Search Supplier Contracts")
+  })
+
+  it("(3) a folder resolves last of the three config tiers, and beats human input", () => {
+    expect(derivedFace({ phaseType: "llm_human_input", folderName: "Board Papers" })).toBe(
+      "Search Board Papers",
+    )
+  })
+
+  it("(4) an llm_human_input step with nothing bound waits for you", () => {
+    expect(derivedFace({ phaseType: "llm_human_input" })).toBe("Wait for your approval")
+  })
+
+  it("(5) nothing bound is null — the honest floor, never a fabricated face", () => {
+    expect(derivedFace({ phaseType: "llm_agent" })).toBeNull()
+    expect(derivedFace({ phaseType: "llm_single" })).toBeNull()
+    expect(derivedFace({ phaseType: "programmatic" })).toBeNull()
+    expect(derivedFace({ phaseType: "llm_batch_agents" })).toBeNull()
+    expect(derivedFace({ phaseType: "llm_emit" })).toBeNull()
+    expect(derivedFace({ phaseType: "totally_unknown" })).toBeNull()
+  })
+
+  it("an empty-string lookup result never wins a tier", () => {
+    expect(derivedFace({ phaseType: "llm_emit", skillName: "", templateFilename: "" })).toBeNull()
+  })
+})
+
+describe("phaseVocabulary.derivedFaceOf — the phase-shaped adapter (D-187-05)", () => {
+  it("a resolvable skill_ref wins even with folder_scope and a template present", () => {
+    const p = phase({
+      config: { phase_type: "llm_emit", skill_ref: SKILL_ID, folder_scope: [FOLDER_ID] },
+    })
+    expect(derivedFaceOf(p, CTX)).toBe("Run the pricing policy check")
+  })
+
+  it("an llm_emit step with only the definition template renders Fill <filename>", () => {
+    const p = phase({ config: { phase_type: "llm_emit" } })
+    expect(derivedFaceOf(p, CTX)).toBe("Fill Renewal Summary.pptx")
+  })
+
+  it("a NON-llm_emit step with the same template does NOT render the template face", () => {
+    const p = phase({ config: { phase_type: "llm_agent" } })
+    expect(derivedFaceOf(p, CTX)).toBeNull()
+  })
+
+  it("exactly ONE resolvable folder_scope id renders Search <folder>", () => {
+    const p = phase({ config: { phase_type: "llm_agent", folder_scope: [FOLDER_ID] } })
+    expect(derivedFaceOf(p, CTX)).toBe("Search Supplier Contracts")
+  })
+
+  it("TWO OR MORE scoped folders fall through — a count is not a name", () => {
+    const p = phase({
+      config: { phase_type: "llm_agent", folder_scope: [FOLDER_ID, OTHER_FOLDER_ID] },
+    })
+    expect(derivedFaceOf(p, CTX)).toBeNull()
+  })
+
+  it("an llm_human_input step with nothing bound waits for your approval", () => {
+    const p = phase({ config: { phase_type: "llm_human_input" } })
+    expect(derivedFaceOf(p, { skillNames: {}, folderNames: {} })).toBe("Wait for your approval")
+  })
+
+  it("a step with nothing bound returns null", () => {
+    expect(derivedFaceOf(phase({ config: { phase_type: "llm_single" } }), CTX)).toBeNull()
+  })
+
+  it("NEVER FABRICATE: an unresolved skill_ref falls through and never leaks the raw id", () => {
+    const p = phase({ config: { phase_type: "llm_agent", skill_ref: SKILL_ID } })
+    expect(derivedFaceOf(p, { skillNames: {} })).toBeNull()
+    // …and when a lower tier does resolve, the id is still nowhere in the face.
+    const withFolder = phase({
+      config: { phase_type: "llm_agent", skill_ref: SKILL_ID, folder_scope: [FOLDER_ID] },
+    })
+    const face = derivedFaceOf(withFolder, { skillNames: {}, folderNames: CTX.folderNames })
+    expect(face).toBe("Search Supplier Contracts")
+    expect(face).not.toContain(SKILL_ID)
+  })
+
+  it("NEVER FABRICATE: an unresolved folder_scope id falls through and never leaks the raw id", () => {
+    const p = phase({ config: { phase_type: "llm_agent", folder_scope: [FOLDER_ID] } })
+    expect(derivedFaceOf(p, { folderNames: {} })).toBeNull()
+  })
+
+  it("an EMPTY NameContext makes every tier miss (absent ⇒ fall through, D-187-05)", () => {
+    const shapes = [
+      phase({ config: { phase_type: "llm_emit", skill_ref: SKILL_ID, folder_scope: [FOLDER_ID] } }),
+      phase({ config: { phase_type: "llm_agent", folder_scope: [FOLDER_ID] } }),
+      phase({ config: { phase_type: "llm_emit" } }),
+    ]
+    for (const p of shapes) expect(derivedFaceOf(p, {})).toBeNull()
+  })
+
+  it("the context parameter is OPTIONAL and defaults to the frozen empty context", () => {
+    const p = phase({ config: { phase_type: "llm_emit", skill_ref: SKILL_ID } })
+    expect(derivedFaceOf(p)).toBeNull()
+    // human input still resolves with no context at all — it reads no lookup.
+    expect(derivedFaceOf(phase({ config: { phase_type: "llm_human_input" } }))).toBe(
+      "Wait for your approval",
+    )
+  })
+})
+
+describe("phaseVocabulary.derivedFaceOf — TOTALITY over the LOOSE JSONB (CANVAS-01)", () => {
+  it("an absent config does not throw", () => {
+    const p = { slug: "x", phase_index: 0 } as unknown as PhaseSpecJSON
+    expect(() => derivedFaceOf(p, CTX)).not.toThrow()
+    expect(derivedFaceOf(p, CTX)).toBeNull()
+  })
+
+  it("an unknown phase_type does not throw", () => {
+    const p = phase({ config: { phase_type: "llm_future_type" } })
+    expect(() => derivedFaceOf(p, CTX)).not.toThrow()
+    expect(derivedFaceOf(p, CTX)).toBeNull()
+  })
+
+  it("a folder_scope that is a STRING instead of an array does not throw", () => {
+    const p = phase({ config: { phase_type: "llm_agent", folder_scope: FOLDER_ID } })
+    expect(() => derivedFaceOf(p, CTX)).not.toThrow()
+    expect(derivedFaceOf(p, CTX)).toBeNull()
+  })
+
+  it("a folder_scope array carrying a non-string does not throw", () => {
+    const p = phase({ config: { phase_type: "llm_agent", folder_scope: [42] } })
+    expect(() => derivedFaceOf(p, CTX)).not.toThrow()
+    expect(derivedFaceOf(p, CTX)).toBeNull()
+  })
+
+  it("a skill_ref that is a NUMBER does not throw", () => {
+    const p = phase({ config: { phase_type: "llm_agent", skill_ref: 7 } })
+    expect(() => derivedFaceOf(p, CTX)).not.toThrow()
+    expect(derivedFaceOf(p, CTX)).toBeNull()
+  })
+
+  it("a malformed assets field on the phase is simply not read here", () => {
+    const p = phase({ config: { phase_type: "llm_emit", assets: "nope" } })
+    expect(() => derivedFaceOf(p, CTX)).not.toThrow()
+    expect(derivedFaceOf(p, CTX)).toBe("Fill Renewal Summary.pptx")
+  })
+})
+
+describe("phaseVocabulary — the derived tier is not a SECOND deriveTier (D-187-04)", () => {
+  it("does not reuse the shipped Phase-103 strictness-tier name", () => {
+    expect(phaseVocabularySource).not.toMatch(/deriveTier/)
+  })
+
+  it("hands the SAME frozen empty context on every omitted call", () => {
+    expect(phaseVocabularySource).toMatch(/NO_NAME_CONTEXT[^\n]*=\s*Object\.freeze\(\{\}\)/)
+  })
+
+  it("carries the numbered branch-order comments that ARE the decision", () => {
+    for (const n of ["(1)", "(2)", "(3)", "(4)", "(5)"]) {
+      expect(phaseVocabularySource).toContain(n)
+    }
+    expect(phaseVocabularySource).toContain("D-187-04")
   })
 })
 
