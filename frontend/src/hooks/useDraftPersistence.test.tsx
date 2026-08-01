@@ -1049,6 +1049,127 @@ describe("useDraftPersistence — F20: with the canvas flag OFF the loop writes 
     expect(mockedUpdate).not.toHaveBeenCalled()
     expect(mockedCreate).not.toHaveBeenCalled()
     expect(h.store.getState().dirty).toBe(true)
+
+    // ── 186-17 (WR-09) — AND WHAT THE SURFACE SAYS ONCE THE HOLD HAS ENDED ──────────
+    //
+    // The four assertions above are the write suppression, and they are unchanged: that
+    // half must not move. What this case never asked was what the header READS afterwards.
+    // 186-13 gated the release on `enabled` by returning early, and the early return came
+    // BEFORE anything resolved `{kind:"held"}` — so on the flag-off surface the sentence
+    // *"Publishing — not saved; press Save draft again when it finishes"* stayed on screen
+    // after the gauntlet had ended, and cleared only if the author happened to press Save
+    // again. Nothing was written, and the surface still made a false statement about system
+    // state. The gates below the transition test are reasons not to WRITE; none of them is a
+    // reason to keep claiming a publish is running.
+    const after = stateOf(h.view)
+    expect(after.kind).not.toBe("held")
+    expect(reachableStrings(after)).not.toContain(HOLD_PUBLISHING_MANUAL)
+    expect(reachableStrings(after)).not.toContain(HOLD_PUBLISHING)
+  })
+
+  it("F20f — the flag-off release leaves the pending flag AGREEING with the store", async () => {
+    // 186-17 (WR-09), the second half. 186-13 deliberately did NOT clear `heldPendingRef` on
+    // the flag-off path, so work accumulated with the flag off would still be found if the
+    // flag came on later. The other half of that choice is the hazard: left armed, the flag
+    // can flush a write on the strength of a press made minutes earlier, bypassing the
+    // `dirty` gate the debounce timer carries precisely to stop "merely opening a draft"
+    // from PATCHing it. Setting it to the store's own `dirty` satisfies both — it claims
+    // unsent work exactly when there is unsent work.
+    //
+    // DRIVEN THROUGH BEHAVIOUR, NOT THROUGH THE REF. The question "did a stale arming
+    // survive?" is asked by turning the flag on, driving a second hold to its release, and
+    // COUNTING WRITES — which is the only form of the question a person could ever notice.
+    async function flagOffHoldThenAnEnabledRelease(opts: {
+      unsentWork: boolean
+    }): Promise<ReturnType<typeof harness>> {
+      const h = harness({ enabled: false })
+      h.set({ publishInFlight: true })
+      if (opts.unsentWork) h.edit()
+
+      // The press is the flag-off surface's only way to arm the pending flag (F20b).
+      await act(async () => {
+        await h.view.result.current.saveNow()
+      })
+      h.set({ publishInFlight: false })
+      await flush()
+      expect(mockedUpdate).not.toHaveBeenCalled()
+
+      // A later session turns the canvas back on. No clock is advanced past the debounce
+      // here, so any write that appears came from the RELEASE and not from a timer.
+      h.set({ enabled: true })
+      h.set({ publishInFlight: true })
+      h.set({ publishInFlight: false })
+      await flush()
+      return h
+    }
+
+    mockedUpdate.mockResolvedValue(write("T1"))
+
+    // (a) There WAS unsent work: the flag-off session accumulated it, and the enabled
+    //     release still finds it. This is the half 186-13 protected, guarded here so the
+    //     fix cannot buy honesty by losing work.
+    const withWork = await flagOffHoldThenAnEnabledRelease({ unsentWork: true })
+    expect(mockedUpdate).toHaveBeenCalledTimes(1)
+    expect(withWork.store.getState().dirty).toBe(false)
+
+    mockedUpdate.mockClear()
+
+    // (b) There was NO unsent work — only a press against a clean store. RED: the stale
+    //     arming survived the flag-off release and flushed a PATCH against a draft nobody
+    //     had edited, bumping the token (and every other tab's guard) for nothing.
+    const withoutWork = await flagOffHoldThenAnEnabledRelease({ unsentWork: false })
+    expect(mockedUpdate).not.toHaveBeenCalled()
+    expect(withoutWork.store.getState().dirty).toBe(false)
+  })
+
+  it("F20g — the flag-ON release is unchanged: the reading resolves AND the single flush still happens", async () => {
+    // F20c's claim, restated AFTER the resolution was added, so a regression in either half
+    // is visible: resolving the hold reading must not cost the flush, and flushing must not
+    // leave the hold sentence on screen. It passes before the fix too — that is the point of
+    // a contrast control.
+    mockedUpdate.mockResolvedValue(write("T1"))
+
+    const h = harness()
+    await editThroughAPublish(h)
+
+    expect(mockedUpdate).toHaveBeenCalledTimes(1)
+    expect(sentDefinition(0).phases).toHaveLength(4)
+    expect(h.markSaved).toHaveBeenCalledTimes(1)
+    expect(stateOf(h.view).kind).not.toBe("held")
+    expect(stateOf(h.view)).toEqual({ kind: "saved", at: expect.any(Number) })
+  })
+
+  it("F20h — the resolution sits above the OTHER two gates, and is a no-op for every other reading", async () => {
+    // The `!enabled` arm is one of THREE reasons this effect returns without writing; the
+    // halt is another. Patching only the arm the review named would leave the property
+    // untrue in the other two, which is why the resolution went above all of them.
+    //
+    // AND IT FALSIFIES THE WRONG SHAPE OF THE SAME FIX. A bare `setState({kind:"idle"})`
+    // here would erase a CONFLICT — the only reading that carries Reload and Overwrite —
+    // reintroducing GAP-4 by another door. The functional form makes it a no-op for
+    // everything that is not `held`, and this case is what says so.
+    mockedUpdate.mockRejectedValueOnce(new WorkflowStaleTokenError("T-SERVER"))
+    mockedUpdate.mockResolvedValue(write("T-SHOULD-NEVER-BE-SENT"))
+
+    const h = harness()
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+    await flush()
+    expect(stateOf(h.view).kind).toBe("conflict")
+    const atRefusal = mockedUpdate.mock.calls.length
+
+    // A publish begins and ends while the loop is halted.
+    h.set({ publishInFlight: true })
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS * 3)
+    h.set({ publishInFlight: false })
+    await flush()
+    await advance(AUTOSAVE_DEBOUNCE_MS * 3)
+    await flush()
+
+    expect(stateOf(h.view).kind).not.toBe("held")
+    expect(stateOf(h.view).kind).toBe("conflict")
+    expect(mockedUpdate.mock.calls.length).toBe(atRefusal)
   })
 
   it("F20c — the flag-ON behaviour is UNCHANGED: one write, carrying both edits", async () => {

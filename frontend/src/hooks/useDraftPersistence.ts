@@ -758,6 +758,28 @@ export function useDraftPersistence(args: DraftPersistenceArgs): DraftPersistenc
    * truth — a timer matured while held, or an edit landed while held whose timer was
    * cleared by the next edit. Both mean there is unsent work.
    *
+   * ── EVERY GATE BELOW IS A REASON NOT TO WRITE, AND NONE IS A REASON TO KEEP TALKING ──
+   *
+   * THE FIFTH FACT, AND IT GOVERNS THE WHOLE BLOCK (186-17, WR-09). The three gates under
+   * the transition test — the halt, the `enabled` flag, and the nothing-pending check —
+   * decide whether a WRITE happens. Not one of them is a reason to go on claiming that a
+   * publish is running. So the `{kind:"held"}` reading is resolved to `{kind:"idle"}`
+   * IMMEDIATELY after the non-null → null transition and ABOVE all three, and the gates
+   * below it decide only what they were ever about.
+   *
+   * THE FAILURE IT CLOSES, stated so it is recognisable: with the canvas flag OFF, 186-13's
+   * `if (!enabled) return` landed BEFORE anything resolved the state, so once the gauntlet
+   * ended the header went on reading *"Publishing — not saved; press Save draft again when
+   * it finishes"* — instructing a person to wait for something that had already finished.
+   * Nothing was written, and the surface still made a false statement about system state.
+   * It cleared only if the author happened to press Save again.
+   *
+   * THE FUNCTIONAL FORM IS REQUIRED, not stylistic. A bare `setState({kind:"idle"})` would
+   * erase a `conflict` that arrived during the hold — and `conflict` is the ONLY reading that
+   * carries Reload and Overwrite, so that would reintroduce GAP-4 through a second door. The
+   * resolution is therefore a no-op for every reading that is not `held`, which also leaves
+   * `saved` and `error` exactly where they were. F20h holds that open.
+   *
    * ── THE FLAG GATE, AND WHY IT SITS EXACTLY WHERE IT SITS (186-13, GAP-3 / WR-03) ──
    *
    * This effect used not to read `enabled` at all, and the hold is REACHABLE with the flag
@@ -774,9 +796,26 @@ export function useDraftPersistence(args: DraftPersistenceArgs): DraftPersistenc
    *     surface;
    *   • AFTER the `haltedRef` check, so a halted loop is still described as halted rather
    *     than as merely disabled;
-   *   • BEFORE `heldPendingRef.current = false`, so work accumulated while the flag was off
-   *     is still found by a session where the flag is later turned on;
+   *   • BEFORE the unconditional `heldPendingRef.current = false`, so work accumulated while
+   *     the flag was off is still found by a session where the flag is later turned on
+   *     (186-17 keeps this and makes it exact — see the paragraph below);
    *   • BEFORE `performWrite()`, which is the leak itself.
+   *
+   * ── THE PENDING FLAG ON THE FLAG-OFF PATH IS SET TO THE TRUTH (186-17, WR-09) ────
+   *
+   * BOTH HALVES OF THE REASON, because 186-13 deliberately chose the opposite and a future
+   * reader will find that plan. Leaving the flag ARMED lets a later hold-release flush a
+   * write on the strength of a Save press made minutes earlier, in a session that may now
+   * have a perfectly clean store — bypassing the `dirty` gate the debounce timer carries
+   * precisely to stop "merely opening a draft" from PATCHing it, and so bumping the token
+   * every other open tab holds for nothing. CLEARING it unconditionally would lose the other
+   * half: work really accumulated while the flag was off must still be found if the flag
+   * comes on later.
+   *
+   * `heldPendingRef.current = store.getState().dirty` satisfies both, because it stops being
+   * a memory of a press and becomes a statement about the document: the flag claims unsent
+   * work exactly when there IS unsent work. F20f drives both directions through a subsequent
+   * enabled release, and asks the question by counting writes rather than by reading the ref.
    *
    * `saveNow`, `overwrite` and `reload` are deliberately NOT gated. They are things a person
    * pressed, D-186-03 keeps the explicit save working on the flag-off surface, and D-186-08
@@ -787,8 +826,18 @@ export function useDraftPersistence(args: DraftPersistenceArgs): DraftPersistenc
     const previous = holdRef.current
     holdRef.current = holdReason
     if (previous === null || holdReason !== null) return
+    // THE HOLD HAS ENDED, SO THE SENTENCE ABOUT IT ENDS TOO — above every gate below, and
+    // functionally, so a `conflict`, `error` or `saved` reading that arrived during the hold
+    // is untouched (186-17, WR-09).
+    setState((s) => (s.kind === "held" ? { kind: "idle" } : s))
     if (haltedRef.current) return
-    if (!enabled) return
+    if (!enabled) {
+      // No automatic write past the revert switch (D-181-01) — and no stale arming left
+      // behind either: the flag is made to agree with the store rather than to remember a
+      // press. See the docblock's pending-flag paragraph for both halves of the reason.
+      heldPendingRef.current = store.getState().dirty
+      return
+    }
     if (!heldPendingRef.current && !store.getState().dirty) return
     heldPendingRef.current = false
     // D-186-12 literally: edits accumulated as dirty, and EXACTLY ONE write flushes them.
