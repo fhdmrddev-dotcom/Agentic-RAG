@@ -45,6 +45,7 @@ import {
   technicalTitle,
   waitsForYou,
   PHASE_TYPE_SUBTITLES,
+  type NameContext,
   type PhaseSpecJSON,
 } from "@/components/workflows/phaseVocabulary"
 
@@ -274,14 +275,24 @@ function checkpointOnTarget(phase: PhaseSpecJSON): boolean | undefined {
   return actionRiskArmed(phase) ? true : undefined
 }
 
-/** Resolve every face value a phase card needs, once. */
-function buildPhaseData(phase: PhaseSpecJSON, kbTools: readonly string[]): PhaseNodeData {
+/**
+ * Resolve every face value a phase card needs, once.
+ *
+ * `nameContext` reaches `nodeTitle` and NOTHING else (Phase 187 / D-187-05). The
+ * technical form is deliberately left on one argument: it is the `label · slug` pair,
+ * and a derived face behind the ⌥ reveal would hide the slug the reveal exists to show.
+ */
+function buildPhaseData(
+  phase: PhaseSpecJSON,
+  kbTools: readonly string[],
+  nameContext: NameContext,
+): PhaseNodeData {
   const phaseType = phase.config.phase_type
   return {
     slug: phase.slug,
     phaseIndex: phase.phase_index,
     phaseType,
-    title: nodeTitle(phase),
+    title: nodeTitle(phase, nameContext),
     technicalTitle: technicalTitle(phase),
     subtitle: PHASE_TYPE_SUBTITLES[phaseType] ?? "",
     grounded: isGrounded(phase, kbTools),
@@ -310,16 +321,35 @@ function buildPhaseData(phase: PhaseSpecJSON, kbTools: readonly string[]): Phase
  * unread palette marks NOTHING rather than un-marking something, because the
  * run-time gate is server-side and unconditional either way (D-185-09). Every
  * shipped caller that omits it therefore projects exactly as it did before.
+ *
+ * `options.nameContext` (Phase 187 / D-187-05) reads the SAME way, and for the same
+ * reason. `folder_scope` and `skill_ref` store resolved UUIDs and the template lives on
+ * the DEFINITION, so the config-derived node face cannot be a function of the phase
+ * alone — it is a function of *(phase, injected name context)*. The id→name maps are
+ * therefore passed IN so this module stays PURE: it fetches nothing and hardcodes
+ * nothing. It is OPTIONAL and defaults to EMPTY, and that default is the safe direction
+ * stated out loud: an absent map makes the derived tier MISS and renders the generic
+ * type sentence, never a fabricated or id-shaped face. Every shipped caller that omits
+ * it therefore projects exactly as it did before.
  */
 export interface ToCanvasOptions {
   /** The server-supplied KB-reading tool names. Absent or empty marks nothing. */
   kbTools?: readonly string[]
+  /** The page-owned folder/skill id→name maps and the definition's template filename.
+   *  Absent or empty ⇒ every derived tier misses and the type sentence renders. */
+  nameContext?: NameContext
 }
 
 /** Module-scope so an omitted `kbTools` hands the same reference on every call —
  *  the projection must be deterministic to the byte (the snapshot gate depends
  *  on it) and a fresh `[]` per call is a needless identity change. */
 const NO_KB_TOOLS: readonly string[] = Object.freeze([])
+
+/** Module-scope for exactly the reason above: an omitted `nameContext` must hand the
+ *  SAME reference on every call, because the projection has to be deterministic to the
+ *  byte and a fresh `{}` per call is a needless identity change the snapshot gate would
+ *  see. The `NO_KB_TOOLS` idiom, applied to the second injected lookup. */
+const NO_NAME_CONTEXT: NameContext = Object.freeze({})
 
 export function toCanvas(
   phases: PhaseSpecJSON[],
@@ -328,6 +358,7 @@ export function toCanvas(
   const nodes: CanvasNode[] = []
   const edges: CanvasEdge[] = []
   const kbTools = options.kbTools ?? NO_KB_TOOLS
+  const nameContext = options.nameContext ?? NO_NAME_CONTEXT
 
   if (!phases || phases.length === 0) return { nodes, edges }
 
@@ -345,7 +376,7 @@ export function toCanvas(
   // node: the ×N fan-out is a RUNTIME behaviour, not topology, and drawing N lanes
   // would disagree with the server's adjacency.
   for (const [col, phase] of ordered.entries()) {
-    const data = buildPhaseData(phase, kbTools)
+    const data = buildPhaseData(phase, kbTools, nameContext)
     nodes.push({
       id: phase.slug,
       type: CANVAS_NODE_TYPES.phase,
