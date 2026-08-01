@@ -139,8 +139,34 @@ export const AUTOSAVE_DEBOUNCE_MS = 1000
  * ONE OF TWO SENTENCES ON ONE MECHANISM. This string has exactly ONE HOME: the page
  * renders it and must not re-declare it. Two spellings of a locked string is how a locked
  * string stops being locked (the `SAVED_STILL_A_DRAFT` docblock's rule, inherited).
+ *
+ * ⚠ IT PROMISES A FLUSH, SO IT IS ONLY TRUE WHERE ONE HAPPENS. Do not render this on a
+ * surface where `enabled` is false — `HOLD_PUBLISHING_MANUAL` below is the honest spelling
+ * for that case, and `holdReason` picks between them. See its docblock for why.
  */
 export const HOLD_PUBLISHING = "Publishing — changes will save when it finishes"
+
+/**
+ * THE SAME HOLD, SAID HONESTLY ON A SURFACE WHERE THE FLUSH WILL NOT HAPPEN (186-13, WR-04).
+ *
+ * `HOLD_PUBLISHING` above PROMISES an automatic flush, and after 186-13 gated the
+ * hold-release effect on `enabled` (D-181-01 — no automatic write past the revert switch)
+ * that flush does not happen when the canvas flag is off. Using one sentence for both
+ * surfaces would make the surface promise something the loop will not do: a receipt in the
+ * future tense, for a save that is never coming. So the flag-off spelling INSTRUCTS instead
+ * of promising, and it names the way out — the Save-draft button is still there and still
+ * works the moment the gauntlet resolves.
+ *
+ * READ THIS AS ONE MECHANISM WITH A THIRD STRING, NOT AS A SECOND MECHANISM. D-186-12's
+ * rule is *"Do not build two"* holds, and this does not build one: there is still exactly
+ * one `holdRef`, one release effect and one `{kind:"held"}` state. What changed is that the
+ * sentence the single mechanism carries is now selected on the same input that decides
+ * whether the flush happens, which is the only way the two can agree.
+ *
+ * ONE HOME, same rule as its neighbours: the page renders it and must not re-declare it.
+ */
+export const HOLD_PUBLISHING_MANUAL =
+  "Publishing — not saved; press Save draft again when it finishes"
 
 /**
  * D-186-04 — a definition whose SHAPE the server could not read is held rather than
@@ -395,12 +421,23 @@ export function useDraftPersistence(args: DraftPersistenceArgs): DraftPersistenc
    * a check to complete would stall autosave for as long as the network is slow, which
    * turns a degraded check into lost work. The authoritative backstop for a shape that
    * really is unreadable is the write's own 422, which lands on the same sentence.
+   *
+   * ── THE PUBLISH SENTENCE READS `enabled`, AND THAT IS THE POINT (186-13, WR-04) ───
+   *
+   * The publish branch's sentence is a claim about what this loop will do when the hold
+   * releases, and after 186-13 that is exactly what `enabled` decides — so the sentence and
+   * the flush take the SAME input, and cannot disagree. Promise when the loop will flush,
+   * instruction when it will not.
+   *
+   * The `unreadable` branch is deliberately UNCHANGED: `HOLD_UNREADABLE` ("Not saved — we
+   * can't read this shape yet") promises nothing about a future write, so it is already
+   * honest on both surfaces and a second spelling of it would be two strings for one fact.
    */
   const holdReason = useMemo<string | null>(() => {
-    if (publishInFlight) return HOLD_PUBLISHING
+    if (publishInFlight) return enabled ? HOLD_PUBLISHING : HOLD_PUBLISHING_MANUAL
     if (validationCause === "unreadable") return HOLD_UNREADABLE
     return null
-  }, [publishInFlight, validationCause])
+  }, [publishInFlight, validationCause, enabled])
 
   /**
    * The write loop. `store` is the page's per-mount factory instance and never changes, so

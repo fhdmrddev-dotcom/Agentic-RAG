@@ -29,6 +29,7 @@ import {
   useDraftPersistence,
   AUTOSAVE_DEBOUNCE_MS,
   HOLD_PUBLISHING,
+  HOLD_PUBLISHING_MANUAL,
   HOLD_UNREADABLE,
   SAVE_FAILED_SENTENCE,
   PUBLISHED_CONFLICT_MESSAGE,
@@ -758,6 +759,33 @@ describe("useDraftPersistence — F20: with the canvas flag OFF the loop writes 
     expect(mockedUpdate).toHaveBeenCalledTimes(1)
     expect(sentDefinition(0).phases).toHaveLength(4)
     expect(h.markSaved).toHaveBeenCalledTimes(1)
+  })
+
+  it("F20e — the hold SENTENCE promises a flush only where one will happen (WR-04)", async () => {
+    // The two spellings take the SAME input as the flush itself, which is the only way they
+    // can agree. Asserted as an INEQUALITY as well as two equalities, the way F8's published
+    // branch asserts `PUBLISHED_CONFLICT_MESSAGE !== SAVE_FAILED_SENTENCE`: two constants
+    // that happened to hold the same string would pass both equalities and prove nothing.
+    expect(HOLD_PUBLISHING_MANUAL).not.toBe(HOLD_PUBLISHING)
+    mockedUpdate.mockResolvedValue(write("T1"))
+
+    const on = harness()
+    on.set({ publishInFlight: true })
+    on.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+    // Flag ON, the loop WILL flush on release — so a promise is the truth.
+    expect(stateOf(on.view)).toEqual({ kind: "held", sentence: HOLD_PUBLISHING })
+
+    const off = harness({ enabled: false })
+    off.set({ publishInFlight: true })
+    let ok = true
+    await act(async () => {
+      ok = await off.view.result.current.saveNow()
+    })
+    // Flag OFF, the loop will NOT flush (F20a/F20b) — so the same promise would be a false
+    // receipt in the future tense, and the sentence instructs instead.
+    expect(ok).toBe(false)
+    expect(stateOf(off.view)).toEqual({ kind: "held", sentence: HOLD_PUBLISHING_MANUAL })
   })
 
   it("F20d — the hold READING is still reachable flag-off: Save reports it rather than saving", async () => {

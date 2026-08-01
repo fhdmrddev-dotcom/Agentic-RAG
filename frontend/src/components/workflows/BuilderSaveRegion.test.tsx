@@ -27,7 +27,7 @@ import { render, screen } from "@testing-library/react"
 
 import { BuilderSaveRegion } from "./BuilderSaveRegion"
 import { SAVED_STILL_A_DRAFT } from "./builderStore"
-import type { PersistState } from "@/hooks/useDraftPersistence"
+import { HOLD_PUBLISHING_MANUAL, type PersistState } from "@/hooks/useDraftPersistence"
 
 /**
  * Every prop, defaulted to REST. Each test overrides only what it is about, so a test that
@@ -59,6 +59,14 @@ function renderRegion(
 }
 
 const CONFLICTED: PersistState = { kind: "conflict", currentToken: "T-SERVER" }
+
+/**
+ * The REAL flag-off hold sentence, imported rather than invented. The component authors no
+ * copy and selects nothing — the hook picks between `HOLD_PUBLISHING` and this one on
+ * `enabled` — so using the actual string makes these assertions the end-to-end claim: the
+ * exact words a person on the flag-off surface receives when they press Save mid-publish.
+ */
+const HELD_SENTENCE = HOLD_PUBLISHING_MANUAL
 
 describe("BuilderSaveRegion — the conflict banner (D-186-08 · 186-12)", () => {
   it("a conflict renders the banner with Reload FIRST in DOM order, both controls live", () => {
@@ -115,12 +123,17 @@ describe("BuilderSaveRegion — the conflict banner (D-186-08 · 186-12)", () =>
   })
 })
 
-describe("BuilderSaveRegion — the quiet autosave line is flag-gated", () => {
+/**
+ * 186-13 (WR-04) — the flag gates AUTOSAVE NARRATING ITSELF, and nothing else.
+ *
+ * Both halves of that rule are asserted together on purpose. Before 186-13 the `held`
+ * sentence sat behind the same gate as `Saving…`/`Saved · just now`, so on the flag-off
+ * surface a Save-draft press during a publish reached `{kind:"held"}`, chose a sentence, and
+ * rendered nothing — a control that stated no outcome at all, which is worse than the
+ * pre-186 button it replaced. Asserting only the hiding half is what let that ship.
+ */
+describe("BuilderSaveRegion — the quiet line is flag-gated, but the HOLD is not (WR-04)", () => {
   it("`autosaveEnabled: false` hides the quiet line for BOTH `saving` and `saved`", () => {
-    // Pins the CURRENT behaviour, deliberately. 186-13 changes the `held` case (WR-04 — a
-    // Save-draft press during a publish currently looks like a control that did nothing)
-    // and will edit this file; `saving` and `saved` are not its subject and must not drift
-    // while it works.
     const saving = renderRegion({ state: { kind: "saving" }, autosaveEnabled: false })
     expect(screen.queryByTestId("builder-autosave-status")).toBeNull()
     // The BUTTON still reports the write — the flag gates the quiet line, not the control.
@@ -131,5 +144,45 @@ describe("BuilderSaveRegion — the quiet autosave line is flag-gated", () => {
     expect(screen.queryByTestId("builder-autosave-status")).toBeNull()
     // …and the 184-11 receipt beside it is NOT flag-gated, which is the distinction.
     expect(screen.getByTestId("builder-save-confirm")).toHaveTextContent(SAVED_STILL_A_DRAFT)
+  })
+
+  it("`autosaveEnabled: false` STILL renders the hold sentence — a press always states an outcome", () => {
+    // The sentence is the LOOP'S, verbatim. This component neither authors nor selects it:
+    // the hook picks HOLD_PUBLISHING or HOLD_PUBLISHING_MANUAL on the same `enabled` that
+    // decides whether the flush happens, and this asserts only that whatever it picked
+    // reaches the DOM on the surface where the quiet line does not.
+    renderRegion({ state: { kind: "held", sentence: HELD_SENTENCE }, autosaveEnabled: false })
+
+    expect(screen.getByTestId("builder-autosave-status")).toHaveTextContent(HELD_SENTENCE)
+  })
+
+  it("a hold renders through ONE span, on both surfaces", () => {
+    // There is one quiet-line element, not a second one added for the flag-off case: two
+    // homes for one reading is how two readings drift apart.
+    const off = renderRegion({
+      state: { kind: "held", sentence: HELD_SENTENCE },
+      autosaveEnabled: false,
+    })
+    expect(off.view.container.querySelectorAll('[data-testid="builder-autosave-status"]')).toHaveLength(1)
+    off.view.unmount()
+
+    const on = renderRegion({ state: { kind: "held", sentence: HELD_SENTENCE } })
+    expect(on.view.container.querySelectorAll('[data-testid="builder-autosave-status"]')).toHaveLength(1)
+    expect(screen.getByTestId("builder-autosave-status")).toHaveTextContent(HELD_SENTENCE)
+  })
+
+  it("at rest with the flag OFF the only control is Save draft, and no quiet line exists", () => {
+    // The guard on `header.test.tsx:305`. `held` is unreachable at rest — it needs a publish
+    // in flight or an unreadable verdict — so moving its branch ahead of the flag gate adds
+    // nothing to the resting markup. This is the assertion that would red if it ever did.
+    const { view } = renderRegion({ autosaveEnabled: false })
+
+    expect(screen.queryByTestId("builder-autosave-status")).toBeNull()
+    expect(screen.queryByTestId("builder-save-confirm")).toBeNull()
+    expect(screen.queryByTestId("builder-save-error")).toBeNull()
+    expect(screen.queryByTestId("builder-conflict-banner")).toBeNull()
+
+    const controls = [...view.container.querySelectorAll("button")]
+    expect(controls).toEqual([screen.getByTestId("builder-save-draft")])
   })
 })

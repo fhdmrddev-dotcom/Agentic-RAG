@@ -20,8 +20,12 @@
  *   saving   → the button's own spinner + the quiet line
  *   saved    → `Saved · still a draft` (the locked 184 wording) + the quiet line, and BOTH
  *              retire the instant `dirty` is true again
- *   held     → the loop's hold sentence, on the quiet line — nothing was refused and the
- *              person is not being asked to do anything except wait
+ *   held     → the loop's hold sentence, on the quiet line — nothing was refused, and what
+ *              the person is asked to do next depends on whether the loop will flush for
+ *              them (it says "wait" when it will, and "press Save again" when it will not).
+ *              RENDERED ON EVERY SURFACE, unlike the two readings above it: `held` describes
+ *              the outcome of an explicit Save press as much as autosave's, so it is not
+ *              part of what the canvas flag hides (186-13, WR-04).
  *   error    → the loop's refusal sentence, in the alert span beside the button
  *   conflict → the banner, which is the only reading that carries controls
  *
@@ -73,10 +77,17 @@ export interface BuilderSaveRegionProps {
   /** The store's dirty flag. It OUTRANKS a `saved` reading — see `receiptVisible`. */
   dirty: boolean
   /**
-   * Is the autosave loop actually running on this surface? The quiet line describes
-   * autosave, so with the loop off it must not appear: D-181-01 promises a flag-off header
-   * identical to the one that shipped, and `WorkflowBuilderPage.header.test.tsx` pins that
-   * header as literal markup. The explicit Save button is unaffected either way.
+   * Is the autosave loop actually running on this surface? `Saving…` and `Saved · just now`
+   * describe AUTOSAVE NARRATING ITSELF, so with the loop off they must not appear: D-181-01
+   * promises a flag-off header identical to the one that shipped, and
+   * `WorkflowBuilderPage.header.test.tsx` pins that header as literal markup.
+   *
+   * IT DOES NOT GATE `held` (186-13, WR-04). A hold is the outcome of an explicit Save press
+   * as much as of an autosave beat, and the press is available on every surface — so gating
+   * the sentence made the flag-off button look like a control that did nothing at all.
+   * Nothing about the resting header changes: `held` is unreachable at rest.
+   *
+   * The explicit Save button itself is unaffected either way.
    */
   autosaveEnabled: boolean
   /**
@@ -107,15 +118,33 @@ export function BuilderSaveRegion({
    * by the next change, not by a clock.
    */
   const receiptVisible = state.kind === "saved" && !dirty
+  /**
+   * `held` IS EVALUATED BEFORE THE FLAG GATE, and the order is the fix (186-13, WR-04).
+   *
+   * It used to sit behind `!autosaveEnabled ? null`, which made a Save-draft press during a
+   * publish a completely silent no-op on the flag-off surface: the loop reached
+   * `{kind:"held"}`, chose a sentence, and nothing rendered it. A control that states no
+   * outcome is worse than the pre-186 button it replaced.
+   *
+   * The other two readings stay behind the flag because of what they DESCRIBE. `Saving…` and
+   * `Saved · just now` are the autosave loop narrating itself, and with the flag off that
+   * loop genuinely is not running. `held` is not about autosave: it is the outcome of
+   * something the person just did, and it is reachable on any surface because the Save
+   * button and the Publish door are both mounted on any surface.
+   *
+   * Nothing is added to the RESTING markup by this: `held` is only reachable while a publish
+   * is in flight or a shape check came back unreadable, so the flag-off header at rest is
+   * still the one `WorkflowBuilderPage.header.test.tsx:305` pins byte for byte.
+   */
   const quietLine =
-    !autosaveEnabled
-      ? null
-      : saving
-        ? AUTOSAVE_SAVING
-        : receiptVisible
-          ? AUTOSAVE_SAVED
-          : state.kind === "held"
-            ? state.sentence
+    state.kind === "held"
+      ? state.sentence
+      : !autosaveEnabled
+        ? null
+        : saving
+          ? AUTOSAVE_SAVING
+          : receiptVisible
+            ? AUTOSAVE_SAVED
             : null
 
   return (
