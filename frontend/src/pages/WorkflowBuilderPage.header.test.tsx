@@ -471,3 +471,277 @@ describe("Builder header — the canvas gate is defined ONCE (D-184.1-04)", () =
     expect(doorSwitchSource).toMatch(/inline \? \{ headerLead, headerTrail/)
   })
 })
+
+// ══════════════════════════════════════════════════════════════════════════════════
+// 186-08 / F16 — THE BINDING IS A CONTROL, AND WHAT IT SAYS IS NEVER A VERDICT.
+//
+// BUG-260731-03 (severity `blocking`): a workflow's knowledge base could be chosen ONLY
+// on the pre-draft describe screen. Two of the three creation paths never offered the
+// choice at all, the default is whole-KB retrieval, and the only in-product repair was
+// regeneration — which discards the authored canvas. D-186-15 promotes the shipped
+// display-only `📁 <folder>` header chip into the picker that already exists.
+//
+// WHAT THIS BLOCK IS ACTUALLY GUARDING. The control half is the easy half. The dangerous
+// half is D-186-16: the unbound state must state a CONSEQUENCE and claim NOTHING. A
+// client-authored sentence that leaks into `blockedReason` makes an unbound workflow
+// unpublishable — which is Phase 187's call under D-186-14, not this phase's — and a
+// client that computes a severity or a code is the D-182-06 red line. So every case
+// below measures the chip AGAINST A CONTROL RENDER rather than against a hardcoded
+// expectation, and the source fence is proved in both directions before it is trusted.
+//
+// Appended; nothing above this line was edited when 186-08 landed. The flag-off markup
+// pin at the top of this file therefore still passes UNEDITED, which is the evidence
+// that the promoted control is gated (see the SUMMARY's D-181-01 note).
+// ══════════════════════════════════════════════════════════════════════════════════
+
+import { UNBOUND_KB_INVITATION } from "./WorkflowBuilderPage"
+import phaseFormPanelSource from "@/components/workflows/PhaseFormPanel?raw"
+import apiSource from "@/lib/api?raw"
+import nodePresentationSource from "@/components/workflows/nodePresentation?raw"
+
+const FOLDER_ID = "75755ec9-5ba7-495b-ad93-7500011cf6f2"
+const FOLDER_NAME = "Project Meridian — Risks"
+
+/** The same draft, BOUND — the control every neutrality case is measured against. */
+const boundDraftRow = {
+  ...draftRow,
+  definition: { ...definition, project_folder_id: FOLDER_ID },
+}
+
+/** A draft with NO steps — the shipped `EMPTY_DRAFT_INVITATION` path, used purely as a
+ *  SENSITIVITY CONTROL: it proves `publishReading()` below can actually detect a reason
+ *  reaching the publish seam, so "the two readings are equal" means something. */
+const emptyDraftRow = { ...draftRow, definition: { ...definition, phases: [] } }
+
+/** What the promoted chip actually SAYS — the SELECTED option's words.
+ *  Not `textContent`: a `<select>` carries every choice it offers in its text, so the
+ *  whole-chip reading would claim the surface says "No knowledge base · searches
+ *  everything" even while a folder is bound. */
+function chipReading(): string {
+  const sel = screen.getByTestId("project-folder-picker") as HTMLSelectElement
+  return sel.options[sel.selectedIndex]?.textContent ?? ""
+}
+
+/** Every element whose OWN text is the invitation. Used to prove the sentence renders in
+ *  exactly ONE place on the whole surface — the assertion "it is not in the tray" cannot
+ *  make on its own, because it would pass for a tray that simply is not mounted. */
+function invitationSites(container: Element): Element[] {
+  return Array.from(container.querySelectorAll("*")).filter(
+    (el) => el.children.length === 0 && (el.textContent ?? "").includes(UNBOUND_KB_INVITATION),
+  )
+}
+
+/** The publish seam's rendered state, as one comparable string. `blockedReason` reaches
+ *  the DOM as `disabled` + `aria-describedby` on the trigger and as a sibling reason
+ *  element, so this reading changes the moment anything joins it. */
+function publishReading(): string {
+  const trigger = screen.getByTestId("publish-trigger")
+  const reasons = screen.queryAllByTestId("publish-blocked-reason")
+  return [
+    normalise(trigger.outerHTML).replace(/aria-describedby="[^"]*"/, 'aria-describedby="«id»"'),
+    `reasons=${reasons.length}`,
+    reasons.map((r) => normalise(r.textContent ?? "")).join("|"),
+    `tray=${screen.queryAllByTestId("problems-tray-message").length}`,
+  ].join(" · ")
+}
+
+/** Comments stripped, so a fence over CODE cannot be tripped by the prose that explains
+ *  it. The `useGroundingBundle.test.ts:294-316` warning, applied: a blanket grep would
+ *  forbid the constant's own docblock from naming the very seams it exists to stay out
+ *  of. Line comments are matched only at line start, so a `//` inside a string survives. */
+function stripComments(src: string): string {
+  return src.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/^\s*\/\/.*$/gm, " ")
+}
+
+/** TRUE when the invitation has escaped the chip into the verdict surface — inside the
+ *  `blockedReason` memo, or on a line of code that also names the verdict vocabulary. */
+function invitationEscapes(src: string): boolean {
+  const code = stripComments(src)
+  const anchor = code.indexOf("const blockedReason = useMemo")
+  if (anchor === -1) return true // the anchor moved: fail CLOSED rather than pass blind
+  const memoBody = code.slice(anchor, anchor + code.slice(anchor).indexOf("}, ["))
+  if (memoBody.includes("UNBOUND_KB_INVITATION")) return true
+  return code
+    .split("\n")
+    .some(
+      (line) =>
+        line.includes("UNBOUND_KB_INVITATION") &&
+        /verdicts|groupVerdicts|blockedReason|severity/.test(line),
+    )
+}
+
+describe("186-08 / F16 — the KB binding is a CONTROL on the built canvas (D-186-15)", () => {
+  it("an UNBOUND drafted workflow says what unbound MEANS", async () => {
+    await openDraftBuilder(FLAG_ON)
+    expect(chipReading()).toContain(UNBOUND_KB_INVITATION)
+    // The consequence, not the state — pinned as a literal exactly ONCE, here, so a
+    // re-wording has to be deliberate. "Unbound" sounds harmless; this is what happens.
+    expect(UNBOUND_KB_INVITATION).toBe("No knowledge base · searches everything")
+  })
+
+  it("the chip IS the picker — one control, and the author can reach it after drafting", async () => {
+    mockListFolders.mockResolvedValue([{ id: FOLDER_ID, name: FOLDER_NAME }])
+    await openDraftBuilder(FLAG_ON)
+    const picker = (await screen.findByTestId("project-folder-picker")) as HTMLSelectElement
+    expect(picker.tagName).toBe("SELECT")
+    expect(picker.value).toBe("")
+    // Every folder the author can reach is offered, and so is "none".
+    await waitFor(() =>
+      expect(Array.from(picker.options).map((o) => o.value)).toEqual(["", FOLDER_ID]),
+    )
+  })
+
+  it("a BOUND workflow reads its folder NAME, never a UUID, and stops inviting", async () => {
+    mockListFolders.mockResolvedValue([{ id: FOLDER_ID, name: FOLDER_NAME }])
+    mockListDrafts.mockResolvedValue([boundDraftRow])
+    const { container } = await openDraftBuilder(FLAG_ON)
+    await waitFor(() => expect(chipReading()).toBe(FOLDER_NAME))
+    expect(chipReading()).not.toContain(FOLDER_ID)
+    expect(invitationSites(container)).toHaveLength(1) // the offered option, unselected
+    expect(chipReading()).not.toContain(UNBOUND_KB_INVITATION)
+  })
+
+  it("choosing a knowledge base WRITES the binding and ARMS the guard (F14, page level)", async () => {
+    // The whole chain in one assertion: the call site reaches `setProjectFolder` (which
+    // writes `meta.project_folder_id` AND `dirty` in one act, 186-04), the armed `dirty`
+    // opens the autosave loop's gate (186-06), and the binding lands on the wire through
+    // the very save path this phase rebuilt. A binding that did not arm `dirty` would
+    // never be written and this would time out.
+    mockListFolders.mockResolvedValue([{ id: FOLDER_ID, name: FOLDER_NAME }])
+    mockUpdate.mockResolvedValue({ id: "draft-1", version: 1, token: "tok-2" })
+    await openDraftBuilder(FLAG_ON)
+    fireEvent.change(await screen.findByTestId("project-folder-picker"), {
+      target: { value: FOLDER_ID },
+    })
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalled(), { timeout: 5000 })
+    const body = mockUpdate.mock.calls[0][1] as { project_folder_id?: string }
+    expect(body.project_folder_id).toBe(FOLDER_ID)
+  })
+})
+
+describe("186-08 / F16 — the invitation is an INVITATION, never a verdict (D-186-16)", () => {
+  it("renders in exactly ONE place on the whole surface — the chip", async () => {
+    const { container } = await openDraftBuilder(FLAG_ON)
+    const sites = invitationSites(container)
+    expect(sites).toHaveLength(1)
+    expect(sites[0].tagName).toBe("OPTION")
+    expect(sites[0].closest("select")?.getAttribute("data-testid")).toBe("project-folder-picker")
+  })
+
+  it("leaves the verdict surface BYTE-IDENTICAL to a bound control render", async () => {
+    // Measured against a control render rather than against a hardcoded expectation: the
+    // question is not "is the publish seam blocked" (it is not, in either) but "does being
+    // unbound CHANGE anything the verdict surface says". The tray count rides along; in
+    // the spine view it is 0 on both sides, and the load-bearing half of this comparison
+    // is the publish seam, which is where an escaped sentence would actually surface.
+    mockListFolders.mockResolvedValue([{ id: FOLDER_ID, name: FOLDER_NAME }])
+    mockListDrafts.mockResolvedValue([boundDraftRow])
+    await openDraftBuilder(FLAG_ON)
+    const bound = publishReading()
+    cleanup()
+
+    mockListDrafts.mockResolvedValue([draftRow])
+    await openDraftBuilder(FLAG_ON)
+    expect(publishReading()).toBe(bound)
+    expect(publishReading()).not.toContain(UNBOUND_KB_INVITATION)
+  })
+
+  it("that comparison is a REAL measurement — a shipped reason DOES change the reading", async () => {
+    // The positive control for the case above. `EMPTY_DRAFT_INVITATION` is the shipped
+    // path that legitimately reaches `blockedReason`, so if the reading could not tell
+    // these two apart it would be measuring nothing.
+    mockListDrafts.mockResolvedValue([draftRow])
+    await openDraftBuilder(FLAG_ON)
+    const normal = publishReading()
+    cleanup()
+
+    mockListDrafts.mockResolvedValue([emptyDraftRow])
+    await openDraftBuilder(FLAG_ON)
+    const blocked = publishReading()
+    expect(blocked).not.toBe(normal)
+    expect(blocked).toContain("Add a step to get started")
+  })
+
+  it("carries NO severity word and NO severity tone — read out of the shipped sources", async () => {
+    // The vocabulary is EXTRACTED, never retyped: a token renamed in the product renames
+    // it here in the same commit, and a fence that has drifted from the thing it fences
+    // is worse than none.
+    // The WORDS: the wire union, from the `Verdict` type in the API client.
+    const union = /severity:\s*((?:"[a-z_]+"\s*\|\s*)*"[a-z_]+")/.exec(apiSource)?.[1] ?? ""
+    const severityWords = [...union.matchAll(/"([a-z_]+)"/g)].map((m) => m[1])
+    // The TONES: the paint the HARD severity wears, from `VERDICT_MARK.error`. Only the
+    // hard mark — the soft one is deliberately painted in the neutral tokens this chip
+    // also uses, so asserting against those would forbid the chip from being quiet.
+    const errorMark = nodePresentationSource.slice(
+      nodePresentationSource.indexOf("  error: {"),
+      nodePresentationSource.indexOf("  incomplete: {"),
+    )
+    const severityTones = (/className:\s*"([^"]+)"/.exec(errorMark)?.[1] ?? "")
+      .split(/\s+/)
+      .filter((t) => t.includes("-") && t !== "border-border")
+    // The extraction itself is controlled — an empty vocabulary would make every
+    // assertion below vacuously true.
+    expect(severityWords.length).toBeGreaterThan(0)
+    expect(severityTones.length).toBeGreaterThan(0)
+
+    await openDraftBuilder(FLAG_ON)
+    const chip = screen.getByTestId("builder-bound-folder")
+    const said = chipReading()
+    const painted = chip.outerHTML
+    for (const word of severityWords) expect(said).not.toContain(word)
+    for (const tone of severityTones) expect(painted).not.toContain(tone)
+  })
+})
+
+describe("186-08 / F16 — the source fence, proved in BOTH directions", () => {
+  it("the invitation never enters blockedReason, verdicts or groupVerdicts", () => {
+    expect(invitationEscapes(builderSource)).toBe(false)
+  })
+
+  it("the fence FINDS a planted escape (the positive control)", () => {
+    const planted = builderSource.replace(
+      "if (phases.length === 0) return EMPTY_DRAFT_INVITATION",
+      "if (phases.length === 0) return UNBOUND_KB_INVITATION",
+    )
+    expect(planted).not.toBe(builderSource) // the plant actually landed
+    expect(invitationEscapes(planted)).toBe(true)
+  })
+
+  it("and LEAVES the constant's own docblock alone (the negative control)", () => {
+    // The real source already contains a docblock line naming BOTH the constant and
+    // `blockedReason` — that line is why this fence strips comments, and the case above
+    // passing on the real source is the proof. Restated synthetically so the control is
+    // legible even if the docblock is later reworded.
+    const proseOnly = [
+      "/**",
+      " * `UNBOUND_KB_INVITATION` must never join `blockedReason`, enter `verdicts`,",
+      " * reach `groupVerdicts` or carry a `severity`. It is a fact, not a finding.",
+      " */",
+      'export const UNBOUND_KB_INVITATION = "No knowledge base · searches everything"',
+      "const blockedReason = useMemo(() => {",
+      "  if (phases.length === 0) return EMPTY_DRAFT_INVITATION",
+      "  return null",
+      "}, [phases])",
+    ].join("\n")
+    expect(invitationEscapes(proseOnly)).toBe(false)
+  })
+})
+
+describe("186-08 — the UNBIND premise: no authoring control writes folder_scope", () => {
+  it("PhaseFormPanel renders folder_scope, and writes it nowhere (D-186-17, unbind half)", () => {
+    // The whole unbind decision rests on this. A phase declaring `folder_scope` on a
+    // workflow with no `project_folder_id` raises a raw 422 at the shape tier
+    // (`_folder_scope_requires_project`), which under D-186-04's hold-the-write rule
+    // would leave a permanently unsaveable draft. Unbinding is therefore allowed and
+    // proven UNREACHABLE-to-harm rather than refused client-side — a client-side refusal
+    // would be the client computing a validation rule, which D-182-06 forbids.
+    const code = stripComments(phaseFormPanelSource)
+    // It is genuinely there, as a READ — otherwise this test would pass on a file that
+    // had simply stopped mentioning the field.
+    expect(code).toMatch(/cfg\.folder_scope/)
+    // …and nowhere as a WRITE, in any of the three shapes this panel spells a write in.
+    expect(code).not.toMatch(/set\(\s*["']folder_scope["']\s*\)/)
+    expect(code).not.toMatch(/onChange\(\s*\{[^}]*folder_scope/)
+    expect(code).not.toMatch(/folder_scope\s*:/)
+  })
+})

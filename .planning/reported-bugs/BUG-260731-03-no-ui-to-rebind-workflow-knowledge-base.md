@@ -256,3 +256,69 @@ corpora, with no author-time warning, and with the one gate designed to stop it 
 non-deterministically waved it through. The output is a plausible, well-formatted,
 correctly-cited report about the wrong documents — the hardest class of wrong to notice
 downstream.
+
+---
+
+## UPDATE 2026-08-01 — the CONTROL half shipped (Phase 186, plan 08). Status stays `folded`.
+
+**This report is NOT closed, and the frontmatter is deliberately unchanged.** Its own
+`re_open_trigger` says so: 186 closes only the repair path. `status` remains `folded`,
+`folded_into` remains `"186 (control) / 187 (verdict)"`, and `verified_closed_by` remains
+`null`.
+
+### What shipped (commit `99aa0c7e`, `frontend/src/pages/WorkflowBuilderPage.tsx`)
+
+Per D-186-15, the display-only `📁 <folder>` header chip is now the **picker** — the same
+project-folder select the describe screen already renders, at a second mount point, over
+the same folder list (already fetched on mount, so no new request). An author can bind or
+re-bind a knowledge base **after** drafting, from the built canvas, without regenerating
+and without losing canvas edits. Per D-186-16 an unbound workflow now renders an explicit
+state that names the consequence rather than the state:
+
+> **No knowledge base · searches everything**
+
+It is an INVITATION, not a verdict — no severity, no code, no problems-tray row, no node
+mark, and it does **not** join `blockedReason`, so an unbound workflow is still
+publishable. That deliberate omission is the other half of the split (below).
+
+The binding persists through the autosave path this phase rebuilt: the picker's `onChange`
+calls `setProjectFolder`, which writes `meta.project_folder_id` **and** arms `dirty` in one
+act, so the leave guard fires and the debounced PATCH carries the binding.
+
+### What was verified, and what was NOT
+
+**Verified by automated test** (`WorkflowBuilderPage.header.test.tsx`, 15 → 27 cases,
+observed RED before the implementation and GREEN after):
+
+- an unbound drafted workflow renders the sentence above;
+- the chip is a real `<select>` offering every folder the author can reach, plus "none";
+- a bound workflow reads its folder **NAME**, never a UUID;
+- choosing a folder ends in `updateWorkflowDraft` carrying `project_folder_id` — the
+  binding reaches the wire through the shipped save path;
+- the sentence renders in exactly **one** place on the whole surface, carries no severity
+  word and no severity tone (both extracted from the shipped sources, not retyped), and
+  leaves the publish seam **byte-identical** to a bound control render.
+
+**NOT verified.** No live browser run, no live DB row, no golden run, no judge. This entry
+records what the automated suite proved, not that the operator's original scenario has been
+re-driven end to end. The lived-experience check (G-4) belongs to the phase's UAT.
+
+**Reachability caveat.** The control is gated on the `visual_workflow_canvas` flag, so that
+D-181-01's flag-off byte-identity promise (the v3.6 revert switch) still holds. With the
+flag **on** — which is how this bug was reported — all four Builder entry paths reach it:
+NL generate, fork a starter, tweak a published workflow, open a draft. With the flag
+**off**, the shipped display-only chip is unchanged and the repair path is still absent.
+Recorded with a re-open trigger in
+`.planning/phases/186-concurrency-autosave/deferred-items.md`.
+
+### What is still open — the reason this stays `folded`
+
+The deterministic build-time `/validate` `incomplete` verdict for an unbound retrieval
+workflow (**Phase 187**, SEED-132 envelope). 186 deliberately built no verdict: the repair
+path exists now, but nothing at author time still *tells* an author that an unbound
+retrieval workflow is a problem before a golden run is spent. Given §2 above — the judge
+passed a worse deliverable than it failed — that half is the necessary one.
+
+**Close this report only when BOTH are true:** an author can re-bind from every creation
+path (shipped, pending live confirmation), **and** an unbound retrieval workflow is caught
+deterministically on the canvas before a golden run is spent (Phase 187).
