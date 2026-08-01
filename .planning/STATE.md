@@ -109,6 +109,42 @@ literal assertions (`toHaveBeenCalledTimes(2)`, `toHaveLength(4)`, `.toBe("T1")`
 byte-identical; a scoped `git diff` showing changes only inside the helper body is the proof. A
 green suite with a weakened F17 FAILS the task.
 
+**▶ PLAN 186-15 EXECUTED 2026-08-01 — WR-11 and the WR-06 residue are CLOSED.** 3 tasks, 3 commits
+(`165b3e0e` / `03841bd0` / `c4870806`) plus `19329bf2` (SUMMARY). Two test files only — measured
+`git diff --stat e9f9c2fd..HEAD` = 2 files, 422 ins / 8 del. Zero migrations (head still `114_…`),
+zero dependency changes in either stack.
+- **WR-11**: the pane-click row now measures a call-count DELTA bracketed around the dismissal, with
+  its POSITIVE CONTROL in the same row (an explicit Save must show a delta ≥ 1). The ✕/Escape
+  siblings and all three `mockCreate` zeros are untouched — `toHaveBeenCalledTimes(0)` still appears
+  **12** times, and there is no `it.skip`/`xit` anywhere in the file. Count 23 → 23.
+- **WR-06 residue**: module `pytestmark` → four per-test `skipif(not PG_AVAILABLE, reason=
+  _LIVE_DB_REASON)` (the 186-11 precedent, reason byte-identical), plus **9 new DB-free tests** —
+  four at the route tier (`stale_token` / `already_published` / the codeless-404 collapse incl. an
+  UNRECOGNISED cause / `CheckViolationError`) and five at the db tier (all four return shapes, the
+  `token=None` defensive collapse, and the two SQL properties: `CONCURRENCY_TOKEN_SQL` in both the
+  WHERE and the RETURNING, `created_by = $2` on the probe, no bind ever a `datetime`).
+- Numbers: file **4 → 13 passed** live; **0 passed / 4 skipped → 9 passed / 4 skipped** with
+  `POSTGRES_DSN` unreachable. Verification trio **12 → 21 passed** live, **3 → 12 passed** no-DB.
+  Collection **3465 → 3474** (+9 exactly). Full backend suite **211 failed** both before AND after
+  (pre-plan baseline taken deliberately), passed **3228 → 3237**; no phase-186 file is among the
+  211 pre-existing failures.
+- **All new backend tests were FALSIFIED against real source with no database**: renaming the 409
+  detail's `token` key, giving the fail-closed 404 a machine code, and dropping `created_by = $2`
+  from the owner-scoped probe each turned exactly one new test RED. Every injection reverted
+  file-scoped; both source files verified clean.
+- ⚠ **THE PLAN'S REQUIRED RED DID NOT REPRODUCE, and was not fabricated.** The shipped WR-11 row
+  PASSED here in every configuration: **23/23 three times in isolation, 50/50 paired, 260/260 under
+  16-file parallel load** — matching 186-14's report and contradicting the re-verification's 22 + 1
+  (3/3). The diagnosis was confirmed anyway by INJECTING a 1500 ms pause between the pane appearing
+  and the click (standing in for a lazy import slower than the 1000 ms `AUTOSAVE_DEBOUNCE_MS`): the
+  shipped assertion then failed with the verifier's exact signature — `22 passed / 1 failed,
+  "expected +0 times, but got 1 times"` — while the new delta passed 23/23 under the same pause.
+  The positive control was itself falsified (snapshotting `mock.calls` instead of `.length` →
+  `expected 0 to be greater than or equal to 1`). **Conclusion: the 186-12 / 186-13 "passes in
+  isolation" claim was FALSE AS STATED — not because the row always failed, but because it was
+  asserted as a property of the ROW when it was a property of the machine and the vite cache. The
+  row had no true state; that was the defect. Quote none of these numbers without re-measuring.**
+
 **Decision-coverage gate skipped again** — same known parser quirk (CONTEXT.md uses `D-186-NN`,
 the gate matches literal `D-NN`). Verified by hand instead: the new plans cite D-181-01, D-186-01,
 -04, -07, -08, -09, -12 and D-182-06 in their `must_haves`.
@@ -1889,6 +1925,11 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase 186]: 186-14: **a banner may gain LINES; the sentence that OFFERS the exits may never be replaced.** The failed-exit explanation is an additive `builder-conflict-note` under the locked `CONFLICT_BANNER_MESSAGE`, deliberately NOT the `builder-save-error` span — that span is for a refused WRITE and this is a failed READ during a chosen resolution. Two situations in one element is how a sentence stops meaning one thing.
 - [Phase 186]: 186-14 (WR-07): halting docblocks should state a **TAXONOMY, not a count** — `isTerminalRefusal` said "there are exactly TWO halting causes" and a third (a published row, frozen by the `workflow_definitions_block_published_update` trigger) had been retrying forever. The axis that matters is whether the person has an IN-APP exit and, if not, whether the sentence names an out-of-app one: stale token → conflict + two exits; gone row → error, no exit, "copy what you need"; published row → error, no exit, "use Tweak". No re-assertion machinery was added: nothing overwrites that state for the session, so the answer stays on screen beside the button.
 - [Phase 186]: 186-14 (measurement lesson): **two of the plan's predicted REDs came up GREEN, and that changed the diagnosis rather than the fix.** The loop was always recoverable at the hook level (`reloadingRef` resets in `finally`); GAP-4 was a *reachability* defect — the SURFACE lost both controls, so no person could ever reach the second reload. A predicted RED that does not appear is evidence about the defect's shape, not a test to weaken.
+- [Phase 186]: 186-15 (WR-11): **an absolute count over an interval is a claim about the CLOCK, not about the action.** The pane-click row asserted `toHaveBeenCalledTimes(0)` across a window that included a 10 s wait for a lazily-imported canvas, while a real 1000 ms autosave debounce was already armed — so the row went red for the product WORKING. Fixed as a DELTA bracketed around the dismissal, not by fake timers (which would have changed the timing model of 22 other rows for the sake of one) and never by loosening or skipping. The sibling ✕/Escape rows keep their absolute assertions on purpose: they never cross the debounce, and that contrast is what identified the cause.
+- [Phase 186]: 186-15: **a delta assertion needs a positive control in the SAME test, or it is decoration.** A helper that cannot observe a PATCH makes its zero meaningless. The control wraps the same helper around an explicit Save (which bypasses debounce and dirty gate, so it needs no clock) and demands a delta ≥ 1. Falsified: snapshotting `mock.calls` instead of `.length` — the most likely way to break it — turns the control red immediately.
+- [Phase 186]: 186-15 (WR-06): **a module-level `pytestmark` hides every invariant in the file, including the ones that need no database.** `grep -rn "stale_token" backend/tests/` matched exactly one file and that file was wholly skipped without Postgres, so the server half of a two-sided wire contract was absent from any CI while the client half was covered only against a mock. The skip is now a property of the four tests that need a pool. 0 → 9 DB-free passes.
+- [Phase 186]: 186-15: **the fail-closed 404 was a claim in a comment and nothing else.** The route says "any cause this route does not recognise" collapses to the dull string 404; a DB-free test now drives an unrecognised cause and asserts its detail is EQUAL to the `not_found` one and is not a dict — a coded 404 would be an existence oracle (T-186-01-03). Falsified by giving the 404 a machine code.
+- [Phase 186]: 186-15 (measurement lesson, the second in two plans): **a claim that cannot be reproduced is not thereby false — reproduce the MECHANISM instead of picking a side.** The WR-11 row passed 6/6 here and failed 3/3 for the verifier. Rather than record either, the failure condition was injected (a 1500 ms pause standing in for a slow lazy import), which reproduced the verifier's exact signature and confirmed the diagnosis. The real defect was that the row's result depended on machine and cache state at all. Both numbers are recorded in the SUMMARY so no third reader inherits one on trust.
 
 ## Operator Next Steps
 
