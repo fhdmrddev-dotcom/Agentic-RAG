@@ -5,7 +5,7 @@ reported: 2026-07-31
 surface: Agentic-RAG
 severity: blocking
 status: folded
-affected_areas: [frontend/workflow-builder, backend/harness/scope, workflows/publish-gauntlet, RAG/retrieval-scope]
+affected_areas: [frontend/workflow-builder, backend/harness/scope, backend/api/validate, workflows/publish-gauntlet, RAG/retrieval-scope]
 folded_into: "186 (control) / 187 (verdict)"
 verified_closed_by: null
 related_seeds: [SEED-132, SEED-136]
@@ -322,3 +322,72 @@ passed a worse deliverable than it failed — that half is the necessary one.
 **Close this report only when BOTH are true:** an author can re-bind from every creation
 path (shipped, pending live confirmation), **and** an unbound retrieval workflow is caught
 deterministically on the canvas before a golden run is spent (Phase 187).
+
+---
+
+## UPDATE 2026-08-02 — the VERDICT half is planned and built (Phase 187, plan 03). Status stays `folded`.
+
+**Still not closed.** `status: folded`, `folded_into: "186 (control) / 187 (verdict)"`,
+`verified_closed_by: null` — unchanged, deliberately. Per this report's own
+`re_open_trigger`, closing needs BOTH halves *verified*, and neither has had its live
+confirmation yet: 186's re-bind control ships without a live browser run, and the verdict
+below ships without one either.
+
+### What was built (Phase 187, plan 03 — `backend/app/api/workflows.py`)
+
+Per **D-187-11**, `POST /workflows/validate` now mints a new finding:
+
+| | |
+|---|---|
+| Code | `unbound_retrieval` |
+| Severity | `incomplete` — "you are still building", never red "broken" |
+| Keying | **per node** — one verdict per offending phase, keyed to `phase.slug` |
+| Predicate | `definition.project_folder_id is None` **and** `grounding.grounding_cause(phase) == "detected"` |
+| Home | the **route's own** code (`_ROUTE_ASSIGNED_CODES`), stage 5 of `validate_workflow` |
+
+The predicate calls `grounding.grounding_cause` — the ONE home of the
+`available_tools ∩ KB_TOOLS` intersection (`grounding.py`, Phase 185). No local tool list
+was introduced, so the day a 6th KB tool is added to `KB_TOOLS` this check picks it up for
+free. The message states a fact and its consequence and nothing more: *"phase 'X' reads your
+documents, but this workflow is not bound to a knowledge base — it would search
+everything."* It never says "unsafe" and never says "blocked".
+
+### The deliberate decision NOT to put it in `grounding.grounding_verdicts`
+
+`grounding_verdicts` is **shared with publish** — plan 182-06 made the publish gate
+enforcing through that same collector. A rule added there would silently become a **hard
+publish blocker** in addition to a canvas verdict, changing what can be published. Phase 187
+is not scoped to change publish behaviour, so the check is minted in the `/validate` route,
+which is the only seam where a verdict can be canvas-only. `test_182_severity_codes.py` now
+asserts this directly: `unbound_retrieval` is in `_ROUTE_ASSIGNED_CODES` and in **neither**
+owning module's published code set, so the boundary fails a test rather than drifting.
+`test_182_publish_grounding_stage.py` is run as proof that publish classification is
+unchanged.
+
+### Why this blocks publish on the canvas anyway
+
+`blockedReason` (`frontend/src/pages/WorkflowBuilderPage.tsx:1093-1102`, measured
+2026-08-02) returns the first verdict's message verbatim for **any** `ok: false` response —
+`error` findings are merely ordered ahead of `incomplete` ones, so an `incomplete`-ONLY set
+still falls through to `validation.verdicts[0]` and yields a non-null reason. And
+`ValidateResponse.ok == (verdicts == [])` by construction, so one `incomplete` verdict is
+enough. The author is therefore told on the canvas, at edit time, before a golden run is
+ever spent — which is the half §2 above showed is the necessary one, because the publish
+judge passed a worse deliverable than it failed.
+
+Note the reachability boundary, honestly: `blockedReason` is gated on `canvasEnabled` and
+`builderPhase === "drafted"`. With `visual_workflow_canvas` **off**, the D-181-01 revert
+switch holds and this verdict reaches no UI — the same caveat the 186 entry recorded for
+the re-bind control.
+
+### What is NOT verified
+
+- **No live browser run.** No screenshot, no observed canvas verdict, no observed Publish
+  button state. Everything above is proven by unit tests against the route handler and by
+  reading the shipped `blockedReason` source.
+- **No live golden run**, no live judge, no live DB row. The original operator scenario has
+  not been re-driven end to end.
+- **No live confirmation of 186's control half either** — it was never obtained.
+
+Both are the phase's UAT (G-4 lived-experience). Flip this report to `closed` only after
+both halves have been observed in the product, not after a passing suite.
