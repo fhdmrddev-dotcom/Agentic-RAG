@@ -26,7 +26,10 @@
  *    renders as a BLOCK, never a pass; lint codes render the LOWERCASE literals.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { render, screen, waitFor, within } from "@testing-library/react"
+// Phase 186-16 adds `fireEvent`: the WR-10 rows below click a control that is expected to
+// be REFUSED, and `userEvent` asserts pointer-events on the target before it will act — so
+// a disabled button makes it throw rather than letting the suite measure "no request left".
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 // Phase 186-10 (WR-02): the F18 describe at the foot of this file reads the SERVER's own
 // source instead of trusting a transcribed list — via the SAME `?raw` loader the component
@@ -846,5 +849,113 @@ describe("PublishGauntlet — a draft that moved mid-gauntlet blocks at the Comm
 
     // And nothing is claimed as passed while the run is still in flight.
     expect(within(spine).queryAllByText("✓")).toHaveLength(0)
+  })
+})
+
+// --- Phase 186-16 (CONCUR-02, WR-10) — the INNER Publish is gated too ----------------
+//
+// The trigger has been refused by `blockedReason` since 184-11. The inner button was not:
+// it was gated on `goldenInput.trim().length > 0 && !loading` alone, and the modal can sit
+// open for as long as the author takes to write a golden input. That click is the one that
+// actually spends money — a gauntlet started on top of an outstanding autosave PATCH burns
+// a real golden run to reach a `draft_changed` refusal it was always going to get.
+//
+// EVERY ROW HERE DRIVES THE REASON IN WHILE THE MODAL IS ALREADY OPEN, via `rerender`. That
+// is not a convenience: with a reason supplied from the start the TRIGGER is disabled, so
+// the modal could not be opened at all. The open-then-blocked sequence is the real one, and
+// it carries its own positive control — the button is proven enabled first.
+describe("PublishGauntlet 186-16 — a gauntlet cannot START while a reason stands (WR-10)", () => {
+  /** Deliberately NOT the Builder's own sentence: the component neither authors nor
+   *  rewrites this string, so the suite proves passthrough rather than re-typing copy. */
+  const CALLER_REASON = "The caller's own sentence, rendered verbatim and never rewritten"
+
+  /** Open the modal and put a valid golden input in it — i.e. reach the exact state in
+   *  which the ONLY thing that may still refuse the click is the supplied reason. */
+  async function openAndArm() {
+    const user = userEvent.setup()
+    await openModal()
+    await user.type(screen.getByLabelText(/golden_input/i), "a representative kickoff")
+    const btn = screen.getByRole("button", { name: /run the gauntlet/i })
+    expect(btn).toBeEnabled() // the positive control, before anything is blocked
+    return { user, btn }
+  }
+
+  it("a reason arriving mid-modal disables Publish DESPITE a valid golden input, and says why INSIDE the modal", async () => {
+    const { rerender } = render(<PublishGauntlet definitionId="def-1" />)
+    const { btn } = await openAndArm()
+
+    rerender(<PublishGauntlet definitionId="def-1" blockedReason={CALLER_REASON} />)
+
+    expect(btn).toBeDisabled()
+    // R12: the explanation is REACHABLE from the control it disables. The trigger's own
+    // reason is behind the backdrop, so this element is not a duplicate — it is the only
+    // one an author inside the dialog can read.
+    const reason = screen.getByTestId("publish-inner-blocked-reason")
+    expect(reason.textContent).toBe(CALLER_REASON)
+    expect(btn.getAttribute("aria-describedby")).toBe(reason.getAttribute("id"))
+    // …and it is TEXT, not a tooltip (the shipped refusal-copy rule).
+    expect(btn.getAttribute("title")).toBeNull()
+  })
+
+  it("clicking the refused Publish issues NO publish request — the claim is that nothing left", async () => {
+    const { rerender } = render(<PublishGauntlet definitionId="def-1" />)
+    const { btn } = await openAndArm()
+    rerender(<PublishGauntlet definitionId="def-1" blockedReason={CALLER_REASON} />)
+
+    fireEvent.click(btn)
+    // Measured on the transport, not on the rendered outcome: a golden run's cost is
+    // spent the moment the request leaves, whatever the UI does afterwards.
+    expect(mockedPublish).not.toHaveBeenCalled()
+    // …and nothing was CLAIMED to be running either: `runGauntlet` returns before
+    // `setLoading(true)`, so the button never wears the in-flight label.
+    expect(btn.textContent).toBe("Publish ▸ run the gauntlet")
+  })
+
+  it("the reason CLEARING re-opens the gate — one click, exactly one request", async () => {
+    mockedPublish.mockResolvedValue({
+      kind: "verdict",
+      verdict: { published: true, version: 1, golden_run_id: "r1", blocked_stage: null, named_failures: [] },
+    } satisfies PublishOutcome)
+    const { rerender } = render(<PublishGauntlet definitionId="def-1" />)
+    const { btn } = await openAndArm()
+
+    rerender(<PublishGauntlet definitionId="def-1" blockedReason={CALLER_REASON} />)
+    expect(btn).toBeDisabled()
+
+    // The write landed; the Builder stops supplying a reason. This is what makes the row
+    // above a measurement of the GATE rather than of a permanently broken button.
+    rerender(<PublishGauntlet definitionId="def-1" blockedReason={null} />)
+    expect(btn).toBeEnabled()
+    expect(screen.queryByTestId("publish-inner-blocked-reason")).not.toBeInTheDocument()
+    expect(btn.getAttribute("aria-describedby")).toBeNull()
+
+    fireEvent.click(btn)
+    await waitFor(() => expect(mockedPublish).toHaveBeenCalledTimes(1))
+    expect(mockedPublish).toHaveBeenCalledWith("def-1", "a representative kickoff")
+  })
+
+  it("with NO blockedReason prop the inner control is the one that shipped", async () => {
+    // The guarantee every non-Builder call site rides on. The shipped assertions above
+    // cover the trigger; this is the inner half, stated explicitly.
+    render(<PublishGauntlet definitionId="def-1" />)
+    const { btn } = await openAndArm()
+
+    expect(screen.queryByTestId("publish-inner-blocked-reason")).not.toBeInTheDocument()
+    expect(btn.hasAttribute("aria-describedby")).toBe(false)
+    expect(screen.queryByTestId("publish-blocked-reason")).not.toBeInTheDocument()
+    expect(screen.getByTestId("publish-trigger")).toBeEnabled()
+  })
+
+  it("the emptiness test has ONE home — a whitespace-only reason blocks nothing, inner button included", async () => {
+    // A caller with nothing to say must not be able to disable the control by accident.
+    // The wrapper's `blocked` derivation is the single answer both controls read, so this
+    // is the same rule the trigger already obeys — not a second copy of it.
+    const { rerender } = render(<PublishGauntlet definitionId="def-1" />)
+    const { btn } = await openAndArm()
+
+    rerender(<PublishGauntlet definitionId="def-1" blockedReason="   " />)
+    expect(btn).toBeEnabled()
+    expect(screen.queryByTestId("publish-inner-blocked-reason")).not.toBeInTheDocument()
+    expect(screen.getByTestId("publish-trigger")).toBeEnabled()
   })
 })

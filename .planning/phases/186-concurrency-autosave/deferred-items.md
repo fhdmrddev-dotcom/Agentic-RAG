@@ -129,3 +129,59 @@ the ~42 and are pure noise.
 ---
 
 *Recorded: 2026-08-01 · Phase 186-concurrency-autosave, plan 09*
+
+---
+
+## The publish-time `flushPendingWrites()` seam — REJECTED, and not on cost
+
+**What is deferred:** having `runGauntlet` `await` a flush the persistence hook exposes, so
+stage 0 provably reads a token no outstanding PATCH can invalidate. 186-16 shipped the
+weaker-looking half instead: a **refusal** on the existing `blockedReason` seam.
+
+**Why the stronger fix is the wrong build here.**
+
+1. *It would be an automatic write past the revert switch.* `renderPublish` — and therefore
+   `PublishGauntlet` — is mounted **unconditionally** on the Builder header, on **both**
+   branches of the flag gate (`WorkflowBuilderPage.tsx`, the single `actionGroup` both the
+   flag-on and the flag-off header render). A flush called from `runGauntlet` would issue an
+   unrequested PATCH on the **flag-off** surface — exactly the leak 186-13 closed for the
+   hold release, and exactly what **D-181-01** (this milestone's HARD gate #1) exists to make
+   impossible. Re-gating the flush on `enabled` turns the guarantee back into a condition:
+   a conditional flush wearing a guarantee's clothes.
+2. *It would need a five-hop seam.* `WorkflowBuilderPage` → `WorkflowDoorSwitch` →
+   `WorkflowsPage` → `PublishGauntlet`, three of them pure pass-throughs, to carry a promise
+   the existing seam already carries as a fact.
+
+The refusal is also the vocabulary this phase speaks everywhere else — hold, and say why
+(D-186-04 / D-186-12). Waiting one round trip and pressing again costs the person less than
+an unrequested write costs the flag-off guarantee.
+
+**Re-open trigger:** the first `draft_changed` refusal observed in **live** use despite this
+gate (which would mean the ordering property in the memo's docblock does not hold in the
+field), **or** the first phase that gives the gauntlet a flag-aware seam of its own — at
+which point a flush can be awaited without writing on the reverted surface.
+
+---
+
+## Publish while the write loop is in `conflict` or `error` — NOT blocked by 186-16
+
+**What is deferred:** extending the same refusal to `persistState.kind === "conflict"` and
+`"error"`. 186-16 blocks **only** `saving`.
+
+**Why.** The conflict case is arguably worse than the one that was closed — the server holds
+a different definition than the screen does, so a publish there ships something the author is
+not looking at. But it is a **different finding**, it is not in this gap-closure round's
+operator-approved scope, and blocking it **changes what an author can do**: a draft with a
+stale sibling tab would become unpublishable until the conflict is resolved, which is a
+product decision rather than a race fix. `saving` is safe to block precisely because it is
+**bounded** — `performWrite`'s `finally` always clears `inFlightRef` and every terminal
+branch sets a non-`saving` state, so the block always ends by itself. `conflict` and `error`
+are not bounded; blocking on them can only be right if the surface also offers the way out.
+
+**Re-open trigger:** the first report of a publish shipping a definition the author had
+already been told was in conflict, **or** the phase that gives the conflict banner a
+publish-aware reading (i.e. the banner and the publish gate answering with one voice).
+
+---
+
+*Recorded: 2026-08-01 · Phase 186-concurrency-autosave, plan 16*

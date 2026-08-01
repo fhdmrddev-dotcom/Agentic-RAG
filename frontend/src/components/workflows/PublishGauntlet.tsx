@@ -121,6 +121,16 @@ export interface PublishGauntletProps {
    * THE WORDING IS THE CALLER'S. This component neither derives it nor rewrites it: the
    * page passes the server's own first message verbatim (or the plain invitation on an
    * empty draft). There is no severity, code or lint table anywhere in this file.
+   *
+   * ── PHASE 186-16 (WR-10): IT NOW GATES THE INNER PUBLISH TOO, NOT ONLY THE TRIGGER ──
+   * The modal can sit open for as long as the author takes to write a golden input, so
+   * the click that actually spends money is the INNER one — and it used to be checked
+   * against nothing but the input and `loading`. The finding that made that expensive:
+   * the Builder's hold stops NEW writes once a publish is running (D-186-12) but cannot
+   * recall one already outstanding, so an autosave PATCH committing after
+   * `publish_service.py` reads `stage0_token` makes that token dead on arrival — the
+   * stage-5 flip answers `draft_changed` only AFTER a real golden run has burned minutes
+   * and provider spend on a publish that could never have succeeded.
    */
   blockedReason?: string | null
 }
@@ -551,6 +561,8 @@ function GauntletContent({
   loading,
   setLoading,
   goldenInputRef,
+  blocked,
+  blockedReason,
 }: {
   definitionId: string
   definition?: DefShape | null
@@ -558,13 +570,26 @@ function GauntletContent({
   loading: boolean
   setLoading: (v: boolean) => void
   goldenInputRef: React.RefObject<HTMLTextAreaElement | null>
+  /** Phase 186-16 (WR-10) — the wrapper's DERIVED emptiness test, handed down rather
+   *  than recomputed. One home for "is this string a reason", so the trigger and the
+   *  inner Publish can never disagree about whether one was supplied. */
+  blocked: boolean
+  blockedReason?: string | null
 }) {
   const [goldenInput, setGoldenInput] = useState("")
   const [outcome, setOutcome] = useState<PublishOutcome | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [elapsedSec, setElapsedSec] = useState(0)
+  // Its OWN id, in the shape the trigger's already uses. A second element is needed
+  // rather than a reference to the trigger's because the trigger's reason sits behind
+  // the modal backdrop and cannot be read from inside the dialog — and a disabled button
+  // whose explanation is unreachable IS the greyed-in-silence failure R12 names.
+  const innerBlockedReasonId = useId()
 
-  const canPublish = goldenInput.trim().length > 0 && !loading
+  // Phase 186-16 (WR-10): `!blocked` is the third term. `runGauntlet` already returns
+  // immediately when `!canPublish`, so the request cannot leave while a reason stands and
+  // no early return had to be added anywhere else.
+  const canPublish = goldenInput.trim().length > 0 && !loading && !blocked
 
   // Elapsed-seconds ticker — runs only while the golden run is in flight, so the
   // user can SEE the synchronous publish is alive (no live per-phase progress).
@@ -662,9 +687,23 @@ function GauntletContent({
             className="min-h-[88px] w-full resize-y rounded border border-border bg-background px-3 py-2 text-[13px] leading-relaxed text-foreground focus:border-primary focus:outline-none"
           />
           <div className="mt-3 flex items-center justify-end">
+            {/* R12, applied to the one control that did not have it: greying alone is
+                never enough. `mr-auto` puts the sentence at the row's left WITHOUT
+                changing the row's own classes, so with no reason supplied the rendered
+                markup is the one that shipped, character for character. */}
+            {blocked && (
+              <span
+                id={innerBlockedReasonId}
+                data-testid="publish-inner-blocked-reason"
+                className="mr-auto text-[12px] leading-snug text-muted-foreground"
+              >
+                {blockedReason}
+              </span>
+            )}
             <button
               type="button"
               disabled={!canPublish}
+              aria-describedby={blocked ? innerBlockedReasonId : undefined}
               onClick={runGauntlet}
               className="rounded bg-primary px-4 py-1.5 text-[13px] font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-45"
             >
@@ -949,6 +988,8 @@ export function PublishGauntlet({
                 loading={loading}
                 setLoading={setLoading}
                 goldenInputRef={goldenInputRef}
+                blocked={blocked}
+                blockedReason={blockedReason}
               />
             </div>
           </div>
