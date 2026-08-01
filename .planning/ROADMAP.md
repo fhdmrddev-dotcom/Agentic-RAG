@@ -325,7 +325,7 @@ Plans:
 
 **Wave 5**
 
-- [ ] 186-08-PLAN.md — the folded `BUG-260731-03` **control** half: the display-only header chip promoted into the existing picker, with a neutral unbound invitation and no verdict. The `/validate` verdict half stays in Phase 187
+- [x] 186-08-PLAN.md — the folded `BUG-260731-03` **control** half: the display-only header chip promoted into the existing picker, with a neutral unbound invitation and no verdict. The `/validate` verdict half stays in Phase 187
 
 **UI hint**: yes
 **Flags**: autosave-in-place (never mint a version / re-arm the gauntlet — CONCUR-01, the autosave version-explosion trap); soft-lock / optimistic-token co-edit guard (mirrors `publish_definition` WR-03); parallel-editor UAT row (SC#10 parallel axis) — the two-editor org-shared clobber; concurrency mechanism (block vs warn vs merge) = sketch/discuss call (research left it open); red line D-14; no full SC#10 (not cross-provider streamed); no threat model (v3.4 org RLS already enforces the share boundary); no migration.
