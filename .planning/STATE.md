@@ -136,6 +136,35 @@ plan's acceptance greps were unsatisfiable as literally written — `AbortContro
 must count 0 *while the docblock explains why*; `grep "\], \[definition, enabled\])"` cannot match a
 `useEffect` (which ends in a brace); `grep -c "listDraftWorkflows"` cannot be 1 because the import
 line counts. Each was replaced by a measurement of the property, never by obfuscating the code.
+
+**Execution progress — Plan 186-08 COMPLETE (2026-08-01).** Wave 5's folded bug fix shipped in 2
+atomic commits (`99aa0c7e` the promoted picker → `2cf67334` F16 + the carry-forward records),
+SUMMARY `a0c31e0a`. **`BUG-260731-03`'s repair path is closed:** the display-only `📁 <folder>`
+header chip is now the same project-folder select the describe screen renders (one control, two
+mount points, no new fetch), and an unbound workflow says `No knowledge base · searches
+everything` — an INVITATION on the `EMPTY_DRAFT_INVITATION` precedent with no severity, no code,
+no tray row, no node mark and **no `blockedReason` entry**. `onChange` calls `setProjectFolder`
+(186-04: writes `meta` + arms `dirty` in one act) **and** `setHasEdited(true)` at the call site —
+RESEARCH open risk #4 taken as option (a); the subscription's `meta` exclusion was NOT widened.
+Header suite **15 → 27**, F16 observed RED (6 failed / 21 passed) then GREEN; `tsc -b` **33 ==
+baseline**, `vite build` exit 0; the 50-file workflow set **1916 passed, 0 failed**; zero backend
+files, zero migrations, zero packages, `components/workflows/` untouched.
+⚠ **The control is GATED on `canvasEnabled`, deliberately.** D-181-01 (HARD gate #1) promises
+flag-off byte-identity and pins it as literal markup; an unconditional affordance would break the
+v3.6 revert switch. Flag-off keeps the shipped display-only chip and the markup pin passes
+**unedited**. With the flag ON all four Builder entry paths reach the control — which is how the
+bug was reported. Cost recorded with a re-open trigger in
+`.planning/phases/186-concurrency-autosave/deferred-items.md` (which also carries D-186-17 forward
+**plus its unbind addendum**, proven unreachable by a source assertion over `PhaseFormPanel`).
+⚠ **`BUG-260731-03` STAYS `folded` — frontmatter byte-unchanged.** Only the control half shipped;
+the deterministic build-time `/validate` `incomplete` verdict remains **Phase 187's** (D-186-14).
+A dated note below the report's frontmatter records what was verified by test and what was not
+(no live browser run, no golden run).
+⚠ **Measurement note (the counting-criterion lesson, now SEVEN plans running):** two acceptance
+greps counted the executor's own docblock prose (`project-folder-picker` → 3, `boundFolderName &&`
+→ 1). Prose reworded to state the facts by description; counts became 2 and 0 honestly. And on the
+first: the number moved further than the property — the flag-off arm still hides the unbound
+state, by design, which is said plainly in the SUMMARY rather than left to the grep.
 Resume file: None
 
 Both owed items are now ROUTED at the discuss-phase touchpoint:
