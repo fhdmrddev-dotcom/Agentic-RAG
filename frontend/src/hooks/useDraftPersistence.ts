@@ -77,11 +77,31 @@
  *
  * ── NEVER A FALSE RECEIPT (D-186-04, the T-185-04-01 lesson) ─────────────────────
  *
- * The store's receipt action has exactly ONE caller in this file and it sits on the
- * confirmed-write path with nothing newer queued. A refusal — of any kind — leaves the
- * draft dirty, so the leave guard still fires and the toolbar still reads unsaved. A
- * mid-edit definition can legitimately be refused; the honest answer is "not saved, and
- * here is why", never a receipt for something that did not happen.
+ * The store's receipt action has exactly ONE caller in this file, and the condition above
+ * it is a statement about WHAT WAS WRITTEN: the receipt is filed only when the `phases` and
+ * `meta` references the request carried are STILL the references the store holds. A
+ * refusal — of any kind — leaves the draft dirty, so the leave guard still fires and the
+ * toolbar still reads unsaved. A mid-edit definition can legitimately be refused; the
+ * honest answer is "not saved, and here is why", never a receipt for something that did not
+ * happen.
+ *
+ * ⚠ THIS USED TO BE INFERRED FROM A QUEUE FLAG, AND THAT WAS GAP-1 / CR-01. The old test
+ * was a bare `if (pendingRef.current)`, and `pendingRef` is armed only where an edit is
+ * observed while a write is ALREADY in flight — at timer fire, at `saveNow`, at hold
+ * release. An edit that lands during an in-flight PATCH but before its own 1000 ms debounce
+ * matures arms none of them: it merely reschedules the debounce effect, whose `inFlightRef`
+ * re-check happens a full second later. A PATCH round trip is normally far shorter than
+ * that, so the write completed against a clear flag, filed `Saved ✓` for a payload that
+ * predated the edit, and cleared `dirty` — after which the edit's own timer read the
+ * not-dirty gate and dropped the work silently. That also disarmed `beforeunload`, the
+ * in-app leave guard and the blur rescue, all of which key on `dirty`.
+ *
+ * `pendingRef` is now ONE of three reasons a turn can be superseded, not the only one. The
+ * lesson is T-185-04-01's, met a second time: a guard scoped to a proxy for the property is
+ * green and worthless. Verify the PROPERTY, not the patch. F17 in the co-located suite
+ * holds the interleaving open (the second edit's timer is deliberately left immature) and
+ * records the {store, sent} pair at receipt time, so a regression reads as a number rather
+ * than as an argument.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
@@ -366,6 +386,18 @@ export function useDraftPersistence(args: DraftPersistenceArgs): DraftPersistenc
         if (snapshot.builderPhase !== "drafted") break
         const def = selectDefinition(snapshot) as unknown as WorkflowDefinitionJSON
 
+        // THE IDENTITY OF WHAT IS ABOUT TO BE WRITTEN, captured before the request leaves.
+        //
+        // Two references and not a deep compare, because two is the whole payload:
+        // `selectDefinition` is literally `{ ...state.meta, phases: state.phases }`, so
+        // `meta` and `phases` between them determine every byte that gets sent. Every store
+        // action that changes either one REPLACES the reference — `setProjectFolder` spreads
+        // a new `meta`, and the phase actions replace `phases`, which is exactly what the
+        // store's own dirty subscription keys on. Two O(1) identity compares therefore cover
+        // the payload completely, with no third field to forget.
+        const writtenPhases = snapshot.phases
+        const writtenMeta = snapshot.meta
+
         setState({ kind: "saving" })
         try {
           if (draftIdRef.current === null) {
@@ -400,7 +432,18 @@ export function useDraftPersistence(args: DraftPersistenceArgs): DraftPersistenc
           break
         }
 
-        if (pendingRef.current) {
+        // IS THIS CONFIRMED WRITE STILL THE TRUTH? Asked of WHAT WAS WRITTEN, never of a
+        // queue flag (GAP-1 / CR-01). `pendingRef` is now ONE of three reasons a turn can be
+        // superseded rather than the only one: it catches an edit whose own timer matured
+        // while this request was outstanding, but an edit that landed mid-flight and is
+        // still inside its 1000 ms debounce arms nothing at all, and that is the common
+        // shape — type, pause about a second, resume. The store having moved on is the
+        // property; the flag was only ever a proxy for it.
+        const now = store.getState()
+        const superseded =
+          pendingRef.current || now.phases !== writtenPhases || now.meta !== writtenMeta
+
+        if (superseded) {
           // A newer edit landed mid-flight, so this confirmed write is already superseded
           // and no receipt may be filed for it — clearing `dirty` here would tell the
           // person their latest change is safe when it has not been sent.
