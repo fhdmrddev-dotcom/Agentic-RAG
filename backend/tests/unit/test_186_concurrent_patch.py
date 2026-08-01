@@ -18,9 +18,27 @@ Live :54322 (asyncpg for the work, psycopg2 for the module-level reachability pr
 CONVENTION (Phase 102 posture): imports INSIDE the test bodies; the DB connect is guarded,
 so this file SKIPS cleanly when the local stack is down — it never fails for want of a DB.
 
+WHICH TESTS SKIP WITHOUT POSTGRES — WR-06 residue. The skip is a property of the tests that
+need a database, not of this file. F1/F2/F3/F13 open a real asyncpg pool and carry their own
+``@pytest.mark.skipif``; **everything below the "DB-FREE" banner touches no database at all**
+(``get_pg_pool`` and the db-layer function are both mocked) and therefore runs EVERYWHERE,
+including a CI with no Postgres.
+
+That matters because of what was missing. The client branches its ENTIRE conflict UX on
+``detail["code"] == "stale_token"`` and ``detail["token"]`` (``api.ts:3459-3460``), and that
+half is covered only against a MOCK. Until now the server half was gated behind a
+module-level ``pytestmark``, so ``grep -rn "stale_token" backend/tests/`` matched exactly one
+file and that file was entirely skipped wherever a local database was absent. The two halves
+of one wire contract could therefore drift apart — ``cause`` renamed, ``detail`` flattened
+back to a string, the ``token`` key dropped — with every suite staying green. A guard that
+hides the invariant it defends is not a guard.
+
 THE TOKEN IS A ``str`` AND NOTHING ELSE (D-186-07). No test in this file parses it into a
 ``datetime``; it is read from one response and echoed verbatim into the next request. That
-is the whole contract the client (186-03/186-06) is written against.
+is the whole contract the client (186-03/186-06) is written against. Every token in the
+DB-free tests below is an OPAQUE SENTINEL (``T-NOW`` / ``T-OLD``) rather than a
+timestamp-shaped literal, so nothing here can be cited as a promise that the token is
+parseable (T-186-15-04).
 """
 
 from __future__ import annotations
@@ -49,9 +67,11 @@ def _pg_reachable(dsn: str = _DSN) -> bool:
 
 PG_AVAILABLE = _pg_reachable()
 
-pytestmark = pytest.mark.skipif(
-    not PG_AVAILABLE,
-    reason=f"Local Postgres on {_DSN} not reachable; skipping live concurrent-PATCH tests",
+#: ONE home for the skip sentence, so the per-test decorators cannot drift apart. Byte
+#: identical to the module-level ``pytestmark`` reason it replaced (WR-06 residue), so the
+#: skip report reads exactly as it did before.
+_LIVE_DB_REASON = (
+    f"Local Postgres on {_DSN} not reachable; skipping live concurrent-PATCH tests"
 )
 
 
@@ -93,6 +113,7 @@ async def _two_owners(con):
 
 
 # ── F1 ────────────────────────────────────────────────────────────────────────
+@pytest.mark.skipif(not PG_AVAILABLE, reason=_LIVE_DB_REASON)
 @pytest.mark.asyncio
 async def test_stale_patch_is_refused_and_the_winners_content_survives():
     """CONCUR-02 / D-186-06: writer B holds a token that writer A has already invalidated.
@@ -168,6 +189,7 @@ async def test_stale_patch_is_refused_and_the_winners_content_survives():
 
 
 # ── F2 ────────────────────────────────────────────────────────────────────────
+@pytest.mark.skipif(not PG_AVAILABLE, reason=_LIVE_DB_REASON)
 @pytest.mark.asyncio
 async def test_a_stale_token_is_409_stale_token_never_404():
     """D-186-09: a stale token must NEVER surface as 404 "draft not found".
@@ -238,6 +260,7 @@ async def test_a_stale_token_is_409_stale_token_never_404():
 
 
 # ── F3 ────────────────────────────────────────────────────────────────────────
+@pytest.mark.skipif(not PG_AVAILABLE, reason=_LIVE_DB_REASON)
 @pytest.mark.asyncio
 async def test_foreign_and_unknown_ids_are_the_same_404():
     """T-186-01-03: the 404-collapse stays closed once a third refusal cause exists.
@@ -313,6 +336,7 @@ async def test_foreign_and_unknown_ids_are_the_same_404():
 
 
 # ── F13 ───────────────────────────────────────────────────────────────────────
+@pytest.mark.skipif(not PG_AVAILABLE, reason=_LIVE_DB_REASON)
 @pytest.mark.asyncio
 async def test_autosave_never_mints_a_version():
     """CONCUR-01: N in-place autosaves leave ``version`` byte-identical.
@@ -375,3 +399,147 @@ async def test_autosave_never_mints_a_version():
                 await con.execute("DELETE FROM workflow_definitions WHERE slug = $1", slug)
     finally:
         await pool.close()
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# DB-FREE — the refusal WIRE SHAPE, asserted on a machine with no Postgres
+# (WR-06 residue). Nothing below opens a pool, a socket or a transaction.
+# ══════════════════════════════════════════════════════════════════════════════
+#
+# THE TOKENS HERE ARE OPAQUE SENTINELS ON PURPOSE. ``T-NOW`` and ``T-OLD`` are not
+# timestamp-shaped, and that is the assertion these fixtures make by their SHAPE rather
+# than by a line of code: D-186-07 says the token is an opaque string the client echoes
+# and never parses, so a fixture written in ISO-8601 would quietly document a format
+# nothing is entitled to rely on (T-186-15-04). The one timestamp-shaped literal in this
+# file is F3's shipped ``some_token``, which predates this rule and is deliberately left
+# alone — it is an input to a live 404 path that never reads it.
+
+
+async def _refusal_from(db_result=None, db_raises=None):
+    """Drive ``update_draft`` with the DB LAYER MOCKED and return the ``HTTPException``.
+
+    ``get_pg_pool`` hands back an ``AsyncMock`` that is never asked to do anything real,
+    and ``update_workflow_definition`` is replaced by the refusal under test — so this
+    exercises exactly ONE thing, the route's ``cause`` -> HTTP mapping, which is the half
+    of the contract that had no cover outside a live-DB run (WR-06 residue).
+
+    ``db_raises`` takes the other arm: an exception raised BY the db call, which is how the
+    published-row immutability trigger arrives at this route.
+    """
+    import uuid
+    from unittest.mock import AsyncMock, patch
+
+    from fastapi import HTTPException
+
+    from app.api import workflows as wf_api
+    from app.models.harness import WorkflowDefinition
+
+    db = (
+        AsyncMock(side_effect=db_raises)
+        if db_raises is not None
+        else AsyncMock(return_value=db_result)
+    )
+    with patch("app.api.workflows.get_pg_pool", AsyncMock(return_value=AsyncMock())):
+        with patch("app.api.workflows.update_workflow_definition", db):
+            with pytest.raises(HTTPException) as exc:
+                await wf_api.update_draft(
+                    definition_id=uuid.uuid4(),
+                    body=WorkflowDefinition.model_validate(_draft_definition("p186-wire")),
+                    current_user={"id": str(uuid.uuid4())},
+                    if_match="T-OLD",
+                )
+    return exc.value
+
+
+@pytest.mark.asyncio
+async def test_stale_token_reaches_the_wire_as_a_409_carrying_code_and_token():
+    """D-186-09, without a database: the exact two keys the client branches on.
+
+    ``useDraftPersistence`` raises its conflict banner off ``detail["code"] ==
+    "stale_token"`` and adopts ``detail["token"]`` as the Overwrite precondition. Flatten
+    this detail back to a string, rename the code, or drop the token key, and the client's
+    whole conflict UX silently stops working while its own mock-backed tests stay green.
+    """
+    exc = await _refusal_from({"ok": False, "cause": "stale_token", "token": "T-NOW"})
+
+    assert exc.status_code == 409  # NOT 404 — telling an author their own draft is gone
+    detail = exc.detail
+    assert isinstance(detail, dict)
+    assert detail["code"] == "stale_token"
+    # Carried VERBATIM from the db layer, so Overwrite is one more PATCH rather than a
+    # re-read plus a PATCH (D-186-08). Disclosing it leaks nothing: the disambiguating
+    # probe is owner-scoped, so the caller already owns this row (T-186-01-04, accepted).
+    assert detail["token"] == "T-NOW"
+    # A human-readable line EXISTS, and nothing in this file asserts its wording. That
+    # asymmetry IS the D-186-09 rule: the code is the contract, the prose is for a log, and
+    # a re-wording must never be able to break a client.
+    assert isinstance(detail["message"], str)
+    assert detail["message"] != ""
+    # …and deliberately NO assertion about the token's SHAPE (T-186-15-03).
+
+
+@pytest.mark.asyncio
+async def test_already_published_reaches_the_wire_as_the_one_locked_409_detail():
+    """The published-row refusal, asserted against the CONSTANT rather than a retyped
+    literal — two spellings of one locked string is how a locked string stops being
+    locked (the reason ``_ALREADY_PUBLISHED_DETAIL`` exists at all)."""
+    from app.api import workflows as wf_api
+
+    exc = await _refusal_from({"ok": False, "cause": "already_published"})
+
+    assert exc.status_code == 409
+    assert exc.detail == wf_api._ALREADY_PUBLISHED_DETAIL
+    assert exc.detail["code"] == "already_published"
+
+
+@pytest.mark.asyncio
+async def test_not_found_and_an_unrecognised_cause_are_the_same_codeless_404():
+    """T-186-01-03 / T-186-15-02: the 404-collapse, and its FAIL-CLOSED property.
+
+    ``not_found`` is the dullest answer this route has, and it must stay that way for any
+    cause the route does not recognise. The route's own comment claims exactly this — "a
+    new refusal cause must be mapped deliberately" — and nothing checked it. A cause minted
+    later in the db layer that arrived at the wire as a CODED 404 would be an existence
+    oracle: it would let a caller tell "no such workflow" from "someone else's workflow".
+
+    Asserted as an EQUALITY between the two details, because "both are 404" is satisfied by
+    two different-looking 404s and the collapse is about indistinguishability.
+    """
+    missing = await _refusal_from({"ok": False, "cause": "not_found"})
+    minted = await _refusal_from(
+        {"ok": False, "cause": "cause_minted_after_this_test_shipped"}
+    )
+
+    assert missing.status_code == 404
+    assert minted.status_code == 404
+    # Byte-identical to EACH OTHER — that equality is the collapse.
+    assert missing.detail == minted.detail
+    # And plain strings: a dict detail is where a machine code would live, i.e. the oracle.
+    assert isinstance(missing.detail, str)
+    assert isinstance(minted.detail, str)
+    assert "code" not in missing.detail
+    assert "token" not in missing.detail
+
+
+@pytest.mark.asyncio
+async def test_a_published_row_check_violation_is_the_same_409_as_already_published():
+    """T-103-01-02 / T-186-01-06 — the race arm, which also had no DB-free cover.
+
+    The ``status='draft'`` conjunct usually pre-empts the immutability trigger, but not
+    when the PATCH loses a race with a concurrent publish; then Postgres ``23514`` reaches
+    this route as a ``CheckViolationError``. It must land on the SAME refusal object as the
+    ordinary ``already_published`` cause — one object for one meaning — so the client
+    branches on ``code`` in both cases rather than meeting a 500.
+    """
+    import asyncpg
+
+    from app.api import workflows as wf_api
+
+    exc = await _refusal_from(
+        db_raises=asyncpg.exceptions.CheckViolationError(
+            "workflow_definitions_block_published"
+        )
+    )
+
+    assert exc.status_code == 409
+    assert exc.detail == wf_api._ALREADY_PUBLISHED_DETAIL
