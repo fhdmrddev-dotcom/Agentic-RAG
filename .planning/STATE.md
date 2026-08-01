@@ -621,6 +621,37 @@ phase-186 file. `186-VALIDATION.md` gained **row 8** (flag-OFF Save-then-Publish
 stays as the orchestrator left it; plan counter, ROADMAP plan-progress and requirement completion
 are the orchestrator's.
 
+**▶ PLAN 186-19 EXECUTED 2026-08-01 — the two residual warnings WR-12 and WR-13 are CLOSED IN
+CODE.** 2 tasks, 2 commits (`83a721fb` WR-12 / `a27e3e39` WR-13). Zero migrations, zero package
+changes, zero component files touched (`git diff --stat BuilderSaveRegion.tsx` empty — the new
+reading rides the `held` → quiet-line path 186-13/WR-04 left ungated by `autosaveEnabled`).
+**WR-12:** 186-17 resolved the hold reading unconditionally, which killed the stale *"Publishing
+— not saved…"* sentence and then left a BLANK where the true one belongs — the flag-off author
+was holding unsent work with nothing on screen until the leave guard fired. New locked constant
+`HOLD_ENDED_UNSAVED` ("Not saved — press Save draft to save your changes", one home, `:212`); the
+`!enabled` branch reads `dirty` ONCE and, when true, applies a **second functional** `setState`
+(a bare object would erase a `conflict` — GAP-4's second door). The `return` still sits above
+`performWrite()`. **WR-13:** `overwrite()` now clears `heldPendingRef` beside `haltedRef`,
+restoring the symmetry `reload()`'s success path already had — an arming made before a conflict
+could otherwise flush a no-op PATCH after the conflict was resolved, minting a fresh token and
+invalidating every other tab's guard. Decisions **D-186-19-A..D**.
+⚠ **A PLANNED DOCBLOCK CLAIM WAS PROBED AND MEASURED FALSE, and the false premise is now recorded
+by name so it cannot be resurrected:** *"a halted loop is always dirty"* does NOT hold — `saveNow`
+bypasses the dirty gate by design (D-186-03), so a Save press on a CLEAN store issues one PATCH
+and a stale-token refusal lands `{kind:"conflict"}` with `dirty === false` (probe: 1 update call,
+`currentToken: "T-SERVER"`, dirty false). The shipped derivation is the **two-doors** one instead:
+`haltedRef` is cleared in exactly two places and both now clear `heldPendingRef`.
+Both REDs observed first and recorded verbatim (received `{kind:'idle'}` at F20b **and** F20i(a);
+`expected "vi.fn()" to be called 2 times, but got 3 times` at F23). Hook suite **53 → 54 → 55**,
+all green, **132 insertions / 0 deletions** — no pre-existing row could have been weakened.
+Consumers 49/49 green and unedited. `tsc` has **33 pre-existing errors** unchanged and **0** in
+this plan's files — the plan's "zero errors" criterion was an inherited claim, not a measurement.
+No `186-VALIDATION.md` row added: both closures are proven by counting, and the operator board
+stays at **eight** rows.
+⚠ **Counters and requirement status deliberately NOT advanced by this executor** — `CONCUR-01`
+and `CONCUR-02` stay as the orchestrator left them; plan counter, ROADMAP plan-progress and
+requirement completion are the orchestrator's.
+
 Resume file: None
 
 Both owed items are now ROUTED at the discuss-phase touchpoint:
