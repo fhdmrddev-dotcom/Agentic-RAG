@@ -255,6 +255,64 @@ measure per-file in isolation, not as one whole-suite number.
 same file in waves 7-8; marking either complete now would be exactly the false-completion record
 the SDK verbs produce. ROADMAP plan-progress left to the orchestrator.
 
+**Execution progress — Plan 186-10 COMPLETE (2026-08-01), the second gap-closure plan.** Wave 6's
+WR-02 fix shipped in 2 atomic commits (`c36daf12` F18 RED → `8504af03` the Grounding row), SUMMARY
+`5ed2a243`. **The spine can now place `grounding_fidelity`** — emitted by `publish_service.py` since
+Phase 182, with no client row, so the most likely real refusal on a KB-bound workflow rendered as a
+fully grey unplaceable spine under the generic fallback sentence. The new `Grounding` row is
+**INSERTED at index 5** (its true pipeline position, after the interactive-phase gate and before the
+golden run), not appended — which forced the second half: both `i === 5` reads (the amber aura and
+the energy comet) became `i === RUNNING_STAGE_INDEX`, derived from the row whose codes include
+`golden_run_timeout`, so a future insertion cannot silently pulse the wrong node. Icon
+`~icons/fluent-emoji/books`, proven three ways (registry listing + `vite build` exit 0 + a render
+assertion, since an unverified slug ships as an EMPTY svg rather than failing the build). **F7 is
+untouched and green.** Suite **29 → 41** (F18 = 2 controls + a 10-case `it.each`), `tsc -b` **33 ==
+baseline** with 0 naming a touched file, `eslint` exit 0, `vite build` exit 0, zero backend files,
+zero migrations (head stays 114), zero packages.
+⚠ **The claim that could go stale is now a test that reads the server's own source.** F18 extracts
+the `stage="…"` literals from `publish_service.py` at test time (**11 distinct**: already_published ·
+definition_invalid · business_requirement · lint · interactive_phase · grounding_fidelity ·
+golden_run_timeout · golden_run_error · structural_gate · judge · draft_changed) and drives one
+render per stage, asserting **exactly one** blocked node each. RED was exactly as predicted — one
+failing case, `grounding_fidelity`, 0 blocked nodes where 1 was expected — so no second forgotten
+stage exists. One evidence-justified exclusion, `already_published`, whose set size is asserted
+`=== 1` so a future forgotten stage cannot be parked there instead of given a row.
+⚠ **`node:fs` and `new URL(…, import.meta.url)` are both unusable in this codebase's frontend
+tests — carry this forward.** The plan prescribed both; each failed for its own reason. Vite
+**statically rewrites** the `new URL(literal, import.meta.url)` asset pattern, so `fileURLToPath`
+receives a non-`file:` URL and the whole suite fails to collect. And `tsconfig.app.json` sets
+`types: ["vite/client"]` on purpose — browser code must not reach a Node built-in — so three
+`node:*` imports added **3 NEW tsc errors** (33 → 36). Both replaced by the `?raw` loader the same
+file already uses for the component source. Adding `"node"` to the app tsconfig was **rejected**: it
+would let shipped browser code use `process`/`Buffer` unchallenged, a permanent widening bought for
+one test file.
+⚠ **Measurement note (the counting-criterion lesson, now NINE plans running).** `grep -c "codes:"`
+was specified to count 10 and counts **11** — the `STAGES` type annotation line contains
+`codes: string[]`, so it was always N+1. `grep "i === 5"` was specified to return nothing and
+returned the executor's own docblock explaining the literal's removal. Fixed by measuring the
+property (`grep -c 'codes: \['` → 10) and rewording prose, never by obfuscating code; verified more
+strongly than asked — no bare numeric index comparison survives anywhere in `GauntletSpine`.
+⚠ **Three small Rule-1/2 repairs inside the two declared files.** The visible sentence *"Publishing
+runs the full **8-stage gauntlet**"* became false with a ninth CHECK — the count was removed, not
+incremented, so it cannot go stale again. The shipped Commit-node glyph test was widened to sweep
+**every** node, because the component's icon docblock claims "the newest addition is pinned by a
+render assertion" and a row-scoped test stops being that the moment a row is added. And the
+`draft_changed` test's literal `8` ✓ badges became `nodeCount − 1` — a claim that had not changed
+should not fail because a table grew.
+⚠ **The frontend full-suite number is still not a gate, and this plan re-proved why.**
+`PublishGauntlet.test.tsx` reports **18 failures under full-suite parallel load and 0 in isolation** —
+byte-identical to the count 186-09 measured for this file BEFORE any change here. All 18 are
+`Test timed out in 5000ms` on **shipped** (103/127-era) tests; the file takes 131 s under load vs
+22 s alone; **zero F18 cases appear in any failure list**. The 13 suites importing `PublishGauntlet`
+run **211/211** together. Full-suite failures measured **41 / 42 / 41** across three runs (186-09
+measured 42/43); collected **3556 → 3568**, exactly the +12 F18 added — non-decreasing.
+⚠ **Counters and requirement status deliberately NOT advanced by this executor.** `CONCUR-02` stays
+as it is — WR-02 is one of three blockers plus four warnings, and 186-12 / 186-13 are still owed in
+waves 7-8. ROADMAP plan-progress left to the orchestrator.
+⚠ **Newly observable in manual UAT:** `186-VALIDATION.md` row 3 ("Publish race") can now show a
+*placed* block for a grounding refusal instead of an all-grey spine. Still to run — deliberately not
+a plan task.
+
 Resume file: None
 
 Both owed items are now ROUTED at the discuss-phase touchpoint:

@@ -210,6 +210,13 @@ None — no external service configuration, no migration (head stays 114), no de
 - **Counters and requirement status deliberately NOT advanced by this executor.** `CONCUR-02` stays as it is — WR-02 is one of three blockers plus four warnings, and 186-12 / 186-13 are still outstanding. ROADMAP plan-progress is the orchestrator's write.
 - **Carry-forward for any future plan touching a frontend test that must read a file:** use `?raw`. `node:fs` costs three tsc errors and `new URL(…, import.meta.url)` is rewritten by Vite before it runs.
 
+## Self-Check: PASSED
+
+- `frontend/src/components/workflows/PublishGauntlet.tsx` — FOUND
+- `frontend/src/components/workflows/PublishGauntlet.test.tsx` — FOUND
+- `.planning/phases/186-concurrency-autosave/186-10-SUMMARY.md` — FOUND
+- Commits `c36daf12`, `8504af03`, `5ed2a243` — all FOUND in `git log --all`
+
 ---
 *Phase: 186-concurrency-autosave*
 *Completed: 2026-08-01*
