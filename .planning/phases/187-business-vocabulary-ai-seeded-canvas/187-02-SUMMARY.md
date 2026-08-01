@@ -169,3 +169,8 @@ git diff --stat -- supabase/migrations  → empty
 |---|---|---|
 | 1 | `6a1661e6` | `feat(187-02): add name_seeded_by_ai provenance marker to PhaseSpec` |
 | 2 | `b45675ef` | `feat(187-02): instruct a per-step name in the NL generator and stamp its provenance` |
+| — | `39a6f109` | `docs(187-02): complete per-step names + name provenance plan` |
+
+## Self-Check: PASSED
+
+All five claimed files exist on disk; all three claimed commits resolve in `git log`.
