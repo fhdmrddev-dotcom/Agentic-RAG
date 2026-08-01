@@ -238,3 +238,8 @@ None.
   ("What the code currently does: neither the trigger nor the inner Publish button is disabled…").
   That report is a dated artifact of the 2026-08-01 pass and was deliberately not rewritten here —
   the next verification pass supersedes it.
+
+## Self-Check: PASSED
+
+All four touched files exist on disk; all four commits (`64042c12`, `bb693e10`, `bbccf283`,
+`17a1fd37`) are present in `git log`.
