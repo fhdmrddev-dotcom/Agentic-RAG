@@ -259,10 +259,14 @@ def test_known_codes_compose_from_the_owning_modules_with_no_orphan():
         "composed from LINT_CODES + GROUNDING_VERDICT_CODES + _ROUTE_ASSIGNED_CODES."
     )
 
-    # The route mints exactly two codes itself — neither owning module emits them.
+    # The route mints exactly three codes itself — no owning module emits them.
+    # `unbound_retrieval` (Phase 187 / D-187-11) is deliberately a ROUTE code rather than a
+    # `grounding.GROUNDING_VERDICT_CODES` one: that collector is shared with publish, so a
+    # rule added there would silently become a publish blocker too.
     assert set(workflows._ROUTE_ASSIGNED_CODES) == {
         "business_requirement",
         "interactive_phase",
+        "unbound_retrieval",
     }
     assert set(workflows._ROUTE_ASSIGNED_CODES).isdisjoint(owned), (
         "a route-minted code collided with an owning module's code — one of them must move"

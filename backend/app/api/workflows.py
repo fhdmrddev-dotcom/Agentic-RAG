@@ -309,8 +309,9 @@ class Verdict(BaseModel):
     ``code`` is the machine literal, and every one of them is OWNED by the module that emits
     it (WR-05): the 5 ``reachability.LINT_CODES`` values, the 3
     ``grounding.GROUNDING_VERDICT_CODES`` values (``folder_scope`` / ``unregistered_tool`` /
-    ``unregistered_skill``), and the 2 ``_ROUTE_ASSIGNED_CODES`` this route mints itself
-    (``business_requirement`` / ``interactive_phase``). ``phase`` is the phase ``slug`` — the
+    ``unregistered_skill``), and the 3 ``_ROUTE_ASSIGNED_CODES`` this route mints itself
+    (``business_requirement`` / ``interactive_phase`` / ``unbound_retrieval``). ``phase`` is
+    the phase ``slug`` — the
     node identity the canvas paints on (the 181/183 ``node id == phase.slug`` contract) — or
     ``None`` for a workflow-global finding. ``severity`` is the ONLY net-new field (D-182-03):
     an ORTHOGONAL UI hint (``error`` = broken/red, ``incomplete`` = still-building/grey), NOT
@@ -456,15 +457,25 @@ class GroundingBundleResponse(BaseModel):
 # never paint the soft ``incomplete``, or the canvas would say "still building" while publish
 # says "blocked". Its STRING lives in ``grounding.py`` so neither consumer carries a literal.
 
-# The two codes the ROUTE mints itself — neither owning module emits them:
+# The three codes the ROUTE mints itself — no owning module emits them:
 #   ``business_requirement`` — minted in ``validate_workflow`` from
 #                              ``grounding.business_requirement_missing(body)`` being True
 #   ``interactive_phase``    — minted in ``validate_workflow``'s
 #                              ``publish_service._interactive_phase_failures(body)`` loop
+#   ``unbound_retrieval``    — minted in ``validate_workflow``'s stage (5) loop over
+#                              ``grounding.grounding_cause(phase) == "detected"`` while
+#                              ``body.project_folder_id is None`` (Phase 187 / D-187-11)
+#
+# WHY THE ROUTE AND NOT ``grounding.grounding_verdicts`` (D-187-11): that collector is SHARED
+# with publish — plan 182-06 made the publish gate enforcing through it — so a rule added
+# there silently becomes a hard PUBLISH BLOCKER as well as a canvas verdict. Phase 187 is not
+# scoped to change what publishes; it is scoped to tell the author sooner. The route is the
+# only seam where a verdict can be canvas-only, which is exactly what these three codes are.
 _ROUTE_ASSIGNED_CODES: frozenset[str] = frozenset(
     {
         "business_requirement",
         "interactive_phase",
+        "unbound_retrieval",
     }
 )
 
@@ -475,6 +486,13 @@ _INCOMPLETE_CODES: frozenset[str] = frozenset(
         "input_unsatisfied",
         "business_requirement",
         "interactive_phase",
+        # D-187-11: an unbound retrieval workflow is UNFINISHED, not broken — the author has
+        # not yet said which corpus this is about. BOTH registrations are required: this one
+        # AND ``_ROUTE_ASSIGNED_CODES`` above. ``_ERROR_CODES`` is DERIVED by subtraction, so
+        # a code registered in neither lands in the error bucket and ``_severity`` logs a
+        # fail-loud warning on EVERY canvas edit — the opposite of the grey "still building"
+        # this verdict is for.
+        "unbound_retrieval",
     }
 )
 
@@ -565,6 +583,10 @@ async def validate_workflow(
                                                       available_tools ∈ registry, skill_ref ∈ enabled)
       3. ``grounding.business_requirement_missing`` — the D-13 publish invariant (shared with publish stage 1)
       4. ``publish_service._interactive_phase_failures`` — the WR-04 interactive-phase pre-run block
+      5. ``grounding.grounding_cause`` × ``project_folder_id`` — the D-187-11 unbound-retrieval
+                                                      check, the ONE rule on this route that
+                                                      publish does NOT also run (see
+                                                      ``_ROUTE_ASSIGNED_CODES``)
 
     The golden run + judge (publish stages 3-4) are LIVE-only and deliberately NOT here —
     ``/validate`` is a static, no-provider, read-only surface called on every canvas edit.
@@ -667,6 +689,42 @@ async def validate_workflow(
         }
         for f in publish_service._interactive_phase_failures(body)
     )
+
+    # (5) D-187-11 — the unbound-retrieval check (BUG-260731-03, the verdict half). A step
+    # that READS the knowledge base while the workflow is bound to no folder searches
+    # EVERYTHING: at report time, 40+ documents across 10 unrelated corpora. It is a pure,
+    # registry-free, structural property of the definition, so it lives OUT here with lint and
+    # the D-13 invariant rather than inside the sealed grounding block above.
+    #
+    # WHY DETERMINISTIC, AND WHY AT AUTHOR TIME. This condition already had a gate: the
+    # publish gauntlet's judge. `BUG-260731-03` measured it PASSING a worse deliverable
+    # (11 files / 5+ folders) than the one it FAILED (3 files / 3 folders) an hour apart, on
+    # the same defect. A hard wall that fails open under variance is not a control for this
+    # failure mode — and the judge only speaks after a full golden run has been spent, about
+    # the SYMPTOM (bad citations) rather than the CAUSE (no scope). Scope-boundness is
+    # structural, so the answer here is the same every time.
+    #
+    # ``grounding.grounding_cause`` is the ONE home of the KB-tool intersection (its
+    # ``KB_TOOLS`` docblock says why a second copy is a safety hole, not a duplication smell).
+    # A local tool tuple here would silently stop marking the day a 6th KB tool lands. It is
+    # PURE and does zero I/O, so calling it needs no pool and cannot fail.
+    #
+    # INCOMPLETE, not error, and the message says a FACT plus a CONSEQUENCE — never "unsafe"
+    # and never "blocked". The author is still building; they have not yet said what this
+    # workflow is about.
+    if body.project_folder_id is None:
+        findings.extend(
+            {
+                "code": "unbound_retrieval",
+                "phase": phase.slug,
+                "message": (
+                    f"phase '{phase.slug}' reads your documents, but this workflow is not "
+                    "bound to a knowledge base — it would search everything"
+                ),
+            }
+            for phase in body.phases
+            if grounding.grounding_cause(phase) == "detected"
+        )
 
     phases_empty = len(body.phases) == 0
     verdicts = [
