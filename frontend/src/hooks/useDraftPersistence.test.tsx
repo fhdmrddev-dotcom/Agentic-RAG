@@ -1890,6 +1890,98 @@ describe("useDraftPersistence — F21: a FAILED exit is not a lost exit (GAP-4 /
   })
 })
 
+// ── F23 — an exit leaves no arming behind (186-19, WR-13) ─────────────────────
+
+/**
+ * `heldPendingRef` IS A MEMORY, AND A MEMORY THAT OUTLIVES ITS SITUATION IS A BUG.
+ *
+ * `saveNow` arms it whenever a hold is running, and the hold release is the only thing that
+ * ordinarily disarms it. A CONFLICT interrupts that: the release hits `if (haltedRef.current)
+ * return` above every other gate, so the arming survives the halt untouched. `reload()`'s
+ * success path already clears it beside `haltedRef`; `overwrite()` did not — and that
+ * asymmetry is the whole of WR-13.
+ *
+ * WHY IT MATTERS RATHER THAN BEING TIDY: the surviving flag is read by the NEXT hold release
+ * as "there is unsent work", which is exactly the `dirty` gate the debounce timer carries to
+ * stop merely opening a draft from PATCHing it. So a publish that begins and ends against a
+ * perfectly clean store issues a PATCH nobody asked for — and every PATCH mints a fresh
+ * token, invalidating the optimistic guard every other open tab holds. The mechanism built to
+ * resolve a concurrency conflict manufactures one.
+ *
+ * COUNTED, NOT ARGUED: the claim is a call count over the whole drive, which is the only form
+ * of the question a person could ever notice.
+ */
+describe("useDraftPersistence — F23: a chosen exit clears the pending arming (WR-13)", () => {
+  it("F23 — a chosen exit clears the pending arming, so a later clean hold writes nothing (WR-13)", async () => {
+    // Call 1 is held open by a deferred so a hold can begin WHILE it is outstanding; it is
+    // then refused with a stale token, which is what halts the loop. Calls 2+ resolve.
+    const first = deferred<WorkflowDraftWriteResult>()
+    mockedUpdate.mockImplementation(() => Promise.resolve(write("T-LATER")))
+    mockedUpdate.mockImplementationOnce(() => first.promise)
+
+    const h = harness()
+
+    // (1) A write is outstanding.
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+    expect(mockedUpdate).toHaveBeenCalledTimes(1)
+
+    // (2) A publish hold begins while it is still in flight.
+    h.set({ publishInFlight: true })
+
+    // (3) The author presses Save draft. This is the arming: `saveNow` reports the hold and
+    //     sets `heldPendingRef`, and it writes nothing.
+    let ok = true
+    await act(async () => {
+      ok = await h.view.result.current.saveNow()
+    })
+    expect(ok).toBe(false)
+    expect(mockedUpdate).toHaveBeenCalledTimes(1)
+
+    // (4) The outstanding write is refused: the row moved, so the loop halts into `conflict`.
+    await act(async () => {
+      first.reject(new WorkflowStaleTokenError("T-SERVER"))
+      await Promise.resolve()
+    })
+    await flush()
+    expect(stateOf(h.view).kind).toBe("conflict")
+
+    // (5) The publish ends. The release hits the halted early return, so nothing is written
+    //     and — in RED — nothing disarms the flag either.
+    h.set({ publishInFlight: false })
+    await flush()
+    expect(mockedUpdate).toHaveBeenCalledTimes(1)
+
+    // (6) The author picks an exit: Overwrite. Exactly one PATCH, carrying the server's token.
+    await act(async () => {
+      await h.view.result.current.overwrite()
+    })
+    await flush()
+    expect(mockedUpdate).toHaveBeenCalledTimes(2)
+    expect(mockedUpdate.mock.calls[1][2]).toBe("T-SERVER")
+
+    // THE POSITIVE CONTROL. The conflict is resolved and the receipt was filed, so there is
+    // genuinely nothing unsent — which is what makes any further PATCH a no-op rather than a
+    // legitimate flush.
+    expect(stateOf(h.view)).toEqual({ kind: "saved", at: expect.any(Number) })
+    expect(h.store.getState().dirty).toBe(false)
+
+    // (7) A LATER publish hold begins and ends against that clean store.
+    h.set({ publishInFlight: true })
+    await advance(AUTOSAVE_DEBOUNCE_MS * 3)
+    h.set({ publishInFlight: false })
+    await flush()
+    await advance(AUTOSAVE_DEBOUNCE_MS * 3)
+    await flush()
+
+    // GREEN: two calls over the whole drive — the refused write and the Overwrite the person
+    // chose. RED: three, the third a PATCH carrying a definition nobody changed, minting a
+    // fresh token and invalidating every other open tab's guard.
+    expect(mockedUpdate).toHaveBeenCalledTimes(2)
+    expect(h.store.getState().dirty).toBe(false)
+  })
+})
+
 // ── The explicit Save-draft affordance (D-186-03) ─────────────────────────────
 
 describe("useDraftPersistence — saveNow, the deliberate commit-now", () => {

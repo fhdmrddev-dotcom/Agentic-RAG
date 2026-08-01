@@ -860,6 +860,31 @@ export function useDraftPersistence(args: DraftPersistenceArgs): DraftPersistenc
    * pressed, D-186-03 keeps the explicit save working on the flag-off surface, and D-186-08
    * requires that somebody who has hit a conflict is offered BOTH exits on any surface. The
    * asymmetry is the decision: automatic writes obey the flag, chosen ones obey the person.
+   *
+   * ── WHY THE HALTED RETURN WRITES NO REF, DERIVED (186-19, WR-13) ─────────────────
+   *
+   * `if (haltedRef.current) return` sits ABOVE the two gates that disarm `heldPendingRef`, so
+   * it is the one exit from this effect that leaves the arming exactly as it found it. That
+   * reads like an oversight and is not one, so here is the reason by name rather than an
+   * invitation to re-open it.
+   *
+   * `haltedRef` is cleared in EXACTLY TWO PLACES — `reload()`'s success path and `overwrite()`
+   * — and as of 186-19 both clear `heldPendingRef` in the same breath. A halt therefore cannot
+   * be left behind without the arming being left behind with it: whichever door the person
+   * takes back to a RUNNING loop also disarms the flag, and while the loop stays halted
+   * nothing reads the flag at all (this effect returns above it, the debounce timer returns on
+   * its own halt check, and `performWrite` returns on its). An arming cannot survive a halt
+   * into a running loop, which is the only place it could do harm.
+   *
+   * ⚠ AND IT IS NOT THE SHORTER ARGUMENT, WHICH WAS MEASURED FALSE. The tempting version —
+   * "a halted loop is always dirty, so writing the ref here would be unobservable" — does not
+   * hold, and the counterexample is a shipped path rather than a contrivance: `saveNow`
+   * bypasses the dirty gate BY DESIGN (D-186-03 — a person who presses Save means it), so a
+   * Save press against a CLEAN store issues one PATCH, and if the server refuses it as stale
+   * the loop lands in `{kind:"conflict"}` with `dirty === false`. Probed directly against this
+   * hook on 2026-08-01: one `updateWorkflowDraft` call, state `{kind:"conflict", currentToken:
+   * "T-SERVER"}`, `dirty` false. The two-doors derivation above is what actually carries the
+   * claim; the dirty one would have been a false premise sitting in a docblock.
    */
   useEffect(() => {
     const previous = holdRef.current
@@ -869,6 +894,8 @@ export function useDraftPersistence(args: DraftPersistenceArgs): DraftPersistenc
     // functionally, so a `conflict`, `error` or `saved` reading that arrived during the hold
     // is untouched (186-17, WR-09).
     setState((s) => (s.kind === "held" ? { kind: "idle" } : s))
+    // THIS RETURN WRITES NO REF, AND THAT IS DERIVED RATHER THAN OVERLOOKED (186-19, WR-13).
+    // See the docblock's closing paragraph — the two exits are what make it safe.
     if (haltedRef.current) return
     if (!enabled) {
       // No automatic write past the revert switch (D-181-01) — and no stale arming left
@@ -1030,6 +1057,19 @@ export function useDraftPersistence(args: DraftPersistenceArgs): DraftPersistenc
     try {
       tokenRef.current = conflictTokenRef.current
       haltedRef.current = false
+      // AND THE ARMING GOES WITH THE HALT (186-19, WR-13). `reload()`'s success path has
+      // always cleared these two together; this one did not, and that asymmetry was the
+      // whole defect. An arming made by a Save press before the conflict survived the halt
+      // (the release's `if (haltedRef.current) return` sits above every disarming gate) and
+      // was then read by the NEXT hold release as "there is unsent work" — flushing a PATCH
+      // against a draft nobody had edited, which mints a fresh token and invalidates the
+      // optimistic guard every other open tab holds. The mechanism built to resolve a
+      // conflict was manufacturing one. F23 counts it.
+      //
+      // NOTHING IS LOST BY CLEARING IT HERE: `performWrite()` runs on the very next line and
+      // writes the CURRENT definition, bypassing the dirty gate, so whatever work the flag
+      // was remembering is written by that call rather than by a later release.
+      heldPendingRef.current = false
       await performWrite()
     } finally {
       reloadingRef.current = false
