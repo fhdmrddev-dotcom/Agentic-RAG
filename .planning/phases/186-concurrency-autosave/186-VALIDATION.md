@@ -22,7 +22,7 @@ created: 2026-08-01
 | **Config file** | `backend/pytest.ini` (`testpaths = tests`) | `frontend/vitest.config.ts` (excludes `tests/e2e/**`) |
 | **Quick run command** | `cd backend && ./venv/Scripts/python.exe -m pytest tests/unit/<file> -x -q` | `cd frontend && npx vitest run <files>` |
 | **Full suite command** | `cd backend && ./venv/Scripts/python.exe -m pytest -q` | `cd frontend && npx vitest run` |
-| **Measured baseline** | **3457 tests collected** (`--collect-only -q`, 5.22 s) | **209 passing** across the 7 builder-related files (30.9 s) |
+| **Measured baseline** | **3457 tests collected** (`--collect-only -q`, 5.22 s) — re-measured **3465** after Plan 186-11 (non-decreasing; +8 added by 186-01/186-02, 0 by 186-11) | **209 passing** across the 7 builder-related files (30.9 s) |
 | **Estimated runtime** | ~5 s collect / full suite per run | ~31 s (builder subset) |
 | **E2E** | — | Playwright `frontend/tests/e2e/`. **Known rot 16/17 fail (SEED-049) — NOT a backstop for this phase.** |
 
@@ -63,7 +63,7 @@ The Phase 185 lesson is binding: *verify the PROPERTY, not the PATCH; observe fa
 | F3 | 404-collapse still closed | Foreign draft id returns ≠404 or leaks status | Foreign + unknown id both 404, identical detail | same file |
 | F4 | Published 409 unchanged | (regression) | Published-row PATCH still 409, `detail.code == "already_published"` | `test_103_published_409.py` (updated, **not** replaced) |
 | F5 | Publish race refused | Edit mid-gauntlet ⇒ publish succeeds, ships unchecked definition | `publish_definition` returns `-2`; `blocked_stage == "draft_changed"`; row still `draft` | `backend/tests/unit/test_186_publish_race.py` |
-| F6 | Golden-run receipt preserved | `harness_audit` golden-run rows absent after refusal | `judge_verdict` + run rows survive; `publish_blocked` receipt added | same file |
+| F6 | Golden-run receipt preserved | `harness_audit` golden-run rows absent after refusal | `judge_verdict` + run rows survive; `publish_blocked` receipt added | same file — **DB-free: runs without local Postgres** (mocked pool + boundaries; per-test skips since WR-06 / 186-11, so this guard survives a CI with no database) |
 | F7 | **Unknown stage never renders green** | A bogus `blocked_stage` renders **8 ✓ badges** | Zero ✓ badges; headline contains no raw code | `PublishGauntlet.test.tsx` |
 | F8 | Never a false `Saved ✓` | A 422 PATCH still shows `Saved · still a draft` | Shows `Not saved — …`; `dirty` stays true | `useDraftPersistence.test.tsx` |
 | F9 | Single-flight | Two overlapping edits issue two concurrent PATCHes | ≤ 1 outstanding PATCH; second carries the token returned by the first | `useDraftPersistence.test.tsx` |
