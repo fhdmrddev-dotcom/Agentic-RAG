@@ -185,3 +185,178 @@ publish-aware reading (i.e. the banner and the publish gate answering with one v
 ---
 
 *Recorded: 2026-08-01 · Phase 186-concurrency-autosave, plan 16*
+
+---
+
+## WR-14 — the wait reason outranks the fixable ones, and it disables a click that spends nothing
+
+**What is deferred:** two related changes, neither built. (a) Re-ranking `blockedReason` so a
+"wait a moment" reason no longer displaces a "fix this" one. (b) Narrowing the disable so only
+the **inner** Publish button — the one that spends a golden run — refuses while a write is
+outstanding, leaving the outer `◆ Publish…` trigger free to open the modal.
+
+**The shape as shipped**, re-derived at HEAD rather than inherited. `blockedReason`
+(`frontend/src/pages/WorkflowBuilderPage.tsx:1093-1102`) evaluates
+`if (persistState.kind === "saving") return SAVING_PUBLISH_WAIT` as its **first** statement
+(`:1094`), above the flag/phase gate (`:1095`) and therefore above all four verdict branches —
+the empty-draft invitation (`:1096`), the degraded sentence (`:1097`) and the two verdict reads
+(`:1098-1101`). `PublishGauntlet` derives `blocked` straight from that string (`:846`) and feeds
+it to **both** gates: `canPublish = … && !blocked` (`:592`), which guards the golden run, and
+`disabled={blocked}` (`:921`) on the outer trigger — whose entire `onClick` is `setOpen(true)`
+(`:920`). So during sustained typing the actionable sentence flickers out once per debounce beat,
+and a control that costs nothing is intermittently unclickable.
+
+**Why it is deferred, not fixed here.** The rank is a **shipped, tested decision**, not an
+oversight: `WorkflowBuilderPage.canvas.test.tsx:1864` pins *"the saving reason OUTRANKS the
+empty-draft invitation — the nearest obstacle is the one named"*, and the memo's own docblock
+(`:1076-1077`) states the rationale — fixing a verdict will not make Publish go until the PATCH
+has landed. Reversing that is a product call about which sentence a person should read first, not
+a race fix. Splitting the two gates is the more defensible half, and it is still a contract
+change: the modal would open while its inner action refuses, which moves where the R12 reason is
+placed and what the modal promises when it is opened.
+
+**The widening this round caused, recorded rather than left to be discovered.** 186-18 closed
+CR-03 by lifting the `saving` branch **above** the flag gate. That was the correct fix — a write
+this client has outstanding is a fact about the client, not a verdict about the workflow — but it
+means `SAVING_PUBLISH_WAIT` now outranks the verdict branches on the **flag-off** Builder too,
+where before the gate returned `null` unconditionally. WR-14's flicker and its free-click cost
+therefore now exist on **both** surfaces, not one. That is the price of closing the blocker, and
+it was paid deliberately.
+
+**Re-open trigger:** the first operator observation that the `◆ Publish…` trigger felt
+unclickable or "flickery" while typing (rows 3b and 8 of `186-VALIDATION.md` are the sessions
+most likely to surface it), **or** the first phase that gives `blockedReason` a rank/kind model
+able to distinguish "wait a moment" from "fix this" — at which point the outer trigger should
+stop being gated by a wait at all, and `canvas.test.tsx:1864`'s rank assertion must be rewritten
+in the same commit rather than deleted.
+
+---
+
+## WR-15 — the `saving` block has no ceiling
+
+**What is deferred:** a client-side timeout or abort belt on the draft write, and closing the one
+branch that can leave the reading at `{kind:"saving"}`.
+
+**The shape as shipped.** `performWrite` sets `{ kind: "saving" }` synchronously before the
+request leaves (`frontend/src/hooks/useDraftPersistence.ts:633`). Its `finally`
+(`:738-740`) clears `inFlightRef` and **nothing else** — it does not touch the reading — so the
+bound on the block rests entirely on every terminal branch setting a non-`saving` state. One
+branch does not: `if (creatingRef.current) break` (`:638`) sits *below* the `saving` assignment
+and returns without a further `setState`. It is unreachable today (prior IN-01: `creatingRef` can
+only be true inside the synchronous region that set it), which is why it is a warning rather than
+a defect. Separately there is **no network ceiling at all**: `updateWorkflowDraft`
+(`frontend/src/lib/api.ts:3430-3449`) accepts an optional `signal` but the hook's only call site
+(`useDraftPersistence.ts:650-654`) passes three arguments and no signal, and nothing anywhere
+arms a timer against the fetch.
+
+**Why it is deferred.** This file's §"Publish while the write loop is in `conflict` or `error`"
+entry argues that `saving` is safe to block on **precisely because it is bounded**. WR-15 is the
+observation that the bound is a property of the branch set rather than a guarantee. Adding an
+abort belt is a **transport-wide decision**, not a local patch: the sibling assertion
+`useDraftPersistence.test.tsx:712` — *"cancels no write — the abort belt `useLiveValidation` uses
+is deliberately absent"* — pins the absence as a **choice**, because a half-applied timeout could
+abort a write the server has already committed, leaving the client believing nothing was written
+while the row moved. Waiting is strictly safer than that.
+
+**Re-open trigger:** the first live observation of a `Saving…` reading that never resolves (or a
+Publish control that stays disabled with `SAVING_PUBLISH_WAIT` after the network settled),
+**or** the first phase that gives the workflow-draft transport an abort/timeout policy — that
+plan owns deleting the absence-pinning assertion at `useDraftPersistence.test.tsx:712` in the
+same commit, because the moment a belt exists that test asserts something untrue.
+
+---
+
+## WR-16 — `reload()`'s catch spans more than the request
+
+**What is deferred:** narrowing the try scope so only the network call is caught, and the
+post-read work (the row lookup and the store write) is allowed to fail as itself.
+
+**The shape as shipped.** `reload()` (`frontend/src/hooks/useDraftPersistence.ts:988-1032`) opens
+its `try` at `:993` and closes it at `:1015`. Inside that scope, **after** the request has
+already succeeded, sit `rows.find(…)` (`:995`) and
+`store.getState().setDrafted(row.definition …)` (`:1008`). A throw from either lands in the same
+catch (`:1015-1027`), which — while `haltedRef` is set — restores the conflict with
+`RELOAD_FAILED_NOTE` (`:289`): a sentence that tells the person we could not reach the server. So
+a failure *after* a server that answered is reported as a network failure, inviting a retry that
+cannot work.
+
+**Why it is deferred.** It is a real honesty defect, and it is also **the exact catch that
+GAP-4/CR-02 was repaired in** — this phase's most recently closed blocker. Re-scoping it means
+re-proving the whole F21 family (both exits stay mounted and pressable through a failed exit,
+`haltedRef`-guarded so a conflict that did not happen is never fabricated). That is a deliberate
+piece of work with its own falsification set, not a line move inside a gap-closure round.
+
+**Re-open trigger:** the first report of the reload note appearing against a server that
+demonstrably answered, **or** any change that makes the reload path parse more of the response
+body (which widens the surface the mis-attribution covers).
+
+---
+
+## WR-17 — a second Reload shows the first failure's note
+
+**What is deferred:** clearing `state.note` when a new resolution starts.
+
+**The shape as shipped.** `reload()`'s entry (`useDraftPersistence.ts:988-993`) takes the
+re-entrancy guard, sets `reloadingRef` and `setResolving(true)` — and never touches the reading.
+So a second press, made while the previous attempt's `{kind:"conflict", note: RELOAD_FAILED_NOTE}`
+is on screen, keeps asserting a past network failure while a fresh attempt is in flight and both
+exits are disabled by `resolving`.
+
+**Why it is deferred.** Same mechanism and, in practice, the same edit as WR-16 — they are one
+change to one function. Splitting them across rounds would touch the CR-02 repair twice and
+re-prove the F21 family twice.
+
+**Re-open trigger:** identical to WR-16's. **These two re-open together**, in one plan, with one
+falsification pass over the failed-exit family.
+
+---
+
+## WR-18 — `overwrite()` degrades to an unguarded write on a `null` token
+
+**What is deferred:** refusing the Overwrite, or re-reading first, when the refusal body carried
+no `detail.token`.
+
+**The shape as shipped**, traced end to end. `updateWorkflowDraft` throws
+`new WorkflowStaleTokenError(body.detail?.token ?? null)` on a `stale_token` 409
+(`frontend/src/lib/api.ts:3460`) — the `?? null` is the degradation's origin. `refusalOf`
+(`useDraftPersistence.ts:403-412`) carries that through as `{ kind: "conflict", currentToken:
+carried ?? null }`, and the catch stores it (`:661`). `overwrite()` then assigns it
+unconditionally: `tokenRef.current = conflictTokenRef.current` (`:1058`), directly above
+`await performWrite()` (`:1073`). Back in the transport, the `If-Match` header is **added only**
+when the token is a non-empty string (`api.ts:3440-3443`) — deliberately, so a missing token
+sends no header rather than an empty one. Net effect: a `null` token turns "Overwrite" from a
+guarded single-shot write into an unguarded one.
+
+**Why it is deferred — it is the sharpest of the five, and every answer changes the product.**
+Refusing removes an exit that **D-186-08 guarantees is always offered** ("the person picks the
+exit; neither control is ever a silent no-op"). Re-reading turns the one-request exit into two,
+which is the round trip `overwrite()` was explicitly designed to avoid (its docblock: the
+server's disambiguating re-read already fetched the token). Choosing between those is a product
+decision, and it belongs with the phase that also gives the conflict banner a publish-aware
+reading — the same seam this file's §"Publish while the write loop is in `conflict` or `error`"
+entry names.
+
+**The containment, stated honestly so nobody has to re-derive its size.** The server still
+applies its owner scope (`auth.uid() = created_by` at both the RLS layer and the service-layer
+WHERE) and its published-row guard. What a null token loses is the **optimistic** guard — the
+third writer's concurrent edit would not be refused — not an authorisation. This is a lost
+concurrency check inside one owner's own drafts, not a path to somebody else's data.
+
+**Re-open trigger:** the first `stale_token` 409 observed in the field whose body lacks
+`detail.token` (which would make the degradation live rather than theoretical), **or** the phase
+that gives the conflict banner and the publish gate one voice — that plan owns deciding which of
+the two answers ships.
+
+---
+
+**What was CLOSED this round, so this file alone separates the five carried from the three
+fixed.** `CR-03` (the publish refusal was dead code on the flag-off Builder) was closed by
+**plan 186-18**, which lifted the `saving` branch above the flag gate and added the flag-off
+canvas row that observes it. `WR-12` (the flag-off hold release resolved to silence) and `WR-13`
+(a conflict resolved by Overwrite left a stale arming for a later hold to flush) were closed by
+**plan 186-19**. Those three are **not** deferrals and have no entry above; the five entries in
+this block — WR-14, WR-15, WR-16, WR-17, WR-18 — are the ones carried forward.
+
+---
+
+*Recorded: 2026-08-01 · Phase 186-concurrency-autosave, plan 20*
