@@ -32,6 +32,7 @@ import {
   HOLD_PUBLISHING_MANUAL,
   HOLD_UNREADABLE,
   SAVE_FAILED_SENTENCE,
+  DRAFT_GONE_SENTENCE,
   PUBLISHED_CONFLICT_MESSAGE,
   type PersistState,
 } from "./useDraftPersistence"
@@ -523,7 +524,11 @@ describe("useDraftPersistence — F8: a refusal never files a receipt", () => {
     }
   })
 
-  it("a 404 gets the generic sentence — a missing row is not an unreadable shape", async () => {
+  it("a 404 gets its OWN sentence — a missing row is not an unreadable shape, and not a dead network either", async () => {
+    // RETARGETED by 186-13 (WR-05), not replaced: the claim its name makes is the one it
+    // always made, and the SECOND inequality below is the whole finding. This test used to
+    // assert `SAVE_FAILED_SENTENCE` and therefore certified the defect — the cause-neutral
+    // line invites a retry, and there is no retry that can help here.
     mockedUpdate.mockRejectedValue(new WorkflowNotFoundError())
 
     const h = harness()
@@ -531,8 +536,40 @@ describe("useDraftPersistence — F8: a refusal never files a receipt", () => {
     await advance(AUTOSAVE_DEBOUNCE_MS)
     await flush()
 
-    expect(stateOf(h.view)).toEqual({ kind: "error", sentence: SAVE_FAILED_SENTENCE })
+    expect(stateOf(h.view)).toEqual({ kind: "error", sentence: DRAFT_GONE_SENTENCE })
+    expect(DRAFT_GONE_SENTENCE).not.toBe(HOLD_UNREADABLE)
+    expect(DRAFT_GONE_SENTENCE).not.toBe(SAVE_FAILED_SENTENCE)
     expect(h.markSaved).not.toHaveBeenCalled()
+  })
+
+  it("a 404 HALTS the loop — three further edits issue nothing at all (WR-05)", async () => {
+    // Written in F10's shape ON PURPOSE. The halt property is the same one, reached by a
+    // different cause, and saying it the same way is what makes that visible: a refusal the
+    // loop cannot recover from stops the loop, whichever refusal it was.
+    mockedUpdate.mockRejectedValueOnce(new WorkflowNotFoundError())
+    mockedUpdate.mockResolvedValue(write("T-SHOULD-NEVER-BE-SENT"))
+
+    const h = harness()
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+    await flush()
+
+    const atRefusal = mockedUpdate.mock.calls.length
+    expect(atRefusal).toBe(1)
+
+    for (let i = 0; i < 3; i += 1) {
+      h.edit()
+      await advance(AUTOSAVE_DEBOUNCE_MS * 3)
+      await flush()
+    }
+
+    expect(mockedUpdate).toHaveBeenCalledTimes(atRefusal)
+    expect(h.markSaved).not.toHaveBeenCalled()
+    // The work is not lost, it is unsendable: dirty stays true, so every leave guard fires.
+    expect(h.store.getState().dirty).toBe(true)
+    // …and it is NOT a conflict. There is no row to reload and none to overwrite, so the
+    // banner's two exits would both be dead affordances.
+    expect(stateOf(h.view)).toEqual({ kind: "error", sentence: DRAFT_GONE_SENTENCE })
   })
 
   it("a PUBLISHED row keeps the sentence that names the way out (186-07 closes 186-06's debt)", async () => {
@@ -942,6 +979,9 @@ describe("useDraftPersistence — F10: a stale token halts the loop dead", () =>
     })
 
     expect(stateOf(h.view).kind).toBe("error")
+    // 186-13 — and it reads the SAME WAY as a gone row discovered by a PATCH. One situation,
+    // one sentence, whichever path found it: the rule the two hold sentences already follow.
+    expect(stateOf(h.view)).toEqual({ kind: "error", sentence: DRAFT_GONE_SENTENCE })
   })
 })
 

@@ -187,6 +187,24 @@ export const HOLD_UNREADABLE = "Not saved — we can't read this shape yet"
 export const SAVE_FAILED_SENTENCE = "Not saved — we couldn't complete the save"
 
 /**
+ * THE ROW IS GONE, SO THE LOOP STOPS AND SAYS SO (186-13, WR-05).
+ *
+ * WHY IT IS NOT THE CAUSE-NEUTRAL LINE ABOVE. `SAVE_FAILED_SENTENCE` describes a situation
+ * a retry can fix — a dropped connection, a timeout — and it therefore INVITES one: the
+ * honest thing to do after reading it is to press Save again. This situation cannot be
+ * fixed by pressing anything. Telling a person "we couldn't complete the save" for a row
+ * that no longer exists sends them back to press the same button forever, against a server
+ * that will answer 404 every single time.
+ *
+ * So it states three things and nothing else: that the draft is gone, that this client has
+ * stopped trying, and what they can still do about the work that is on their screen.
+ *
+ * IT DOES NOT OFFER AN EXIT, and that is deliberate — see `isTerminalRefusal` below.
+ */
+export const DRAFT_GONE_SENTENCE =
+  "Not saved — this draft no longer exists, so we've stopped trying. Copy anything you still need before you leave this page."
+
+/**
  * The published-row refusal (D-184-16 debt 3, MOVED HERE BY 186-07).
  *
  * IT LIVED ON `WorkflowBuilderPage` AND HAD TO MOVE, because the branch that chooses it
@@ -290,12 +308,18 @@ function nameOf(err: unknown): string {
 }
 
 /**
- * Which honest state a refused write lands in. THREE named branches — the stale token,
- * which is a conflict the person resolves; the 422, which is a cause they can act on; and
- * the published row, which has a way out the generic line cannot name — plus a genuine
- * catch-all. A 404, a dropped connection, a timeout and a refusal minted after this client
- * shipped all mean "we could not complete it", and none of them may borrow a specific
- * wording they did not earn.
+ * Which honest state a refused write lands in. FOUR named branches — the stale token,
+ * which is a conflict the person resolves; the 422, which is a cause they can act on; the
+ * published row, which has a way out the generic line cannot name; and the missing row,
+ * which has no way out at all and must say so — plus a genuine catch-all. A dropped
+ * connection, a timeout and a refusal minted after this client shipped all mean "we could
+ * not complete it", and none of them may borrow a specific wording they did not earn.
+ *
+ * ⚠ THE 404 BRANCH IS 186-13's, AND IT CLOSES WR-05. It used to fall into the catch-all, so
+ * a draft deleted in another tab produced the cause-neutral line and the loop kept writing
+ * — every subsequent edit issued another PATCH against a row that could not exist, forever,
+ * and the sentence it showed invited exactly that. A retry is the right instinct for a dead
+ * network and the wrong one here, which is why the two situations may not share a string.
  *
  * ⚠ THE PUBLISHED BRANCH IS 186-07's, AND IT CLOSES A DEBT 186-06 RECORDED RATHER THAN
  * GUESSED AT. 186-06 left `WorkflowConflictError` in the catch-all deliberately, because
@@ -323,7 +347,40 @@ function refusalOf(
   if (name === "WorkflowConflictError") {
     return { kind: "error", sentence: PUBLISHED_CONFLICT_MESSAGE }
   }
+  if (name === "WorkflowNotFoundError") {
+    return { kind: "error", sentence: DRAFT_GONE_SENTENCE }
+  }
   return { kind: "error", sentence: SAVE_FAILED_SENTENCE }
+}
+
+/**
+ * IS THIS REFUSAL THE END OF THE LOOP? (186-13, WR-05)
+ *
+ * A PREDICATE RATHER THAN A STRING COMPARISON, deliberately. Halting is a property of the
+ * CAUSE, not of the sentence the cause happens to have been given this month; asking
+ * `refusal.sentence === DRAFT_GONE_SENTENCE` would make a copy edit into a behaviour change.
+ * Structural on the name, for `nameOf`'s reason: no prototype comparison appears in this
+ * file, so a class that arrived through a second module copy still classifies.
+ *
+ * THERE ARE EXACTLY TWO HALTING CAUSES AND THEY LAND IN DIFFERENT STATES, which is the part
+ * worth reading twice:
+ *
+ *   • a stale token halts into `{kind:"conflict"}`, because the row is still there and the
+ *     person has two real exits — take the server's copy, or force theirs through;
+ *   • a missing row halts into `{kind:"error"}` with the sentence above, because it has
+ *     NEITHER. Reload would find nothing and Overwrite would PATCH a row that is not there,
+ *     so offering them would be two dead affordances on a banner that promises a way out.
+ *
+ * AND IT MUST NOT AUTO-RECREATE THE DRAFT. The obvious alternative — clear `draftIdRef` so
+ * the next write creates a fresh row — was rejected on the 404's own design: missing and
+ * not-owned answer IDENTICALLY (T-103-01-01, so no existence leaks), which means this
+ * client literally cannot tell "deleted elsewhere" from "not yours". Silently minting a new
+ * row on a refusal it cannot classify is a worse failure than stopping. The loop stops, the
+ * draft stays dirty, and every leave guard therefore fires — which is the right outcome for
+ * work that cannot be persisted here.
+ */
+function isTerminalRefusal(err: unknown): boolean {
+  return nameOf(err) === "WorkflowNotFoundError"
 }
 
 export function useDraftPersistence(args: DraftPersistenceArgs): DraftPersistence {
@@ -516,6 +573,10 @@ export function useDraftPersistence(args: DraftPersistenceArgs): DraftPersistenc
           if (refusal.kind === "conflict") {
             haltedRef.current = true
             conflictTokenRef.current = refusal.currentToken
+          } else if (isTerminalRefusal(err)) {
+            // The row is gone: halt, but do NOT set `conflictTokenRef` and do NOT produce a
+            // `conflict` state. There is nothing to reload and nothing to overwrite.
+            haltedRef.current = true
           }
           setState(refusal)
           break
@@ -690,7 +751,13 @@ export function useDraftPersistence(args: DraftPersistenceArgs): DraftPersistenc
       if (!row || !row.definition) {
         // Deleted somewhere else, or never persisted. Land honestly, never silently — a
         // reload that quietly did nothing would look identical to one that worked.
-        setState({ kind: "error", sentence: SAVE_FAILED_SENTENCE })
+        //
+        // THE SAME SENTENCE THE WRITE PATH USES FOR THE SAME SITUATION (186-13). This is a
+        // gone row discovered by a read instead of by a PATCH, and one situation reads one
+        // way whichever path found it — the rule the two hold sentences already follow. The
+        // catch below keeps the cause-neutral line, because a failed REQUEST is a different
+        // thing from a row that is not there.
+        setState({ kind: "error", sentence: DRAFT_GONE_SENTENCE })
         return
       }
       store.getState().setDrafted(row.definition as unknown as BuilderDefinition)
