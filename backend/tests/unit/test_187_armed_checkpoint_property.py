@@ -77,6 +77,31 @@ MOCK COMPLETENESS (``feedback_mock_completeness``): every network dependency is 
 ``harness_engine._emit``, ``ctx.emit`` and
 ``app.services.ask_user_service.subscribe_for_response``.
 
+THE THREE ASSERTIONS
+--------------------
+* **P1 — body implies asked-first (universal, every row).** If the body ran, the armed
+  prompt must have been awaited, and its order index must be strictly LESS than the
+  body's. Both halves are asserted; the ordering is never inferred from call counts.
+* **P2 — reaching the body implies asked (targeted).** On every row whose
+  ``reaches_body_without_arming`` is ``True``, the armed prompt must have been awaited
+  **exactly once**. This is the assertion the HEAD bypass fails: the body runs while the
+  armed-prompt count is ``0``. It is also the only assertion that can see the Pitfall-4
+  fail-open (T-187-01-05), because a checkpoint routed away by an author's ``fail_run``
+  leaves the body un-run, which P1 satisfies vacuously.
+* **P3 — a refusal writes no receipt (negative).** On ``armed_refused_typed``: the body
+  never ran, the outcome is ``fail_run``, and ``write_audit`` was awaited **ZERO** times
+  with ``event_type="validator_ask_user_approved"`` — computed by FILTERING
+  ``await_args_list`` on that kwarg, never by a total await count (the same drive also
+  writes an ``action_risk_pending`` consequence row, which is correct and must not be
+  counted as a receipt). Phase 185's BLOCKER T-185-04-01 was a FALSE APPROVAL RECEIPT,
+  not a missing prompt, so this is the assertion that would have caught it.
+
+## RED signature observed on HEAD
+
+*(Filled by plan 187-01 Task 3, after running this file on unmodified HEAD. Until that
+section carries the observed values, the RED observation has not been made and no fix may
+be written.)*
+
 Imports INSIDE the body, per this suite's convention.
 """
 
@@ -465,3 +490,142 @@ def test_the_space_contains_both_known_bypasses():
     assert "pre_pass_fail_run_disposition" in CASE_IDS
     assert "armed_refused_typed" in CASE_IDS
     assert len(CASES) >= 9
+
+
+def _case(case_id: str) -> dict:
+    """The row named ``case_id`` — so a targeted test cannot silently address the wrong one."""
+    for c in CASES:
+        if c["id"] == case_id:
+            return c
+    raise AssertionError(f"no case named {case_id!r} in CASES")
+
+
+# ── P1 — BODY IMPLIES ASKED-FIRST (universal) ────────────────────────────────
+@pytest.mark.parametrize("case", CASES, ids=CASE_IDS)
+def test_p1_body_implies_the_armed_prompt_was_awaited_first(case):
+    """If the risky step's body RAN, a person was asked BEFORE it — on every author set.
+
+    This is the property in its weakest, universal form: it says nothing about rows where
+    an author's own gate legitimately routes control away from the body (there, it is
+    vacuously true and P2 does the work). Both halves are asserted separately —
+    PRESENCE (the armed prompt was awaited at all) and ORDERING (its recorded order index
+    is strictly less than the body's). Ordering is compared on the recorder's single
+    monotonic clock; it is never inferred from a call count, because "one prompt and one
+    body invocation" is equally consistent with asking AFTER running the step.
+    """
+    outcome, rec, _write_audit, approval = _drive(case)
+    armed_orders = rec.ask_orders_for(approval)
+
+    if not rec.body_invoked:
+        # Vacuously true. Recorded rather than skipped, so the row still proves the drive
+        # completed and the body genuinely did not fire.
+        assert rec.body_order is None
+        return
+
+    assert armed_orders, (
+        f"{case['id']}: THE BODY RAN AND NOBODY WAS ASKED. The phase is "
+        f"action_risk_armed=True, the executor body was invoked at order "
+        f"{rec.body_order}, and the armed approval prompt was awaited 0 times "
+        f"(awaits seen: {[rec.prompts.get(t) for t, _ in rec.asks]!r}). "
+        f"Mechanism: {case['why']}"
+    )
+    assert min(armed_orders) < rec.body_order, (
+        f"{case['id']}: the armed prompt was awaited at order {min(armed_orders)} but the "
+        f"body ran at order {rec.body_order} — asking AFTER the irreversible step is not "
+        f"a checkpoint"
+    )
+
+
+# ── P2 — REACHING THE BODY IMPLIES ASKED (targeted) ──────────────────────────
+_REACHING_CASES: tuple[dict, ...] = tuple(
+    c for c in CASES if c["reaches_body_without_arming"]
+)
+_REACHING_IDS: tuple[str, ...] = tuple(c["id"] for c in _REACHING_CASES)
+
+
+@pytest.mark.parametrize("case", _REACHING_CASES, ids=_REACHING_IDS)
+def test_p2_reaching_the_body_implies_exactly_one_armed_prompt(case):
+    """On every author set that reaches the body, the armed prompt is awaited EXACTLY once.
+
+    ``reaches_body_without_arming`` is the row's own declaration that control legitimately
+    arrives at the executor body — so on these rows a checkpoint IS owed, and "the armed
+    prompt count is 0" is a bypass no matter what the outcome ends up being. This is the
+    assertion that goes red on the SEED-137 HEAD bypass, and the only one that can see the
+    Pitfall-4 fail-open (T-187-01-05), where the checkpoint is routed away by an author's
+    ``on_failure`` and the body therefore never runs — invisible to P1.
+
+    EXACTLY once, not at-least-once: a checkpoint asked twice for one phase execution is
+    its own defect (D-187-17 puts the checkpoint BEFORE the ``while True:`` retry loop
+    precisely so a 3-retry phase does not ask a person three times).
+    """
+    outcome, rec, _write_audit, approval = _drive(case)
+    armed_orders = rec.ask_orders_for(approval)
+
+    assert len(armed_orders) == 1, (
+        f"{case['id']}: expected EXACTLY 1 armed approval prompt, observed "
+        f"{len(armed_orders)}. body_invoked={rec.body_invoked}, "
+        f"outcome={getattr(outcome, 'kind', None)!r}, "
+        f"prompts awaited={[rec.prompts.get(t) for t, _ in rec.asks]!r}. "
+        f"Mechanism: {case['why']}"
+    )
+
+
+# ── P3 — A REFUSAL WRITES NO RECEIPT (negative) ──────────────────────────────
+_APPROVAL_RECEIPT = "validator_ask_user_approved"
+
+
+def _approval_receipts(write_audit) -> list:
+    """The ``validator_ask_user_approved`` awaits ONLY.
+
+    Filters ``await_args_list`` on the ``event_type`` kwarg rather than reading a total
+    count: the same drive legitimately writes an ``action_risk_pending`` CONSEQUENCE row
+    (the run paused for a person), and the audit ledger's consequence != receipt rule
+    means that row is correct and must never be mistaken for approval.
+    """
+    return [
+        c for c in write_audit.await_args_list
+        if c.kwargs.get("event_type") == _APPROVAL_RECEIPT
+    ]
+
+
+def test_p3_a_typed_refusal_runs_nothing_and_writes_zero_approval_receipts():
+    """T-187-01-02 / the Phase-185 BLOCKER shape, as a property-space row.
+
+    ``armed_refused_typed`` answers the armed prompt with a typed free-text refusal that
+    is neither the exact approval label nor an exact member of the deny-list (the trailing
+    period defeats it). All three must hold:
+
+      1. ``_execute_phase`` was never invoked — the risky step did not run;
+      2. the outcome is ``fail_run`` — honest, not a silent continue;
+      3. ZERO ``validator_ask_user_approved`` receipts — the person who said no is not
+         recorded in the governance ledger as the one who authorised it.
+
+    A POSITIVE CONTROL follows in the same test: without it, "0 receipts" could be
+    vacuously true because the counter never moves at all.
+    """
+    outcome, rec, write_audit, _approval = _drive(_case("armed_refused_typed"))
+
+    assert rec.body_invoked is False, (
+        "a typed refusal RAN THE STEP — the answer the engine could not read as consent "
+        "was treated as consent"
+    )
+    assert outcome is not None, "a refusal returned None on a PRE gate — the body WOULD RUN"
+    assert outcome.kind == "fail_run", (
+        f"a refusal routed to {outcome.kind!r}, not fail_run"
+    )
+    receipts = _approval_receipts(write_audit)
+    assert len(receipts) == 0, (
+        f"a refusal wrote {len(receipts)} {_APPROVAL_RECEIPT!r} receipt(s): "
+        f"{[c.kwargs.get('metadata') for c in receipts]!r} — a false approval receipt "
+        f"names the refuser as the authoriser (T-185-04-01 / T-187-01-02)"
+    )
+
+    # POSITIVE CONTROL — the same harness, an approving answer. Proves the receipt
+    # counter moves, so the zero above is a measurement rather than an artefact.
+    _o2, _r2, approved_write_audit, _a2 = _drive(_case("no_author_validators"))
+    approved = _approval_receipts(approved_write_audit)
+    assert len(approved) == 1, (
+        f"positive control: expected exactly 1 {_APPROVAL_RECEIPT!r} on an approval, "
+        f"observed {len(approved)} — the negative assertion above may be vacuous"
+    )
+    assert approved[0].kwargs["metadata"]["choice"] == _approve_label()
