@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
 status: executing
-last_updated: "2026-08-01T13:15:00.000Z"
-last_activity: 2026-08-01 -- Phase 186 plan 16 executed (WR-10 closed)
+last_updated: "2026-08-01T17:00:00.000Z"
+last_activity: 2026-08-01 -- Phase 186 plan 17 executed (WR-08 + WR-09 closed; all 17 plans landed, operator UAT still owed)
 progress:
   total_phases: 19
   completed_phases: 5
@@ -50,7 +50,12 @@ Security found one real fail-open BLOCKER — T-185-04-01, a **typed** refusal o
 the step and filed a false approval receipt — fixed by quick task `260731-3y4` (`417728bd`) and
 **confirmed live in the browser** on run `5d3a4707` (run failed, step never ran, zero receipts).
 
-**Next:** **Phase 186 — SECOND GAP CLOSURE PLANNED — `/gsd:execute-phase 186` (waves 9-10).**
+**Next:** **Phase 186 — ALL 17 PLANS EXECUTED (waves 1-10 complete as of 2026-08-01).** The second
+gap-closure round (186-14..17) landed in full; every item the 2026-08-01 re-verification raised —
+GAP-4 / CR-02 and WR-06..WR-11 — now has a landed plan. **The phase is NOT complete:** the seven
+operator-driven rows in `186-VALIDATION.md` (1, 2, 3, 3b, 5, 6, 7) are still `to run`, and SC#4 (the
+two-editor parallel axis) is satisfied only by rows 1-3 being driven live. Candidate next steps are
+a re-verification pass or the operator UAT — **no requirement status has been advanced**.
 CONTEXT gathered 2026-07-31 (`0a200d51`), 17 decisions (D-186-01..17); PLAN committed 2026-08-01
 (`a4c4eb86`, 8 plans / 5 waves) — all 8 executed. Gap-closure plans 186-09..13 (waves 6-8) then
 executed 2026-08-01 — **13/13 plans complete, all tasks done, zero plans outstanding.**
@@ -173,7 +178,44 @@ Zero migrations (head still `114_…`), zero dependency changes.
   canvas suite); the prop docblock's "24 shipped assertions" is stale (41); the canvas-pair baseline
   is **111, not the 141** the plan's verification block states; `WorkflowsPage.test.tsx` does exist.
 
-⚠ **The `progress.completed_plans` counter was deliberately NOT incremented by 186-16.** It reads
+**▶ PLAN 186-17 EXECUTED 2026-08-01 — WR-08 and WR-09 are CLOSED. This was the LAST plan of the
+round; all 17 plans of phase 186 have now landed.** 2 tasks, 2 commits (`4b02ed18` / `fa6c1a03`)
+plus `83b97669` (SUMMARY). Two source/test files + `186-VALIDATION.md`; zero migrations (head still
+`114_…`), zero dependency changes, `BuilderSaveRegion.tsx` diff **empty**.
+- **WR-08 — the drain asks TWO questions instead of using one answer twice.** Payload identity
+  alone gates the RECEIPT (CR-01 preserved verbatim); `pendingRef` alone gates IMMEDIATE RE-ENTRY;
+  every other supersession BREAKS after resolving `{kind:"saving"}` → `idle`, and the edit's own
+  live debounce timer issues the follow-up. **Falsified: 11 PATCHes across 3 s of typing → 1**
+  (F22a), and a Save press with nothing changed stopped minting a redundant token-bumping PATCH
+  (F22d, 2 → 1). No second timer was added — D-186-01 intact. Both module docblocks the drain had
+  made false are now true and stated as checkable rules.
+- **WR-09 — the hold's reading resolves when the hold does, on BOTH surfaces.** The resolution sits
+  above all three gates (halt, `enabled`, nothing-pending) because each is a reason not to WRITE
+  and none is a reason to keep claiming a publish runs. RED was literally
+  `expected 'held' not to be 'held'`. It is **functional** (`s.kind === "held" ? … : s`) so a
+  `conflict` — the only reading carrying Reload/Overwrite — survives; F20h falsifies the wrong
+  shape of the same fix. `heldPendingRef` on the flag-off path is set to the store's own `dirty`
+  (F20f RED: a PATCH carrying the untouched 2-phase draft and the session's original token).
+- **D-181-01 spot-check recorded in the SUMMARY**: four `performWrite()` call sites, gates
+  unchanged from 186-13's enumeration — the two automatic ones behind `enabled`, `saveNow` and
+  `overwrite` deliberately ungated because a person pressed them.
+- Numbers, measured this session at 30 s: hook suite **46 → 53** in isolation; the 7-suite consumer
+  set **270 → 277, zero failures**; canvas+session pair 110/110 (the WR-11 row did not fail);
+  `vite build` exit 0.
+- ⚠ **Six plan claims refuted by measurement** (recorded in the SUMMARY, do not inherit): the
+  "three `pendingRef` arming sites" have been **one statement + three call paths** since 186-12, so
+  `grep -c "pendingRef.current = true"` is 1 not 3; the consumer-set baseline is **270/270**, not
+  the plan's "233 passed + 1 failed"; `grep -n "if (!enabled)"` cannot match the debounce effect's
+  `if (!enabled || definition === null)`; `grep -c "continue"` is 2 because the docblock now names
+  the hazard (one `continue` STATEMENT); F22a's RED is **parameter-dependent — 5 or 11** (a typing
+  cadence longer than the round trip lets the storm self-terminate), both recorded; and F22c's
+  STATE assertion cannot go red pre-fix because a request genuinely WAS outstanding.
+- **`186-VALIDATION.md` row 3b was REWORDED, not added** (63 rows before and after): it now names
+  both halves of the flag, including the flag-off requirement that the "Publishing —" sentence is
+  GONE from the header once the gauntlet ends. Still `to run`.
+
+⚠ **The `progress.completed_plans` counter was deliberately NOT incremented by 186-16 or 186-17.**
+It reads
 64 while `.planning/phases/*/NN-SUMMARY.md` counts **67 on disk** — it was already stale before this
 plan and bumping a wrong base only launders it. The orchestrator owns the recount; do not treat 64
 (or 65) as evidence of what has shipped.
@@ -1969,6 +2011,12 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase 186]: 186-16 (falsification): the gate was proven by REMOVING `&& !blocked` and re-running — exactly the 3 gate rows went red while the 2 identity rows (no prop / whitespace-only reason) correctly stayed green. A row that stays green under the mutation is measuring identity, not the gate, and knowing which is which is the point. The refusal is asserted on the mocked TRANSPORT rather than on the rendered outcome: a golden run's cost is spent the moment the request leaves.
 - [Phase 186]: 186-16 (measurement lesson, the third in three plans): **four claims inherited from the PLAN were false against the tree** — the gauntlet suite had no R12 cases at all (they live in the canvas suite), its prop docblock's "24 shipped assertions" is stale at 41, and the "canvas-pair baseline is 141" is 111. None changed what was built; all are recorded so a fourth reader does not inherit them. Re-measure before quoting any count in this phase.
 - [Phase 186]: 186-15 (measurement lesson, the second in two plans): **a claim that cannot be reproduced is not thereby false — reproduce the MECHANISM instead of picking a side.** The WR-11 row passed 6/6 here and failed 3/3 for the verifier. Rather than record either, the failure condition was injected (a 1500 ms pause standing in for a slow lazy import), which reproduced the verifier's exact signature and confirmed the diagnosis. The real defect was that the row's result depended on machine and cache state at all. Both numbers are recorded in the SUMMARY so no third reader inherits one on trust.
+- [Phase 186]: 186-17 (WR-08): **when one boolean answers two questions, split the questions — do not tune the boolean.** The drain's `superseded` decided both *may a receipt be filed* and *may the loop issue another request now*, so CR-01's correct widening of the first (queue flag → payload identity) silently widened the second into an unthrottled loop: one PATCH per ROUND TRIP while an author types, a rate set by network latency. Now identity alone gates the receipt and `pendingRef` alone gates re-entry. Rejected: a `dirty`-gated safety re-arm (a SECOND timer in a module whose rule is one timer, guarding the case `pendingRef` already identifies) and an `await delay()` before `continue` (keeps `inFlightRef` true through the quiet period, so Save-draft is disabled and `Saving…` shows while nothing is outstanding — a rate limit that lies about state).
+- [Phase 186]: 186-17: **the re-entry rule is derivable from the arming site, not from a comment.** `pendingRef` has ONE home since 186-12 — `performWrite`'s single-flight guard — reached by exactly three beats (a MATURED timer, `saveNow`, the hold release), each of which had its beat CONSUMED and so has no live timer behind it. Every other supersession is an edit still inside its own debounce, and an edit reschedules the debounce effect by construction (`[definition, enabled]`). So: `continue` under `pendingRef`, `break` otherwise, and the ordinary beat writes the rest. A future change that arms `pendingRef` anywhere new must name the beat it consumed or the rule stops being derivable.
+- [Phase 186]: 186-17: **the fix's own hazard is closed in the same task** — a `break` that leaves `{kind:"saving"}` on screen is WR-09's defect introduced by WR-08's cure, so the break resolves the reading to `idle` first. This is the pattern the phase failed five times: a mechanism honest about the thing it was written for and silent about the state it leaves behind.
+- [Phase 186]: 186-17 (WR-09): **a state resolution belongs above every gate that only decides whether to WRITE.** The review proposed clearing the held reading inside the `!enabled` arm; the halt gate and the nothing-pending gate carry the identical hazard, so the fix would have been true in one third of the cases. And the resolution must be FUNCTIONAL (`s.kind === "held" ? {kind:"idle"} : s`) — a bare reset would erase a `conflict`, the only reading that carries Reload/Overwrite, reintroducing GAP-4 by a second door. F20h falsifies that wrong shape rather than trusting the comment.
+- [Phase 186]: 186-17: **make a flag AGREE WITH THE TRUTH instead of choosing between two failure modes.** 186-13 left `heldPendingRef` armed on the flag-off path (so work would not be lost) and the review wanted it cleared (so a stale arming could not write later). `heldPendingRef.current = store.getState().dirty` satisfies both: it stops being a memory of a press and becomes a statement about the document. RED was a PATCH carrying the untouched 2-phase draft and the session's original token — a write against a document nobody had edited.
+- [Phase 186]: 186-17 (measurement lesson, the fourth in four plans): **a falsification's STRENGTH is a parameter, and the parameter must be chosen by measurement.** F22a at the plan's typing cadence (250 ms against a 200 ms server) showed 5 calls — real, but the storm self-terminates when the typist is slower than the round trip. At 125 ms it is sustained and shows 11. Both are recorded in the test's own docblock so the choice is auditable. Also refuted here: the "three `pendingRef` arming sites" (one statement + three call paths since 186-12) and the plan's "233 passed + 1 failed" consumer-set baseline (270/270 at the real base commit). Re-measure before quoting any count in this phase — this is now unanimous across 186-14..17.
 
 ## Operator Next Steps
 
