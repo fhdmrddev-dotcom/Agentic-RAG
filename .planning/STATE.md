@@ -4,7 +4,7 @@ milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
 status: executing
 last_updated: "2026-08-01T09:21:54.000Z"
-last_activity: 2026-08-01 -- Phase 186 gap closure complete (186-13, wave 8 -- last plan)
+last_activity: 2026-08-01 -- Phase 186 waves 6-8 executed (13/13 plans); re-verification gaps_found, GAP-4 blocker open
 progress:
   total_phases: 19
   completed_phases: 5
@@ -50,9 +50,34 @@ Security found one real fail-open BLOCKER — T-185-04-01, a **typed** refusal o
 the step and filed a false approval receipt — fixed by quick task `260731-3y4` (`417728bd`) and
 **confirmed live in the browser** on run `5d3a4707` (run failed, step never ran, zero receipts).
 
-**Next:** **Phase 186 — Concurrency & Autosave — EXECUTE THE GAP CLOSURE (186-09..13, waves 6-8).**
+**Next:** **Phase 186 — Concurrency & Autosave — SECOND GAP CLOSURE OWED (GAP-4 blocker).**
 CONTEXT gathered 2026-07-31 (`0a200d51`), 17 decisions (D-186-01..17); PLAN committed 2026-08-01
-(`a4c4eb86`, 8 plans / 5 waves) — all 8 executed, committed, suites green.
+(`a4c4eb86`, 8 plans / 5 waves) — all 8 executed. Gap-closure plans 186-09..13 (waves 6-8) then
+executed 2026-08-01 — **13/13 plans complete, all tasks done, zero plans outstanding.**
+
+**⚠ RE-VERIFICATION 2026-08-01 returned `gaps_found` again — 6/8 must-haves.** GAP-1 / GAP-2 /
+GAP-3 and WR-01..WR-05 are all **genuinely closed**, each re-derived from source rather than trusted
+from the SUMMARYs. But the re-review + re-verification independently found a **NEW blocker, GAP-4 /
+CR-02**, in the same hook: `reload()`'s catch (`useDraftPersistence.ts:770`) sets `{kind:"error"}`
+without clearing `haltedRef`, while the banner renders only on `conflict || resolving` — both false
+after the catch. One flaky `listDraftWorkflows` on the **recommended default** conflict exit and the
+draft is permanently unsavable for the session, behind a sentence that invites an impossible retry.
+No test drives a rejecting reload. Five warnings also open: WR-06 residue (`stale_token` wire shape
+has no DB-free coverage), WR-07 (a published-row 409 is unsatisfiable but never terminal), WR-08
+(the CR-01 repair's `continue` gives back the debounce — one PATCH per round trip), WR-09 (flag-off,
+"Publishing —" never resolves), WR-10 (Publish not gated on an outstanding write).
+
+**A SUMMARY measurement claim was refuted:** 186-12 and 186-13 both record
+`WorkflowBuilderPage.session.test.tsx > pane click — ZERO PATCHes` as a parallel-load flake that
+"passes in isolation". It fails 3/3 including full isolation — the test encodes its claim as an
+absolute call count while legitimately waiting up to 10 s for the lazily-imported canvas pane.
+Product behaviour is correct; the test is wrong. Do not inherit the "passes in isolation" claim.
+
+**CONCUR-01 ✓ satisfied; CONCUR-02 ⚠ partial — neither flipped to Complete** while GAP-4 and the
+six manual UAT rows are open. Phase NOT marked complete.
+
+**The prior (waves 1-5) reports are preserved:** `186-REVIEW-waves-1-5.md` keeps the definitions of
+CR-01 and WR-01..WR-06 that the gap plans' `closes:` frontmatter references.
 
 **⚠ `/gsd:verify-work 186` returned `gaps_found` — 4/7 must-haves verified (`8113deea`).** All 8
 plans' tasks are done; this is a GOAL failure, not a task failure. Three blockers were independently
