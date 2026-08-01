@@ -1547,7 +1547,12 @@ if body.project_folder_id is None:
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+> **All 7 were closed at the plan-phase touchpoint (2026-08-02).** The questions and their measurements
+> are left verbatim — the measurement in each one IS the record, and re-writing it would destroy the
+> evidence a later phase needs. Each carries a one-line resolution pointer to the decision or plan that
+> settled it. Nothing below is still open.
 
 1. **SC#5 check 2 cannot pass over the named corpus.** *(highest priority)*
    - What we know: `plan_execute_verify`'s `plan` and `verify` are both bare `llm_single` steps
@@ -1559,6 +1564,10 @@ if body.project_folder_id is None:
    - Recommendation: **narrow the check** to "no two steps with materially different config render
      identical faces", and record `plan_execute_verify` as the documented exception with its
      measured shape. Do not add a prompt-derived tier (fabrication risk, D-187-05's floor).
+   - → **RESOLVED by D-187-15** — the operator took the narrowing verbatim ("no two steps with
+     *materially different config* render identical faces") and recorded `plan_execute_verify` as the
+     documented exception with its measured shape. A prompt-derived tier was explicitly rejected.
+     Implemented in **plan 187-12** (`phaseVocabulary.corpus.test.ts`).
 
 2. **What is a "face" for SC#5 check 1?**
    - What we know: `PhaseSpineGraph.tsx:184` prints the raw `phase.config.phase_type` in a mono chip
@@ -1568,31 +1577,60 @@ if body.project_folder_id is None:
    - Recommendation: define "face" as **the string `nodeTitle()` returns** (plus the canvas card's
      subtitle), and test it as a pure-function assertion over the corpus rather than a DOM scrape.
      That is deterministic, cheap, and matches what Req 1 actually changes.
+   - → **RESOLVED by D-187-16** — "face" = the string `nodeTitle()` returns, plus the canvas card's
+     subtitle; SC#5 check 1 is a **pure-function assertion over the corpus**, not a DOM scrape.
+     Stripping the spine's pre-existing raw chrome was rejected. Implemented in **plan 187-12**.
 
 3. **Does Req 4's "both graph views agree" require a subtitle on the spine?**
    - What we know: the spine has no `PHASE_TYPE_SUBTITLES` consumer. The SPEC's own acceptance
      criterion says *"the same **title** in both toggle states"*, which is satisfiable without one.
    - Recommendation: canvas gets the subtitle swap; the spine simply stops swapping its title.
      Record the asymmetry rather than growing scope.
+   - → **RESOLVED by D-187-16** (same decision, second half) — **no**. The canvas gets the subtitle
+     swap; the spine simply stops swapping its title, and the asymmetry is recorded rather than
+     designed away. Adding a `PHASE_TYPE_SUBTITLES` consumer to the spine was rejected. Implemented in
+     **plan 187-09**.
 
 4. **Where exactly does the armed checkpoint sit relative to the retry loop?**
    - What we know: the body is at `:747` inside `while True:` at `:743`. Inside ⇒ one prompt per
      retry attempt; before ⇒ one per phase execution.
    - Recommendation: **before** the loop (matching the once-per-phase pre-gate pass). Neither SPEC
      nor CONTEXT settles it.
+   - → **RESOLVED by D-187-17** — **before** the `while True:` at `harness_engine.py:743`. One prompt
+     per phase execution; a retry after a failed attempt does not re-ask. Inside the loop was rejected
+     (a 3-retry phase would ask three times). Implemented in **plan 187-06**, proved by the plan
+     187-01 property and re-verified in **187-11**.
 
 5. **Should the receipt appear on the `autoDraft` hand-off path?**
    - What we know: `onDraft` is reachable from `:1202-1216` (the Phase-124 "Describe & run" door).
    - Recommendation: yes (it is a genuine AI seed), but state it so it is not discovered in UAT.
+   - → **RESOLVED — Claude's Discretion**, decided **yes** and stated in **plan 187-15 Task 2**'s action
+     and `<behavior>` (with an acceptance criterion asserting the receipt appears after an
+     `autoDraft`-driven draft), precisely so it is not discovered in UAT. Both paths funnel through
+     `onDraft`'s success branch, so it costs no extra line.
 
 6. **How many of the six `nodeTitle()` call sites get the name context?**
    - Recommendation: at minimum canvas + spine (SPEC's bar). `ProblemsTray` and both
      `WorkflowBuilderPage` announcement sites are cheap and prevent a screen-reader/tray disagreement.
      `definitionOps.canRemovePhase` needs a signature widening — decide deliberately.
+   - → **RESOLVED — Claude's Discretion, decided FIVE of six.** Canvas + spine in **plan 187-15 Task 1**
+     (the SPEC floor); `ProblemsTray` in **plan 187-08 Task 2** — measured: the tray is mounted at
+     `WorkflowCanvas.tsx:1383`, *inside* a file that plan already touches, so it costs **one prop line
+     and zero lines in the D-187-14-gated page**; both `WorkflowBuilderPage` announcement sites
+     (`:985`, `:1025`) in **plan 187-15 Task 1**, budgeted as component 4 of that plan's derived diff
+     cap (5 ins / 4 del). **`definitionOps.canRemovePhase` is DEFERRED by name** — widening a pure
+     module's signature is a separate decision and its refusal sentence is a shape predicate, not a
+     node face. Its consequence (a refusal notice naming a step differently from the `Added`/`Removed`
+     notices beside it) and its **re-open trigger — Phase 188's `WorkflowCanvas.tsx` extraction** — are
+     recorded in `187-VALIDATION.md`, and a plan 187-15 acceptance criterion fails if it is closed
+     silently.
 
 7. **Does `harness_audit`'s `validator_ask_user_approved` metadata keep `"validator": <int>`?**
    - After the hoist it becomes `None`. Honest, but it is a governance-artifact shape change. Decide
      and record.
+   - → **RESOLVED by D-187-18** — the field is KEPT and its value is `null` for a hoisted armed
+     checkpoint (honest: there is no author validator index to name). Ordering is unchanged; only the
+     `validator` value moves. Implemented in **plan 187-06** (T-187-06-05) and asserted in **187-11**.
 
 ---
 
