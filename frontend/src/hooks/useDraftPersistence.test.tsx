@@ -762,6 +762,294 @@ describe("useDraftPersistence — F10: a stale token halts the loop dead", () =>
   })
 })
 
+// ── F19 — single flight is a property of the WRITER (GAP-2 / WR-01) ───────────
+
+/**
+ * Phase 186-12 — the difference between a PATCH test and a PROPERTY test.
+ *
+ * F9 above pins "at most one PATCH is outstanding" for exactly ONE caller: the debounce
+ * timer. That is a patch test. It passes because the timer happens to carry its own
+ * `inFlightRef` check, and it says nothing whatsoever about the other callers — which is
+ * how `overwrite()` and `reload()` shipped without one. F19 pins the same invariant for the
+ * whole caller SET, so the property survives a caller F9 never imagined.
+ *
+ * THE TWO CALLERS F9 NEVER EXERCISED ARE THE ESCAPE HATCHES. `overwrite` and `reload` are
+ * the mechanism built specifically to RESOLVE a concurrency conflict, and before 186-12
+ * neither of them was concurrency-safe: an ordinary double-click on Overwrite issued two
+ * concurrent PATCHes carrying the SAME token, the server refused the loser `stale_token`,
+ * and the loop raised a conflict banner for a conflict that had never happened. The
+ * conflict resolver manufacturing conflicts is the T-185-04-01 lesson met a third time —
+ * an invariant that each caller has to remember is not an invariant.
+ *
+ * THE RED NUMBERS, so a future reader can re-observe them by reverting the fix:
+ *   F19a — three rows (the debounce timer, `saveNow`, the hold release) are GREEN before the
+ *          fix, because those callers carry their own check. The `overwrite()` row reports
+ *          a peak of 2.
+ *   F19b — `updateWorkflowDraft` is called 2 times after the conflict where 1 is expected,
+ *          and the surface reads `conflict` while the resolution is still in flight.
+ *   F19c — `listDraftWorkflows` is called 2 times where 1 is expected.
+ *   F19d — the next request carries `T-STALE-RACE`, the token minted by the racing second
+ *          overwrite that completed LAST, rather than `T-FRESH` from the write the person
+ *          actually authorised.
+ *
+ * The tracking idiom below (`outstanding` / `peak` / `tracked`) is F9's, reused rather than
+ * reinvented: one counter pair incremented at CALL time and decremented in a `.finally`, so
+ * `peak` records the true simultaneous maximum rather than a count of requests.
+ */
+describe("useDraftPersistence — F19: single flight is a property of the WRITER (WR-01)", () => {
+  let outstanding = 0
+  let peak = 0
+
+  beforeEach(() => {
+    outstanding = 0
+    peak = 0
+  })
+
+  function tracked(p: Promise<WorkflowDraftWriteResult>): Promise<WorkflowDraftWriteResult> {
+    outstanding += 1
+    peak = Math.max(peak, outstanding)
+    return p.finally(() => {
+      outstanding -= 1
+    })
+  }
+
+  type Held = { h: ReturnType<typeof harness>; first: Deferred<WorkflowDraftWriteResult> }
+
+  /** The shared arrangement: one autosave write issued and HELD OPEN by a deferred. */
+  async function holdFirstWriteOpen(): Promise<Held> {
+    const first = deferred<WorkflowDraftWriteResult>()
+    mockedUpdate.mockImplementation(() => tracked(Promise.resolve(write("T-EXTRA"))))
+    mockedUpdate.mockImplementationOnce(() => tracked(first.promise))
+
+    const h = harness()
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+
+    expect(mockedUpdate).toHaveBeenCalledTimes(1)
+    expect(outstanding).toBe(1)
+    return { h, first }
+  }
+
+  /**
+   * The `overwrite` row needs its OWN arrangement, and the reason is structural rather than
+   * incidental: `overwrite` is only reachable from a `conflict`, and a conflict is only
+   * reachable from a REFUSED write. So this row spends its first request reaching the
+   * conflict, takes the exit once to put a write in flight, and only then double-clicks.
+   */
+  async function conflictThenHoldTheOverwriteOpen(): Promise<Held> {
+    const first = deferred<WorkflowDraftWriteResult>()
+    mockedUpdate.mockImplementation(() => tracked(Promise.resolve(write("T-EXTRA"))))
+    mockedUpdate
+      .mockImplementationOnce(() =>
+        tracked(Promise.reject(new WorkflowStaleTokenError("T-SERVER"))),
+      )
+      .mockImplementationOnce(() => tracked(first.promise))
+
+    const h = harness()
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+    await flush()
+    expect(stateOf(h.view).kind).toBe("conflict")
+
+    await act(async () => {
+      void h.view.result.current.overwrite()
+      await Promise.resolve()
+    })
+    expect(mockedUpdate).toHaveBeenCalledTimes(2)
+    expect(outstanding).toBe(1)
+    return { h, first }
+  }
+
+  const ROWS: {
+    name: string
+    arrange: () => Promise<Held>
+    drive: (h: ReturnType<typeof harness>) => Promise<void>
+  }[] = [
+    {
+      name: "the debounce timer",
+      arrange: holdFirstWriteOpen,
+      drive: async (h) => {
+        h.edit()
+        await advance(AUTOSAVE_DEBOUNCE_MS)
+      },
+    },
+    {
+      name: "saveNow()",
+      arrange: holdFirstWriteOpen,
+      drive: async (h) => {
+        await act(async () => {
+          await h.view.result.current.saveNow()
+        })
+      },
+    },
+    {
+      name: "the hold release",
+      arrange: holdFirstWriteOpen,
+      drive: async (h) => {
+        h.set({ publishInFlight: true })
+        h.set({ publishInFlight: false })
+        await flush()
+      },
+    },
+    {
+      name: "overwrite()",
+      arrange: conflictThenHoldTheOverwriteOpen,
+      drive: async (h) => {
+        await act(async () => {
+          void h.view.result.current.overwrite()
+          await Promise.resolve()
+        })
+      },
+    },
+  ]
+
+  for (const row of ROWS) {
+    it(`F19a — ${row.name} adds no concurrent request while a write is outstanding`, async () => {
+      const { h } = await row.arrange()
+
+      await row.drive(h)
+      // Time passes and the first write is deliberately NEVER resolved, so anything a
+      // second entry point issued is still outstanding when the peak is read.
+      await advance(AUTOSAVE_DEBOUNCE_MS * 2)
+
+      expect(peak).toBe(1)
+    })
+  }
+
+  it("F19b — a double-click on Overwrite is ONE PATCH, so no stale_token conflict is manufactured", async () => {
+    const held = deferred<WorkflowDraftWriteResult>()
+    // What the SERVER does to the loser of a same-token race. If a second PATCH is ever
+    // issued, this is the refusal the loop turns back into a conflict banner.
+    mockedUpdate.mockImplementation(() =>
+      tracked(Promise.reject(new WorkflowStaleTokenError("T-SERVER-2"))),
+    )
+    mockedUpdate
+      .mockImplementationOnce(() =>
+        tracked(Promise.reject(new WorkflowStaleTokenError("T-SERVER"))),
+      )
+      .mockImplementationOnce(() => tracked(held.promise))
+
+    const h = harness()
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+    await flush()
+    expect(stateOf(h.view).kind).toBe("conflict")
+    // Counted as a DELTA: reaching a conflict costs one refused write, and that one is not
+    // the subject here.
+    const atConflict = mockedUpdate.mock.calls.length
+
+    // The double-click: two presses inside one tick, before React can re-render anything.
+    await act(async () => {
+      void h.view.result.current.overwrite()
+      void h.view.result.current.overwrite()
+      await Promise.resolve()
+    })
+    await advance(0)
+
+    // Before ANYTHING resolves, the surface is saving. In RED the racing second PATCH has
+    // already been refused and the banner is back up for a conflict that never happened.
+    expect(stateOf(h.view).kind).toBe("saving")
+
+    held.resolve(write("T-NEXT"))
+    await flush()
+
+    expect(mockedUpdate.mock.calls.length - atConflict).toBe(1)
+    expect(mockedUpdate.mock.calls[atConflict][2]).toBe("T-SERVER")
+    expect(stateOf(h.view)).toEqual({ kind: "saved", at: expect.any(Number) })
+  })
+
+  it("F19c — a double-click on Reload is ONE read and ONE setDrafted", async () => {
+    mockedUpdate.mockImplementationOnce(() =>
+      tracked(Promise.reject(new WorkflowStaleTokenError("T-SERVER"))),
+    )
+
+    const h = harness()
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+    await flush()
+    expect(stateOf(h.view).kind).toBe("conflict")
+
+    // Counted the way the harness counts `markSaved` — through `setState`, because zustand
+    // rebuilds the state object and only a value written INTO it survives.
+    const setDrafted = vi.fn()
+    const realSetDrafted = h.store.getState().setDrafted
+    h.store.setState({
+      setDrafted: (d: BuilderDefinition) => {
+        setDrafted(d)
+        realSetDrafted(d)
+      },
+    })
+
+    const rows: WorkflowDraftRow[] = [
+      {
+        id: DRAFT_ID,
+        slug: "risk-register",
+        version: 1,
+        name: "Risk register",
+        definition: { ...draft(), phases: [phase("server-side", 0)] },
+        token: "T-RELOADED",
+      },
+    ]
+    const listHeld = deferred<WorkflowDraftRow[]>()
+    mockedList.mockImplementation(() => Promise.resolve(rows))
+    mockedList.mockImplementationOnce(() => listHeld.promise)
+
+    await act(async () => {
+      void h.view.result.current.reload()
+      void h.view.result.current.reload()
+      await Promise.resolve()
+    })
+
+    listHeld.resolve(rows)
+    await flush()
+
+    expect(mockedList).toHaveBeenCalledTimes(1)
+    expect(setDrafted).toHaveBeenCalledTimes(1)
+    expect(h.store.getState().phases).toHaveLength(1)
+    expect(stateOf(h.view)).toEqual({ kind: "idle" })
+  })
+
+  it("F19d — an exit taken while a write is outstanding adopts no token", async () => {
+    // Two deferreds, resolved in the order the race would really settle: the write the
+    // person authorised lands FIRST, and the racing one the loop should never have issued
+    // lands LAST — which is precisely why a late loser can clobber `tokenRef`.
+    const authorised = deferred<WorkflowDraftWriteResult>()
+    const racing = deferred<WorkflowDraftWriteResult>()
+    mockedUpdate.mockImplementation(() => tracked(Promise.resolve(write("T-EXTRA"))))
+    mockedUpdate
+      .mockImplementationOnce(() =>
+        tracked(Promise.reject(new WorkflowStaleTokenError("T-CONFLICT"))),
+      )
+      .mockImplementationOnce(() => tracked(authorised.promise))
+      .mockImplementationOnce(() => tracked(racing.promise))
+
+    const h = harness()
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+    await flush()
+    expect(stateOf(h.view).kind).toBe("conflict")
+
+    await act(async () => {
+      void h.view.result.current.overwrite()
+      void h.view.result.current.overwrite()
+      await Promise.resolve()
+    })
+
+    authorised.resolve(write("T-FRESH"))
+    await flush()
+    // Harmless in GREEN — the second exit never issued a request, so nothing awaits this.
+    racing.resolve(write("T-STALE-RACE"))
+    await flush()
+
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+    await flush()
+
+    const last = mockedUpdate.mock.calls[mockedUpdate.mock.calls.length - 1]
+    expect(last[2]).toBe("T-FRESH")
+  })
+})
+
 // ── The explicit Save-draft affordance (D-186-03) ─────────────────────────────
 
 describe("useDraftPersistence — saveNow, the deliberate commit-now", () => {
