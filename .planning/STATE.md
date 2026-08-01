@@ -4,13 +4,13 @@ milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
 status: executing
 last_updated: "2026-08-01T09:21:54.000Z"
-last_activity: 2026-08-01 -- Phase 186 waves 6-8 executed (13/13 plans); re-verification gaps_found, GAP-4 blocker open
+last_activity: 2026-08-01 -- Phase 186 second gap closure PLANNED (186-14..17, waves 9-10); plan-check passed
 progress:
   total_phases: 19
   completed_phases: 5
-  total_plans: 65
+  total_plans: 69
   completed_plans: 63
-  percent: 26
+  percent: 25
 ---
 
 # Project State
@@ -50,10 +50,36 @@ Security found one real fail-open BLOCKER — T-185-04-01, a **typed** refusal o
 the step and filed a false approval receipt — fixed by quick task `260731-3y4` (`417728bd`) and
 **confirmed live in the browser** on run `5d3a4707` (run failed, step never ran, zero receipts).
 
-**Next:** **Phase 186 — Concurrency & Autosave — SECOND GAP CLOSURE OWED (GAP-4 blocker).**
+**Next:** **Phase 186 — SECOND GAP CLOSURE PLANNED — `/gsd:execute-phase 186` (waves 9-10).**
 CONTEXT gathered 2026-07-31 (`0a200d51`), 17 decisions (D-186-01..17); PLAN committed 2026-08-01
 (`a4c4eb86`, 8 plans / 5 waves) — all 8 executed. Gap-closure plans 186-09..13 (waves 6-8) then
 executed 2026-08-01 — **13/13 plans complete, all tasks done, zero plans outstanding.**
+
+**Second gap-closure round PLANNED 2026-08-01 — 4 plans (186-14..17) in waves 9-10 (`a2dffab2`),
+plan-check PASSED (0 blockers, 1 warning applied inline).** Operator scoped the round to
+*blocker + interacting warnings*; IN-01/03/04/06 stay deferred, and truth 8 / SC#4's seven
+`human_verification` rows stay operator-owned live UAT (not plannable code).
+
+| Plan | Wave | Closes |
+|---|---|---|
+| **186-14** | 9 | **GAP-4 / CR-02 (blocker)** — `reload`'s catch RESTORES `{kind:"conflict"}` (guarded on `haltedRef` still true, so it can't manufacture a conflict), and the "why" becomes an EXTRA banner line via a new `note?: string` — never a replacement for the sentence that offers the exits. Plus **WR-07**: `isTerminalRefusal` gains `WorkflowConflictError` so a frozen published row stops yielding a doomed PATCH per edit. |
+| **186-15** | 9 | **WR-11** — the pane-click assertion is retargeted to a call-count DELTA with its own positive control (a `grep -c "toHaveBeenCalledTimes(0)" >= 4` criterion structurally pins the ✕/Escape siblings against weakening). Plus **WR-06 residue**: per-test skips + DB-free coverage of the `stale_token` 409 wire shape. |
+| **186-16** | 9 | **WR-10** — the inner Publish is gated on the live `blockedReason` (new `saving` branch), reason rendered in the modal. The review's preferred `flushPendingWrites()` seam was **rejected on a safety argument**: `PublishGauntlet` mounts on BOTH branches of the flag gate, so a flush from `runGauntlet` would issue an unrequested PATCH on the flag-off surface — the D-181-01 leak 186-13 just closed. Rejection recorded in `deferred-items.md` with a re-open trigger. |
+| **186-17** | 10 | **WR-08** — the drain SPLITS two questions: payload identity alone decides the *receipt* (CR-01 preserved), `pendingRef` alone decides *immediate re-entry*; the new `break` also resolves `{kind:"saving"}` → `idle`. Plus **WR-09**: the hold resolution moves ABOVE every gate including `!enabled`, so the "Publishing —" sentence never outlives the hold on either surface. |
+
+**Wave 9 → 10 is sequential by construction:** 186-14 and 186-17 both own `useDraftPersistence.ts`.
+186-15 and 186-16 share no file with either, so they run beside 186-14 in wave 9.
+
+⚠ **Executor warning carried into 186-17 Task 1 as a machine-checked criterion (not prose):** the
+WR-08 fix must RETARGET `driveMidFlightEdit` — the shared driver behind F17a/b/c, whose
+`toHaveBeenCalledTimes(2)` currently depends on the very `continue` being removed. F17's three
+literal assertions (`toHaveBeenCalledTimes(2)`, `toHaveLength(4)`, `.toBe("T1")`) must survive
+byte-identical; a scoped `git diff` showing changes only inside the helper body is the proof. A
+green suite with a weakened F17 FAILS the task.
+
+**Decision-coverage gate skipped again** — same known parser quirk (CONTEXT.md uses `D-186-NN`,
+the gate matches literal `D-NN`). Verified by hand instead: the new plans cite D-181-01, D-186-01,
+-04, -07, -08, -09, -12 and D-182-06 in their `must_haves`.
 
 **⚠ RE-VERIFICATION 2026-08-01 returned `gaps_found` again — 6/8 must-haves.** GAP-1 / GAP-2 /
 GAP-3 and WR-01..WR-05 are all **genuinely closed**, each re-derived from source rather than trusted
