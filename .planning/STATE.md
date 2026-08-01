@@ -141,6 +141,36 @@ would NOT trip the byte pin — widen the region deliberately rather than assumi
 state). A change to `canDraft`'s initial value reds this pin, and that would be a real product
 change, not a test artefact.
 
+**Plan 187-06 COMPLETE (Wave 2, 2026-08-02, `3253ee21` → `f4a3d539` → `b1239e10`).** SC#6 / SEED-137 —
+**the armed action-risk checkpoint is HOISTED** out of `phase.validators` into an explicit engine step
+at `harness_engine.py:754`, before `while True:` at `:805` (D-187-01/02/17). `effective_phase` now
+synthesizes **only** `citations_required` (`timing="post"`, byte-unchanged, confirmed unreachable by
+this hazard); `_is_action_risk_finding` is **deleted** (`grep -c` → 0); `_ACTION_RISK_FINDING_PREFIX`
+is kept as a wire format. `is_action_risk` is an explicit keyword PARAMETER of
+`_resolve_failure_with_ask_user` (Pitfall 3), and **the Pitfall-4 fail-open is closed STRUCTURALLY** —
+`_failing_on_failure` is reachable only under `if not is_action_risk:`, skipped entirely rather than
+computed-and-overridden. `total_phases` threaded from `run_workflow`. Zero migrations, zero new audit
+event types (`grep -c "event_type="` **14 → 14**), allow-list untouched, `publish_service.py` clean
+(D-187-12 still deferred).
+**MEASURED: the SC#6 property is 30/30 GREEN** when its drive supplies the new keyword — proved with a
+scratchpad-only pytest plugin, zero tree edits. A live probe shows the ledger writes
+`action_risk_pending` then `validator_ask_user_approved` with **`validator: None`** (D-187-18 observed,
+not asserted), and a typed refusal → `fail_run` with the body never invoked and zero receipts.
+**Carry forward — 187-11 owes exactly three things:**
+(1) **One keyword**: `test_187_armed_checkpoint_property.py:522-526` must pass
+`total_phases=TOTAL_PHASES` to `_run_phase_with_gates`. Without it the checkpoint composes
+`"Step 2 of 2"` instead of `"Step 2 of 4"`, the sentence join fails, and the property reads **15 red
+that are not real** — do NOT read that as a regression.
+(2) **Re-shape 9 shipped armed tests** (8 in `test_185_engine_attachment.py`, 1 in
+`test_ask_user_disposition.py`): 6 are direct `_resolve_failure_with_ask_user` calls needing
+`is_action_risk=True`; 3 drive `_drive_failing_pre_gate` with a manufactured armed finding and must
+drive `action_risk_armed=True` instead.
+(3) The 187-VALIDATION §5 falsification re-run (remove `harness_engine.py:754-803`, confirm 187-01's
+RED signature returns).
+**Also carry forward:** a hand-declared `action_risk_approval` ValidatorSpec is now an **ordinary
+author gate** — nothing in the engine treats that `kind` specially. The Literal is kept (187-02) and
+0 stored rows name it, so no live data is affected.
+
 (`3713a716`), GOVERN-01/02/03 all `Complete`, `nyquist_compliant` true, SECURED 49/49 (`a00b1cc5`).
 Security found one real fail-open BLOCKER — T-185-04-01, a **typed** refusal on an armed checkpoint ran
 the step and filed a false approval receipt — fixed by quick task `260731-3y4` (`417728bd`) and
