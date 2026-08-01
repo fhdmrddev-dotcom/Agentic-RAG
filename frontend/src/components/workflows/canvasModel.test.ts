@@ -527,3 +527,116 @@ describe("canvasModel.toCanvas — the armed checkpoint rides the edge INTO the 
     }
   })
 })
+
+// ── Phase 187-08 (VOCAB-01 / D-187-05) — the injected name-lookup context ────────
+//
+// `toCanvas` gains an OPTIONAL `nameContext`, the `kbTools` shape verbatim: the id→name
+// maps are owned by the PAGE, passed IN, and default to a frozen empty context. The
+// derivation itself lives in `phaseVocabulary.derivedFaceOf` and has its own suite —
+// what these cases pin is the pair of properties that make threading it safe.
+//
+//  1. AN OMITTED OPTION IS BYTE-IDENTICAL. Every shipped caller keeps its projection,
+//     which is why no snapshot moves and why this plan touches no other file.
+//  2. A SUPPLIED ONE MOVES THE TITLE AND NOTHING ELSE. Asserted FIELD BY FIELD against
+//     the no-context projection rather than by snapshot: a snapshot would go red on any
+//     change and tell you nothing about WHICH field moved, and "only the title moved"
+//     is the whole claim.
+//
+// The `ariaLabel` is the one deliberate exception to (2) — it is derived FROM the title
+// (`ariaLabelFor(phase, data.title)`), so a face that changes and a label that does not
+// would be the screen-reader disagreement this phase exists to prevent.
+
+describe("canvasModel.toCanvas — the injected name context (Phase 187 / D-187-05)", () => {
+  const SKILL_ID = "3f2b8c40-1111-4a2b-9c3d-000000000001"
+  const FOLDER_ID = "9a1e77d2-2222-4b3c-8d4e-000000000002"
+
+  /** One step with a resolvable `skill_ref` and one bare step, so a hit and a miss are
+   *  both inside the same projection. */
+  const bound: PhaseSpecJSON[] = [
+    { slug: "check", phase_index: 0, config: { phase_type: "llm_agent", skill_ref: SKILL_ID } },
+    { slug: "write", phase_index: 1, config: { phase_type: "llm_single" } },
+  ]
+
+  const SKILL_CTX = { skillNames: { [SKILL_ID]: "pricing policy check" } }
+
+  /** Every `data` key EXCEPT the title — the fields a name context must never move. */
+  const UNMOVED_DATA_KEYS = [
+    "slug",
+    "phaseIndex",
+    "phaseType",
+    "technicalTitle",
+    "subtitle",
+    "grounded",
+    "armed",
+    "waitsForYou",
+  ] as const
+
+  it("omitting the option projects byte-identically to passing an empty one", () => {
+    expect(toCanvas(bound)).toEqual(toCanvas(bound, {}))
+    expect(JSON.stringify(toCanvas(bound))).toBe(JSON.stringify(toCanvas(bound, {})))
+  })
+
+  it("omitting it twice projects byte-identically — the default is a stable reference", () => {
+    expect(JSON.stringify(toCanvas(bound))).toBe(JSON.stringify(toCanvas(bound)))
+    expect(JSON.stringify(toCanvas(bound, { kbTools: ["search_documents"] }))).toBe(
+      JSON.stringify(toCanvas(bound, { kbTools: ["search_documents"] })),
+    )
+  })
+
+  it("kbTools WITHOUT a name context still renders the shipped type sentence", () => {
+    // The pre-187 face, unchanged: a `skill_ref` nobody can resolve names nothing.
+    const withKb = toCanvas(bound, { kbTools: ["search_documents"] })
+    expect(phaseNodes(withKb.nodes)[0].data.title).toBe("Work out how to do it")
+    expect(JSON.stringify(withKb)).toBe(JSON.stringify(toCanvas(bound, { kbTools: ["search_documents"] })))
+  })
+
+  it("a supplied context moves the resolving node's TITLE and no other data field", () => {
+    const before = toCanvas(bound)
+    const after = toCanvas(bound, { nameContext: SKILL_CTX })
+
+    const b = phaseNodes(before.nodes)
+    const a = phaseNodes(after.nodes)
+
+    expect(b[0].data.title).toBe("Work out how to do it")
+    expect(a[0].data.title).toBe("Run the pricing policy check")
+
+    for (const key of UNMOVED_DATA_KEYS) {
+      expect(a[0].data[key]).toEqual(b[0].data[key])
+    }
+    // The technical form is the SLUG and must stay the slug — the reveal is not a name.
+    expect(a[0].data.technicalTitle).toBe("AI agent step · check")
+    // The non-resolving step is untouched in every field, its title included.
+    expect(a[1].data).toEqual(b[1].data)
+  })
+
+  it("the aria label follows the title, so the face and the announcement agree", () => {
+    const after = toCanvas(bound, { nameContext: SKILL_CTX })
+    expect(phaseNodes(after.nodes)[0].ariaLabel).toContain("Run the pricing policy check")
+    expect(phaseNodes(after.nodes)[0].ariaLabel).not.toContain("Work out how to do it")
+  })
+
+  it("node ids, positions and the whole edge set are untouched by a name context", () => {
+    const before = toCanvas(bound)
+    const after = toCanvas(bound, { nameContext: SKILL_CTX })
+    expect(after.nodes.map((n) => [n.id, n.type, n.position.x, n.position.y])).toEqual(
+      before.nodes.map((n) => [n.id, n.type, n.position.x, n.position.y]),
+    )
+    expect(after.edges).toEqual(before.edges)
+  })
+
+  it("resolves a sole folder_scope through the SAME context, on the folder tier", () => {
+    const scoped: PhaseSpecJSON[] = [
+      { slug: "read", phase_index: 0, config: { phase_type: "llm_agent", folder_scope: [FOLDER_ID] } },
+    ]
+    const after = toCanvas(scoped, {
+      nameContext: { folderNames: { [FOLDER_ID]: "Supplier Contracts" } },
+    })
+    expect(phaseNodes(after.nodes)[0].data.title).toBe("Search Supplier Contracts")
+  })
+
+  it("an unresolved id NEVER reaches the face — it falls through to the type sentence", () => {
+    const after = toCanvas(bound, { nameContext: { skillNames: { "some-other-id": "x" } } })
+    expect(phaseNodes(after.nodes)[0].data.title).toBe("Work out how to do it")
+    expect(JSON.stringify(after)).not.toContain(SKILL_ID)
+  })
+})

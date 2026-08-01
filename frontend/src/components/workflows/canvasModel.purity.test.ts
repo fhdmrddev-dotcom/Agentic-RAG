@@ -268,3 +268,87 @@ describe("canvasModel — fromCanvas behaviour (the Task-1 acceptance pins)", ()
     round.forEach((phase, i) => expect(phase).toBe(duplicateSlugs[i]))
   })
 })
+
+/**
+ * Phase 187-08 (VOCAB-01 / D-187-05) — the injected name context does not cost purity.
+ *
+ * The threat the plan names (T-187-08-01) is that a module which needs id→name maps
+ * grows a way to GO AND GET THEM. The control is structural rather than reviewed: the
+ * maps arrive as an OPTIONAL option with a frozen module-scope default, and the source
+ * guards below say so in a form that fails a test if anyone changes their mind.
+ */
+describe("canvasModel — the injected name context stays PURE (Phase 187 / D-187-05)", () => {
+  /** All three members populated, so no branch of the derivation is left unexercised. */
+  const NAME_CTX = {
+    skillNames: { "3f2b8c40-1111-4a2b-9c3d-000000000001": "pricing policy check" },
+    folderNames: { "9a1e77d2-2222-4b3c-8d4e-000000000002": "Supplier Contracts" },
+    templateFilename: "Renewal Summary.pptx",
+  }
+
+  it.each(ALL_FIXTURES)(
+    "$name: the input is deep-equal to its pre-call clone WITH a name context",
+    ({ phases }) => {
+      const before = clone(phases)
+      toCanvas(phases, { nameContext: NAME_CTX })
+      expect(phases).toEqual(before)
+    },
+  )
+
+  it.each(ALL_FIXTURES)(
+    "$name: no position/x/y/layout key reaches the INPUT with a name context",
+    ({ phases }) => {
+      toCanvas(phases, { nameContext: NAME_CTX })
+      expect(forbiddenKeysIn(phases)).toEqual([])
+    },
+  )
+
+  it.each(ALL_FIXTURES)(
+    "$name projects byte-identically across two calls with the SAME context",
+    ({ phases }) => {
+      expect(JSON.stringify(toCanvas(phases, { nameContext: NAME_CTX }))).toBe(
+        JSON.stringify(toCanvas(phases, { nameContext: NAME_CTX })),
+      )
+    },
+  )
+
+  it.each(ALL_FIXTURES)(
+    "$name: omitting the option twice projects byte-identically (the frozen default)",
+    ({ phases }) => {
+      expect(JSON.stringify(toCanvas(phases))).toBe(JSON.stringify(toCanvas(phases, {})))
+    },
+  )
+
+  // ── The source guards. The identity of the omitted default is not observable from
+  //    outside the module (nothing returns it), so it is pinned where it is declared.
+
+  it("declares the frozen module-scope empty default, `NO_KB_TOOLS`'s idiom verbatim", () => {
+    expect(canvasModelSource).toMatch(
+      /const NO_NAME_CONTEXT:\s*NameContext\s*=\s*Object\.freeze\(\{\}\)/,
+    )
+    // Control: the regex does NOT match a per-call fresh object.
+    expect("const NO_NAME_CONTEXT: NameContext = {}").not.toMatch(
+      /const NO_NAME_CONTEXT:\s*NameContext\s*=\s*Object\.freeze\(\{\}\)/,
+    )
+  })
+
+  it("resolves an omitted option to that same default rather than to a fresh `{}`", () => {
+    const code = stripComments(canvasModelSource)
+    expect(code).toMatch(/options\.nameContext\s*\?\?\s*NO_NAME_CONTEXT/)
+    expect(code).not.toMatch(/options\.nameContext\s*\?\?\s*\{\}/)
+  })
+
+  it("hands the context to nodeTitle ONLY — technicalTitle still takes one argument", () => {
+    const code = stripComments(canvasModelSource)
+    expect(code).toMatch(/nodeTitle\(phase,\s*nameContext\)/)
+    expect(code).toMatch(/technicalTitle\(phase\)/)
+    // The reveal-ON form is the SLUG and must stay the slug: a name context there would
+    // put a derived face behind the technical toggle, which is the opposite of its job.
+    expect(code).not.toMatch(/technicalTitle\(phase\s*,/)
+  })
+
+  it("still fetches nothing — the maps are passed IN, never gone and got (T-187-08-01)", () => {
+    expect(canvasModelSource).not.toMatch(/from\s+["']@\/lib\/api["']/)
+    expect(canvasModelSource).not.toMatch(/fetch\(/)
+    expect(canvasModelSource).not.toMatch(/useState|useEffect/)
+  })
+})
