@@ -88,6 +88,10 @@ const { mockPublish } = vi.hoisted(() => ({ mockPublish: vi.fn() }))
 // fence machine-checkable (the `PhaseSpineGraph.test.tsx:20-22` precedent).
 import builderSource from "./WorkflowBuilderPage?raw"
 import { WorkflowBuilderPage, type BuilderDefinition } from "./WorkflowBuilderPage"
+// Plan 186-16 (WR-10), on its own line so this file's diff stays 0-deletion: the empty
+// draft's sentence, IMPORTED rather than re-typed, so the precedence row below compares
+// character-identity against the page's own constant instead of a second copy of it.
+import { EMPTY_DRAFT_INVITATION, SAVING_PUBLISH_WAIT } from "./WorkflowBuilderPage"
 import { EffectiveFeaturesProvider } from "@/providers/EffectiveFeaturesProvider"
 import type { EffectiveFeatures } from "@/lib/api"
 import { researchSummarize } from "@/components/workflows/__fixtures__/canvasFixtures"
@@ -1741,5 +1745,148 @@ describe("WorkflowBuilderPage 186-07 — the conflict banner (D-186-08)", () => 
     fireEvent.click(screen.getByTestId("builder-conflict-reload"))
     await waitFor(() => expect(mockListDrafts).toHaveBeenCalledTimes(1))
     await waitFor(() => expect(screen.queryByTestId("builder-conflict-banner")).toBeNull())
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Plan 186-16 (WR-10) — A PUBLISH CANNOT START ON TOP OF AN OUTSTANDING WRITE.
+//
+// Appended; nothing above this line was edited.
+//
+// WHAT IS BEING MEASURED HERE, and why it is the page rather than the gauntlet. The
+// component half — that a supplied reason refuses the INNER Publish button and states
+// itself inside the modal — is `PublishGauntlet.test.tsx`'s. This half is the page's
+// COMPOSITION: that the write loop's own `saving` reading reaches the publish seam as a
+// reason at all. So the loop is driven for real — an edit, the shipped 1000 ms debounce,
+// and a deferred `updateWorkflowDraft` that is issued and never answered, which IS the
+// outstanding-PATCH window WR-10 describes. Stubbing `useDraftPersistence` would have
+// proved nothing about the page that composes it.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe("WorkflowBuilderPage 186-16 — an outstanding write blocks publish (WR-10)", () => {
+  const FLAG_ON_186_16 = { features: { visual_workflow_canvas: true }, loading: false }
+  const FLAG_OFF_186_16 = { features: {}, loading: false }
+
+  /** The empty draft — the branch the saving one has to OUTRANK. */
+  const emptyDraft186: BuilderDefinition = { ...definition, phases: [] }
+
+  const FOLDER = { id: "0d1f4b6e-0000-4000-8000-00000000f01d", name: "Vendor contracts" }
+
+  /**
+   * Mount the page and CAPTURE every `blockedReason` it hands the shipped `renderPublish`
+   * seam. The seam is a genuine observable of the page's state — the same third argument
+   * `WorkflowsPage` passes into the real gauntlet in production — so no private field is
+   * reached into and no hook is stubbed.
+   */
+  function renderCapturing(
+    features: { features: EffectiveFeatures; loading: boolean },
+    def: BuilderDefinition = definition,
+  ) {
+    const seen: (string | null)[] = []
+    render(
+      <EffectiveFeaturesProvider value={{ ...features, refetch: vi.fn() }}>
+        <div style={{ width: 1200, height: 800 }}>
+          <WorkflowBuilderPage
+            initial={{ definition: def, draftId: "draft-1" }}
+            renderPublish={(_d, _id, blockedReason) => {
+              seen.push(blockedReason ?? null)
+              return <span data-testid="publish-seam">{blockedReason ?? ""}</span>
+            }}
+          />
+        </div>
+      </EffectiveFeaturesProvider>,
+    )
+    return { seen, latest: () => seen[seen.length - 1] ?? null }
+  }
+
+  /** A PATCH that is issued and never answered — the window itself. Returns its release. */
+  function deferUpdate() {
+    let release: (() => void) | null = null
+    mockUpdate.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          release = () => resolve({ id: "draft-1", version: 2, token: "tok-after" })
+        }),
+    )
+    return () => {
+      expect(release).not.toBeNull()
+      release!()
+    }
+  }
+
+  /** One real edit through the shipped form panel, so the loop's `dirty` gate opens. */
+  async function editOnce(text: string) {
+    fireEvent.click(await screen.findByTestId("spine-node-research"))
+    const field = await screen.findByLabelText(/instructions/i)
+    fireEvent.change(field, { target: { value: text } })
+  }
+
+  it("names the outstanding write while it is outstanding, and stops naming it when it lands", async () => {
+    const releaseWrite = deferUpdate()
+    const { latest } = renderCapturing(FLAG_ON_186_16)
+    await screen.findByTestId("builder-view-toggle")
+
+    // The reading BEFORE the write, captured rather than assumed: this row is about the
+    // saving branch, not about what the fixture's validation happens to say.
+    const before = latest()
+
+    await editOnce("search the vendor corpus")
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1), { timeout: 5000 })
+
+    // WR-10: the PATCH is in flight and unanswered — exactly the window in which a
+    // gauntlet's stage-0 token read is already doomed.
+    await waitFor(() => expect(latest()).toBe(SAVING_PUBLISH_WAIT))
+    // The wording is pinned as a literal exactly ONCE, here, so a re-wording has to be
+    // deliberate — and it reads as a WAIT, never as a fault the author has to fix.
+    expect(SAVING_PUBLISH_WAIT).toBe("Saving your last change — Publish will be ready in a moment")
+
+    // …and the block is momentary, not a lock-out: the answer lands and the reading
+    // returns to whatever it was before the write, measured as an equality.
+    releaseWrite()
+    await waitFor(() => expect(latest()).toBe(before))
+  })
+
+  it("with the flag OFF nothing writes and nothing blocks (D-181-01)", async () => {
+    deferUpdate()
+    const { latest } = renderCapturing(FLAG_OFF_186_16)
+    await waitFor(() => expect(screen.getByTestId("builder-grid")).toBeInTheDocument())
+
+    await editOnce("an edit on the flag-off surface")
+    // The shipped debounce plus a margin — long enough that a write WOULD have been
+    // issued had the loop been running at all.
+    await new Promise((resolve) => setTimeout(resolve, 2200))
+
+    expect(mockUpdate).toHaveBeenCalledTimes(0)
+    expect(latest()).toBeNull()
+    expect(screen.queryByTestId("publish-blocked-reason")).toBeNull()
+  })
+
+  it("the saving reason OUTRANKS the empty-draft invitation — the nearest obstacle is the one named", async () => {
+    mockListFolders.mockResolvedValue([FOLDER])
+    const releaseWrite = deferUpdate()
+    const { latest } = renderCapturing(FLAG_ON_186_16, emptyDraft186)
+    await screen.findByTestId("builder-view-toggle")
+
+    // A draft with no steps: today's reason is the invitation.
+    await waitFor(() => expect(latest()).toBe(EMPTY_DRAFT_INVITATION))
+
+    // Bind a knowledge base — an author edit that arms `dirty` on a workflow with no
+    // steps, which is how an empty draft can have a write outstanding at all.
+    const picker = await screen.findByTestId("project-folder-picker")
+    await waitFor(() =>
+      expect(Array.from((picker as HTMLSelectElement).options).map((o) => o.value)).toEqual([
+        "",
+        FOLDER.id,
+      ]),
+    )
+    fireEvent.change(picker, { target: { value: FOLDER.id } })
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1), { timeout: 5000 })
+
+    // Both branches are true at once. The one the author can act on RIGHT NOW is the
+    // wait — adding a step will not make Publish go until the write has landed.
+    await waitFor(() => expect(latest()).toBe(SAVING_PUBLISH_WAIT))
+
+    releaseWrite()
+    await waitFor(() => expect(latest()).toBe(EMPTY_DRAFT_INVITATION))
   })
 })

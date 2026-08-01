@@ -284,6 +284,20 @@ export { PUBLISHED_CONFLICT_MESSAGE }
 export const EMPTY_DRAFT_INVITATION = "Add a step to get started"
 
 /**
+ * The publish reason while the write loop still has a PATCH outstanding (WR-10, 186-16).
+ * A WAIT, NOT A FAULT: nothing is wrong and the author has nothing to fix, so the sentence
+ * says what is happening and that it ends by itself — a greyed control with a fault-shaped
+ * explanation reads as a refusal the person caused.
+ *
+ * WHAT THE MOMENT'S WAIT BUYS. `publish_service.py` reads `stage0_token` when the gauntlet
+ * starts and spends it at the stage-5 flip minutes later, so an autosave PATCH committing
+ * after that read makes the token dead on arrival: the flip answers `-2` → `draft_changed`
+ * AFTER a real golden run has burned wall clock and provider spend on a publish that could
+ * never have succeeded — and the author sees that refusal for an edit made BEFORE Publish.
+ */
+export const SAVING_PUBLISH_WAIT = "Saving your last change — Publish will be ready in a moment"
+
+/**
  * What the header says about a workflow bound to NO knowledge base (D-186-16).
  *
  * IT STATES THE CONSEQUENCE, NOT THE STATE. "Unbound", and the describe screen's own
@@ -1039,7 +1053,15 @@ export function WorkflowBuilderPage({
    * for everyone including operators. A flag-off empty draft therefore still gets today's
    * enabled `◆ Publish…`, exactly as before this plan.
    *
-   * The reason is chosen honestly, and only one of the four branches is authored here:
+   * The reason is chosen honestly, and two of the five branches are authored here:
+   *  - A WRITE OUTSTANDING → `SAVING_PUBLISH_WAIT`, ranked FIRST because it is the nearest
+   *    obstacle: fixing a verdict will not make Publish go until the PATCH has landed.
+   *    Still not the client computing a verdict (D-182-06) — it states a fact about THIS
+   *    client's own write loop, carries no severity, code or tray row, and never enters
+   *    `verdicts`. It needs no promise to be sound: `performWrite` sets
+   *    `{kind:"saving"}` SYNCHRONOUSLY before the request leaves, and every automatic
+   *    trigger runs from a timer callback or an effect — a different task from any later
+   *    click — so the reading a click observes has already rendered and is never stale.
    *  - EMPTY DRAFT → the INVITATION. Not a verdict, not a lint code, not a severity —
    *    just what to do next. The server is never asked about a workflow with no steps.
    *  - DEGRADED → the loop's own sentence for that cause. A check that did NOT RUN must
@@ -1052,13 +1074,14 @@ export function WorkflowBuilderPage({
    */
   const blockedReason = useMemo<string | null>(() => {
     if (!canvasEnabled || builderPhase !== "drafted") return null
+    if (persistState.kind === "saving") return SAVING_PUBLISH_WAIT
     if (phases.length === 0) return EMPTY_DRAFT_INVITATION
     if (validation.kind === "degraded") return DEGRADED_SENTENCE[validation.cause]
     if (validation.kind !== "verdicts" || validation.ok) return null
     const first =
       validation.verdicts.find((v) => v.severity !== "incomplete") ?? validation.verdicts[0]
     return first?.message ?? null
-  }, [canvasEnabled, builderPhase, phases, validation])
+  }, [canvasEnabled, builderPhase, persistState, phases, validation])
 
   // Phase 103-ux: fetch folders + skills ONCE on mount → id→name maps for the form
   // panel + the project picker. Best-effort; a failure leaves the maps empty (the
