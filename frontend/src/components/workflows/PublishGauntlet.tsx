@@ -53,7 +53,8 @@ import type { DefShape } from "@/components/workflows/soulData"
 import { blockedSentence } from "@/components/workflows/verdictModel"
 // Phase 127-02 Task 1 (WUX-03, sketch 051-A) — the engized gauntlet re-skin.
 // The engine chip mirrors RunCard's providerLogo()→Bot fallback (icon-convention
-// §1); the 8 stage glyphs are the bundled 3D fluent-emoji set (icon-convention §3).
+// §1); the stage glyphs are the bundled 3D fluent-emoji set (icon-convention §3) —
+// one per STAGES row, so the count follows the table rather than a numeral here.
 import { Bot } from "lucide-react"
 import { providerLogo } from "@/lib/providerLogo"
 // The gauntlet-node 3D glyphs, bundled at build time by unplugin-icons — one per row of
@@ -63,6 +64,7 @@ import { providerLogo } from "@/lib/providerLogo"
 // slug renders as an EMPTY svg rather than failing to build, the newest addition here is
 // pinned by a render assertion in the suite, not by this comment.
 import Shield from "~icons/fluent-emoji/shield"
+import Books from "~icons/fluent-emoji/books"
 import CheckMarkButton from "~icons/fluent-emoji/check-mark-button"
 import Bullseye from "~icons/fluent-emoji/bullseye"
 import MagnifyingGlassTiltedLeft from "~icons/fluent-emoji/magnifying-glass-tilted-left"
@@ -130,13 +132,29 @@ export interface PublishGauntletProps {
  * (passed-up-to / blocked-at) is a VISUAL derivation only — the PASS/BLOCK truth comes
  * from the server verdict, never re-computed here.
  *
- * The first eight rows are the eight CHECKS. The last row is the publish COMMIT — the
- * flip itself, which sketch 020-B D2 has always carried as its own row and which the
- * spine had no node for until Phase 186-05. It is appended rather than inserted, on
- * purpose and in two senses: a refusal there happened AFTER the grader passed, so
- * folding its code into the Judge row would tell an author the grader stopped them,
- * which is false; and appending leaves the golden-run row at the same index the running
- * highlight below points at.
+ * Every row but the last is a CHECK. The last row is the publish COMMIT — the flip
+ * itself, which sketch 020-B D2 has always carried as its own row and which the spine
+ * had no node for until Phase 186-05. It sits last on purpose: a refusal there happened
+ * AFTER the grader passed, so folding its code into the Judge row would tell an author
+ * the grader stopped them, which is false.
+ *
+ * ── PHASE 186-10 (WR-02): THE MIRROR CLAIM IS NOW CHECKED, NOT ASSERTED ──
+ * The paragraph above used to argue that the table was safe to extend only by APPENDING,
+ * because the running highlight below pointed at the golden-run row by a literal index.
+ * That is no longer the reason it is safe, and leaving it written would send the next
+ * reader to the wrong invariant: the highlight now LOCATES its row by the stage it
+ * belongs to (see `RUNNING_STAGE_INDEX`), so a row may be inserted at its true pipeline
+ * position without moving the pulse. `Grounding` is the first row that needed that — it
+ * runs BEFORE the golden run in `publish_service.py`, so appending it would have drawn
+ * the pipeline in the wrong order to spare the code.
+ *
+ * And the first sentence of this docblock — that the table mirrors the server's stage
+ * list — was prose for three phases and was FALSE for two of them: `grounding_fidelity`
+ * has been emitted since Phase 182 with no row here, so the most likely real refusal on a
+ * KB-bound workflow painted a spine that could place nothing. It is now pinned by F18 in
+ * the co-located suite, which reads the `stage="…"` literals out of `publish_service.py`
+ * itself and drives one render per stage. A stage added to the service and forgotten here
+ * fails that test; it can no longer be a comment that quietly stops being true.
  */
 const STAGES: { label: string; what: string; codes: string[]; Icon: StageIcon }[] = [
   { label: "Owner", what: "Owner check — RLS-resolve + you own it", codes: ["not_found"], Icon: Shield },
@@ -144,11 +162,29 @@ const STAGES: { label: string; what: string; codes: string[]; Icon: StageIcon }[
   { label: "Goal", what: "business_requirement — exactly one must be declared", codes: ["business_requirement"], Icon: Bullseye },
   { label: "Structure", what: "Structural lint — reachable · terminal · inputs satisfied · no orphans", codes: ["lint"], Icon: MagnifyingGlassTiltedLeft },
   { label: "Pause", what: "Interactive-phase check — human-pause phases can't validate synchronously", codes: ["interactive_phase"], Icon: RaisedHand },
+  { label: "Grounding", what: "Grounding check — the folders, tools and skills this workflow points at must all resolve", codes: ["grounding_fidelity"], Icon: Books },
   { label: "Golden run", what: "Golden run — a REAL harness run against the project KB", codes: ["golden_run_timeout", "golden_run_error"], Icon: Rocket },
   { label: "Citations", what: "Structural gate — citations / integrity checked during the run", codes: ["structural_gate"], Icon: Locked },
   { label: "Judge", what: "Independent judge — an independent model grades the deliverable", codes: ["judge"], Icon: BalanceScale },
   { label: "Commit", what: "Publish commit — the draft must not have changed while we were checking it", codes: ["draft_changed"], Icon: ChequeredFlag },
 ]
+
+/**
+ * Which row pulses while a publish is in flight — LOCATED BY THE STAGE IT BELONGS TO, never
+ * by a literal index (Phase 186-10 / WR-02).
+ *
+ * The golden run is the only stage the author actually waits on: everything before it is a
+ * cheap static check that resolves in milliseconds, and everything after it grades a run that
+ * has already finished. So the amber aura and the energy comet both belong to this row.
+ *
+ * It used to be a bare index literal, compared against the loop counter in two separate
+ * places (the node tone and the energy comet). That number was a fact about the table's
+ * SHAPE, not about the golden run, so inserting `Grounding` at its true pipeline position
+ * would have moved the pulse silently onto the wrong node — the surface claiming a different
+ * stage is running than the one that is. Derived here, a row may be inserted anywhere and the
+ * pulse follows the run.
+ */
+const RUNNING_STAGE_INDEX = STAGES.findIndex((s) => s.codes.includes("golden_run_timeout"))
 
 /** The HTTP status surfaced for each discriminated outcome kind (for the badge). */
 function httpStatusForKind(kind: PublishOutcome["kind"]): number {
@@ -349,7 +385,8 @@ function HardWall({ onFix }: { onFix: () => void }) {
  *
  * Phase 127-02 Task 1 (WUX-03, sketch 051-A): the wrapping boxes become a compact
  * horizontal spine of 3D icon nodes joined by energy connectors — passed nodes glow
- * green with a ✓ badge, the running golden-run node (i===5) pulses an amber aura with
+ * green with a ✓ badge, the running golden-run node (`RUNNING_STAGE_INDEX`, located by its
+ * stage rather than by a literal index since Phase 186-10) pulses an amber aura with
  * an energy comet flowing into it, a blocked node turns red. All motion is gated behind
  * prefers-reduced-motion (colour + glyph + ✓ badge carry the state without any
  * animation).
@@ -388,7 +425,7 @@ function GauntletSpine({ blockedStage, running }: { blockedStage: string | null;
         // is honest precisely BECAUSE the guard ran first: a missing index that is not an
         // unknown block can only be "nothing blocked", which still waits for the run.
         const isPassed = unknownBlock ? false : blockedIndex >= 0 ? i < blockedIndex : !running
-        const isRunning = running && i === 5
+        const isRunning = running && i === RUNNING_STAGE_INDEX
         const Icon = stage.Icon
         // The connector LEADING INTO this node is "reached" up to (and incl.) the block.
         // The SAME guard in the SAME order, because this is a SECOND, independent read of
@@ -414,7 +451,7 @@ function GauntletSpine({ blockedStage, running }: { blockedStage: string | null;
             {i > 0 && (
               <div className={`relative mt-[20px] h-[3px] w-4 shrink-0 rounded-full sm:w-6 ${connReached ? "bg-success/50" : "bg-border"}`}>
                 {/* The energy comet flows along the connector INTO the running golden-run node. */}
-                {running && i === 5 && <span className="gauntlet-comet" aria-hidden />}
+                {running && i === RUNNING_STAGE_INDEX && <span className="gauntlet-comet" aria-hidden />}
               </div>
             )}
             <div className="flex w-[64px] shrink-0 flex-col items-center gap-1">
@@ -607,7 +644,7 @@ function GauntletContent({
         <div className="mt-2 rounded-lg border border-border bg-card p-4">
           <div className="font-mono text-[11px] font-semibold text-foreground">◆ Publish this workflow</div>
           <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-            Publishing runs the full <b>8-stage gauntlet</b> — including a <b>real golden run</b> of this workflow against
+            Publishing runs the <b>full gauntlet above</b> — including a <b>real golden run</b> of this workflow against
             your project KB and an <b>independent judge</b> of the result. It can honestly block.
           </p>
           <label

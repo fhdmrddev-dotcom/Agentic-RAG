@@ -29,11 +29,18 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 // Phase 186-10 (WR-02): the F18 describe at the foot of this file reads the SERVER's own
-// source at test time instead of trusting a transcribed list. Node built-ins only — no
-// dependency, no fixture, nothing that can drift from the file it is asserting about.
-import { readFileSync } from "node:fs"
-import { fileURLToPath } from "node:url"
-import path from "node:path"
+// source instead of trusting a transcribed list — via the SAME `?raw` loader the component
+// source is read with two lines above, and deliberately NOT via `node:fs`.
+//
+// Two reasons the obvious `readFileSync` spelling is wrong here. `tsconfig.app.json` sets
+// `types: ["vite/client"]` and nothing else, on purpose: `src/**` is browser code and must
+// not be able to reach a Node built-in without the typechecker objecting, so three
+// `node:*` imports would have added three NEW `tsc -b` errors to a baseline this phase
+// measures every plan against. And the path spelling that pairs with it —
+// `new URL("…", import.meta.url)` — is a pattern Vite STATICALLY REWRITES as an asset
+// reference, so `fileURLToPath` receives something that is no longer a `file:` URL and
+// throws before a single test runs (observed, not predicted).
+import publishServiceSource from "../../../../backend/app/services/harness/publish_service.py?raw"
 // Read the component SOURCE via Vite's ?raw loader (typechecks under `vite/client`).
 import publishGauntletSource from "./PublishGauntlet?raw"
 import { PublishGauntlet } from "./PublishGauntlet"
@@ -277,7 +284,7 @@ describe("PublishGauntlet — form + verbatim verdict + judge hard wall", () => 
     expect(screen.getByText(/could not produce a verdict|treated as a block/i)).toBeInTheDocument()
   })
 
-  it("the server-fixed stages render (the gauntlet spine) — the eight checks plus the publish commit", async () => {
+  it("the server-fixed stages render (the gauntlet spine) — every check plus the publish commit", async () => {
     render(<PublishGauntlet definitionId="def-1" />)
     await openModal()
     const spine = screen.getByTestId("gauntlet-spine")
@@ -285,13 +292,15 @@ describe("PublishGauntlet — form + verbatim verdict + judge hard wall", () => 
     // technical descriptions live in the node title= tooltip, not the visible text).
     // "Commit" is the flip itself (Phase 186-05): sketch 020-B D2 has always carried it
     // as its own row, and the spine gained a node for it when the publish commit began
-    // refusing a draft that moved mid-gauntlet.
+    // refusing a draft that moved mid-gauntlet. "Grounding" is Phase 186-10 (WR-02) — the
+    // stage the service has emitted since Phase 182 with no row here to place it.
     for (const label of [
       "Owner",
       "Valid",
       "Goal",
       "Structure",
       "Pause",
+      "Grounding",
       "Golden run",
       "Citations",
       "Judge",
@@ -625,17 +634,6 @@ describe("PublishGauntlet — an unrecognised blocked_stage never renders a pass
 // F7 above is NOT weakened by any of this and must not be: it drives a stage no server will
 // ever send, and its fail-closed property is what keeps the forgotten-stage case honest in the
 // window between the backend adding one and this test catching it.
-// NOT `new URL("…", import.meta.url)`. Vite STATICALLY REWRITES that exact pattern as an
-// asset reference, so the value that reaches `fileURLToPath` is no longer a `file:` URL and
-// it throws ("The URL must be of scheme file") before a single test runs. Resolving from the
-// plain `import.meta.url` string — which Vite leaves alone — is the form that works under the
-// vitest transform. Five segments up from this FILE (not its directory) is the repo root.
-const PUBLISH_SERVICE_PATH = path.resolve(
-  fileURLToPath(import.meta.url),
-  "../../../../../backend/app/services/harness/publish_service.py",
-)
-const PUBLISH_SERVICE_SOURCE = readFileSync(PUBLISH_SERVICE_PATH, "utf8")
-
 /** The call-form literal `_block(..., stage="...")` writes. Held as a SOURCE string and
  *  compiled fresh per use, so the shared `g`-flagged object can never carry a `lastIndex`
  *  from one call into the next. */
@@ -646,7 +644,7 @@ function extractStages(source: string): string[] {
 }
 
 /** Every distinct `blocked_stage` value the publish service can emit, read from its source. */
-const EMITTED_STAGES = new Set(extractStages(PUBLISH_SERVICE_SOURCE))
+const EMITTED_STAGES = new Set(extractStages(publishServiceSource))
 
 /**
  * The stages that are emitted but provably cannot arrive here as a `blocked_stage`.
@@ -760,7 +758,7 @@ describe("PublishGauntlet — a draft that moved mid-gauntlet blocks at the Comm
     return box as HTMLElement
   }
 
-  it("blocks AT the Commit node, passes the eight checks before it, and leads with a plain sentence", async () => {
+  it("blocks AT the Commit node, passes every check before it, and leads with a plain sentence", async () => {
     mockedPublish.mockResolvedValue(draftChangedBlock)
     render(<PublishGauntlet definitionId="def-1" />)
     await doPublish()
@@ -777,9 +775,14 @@ describe("PublishGauntlet — a draft that moved mid-gauntlet blocks at the Comm
     const judge = nodeBoxFor("Judge")
     expect(judge.className).toContain(PASSED_NODE_TONE)
     expect(within(judge).getByText("✓")).toBeInTheDocument()
-    // Eight checks passed, the ninth row is the block: exactly eight badges.
+    // Every check passed and the LAST row is the block: every node but one wears a ✓.
+    // Phase 186-10 replaced the literal 8 here with the node count. The literal was a fact
+    // about the table's length, not about the property — inserting the `Grounding` row made
+    // it read 9 and failed a test whose claim had not changed at all.
     const spine = screen.getByTestId("gauntlet-spine")
-    expect(within(spine).queryAllByText("✓")).toHaveLength(8)
+    const nodeBoxes = spine.querySelectorAll('[class*="rounded-xl"]')
+    expect(nodeBoxes.length).toBeGreaterThan(1)
+    expect(within(spine).queryAllByText("✓")).toHaveLength(nodeBoxes.length - 1)
 
     // The headline is a sentence and carries no machine token; the server's own words
     // render underneath, verbatim, as the block message.
@@ -793,18 +796,31 @@ describe("PublishGauntlet — a draft that moved mid-gauntlet blocks at the Comm
     expect(screen.getByTestId("run-link")).toBeInTheDocument()
   })
 
-  it("renders a real glyph on the Commit node — an unverified icon slug cannot ship as an invisible node", async () => {
+  it("renders a real glyph on EVERY spine node — an unverified icon slug cannot ship as an invisible node", async () => {
     render(<PublishGauntlet definitionId="def-1" />)
     await openModal()
 
     // unplugin-icons resolves an unknown fluent-emoji slug to an EMPTY <svg> rather than
     // failing the build, so presence alone proves nothing. Assert the drawing.
-    const svg = nodeBoxFor("Commit").querySelector("svg")
-    expect(svg).not.toBeNull()
-    expect((svg as SVGSVGElement).childNodes.length).toBeGreaterThan(0)
+    //
+    // Phase 186-10 widened this from the Commit node to every node. The component's icon
+    // docblock claims "the newest addition is pinned by a render assertion in the suite" —
+    // scoped to one named row, that claim expired the moment `Grounding` was added and no
+    // one thought to duplicate the test. Swept across the spine, it cannot expire again.
+    const spine = screen.getByTestId("gauntlet-spine")
+    const nodeBoxes = [...spine.querySelectorAll('[class*="rounded-xl"]')]
+    expect(nodeBoxes.length).toBeGreaterThan(1)
+    for (const box of nodeBoxes) {
+      const svg = box.querySelector("svg")
+      expect(svg).not.toBeNull()
+      expect((svg as SVGSVGElement).childNodes.length).toBeGreaterThan(0)
+    }
+    // And the two rows this phase's suites name by hand really are on that swept list.
+    expect(nodeBoxFor("Commit")).toBeInTheDocument()
+    expect(nodeBoxFor("Grounding")).toBeInTheDocument()
   })
 
-  it("keeps the running highlight on the Golden run row — appending the ninth stage moved nothing", async () => {
+  it("pulses the Golden run row WHEREVER it sits — and pulses nothing else (Phase 186-10)", async () => {
     const user = userEvent.setup()
     mockedPublish.mockReturnValue(new Promise<PublishOutcome>(() => {})) // never resolves
     render(<PublishGauntlet definitionId="def-1" />)
@@ -812,11 +828,23 @@ describe("PublishGauntlet — a draft that moved mid-gauntlet blocks at the Comm
     await user.type(screen.getByLabelText(/golden_input/i), "a representative kickoff")
     await user.click(screen.getByRole("button", { name: /run the gauntlet/i }))
 
-    // The running node is addressed by INDEX in the component, so a stage inserted rather
-    // than appended would silently move the amber aura onto the wrong row.
+    // This test used to defend a WEAKER claim — that appending a row left a literal index
+    // pointing at the right node. Phase 186-10 inserted `Grounding` at its true pipeline
+    // position, which moved Golden run from index 5 to index 6 and would have silently
+    // pulsed the wrong row. The property it defends now is the one that survives that: the
+    // aura sits on the golden-run row because the component LOOKS THAT ROW UP, not because
+    // the table happens to be shaped a certain way.
     await waitFor(() => expect(nodeBoxFor("Golden run").className).toContain("border-amber-500"))
     expect(nodeBoxFor("Commit").className).not.toContain("border-amber-500")
+    expect(nodeBoxFor("Grounding").className).not.toContain("border-amber-500")
+
+    // EXACTLY ONE amber node on the whole spine. Without this, a derived index that answered
+    // -1 (or an every-node highlight) would still satisfy the assertion above — the count is
+    // what makes the derivation falsifiable rather than merely re-passing.
+    const spine = screen.getByTestId("gauntlet-spine")
+    expect(spine.querySelectorAll('[class*="border-amber-500"]')).toHaveLength(1)
+
     // And nothing is claimed as passed while the run is still in flight.
-    expect(within(screen.getByTestId("gauntlet-spine")).queryAllByText("✓")).toHaveLength(0)
+    expect(within(spine).queryAllByText("✓")).toHaveLength(0)
   })
 })
