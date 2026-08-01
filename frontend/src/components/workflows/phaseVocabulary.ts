@@ -318,6 +318,157 @@ export function actionRiskArmed(phase: PhaseSpecJSON): boolean {
   return phase.action_risk_armed === true
 }
 
+// ── Phase 187 (VOCAB-01 / D-187-04, D-187-05) — THE CONFIG-DERIVED NODE FACE ────
+//
+// WHY IT EXISTS, measured. On the live corpus (:54322, 2026-08-02) **0 of 57**
+// phases across the 27 well-formed `workflow_definitions` rows carry a real
+// `phase.name`, so `nodeTitle` falls through its first tier 100% of the time and
+// every node face on every workflow is one of exactly six type sentences. Two steps
+// that do genuinely different work — "search the contracts folder" and "apply the
+// pricing policy" — render letter-for-letter identically. This section inserts a
+// tier that makes a step say what THAT step does, read from config it already has.
+//
+// DERIVE, NEVER STORE. The face is computed at render and written nowhere, so
+// re-binding a skill changes it with no write and a stale JSONB row cannot lie —
+// the same property that makes `groundingCauseOf` above safe.
+//
+// INJECTED CONTEXT, NOT A FETCH (D-187-05). `folder_scope` and `skill_ref` store
+// resolved UUIDs, never names (`backend/app/models/harness.py:88`, `:93`), and the
+// template lives on the DEFINITION (`assets[]`), not the phase. So the derivation
+// cannot be a pure function of the phase alone. It takes an OPTIONAL name-lookup
+// context instead — exactly the shipped `ToCanvasOptions.kbTools` precedent: passed
+// IN with a safe default, never hardcoded, never fetched. The purity contract at the
+// top of this file is preserved to the letter.
+//
+// NEVER FABRICATE. Absent context, or a lookup that misses, falls THROUGH to the
+// type sentence. An id-shaped face is worse than a generic one.
+
+/** The one type that pauses for a person — the literal `waitsForYou` also reads. */
+const HUMAN_INPUT_PHASE_TYPE = "llm_human_input"
+
+/**
+ * The id→name lookups the derived face needs, injected by whoever holds them.
+ *
+ * Every member is optional and every miss is a fall-through, so the omitted /
+ * empty context is the safe direction by construction: an unread map renders the
+ * shipped type sentence rather than a fabricated or id-shaped face.
+ */
+export interface NameContext {
+  /** Folder id → display name. Source: `PhaseFormPanel`'s `folderNames` (Phase
+   *  103-ux). Absent or missing key ⇒ the folder tier misses. */
+  folderNames?: Readonly<Record<string, string>>
+  /** Skill id → display name. Source: `PhaseFormPanel`'s `skillNames` (Phase
+   *  103-ux). Absent or missing key ⇒ the skill tier misses. */
+  skillNames?: Readonly<Record<string, string>>
+  /** The DEFINITION's `assets[]` entry where `kind === "template"`, already
+   *  resolved to its filename by the caller that holds the definition. Absent ⇒
+   *  the template tier misses. */
+  templateFilename?: string
+}
+
+/** Module-scope so an omitted context hands the SAME reference on every call — the
+ *  projection must stay deterministic to the byte (`canvasModel.ts`'s `NO_KB_TOOLS`
+ *  idiom), and a fresh `{}` per call is a needless identity change. */
+const NO_NAME_CONTEXT: NameContext = Object.freeze({})
+
+/**
+ * The flat inputs the derived face is a pure function of — mirroring
+ * `GroundingInputs` above for the same reason: the panel holds these as separate
+ * values while the canvas holds a whole phase, so `derivedFaceOf` below is the
+ * phase-shaped adapter and BOTH consumers reach this one body.
+ */
+export interface DerivedFaceInputs {
+  /** The step's `phase_type`. Gates tiers 2 and 4. */
+  phaseType: string
+  /** The bound skill's display name, already resolved. */
+  skillName?: string
+  /** The definition's template filename, already resolved. */
+  templateFilename?: string
+  /** The single scoped folder's display name, already resolved. */
+  folderName?: string
+}
+
+/**
+ * Resolve what THIS step does from its config, or `null` when nothing is bound.
+ * TOTAL — every input shape returns and none of them throws.
+ *
+ * The ORDER is the decision (D-187-04), so it is numbered in the source: the rule is
+ * MOST-SPECIFIC-FIRST, and any future tier is inserted by that test rather than by
+ * taste. SPEC Req 1's "folder scope → bound skill → template" is a drafting slip and
+ * is OVERRIDDEN by D-187-04.
+ */
+export function derivedFace(inputs: DerivedFaceInputs): string | null {
+  // (1) BOUND SKILL — a bound skill states what *this* step does, so it wins over
+  //     everything below. Most-specific-first is the whole argument for the
+  //     precedence (D-187-04).
+  if (inputs.skillName) return `Run the ${inputs.skillName}`
+
+  // (2) TEMPLATE — gated on `llm_emit`, deliberately. The template is
+  //     DEFINITION-level, so an ungated tier would render the same filename on
+  //     every phase that reaches it and make distinct steps identical — the exact
+  //     failure SC#5 check 2 exists to catch. `llm_emit` is also the only type
+  //     whose executor resolves the bound template.
+  if (inputs.phaseType === EMIT_PHASE_TYPE && inputs.templateFilename) {
+    return `Fill ${inputs.templateFilename}`
+  }
+
+  // (3) FOLDER SCOPE — last of the three config tiers, deliberately. `folder_scope`
+  //     is a subset of the single `project_folder_id`
+  //     (`harness.py:_folder_scope_requires_project`), so most steps in one workflow
+  //     share it and folder-first would collapse distinct steps back into identical
+  //     faces — defeating the phase's own falsifiable bar.
+  if (inputs.folderName) return `Search ${inputs.folderName}`
+
+  // (4) HUMAN INPUT — nothing is bound, but the type alone says what happens.
+  if (inputs.phaseType === HUMAN_INPUT_PHASE_TYPE) return "Wait for your approval"
+
+  // (5) otherwise NULL — the honest floor. Never fabricate; the caller falls through
+  //     to the plain-language type sentence.
+  return null
+}
+
+/**
+ * The phase-shaped adapter over `derivedFace`. It declares NO branch of its own — it
+ * only reads defensively off the LOOSE definition-JSONB shape and delegates, so the
+ * canvas and the panel cannot drift apart by construction.
+ *
+ * Every read is guarded (`Array.isArray` / `typeof`) because `PhaseConfigJSON` is
+ * author-supplied and hand-editable: a projection must not crash on a malformed row
+ * (CANVAS-01 totality).
+ *
+ * `assets` is NOT read here. The template is definition-level, so resolving it
+ * belongs to the caller that holds the definition; this module stays a pure function
+ * of *(phase, injected context)*.
+ */
+export function derivedFaceOf(
+  phase: PhaseSpecJSON,
+  ctx: NameContext = NO_NAME_CONTEXT,
+): string | null {
+  const config: Partial<PhaseConfigJSON> = phase.config ?? { phase_type: "" }
+
+  // A `skill_ref` is a resolved UUID. A miss yields `undefined` — NEVER the raw id.
+  const rawSkillRef = config.skill_ref
+  const skillName =
+    typeof rawSkillRef === "string" ? ctx.skillNames?.[rawSkillRef] : undefined
+
+  // `folder_scope` is a LIST of ids. Only a single scoped folder can name the step:
+  // a face that named one of several would be wrong, and a count is not a name.
+  const rawScope = config.folder_scope
+  const soleFolderId =
+    Array.isArray(rawScope) && rawScope.length === 1 && typeof rawScope[0] === "string"
+      ? rawScope[0]
+      : undefined
+  const folderName = soleFolderId !== undefined ? ctx.folderNames?.[soleFolderId] : undefined
+
+  return derivedFace({
+    phaseType: typeof config.phase_type === "string" ? config.phase_type : "",
+    skillName,
+    // The `llm_emit` gate lives in the core so both callers inherit it.
+    templateFilename: ctx.templateFilename,
+    folderName,
+  })
+}
+
 // ── The badge slots (D-183-07 — Phase 185 leaves slot 1 EMPTY) ──────────────────
 //
 // Slot 1 carried a three-face grounding word-badge until Phase 185. SPEC Req 6
@@ -334,5 +485,5 @@ export function actionRiskArmed(phase: PhaseSpecJSON): boolean {
  * deliberately unspent).
  */
 export function waitsForYou(phase: PhaseSpecJSON): boolean {
-  return phase.config.phase_type === "llm_human_input"
+  return phase.config.phase_type === HUMAN_INPUT_PHASE_TYPE
 }
