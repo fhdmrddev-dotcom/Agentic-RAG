@@ -591,6 +591,58 @@ describe("useDraftPersistence — F8: a refusal never files a receipt", () => {
     // A refusal is still a refusal: no receipt, still dirty.
     expect(h.markSaved).not.toHaveBeenCalled()
     expect(h.store.getState().dirty).toBe(true)
+
+    // 186-14 (WR-07) — the enabled Save button's behaviour RECORDED rather than assumed.
+    // It resolves false, and the sentence naming the way out (Tweak) is already on screen
+    // and stays there, so the press is answered rather than silently ignored. That is the
+    // material difference from GAP-4, where the standing sentence was a retry invitation
+    // and the exits had vanished — which is why this halt needs no banner and no
+    // re-assertion machinery.
+    let ok = true
+    await act(async () => {
+      ok = await h.view.result.current.saveNow()
+    })
+    expect(ok).toBe(false)
+    expect(stateOf(h.view)).toEqual({ kind: "error", sentence: PUBLISHED_CONFLICT_MESSAGE })
+  })
+
+  it("a PUBLISHED row HALTS the loop — three further edits issue nothing at all (WR-07)", async () => {
+    // WR-05's OWN ARGUMENT APPLIED TO THE OTHER TERMINAL CAUSE, and written in the 404
+    // test's shape on purpose. A published row is frozen by the DB trigger
+    // `workflow_definitions_block_published_update` (056_workflow_definitions.sql) and can
+    // never become a draft again, so NO PATCH against this id can ever succeed. Before
+    // 186-14, `isTerminalRefusal` named only `WorkflowNotFoundError`, so every subsequent
+    // keystroke burst re-issued a doomed PATCH for the life of the session.
+    //
+    // RED: `expected "spy" to be called 1 times, but got 4 times` — the refusal plus one
+    // doomed PATCH per edit.
+    mockedUpdate.mockRejectedValueOnce(new WorkflowConflictError())
+    mockedUpdate.mockResolvedValue(write("T-SHOULD-NEVER-BE-SENT"))
+
+    const h = harness()
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+    await flush()
+
+    const atRefusal = mockedUpdate.mock.calls.length
+    expect(atRefusal).toBe(1)
+
+    for (let i = 0; i < 3; i += 1) {
+      h.edit()
+      await advance(AUTOSAVE_DEBOUNCE_MS * 3)
+      await flush()
+    }
+
+    expect(mockedUpdate).toHaveBeenCalledTimes(atRefusal)
+    expect(h.markSaved).not.toHaveBeenCalled()
+    // The work is not lost, it is unsendable: dirty stays true, so every leave guard fires.
+    expect(h.store.getState().dirty).toBe(true)
+    // …and it is NOT a conflict, which is the clause that distinguishes this from a stale
+    // token. A frozen row has no exits: Reload would replace the author's work with the
+    // published copy they cannot edit, and Overwrite would PATCH a row the database itself
+    // refuses. The sentence names the real way out (Tweak) instead.
+    expect(stateOf(h.view)).toEqual({ kind: "error", sentence: PUBLISHED_CONFLICT_MESSAGE })
+    expect(stateOf(h.view).kind).not.toBe("conflict")
   })
 
   it("a dropped connection gets the generic sentence too", async () => {

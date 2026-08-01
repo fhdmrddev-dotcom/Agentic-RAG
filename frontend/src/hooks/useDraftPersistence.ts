@@ -389,14 +389,29 @@ function refusalOf(
  * Structural on the name, for `nameOf`'s reason: no prototype comparison appears in this
  * file, so a class that arrived through a second module copy still classifies.
  *
- * THERE ARE EXACTLY TWO HALTING CAUSES AND THEY LAND IN DIFFERENT STATES, which is the part
- * worth reading twice:
+ * THREE HALTING CAUSES, AND THE TAXONOMY IS THE POINT RATHER THAN THE COUNT (186-14, WR-07
+ * — this docblock said TWO until a published row was found retrying forever). What separates
+ * them is not how bad they are; it is whether the person has an exit, and where it lives:
  *
  *   • a stale token halts into `{kind:"conflict"}`, because the row is still there and the
- *     person has two real exits — take the server's copy, or force theirs through;
- *   • a missing row halts into `{kind:"error"}` with the sentence above, because it has
+ *     person has two real IN-APP exits — take the server's copy, or force theirs through;
+ *   • a missing row halts into `{kind:"error"}` with `DRAFT_GONE_SENTENCE`, because it has
  *     NEITHER. Reload would find nothing and Overwrite would PATCH a row that is not there,
- *     so offering them would be two dead affordances on a banner that promises a way out.
+ *     so offering them would be two dead affordances on a banner that promises a way out;
+ *   • a PUBLISHED row halts into `{kind:"error"}` with `PUBLISHED_CONFLICT_MESSAGE`. The row
+ *     is frozen by the `workflow_definitions_block_published_update` trigger
+ *     (`056_workflow_definitions.sql`) and can never become a draft again, so NO PATCH
+ *     against this id can ever succeed — "terminal" here is a fact about the row, not a
+ *     guess about the network. It has no in-app exit either, but its sentence already NAMES
+ *     the way out (Tweak, which forks a new draft), which is why it needs no banner and no
+ *     machinery to re-state itself: nothing overwrites that state for the rest of the
+ *     session, so the answer stays on screen beside the button.
+ *
+ * WR-07 IS WR-05's OWN ARGUMENT, APPLIED TO THE OTHER TERMINAL CAUSE. Before this, the
+ * predicate named only `WorkflowNotFoundError`, so a published-row 409 refused the write,
+ * showed the right sentence, and then let every subsequent keystroke burst re-issue a doomed
+ * PATCH for the life of the session. The halt is what stops that loop; the sentence was
+ * never the thing doing the work.
  *
  * AND IT MUST NOT AUTO-RECREATE THE DRAFT. The obvious alternative — clear `draftIdRef` so
  * the next write creates a fresh row — was rejected on the 404's own design: missing and
@@ -407,7 +422,8 @@ function refusalOf(
  * work that cannot be persisted here.
  */
 function isTerminalRefusal(err: unknown): boolean {
-  return nameOf(err) === "WorkflowNotFoundError"
+  const name = nameOf(err)
+  return name === "WorkflowNotFoundError" || name === "WorkflowConflictError"
 }
 
 export function useDraftPersistence(args: DraftPersistenceArgs): DraftPersistence {
@@ -601,8 +617,12 @@ export function useDraftPersistence(args: DraftPersistenceArgs): DraftPersistenc
             haltedRef.current = true
             conflictTokenRef.current = refusal.currentToken
           } else if (isTerminalRefusal(err)) {
-            // The row is gone: halt, but do NOT set `conflictTokenRef` and do NOT produce a
-            // `conflict` state. There is nothing to reload and nothing to overwrite.
+            // The row is gone, or frozen by publication (186-14, WR-07): halt, but do NOT
+            // set `conflictTokenRef` and do NOT produce a `conflict` state. In neither case
+            // is there anything to reload or anything an overwrite could reach — the
+            // refusal's own sentence is the whole answer. This arm is UNCHANGED by WR-07;
+            // only the predicate above it learned the second cause, which is the point of
+            // its being a predicate.
             haltedRef.current = true
           }
           setState(refusal)
