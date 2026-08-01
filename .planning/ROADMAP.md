@@ -300,7 +300,7 @@ Plans:
   3. Publish is guarded against reading a dirty draft (mirrors the shipped `publish_definition` WR-03 draft-status guard).
   4. The two-editor / parallel path is exercised in UAT (SC#10 parallel axis) — a second editor gets an honest read-only banner or a merge-safe outcome, never a silent overwrite.
 
-**Plans**: 13 plans in 8 waves (8 shipped + 5 gap-closure from `186-VERIFICATION.md`)
+**Plans**: 17 plans in 10 waves (8 shipped + 5 gap-closure from the first `186-VERIFICATION.md` + 4 gap-closure from the 2026-08-01 re-verification)
 
 Plans:
 
@@ -340,6 +340,16 @@ Plans:
 **Wave 8** *(blocked on Wave 7 — shares `useDraftPersistence.ts` and `BuilderSaveRegion.tsx` with 186-12)*
 
 - [ ] 186-13-PLAN.md — GAP-3 / WR-03 (+ WR-04, WR-05): the hold-release effect obeys `enabled`, closing the flag-off automatic-PATCH leak against D-181-01; the publish hold sentence stops promising a save the loop will not perform and renders on both surfaces; a 404 on a deleted draft halts the loop instead of retrying forever
+
+**Wave 9** *(gap closure — the 2026-08-01 re-verification returned `gaps_found` 6/8 with one BLOCKER; no shared files, run in parallel)*
+
+- [ ] 186-14-PLAN.md — **GAP-4 / CR-02 (BLOCKER)** + WR-07: a failed `reload()` no longer strands the draft — the catch RESTORES the conflict (both exits stay on screen) and the banner gains an extra line saying why the exit failed; and a published-row 409 becomes terminal, so a frozen draft stops re-issuing doomed PATCHes for the life of the session
+- [ ] 186-15-PLAN.md — WR-11 + WR-06 residue: the pane-click row measures the DISMISSAL (a call-count delta with its own positive control) instead of an absolute count over an interval that outruns the debounce — the 186-12/13 "passes in isolation" claim is falsified and recorded; and the `stale_token` 409 wire shape gains DB-free coverage at both the route and the db tier
+- [ ] 186-16-PLAN.md — WR-10: a gauntlet can no longer start on top of an outstanding autosave write. The INNER Publish button is gated on the same live `blockedReason` the trigger already reads, and the reason is stated inside the modal (R12). The `flushPendingWrites()` alternative is rejected on D-181-01 grounds and recorded in `deferred-items.md`
+
+**Wave 10** *(blocked on Wave 9 — shares `useDraftPersistence.ts` with 186-14)*
+
+- [ ] 186-17-PLAN.md — WR-08 + WR-09: the drain stops giving back the debounce (supersede decides the RECEIPT, `pendingRef` decides RE-ENTRY), so a typing author gets one write per second rather than one per round trip and stops manufacturing the conflicts this phase exists to prevent; and the hold's reading resolves when the hold does, so the flag-off header stops claiming "Publishing —" after the gauntlet has ended
 
 **UI hint**: yes
 **Flags**: autosave-in-place (never mint a version / re-arm the gauntlet — CONCUR-01, the autosave version-explosion trap); soft-lock / optimistic-token co-edit guard (mirrors `publish_definition` WR-03); parallel-editor UAT row (SC#10 parallel axis) — the two-editor org-shared clobber; concurrency mechanism (block vs warn vs merge) = sketch/discuss call (research left it open); red line D-14; no full SC#10 (not cross-provider streamed); no threat model (v3.4 org RLS already enforces the share boundary); no migration.
