@@ -4,7 +4,7 @@ milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
 status: executing
 last_updated: "2026-08-01T21:34:50.931Z"
-last_activity: 2026-08-02 -- Phase 187 plan 03 complete (unbound_retrieval /validate verdict, D-187-11)
+last_activity: 2026-08-02 -- Phase 187 plan 04 complete (config-derived node face, 4-tier nodeTitle)
 progress:
   total_phases: 19
   completed_phases: 6
@@ -91,6 +91,33 @@ tests `"detected"` ONLY (not `already-set` / `escalated`, which do not imply KB 
 `blockedReason` renders this message **verbatim** next to a disabled Publish button, so rewording it
 is a UX change. **UAT owes:** observing the verdict on the canvas with `visual_workflow_canvas` ON
 (G-4) — nothing here was live-verified in a browser.
+
+**Plan 187-04 COMPLETE (Wave 1, 2026-08-02, `8e86ee50` → `59b37865` → `dd12bb2f` → `f5ed99ac`).**
+VOCAB-01 / D-187-04 / D-187-05 — the **config-derived node face**, in the ONE vocabulary module.
+`phaseVocabulary.ts` gains `NameContext` (optional injected `folderNames` / `skillNames` /
+`templateFilename`), a frozen module-scope `NO_NAME_CONTEXT`, the pure `derivedFace` core with its
+precedence numbered `(1)`..`(5)` in the source, and the `derivedFaceOf` phase adapter; `nodeTitle`
+becomes `nodeTitle(phase, ctx = NO_NAME_CONTEXT)` resolving **stored name → derived face → type
+sentence → raw type**. `PhaseSpecJSON.name_seeded_by_ai` is declared here (additive-optional, read by
+NO resolver in this file — 187-05's `definitionOps` demote rule owns it). The refuted "10 of 119"
+docblock figure is replaced by the measured **0 of 57** and deliberately not restated, so a grep
+proves it gone. Measured: `phaseVocabulary.test.ts` **33 → 72**; 8-file vocabulary set **902**
+(bar 863); 5-file consumer set **381** (bar 381); `?raw` spine guards green.
+**Carry forward — three things the next plans must not rediscover:**
+(1) **The plan contradicted itself** ("an empty `NameContext` returns `null` for EVERY phase" vs
+"`llm_human_input` renders `Wait for your approval`"). Resolved in favour of the D-187-04 tier
+ORDER: tier 4 reads no lookup, so it resolves uncontextualised. **Consequence — a real product
+change:** an unnamed `llm_human_input` step now reads **"Wait for your approval"** instead of
+**"Check with you"** for *every* caller, context or not. 3 fixture snapshots + one
+`WorkflowCanvas.test.tsx` assertion were updated to the intended value after reading the full diff
+(nothing but the face changed).
+(2) **`derivedFaceOf` does NOT read `assets`** — 187-08 / 187-15 owe resolving the definition's
+`assets[]` entry where `kind === "template"` and passing its filename as `ctx.templateFilename`.
+The `llm_emit` gate already lives in the core, so callers inherit it.
+(3) **`npx tsc -b` does NOT exit 0 at HEAD** — measured **33 errors, 0 in `components/workflows`**
+(owners: `SettingsPage`, `OrgProvider.test`, `StreamsProvider`, `streamsStore`). Every 187 plan
+inherits that gate from `187-RESEARCH.md:1769` and it has never been true. Logged as `D-ITEM-01` in
+the phase's new `deferred-items.md`; read the criterion as *no NEW error, none in the touched files*.
 
 (`3713a716`), GOVERN-01/02/03 all `Complete`, `nyquist_compliant` true, SECURED 49/49 (`a00b1cc5`).
 Security found one real fail-open BLOCKER — T-185-04-01, a **typed** refusal on an armed checkpoint ran
