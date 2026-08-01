@@ -84,8 +84,12 @@ AUTHORING_SYSTEM_PROMPT = (
     "tree, and only ids inside the bound project subtree; set the definition's "
     "`project_folder_id` when any phase declares a `folder_scope`.\n"
     "- Emit ONLY the schema's fields; do NOT invent keys (extra keys are rejected).\n"
-    "- Give each phase a short `slug` and a sequential `phase_index` starting at 0; set "
-    "the definition `slug`, `version` (1), `name`, and `status` ('draft')."
+    "- Give each phase a short `slug`, a sequential `phase_index` starting at 0, and a "
+    "short, specific, plain-language `name` saying what THAT step does rather than what "
+    "its type does — write \"Pull the renewal history\", not \"LLM step\". This per-phase "
+    "`name` is what a non-coder reads on the canvas, and it is SEPARATE from the "
+    "definition-level `name` below. Set the definition `slug`, `version` (1), `name`, and "
+    "`status` ('draft')."
 )
 
 
@@ -333,6 +337,34 @@ async def generate_workflow_definition(
     )
     if fidelity is not None:
         return fidelity
+
+    # ── Phase 187 (VOCAB-01 / REQ-3, D-187-03) — stamp the name PROVENANCE.
+    #
+    # SERVER-SIDE, AFTER validation, UNCONDITIONALLY (T-187-02-02). The marker is
+    # never read off the emitted payload, so a model cannot claim that a name it just
+    # wrote was hand-typed by a person — which matters because the demote-on-config-
+    # edit rule (D-187-07) clears a GENERATOR-seeded name and never a hand-typed one.
+    #
+    # A name that trims empty was not seeded, and we do not claim it was: provenance
+    # for a name that does not exist would make that rule read a lie.
+    #
+    # `model_copy` on each PhaseSpec, rebuilding the list — never a mutation in place,
+    # and never a model-level validator hook (the save path persists
+    # `model_dump(mode="json")`, so a derivation living in the model would be baked
+    # into the JSONB; see the PhaseSpec docblock in `app/models/harness.py`).
+    #
+    # This sits on the SINGLE success path, so a first-emit result and a retry-emit
+    # result are stamped identically.
+    wd = wd.model_copy(
+        update={
+            "phases": [
+                p.model_copy(
+                    update={"name_seeded_by_ai": bool(p.name and p.name.strip())}
+                )
+                for p in wd.phases
+            ]
+        }
+    )
 
     # Mint a UNIQUE slug for this net-new draft so two same-named generations never
     # collide on UNIQUE(slug, version) at create time (mirrors the existing fixture
