@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
 status: executing
-last_updated: "2026-08-01T10:55:08.780Z"
-last_activity: 2026-08-01 -- Phase 186 execution started
+last_updated: "2026-08-01T13:15:00.000Z"
+last_activity: 2026-08-01 -- Phase 186 plan 16 executed (WR-10 closed)
 progress:
   total_phases: 19
   completed_phases: 5
@@ -144,6 +144,39 @@ zero dependency changes in either stack.
   isolation" claim was FALSE AS STATED — not because the row always failed, but because it was
   asserted as a property of the ROW when it was a property of the machine and the vite cache. The
   row had no true state; that was the defect. Quote none of these numbers without re-measuring.**
+
+**▶ PLAN 186-16 EXECUTED 2026-08-01 — WR-10 is CLOSED.** 2 tasks, 2 commits (`e7b2b237` /
+`3f06d112`) plus `f0384214` (SUMMARY). Four source/test files + `deferred-items.md`; 382 ins / 4 del.
+Zero migrations (head still `114_…`), zero dependency changes.
+- **The page half**: a new exported `SAVING_PUBLISH_WAIT` ("Saving your last change — Publish will
+  be ready in a moment") and ONE branch in the `blockedReason` memo keyed on
+  `persistState.kind === "saving"`, ranked **ahead of** the validation branches (the nearest
+  obstacle is the one named). **+25 insertions exactly — the plan's cap** on this G-5 hot file; the
+  memo body grew by 2 lines against a budget of 6, and the F16 fence anchor is byte-identical.
+- **The gauntlet half**: `canPublish` gains `&& !blocked`, so the INNER modal Publish — the click
+  that actually spends money, and the one gated on nothing but the input and `loading` — is refused
+  too. The reason renders INSIDE the modal (`publish-inner-blocked-reason`, `aria-describedby`),
+  because the trigger's reason sits behind the backdrop and an unreachable explanation IS R12's
+  greyed-in-silence failure. `blocked` is handed DOWN, so the emptiness test keeps one home.
+- Numbers, per file in isolation at 30 s: `PublishGauntlet.test.tsx` **41 → 46**; the canvas+header
+  pair **111 → 114**; the 4-file acceptance set **183/183**, `vite build` exit 0.
+- **The gate was FALSIFIED, not just run green**: removing `&& !blocked` reds exactly the 3 gate
+  rows (the 2 identity rows correctly stay green). The refusal row measures the mocked TRANSPORT —
+  a golden run's cost is spent the moment the request leaves — with the cleared-reason click as its
+  positive control.
+- **The review's preferred `flushPendingWrites()` was rejected on safety, and recorded**: the
+  gauntlet mounts on BOTH branches of the flag gate, so a flush from `runGauntlet` is an unrequested
+  PATCH on the flag-off surface — the D-181-01 leak 186-13 closed. In `deferred-items.md` with a
+  re-open trigger, alongside the residual `conflict`/`error` case (bounded vs unbounded states).
+- ⚠ **Four plan claims were refuted by measurement** (recorded in the SUMMARY, do not inherit):
+  `PublishGauntlet.test.tsx` had **no** R12 blocked-trigger cases at all (every one lives in the
+  canvas suite); the prop docblock's "24 shipped assertions" is stale (41); the canvas-pair baseline
+  is **111, not the 141** the plan's verification block states; `WorkflowsPage.test.tsx` does exist.
+
+⚠ **The `progress.completed_plans` counter was deliberately NOT incremented by 186-16.** It reads
+64 while `.planning/phases/*/NN-SUMMARY.md` counts **67 on disk** — it was already stale before this
+plan and bumping a wrong base only launders it. The orchestrator owns the recount; do not treat 64
+(or 65) as evidence of what has shipped.
 
 **Decision-coverage gate skipped again** — same known parser quirk (CONTEXT.md uses `D-186-NN`,
 the gate matches literal `D-NN`). Verified by hand instead: the new plans cite D-181-01, D-186-01,
@@ -1929,6 +1962,12 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase 186]: 186-15: **a delta assertion needs a positive control in the SAME test, or it is decoration.** A helper that cannot observe a PATCH makes its zero meaningless. The control wraps the same helper around an explicit Save (which bypasses debounce and dirty gate, so it needs no clock) and demands a delta ≥ 1. Falsified: snapshotting `mock.calls` instead of `.length` — the most likely way to break it — turns the control red immediately.
 - [Phase 186]: 186-15 (WR-06): **a module-level `pytestmark` hides every invariant in the file, including the ones that need no database.** `grep -rn "stale_token" backend/tests/` matched exactly one file and that file was wholly skipped without Postgres, so the server half of a two-sided wire contract was absent from any CI while the client half was covered only against a mock. The skip is now a property of the four tests that need a pool. 0 → 9 DB-free passes.
 - [Phase 186]: 186-15: **the fail-closed 404 was a claim in a comment and nothing else.** The route says "any cause this route does not recognise" collapses to the dull string 404; a DB-free test now drives an unrecognised cause and asserts its detail is EQUAL to the `not_found` one and is not a dict — a coded 404 would be an existence oracle (T-186-01-03). Falsified by giving the 404 a machine code.
+- [Phase 186]: 186-16 (WR-10): **a gate that guards the entrance does not guard the purchase.** The publish trigger had been refused by `blockedReason` since 184-11, but the INNER modal button — which can be clicked minutes later, after the author finishes writing a golden input — was gated on nothing but the textarea and `loading`. The expensive click and the guarded click were not the same click. Both now read the SAME derived `blocked`, handed down rather than recomputed, so they cannot disagree about whether a reason was supplied.
+- [Phase 186]: 186-16: **a stronger fix that writes past the revert switch is a weaker fix.** The review preferred `runGauntlet` awaiting a `flushPendingWrites()`, which closes the window rather than shrinking it. Rejected on safety, not cost: `PublishGauntlet` mounts unconditionally on BOTH branches of the flag gate, so that flush issues an unrequested PATCH on the flag-off surface — the exact D-181-01 leak 186-13 had just closed — and re-gating it on `enabled` makes it a conditional flush wearing a guarantee's clothes. The refusal rides the seam that already exists and is the vocabulary the phase speaks everywhere else (hold, and say why).
+- [Phase 186]: 186-16: **only a BOUNDED state is safe to block on.** `saving` always ends by itself (`performWrite`'s `finally` clears `inFlightRef`; every terminal branch leaves `saving`), so the refusal is momentary by construction and needs no escape hatch. `conflict` and `error` are NOT bounded — blocking publish on them would need the surface to also offer the way out, which is a product decision, not a race fix. Deferred with a trigger rather than folded in because "arguably worse" is not the same as "in scope".
+- [Phase 186]: 186-16: **the refusal branch is ranked FIRST, and that ordering is the message.** A saving draft that is also empty gets the wait, not the invitation — adding a step will not make Publish go until the PATCH lands, so naming the further obstacle would send the author to work that changes nothing. Same precedence rule the hold sentences already follow.
+- [Phase 186]: 186-16 (falsification): the gate was proven by REMOVING `&& !blocked` and re-running — exactly the 3 gate rows went red while the 2 identity rows (no prop / whitespace-only reason) correctly stayed green. A row that stays green under the mutation is measuring identity, not the gate, and knowing which is which is the point. The refusal is asserted on the mocked TRANSPORT rather than on the rendered outcome: a golden run's cost is spent the moment the request leaves.
+- [Phase 186]: 186-16 (measurement lesson, the third in three plans): **four claims inherited from the PLAN were false against the tree** — the gauntlet suite had no R12 cases at all (they live in the canvas suite), its prop docblock's "24 shipped assertions" is stale at 41, and the "canvas-pair baseline is 141" is 111. None changed what was built; all are recorded so a fourth reader does not inherit them. Re-measure before quoting any count in this phase.
 - [Phase 186]: 186-15 (measurement lesson, the second in two plans): **a claim that cannot be reproduced is not thereby false — reproduce the MECHANISM instead of picking a side.** The WR-11 row passed 6/6 here and failed 3/3 for the verifier. Rather than record either, the failure condition was injected (a 1500 ms pause standing in for a slow lazy import), which reproduced the verifier's exact signature and confirmed the diagnosis. The real defect was that the row's result depended on machine and cache state at all. Both numbers are recorded in the SUMMARY so no third reader inherits one on trust.
 
 ## Operator Next Steps
