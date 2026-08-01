@@ -327,7 +327,7 @@ gap-report blockers (GAP-1 / 186-09, GAP-2 / 186-12, GAP-3 / this plan) are clos
 
 | Claim | Result |
 |---|---|
-| `frontend/src/hooks/useDraftPersistence.ts` exists | FOUND (818 lines) |
+| `frontend/src/hooks/useDraftPersistence.ts` exists | FOUND (812 lines) |
 | `frontend/src/hooks/useDraftPersistence.test.tsx` exists | FOUND (40 tests, `F20` present) |
 | `frontend/src/components/workflows/BuilderSaveRegion.tsx` exists | FOUND (1 `builder-autosave-status` span) |
 | `frontend/src/components/workflows/BuilderSaveRegion.test.tsx` exists | FOUND (8 tests) |
@@ -336,7 +336,7 @@ gap-report blockers (GAP-1 / 186-09, GAP-2 / 186-12, GAP-3 / this plan) are clos
 | commit `c572b3f9` (the `enabled` gate) | FOUND |
 | commit `41608375` (the hold sentence, both surfaces) | FOUND |
 | commit `a24ffec6` (the terminal 404) | FOUND |
-| key link — `enabled` → the hold-release effect via an early return | FOUND: `if (!enabled) return` at `:700`, above the `heldPendingRef` clear and the `performWrite()` at `:703` |
+| key link — `enabled` → the hold-release effect via an early return | FOUND: `if (!enabled) return` at `:698`, above the `heldPendingRef` clear and the `performWrite()` at `:703` |
 | key link — `state.kind === "held"` → the quiet line, before the flag gate | FOUND: `BuilderSaveRegion.tsx` `quietLine` opens on `state.kind === "held"`, `!autosaveEnabled` is the second test |
 | exports named in the artifact contract | FOUND: `HOLD_PUBLISHING`, `HOLD_PUBLISHING_MANUAL`, `HOLD_UNREADABLE`, `SAVE_FAILED_SENTENCE`, `DRAFT_GONE_SENTENCE`, `PUBLISHED_CONFLICT_MESSAGE` |
 | no file deletions in any of the four commits | CONFIRMED (`git diff --diff-filter=D --name-only HEAD~4 HEAD` empty) |

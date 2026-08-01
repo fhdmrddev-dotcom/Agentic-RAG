@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
 status: executing
-last_updated: "2026-08-01T08:49:10.790Z"
-last_activity: 2026-08-01 -- Phase 186 execution started
+last_updated: "2026-08-01T09:21:54.000Z"
+last_activity: 2026-08-01 -- Phase 186 gap closure complete (186-13, wave 8 -- last plan)
 progress:
   total_phases: 19
   completed_phases: 5
@@ -347,6 +347,39 @@ would silently restore the exact defect WR-06 recorded — with a green suite ei
 ⚠ **Counters and requirement status deliberately NOT advanced by this executor.** `CONCUR-02`
 stays as it is — WR-06 is one of three blockers plus four warnings, and 186-12 / 186-13 are still
 owed in waves 7-8. ROADMAP plan-progress left to the orchestrator.
+
+**Execution progress — Plan 186-13 COMPLETE (2026-08-01), the LAST plan of the phase.** Wave 8
+shipped in 4 commits (`36ce9806` F20 RED → `c572b3f9` the `enabled` gate → `41608375` the hold
+sentence on both surfaces → `a24ffec6` the terminal 404), closing **WR-03 + WR-04 + WR-05** and
+with them the third and final gap-report blocker. **GAP-1 (186-09), GAP-2 (186-12) and GAP-3
+(186-13) are now all closed.**
+RED observed first, with the hook unmodified: F20a `updateWorkflowDraft` **1 where 0 expected**,
+F20a-create `createWorkflowDraft` **1 where 0**, F20b **1 where 0** — an unrequested PATCH
+carrying the full definition, in a session where the person had switched the feature off.
+**D-181-01 spot-check by source read, recorded in the SUMMARY:** all four `performWrite()` call
+sites enumerated — `:653` (debounce timer) and `:703` (hold release) are AUTOMATIC and both now
+`enabled`-gated with `enabled` in their dependency arrays; `:720` (`saveNow`) and `:804`
+(`overwrite`) require a press and stay ungated by design (D-186-03 / D-186-08). `reload()` never
+calls it. No automatic write path can cross the revert switch.
+Task 2's load-bearing change was **falsified in place** — restoring the old `quietLine` ternary
+order reds exactly 2 tests, both written for that clause, and leaves `header.test.tsx` green
+either way, which is itself the evidence the resting flag-off markup is untouched.
+Counts: `useDraftPersistence.test.tsx` **33 → 40**, `BuilderSaveRegion.test.tsx` **5 → 8**, the
+three page suites **134 → 134**, six-file consumer run **251/251**, full suite **3580 → 3590
+collected** with **40** failures all inside the SEED-056 band (the one
+`WorkflowBuilderPage.session` failure passes in isolation — same parallel-load flake waves 6-7
+recorded; `PublishGauntlet` took 124 s under load vs. milliseconds alone). `tsc -b` **33**, none
+naming a touched file; `vite build` exit 0; package/lockfile diff empty. Zero migrations (114).
+⚠ **Two acceptance greps were not satisfiable as literally written, and NO code was reworded to
+make them so** (the counting-criterion lesson, now nine plans running): `grep "if (!enabled)
+return"` misses the shipped `if (!enabled || definition === null) return`, so the property was
+measured comment-filtered on `!enabled` → two code sites; and `grep -c` counts LINES, so the
+wrapped `HOLD_PUBLISHING_MANUAL` declaration read 2 until a *genuinely useful* cross-reference
+was added to `HOLD_PUBLISHING`'s docblock (a reader landing on the promise-form must know the
+flag-off spelling exists) — 3 as a side effect, not as its purpose.
+⚠ **Counters and requirement status deliberately NOT advanced by this executor.** `CONCUR-01` /
+`CONCUR-02` stay **Pending** — `/gsd:verify-work 186` re-verifies both now that all three
+blockers are closed. ROADMAP plan-progress and the plan counter left to the orchestrator.
 
 Resume file: None
 
@@ -1762,6 +1795,12 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase 186]: 186-12 (GAP-2 / WR-01): single flight is enforced INSIDE `performWrite`, not by each caller — an invariant every caller must remember is not an invariant. The three caller-side `inFlightRef` checks (timer, hold release, `saveNow`) were deleted; `overwrite`/`reload` had never had one, which is how a double-click on Overwrite issued two same-token PATCHes and manufactured a `stale_token` conflict that did not exist.
 - [Phase 186]: 186-12: the two conflict exits carry a SEPARATE re-entrancy guard (`reloadingRef`), placed ABOVE the `tokenRef` assignment in `overwrite`. Guarding only the request would trade a duplicate PATCH for a corrupted token — F19d is the test that discriminates that half-fix (it reds on a late-settling racing write, not on the request count).
 - [Phase 186]: 186-12: `resolving` is a plain boolean on `DraftPersistence`, NOT a sixth `PersistState` member — the union describes the write loop's OUTCOME and a resolution under way is not an outcome. The banner's render condition needed `|| resolving` because `overwrite()` flips the loop to `saving` synchronously; falsified in place (removing the clause reds exactly one of the five net-new `BuilderSaveRegion.test.tsx` tests).
+- [Phase 186]: 186-13 (GAP-3 / WR-03): the `enabled` guard's POSITION in the hold-release effect is load-bearing four ways and is commented as such — AFTER the `holdRef.current = holdReason` mirror (the timer and `saveNow` read that ref at FIRE time on the flag-ON surface, so a stale mirror would let a write through mid-gauntlet), AFTER the `haltedRef` check, BEFORE the `heldPendingRef` clear (so a later flag-on session still finds the accumulated work), and BEFORE `performWrite()` (the leak itself).
+- [Phase 186]: 186-13: `saveNow` / `overwrite` / `reload` stay UNGATED, stated in the source as a decision rather than left as an omission — D-186-03 keeps the explicit save working flag-off and D-186-08 requires both conflict exits on any surface. **Automatic writes obey the flag, chosen ones obey the person.**
+- [Phase 186]: 186-13 (WR-04): the flag-off Save-during-publish outcome is an HONEST SENTENCE (`HOLD_PUBLISHING_MANUAL`), not a disabled button — a greyed control with no stated reason is the R12 failure, and it would have changed the resting flag-off header markup `header.test.tsx:305` pins byte for byte. The hold was NOT dropped flag-off either: 186-02's stage-5 token guard is not flag-gated, so removing the hold would restore client identity by making the SERVER refuse those writes and cost the person a whole golden run.
+- [Phase 186]: 186-13: the hold sentence is selected on `enabled` — **the same input that decides whether the flush happens**, which is the only way the surface and the loop cannot disagree. `HOLD_UNREADABLE` is deliberately unchanged: it promises nothing about a future write, so it was already honest on both surfaces.
+- [Phase 186]: 186-13 (WR-05): a 404 halts on a PREDICATE over the cause (`isTerminalRefusal`), never on a comparison against the sentence — otherwise a copy edit becomes a behaviour change. It halts into `{kind:"error"}` and NOT `{kind:"conflict"}`: Reload would find nothing and Overwrite would PATCH a row that is not there, so the banner would offer two dead affordances. No auto-recreate — the 404-collapse (missing ≡ not-owned, T-103-01-01) means the client cannot classify the refusal, and minting a new row on one it cannot read is worse than stopping.
+- [Phase 186]: 186-13 (test lesson): a test asserting only the HIDING half of a gate certifies the silence it was meant to catch. `BuilderSaveRegion.test.tsx`'s `autosaveEnabled: false` case pinned that `saving`/`saved` render nothing and said nothing about `held` — which is exactly how a Save press that produced no visible outcome shipped. It now asserts both halves.
 
 ## Operator Next Steps
 
