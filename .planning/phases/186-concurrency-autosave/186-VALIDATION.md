@@ -3,7 +3,7 @@ phase: 186
 slug: concurrency-autosave
 status: planned
 nyquist_compliant: false
-wave_0_complete: false   # 6 files owed — see Wave 0 Requirements; created inside 186-01/02/06 Task 1s
+wave_0_complete: true    # all 6 files verified present on disk by `ls` 2026-08-01 (plan 186-20, Task 2) — the flag was stale, not the tree
 created: 2026-08-01
 ---
 
@@ -174,13 +174,126 @@ instance because it crosses a minutes-long server operation.
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references (6 files above)
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies — every row of the Per-Task
+      Verification Map carries an `Automated Command`, and all six Wave-0 files now exist (186-20)
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify — no row in the map
+      lacks a command, so the longest gap is zero (186-20)
+- [x] Wave 0 covers all MISSING references (6 files above) — all six verified present by `ls` (186-20)
 - [ ] Every F-guard observed **RED before GREEN** (falsification-first, G-6)
-- [ ] Test COUNT recorded before/after for both suites; no decrease (baselines 3457 / 209)
-- [ ] No watch-mode flags
+- [x] Test COUNT recorded before/after for both suites; no decrease (baselines 3457 / 209) —
+      backend collected **3474** (≥ 3457 baseline, ≥ 3465 post-186-11); the frontend phase-186
+      consumer set went **426 → 429**, delta measured as exactly +3. See the gate below (186-20)
+- [x] No watch-mode flags — every command in the gate below is `vitest run` / `pytest`, never `--watch`
 - [ ] Feedback latency < 30 s
 - [ ] `nyquist_compliant: true` set in frontmatter
 
 **Approval:** pending
+
+---
+
+## Post-gap-closure gate (2026-08-01 · plans 186-18 / 186-19 / 186-20)
+
+Measured **after** both wave-1 gap-closure plans landed on `develop`, at `5a1cc5c8`. Every number
+below was produced by the command beside it in this session; none is inherited from a SUMMARY.
+The full raw output of each is pasted in `186-20-SUMMARY.md`.
+
+### Command 1 — the phase-186 frontend consumer set (11 files, one run)
+
+```
+cd frontend && npx vitest run --fileParallelism=false \
+  src/pages/WorkflowBuilderPage.test.tsx src/pages/WorkflowBuilderPage.session.test.tsx \
+  src/pages/WorkflowBuilderPage.header.test.tsx src/pages/WorkflowBuilderPage.canvas.test.tsx \
+  src/hooks/useDraftPersistence.test.tsx src/lib/api.workflows.test.ts \
+  src/components/workflows/PublishGauntlet.test.tsx src/components/workflows/builderStore.test.ts \
+  src/components/workflows/BuilderSaveRegion.test.tsx \
+  src/components/workflows/WorkflowCanvas.editing.test.tsx \
+  src/components/workflows/canvasNudge.test.ts
+
+ Test Files  11 passed (11)
+      Tests  429 passed (429)
+   Duration  151.47s
+```
+
+`--fileParallelism=false` is carried forward from **D-186-18-D**: under vitest's default parallel
+workers `PublishGauntlet.test.tsx` flakes on `user-event` timeouts, which is load-induced noise
+rather than a signal. Serial execution is what makes the before/after comparison apples-to-apples.
+
+**The delta, measured rather than asserted.** Comparing the pre-round tree (`b417584d`, the commit
+immediately before 186-18's first commit `64042c12`) with `HEAD` across the same 11 files:
+
+| File | `it(`/`test(` declarations, base → head |
+|---|---|
+| `WorkflowBuilderPage.canvas.test.tsx` | 87 → 88 (+1, 186-18's CR-03 row) |
+| `useDraftPersistence.test.tsx` | 50 → 52 (+2, 186-19's F20i and F23) |
+| the other 9 files | **unchanged, every one** |
+| **total** | **412 → 415 (+3)** |
+
+So the pre-round runner total for this set was **426**, and **429 − 426 = +3** — exactly the three
+rows the two plans added, with no file losing a row. **Non-decreasing, and the increase is fully
+accounted for** (the Phase 177 lesson: a "net-new" file can replace a suite invisibly, so the delta
+is attributed per file rather than read as one number). The static count (415) is lower than the
+runner count (429) because some rows are generated inside loops; the *delta* is what this gate
+measures, and it is identical either way.
+
+### Command 2 — the phase-186 backend files
+
+```
+cd backend && ./venv/Scripts/python.exe -m pytest \
+  tests/unit/test_186_concurrent_patch.py tests/unit/test_186_publish_race.py \
+  tests/unit/test_103_published_409.py -q
+
+21 passed, 1 warning in 1.69s
+```
+
+**21 passed, 0 skipped.** Zero skips means the local Postgres at `:54322` was **present** — the
+per-test `skipif` guards shipped by WR-06 / 186-11 did not fire, so the live-DB guards (F1/F2/F3/
+F13/F5/F6) genuinely ran rather than being silently waived. The lone warning is the pre-existing
+`urllib3`/`chardet` version notice from `requests`, unrelated to this phase.
+
+Backend whole-suite collection, for the count guard:
+`pytest --collect-only -q` → **3474 tests collected** (baseline 3457, re-measured 3465 after
+186-11). Non-decreasing. This round added **zero** backend tests, so the +9 predates it.
+
+### Command 3 — typecheck
+
+```
+cd frontend && npx tsc --noEmit -p tsconfig.app.json
+→ 33 errors, across 19 files
+→ 0 errors in ANY phase-186 file
+```
+
+Filtered on `WorkflowBuilderPage`, `useDraftPersistence`, `PublishGauntlet`, `BuilderSaveRegion`,
+`builderStore`, `api.workflows`, `WorkflowCanvas` and `canvasNudge`: **no match**. The 33 are the
+project's recorded pre-existing typecheck rot (`__tests__/**`, chat components, `SettingsPage`,
+`StreamsProvider`/`streamsStore`, `SkillFormDialog`); this round touched four files and none of
+them appears in the error list, so every one of the 33 is pre-existing by construction. The count
+is unchanged from the 33 that plan 186-19 measured. **"Zero errors" is not achievable on this
+project and never was** — the honest criterion is *zero in the phase's own files*, and that holds.
+
+### Command 4 — no migrations, no packages
+
+```
+git status --porcelain supabase/migrations        → (empty)
+git diff --stat frontend/package.json             → (empty)
+git diff --stat b417584d..HEAD -- frontend/package.json frontend/package-lock.json \
+                                  backend/requirements.txt supabase/migrations
+                                                  → (empty)
+```
+
+Zero schema change and zero dependency change, both in the working tree **and** across the whole
+gap-closure round. T-186-20-SC satisfied.
+
+### Wave-0 flag
+
+`wave_0_complete` read `false` while the tree already held all six files. Verified by `ls`, all six
+present; the flag is now `true`. It was a stale record, not a missing artifact — the six files were
+created inside the 186-01 / 186-02 / 186-06 Task 1s and nobody flipped the flag afterwards.
+
+### What this gate does NOT close
+
+The eight Manual-Only rows above are **all still unrun**, row 4 remains correctly recorded as
+BLOCKED-not-reachable, and `**Approval:** pending` is untouched — the table above was not edited
+by this plan at all (its status column and its blocked-row reason are byte-identical). **SC#4 / D-186-13 / G-4 make live operator observation
+non-substitutable** — no unit count, wire format or screenshot stands in for it, and no plan task
+may tick those rows. `CONCUR-01` and `CONCUR-02` therefore remain **Pending** in
+`.planning/REQUIREMENTS.md`, which this plan did not modify.
