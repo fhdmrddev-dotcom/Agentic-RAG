@@ -733,6 +733,7 @@ async def _run_phase_with_gates(
             run_id=run_id, pool=pool, redis=redis, ctx=ctx,
             _audit_user_id=_audit_user_id, stream_run_id=stream_run_id,
             is_pre=True,
+            is_action_risk=_is_action_risk_finding(pre.error_message),
         )
         if outcome is not None:
             return outcome  # fail_run / skip_to_phase / aborted ask_user
@@ -820,6 +821,7 @@ async def _run_phase_with_gates(
             run_id=run_id, pool=pool, redis=redis, ctx=ctx,
             _audit_user_id=_audit_user_id, stream_run_id=stream_run_id,
             produced_output=output, is_pre=False,
+            is_action_risk=_is_action_risk_finding(gate.error_message),
         )
 
 
@@ -931,12 +933,13 @@ _ACTION_RISK_FINDING_PREFIX = "action_risk:approval|"
 def _is_action_risk_finding(error_message: str | None) -> bool:
     """True when a failing gate is the ARMED action-risk checkpoint (GOVERN-03).
 
-    THE ONE READING of "this gate is about to WAIT for a person, not fail". It is
-    taken off the FINDING rather than off the phase because the finding is what
-    identifies WHICH validator failed — an armed phase can carry authored gates too,
-    and only the armed one gets the armed treatment. Every other finding (freshness,
-    citations, an authored regex) returns False here and keeps byte-identical
-    behaviour on both call sites.
+    Read off the FINDING, at the CALL SITE. Phase 187 (D-187-01) made the armed
+    treatment an explicit ``is_action_risk`` parameter of
+    ``_resolve_failure_with_ask_user`` rather than a read inside it, because that helper
+    also serves the author's OWN ``ask_user`` gates on the same phase — an armed phase
+    can carry authored gates too, and only the armed one gets the armed treatment. This
+    predicate is what each call site passes. Every other finding (freshness, citations,
+    an authored regex) returns False and keeps byte-identical behaviour.
     """
     return (error_message or "").startswith(_ACTION_RISK_FINDING_PREFIX)
 
@@ -955,6 +958,7 @@ async def _resolve_failure_with_ask_user(
     stream_run_id: UUID | None = None,
     produced_output: dict | None = None,
     is_pre: bool = False,
+    is_action_risk: bool = False,
 ) -> PhaseOutcome | None:
     """Resolve a failing validator's disposition, pausing for a human choice when
     the disposition is ``ask_user`` (D-11).
@@ -975,11 +979,32 @@ async def _resolve_failure_with_ask_user(
 
     The redis/pool ordering, the channel keying, and the expiry-honest-fail are the
     SAME shipped 085 substrate ``_exec_llm_human_input`` uses — never re-invented.
+
+    ``is_action_risk`` (D-187-01 / RESEARCH Pitfall 3) — TRUE only when the CALLER is
+    the armed action-risk checkpoint. It is a per-CALL parameter and never a
+    ``phase.action_risk_armed`` read inside this function, because this function serves
+    BOTH the armed checkpoint AND the author's own ``ask_user`` gates on the SAME phase.
+    An armed phase can carry authored gates too, and only the armed one gets the armed
+    treatment (the indefinite wait, the shutdown-``CancelledError`` escape, the armed
+    choice pair, and the exact-match approval allow-list). Reading the phase here would
+    hand an unrelated freshness gate all four. Every non-armed caller leaves it at its
+    ``False`` default and every branch below evaluates to exactly the expression that
+    shipped.
     """
-    disp = _parse_on_failure(_failing_on_failure(phase, failed_idx))
-    if disp.kind != "ask_user":
-        # fail_run / skip_to_phase — the sync mapper handles it byte-identical.
-        return _route_on_failure(phase, error_message, attempt, failed_idx)
+    # ── D-187-01 / RESEARCH Pitfall 4 — THE DISPOSITION SHORT-CIRCUIT ────────────
+    # An armed checkpoint has NO index into ``phase.validators`` (after the hoist it is
+    # not in the list at all), so ``failed_idx`` is None and ``_failing_on_failure``
+    # would fall back to the PHASE's own heuristic — an author's ``fail_run`` could
+    # route the checkpoint to ``_route_on_failure`` and THE PERSON WOULD NEVER BE ASKED.
+    # That is a fail-open of exactly the class the Phase-185 BLOCKER T-185-04-01
+    # belonged to. When ``is_action_risk`` the disposition is ``ask_user`` BY
+    # CONSTRUCTION, so ``_failing_on_failure`` is skipped ENTIRELY rather than computed
+    # and overridden — there is no path a future edit can re-introduce the read on.
+    if not is_action_risk:
+        disp = _parse_on_failure(_failing_on_failure(phase, failed_idx))
+        if disp.kind != "ask_user":
+            # fail_run / skip_to_phase — the sync mapper handles it byte-identical.
+            return _route_on_failure(phase, error_message, attempt, failed_idx)
 
     # ── ask_user pause (copy _exec_llm_human_input ordering VERBATIM) ──
     # The pause needs a live redis transport + a run_id channel; without them the
@@ -991,14 +1016,14 @@ async def _resolve_failure_with_ask_user(
     from uuid import uuid4
 
     # ── Phase 185 (GOVERN-03 / SPEC Req 9) — THE ARMED-GATE READING ──────────────
-    # ONE predicate; every Phase-185 delta below branches on it. Read off the FINDING
-    # (the structured prefix ``_validate_action_risk_approval`` emits) rather than off
-    # the phase, because the finding is what identifies WHICH validator failed — an
-    # armed phase can also carry authored gates, and only the armed one gets this
-    # disposition. An unarmed ``llm_human_input`` step and every freshness gate keep
-    # byte-identical behaviour: for them ``is_action_risk`` is False and each branch
-    # below evaluates to exactly the expression that shipped.
-    is_action_risk = _is_action_risk_finding(error_message)
+    # ONE flag; every Phase-185 delta below branches on it. Phase 187 (D-187-01) moved
+    # the reading from a string-prefix sniff on the error message to the ``is_action_risk``
+    # PARAMETER declared above: the CALLER knows which gate it is, and only the armed
+    # caller passes True. The substance is unchanged — an armed phase can also carry
+    # authored gates, and only the armed one gets this disposition. An unarmed
+    # ``llm_human_input`` step and every freshness gate keep byte-identical behaviour:
+    # for them ``is_action_risk`` is False and each branch below evaluates to exactly the
+    # expression that shipped.
 
     tool_call_id = uuid4().hex
     choices = _ask_user_choices_from_finding(error_message)
@@ -1185,7 +1210,8 @@ async def _resolve_failure_with_ask_user(
     #
     # ORDERING IS LOAD-BEARING. ``_is_abort_choice`` stays FIRST so "Do not run it" and
     # "Abort" keep the byte-identical "— aborted by user" reason on every path including
-    # this one. And the branch is gated on ``is_action_risk`` (computed once, above), so
+    # this one. And the branch is gated on ``is_action_risk`` (the caller-supplied
+    # parameter, D-187-01 — one flag read in one place), so
     # on the three non-armed choice pairs it is dead code and their routing — free-text
     # fall-through included — is unmoved. The distinct reason below is deliberate: the
     # ledger must not claim the person "aborted" when the truth is that the engine could
@@ -1198,6 +1224,16 @@ async def _resolve_failure_with_ask_user(
         )
 
     # Proceed — write the governance receipt, then continue.
+    #
+    # D-187-18 — ``validator`` is written as ``None`` for a HOISTED armed checkpoint
+    # (``is_action_risk`` with ``failed_idx is None``). After D-187-01's hoist the
+    # checkpoint is not a member of ``phase.validators``, so there IS no validator index
+    # and saying so is honest. This is a DELIBERATE governance-ledger shape change, not
+    # an oversight: the key stays PRESENT so there is exactly one row shape per
+    # ``event_type`` — two shapes for one event type is worse than an honest null — and
+    # every pre-187 row keeps its int. No new ``event_type`` is introduced; the
+    # ``harness_audit`` CHECK is a closed list of 23 values and this phase ships zero
+    # migrations (``BUG-260731-02`` is the precedent where an unlisted kind killed a run).
     receipt_metadata = {
         "phase": phase.slug,
         "validator": failed_idx,
