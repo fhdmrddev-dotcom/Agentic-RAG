@@ -28,6 +28,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
+// Phase 186-10 (WR-02): the F18 describe at the foot of this file reads the SERVER's own
+// source at test time instead of trusting a transcribed list. Node built-ins only — no
+// dependency, no fixture, nothing that can drift from the file it is asserting about.
+import { readFileSync } from "node:fs"
+import { fileURLToPath } from "node:url"
+import path from "node:path"
 // Read the component SOURCE via Vite's ?raw loader (typechecks under `vite/client`).
 import publishGauntletSource from "./PublishGauntlet?raw"
 import { PublishGauntlet } from "./PublishGauntlet"
@@ -601,6 +607,123 @@ describe("PublishGauntlet — an unrecognised blocked_stage never renders a pass
     const raw = await screen.findByTestId("raw-verdict")
     expect(within(raw).getByTestId("verdict-blocked_stage")).toHaveTextContent(UNKNOWN_STAGE)
   })
+})
+
+// --- Phase 186-10 (CONCUR-02, F18, WR-02) — the spine names every stage the server emits ---
+//
+// THE CLAIM THIS REPLACES WAS PROSE. The `STAGES` docblock in the component says the table
+// mirrors the server's stage list; nothing checked it, and it had been false since Phase 182
+// added `grounding_fidelity`. The consequence is not a cosmetic one: a stage the client cannot
+// place renders (correctly, per F7) as a fully grey spine under the generic fallback sentence,
+// so the author is told a refusal happened and shown nothing about where — for what is, on a
+// KB-bound workflow, the single most likely real refusal.
+//
+// So the list is not transcribed here either. This suite READS `publish_service.py` and drives
+// one render per stage it finds. A backend that adds a thirteenth `stage="..."` call makes this
+// file go red on the next run, with no edit to the test and no one having to remember.
+//
+// F7 above is NOT weakened by any of this and must not be: it drives a stage no server will
+// ever send, and its fail-closed property is what keeps the forgotten-stage case honest in the
+// window between the backend adding one and this test catching it.
+// NOT `new URL("…", import.meta.url)`. Vite STATICALLY REWRITES that exact pattern as an
+// asset reference, so the value that reaches `fileURLToPath` is no longer a `file:` URL and
+// it throws ("The URL must be of scheme file") before a single test runs. Resolving from the
+// plain `import.meta.url` string — which Vite leaves alone — is the form that works under the
+// vitest transform. Five segments up from this FILE (not its directory) is the repo root.
+const PUBLISH_SERVICE_PATH = path.resolve(
+  fileURLToPath(import.meta.url),
+  "../../../../../backend/app/services/harness/publish_service.py",
+)
+const PUBLISH_SERVICE_SOURCE = readFileSync(PUBLISH_SERVICE_PATH, "utf8")
+
+/** The call-form literal `_block(..., stage="...")` writes. Held as a SOURCE string and
+ *  compiled fresh per use, so the shared `g`-flagged object can never carry a `lastIndex`
+ *  from one call into the next. */
+const STAGE_LITERAL_PATTERN = 'stage="([a-z_]+)"'
+
+function extractStages(source: string): string[] {
+  return [...source.matchAll(new RegExp(STAGE_LITERAL_PATTERN, "g"))].map((m) => m[1])
+}
+
+/** Every distinct `blocked_stage` value the publish service can emit, read from its source. */
+const EMITTED_STAGES = new Set(extractStages(PUBLISH_SERVICE_SOURCE))
+
+/**
+ * The stages that are emitted but provably cannot arrive here as a `blocked_stage`.
+ *
+ * AN ALLOW-LIST WITH REASONS, NOT A DRIFT HATCH. Each entry owes a line of evidence that
+ * the value cannot reach `GauntletSpine` — and the size assertion below is what stops the
+ * next forgotten stage from being parked here instead of given a row, which would quietly
+ * turn this whole suite back into the prose claim it replaced.
+ *
+ * `already_published` (publish_service.py:130 and :385) — `api.ts:3753-3754` maps HTTP 404
+ * to `{kind:"not_found"}` and HTTP 409 to `{kind:"already_published"}`. NEITHER outcome
+ * carries a `verdict`, and the spine is driven by `verdict?.blocked_stage ?? null`, so this
+ * stage renders as its own dedicated 409 block panel and never reaches the spine at all.
+ */
+const NOT_ON_THE_SPINE = new Set(["already_published"])
+
+/** The stages that MUST each land on exactly one node. */
+const SPINE_STAGES = [...EMITTED_STAGES].filter((s) => !NOT_ON_THE_SPINE.has(s))
+
+/** The blocked-node tone, read out of `nodeTone` in `PublishGauntlet.tsx` rather than
+ *  retyped from memory — the same discipline as PASSED_NODE_TONE above. */
+const BLOCKED_NODE_TONE = "border-destructive/60"
+
+describe("PublishGauntlet — F18: the spine names every stage the server can emit (WR-02)", () => {
+  it("(F18a) the extraction is not vacuous — it reads real stages, and the pattern captures a planted one", () => {
+    // The service has emitted at least eleven distinct stages since Phase 186-02. A refactor
+    // that renamed the `_block` keyword would silently empty this set and turn the property
+    // test below into zero cases, which is the one way this suite could lie.
+    expect(EMITTED_STAGES.size).toBeGreaterThanOrEqual(11)
+    // A positive control on the pattern itself: a source line the regex has never seen still
+    // yields its stage. Without this, an over-narrow pattern reads as "nothing changed".
+    const planted = 'return await _block(pool, stage="a_planted_stage", named_failures=[])'
+    expect(extractStages(planted)).toEqual(["a_planted_stage"])
+  })
+
+  it("(F18c) the exclusion set is justified, not convenient — exactly one entry, and it is the 409", () => {
+    expect([...NOT_ON_THE_SPINE]).toEqual(["already_published"])
+    // Deliberately an equality, not a `toBeLessThanOrEqual`. Growing this set is allowed only
+    // together with the evidence line in its docblock, and editing this number is the moment
+    // that costs a reviewer's attention.
+    expect(NOT_ON_THE_SPINE.size).toBe(1)
+    // And the excluded stage really is emitted — an exclusion for a stage that does not exist
+    // would be dead weight pretending to be a decision.
+    expect(EMITTED_STAGES.has("already_published")).toBe(true)
+  })
+
+  it.each(SPINE_STAGES)(
+    "places the server's `%s` refusal on exactly one spine node",
+    async (stage) => {
+      mockedPublish.mockResolvedValue({
+        kind: "verdict",
+        verdict: {
+          published: false,
+          version: null,
+          golden_run_id: null,
+          blocked_stage: stage,
+          named_failures: ["publish was refused"],
+        },
+      } satisfies PublishOutcome)
+      render(<PublishGauntlet definitionId="def-1" />)
+      await doPublish("go")
+
+      await waitFor(() => expect(screen.getByTestId("publish-block")).toBeInTheDocument())
+      const spine = screen.getByTestId("gauntlet-spine")
+
+      // EXACTLY one. Zero is the WR-02 failure — a stage with no row, painted grey end to end.
+      // Two would mean a code was copied onto a second row, which would tell an author the
+      // refusal happened somewhere it did not.
+      const blocked = spine.querySelectorAll(`[class*="${BLOCKED_NODE_TONE}"]`)
+      expect(blocked).toHaveLength(1)
+
+      // The blocked node is not simultaneously claimed as passed — which is also the "at least
+      // one node is not passed" guarantee, asserted on the node where it matters rather than
+      // on a count that a re-skin could satisfy by accident.
+      expect((blocked[0] as HTMLElement).className).not.toContain(PASSED_NODE_TONE)
+    },
+  )
 })
 
 // --- Phase 186-05 (CONCUR-02, D-186-11) — the publish-commit refusal ----------------
