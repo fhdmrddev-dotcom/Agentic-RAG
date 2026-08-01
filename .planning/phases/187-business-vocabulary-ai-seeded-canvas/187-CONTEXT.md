@@ -235,8 +235,96 @@ to this phase and the SPEC omitted.
   `WorkflowBuilderPage.tsx` is a phase gate** — if the render body grows beyond a handful of
   insertions, the surface belongs in its own component, not the page.
 
+### Post-research amendments (operator-decided 2026-08-02, at the plan-phase touchpoint)
+
+Four measured findings in `187-RESEARCH.md` contradicted locked SPEC/CONTEXT text. Each was put to
+the operator and decided in the open. **These override the text they name.**
+
+- **D-187-15 — SC#5 check 2 is NARROWED to "no two steps with materially different config render
+  identical faces."** Measured: `four_seed_defs()`'s `plan_execute_verify` seed
+  (`backend/tests/conftest.py:867-890`) has two bare `llm_single` steps — `plan` and `verify` —
+  whose only differing field is `prompt`. The D-187-04 tier reads none of that, so both resolve to
+  `null` and both render `"Write it up"`; and because they are migration-061 seeds rather than
+  generator-authored, Req 2 can never fill their `name` either. Two genuinely identical configs
+  rendering identically is an **honest statement, not a defect**. `plan_execute_verify` is recorded
+  as the documented exception **with its measured shape** in the corpus test. **Rejected:** a
+  prompt-derived tier (violates D-187-05's never-fabricate floor — a prompt is not a name); editing
+  the seed fixture to fit the test (the acceptance bar would stop measuring the real corpus).
+
+- **D-187-16 — "Face" = the string `nodeTitle()` returns (plus the canvas card's subtitle), and the
+  spine gets the TITLE agreement only.** Measured: `PhaseSpineGraph` has **no subtitle slot** — its
+  second line is a raw `phase_index` (`:187-189`) and `:184` prints the raw `phase_type` in a mono
+  chip **unconditionally**, reveal-OFF included, as does the `aria-label` at `:164`. So Req 4's
+  "both graph views agree in both toggle states" is satisfied on the **title**, which is what the
+  SPEC's own acceptance criterion says. The canvas gets the subtitle swap; **the spine simply stops
+  swapping its title.** The asymmetry is recorded, not designed away. SC#5 check 1 is tested as a
+  **pure-function assertion over the corpus**, not a DOM scrape — otherwise it fails 100% on the
+  spine's pre-existing chrome and could only pass by deleting shipped UI. **Rejected:** adding a
+  `PHASE_TYPE_SUBTITLES` consumer to the spine, and stripping the spine's raw chrome — both grow
+  scope into a second component's layout for no Req-4 gain.
+
+- **D-187-17 — The armed checkpoint fires BEFORE the `while True:` retry loop.** The body sits at
+  `harness_engine.py:747` inside the loop at `:743`; neither SPEC nor CONTEXT settled the side.
+  **Before** = one prompt per phase execution, matching the once-per-phase pre-gate pass. A retry
+  after a failed attempt does **not** re-ask. **Rejected:** inside the loop — a 3-retry phase would
+  ask a person three times for one step.
+
+- **D-187-18 — The `validator_ask_user_approved` receipt writes `validator: null` for a hoisted
+  checkpoint.** After the hoist there is no validator index, and saying so is honest. Existing rows
+  keep their ints; the key stays present so readers see one shape per `event_type`. **This is a
+  deliberate governance-ledger shape change and must be stated in the plan, not discovered.**
+  Note the hard constraint from research: `harness_audit.event_type` is a **closed CHECK of 23
+  values** — the checkpoint MUST reuse `action_risk_pending` + `validator_ask_user_approved`
+  (metadata is free; a new event_type would need a migration and this phase ships zero).
+  **Rejected:** omitting the key for armed rows (two shapes for one event type).
+
+### Corrections research forced on the decisions above (planner MUST honour)
+
+- **D-187-03's "exactly ONE reading of armed" cannot hold as stated.** `_is_armed_action_risk`
+  (`harness_engine.py:2148`) is already a **second** phase-level armed reading. The decision's
+  intent survives — delete the `_is_action_risk_finding` string-prefix sniff on an error message —
+  but the plan must reconcile with `:2148` rather than claim a uniqueness it cannot deliver.
+- **`is_action_risk` must be a PARAMETER of `_resolve_failure_with_ask_user`, not a
+  `phase.action_risk_armed` read inside it.** That function serves both the armed checkpoint and
+  the author's own `ask_user` gates on the same phase (its shipped docblock at `:934-939` says
+  why). A phase read there would hand an unrelated freshness gate the indefinite wait, the shutdown
+  escape and the exact-match allow-list.
+- **A fail-open lurks in the hoist (same class as Phase 185's BLOCKER T-185-04-01).**
+  `_resolve_failure_with_ask_user:979` resolves the disposition from `phase.validators[failed_idx]`.
+  With no armed spec in the list, `failed_idx` is `None` and an author's `fail_run` routing could
+  send the checkpoint to `_route_on_failure` — **the person is never asked.** The disposition
+  resolution must be short-circuited when `is_action_risk`.
+- **D-187-03's "T-185-03-03's doubled gate row disappears" is REFUTED.** That row is the
+  `citations_required` doubling (`185-03-PLAN.md:364`), which this phase leaves in place.
+- **The SPEC's `MODEL_CAPABILITIES` parse is REFUTED on four counts.** Measured: **61 models /
+  8 provider groups**; **DeepSeek IS present** (`deepseek-v4-flash`, `deepseek-v4-pro`); 5 models
+  declare no `forced_emission` (moonshot, `emit_tier: coerce`); **all 8 provider keys are configured
+  locally ⇒ zero ⛔ rows expected.** Derive the roster by importing the registry, never by grep.
+- **Project memory's "~14-17 frontend vitest failures" is REFUTED.** Measured **42–49 across 11
+  files, flaky at the same commit**; `WorkflowCanvas.test.tsx` and `PublishGauntlet.test.tsx` are
+  **100% green in isolation**. Gate on the two isolated named sets per `187-VALIDATION.md` — never
+  on the full frontend suite.
+- **`ValidatorSpec.kind`'s `"action_risk_approval"` Literal: KEEP it.** Live DB measured — 0 stored
+  rows name it, so removal is technically safe on this DB, but Literal sets grow additively and an
+  existing member's spelling never changes (`harness.py:10-21`).
+- **SC#10 needs no monkeypatch.** `generate_workflow_definition` takes `settings` as a **parameter**
+  (`workflow_authoring.py:222`), so each roster row passes a stub — zero global mutation.
+- **`vitest` is 4.1.0 — `--reporter=basic` no longer exists** and fails with `Failed to load url
+  basic`. Use the default reporter or `--reporter=json --outputFile=…`.
+- **D-187-11 placement:** put the new `incomplete` check in the `/validate` route's own code
+  (`_ROUTE_ASSIGNED_CODES`), **not** in `grounding.grounding_verdicts` — the latter is shared with
+  publish (182-06 made publish enforcing), so a check added there silently becomes a **publish
+  blocker** as well as a canvas verdict.
+
 ### Claude's Discretion
 
+- Whether the seed receipt also appears on the `autoDraft` hand-off path
+  (`WorkflowBuilderPage.tsx:1202-1216`, the Phase-124 "Describe & run" door). Recommended **yes** —
+  it is a genuine AI seed — but state it in the plan so it is not discovered in UAT.
+- How many of the six `nodeTitle()` call sites receive the name context. Floor: canvas + spine
+  (SPEC's bar). `ProblemsTray` and both `WorkflowBuilderPage` announcement sites are cheap and
+  prevent a screen-reader/tray disagreement. `definitionOps.canRemovePhase` needs a signature
+  widening — decide deliberately.
 - The exact derived sentence templates (`"Run the <skill>"` / `"Fill <template>"` /
   `"Search <folder>"`) — the precedence and the never-fabricate floor are locked by D-187-04 /
   D-187-05; the phrasing is not.
