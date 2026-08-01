@@ -358,6 +358,103 @@ describe("phaseVocabulary — the derived tier is not a SECOND deriveTier (D-187
   })
 })
 
+describe("phaseVocabulary.nodeTitle — the FOUR-tier ladder (D-187-04 / D-187-05)", () => {
+  it("tier 1 — a stored name still wins, even when the derived tier would resolve", () => {
+    const p = phase({
+      name: "  Board-ready renewal pack  ",
+      config: { phase_type: "llm_emit", skill_ref: SKILL_ID },
+    })
+    expect(nodeTitle(p, CTX)).toBe("Board-ready renewal pack")
+  })
+
+  it("tier 2 — the derived face shows when the name is absent or blank", () => {
+    expect(
+      nodeTitle(phase({ config: { phase_type: "llm_agent", skill_ref: SKILL_ID } }), CTX),
+    ).toBe("Run the pricing policy check")
+    expect(
+      nodeTitle(phase({ name: "   ", config: { phase_type: "llm_emit" } }), CTX),
+    ).toBe("Fill Renewal Summary.pptx")
+    expect(
+      nodeTitle(phase({ name: null, config: { phase_type: "llm_agent", folder_scope: [FOLDER_ID] } }), CTX),
+    ).toBe("Search Supplier Contracts")
+  })
+
+  it("tier 3 — the type sentence shows when no derived tier resolves", () => {
+    expect(nodeTitle(phase({ config: { phase_type: "llm_single" } }), CTX)).toBe(
+      PHASE_TYPE_SENTENCES.llm_single,
+    )
+  })
+
+  it("tier 4 — an unknown phase_type still echoes the raw type honestly", () => {
+    expect(nodeTitle(phase({ config: { phase_type: "llm_future_type" } }), CTX)).toBe(
+      "llm_future_type",
+    )
+  })
+
+  it("the slug NEVER appears, on any tier", () => {
+    const p = phase({ slug: "find-renewal-terms", config: { phase_type: "llm_agent", folder_scope: [FOLDER_ID] } })
+    expect(nodeTitle(p, CTX)).not.toContain("find-renewal-terms")
+  })
+
+  it("NEVER FABRICATE: an unresolved skill_ref falls to the type sentence, not an id", () => {
+    const p = phase({ config: { phase_type: "llm_agent", skill_ref: SKILL_ID } })
+    const title = nodeTitle(p, { skillNames: {} })
+    expect(title).toBe(PHASE_TYPE_SENTENCES.llm_agent)
+    expect(title).not.toContain(SKILL_ID)
+  })
+
+  it("OMITTING the context is BYTE-IDENTICAL to HEAD — the whole compatibility claim", () => {
+    const shapes: PhaseSpecJSON[] = [
+      phase({ config: { phase_type: "llm_agent", skill_ref: SKILL_ID, folder_scope: [FOLDER_ID] } }),
+      phase({ config: { phase_type: "llm_emit" } }),
+      phase({ config: { phase_type: "llm_single" } }),
+      phase({ config: { phase_type: "programmatic" } }),
+      phase({ config: { phase_type: "llm_batch_agents" } }),
+      phase({ name: "Hand-typed", config: { phase_type: "llm_emit" } }),
+      phase({ config: { phase_type: "llm_future_type" } }),
+    ]
+    for (const p of shapes) {
+      const omitted = nodeTitle(p)
+      expect(nodeTitle(p, {})).toBe(omitted)
+      const type = p.config.phase_type
+      expect(omitted).toBe(p.name?.trim() || (PHASE_TYPE_SENTENCES[type] ?? type))
+    }
+  })
+
+  it("an llm_human_input step is the ONE type whose face changes with no context at all", () => {
+    // Tier 4 of `derivedFace` reads no lookup, so it resolves even uncontextualised.
+    // This is the deliberate exception to "omitting the context changes nothing" and
+    // it is recorded rather than hidden.
+    expect(nodeTitle(phase({ config: { phase_type: "llm_human_input" } }))).toBe(
+      "Wait for your approval",
+    )
+  })
+
+  it("still TOTAL — a malformed phase never throws on any tier", () => {
+    const noConfig = { slug: "x", phase_index: 0 } as unknown as PhaseSpecJSON
+    expect(() => nodeTitle(noConfig, CTX)).not.toThrow()
+    const weirdScope = phase({ config: { phase_type: "llm_agent", folder_scope: "not-an-array" } })
+    expect(() => nodeTitle(weirdScope, CTX)).not.toThrow()
+    expect(nodeTitle(weirdScope, CTX)).toBe(PHASE_TYPE_SENTENCES.llm_agent)
+  })
+})
+
+describe("phaseVocabulary — the docblock carries no refuted measurement (187-04)", () => {
+  it("the refuted '10 of 119' figure is gone", () => {
+    expect(phaseVocabularySource).not.toContain("10 of 119")
+  })
+
+  it("the measured '0 of 57' figure replaces it", () => {
+    expect(phaseVocabularySource).toContain("0 of 57")
+  })
+
+  it("declares name_seeded_by_ai EXACTLY once, and no resolver in this file reads it", () => {
+    const hits = phaseVocabularySource.match(/name_seeded_by_ai/g) ?? []
+    expect(hits).toHaveLength(1)
+    expect(phaseVocabularySource).toMatch(/name_seeded_by_ai\?:\s*boolean/)
+  })
+})
+
 describe("phaseVocabulary.technicalTitle — the ⌥ Technical-names reveal (D-183-08)", () => {
   it("is today's shipped fallback preserved: '<label> · <slug>'", () => {
     expect(technicalTitle(phase({ slug: "retrieve", config: { phase_type: "llm_agent" } }))).toBe(
