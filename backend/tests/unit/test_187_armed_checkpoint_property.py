@@ -98,9 +98,76 @@ THE THREE ASSERTIONS
 
 ## RED signature observed on HEAD
 
-*(Filled by plan 187-01 Task 3, after running this file on unmodified HEAD. Until that
-section carries the observed values, the RED observation has not been made and no fix may
-be written.)*
+Observed on ``develop`` @ ``5fae96f0`` (the Task-2 commit — unmodified engine; this plan
+touches no production source), 2026-08-02::
+
+    cd backend && ./venv/Scripts/python.exe -m pytest \
+        tests/unit/test_187_armed_checkpoint_property.py -q --no-header
+    → 8 failed, 22 passed, 1 warning in 0.79s   (exit 1)
+
+**FOUR case ids are RED, each on BOTH P1 and P2** — ``pre_ask_user_proceed``,
+``pre_ask_user_plus_post_citations``, ``two_pre_ask_user``, ``pre_pass_then_pre_ask_user``.
+Every one of them shows the SAME observed values:
+
+===============================  ==================================================
+Failing assertion (P1)           ``assert armed_orders`` — "THE BODY RAN AND NOBODY
+                                 WAS ASKED"
+Failing assertion (P2)           ``assert len(armed_orders) == 1``
+Observed                         ``0`` armed approval prompts awaited; the executor
+                                 body invoked at order ``3``; the ONLY prompt awaited
+                                 was the author's generic
+                                 ``"A validation check on phase 'send-the-notice'
+                                 flagged: structure_check: missing sections […]. How
+                                 should the run proceed?"``
+Expected                         exactly ``1`` armed approval prompt, at an order
+                                 index strictly less than the body's
+Outcome returned                 ``'completed'``
+===============================  ==================================================
+
+``outcome == 'completed'`` is the sharpest reading available: on HEAD an
+``action_risk_armed=True`` step does not merely skip its checkpoint — it runs to a
+SUCCESSFUL phase completion with nobody asked.
+
+**The mechanism, for ``pre_ask_user_proceed`` (SEED-137's named bypass).**
+``effective_phase`` APPENDS the ``action_risk_approval`` spec (D-185-05 — appending, so
+``validators[0]`` stays the author's and the WR-03 retry seed is byte-identical), which
+puts the armed gate LAST. ``run_gates`` is first-failure-wins and returns at
+``validators.py:248``, so the author's failing ``structure_check`` is what comes back and
+the armed gate at the end of the list is never evaluated. ``_is_action_risk_finding`` is
+therefore ``False`` (the finding is ``structure_check: …``, not
+``action_risk:approval|…``), the armed announce branch is skipped, and
+``_resolve_failure_with_ask_user`` resolves the AUTHOR's ``ask_user`` disposition. Their
+"Proceed anyway" returns ``None``, and **``harness_engine.py:739`` — ``"outcome is None →
+ask_user Proceed: fall through and run the body"`` — falls straight through to the body at
+``:747``.** The pre-gate pass happens exactly once, so there is no second chance for the
+armed gate to run. The three sibling ids are the same mechanism with a post gate present,
+with a second failing ``ask_user`` gate, and with a passing gate ahead of the failing one
+— proving the bypass is a property of the ORDERING, not of a one-element author list.
+
+**The GREEN rows are the regression net and were deliberately NOT deleted.** The property
+must hold for EVERY author set, so a set that already satisfies it is what will catch a fix
+that breaks it. Why each is green on HEAD:
+
+* ``no_author_validators`` — the appended armed spec is the ONLY pre gate, so ``run_gates``
+  returns the ``action_risk:approval|`` finding, the armed branch fires and the person is
+  asked before the body. (The bypass is caused by an author gate being *ahead* of the
+  armed one; with no author gates there is nothing ahead of it.)
+* ``pre_fail_run`` and ``pre_skip_to_phase`` — the author's own gate FAILS and routes
+  control away from the body, so no checkpoint is owed (D-187-02) and P1 is vacuously
+  true. Both declare ``reaches_body_without_arming=False``, so P2 correctly does not apply.
+* ``post_only`` — the ``timing`` filter skips the author's post gate on the pre pass, so
+  again the armed spec is the only pre gate.
+* ``pre_pass_fail_run_disposition`` — the author's gate PASSES, so the armed spec is the
+  first FAILING pre gate and ``failed_idx`` points at it; ``_failing_on_failure`` reads the
+  armed spec's own ``ask_user``. **This row is green on HEAD and is the falsification for
+  the Pitfall-4 fail-open (T-187-01-05): after the hoist the checkpoint has no validator
+  index, so ``_failing_on_failure(phase, None)`` would fall back to ``validators[0]`` — the
+  author's ``fail_run`` — and route the checkpoint away with the person never asked. It
+  turns RED the moment that fail-open is introduced.**
+* ``armed_refused_typed`` — T-185-04-01's exact-match approval ALLOW-LIST
+  (``harness_engine.py:1194-1198``) already ships, so the typed refusal fails the run and
+  writes no receipt. P3 is green on HEAD **by design**: it is the assertion that would have
+  caught Phase 185's BLOCKER, kept here so the hoist cannot silently re-open it.
 
 Imports INSIDE the body, per this suite's convention.
 """
