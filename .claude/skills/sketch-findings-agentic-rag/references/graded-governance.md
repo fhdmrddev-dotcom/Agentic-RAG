@@ -220,7 +220,49 @@ scope) or the word leaves the requirement. **Decide at spec time.**
 
 ---
 
+---
+
+## 147 — who owns the card: the occupancy audit (winner B, the DETOUR)
+
+Sketch 147 asked which shape is real, where the seal and the armed action-risk mark actually fit,
+and **what collides once 185, 188 and 189 have all landed**. Its findings are now hard constraints.
+
+**The corner rule, stated once so it is never re-litigated:**
+
+> **A PERMANENT mark keeps a verified corner; a TRANSIENT one moves.**
+
+The governance seal is a permanent property of the step — true whether or not anything has run — so
+it **keeps top-right**. A verdict only exists once the server has returned a problem, so the verdict
+mark is the one that relocated (to `-left-2 top-1.5`). Phases 188 and 189 may not take the corner
+back.
+
+**The armed action-risk mark is an EDGE, not a node change.** Winner B is the **detour**: the
+connector *into* the risky step leaves the flow and comes back through a point representing the
+person. It is the only finalist that says what the engine DOES (stop, hand out to a human, resume)
+rather than merely *blocked*.
+
+- **Armed:** the solid arc IS the path — no straight line runs past it.
+- **Not armed:** the arc stays as a faint dashed ghost with a line through it — present and open,
+  never absent. That is what keeps the armed-on-by-default rule legible.
+- Verified by computation, not assertion: the arc clears the ＋ by **8.2px** and never enters its
+  box; living in the gap keeps it clear of the ✕ (card-centred, straddling the bottom edge,
+  y = H−12 … H+12) — *exactly where the rejected `countersign` would have landed*.
+- **Build note:** a CUSTOM EDGE. `FlowEdge.tsx` is the first custom `@xyflow/react` edge in this
+  tree.
+
+**Arming happens in the SIDE PANEL; the canvas mark is READ-ONLY.** Forced as much as chosen —
+no focusable control may live inside the card (one tab stop per node), which is why the ✕ and ＋
+live on the lane. Both governance dials therefore sit together in the panel, beside the grounding
+dial. **The panel is where you SET, the canvas is where you SEE.**
+
+**Residual, recorded rather than discovered later:** the moved verdict grazes the `stepNumber` slot
+by 2×16px. Not a collision today because that slot renders nothing (`phase_index` is kept off the
+face). If `phase_index` is ever brought to the face, move the step number to `left:16` and it clears.
+
+---
+
 ## Origin
 
-Synthesized from sketches: **142**, **143**.
-Source files: `sources/142-grounding-dial-and-lock/`, `sources/143-proven-on-the-canvas/`.
+Synthesized from sketches: **142**, **143**, **147** (winner B — the detour edge).
+Source files: `sources/142-grounding-dial-and-lock/`, `sources/143-proven-on-the-canvas/`,
+`sources/147-the-armed-mark/`.

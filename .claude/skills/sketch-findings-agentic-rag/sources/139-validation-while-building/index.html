@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sketch 139 — Validation while you build (Phase 184)</title>
+<link rel="stylesheet" href="../themes/default.css">
+<link rel="stylesheet" href="../themes/canvas-184.css">
+<style>
+  /* ── B: the message lives on the card face ────────────────────────────── */
+  .vfix { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+  .vrow {
+    display: flex; gap: 8px; align-items: flex-start; font-size: 11px; line-height: 1.5;
+    padding: 7px 9px 7px 10px; border-radius: 9px; border-left: 3px solid transparent;
+  }
+  .vrow.error {
+    background: hsl(0 60% 30% / .16); border-left-color: hsl(0 72% 55%); color: hsl(0 85% 84%);
+  }
+  .vrow.incomplete {
+    background: hsl(220 20% 30% / .3); border-left-color: var(--color-text-dim); color: var(--color-text-muted);
+  }
+  .vrow .code { font-family: var(--font-mono); font-size: 9.5px; opacity: .75; display: none; }
+  body.tech .vrow .code { display: block; }
+
+  /* ── A: the problems tray ─────────────────────────────────────────────── */
+  .tray {
+    flex-shrink: 0; border-top: 1px solid var(--color-border); background: var(--color-bg-elev1);
+    display: flex; flex-direction: column; max-height: 46vh;
+  }
+  .tray > .hd {
+    display: flex; align-items: center; gap: 10px; padding: 9px var(--space-5);
+    cursor: pointer; font-size: var(--text-sm); user-select: none;
+  }
+  .tray > .hd:hover { background: var(--color-accent); }
+  .tray .list { overflow: auto; padding: 0 var(--space-5) 44px; }
+  body.trayclosed .tray .list { display: none; }
+  .trow {
+    display: flex; gap: 11px; align-items: flex-start; width: 100%; text-align: left;
+    padding: 9px 11px; margin-bottom: 6px; border-radius: 11px; cursor: pointer;
+    background: var(--color-surface); border: 1px solid var(--color-border);
+    color: var(--color-text); font-family: inherit; font-size: 12px; line-height: 1.55;
+    transition: all var(--dur-fast) var(--ease-out);
+  }
+  .trow:hover { border-color: var(--color-text-dim); background: var(--color-accent); }
+  .trow.error { border-left: 3px solid hsl(0 72% 55%); }
+  .trow.incomplete { border-left: 3px solid var(--color-text-dim); border-style: dashed; }
+  .trow .who { display: none; font-size: 10.5px; color: var(--color-text-dim); font-family: var(--font-mono); margin-top: 3px; }
+  body.tech .trow .who { display: block; }
+  .trow .msg { color: var(--color-text-muted); }
+  .trow strong { color: var(--color-text); font-weight: 600; }
+
+  /* ── C: prevention ────────────────────────────────────────────────────── */
+  .picker {
+    position: fixed; z-index: 60; width: 300px; padding: 7px;
+    background: var(--color-surface-hi); border: 1px solid var(--color-border);
+    border-radius: 14px; box-shadow: var(--shadow-lg); display: none;
+  }
+  .picker.show { display: block; animation: fadeSlideUp var(--dur-base) var(--ease-out); }
+  .picker .phdr { font-size: 10px; font-family: var(--font-mono); text-transform: uppercase;
+                  letter-spacing: .09em; color: var(--color-text-dim); padding: 5px 8px 7px; }
+  .picker button {
+    display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+    padding: 7px 8px; border-radius: 9px; cursor: pointer; border: 0; background: transparent;
+    color: var(--color-text); font-family: inherit; font-size: 12.5px;
+  }
+  .picker button:hover:not(:disabled) { background: var(--color-accent); }
+  .picker button:disabled { opacity: .42; cursor: not-allowed; }
+  .picker button small { display: block; color: var(--color-text-dim); font-size: 10.5px; }
+  .picker button:disabled small { color: hsl(38 92% 66%); }
+
+  /* the quiet backstop strip C uses instead of a tray */
+  .backstop {
+    flex-shrink: 0; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    padding: 8px 200px 8px var(--space-5); font-size: var(--text-xs); color: var(--color-text-muted);
+    background: var(--color-bg-elev1); border-top: 1px solid var(--color-border);
+  }
+
+  /* ── the server rail: VALID-03 made literal ───────────────────────────── */
+  .srail {
+    flex-shrink: 0; width: 356px; border-left: 1px solid var(--color-border);
+    background: var(--color-bg-elev1); display: flex; flex-direction: column; overflow: hidden;
+  }
+  .srail header { flex-shrink: 0; padding: 11px 14px; border-bottom: 1px solid var(--color-border);
+                  display: flex; align-items: center; gap: 8px; font-size: var(--text-sm); }
+  .srail .scroll { flex: 1; min-height: 0; overflow: auto; padding: 12px 14px 20px; }
+  body:not(.showsrv) .srail { display: none; }
+  .dot-live { width: 7px; height: 7px; border-radius: 50%; background: var(--color-success); flex-shrink: 0; }
+  .dot-live.busy { background: var(--color-warning); animation: brandPulse 700ms ease-in-out infinite; }
+  .rq { font-family: var(--font-mono); font-size: 10px; color: var(--color-text-dim); margin: 0 0 10px; }
+
+  .sev {
+    display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; padding: 2px 8px;
+    font-size: 10px; font-family: var(--font-mono);
+  }
+  .sev.error { color: hsl(0 85% 76%); background: hsl(0 72% 51% / .15); border: 1px solid hsl(0 72% 51% / .4); }
+  .sev.incomplete { color: var(--color-text-muted); background: var(--color-muted); border: 1px dashed var(--color-border); }
+
+  .expl {
+    margin-top: 14px; padding: 11px 12px; border-radius: 12px; font-size: 11.5px; line-height: 1.65;
+    border: 1px solid var(--color-border); background: var(--color-surface); color: var(--color-text-muted);
+  }
+  .expl b { color: var(--color-text); }
+
+  .node.v-error .vmark, .node.v-incomplete .vmark { display: grid; }
+  /* B's whole premise is that the message IS the surface — no corner mark to double it up. */
+  body.vb .node .vmark { display: none !important; }
+  .checking { opacity: .55; }
+</style>
+</head>
+<body class="alive card-b va showsrv">
+
+<nav class="variant-nav">
+  <span class="label">Sketch 139</span>
+  <button class="variant-tab active" data-v="a" type="button">A: Mark + problems tray <span class="star">★</span></button>
+  <button class="variant-tab" data-v="b" type="button">B: On the card face</button>
+  <button class="variant-tab" data-v="c" type="button">C: Prevent at source</button>
+</nav>
+
+<p class="lead" id="lead"></p>
+
+<div class="bar">
+  <span class="lbl">State of the draft</span>
+  <div class="seg" id="scenseg"></div>
+  <div class="spacer"></div>
+  <span class="lbl">Card</span>
+  <div class="seg" id="cardseg">
+    <button type="button" data-card="b" class="on">137-B floating icon</button>
+    <button type="button" data-card="d">137-D left icon</button>
+  </div>
+  <div class="seg" id="techseg">
+    <button type="button" data-tech="off" class="on">Plain language</button>
+    <button type="button" data-tech="on">⌥ Technical names</button>
+  </div>
+  <div class="seg" id="srvseg">
+    <button type="button" data-srv="on" class="on">Show the server reply</button>
+    <button type="button" data-srv="off">Hide</button>
+  </div>
+</div>
+
+<div class="stage" id="stage">
+  <div class="plane scrollbar-thin" id="plane">
+    <div class="amb"></div>
+    <div class="flow" id="flow"></div>
+  </div>
+
+  <aside class="srail">
+    <header>
+      <span class="dot-live" id="srvdot"></span>
+      <b style="font-family:var(--font-headline)">POST /workflows/validate</b>
+      <span class="spacer"></span>
+      <span class="pill" id="okpill">—</span>
+    </header>
+    <div class="scroll" id="srvout"></div>
+  </aside>
+</div>
+
+<div class="tray" id="tray">
+  <div class="hd" id="trayhd" role="button" tabindex="0" aria-expanded="true"></div>
+  <div class="list" id="traylist"></div>
+</div>
+
+<div class="backstop" id="backstop" style="display:none"></div>
+
+<div class="picker" id="picker" role="menu" aria-label="Add a step"></div>
+<div class="toast" id="toast" role="status"></div>
+
+<div class="sketch-toolbar">
+  <span>139</span>
+  <select id="themesel" aria-label="Theme">
+    <option value="default">Deep Midnight</option>
+  </select>
+</div>
+
+<script src="../themes/phase-icons-3d.js"></script>
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   Sketch 139 — Live structural validation while you build.  VALID-02 / VALID-03.
+
+   EVERY verdict below is real. The codes come from the two modules that own
+   them (`reachability.LINT_CODES` and `grounding.GROUNDING_VERDICT_CODES`)
+   plus the two `POST /workflows/validate` mints itself, and the messages are
+   the actual f-strings those modules emit. Nothing here is invented, because
+   VALID-03 says a per-node status is derived from the SERVER verdict and never
+   from a client-side guess — a sketch that showed made-up copy would be
+   sketching the wrong thing.
+
+   The load-bearing distinction is D-182-03's severity split:
+
+     error       broken — this cannot run
+     incomplete  you are not finished — this is not a mistake
+
+   Both block a publish. Only one of them is bad news. A surface that paints
+   them the same colour punishes a person for being mid-build, which is the
+   single most common state a canvas is ever in.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+var TYPE_META = {
+  llm_agent:        { icon: 'llm_agent_compass',     label: 'AI agent step',   plain: 'Work out how to do it',       sub: 'Searches and decides its own next move' },
+  llm_single:       { icon: 'llm_single',            label: 'AI write step',   plain: 'Write it up',                 sub: 'Writes one piece in one pass' },
+  llm_human_input:  { icon: 'llm_human_input',       label: 'Needs you',       plain: 'Check with you',              sub: 'Pauses here until you answer' },
+  llm_emit:         { icon: 'llm_emit',              label: 'Deliverable',     plain: 'Produce the deliverable',     sub: 'Fills your template and produces the file' },
+  programmatic:     { icon: 'programmatic',          label: 'Server step',     plain: 'Prepare the inputs',          sub: 'A fixed step the server runs' },
+  llm_batch_agents: { icon: 'llm_batch_agents_alt',  label: 'Parallel agents', plain: 'Work on the parts together',  sub: 'Several assistants work in parallel' }
+};
+
+/* Plain-language translations of the real verdicts. The technical form is the
+   VERBATIM server message, revealed by ⌥ — the shipped two-audience pattern. */
+var PLAIN = {
+  input_unsatisfied:    'This step is waiting on something no earlier step produces yet.',
+  bad_index:            'Two steps are using the same name.',
+  orphan_phase:         'Nothing leads to this step, so it will never run.',
+  unsatisfiable_skip:   'If this step fails it is told to jump to a step that no longer exists.',
+  no_terminal:          'This flow never reaches an end.',
+  unregistered_tool:    'This step asks for a tool that is not available to it.',
+  unregistered_skill:   'This step points at a skill that is not enabled.',
+  folder_scope:         'This step reads from outside the folder the workflow is bound to.',
+  business_requirement: 'The workflow still needs a one-line description of what it is for.',
+  interactive_phase:    'A step here pauses for a person — that is fine to build, it just cannot publish unattended.',
+  grounding_unavailable:'We could not check this one — the check itself failed, not your workflow.'
+};
+
+var SCEN = {
+  clean: {
+    label: 'Finished', kind: 'ok',
+    steps: [
+      { slug: 'retrieve', t: 'llm_agent', plain: 'Search the knowledge base', sub: 'Finds every risk it can support with a source',
+        badges: [['cited', '⛨ Must cite its sources']] },
+      { slug: 'emit', t: 'llm_emit', plain: 'Produce the risk register', sub: 'Fills your Word template, one row per risk',
+        badges: [['cited', '⛨ Every cell cited'], ['file', '▤ risk-register.docx']] }
+    ],
+    verdicts: []
+  },
+  midbuild: {
+    label: 'Mid-build', kind: 'soft',
+    steps: [
+      { slug: 'retrieve', t: 'llm_agent', plain: 'Search the knowledge base', sub: 'Finds every risk it can support with a source',
+        badges: [['cited', '⛨ Must cite its sources']] },
+      { slug: 'confirm', t: 'llm_human_input', plain: 'Check with you', sub: 'Pauses here until you answer',
+        badges: [['you', '✋ Waits for you']] },
+      { slug: 'emit', t: 'llm_emit', plain: 'Produce the risk register', sub: 'Not wired to a template yet' }
+    ],
+    verdicts: [
+      { code: 'business_requirement', phase: null, severity: 'incomplete',
+        message: 'definition is missing a business_requirement' },
+      { code: 'interactive_phase', phase: 'confirm', severity: 'incomplete',
+        message: "phase 'confirm' is interactive (llm_human_input) and cannot run unattended" },
+      { code: 'input_unsatisfied', phase: 'emit', severity: 'incomplete',
+        message: "input_key 'template_fields' is never produced by an upstream phase or a run input" }
+    ]
+  },
+  broken: {
+    label: 'Genuinely broken', kind: 'hard',
+    steps: [
+      { slug: 'retrieve', t: 'llm_agent', plain: 'Search the knowledge base', sub: 'Finds every risk it can support with a source',
+        badges: [['cited', '⛨ Must cite its sources']] },
+      { slug: 'review', t: 'llm_single', plain: 'Write it up', sub: 'Brings everything into one answer' },
+      { slug: 'emit', t: 'llm_emit', plain: 'Produce the risk register', sub: 'Fills your Word template, one row per risk',
+        badges: [['cited', '⛨ Every cell cited']] }
+    ],
+    verdicts: [
+      { code: 'unsatisfiable_skip', phase: 'retrieve', severity: 'error',
+        message: "skip_to_phase target 'triage' is not an existing phase" },
+      { code: 'orphan_phase', phase: 'review', severity: 'error',
+        message: "phase 'review' is unreachable" }
+    ]
+  },
+  mixed: {
+    label: 'Both at once', kind: 'mixed',
+    steps: [
+      { slug: 'retrieve', t: 'llm_agent', plain: 'Search the knowledge base', sub: 'Finds every risk it can support with a source',
+        badges: [['cited', '⛨ Must cite its sources']] },
+      { slug: 'confirm', t: 'llm_human_input', plain: 'Check with you', sub: 'Pauses here until you answer',
+        badges: [['you', '✋ Waits for you']] },
+      { slug: 'emit', t: 'llm_emit', plain: 'Produce the risk register', sub: 'Fills your Word template, one row per risk',
+        badges: [['cited', '⛨ Every cell cited']] }
+    ],
+    verdicts: [
+      { code: 'unregistered_tool', phase: 'retrieve', severity: 'error',
+        message: "phase 'retrieve' references a non-registered tool 'web_scrape'" },
+      { code: 'interactive_phase', phase: 'confirm', severity: 'incomplete',
+        message: "phase 'confirm' is interactive (llm_human_input) and cannot run unattended" },
+      { code: 'business_requirement', phase: null, severity: 'incomplete',
+        message: 'definition is missing a business_requirement' }
+    ]
+  },
+  degraded: {
+    label: 'Check itself failed', kind: 'degraded',
+    steps: [
+      { slug: 'retrieve', t: 'llm_agent', plain: 'Search the knowledge base', sub: 'Finds every risk it can support with a source',
+        badges: [['cited', '⛨ Must cite its sources']] },
+      { slug: 'emit', t: 'llm_emit', plain: 'Produce the risk register', sub: 'Fills your Word template, one row per risk',
+        badges: [['cited', '⛨ Every cell cited']] }
+    ],
+    verdicts: [
+      { code: 'grounding_unavailable', phase: null, severity: 'error',
+        message: 'grounding could not be resolved (folders, skills); the definition was not checked against it' }
+    ]
+  }
+};
+var SCEN_ORDER = ['clean', 'midbuild', 'broken', 'mixed', 'degraded'];
+
+var LEAD = {
+  a: '<b>A — A quiet mark on the node, the detail in a tray.</b> Each affected step gets a small corner mark ' +
+     '(<span style="color:hsl(0 85% 76%)">✕ red</span> = broken, <span style="color:var(--color-text-muted)">○ dashed grey</span> = ' +
+     'not finished). The cards stay the size they were. Everything else lives in a tray at the bottom that <b>tells you the ' +
+     'count before you open it</b> — and its wording separates the two kinds: “1 problem · 2 things to finish”. ' +
+     'Click a row to jump to the step.',
+  b: '<b>B — The message lives on the card.</b> No tray at all: the verdict is rendered inside the step it belongs to, with ' +
+     'a severity stripe down the left. Nothing is hidden and there is no second place to look — but the cards grow, a ' +
+     'workflow-wide verdict (like the missing description) has <i>no</i> card to live on, and three notes across three ' +
+     'cards is a noisy resting state for a draft you simply have not finished.',
+  c: '<b>C — Do not offer the invalid move.</b> The strongest reading of “you cannot draw an invalid workflow”: the ' +
+     'insert picker greys out anything that would break the flow <i>and says why</i>, deleting a step that another step ' +
+     'jumps to is refused before it happens, and the server verdict becomes a quiet backstop strip rather than a list of ' +
+     'chores. Prevention cannot cover everything — an unavailable tool or a missing description can only be reported — so ' +
+     'C is really <b>A or B plus a gate</b>, not a third alternative.'
+};
+
+var variant = 'a', scen = 'midbuild', sel = null, busy = false, busyT = null, toastT = null;
+
+function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'); }
+function cur() { return SCEN[scen]; }
+function verdictsFor(slug) { return cur().verdicts.filter(function (v) { return v.phase === slug; }); }
+function globals() { return cur().verdicts.filter(function (v) { return v.phase === null; }); }
+function worst(list) {
+  if (list.some(function (v) { return v.severity === 'error'; })) return 'error';
+  if (list.length) return 'incomplete';
+  return null;
+}
+
+function toast(msg) {
+  var el = document.getElementById('toast');
+  el.innerHTML = msg; el.classList.add('show');
+  if (toastT) clearTimeout(toastT);
+  toastT = setTimeout(function () { el.classList.remove('show'); }, 4200);
+}
+
+/* The debounce is not decoration: /validate fires on every canvas edit, so the
+   surface has to have an honest "checking…" beat and a stale-response guard. */
+function fireValidate(why) {
+  busy = true; render();
+  if (busyT) clearTimeout(busyT);
+  busyT = setTimeout(function () { busy = false; render(); }, 520);
+  if (why) toast(why);
+}
+
+function nodeHTML(s, i) {
+  var vs = verdictsFor(s.slug);
+  var w = worst(vs);
+  var badges = (s.badges || []).map(function (b) {
+    return '<span class="badge ' + b[0] + '">' + esc(b[1]) + '</span>';
+  }).join('');
+  var mark = w ? '<span class="vmark ' + w + '" aria-hidden="true">' + (w === 'error' ? '✕' : '○') + '</span>' : '';
+  var inline = (variant === 'b' && vs.length)
+    ? '<div class="vfix">' + vs.map(function (v) {
+        return '<div class="vrow ' + v.severity + '">' +
+          '<span aria-hidden="true">' + (v.severity === 'error' ? '✕' : '○') + '</span>' +
+          '<span>' + esc(PLAIN[v.code] || v.message) +
+            '<span class="code">' + esc(v.code) + ' — ' + esc(v.message) + '</span>' +
+          '</span></div>';
+      }).join('') + '</div>'
+    : '';
+  var meta = TYPE_META[s.t];
+  return '<div class="node' + (sel === s.slug ? ' sel' : '') + (w ? ' v-' + w : '') + (busy ? ' checking' : '') + '"' +
+      ' data-slug="' + esc(s.slug) + '" data-type="' + s.t + '" tabindex="0" role="button"' +
+      ' aria-label="Step ' + (i + 1) + ': ' + esc(s.plain) + ' (' + s.t + ')' +
+        (w ? ', ' + (w === 'error' ? 'has a problem' : 'not finished') : '') + '">' +
+    '<span class="stepn">' + (i + 1) + '</span>' + mark +
+    '<div class="acts">' +
+      '<button type="button" class="danger" data-del="' + esc(s.slug) + '" title="Remove this step" aria-label="Remove this step">✕</button>' +
+    '</div>' +
+    '<div class="icowrap">' + icon3d(meta.icon, 52) + '</div>' +
+    '<div class="body">' +
+      '<div class="ttl">' + esc(s.plain) + '</div>' +
+      '<div class="sub">' + esc(s.sub) + '</div>' +
+      (badges ? '<div class="badges">' + badges + '</div>' : '') +
+      inline +
+      '<div class="techline">' + esc(meta.label) + ' · ' + esc(s.slug) + ' · phase_index ' + i + '</div>' +
+    '</div>' +
+  '</div>';
+}
+
+function renderFlow() {
+  var flow = document.getElementById('flow');
+  var html = '<div class="conn" data-at="0"><div class="ins" role="button" tabindex="0" ' +
+             'aria-label="Insert a step at the beginning" data-ins="0">＋</div></div>';
+  cur().steps.forEach(function (s, i) {
+    html += nodeHTML(s, i);
+    html += '<div class="conn" data-at="' + (i + 1) + '"><div class="line"></div><div class="tip"></div>' +
+            '<div class="ins" role="button" tabindex="0" aria-label="Insert a step after step ' + (i + 1) + '" ' +
+            'data-ins="' + (i + 1) + '">＋</div></div>';
+  });
+  html += '<div class="endpin"><span class="dot"></span> ends here</div>';
+  flow.innerHTML = html;
+}
+
+function counts() {
+  var e = 0, n = 0;
+  cur().verdicts.forEach(function (v) { if (v.severity === 'error') e++; else n++; });
+  return { e: e, n: n };
+}
+
+function renderTray() {
+  var tray = document.getElementById('tray');
+  var back = document.getElementById('backstop');
+  tray.style.display = (variant === 'a') ? '' : 'none';
+  back.style.display = (variant === 'c') ? '' : 'none';
+
+  var c = counts();
+  if (variant === 'a') {
+    var words = [];
+    if (c.e) words.push('<b style="color:hsl(0 85% 76%)">' + c.e + ' problem' + (c.e === 1 ? '' : 's') + '</b>');
+    if (c.n) words.push('<span style="color:var(--color-text-muted)">' + c.n + ' thing' + (c.n === 1 ? '' : 's') + ' to finish</span>');
+    if (!words.length) words.push('<b style="color:hsl(142 71% 64%)">✓ Nothing to fix — this would pass the static half of publish</b>');
+    document.getElementById('trayhd').innerHTML =
+      '<span aria-hidden="true">' + (document.body.classList.contains('trayclosed') ? '▸' : '▾') + '</span>' +
+      words.join('<span style="color:var(--color-text-dim)"> · </span>') +
+      '<span class="spacer" style="flex:1"></span>' +
+      '<span style="font-size:11px;color:var(--color-text-dim)">' +
+        (busy ? 'checking…' : 'checked by the server') + '</span>';
+
+    document.getElementById('traylist').innerHTML = cur().verdicts.length
+      ? cur().verdicts.map(function (v) {
+          return '<button class="trow ' + v.severity + '" type="button" data-focus="' + esc(v.phase || '') + '">' +
+            '<span aria-hidden="true" style="margin-top:1px">' + (v.severity === 'error' ? '✕' : '○') + '</span>' +
+            '<span style="flex:1">' +
+              '<strong>' + esc(v.phase ? stepName(v.phase) : 'The workflow') + '</strong> — ' +
+              '<span class="msg">' + esc(PLAIN[v.code] || v.message) + '</span>' +
+              '<span class="who">' + esc(v.code) + (v.phase ? ' · ' + esc(v.phase) : ' · workflow-wide') + '</span>' +
+            '</span></button>';
+        }).join('')
+      : '<p style="font-size:12px;color:var(--color-text-dim);margin:0 0 6px">Nothing outstanding. The publish gauntlet ' +
+        'still has to run its golden run and its judge — this only says the <i>static</i> half is clean.</p>';
+  }
+
+  if (variant === 'c') {
+    back.innerHTML = c.e || c.n
+      ? '<span class="pill ' + (c.e ? 'bad' : '') + '">' +
+          (c.e ? c.e + ' problem' + (c.e === 1 ? '' : 's') + ' the canvas could not prevent'
+               : c.n + ' thing' + (c.n === 1 ? '' : 's') + ' still to finish') + '</span>' +
+        '<span style="color:var(--color-text-dim)">Prevention covers what the shape of the flow can decide. ' +
+        'Whether a tool is available, or whether you have written a description, can only be reported.</span>'
+      : '<span class="pill good">✓ Clean — and most of that is because the invalid move was never offered</span>';
+  }
+}
+
+function stepName(slug) {
+  var f = cur().steps.filter(function (s) { return s.slug === slug; })[0];
+  return f ? f.plain : slug;
+}
+
+function renderServer() {
+  var c = counts();
+  document.getElementById('srvdot').className = 'dot-live' + (busy ? ' busy' : '');
+  var okp = document.getElementById('okpill');
+  okp.className = 'pill ' + (cur().verdicts.length ? 'bad' : 'good');
+  okp.textContent = cur().verdicts.length ? 'ok: false' : 'ok: true';
+
+  var vs = cur().verdicts.map(function (v) {
+    return '  {\n' +
+      '    <span class="k">"code"</span>: <span class="s">"' + esc(v.code) + '"</span>,\n' +
+      '    <span class="k">"phase"</span>: ' + (v.phase ? '<span class="s">"' + esc(v.phase) + '"</span>' : '<span class="n">null</span>') + ',\n' +
+      '    <span class="k">"severity"</span>: <span class="' + (v.severity === 'error' ? 'n' : 's') + '">"' + v.severity + '"</span>,\n' +
+      '    <span class="k">"message"</span>: <span class="s">"' + esc(v.message) + '"</span>\n' +
+      '  }';
+  }).join(',\n');
+
+  document.getElementById('srvout').innerHTML =
+    '<p class="rq">' + (busy ? '⟳ in flight — debounced 400ms after the last edit' : '200 OK · ' + cur().verdicts.length + ' verdict' + (cur().verdicts.length === 1 ? '' : 's')) + '</p>' +
+    '<p class="readout">{\n  <span class="k">"ok"</span>: <span class="' + (cur().verdicts.length ? 'n' : 's') + '">' +
+      (cur().verdicts.length ? 'false' : 'true') + '</span>,\n  <span class="k">"verdicts"</span>: [\n' +
+      (vs ? vs + '\n' : '') + '  ]\n}</p>' +
+    '<div class="expl">' +
+      '<b>Every mark on the canvas is one of these rows.</b> The node keys off <code>verdict.phase</code>, which is the ' +
+      'phase <code>slug</code> — the same identity <code>node.id</code> already uses. Nothing is computed client-side; ' +
+      'a rule the canvas re-implemented would be a rule that could disagree with publish.' +
+    '</div>' +
+    (scen === 'degraded'
+      ? '<div class="expl" style="border-color:hsl(38 92% 60% / .5);background:hsl(38 92% 60% / .08)">' +
+        '<b>“We could not check” is not “there is nothing wrong.”</b> When the folder/skill registry read fails, the ' +
+        'route emits <code>grounding_unavailable</code> at severity <code>error</code> rather than returning a clean ' +
+        '<code>ok: true</code>. So the canvas must say <i>unverified</i>, never <i>fine</i> — otherwise a database blip ' +
+        'reads as a green light.</div>'
+      : '') +
+    (c.n && !c.e
+      ? '<div class="expl" style="border-color:hsl(220 20% 30%);">' +
+        '<b>Nothing here is a mistake.</b> All three are <code>incomplete</code> — the person is mid-build. They block a ' +
+        'publish (<code>ok: false</code>) but a red-alert reading of this state would be wrong, and it is the state a ' +
+        'canvas spends most of its life in.</div>'
+      : '');
+}
+
+function render() {
+  document.body.classList.remove('va', 'vb', 'vc');
+  document.body.classList.add('v' + variant);
+  document.getElementById('lead').innerHTML = LEAD[variant];
+  renderFlow(); renderTray(); renderServer();
+}
+
+/* ── C: the picker that refuses ──────────────────────────────────────────── */
+var pickAt = -1;
+function openPicker(anchorEl, at) {
+  pickAt = at;
+  var p = document.getElementById('picker');
+  var lastIsEmit = cur().steps.length > 0 && cur().steps[cur().steps.length - 1].t === 'llm_emit';
+  var opts = Object.keys(TYPE_META).map(function (t) {
+    var m = TYPE_META[t];
+    /* The prevention rule shown here is a REAL one: a deliverable must be able to
+       reach the end, so inserting after it would strand it (`no_terminal`). */
+    var blocked = (variant === 'c' && lastIsEmit && at >= cur().steps.length && t !== 'llm_emit');
+    return '<button type="button" data-t="' + t + '"' + (blocked ? ' disabled' : '') + '>' +
+      icon3d(m.icon, 26) + '<span>' + esc(m.plain) +
+      '<small>' + esc(blocked ? 'Not here — the deliverable has to be the last step, or nothing reaches the end.' : m.sub) +
+      '</small></span></button>';
+  }).join('');
+  p.innerHTML = '<div class="phdr">Add a step ' + (at >= cur().steps.length ? 'at the end' : 'before step ' + (at + 1)) + '</div>' + opts;
+  var r = anchorEl.getBoundingClientRect();
+  p.classList.add('show');
+  p.style.top = Math.max(8, Math.min(r.bottom + 8, window.innerHeight - p.offsetHeight - 12)) + 'px';
+  p.style.left = Math.max(8, Math.min(r.left - 130, window.innerWidth - 320)) + 'px';
+}
+function closePicker() { document.getElementById('picker').classList.remove('show'); pickAt = -1; }
+
+/* ── events ──────────────────────────────────────────────────────────────── */
+document.getElementById('scenseg').innerHTML = SCEN_ORDER.map(function (k, i) {
+  return '<button type="button" data-scen="' + k + '"' + (k === scen ? ' class="on"' : '') + '>' + SCEN[k].label + '</button>';
+}).join('');
+
+document.querySelector('.variant-nav').addEventListener('click', function (e) {
+  var b = e.target.closest('.variant-tab'); if (!b) return;
+  document.querySelectorAll('.variant-tab').forEach(function (t) { t.classList.remove('active'); });
+  b.classList.add('active'); variant = b.getAttribute('data-v'); closePicker(); render();
+});
+
+document.querySelector('.bar').addEventListener('click', function (e) {
+  var b = e.target.closest('button'); if (!b) return;
+  var seg = b.closest('.seg'); if (!seg) return;
+  seg.querySelectorAll('button').forEach(function (x) { x.classList.remove('on'); });
+  b.classList.add('on');
+  if (b.hasAttribute('data-scen')) { scen = b.getAttribute('data-scen'); sel = null; fireValidate(''); }
+  if (b.hasAttribute('data-card')) document.body.classList.toggle('card-b', b.getAttribute('data-card') === 'b');
+  if (b.hasAttribute('data-tech')) document.body.classList.toggle('tech', b.getAttribute('data-tech') === 'on');
+  if (b.hasAttribute('data-srv')) document.body.classList.toggle('showsrv', b.getAttribute('data-srv') === 'on');
+  render();
+});
+
+document.getElementById('trayhd').addEventListener('click', function () {
+  document.body.classList.toggle('trayclosed');
+  this.setAttribute('aria-expanded', String(!document.body.classList.contains('trayclosed')));
+  renderTray();
+});
+document.getElementById('trayhd').addEventListener('keydown', function (e) {
+  if (e.repeat) return;
+  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.click(); }
+});
+
+document.getElementById('traylist').addEventListener('click', function (e) {
+  var b = e.target.closest('button[data-focus]'); if (!b) return;
+  var slug = b.getAttribute('data-focus');
+  sel = slug || null;
+  render();
+  var n = slug && document.querySelector('.node[data-slug="' + slug + '"]');
+  if (n) n.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+  else toast('This one is not about any single step — it is about the workflow as a whole. There is nothing on the canvas to point at.');
+});
+
+document.getElementById('stage').addEventListener('click', function (e) {
+  var ins = e.target.closest('.ins');
+  if (ins) { openPicker(ins, parseInt(ins.getAttribute('data-ins'), 10)); return; }
+  var del = e.target.closest('button[data-del]');
+  if (del) {
+    e.stopPropagation();
+    var slug = del.getAttribute('data-del');
+    if (variant === 'c' && slug === 'retrieve' && cur().steps.length > 1) {
+      toast('<b>Not removed.</b> The next step has nothing before it if this one goes — that would make it unreachable ' +
+            '(<code>orphan_phase</code>). Remove them together, or move this one instead.');
+      return;
+    }
+    toast(variant === 'c'
+      ? 'In C this is where prevention runs out: removing a step the flow can survive is allowed, and the server still confirms it.'
+      : 'Removed. The canvas re-validates — watch the reply land in the rail.');
+    fireValidate('');
+    return;
+  }
+  var n = e.target.closest('.node');
+  if (n) { sel = n.getAttribute('data-slug'); render(); }
+});
+
+document.getElementById('stage').addEventListener('keydown', function (e) {
+  if (e.repeat) return;
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  var ins = e.target.closest('.ins');
+  if (ins) { e.preventDefault(); openPicker(ins, parseInt(ins.getAttribute('data-ins'), 10)); return; }
+  var n = e.target.closest('.node');
+  if (n) { e.preventDefault(); sel = n.getAttribute('data-slug'); render(); }
+});
+
+document.getElementById('picker').addEventListener('click', function (e) {
+  var b = e.target.closest('button[data-t]'); if (!b || b.disabled) return;
+  closePicker();
+  fireValidate('Added. Every edit re-fires <code>POST /workflows/validate</code> — debounced, and a late reply for an ' +
+    'older edit is dropped rather than painted.');
+});
+document.addEventListener('click', function (e) {
+  if (!e.target.closest('#picker') && !e.target.closest('.ins')) closePicker();
+});
+
+document.getElementById('themesel').addEventListener('change', function () {
+  document.querySelector('link[href*="themes/default"]').href = '../themes/' + this.value + '.css';
+});
+
+render();
+</script>
+</body>
+</html>

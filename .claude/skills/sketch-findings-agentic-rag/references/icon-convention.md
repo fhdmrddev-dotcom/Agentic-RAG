@@ -54,6 +54,54 @@ and always keep a fallback.
 - For a build that ships an icon set: confirm presence at build time (or bundle the
   exact SVGs) so no production icon can render empty.
 
+## 4. The CANVAS glyph vocabulary — read this before drawing any canvas mark
+
+Added 2026-08-01 (MANIFEST decision 64) after an icon audit of sketches 148-151 caught **four
+drifts, every one an invention where a shipped value already existed**. The failure mode
+generalises: **a sketch that invents a glyph teaches the wrong vocabulary to whoever builds from
+it.** So the shipped marks are written down here, with their source lines.
+
+| Mark | Means | Source of truth |
+|---|---|---|
+| `⛨` | governance — the "Must prove it" seal | `PhaseNodeCard.tsx:440`; `GOVERNANCE_SEAL_LABEL` at `definitionOps.ts:388`. The SAME shield as the Control Room's operator-only mark — **one authority mark, two surfaces** |
+| `🔒` | locked / one-way | `GovernanceSection.tsx:280`, `WorkflowDoorSwitch.tsx:159` |
+| `⤳` | the on-fail (`skip_to_phase`) branch | `PhaseNode.tsx:238`, `PhaseSpineGraph.tsx:201` |
+| `＋` / `✕` | add / remove — **on the lane, never the card** | `WorkflowCanvas.tsx:637`, `:680` |
+| `↶` / `↷` | undo / redo | `CanvasToolbar.tsx:192`, `:209` |
+| `◆` | a publish-gauntlet stage | `PublishGauntlet.tsx:967` |
+| phase-type marks | the 6 workflow phase types | the ONE shared 3D map — §2 above |
+
+### The word-badge carries NO glyph
+
+The shipped `waitsForYou` `BadgeSlot` (`PhaseNode.tsx`) has a **label and no `glyph`**, tone
+`primary`. `PhaseNodeCard`'s own docblock states the rule: *the WORD carries the meaning; tone is
+decoration.* Adding an emoji there spends visual budget the design deliberately withholds.
+
+### There is NO category-icon vocabulary — do not invent one
+
+The worst of the four drifts: sketch 151 gave each starter workflow **one phase-type glyph as a
+category icon**. That misuses the shared map — `icon3d('llm_agent')` means *"this STEP is an agent
+step"*, not *"this WORKFLOW is about risk"*. Finding **#36** already settled how a whole workflow is
+identified: **its glyph-dot PHASE SPINE**, at every size. Starters now render their spine on both
+the chip and the picker row.
+
+*Honest side effect worth keeping:* spines are wider than a single glyph, so the chips wrap to two
+lines — which **strengthens** the density argument against inline chips rather than hiding it. A
+correction that makes a trade-off more visible is the right correction.
+
+### Net-new marks must be FLAGGED as proposals
+
+Sketch 150-C proposes `✦` (AI-drafted) and `✓` (reviewed). These are **not existing
+vocabulary**. They are retained in the sketch and labelled as proposals in its README — never
+passed off as shipped marks — and `✦` additionally sits on the verdict mark's coordinates, so it
+owes a placement before it could ship.
+
+### The audit that closes the loop
+
+After fixing, `⛨` was the only glyph literal across all four sketches. **Run that check**: a
+sketch touching the canvas should be greppable for glyph literals, and every one should trace to a
+row in the table above or be explicitly flagged as a proposal.
+
 ## What to avoid
 
 - Hand-drawing or approximating a provider logo in production (the sketch
@@ -61,9 +109,13 @@ and always keep a fallback.
 - Re-declaring the phase-type glyph map per component (drift `soulData` forbids).
 - Shipping an icon name without verifying it exists in the set (the empty-icon trap).
 - Different marks for the same provider/concept across surfaces.
+- **Inventing a canvas mark when a shipped one exists** — check §4 before drawing.
+- **Putting a glyph on a word-badge** whose shipped slot has none.
+- **Using a phase-type glyph as a category icon** — a workflow is its spine (#36).
 
 ## Origin
 
-Phase 127 (sketches 051 + 052) + operator direction 2026-06-27. Provider-logo seam:
+Phase 127 (sketches 051 + 052) + operator direction 2026-06-27. §4 canvas vocabulary: sketches
+148-151 icon audit + operator directive 2026-08-01 (MANIFEST decision 64). Provider-logo seam:
 Phase 128 / sketch 048 (`providerLogo.tsx`, `@lobehub/icons`). Phase-type map:
 `soulData.ts` `PHASE_GLYPHS` (Phase 124 / sketch 046). Future Settings home: SEED-095.

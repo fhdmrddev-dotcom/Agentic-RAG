@@ -617,3 +617,95 @@ A density + visual-energy re-skin of two ALREADY-SHIPPED workflow surfaces (the 
 
 ### Downstream
 `/gsd:plan-phase 127` — G-2 (sketch-before-plan) satisfied by 051 + 052; the plan adopts the icon convention (Running Design Decision 43) and re-runs the harness replay tests for the G-5 `PhaseCard`/`PhaseTimeline` re-skin. Then `/gsd:execute-phase 127` → verify → `/gsd:complete-milestone` (tag v3.1 — 127 is the last piece). The skill auto-loads during build for the publish gauntlet, the live phase spine, provider/model logos, and the icon convention.
+
+---
+
+# Sketch Wrap-Up Session — v3.6 Visual Canvas + Phase 187 Vocabulary
+
+**Date:** 2026-08-01
+**Sketches processed:** 13 (134-141, 147-151)
+**Design areas:** Canvas Frame & Node Anatomy - Canvas Editing & Authoring - Node Vocabulary & the Reveal - AI Seed & Templates (+ appends into Graded Governance and Icon Convention)
+**Skill output:** `./.claude/skills/sketch-findings-agentic-rag/` (append mode - now 99 processed sketches)
+
+### Included Sketches
+| # | Name | Winner | Design Area |
+|---|------|--------|-------------|
+| 134 | canvas-frame-and-read-only | none locked - look superseded by 137 | Canvas Frame & Node Anatomy |
+| 135 | phase-node-anatomy | none locked - look superseded by 137 | Canvas Frame & Node Anatomy |
+| 136 | flow-shape-and-branches | B - horizontal left-to-right | Canvas Frame & Node Anatomy |
+| 137 | agentic-canvas-look | B - Glass Depth (operator changed D->B) | Canvas Frame & Node Anatomy |
+| 138 | growing-the-flow | C-local - spine + browser-persisted nudge | Canvas Editing & Authoring |
+| 139 | validation-while-building | A - node mark + problems tray | Canvas Editing & Authoring |
+| 140 | step-inspector-and-rails | A - extend the shipped PhaseFormPanel | Canvas Editing & Authoring |
+| 141 | the-authoring-session | B - canvas toolbar + page header | Canvas Editing & Authoring |
+| 147 | the-armed-mark | B - the detour edge | -> appended into Graded Governance |
+| 148 | the-step-that-says-what-it-does | C - the layered node-face ladder | Node Vocabulary & the Reveal |
+| 149 | what-the-reveal-costs | C - swap the subtitle, not the title | Node Vocabulary & the Reveal |
+| 150 | the-seeded-canvas-arrives | B - all at once + the seed receipt | AI Seed & Templates |
+| 151 | a-door-beside-the-describe-box | C - the template seeds the describe box | AI Seed & Templates |
+
+### Excluded Sketches
+| # | Name | Reason |
+|---|------|--------|
+| 017 | cross-thread-run-stop | Orphan - no README, no locked winner |
+| 098 | tool-card-live-essence | Orphan - no README, no locked winner |
+| 094 / 103 / 128 | *-grounding | **Not sketches** - grounding / brief folders (BRIEF.md, DATA-CONTRACT.md); no variants, no winner |
+| 131-133 | org-state-matrix, org-entry-failure-honesty, org-management-surfaces | Deferred - v3.4 org surfaces, shipped and unrelated to the canvas. Wrap when org work next moves. |
+
+### Design Direction
+
+The v3.6 visual canvas, from frame to vocabulary. **137-B "Glass Depth"** is the settled visual
+language: a 3D mark floating above a narrower centre-aligned frosted panel, **no per-step-type
+colour anywhere** (banked for Phase 188's run status), plain language on the face, motion keyed to
+run state. The canvas is a **projection of a LINEAR spine, never a free DAG** - order cannot be
+rewired, because the harness engine runs a sequence and a canvas must not promise what the runtime
+cannot honour.
+
+Phase 187's contribution is **specificity and honesty at the seam where the AI hands you a draft**.
+
+### Key Decisions
+
+- **The card is 137-B, and `themes/canvas-184.css` is NOT it.** That stylesheet encodes the older
+  137-D language; 185-01 rebuilt the shipped card. Reasoning from the sketch-era CSS draws a card
+  that no longer exists. Always read `PhaseNodeCard.tsx`.
+- **Order is the spine; the nudge is a browser preference with zero migration.** Cosmetic movement
+  never writes the definition.
+- **INCOMPLETE is not ERROR**, and any verdict surface must **fail closed** - an unrecognised state
+  is not a pass.
+- **The panel is where you SET; the canvas is where you SEE.** No focusable control inside the card;
+  one tab stop per node.
+- **A permanent mark keeps a verified corner; a transient one moves.** The governance seal holds
+  top-right permanently; the verdict mark relocated to the left edge to free it.
+- **Most of VOCAB-01 already shipped.** The plain-language sentences (183) and the Technical-names
+  reveal (154, already wired to the canvas and both graph views). What was missing is specificity:
+  only 10 of 119 phases carry a name and the generator writes none, so every AI-seeded workflow
+  renders the same six type sentences.
+- **The node face is a layered ladder** (author name -> config-derived -> type sentence), computed
+  and never stored. AI-authored names are a *seeding* behaviour that fills its top tier - not a
+  rival strategy.
+- **The reveal swaps the subtitle, not the title** - and the shipped title swap *truncates*, clipping
+  the slug it exists to show.
+- **Generation is single-shot**, so a staged reveal is pacing, not progress - and the seed receipt is
+  the only thing that makes "safe-by-construction" visible.
+- **Path count, not clutter**, decided the template door: a template that opens a canvas creates a
+  second way workflows come into existence.
+
+### Process findings recorded this session
+
+1. **Variants that differ semantically in the same position need a co-present side-by-side view, not
+   tabs.** Sketch 148's first review reported "no difference" - the variants were correct; the sketch
+   put the deciding card off-screen and made the comparison a memory test.
+2. **The findings skill must be LOADED, not paraphrased from MANIFEST.** Four icon drifts were
+   introduced by not loading it - and the correct mark was written down in
+   `references/graded-governance.md` the whole time. `references/icon-convention.md` now carries a
+   section 4 with the full canvas glyph vocabulary and its source lines.
+3. **There is no category-icon vocabulary** - a workflow is identified by its phase spine (#36),
+   never by one borrowed phase-type glyph.
+
+### Downstream
+
+`/gsd:spec-phase 187` - G-2 satisfied by 148-151. Two things no sketch covers: **SC#6 / SEED-137**
+(the armed-gate precedence bypass - backend, three non-equivalent fix shapes, a discuss-phase
+decision, and the reason 187 carries a threat model), and the **G-5 hot-file audit** for
+`WorkflowBuilderPage.tsx` (151-C touches the describe screen) and `PhaseNode.tsx` (148-C + 149-C
+both touch the face). `WorkflowCanvas.tsx` already has an extraction due in Phase 188.
