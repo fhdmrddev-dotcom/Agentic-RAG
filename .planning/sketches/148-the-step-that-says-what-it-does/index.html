@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sketch 148 — The step that says what it does (Phase 187 / VOCAB-01)</title>
+<link rel="stylesheet" href="../themes/default.css">
+<style>
+/* ══════════════════════════════════════════════════════════════════════════════
+   SKETCH 148 — can a node face say what THIS step does, not what its TYPE does?
+
+   EVERY CARD BELOW IS THE SHIPPED 137-B GEOMETRY, read from
+   `frontend/src/components/workflows/PhaseNodeCard.tsx` on 2026-08-01 — NOT from
+   `themes/canvas-184.css`, which is the superseded 137-D language (left-floating
+   icon, 300px card). 185-01 rebuilt the card; reasoning from the sketch-era CSS
+   would draw a card that no longer exists.
+
+     node box   260 × min 104          (canvasModel.ts:62 CANVAS_LAYOUT)
+     card       248 wide, mx-auto, radius 22, padding 42/20/20, text-centre
+     mark       62×62 at left-1/2 top-[-26px]      (PhaseNodeCard.tsx:456)
+     seal       top 11 / right 17 in the node box  (PhaseNodeCard.tsx:~415)
+     verdict    22×22 at -left-2 top-1.5           (PhaseNodeCard.tsx:~376)
+     title      14px headline semibold, TRUNCATE   (PhaseNodeCard.tsx:319)
+     subtitle   11px muted
+     badges     at most TWO — a third is a typecheck error
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+html, body { height: 100%; }
+body {
+  margin: 0; display: flex; flex-direction: column; overflow: hidden;
+  background: var(--color-bg); color: var(--color-text); font-family: var(--font-sans);
+}
+.variant-nav, .lead, .bar { flex-shrink: 0; }
+
+/* ── chrome ──────────────────────────────────────────────────────────────── */
+.variant-nav {
+  display: flex; gap: 6px; align-items: center; padding: 10px 24px;
+  background: var(--color-bg-elev1); border-bottom: 1px solid var(--color-border);
+}
+.variant-tab {
+  border: 1px solid transparent; background: transparent; color: var(--color-text-dim);
+  font-family: var(--font-sans); font-size: 12.5px; padding: 6px 14px;
+  border-radius: 999px; cursor: pointer; transition: all .15s ease;
+}
+.variant-tab:hover { color: var(--color-text); background: var(--color-muted); }
+.variant-tab.active {
+  background: var(--color-surface-hi); color: var(--color-text);
+  border-color: var(--color-border); box-shadow: var(--shadow-sm);
+}
+.variant-tab.baseline.active { border-color: hsl(0 72% 51% / .5); color: hsl(0 72% 70%); }
+
+.lead {
+  padding: 12px 24px; font-size: 12.5px; color: var(--color-text-muted); line-height: 1.65;
+  border-bottom: 1px solid var(--color-border); background: var(--color-bg-elev1);
+}
+.lead b { color: var(--color-text); font-weight: 600; }
+.lead code { font-family: var(--font-mono); font-size: 11px; color: var(--color-primary); }
+.lead .warn { color: hsl(0 72% 70%); font-weight: 600; }
+.lead .good { color: hsl(142 71% 62%); font-weight: 600; }
+
+.bar {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 10px 24px; border-bottom: 1px solid var(--color-border);
+}
+.bar .lbl {
+  font-family: var(--font-mono); font-size: 10px; color: var(--color-text-dim);
+  text-transform: uppercase; letter-spacing: .09em;
+}
+.btn {
+  border: 1px solid var(--color-border); background: var(--color-muted);
+  color: var(--color-text); font-family: var(--font-sans); font-size: 12px;
+  padding: 6px 13px; border-radius: 8px; cursor: pointer; transition: all .15s ease;
+}
+.btn:hover { background: var(--color-accent); border-color: var(--color-text-dim); }
+.btn.on { background: hsl(38 92% 60% / .18); border-color: hsl(38 92% 60% / .5); color: hsl(38 92% 72%); }
+.spacer { flex: 1; }
+
+/* ── the stage ───────────────────────────────────────────────────────────── */
+.stage { position: relative; flex: 1; min-height: 0; overflow: auto; }
+.amb { position: absolute; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
+.amb::before, .amb::after {
+  content: ''; position: absolute; border-radius: 50%; filter: blur(90px); opacity: .5;
+}
+.amb::before { width: 520px; height: 520px; left: 6%; top: -14%; background: hsl(239 84% 45% / .22); }
+.amb::after  { width: 460px; height: 460px; right: 4%; bottom: -18%; background: hsl(258 90% 50% / .16); }
+
+.flow {
+  position: relative; z-index: 1; display: flex; align-items: flex-start;
+  gap: 34px; padding: 90px 60px 70px; min-width: max-content;
+}
+
+/* ── THE NODE — shipped 137-B ────────────────────────────────────────────── */
+.nodebox { position: relative; width: 260px; min-height: 104px; flex-shrink: 0; }
+
+.card {
+  position: relative; margin: 0 auto; width: 248px; min-height: 104px;
+  border-radius: 22px; padding: 42px 20px 20px; text-align: center;
+  background: hsl(220 30% 100% / .045); backdrop-filter: blur(8px);
+  border: 1px solid var(--color-border-soft);
+  box-shadow: 0 1px 0 hsl(220 30% 100% / .06) inset, 0 18px 36px -22px rgba(0,0,0,.95);
+  transition: border-color .25s ease, box-shadow .25s ease;
+}
+/* the sealed edge — reinforcement only, per 185-09 */
+.nodebox.grounded .card { border-color: hsl(220 30% 100% / .34); }
+
+.ttl {
+  font-family: var(--font-headline); font-weight: 600; font-size: 14px;
+  line-height: 1.25; color: var(--color-text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.sub { margin-top: 4px; font-size: 11px; line-height: 1.45; color: var(--color-text-muted); }
+.badges { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+.badge {
+  display: inline-flex; align-items: center; gap: 4px; border-radius: 999px;
+  padding: 2px 9px; font-size: 10.5px; font-weight: 500; white-space: nowrap;
+  color: hsl(38 92% 68%); background: hsl(38 92% 60% / .14);
+  border: 1px solid hsl(38 92% 60% / .32);
+}
+
+/* the floating 3D mark */
+.mark {
+  position: absolute; left: 50%; top: -26px; transform: translateX(-50%);
+  width: 62px; height: 62px; display: grid; place-items: center;
+  pointer-events: none; z-index: 4;
+}
+.mark::before {
+  content: ''; position: absolute; inset: -3px; border-radius: 50%; z-index: 0;
+  background: radial-gradient(circle, var(--tint, hsl(220 30% 100% / .18)), transparent 68%);
+}
+.mark::after {
+  content: ''; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
+  width: 36px; height: 8px; border-radius: 50%; background: rgba(0,0,0,.5); filter: blur(5px); z-index: 0;
+}
+.mark svg { position: relative; z-index: 2; filter: drop-shadow(0 9px 13px rgba(0,0,0,.8)); }
+
+.nodebox[data-type="llm_agent"]        .mark { --tint: hsl(239 90% 70% / .40); }
+.nodebox[data-type="llm_emit"]         .mark { --tint: hsl(258 90% 70% / .40); }
+.nodebox[data-type="programmatic"]     .mark { --tint: hsl(200 85% 62% / .36); }
+.nodebox[data-type="llm_batch_agents"] .mark { --tint: hsl(170 80% 55% / .34); }
+.nodebox[data-type="llm_human_input"]  .mark { --tint: hsl(38 92% 62% / .38); }
+.nodebox[data-type="llm_single"]       .mark { --tint: hsl(220 30% 100% / .22); }
+
+/* the governance corner seal — shape, no colour (185-09 / sketch 143-A) */
+.seal {
+  position: absolute; top: 11px; right: 17px; width: 20px; height: 20px;
+  border-radius: 50%; display: none; place-items: center; z-index: 6;
+  font-size: 10px; color: var(--color-text);
+  background: hsl(220 30% 100% / .1); border: 1px solid hsl(220 30% 100% / .34);
+}
+.nodebox.grounded .seal { display: grid; }
+
+/* connector */
+.conn {
+  position: relative; flex-shrink: 0; width: 34px; height: 104px;
+  display: grid; place-items: center; margin: 0 -34px;
+}
+.conn svg { overflow: visible; }
+
+/* ── the identical-twin callout: what makes the baseline fail ────────────── */
+body.showtwins .nodebox.twin .card {
+  border-color: hsl(0 72% 55% / .5);
+  box-shadow: 0 0 0 1px hsl(0 72% 55% / .35), 0 18px 36px -22px rgba(0,0,0,.95);
+}
+.twinflag {
+  position: absolute; left: 50%; transform: translateX(-50%); bottom: -30px;
+  font-size: 10px; font-family: var(--font-mono); color: hsl(0 72% 70%);
+  white-space: nowrap; opacity: 0; transition: opacity .2s ease;
+}
+body.showtwins .twinflag { opacity: 1; }
+
+/* ── config strip under each node (what the face COULD be derived from) ──── */
+.cfg {
+  margin: 16px auto 0; width: 248px; padding: 9px 11px; border-radius: 9px;
+  background: hsl(220 30% 100% / .028); border: 1px solid var(--color-border-soft);
+  font-family: var(--font-mono); font-size: 9.5px; line-height: 1.6;
+  color: var(--color-text-dim); text-align: left; opacity: 0; transition: opacity .2s ease;
+}
+body.showcfg .cfg { opacity: 1; }
+.cfg .k { color: var(--color-text-muted); }
+.cfg .v { color: var(--color-primary); }
+.cfg .v.changed { color: hsl(38 92% 68%); font-weight: 600; }
+
+/* ── the staleness verdict rail ──────────────────────────────────────────── */
+.verdictrail {
+  position: sticky; bottom: 0; z-index: 20; display: none;
+  padding: 12px 24px; background: var(--color-bg-elev1);
+  border-top: 1px solid var(--color-border); font-size: 12.5px; line-height: 1.6;
+}
+body.edited .verdictrail { display: block; }
+.verdictrail .tag {
+  display: inline-block; font-family: var(--font-mono); font-size: 10px;
+  padding: 2px 8px; border-radius: 999px; margin-right: 8px;
+}
+.tag.stale { background: hsl(0 72% 51% / .18); color: hsl(0 72% 72%); border: 1px solid hsl(0 72% 51% / .4); }
+.tag.live  { background: hsl(142 71% 45% / .16); color: hsl(142 71% 62%); border: 1px solid hsl(142 71% 45% / .35); }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   THE COMPARE GRID — added after the first operator review, which reported
+   "no difference between the variants". The variants DID differ; the sketch
+   was at fault twice over: step 5 (the ONLY place B and C disagree) sat off
+   the right edge behind a horizontal scroll, and comparing tabs asked the
+   reader to hold five sentences in memory across a tab switch. Neither is a
+   thing to argue with — put all four strategies on screen at once instead.
+   ══════════════════════════════════════════════════════════════════════════ */
+.cmp { position: relative; z-index: 1; padding: 26px 24px 40px; }
+.cmptbl { width: 100%; border-collapse: separate; border-spacing: 0; }
+.cmptbl th, .cmptbl td {
+  padding: 11px 12px; text-align: left; vertical-align: top;
+  border-bottom: 1px solid var(--color-border-soft);
+}
+.cmptbl thead th {
+  font-family: var(--font-mono); font-size: 9.5px; text-transform: uppercase;
+  letter-spacing: .09em; color: var(--color-text-dim); font-weight: 500;
+  border-bottom: 1px solid var(--color-border); white-space: nowrap;
+}
+.cmptbl thead th .glyph { display: block; margin-bottom: 5px; }
+.cmptbl tbody th {
+  font-family: var(--font-sans); font-size: 12.5px; font-weight: 600;
+  color: var(--color-text); white-space: nowrap; width: 158px;
+}
+.cmptbl tbody th small {
+  display: block; font-weight: 400; font-size: 10px; color: var(--color-text-dim);
+  margin-top: 3px; font-family: var(--font-mono);
+}
+.cmptbl tr.baseline th, .cmptbl tr.baseline td { background: hsl(0 72% 51% / .05); }
+.cmptbl tr.pick th, .cmptbl tr.pick td { background: hsl(142 71% 45% / .06); }
+
+.face { font-size: 12.5px; line-height: 1.4; color: var(--color-text); }
+.face em { display: block; font-style: normal; font-size: 10px; color: var(--color-text-dim); margin-top: 3px; }
+
+/* the four things worth seeing, marked where they happen */
+td.same  .face { color: hsl(0 72% 72%); }
+td.same::after {
+  content: 'identical to its neighbour'; display: block; margin-top: 5px;
+  font-family: var(--font-mono); font-size: 9px; color: hsl(0 72% 68%);
+}
+td.stale .face { color: hsl(38 92% 72%); }
+td.stale::after {
+  content: 'STALE — config now says contract-risk-flags'; display: block; margin-top: 5px;
+  font-family: var(--font-mono); font-size: 9px; color: hsl(38 92% 72%);
+}
+td.lost  .face { color: hsl(0 72% 72%); text-decoration: line-through dotted hsl(0 72% 60% / .6); }
+td.lost::after {
+  content: 'author’s name discarded'; display: block; margin-top: 5px;
+  font-family: var(--font-mono); font-size: 9px; color: hsl(0 72% 68%); text-decoration: none;
+}
+td.kept .face { color: hsl(142 71% 68%); }
+td.kept::after {
+  content: 'author’s name kept'; display: block; margin-top: 5px;
+  font-family: var(--font-mono); font-size: 9px; color: hsl(142 71% 62%);
+}
+td.generic .face { color: var(--color-text-dim); }
+
+/* the scorecard */
+.score { display: flex; gap: 5px; }
+.score span {
+  width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center;
+  font-size: 11px; font-weight: 700;
+}
+.score .y { background: hsl(142 71% 45% / .16); color: hsl(142 71% 62%); border: 1px solid hsl(142 71% 45% / .35); }
+.score .n { background: hsl(0 72% 51% / .16);  color: hsl(0 72% 72%);  border: 1px solid hsl(0 72% 51% / .4); }
+.score .u { background: var(--color-muted); color: var(--color-text-dim); border: 1px dashed var(--color-border); }
+.cmpkey {
+  margin-top: 18px; font-size: 11.5px; color: var(--color-text-muted); line-height: 1.7;
+}
+.cmpkey b { color: var(--color-text); }
+.cmpnote {
+  margin-top: 14px; padding: 12px 14px; border-radius: 10px;
+  background: hsl(142 71% 45% / .07); border: 1px solid hsl(142 71% 45% / .25);
+  font-size: 12.5px; line-height: 1.65; color: var(--color-text-muted);
+}
+.cmpnote b { color: hsl(142 71% 68%); }
+
+/* ── sketch toolbar ──────────────────────────────────────────────────────── */
+#sketch-tools {
+  position: fixed; bottom: 12px; right: 12px; z-index: 9999; font-family: system-ui;
+  font-size: 11px; background: rgba(0,0,0,.78); color: #fff; padding: 8px 10px;
+  border-radius: 8px; opacity: .35; transition: opacity .2s;
+  display: flex; gap: 8px; align-items: center;
+}
+#sketch-tools:hover { opacity: 1; }
+#sketch-tools select, #sketch-tools button {
+  background: #222; color: #fff; border: 1px solid #444; border-radius: 5px;
+  font-size: 11px; padding: 3px 7px; cursor: pointer;
+}
+.variant { display: none; }
+.variant.active { display: block; }
+</style>
+</head>
+<body>
+
+<div class="variant-nav">
+  <button class="variant-tab active" onclick="showVariant('compare', this)">◫ Compare all four</button>
+  <button class="variant-tab baseline" onclick="showVariant('today', this)">Today (shipped)</button>
+  <button class="variant-tab" onclick="showVariant('a', this)">A: AI-authored names</button>
+  <button class="variant-tab" onclick="showVariant('b', this)">B: Config-derived</button>
+  <button class="variant-tab" onclick="showVariant('c', this)">C: Layered ★ Selected</button>
+</div>
+
+<div class="lead" id="lead"></div>
+
+<div class="bar">
+  <span class="lbl">Test</span>
+  <button class="btn" id="btn-twins" onclick="toggleBody('showtwins', this)">Flag identical faces</button>
+  <button class="btn" id="btn-cfg" onclick="toggleBody('showcfg', this)">Show each step's config</button>
+  <button class="btn" id="btn-edit" onclick="toggleEdit(this)">✎ Re-bind step 3's skill</button>
+  <span class="spacer"></span>
+  <span class="lbl" style="text-transform:none;letter-spacing:0">Scenario: supplier contract renewal review · 5 steps</span>
+</div>
+
+<div class="stage">
+  <div class="amb"></div>
+  <div id="variant-compare" class="variant active"><div class="cmp" id="cmp"></div></div>
+  <div id="variant-today" class="variant"><div class="flow" id="flow-today"></div></div>
+  <div id="variant-a" class="variant"><div class="flow" id="flow-a"></div></div>
+  <div id="variant-b" class="variant"><div class="flow" id="flow-b"></div></div>
+  <div id="variant-c" class="variant"><div class="flow" id="flow-c"></div></div>
+</div>
+
+<div class="verdictrail" id="verdictrail"></div>
+
+<div id="sketch-tools">
+  <select onchange="document.querySelector('link[href*=themes]').href='../themes/'+this.value+'.css'">
+    <option value="default">Default</option>
+  </select>
+  <button onclick="setW(375)">P</button>
+  <button onclick="setW(768)">T</button>
+  <button onclick="setW(0)">Full</button>
+</div>
+
+<script src="../themes/phase-icons-3d.js"></script>
+<script>
+/* ══════════════════════════════════════════════════════════════════════════════
+   THE WORKFLOW — a real procurement job, not fixture data.
+   `type` / `tools` / `folder` / `skill` / `template` are the fields that ACTUALLY
+   exist on the phase configs today; the four naming strategies below are pure
+   functions of exactly these, so the comparison is honest.
+   ══════════════════════════════════════════════════════════════════════════════ */
+const STEPS = [
+  { type:'programmatic',   name:null, tools:[],                  folder:null,
+    skill:null,                  template:null,  armed:false,
+    aiName:'Pull the renewals due this quarter',  fn:'load_renewal_queue' },
+
+  { type:'llm_agent',      name:null, tools:['search_documents'], folder:'Supplier Contracts',
+    skill:null,                  template:null,  armed:false,
+    aiName:'Find each contract’s renewal terms' },
+
+  { type:'llm_agent',      name:null, tools:['search_documents'], folder:'Supplier Contracts',
+    skill:'pricing-policy-check', template:null, armed:false,
+    aiName:'Check each one against the pricing policy' },
+
+  { type:'llm_human_input', name:null, tools:[],                 folder:null,
+    skill:null,                  template:null,  armed:true,
+    aiName:'Get the contract owner’s sign-off' },
+
+  /* The ONE step an author has actually named by hand. This is the 10-of-119 case
+     (`phaseVocabulary.ts:123`) — and it is the ONLY place B and C disagree, which is
+     the whole reason it is in the scenario. */
+  { type:'llm_emit',       name:'Board-ready renewal pack', tools:[], folder:null,
+    skill:null,   template:'Renewal Summary.pptx', armed:false,
+    aiName:'Produce the renewal summary deck' },
+];
+
+/* The KB-reading tools the server intersects on (D-185-09 — display prediction
+   only; the real list lives server-side). */
+const KB_TOOLS = ['search_documents'];
+const grounded = s => (s.type==='llm_agent'||s.type==='llm_batch_agents')
+                      && s.tools.some(t => KB_TOOLS.includes(t));
+
+/* ── strategy 0 · TODAY — verbatim from phaseVocabulary.ts:127 / :137 ─────── */
+const PHASE_TYPE_SENTENCES = {
+  programmatic:     'Prepare the inputs',
+  llm_single:       'Write it up',
+  llm_agent:        'Work out how to do it',
+  llm_batch_agents: 'Work on the parts together',
+  llm_human_input:  'Check with you',
+  llm_emit:         'Produce the deliverable',
+};
+const PHASE_TYPE_SUBTITLES = {
+  programmatic:     'A fixed step the server runs',
+  llm_single:       'Writes one piece in one pass',
+  llm_agent:        'Searches and decides its own next move',
+  llm_batch_agents: 'Several assistants work in parallel',
+  llm_human_input:  'Pauses here until you answer',
+  llm_emit:         'Fills your template and produces the file',
+};
+
+/* ── strategy B · CONFIG-DERIVED — computed, never stored ─────────────────── */
+function derivedTitle(s) {
+  if (s.skill)             return 'Run the ' + s.skill.replace(/-/g,' ');
+  if (s.template)          return 'Fill ' + s.template;
+  if (s.folder)            return 'Search ' + s.folder;
+  if (s.type==='llm_human_input') return 'Wait for your approval';
+  if (s.fn)                return 'Prepare the inputs';
+  return null;                       /* honest: derives nothing, falls through */
+}
+function derivedSub(s) {
+  if (s.skill)    return 'Applies your saved rules to each contract';
+  if (s.template) return 'Fills your template and produces the file';
+  if (s.folder)   return 'Reads only the ' + s.folder + ' folder';
+  return PHASE_TYPE_SUBTITLES[s.type];
+}
+
+/* ── the four faces ───────────────────────────────────────────────────────── */
+const FACES = {
+  /* Shipped: author name → type sentence. (`phaseVocabulary.ts:169`) */
+  today: s => ({ t: s.name?.trim() || PHASE_TYPE_SENTENCES[s.type], s: PHASE_TYPE_SUBTITLES[s.type] }),
+  /* A writes INTO `phase.name` at seed time, so an author's later edit is simply the
+     stored name — same field, same precedence. */
+  a:     s => ({ t: s.name?.trim() || s.aiName,   s: PHASE_TYPE_SUBTITLES[s.type] }),
+  /* B is config-ONLY on purpose, so the cost of dropping the author tier is visible
+     rather than argued about: watch step 5. */
+  b:     s => ({ t: derivedTitle(s) ?? PHASE_TYPE_SENTENCES[s.type], s: derivedSub(s) }),
+  /* C — the shipped 3-tier `nodeTitle` with ONE tier inserted:
+     author name → config-derived → type sentence. */
+  c:     s => ({ t: s.name?.trim() || derivedTitle(s) || PHASE_TYPE_SENTENCES[s.type],
+                 s: derivedSub(s) }),
+};
+
+const LEADS = {
+  compare: 'All four strategies over the same five steps, so nothing depends on remembering the previous tab. <b>Three things to look at:</b> the two <span class="warn">identical faces</span> in the Today row; what happens to step 3 when you press <b>✎ Re-bind step 3’s skill</b>; and step 5, the one step an author named by hand — <span class="warn">B discards it</span>, <span class="good">C keeps it</span>. The scorecard on the right is computed from these cells, not asserted.',
+  today: 'The <b>shipped</b> face (<code>phaseVocabulary.ts:169 nodeTitle</code>). A real <code>phase.name</code> wins — but only <b>10 of 119</b> live phases carry one, and the NL generator authors a definition-level name only (<code>workflow_authoring.py:88</code>), never a per-step one. So <span class="warn">every AI-seeded workflow renders these six sentences</span>. Steps 2 and 3 are <span class="warn">letter-for-letter identical</span> though one finds terms and the other applies a pricing policy. This is SC#5’s “toy demo” failure, on the phase’s own headline feature.',
+  a: 'The generator writes a <b>per-step name</b> at seed time and it is <b>stored</b>. Most specific, most human — it can say things no config knows (“due this quarter”). The risk is <b>lifetime</b>: a stored string does not know when the step changes underneath it. Press <b>✎ Re-bind step 3’s skill</b>.',
+  b: 'The face is a <b>pure function of the step’s real config</b> — folder, bound skill, template — computed at render, never stored (the same shape as the shipped <code>groundingCauseOf</code> derivation). It <span class="good">can never go stale</span>. Two costs, both visible here: it is only ever as specific as the config (step 1 falls back to the generic sentence), and <span class="warn">step 5 has dropped the author’s hand-written “Board-ready renewal pack”</span> in favour of the template filename — config-only <b>discards the one tier we already ship</b>.',
+  c: '<b>Author name → config-derived → type sentence.</b> ONE tier inserted into the shipped <code>nodeTitle</code> ladder — additive, not a replacement. Step 5 keeps the author’s <span class="good">“Board-ready renewal pack”</span> (which B threw away); steps 2–3 get B’s specificity; step 1 keeps the honest generic floor. Press <b>✎ Re-bind step 3’s skill</b> — the derived tier tracks, because nothing is stored. <b>The question C inherits from A:</b> should a hand-written name that predates a config edit stay on the face, or be marked as written-before-this-change?',
+};
+
+let edited = false;
+let current = 'compare';
+
+function stepsNow() {
+  if (!edited) return STEPS;
+  return STEPS.map((s,i) => i===2 ? {...s, skill:'contract-risk-flags'} : s);
+}
+
+function nodeHTML(s, i, key) {
+  const face = FACES[key](s);
+  const g = grounded(s);
+  const isTwin = key==='today' && (i===1 || i===2);
+  const cfg = [
+    ['type', s.type],
+    s.tools.length ? ['tools', s.tools.join(', ')] : null,
+    s.folder ? ['folder', s.folder] : null,
+    s.skill ? ['skill', s.skill] : null,
+    s.template ? ['template', s.template] : null,
+    s.fn ? ['fn', s.fn] : null,
+  ].filter(Boolean).map(([k,v]) => {
+    const changed = (k==='skill' && edited) ? ' changed' : '';
+    return '<div><span class="k">'+k+':</span> <span class="v'+changed+'">'+v+'</span></div>';
+  }).join('');
+
+  return '<div class="nodebox'+(g?' grounded':'')+(isTwin?' twin':'')+'" data-type="'+s.type+'">'
+    + '<div class="card">'
+    +   '<div class="ttl" title="'+face.t.replace(/"/g,'&quot;')+'">'+face.t+'</div>'
+    +   '<div class="sub">'+face.s+'</div>'
+    +   (s.armed ? '<div class="badges"><span class="badge">✋ Waits for you</span></div>' : '')
+    + '</div>'
+    + '<div class="mark">'+icon3d(s.type, 34)+'</div>'
+    + (g ? '<div class="seal" title="Must prove it — this step reads your documents">◈</div>' : '')
+    + (isTwin ? '<div class="twinflag">⬆ identical to its neighbour</div>' : '')
+    + '<div class="cfg">'+cfg+'</div>'
+    + '</div>';
+}
+
+const CONN = '<div class="conn"><svg width="34" height="12">'
+  + '<line x1="0" y1="6" x2="26" y2="6" stroke="hsl(220 20% 40%)" stroke-width="1.5"/>'
+  + '<path d="M26 2 L32 6 L26 10 Z" fill="hsl(220 20% 40%)"/></svg></div>';
+
+/* ── the compare grid ─────────────────────────────────────────────────────
+   Every cell class below is COMPUTED from the faces, never hand-placed, so the
+   grid cannot drift from what the four strategies actually return. The three
+   scorecard columns are computed from the same cells.                        */
+const ROWS = [
+  { key:'today', label:'Today (shipped)', note:'phaseVocabulary.ts:169', cls:'baseline' },
+  { key:'a',     label:'A · AI-authored', note:'stored in phase.name',   cls:'' },
+  { key:'b',     label:'B · Config-derived', note:'computed at render',  cls:'' },
+  { key:'c',     label:'C · Layered',     note:'name → config → type',   cls:'pick' },
+];
+
+function cellClass(key, s, i, faces) {
+  /* identical to a neighbour? */
+  const prev = faces[i-1], next = faces[i+1];
+  if ((prev && prev.t === faces[i].t) || (next && next.t === faces[i].t)) return 'same';
+  /* step 3 stale after the re-bind? (A stores a name written before the edit) */
+  if (edited && i === 2 && key === 'a') return 'stale';
+  /* step 5 — the author-named step */
+  if (i === 4 && STEPS[4].name) {
+    if (faces[i].t === STEPS[4].name) return 'kept';
+    return 'lost';
+  }
+  if (faces[i].t === PHASE_TYPE_SENTENCES[s.type]) return 'generic';
+  return '';
+}
+
+function renderCompare() {
+  const steps = stepsNow();
+  const head = '<tr><th></th>' + steps.map((s,i) =>
+      '<th><span class="glyph">'+icon3d(s.type, 22)+'</span>Step '+(i+1)+'</th>').join('')
+    + '<th style="width:112px">Survives<br>all three?</th></tr>';
+
+  const body = ROWS.map(r => {
+    const faces = steps.map(s => FACES[r.key](s));
+    const cells = steps.map((s,i) => {
+      const cls = cellClass(r.key, s, i, faces);
+      return '<td class="'+cls+'"><div class="face">'+faces[i].t+'<em>'+faces[i].s+'</em></div></td>';
+    }).join('');
+
+    /* The three criteria, each READ OFF the cells above — including ②, which stays
+       UNTESTED until the re-bind has actually been performed. Marking A as failing
+       before the test has run would be asserting the sketch's conclusion instead of
+       demonstrating it, which is the one thing a sketch may not do. */
+    const anySame  = steps.some((s,i) => cellClass(r.key,s,i,faces) === 'same');
+    const anyStale = edited && steps.some((s,i) => cellClass(r.key,s,i,faces) === 'stale');
+    const anyLost  = steps.some((s,i) => cellClass(r.key,s,i,faces) === 'lost');
+    const mark = (bad, tip) => edited || bad !== null
+      ? '<span class="'+(bad?'n':'y')+'" title="'+tip+'">'+(bad?'✗':'✓')+'</span>'
+      : '<span class="u" title="'+tip+' — press ✎ Re-bind step 3’s skill to test">?</span>';
+    const score = '<div class="score">'
+      + mark(anySame, 'Every step reads distinctly')
+      + (edited ? mark(anyStale, 'Face survives a config edit')
+                : mark(null,     'Face survives a config edit'))
+      + mark(anyLost, 'Author-written names are kept')
+      + '</div>';
+
+    return '<tr class="'+r.cls+'"><th>'+r.label+'<small>'+r.note+'</small></th>'
+      + cells + '<td>'+score+'</td></tr>';
+  }).join('');
+
+  document.getElementById('cmp').innerHTML =
+      '<table class="cmptbl"><thead>'+head+'</thead><tbody>'+body+'</tbody></table>'
+    + '<div class="cmpkey"><b>The three criteria, left to right:</b> '
+    + '① every step reads distinctly · ② the face survives a config edit · ③ a hand-written name is kept.</div>'
+    + (edited
+        ? '<div class="cmpnote"><b>You re-bound step 3.</b> Only row A changed meaning without changing text — '
+          + 'it still promises a pricing-policy check while the step now runs contract-risk-flags. '
+          + 'B and C followed the edit because they store nothing.</div>'
+        : '<div class="cmpnote">Press <b>✎ Re-bind step 3’s skill</b> in the bar above to test criterion ②. '
+          + 'It changes the bound skill and leaves every stored name untouched — which is exactly the '
+          + 'situation a real author creates by editing a step after the AI drafted it.</div>');
+}
+
+function render() {
+  const steps = stepsNow();
+  ['today','a','b','c'].forEach(key => {
+    document.getElementById('flow-'+key).innerHTML =
+      steps.map((s,i) => nodeHTML(s,i,key)).join(CONN);
+  });
+  renderCompare();
+  document.getElementById('lead').innerHTML = LEADS[current];
+  renderVerdict();
+}
+
+function renderVerdict() {
+  const el = document.getElementById('verdictrail');
+  if (!edited) { el.innerHTML=''; return; }
+  const rows = {
+    today: ['live',  'Step 3 still reads <b>“Work out how to do it”</b> — it never said anything about pricing, so it cannot go stale. It was never specific enough to be wrong.'],
+    a:     ['stale', 'Step 3 still reads <b>“Check each one against the pricing policy”</b> — but its bound skill is now <code>contract-risk-flags</code>. <b>The face now lies.</b> A stored name needs an invalidation story: re-generate on every config edit, or mark it “written before this change”.'],
+    b:     ['live',  'Step 3 now reads <b>“Run the contract risk flags”</b> — it followed the edit, because nothing was stored. This is the property that makes it safe to show by default.'],
+    c:     ['live',  'Step 3 now reads <b>“Run the contract risk flags”</b>. An author-written name would still have won here — and would still have gone stale, exactly as in A. <b>The open question C inherits:</b> should a hand-written name that predates a config edit stay on the face?'],
+  };
+  /* the compare grid carries its own verdict inline, so the rail stays out of it */
+  if (!rows[current]) { el.innerHTML = ''; el.style.display = 'none'; return; }
+  el.style.display = '';
+  const [tag, text] = rows[current];
+  el.innerHTML = '<span class="tag '+tag+'">'+(tag==='stale'?'FACE IS STALE':'FACE TRACKED THE EDIT')+'</span>' + text;
+}
+
+function showVariant(id, btn) {
+  current = id;
+  document.querySelectorAll('.variant').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.variant-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('variant-'+id).classList.add('active');
+  btn.classList.add('active');
+  document.getElementById('lead').innerHTML = LEADS[id];
+  renderVerdict();
+}
+
+function toggleBody(cls, btn) {
+  document.body.classList.toggle(cls);
+  btn.classList.toggle('on', document.body.classList.contains(cls));
+}
+
+function toggleEdit(btn) {
+  edited = !edited;
+  document.body.classList.toggle('edited', edited);
+  btn.classList.toggle('on', edited);
+  btn.textContent = edited ? '↶ Undo the re-bind' : '✎ Re-bind step 3’s skill';
+  if (edited) document.body.classList.add('showcfg'),
+              document.getElementById('btn-cfg').classList.add('on');
+  render();
+}
+
+function setW(w) {
+  document.querySelectorAll('.flow').forEach(f => {
+    f.style.maxWidth = w ? w+'px' : '';
+    f.style.flexWrap = w ? 'wrap' : 'nowrap';
+    f.style.rowGap   = w ? '70px' : '';
+  });
+}
+
+render();
+</script>
+</body>
+</html>
