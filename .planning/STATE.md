@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
 status: executing
-last_updated: "2026-08-01T15:31:49.573Z"
-last_activity: 2026-08-01 -- Phase 186 COMPLETE (verified 9/9, UAT passed, secured 112/112)
+last_updated: "2026-08-01T19:45:48.904Z"
+last_activity: 2026-08-01 -- Phase 186 execution started
 progress:
   total_phases: 19
   completed_phases: 6
   total_plans: 72
-  completed_plans: 68
-  percent: 26
+  completed_plans: 71
+  percent: 32
 ---
 
 # Project State
@@ -73,9 +73,11 @@ ordering fix, so the `saving` guard now sits ABOVE the flag gate (`WorkflowBuild
 `:1095`) and UAT row 8 drove that exact flag-off surface live.
 
 **Carried forward from 186 (non-blocking, but unscheduled):**
+
 - **WR-19 / WR-20** — hold-release honesty gaps in `useDraftPersistence.ts` (`:915`, `:889-891`).
   Not write-safety: `markSaved` is uncalled and `dirty` stays true, so no false receipt is possible.
   They still owe `deferred-items.md` entries with concrete re-open triggers — the WR-14..18 treatment.
+
 - **Draft PATCH accepts a negative `max_steps`** (200 + persisted, DB-verified during UAT). Wants a
   server-side sanity clamp. Not a 186 defect — draft PATCH validation shipped in 183/184.
 
@@ -709,7 +711,7 @@ Manual-Only rows still unrun, row 4 still ⛔, `.planning/REQUIREMENTS.md` unmod
 and `CONCUR-02` stay **Pending** until the operator runs the board. **Phase 186 is now ready for
 `/gsd:verify-work 186`, with SC#4 the only thing no automated evidence can close.**
 
-Resume file: None
+Resume file: .planning/phases/187-business-vocabulary-ai-seeded-canvas/187-CONTEXT.md
 
 Both owed items are now ROUTED at the discuss-phase touchpoint:
 
