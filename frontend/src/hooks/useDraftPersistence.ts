@@ -184,6 +184,34 @@ export const HOLD_PUBLISHING_MANUAL =
   "Publishing — not saved; press Save draft again when it finishes"
 
 /**
+ * THE HOLD IS OVER AND THE WORK IS STILL UNSENT, SAID OUT LOUD (186-19, WR-12).
+ *
+ * 186-17 made the hold's reading resolve unconditionally on the non-null → null transition,
+ * which was right — a finished gauntlet may not go on being described as a running one. But
+ * on the `!enabled` branch it resolved to a bare `{kind:"idle"}`, so `HOLD_PUBLISHING_MANUAL`
+ * ("press Save draft again when it finishes") was ERASED at the exact instant it became
+ * actionable. The author was left holding unsent work with nothing at all on screen until the
+ * leave guard fired on navigate-away. The write suppression was right; the silence was the
+ * defect. This sentence REPLACES that instruction rather than deleting it.
+ *
+ * IT PROMISES NOTHING, BECAUSE NOTHING IS COMING. It is reachable only on the flag-off path,
+ * where D-181-01 forbids the automatic flush — so `HOLD_PUBLISHING`'s future-tense promise
+ * would be a receipt for a save that never happens. The rule F20e states is the one being
+ * obeyed here: a sentence may promise a flush only where one will happen. This one instructs,
+ * and names the control that is still mounted and still works.
+ *
+ * IT IS DELIBERATELY NOT `SAVE_FAILED_SENTENCE`. Nothing was refused — no request was made at
+ * all — and the cause-neutral line describes a situation a retry can fix, so it would invite
+ * a retry of something that never failed (the `DRAFT_GONE_SENTENCE` rule, applied in the other
+ * direction). It is also not a receipt: it is carried by `{kind:"held"}`, which has no `at`
+ * and no `ok` field by construction, `markSaved` is never called on this path, and `dirty`
+ * stays true.
+ *
+ * ONE HOME, same rule as its neighbours: the surface renders it and must not re-declare it.
+ */
+export const HOLD_ENDED_UNSAVED = "Not saved — press Save draft to save your changes"
+
+/**
  * D-186-04 — a definition whose SHAPE the server could not read is held rather than
  * written, and the reason is stated. The same sentence is what a write REFUSED for that
  * reason carries, so one situation reads one way whether it was caught before the request
@@ -774,6 +802,17 @@ export function useDraftPersistence(args: DraftPersistenceArgs): DraftPersistenc
    * Nothing was written, and the surface still made a false statement about system state.
    * It cleared only if the author happened to press Save again.
    *
+   * THE SIXTH FACT, AND IT IS THE FIFTH ONE FINISHED (186-19, WR-12). None of those gates is
+   * a reason to keep claiming a publish is running — and none of them is a reason to say
+   * NOTHING either, when the person is holding unsent work that this surface will never send
+   * on its own. 186-17 resolved the reading to `{kind:"idle"}` on both branches of the flag,
+   * which killed the false sentence and then left a blank where the true one belongs: on the
+   * flag-off path the instruction *"press Save draft again when it finishes"* was erased at
+   * the exact moment it became actionable, and nothing replaced it until the leave guard
+   * fired on navigate-away. So the `!enabled` branch below RE-STATES the situation with
+   * `HOLD_ENDED_UNSAVED` when — and only when — the store is still dirty. Silence is kept for
+   * the case where silence is true.
+   *
    * THE FUNCTIONAL FORM IS REQUIRED, not stylistic. A bare `setState({kind:"idle"})` would
    * erase a `conflict` that arrived during the hold — and `conflict` is the ONLY reading that
    * carries Reload and Overwrite, so that would reintroduce GAP-4 through a second door. The
@@ -835,7 +874,19 @@ export function useDraftPersistence(args: DraftPersistenceArgs): DraftPersistenc
       // No automatic write past the revert switch (D-181-01) — and no stale arming left
       // behind either: the flag is made to agree with the store rather than to remember a
       // press. See the docblock's pending-flag paragraph for both halves of the reason.
-      heldPendingRef.current = store.getState().dirty
+      //
+      // ONE READ, TWO USES (186-19, WR-12). The same truth arms the flag and chooses the
+      // sentence, so the surface and the flag cannot disagree about whether work is unsent.
+      const unsent = store.getState().dirty
+      heldPendingRef.current = unsent
+      if (unsent) {
+        // AND THEN IT SAYS SO. Suppressing the write is right; going silent about it was
+        // the defect — the instruction to press Save draft was erased at the instant it
+        // became actionable. FUNCTIONAL, and a no-op for anything that is not the `idle` the
+        // line above just produced: a bare object would erase a `conflict`, which is the only
+        // reading that carries Reload and Overwrite, and that is GAP-4 through a second door.
+        setState((s) => (s.kind === "idle" ? { kind: "held", sentence: HOLD_ENDED_UNSAVED } : s))
+      }
       return
     }
     if (!heldPendingRef.current && !store.getState().dirty) return

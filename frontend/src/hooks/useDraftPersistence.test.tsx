@@ -30,6 +30,7 @@ import {
   AUTOSAVE_DEBOUNCE_MS,
   HOLD_PUBLISHING,
   HOLD_PUBLISHING_MANUAL,
+  HOLD_ENDED_UNSAVED,
   HOLD_UNREADABLE,
   SAVE_FAILED_SENTENCE,
   DRAFT_GONE_SENTENCE,
@@ -1061,10 +1062,71 @@ describe("useDraftPersistence — F20: with the canvas flag OFF the loop writes 
     // again. Nothing was written, and the surface still made a false statement about system
     // state. The gates below the transition test are reasons not to WRITE; none of them is a
     // reason to keep claiming a publish is running.
+    //
+    // ── 186-19 (WR-12) — RETARGETED, NOT WEAKENED ───────────────────────────────────
+    //
+    // This row used to assert `after.kind !== "held"`, and that assertion was PATCH-SHAPED:
+    // it described the shape 186-17's edit happened to produce rather than the property
+    // anyone cares about (the Phase 185 lesson — verify the PROPERTY, not the patch). Going
+    // silent satisfied it, and going silent is WR-12's defect: the instruction to press Save
+    // draft was erased at the instant it became actionable. So the kind assertion is replaced
+    // by a POSITIVE one naming the reading, and the two `not.toContain` assertions — which
+    // are the real property, that a finished publish stops being described as a running one —
+    // are kept verbatim. The row's assertion count does not drop and its claim gets stronger.
     const after = stateOf(h.view)
-    expect(after.kind).not.toBe("held")
+    expect(after).toEqual({ kind: "held", sentence: HOLD_ENDED_UNSAVED })
     expect(reachableStrings(after)).not.toContain(HOLD_PUBLISHING_MANUAL)
     expect(reachableStrings(after)).not.toContain(HOLD_PUBLISHING)
+  })
+
+  it("F20i — the flag-off release SAYS what happened; silence is kept for when nothing is unsent (WR-12)", async () => {
+    // 186-19 (WR-12). Two constants holding the same string would pass every equality below
+    // and prove nothing, so the inequality control comes first — the F20e / F8 idiom.
+    expect(HOLD_ENDED_UNSAVED).not.toBe(HOLD_PUBLISHING)
+    expect(HOLD_ENDED_UNSAVED).not.toBe(HOLD_PUBLISHING_MANUAL)
+    expect(HOLD_ENDED_UNSAVED).not.toBe(SAVE_FAILED_SENTENCE)
+
+    mockedUpdate.mockResolvedValue(write("T-SHOULD-NEVER-BE-SENT"))
+    mockedCreate.mockResolvedValue(write("T-SHOULD-NEVER-BE-CREATED"))
+
+    // (a) THERE IS UNSENT WORK. RED: `{kind:"idle"}` — the header went blank and the author
+    //     was holding work this surface will never send on its own, with nothing on screen
+    //     saying so until the leave guard fired on navigate-away.
+    const withWork = harness({ enabled: false })
+    withWork.set({ publishInFlight: true })
+    withWork.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS * 5)
+    withWork.set({ publishInFlight: false })
+    await flush()
+    await advance(AUTOSAVE_DEBOUNCE_MS * 5)
+    await flush()
+
+    expect(stateOf(withWork.view)).toEqual({ kind: "held", sentence: HOLD_ENDED_UNSAVED })
+    // NOTHING WAS WRITTEN TO BUY THAT SENTENCE (D-181-01, restated from F20a) — and it is not
+    // a receipt: no receipt action ran and the draft is still dirty.
+    expect(mockedUpdate).not.toHaveBeenCalled()
+    expect(mockedCreate).not.toHaveBeenCalled()
+    expect(withWork.markSaved).not.toHaveBeenCalled()
+    expect(withWork.store.getState().dirty).toBe(true)
+
+    // (b) THE STORE IS CLEAN. Silence is correct exactly when there is nothing unsent — a
+    //     sentence here would be an instruction to save work that does not exist.
+    const clean = harness({ enabled: false })
+    clean.set({ publishInFlight: true })
+    await advance(AUTOSAVE_DEBOUNCE_MS * 5)
+    clean.set({ publishInFlight: false })
+    await flush()
+    await advance(AUTOSAVE_DEBOUNCE_MS * 5)
+    await flush()
+
+    expect(clean.store.getState().dirty).toBe(false)
+    expect(stateOf(clean.view)).toEqual({ kind: "idle" })
+    const said = reachableStrings(stateOf(clean.view))
+    expect(said).not.toContain(HOLD_ENDED_UNSAVED)
+    expect(said).not.toContain(HOLD_PUBLISHING_MANUAL)
+    expect(said).not.toContain(HOLD_PUBLISHING)
+    expect(mockedUpdate).not.toHaveBeenCalled()
+    expect(mockedCreate).not.toHaveBeenCalled()
   })
 
   it("F20f — the flag-off release leaves the pending flag AGREEING with the store", async () => {
