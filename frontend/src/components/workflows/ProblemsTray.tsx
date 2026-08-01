@@ -58,6 +58,7 @@ import { VERDICT_MARK } from "@/components/workflows/nodePresentation"
 import {
   nodeTitle,
   technicalTitle,
+  type NameContext,
   type PhaseSpecJSON,
 } from "@/components/workflows/phaseVocabulary"
 import {
@@ -84,6 +85,11 @@ export interface ProblemsTrayProps {
   /** The definition's phases, used ONLY to put a plain-language name on a row. A slug
    *  with no matching phase still renders; it just names itself. */
   phases: readonly PhaseSpecJSON[]
+  /** Phase 187 (D-187-05) — the page-owned id→name maps, the SAME object the canvas hands
+   *  `toCanvas`, so a row and the card it points at can never name one step two ways. Omitted
+   *  falls through to `nodeTitle`'s own frozen empty default: the derived tier misses and the
+   *  generic type sentence renders, never a fabricated or id-shaped name. */
+  nameContext?: NameContext
   /** `null` when the last check answered. Otherwise why it did not. */
   degraded: DegradedValidationCause | null
   /** A check is in flight: dim what is shown, do not clear it. */
@@ -106,6 +112,7 @@ function markForSeverity(severity: string) {
 export function ProblemsTray({
   groups,
   phases,
+  nameContext,
   degraded,
   checking,
   open,
@@ -243,7 +250,7 @@ export function ProblemsTray({
                 <span className="sr-only">{mark.label}</span>
                 <span className="min-w-0 flex-1">
                   <strong className="font-semibold">
-                    {phase ? nodeTitle(phase) : slug}
+                    {phase ? nodeTitle(phase, nameContext) : slug}
                   </strong>{" "}
                   — <span data-testid="problems-tray-message">{verdict.message}</span>
                   {showTechnical ? (

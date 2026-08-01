@@ -209,7 +209,7 @@ import { resolveDrop, type PhaseTypeId } from "@/components/workflows/definition
 import { FlowEdge } from "@/components/workflows/FlowEdge"
 import type { VerdictMarkKind } from "@/components/workflows/nodePresentation"
 import { EndCapNode, PhaseNode, UnresolvedSkipNode } from "@/components/workflows/PhaseNode"
-import type { PhaseSpecJSON } from "@/components/workflows/phaseVocabulary"
+import type { NameContext, PhaseSpecJSON } from "@/components/workflows/phaseVocabulary"
 import { ProblemsTray } from "@/components/workflows/ProblemsTray"
 import { StepTypePicker } from "@/components/workflows/StepTypePicker"
 import type { VerdictGroups } from "@/components/workflows/verdictModel"
@@ -775,6 +775,9 @@ export interface WorkflowCanvasProps {
    * as it did before this plan.
    */
   kbTools?: readonly string[]
+  /** Phase 187 (D-187-05) — the PAGE-owned id→name maps, handed to `toCanvas` AND to the tray
+   *  below so one step is never named two ways. Absent ⇒ the derived tier misses, never an id. */
+  nameContext?: NameContext
 
   // ── 184-10, the editing half. Every one of these is OPTIONAL and every one is
   //    inert while `editable` is false, so the shipped read-only callers compile and
@@ -862,6 +865,7 @@ export function WorkflowCanvas({
   onSelectNode,
   onClearSelection,
   kbTools,
+  nameContext,
   editable = false,
   marks,
   nudges,
@@ -876,7 +880,7 @@ export function WorkflowCanvas({
   const technicalNames = useTechnicalNamesOptional()
   const showTechnical = technicalNames?.showTechnical ?? false
 
-  const projection = useMemo(() => toCanvas(phases, { kbTools }), [phases, kbTools])
+  const projection = useMemo(() => toCanvas(phases, { kbTools, nameContext }), [phases, kbTools, nameContext])
 
   /**
    * The IN-FLIGHT drag position, per node id — pure view state that exists for exactly
@@ -1383,6 +1387,7 @@ export function WorkflowCanvas({
         <ProblemsTray
           groups={session.groups}
           phases={phases}
+          nameContext={nameContext}
           degraded={session.degraded}
           checking={session.checking}
           open={session.trayOpen}

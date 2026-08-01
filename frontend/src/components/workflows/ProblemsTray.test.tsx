@@ -24,6 +24,11 @@ import { ProblemsTray } from "./ProblemsTray"
 import { VERDICT_DESTRUCTIVE_TOKEN } from "./nodePresentation"
 import { DEGRADED_SENTENCE, groupVerdicts } from "./verdictModel"
 import type { PhaseSpecJSON } from "./phaseVocabulary"
+// Phase 187-08 additions land as SEPARATE import statements so this file's whole diff
+// is added lines only. `toCanvas` is imported for ONE reason: the card↔row agreement
+// below compares the tray against the canvas projection itself, not against a literal.
+import { nodeTitle } from "./phaseVocabulary"
+import { toCanvas } from "./canvasModel"
 import type { Verdict } from "@/lib/api"
 
 const PHASES: PhaseSpecJSON[] = [
@@ -357,5 +362,75 @@ describe("ProblemsTray — it is a leaf: no network, no store, no canvas provide
     // would take the whole tray down; the shipped optional one returns null.
     expect(() => renderTray({ open: true })).not.toThrow()
     expect(screen.getByTestId("problems-tray")).toBeInTheDocument()
+  })
+})
+
+// ── Phase 187-08 (VOCAB-01 / D-187-05) — the tray agrees with the card ──────────
+//
+// RESEARCH Open Q6, the tray half. A row points AT a node, so the two naming one step
+// differently — *"Run the pricing policy check"* on the card beside *"Work out how to
+// do it"* in the tray — is a disagreement in front of the author about which step a
+// finding belongs to. The prevention is structural: one `nodeTitle`, one context object,
+// handed to both by the same parent.
+//
+// Both assertions compare against the FUNCTIONS, never against a re-typed literal. A
+// literal would keep passing after the derivation changed, which is the drift this pair
+// exists to catch.
+
+const SKILL_ID = "3f2b8c40-1111-4a2b-9c3d-000000000001"
+
+/** Unnamed AND skill-bound — the only shape where the derived tier decides the face.
+ *  Every phase in `PHASES` above carries a stored `name`, which wins outright. */
+const BOUND: PhaseSpecJSON = {
+  slug: "check",
+  phase_index: 0,
+  config: { phase_type: "llm_agent", skill_ref: SKILL_ID },
+}
+
+const NAME_CTX = { skillNames: { [SKILL_ID]: "pricing policy check" } }
+
+const BOUND_FINDING = [
+  verdict({ phase: "check", severity: "incomplete", message: "still needs an input" }),
+]
+
+describe("ProblemsTray — 187-08: a row and the card name one step the same way", () => {
+  it("renders exactly what the canvas projects for that phase", () => {
+    renderTray({ open: true, phases: [BOUND], nameContext: NAME_CTX }, BOUND_FINDING)
+    const row = screen.getByTestId("problems-tray-row-check-0")
+
+    expect(row.textContent).toContain(nodeTitle(BOUND, NAME_CTX))
+    // …and the canvas card's own value, so the two SURFACES are compared, not two
+    // calls of one function.
+    const card = toCanvas([BOUND], { nameContext: NAME_CTX }).nodes[0]
+    expect(row.textContent).toContain(card.data.title)
+    expect(card.data.title).toBe("Run the pricing policy check")
+  })
+
+  it("omitting the prop renders what HEAD rendered — the type sentence, never the id", () => {
+    const supplied = renderTray(
+      { open: true, phases: [BOUND], nameContext: undefined },
+      BOUND_FINDING,
+    )
+    const suppliedText = supplied.container.textContent
+    supplied.unmount()
+
+    const omitted = renderTray({ open: true, phases: [BOUND] }, BOUND_FINDING)
+    expect(omitted.container.textContent).toBe(suppliedText)
+
+    const row = screen.getByTestId("problems-tray-row-check-0")
+    expect(row.textContent).toContain(nodeTitle(BOUND))
+    // Never fabricate: an unresolved id must not reach the row, and neither must a name
+    // this render was never given.
+    expect(row.textContent).not.toContain(SKILL_ID)
+    expect(row.textContent).not.toContain("pricing policy check")
+  })
+
+  it("leaves the ⌥ reveal line alone — the technical form is still the slug", () => {
+    // No TechnicalNamesProvider is mounted in this file, so the reveal is off and the
+    // mono line is absent. What this pins is the SOURCE contract the plan caps: exactly
+    // one `technicalTitle(phase)` call, taking one argument.
+    renderTray({ open: true, phases: [BOUND], nameContext: NAME_CTX }, BOUND_FINDING)
+    const row = screen.getByTestId("problems-tray-row-check-0")
+    expect(row.textContent).not.toContain("AI agent step · check")
   })
 })
