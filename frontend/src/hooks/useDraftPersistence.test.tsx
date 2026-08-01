@@ -34,6 +34,7 @@ import {
   SAVE_FAILED_SENTENCE,
   DRAFT_GONE_SENTENCE,
   PUBLISHED_CONFLICT_MESSAGE,
+  RELOAD_FAILED_NOTE,
   type PersistState,
 } from "./useDraftPersistence"
 import {
@@ -982,6 +983,13 @@ describe("useDraftPersistence — F10: a stale token halts the loop dead", () =>
     // 186-13 — and it reads the SAME WAY as a gone row discovered by a PATCH. One situation,
     // one sentence, whichever path found it: the rule the two hold sentences already follow.
     expect(stateOf(h.view)).toEqual({ kind: "error", sentence: DRAFT_GONE_SENTENCE })
+    // 186-14 (GAP-4) — THE NEGATIVE CONTROL FOR F21, extended here rather than copied into a
+    // second arrangement. F21 makes a FAILED read restore the conflict; a read that SUCCEEDED
+    // and found nothing must not, because Reload would find nothing a second time and
+    // Overwrite would PATCH a row that is not there — two dead affordances on a banner whose
+    // whole promise is a way out. This clause passes before and after that fix, which is what
+    // makes it a control rather than a restatement.
+    expect(stateOf(h.view).kind).not.toBe("conflict")
   })
 })
 
@@ -1270,6 +1278,168 @@ describe("useDraftPersistence — F19: single flight is a property of the WRITER
 
     const last = mockedUpdate.mock.calls[mockedUpdate.mock.calls.length - 1]
     expect(last[2]).toBe("T-FRESH")
+  })
+})
+
+// ── F21 — a FAILED exit is not a lost exit (GAP-4 / CR-02) ────────────────────
+
+/**
+ * Phase 186-14 — the failure path of the exit the banner recommends FIRST.
+ *
+ * ── WHY THIS IS ORDINARY RATHER THAN EXOTIC ───────────────────────────────────────
+ *
+ * `listDraftWorkflows` (`lib/api.ts:3408-3413`) throws a plain `Error` on ANY non-2xx AND
+ * on a dropped connection, and it carries no name this hook branches on — so every one of
+ * those lands in `reload`'s catch. `BuilderSaveRegion` is the ONLY consumer of
+ * `onReload`/`onOverwrite` in non-test source, and its conflict banner is the ONLY surface
+ * that carries them. The banner renders on `state.kind === "conflict" || resolving`.
+ *
+ * Put those three facts together and the defect reads itself: the catch replaced the
+ * conflict with `{kind:"error"}`, so in the SAME commit that `resolving` went false BOTH
+ * controls left the DOM — while `haltedRef` stayed set forever. From there `saveNow()`
+ * returns at the halt check with no state change, the debounce effect schedules nothing,
+ * `dirty` stays true so every leave guard fires, and the sentence on screen
+ * (`SAVE_FAILED_SENTENCE`, which this module's own docblock identifies as a RETRY
+ * INVITATION) invited a retry that had become structurally impossible. The trigger is one
+ * dropped connection during one click on the RECOMMENDED DEFAULT exit.
+ *
+ * THE RED NUMBERS, so a future reader can re-observe them by reverting the fix:
+ *   F21a — the state reads `{ kind: "error", sentence: "Not saved — we couldn't complete
+ *          the save" }`; `expected 'error' to be 'conflict'`.
+ *   F21c — the second `reload()` never runs as a resumption, because the loop it was meant
+ *          to resume had already been replaced: `expected 'error' to be 'idle'`.
+ *   F21d — `RELOAD_FAILED_NOTE` is `undefined`, so there is nothing for the banner to say.
+ *
+ * THE NEGATIVE CONTROL IS NOT HERE, DELIBERATELY. "A gone row is still not a conflict" is
+ * F10's `"a reload whose row is gone lands in an honest error, never silently"` above,
+ * extended by this plan with the not-a-conflict clause rather than copied: Reload would find
+ * nothing and Overwrite would PATCH a row that is not there, so that branch must keep
+ * `DRAFT_GONE_SENTENCE` and must NOT gain the two exits. It passes unchanged by this fix,
+ * which is exactly what makes it a control.
+ */
+describe("useDraftPersistence — F21: a FAILED exit is not a lost exit (GAP-4 / CR-02)", () => {
+  /** The server row a successful reload adopts. */
+  const SERVER_ROW: WorkflowDraftRow = {
+    id: DRAFT_ID,
+    slug: "risk-register",
+    version: 1,
+    name: "Risk register",
+    definition: { ...draft(), phases: [phase("server-side", 0)] },
+    token: "T-RELOADED",
+  }
+
+  /** What `listDraftWorkflows` really throws: a plain, nameless `Error`. Constructed the
+   *  way the client constructs it, so this test cannot pass on a class the hook happens to
+   *  branch on. */
+  function transportFailure(): Error {
+    return new Error("Failed to list draft workflows (status 503)")
+  }
+
+  /** Reach the conflict the product's own way — one refused write, not a hand-set state. */
+  async function conflicted(): Promise<ReturnType<typeof harness>> {
+    mockedUpdate.mockRejectedValueOnce(new WorkflowStaleTokenError("T-SERVER"))
+    mockedUpdate.mockResolvedValue(write("T-SHOULD-NEVER-BE-SENT"))
+
+    const h = harness()
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+    await flush()
+
+    expect(stateOf(h.view)).toEqual({ kind: "conflict", currentToken: "T-SERVER" })
+    return h
+  }
+
+  /** Take the exit while the read is going to fail. */
+  async function reloadThatFails(h: ReturnType<typeof harness>): Promise<void> {
+    mockedList.mockRejectedValueOnce(transportFailure())
+    await act(async () => {
+      await h.view.result.current.reload()
+    })
+  }
+
+  it("F21a — a rejecting listDraftWorkflows leaves the CONFLICT intact, with the server's token", async () => {
+    const h = await conflicted()
+    await reloadThatFails(h)
+
+    const after = stateOf(h.view)
+    // The state the banner renders on. A failed EXIT is not a failed WRITE: the row still
+    // moved, so the reading that describes the world is still the conflict.
+    expect(after.kind).toBe("conflict")
+    expect(after).toMatchObject({ kind: "conflict", currentToken: "T-SERVER" })
+    // …and the resolution is over, so the controls are pressable again rather than merely
+    // present-and-disabled.
+    expect(h.view.result.current.resolving).toBe(false)
+  })
+
+  it("F21b — the halt is still intact: a further edit issues nothing", async () => {
+    const h = await conflicted()
+    const atConflict = mockedUpdate.mock.calls.length
+    await reloadThatFails(h)
+
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS * 3)
+    await flush()
+
+    // D-186-08 literally. Clearing `haltedRef` in the catch would "recover" the loop into
+    // the silent clobber this phase exists to prevent — the row genuinely moved.
+    expect(mockedUpdate).toHaveBeenCalledTimes(atConflict)
+    expect(h.markSaved).not.toHaveBeenCalled()
+    expect(h.store.getState().dirty).toBe(true)
+  })
+
+  it("F21c — a SECOND Reload is accepted, adopts the server row and its token, and lands idle", async () => {
+    const h = await conflicted()
+    await reloadThatFails(h)
+
+    mockedList.mockResolvedValue([SERVER_ROW])
+    await act(async () => {
+      await h.view.result.current.reload()
+    })
+
+    expect(h.store.getState().phases).toHaveLength(1)
+    expect(h.store.getState().dirty).toBe(false)
+    expect(stateOf(h.view)).toEqual({ kind: "idle" })
+
+    // The token is proved by the one the NEXT write carries, never by reading a ref: the
+    // loop resumed guarded by what the server holds now.
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+    await flush()
+
+    const calls = mockedUpdate.mock.calls
+    expect(calls[calls.length - 1][2]).toBe("T-RELOADED")
+  })
+
+  it("F21d — the failed exit SAYS why, WITHOUT replacing the sentence that offers the exits", async () => {
+    const h = await conflicted()
+    await reloadThatFails(h)
+
+    expect(stateOf(h.view)).toEqual({
+      kind: "conflict",
+      currentToken: "T-SERVER",
+      note: RELOAD_FAILED_NOTE,
+    })
+    // Asserted as INEQUALITIES the way F8's sentence tests are: two constants that happened
+    // to hold the same string would satisfy the equality above and prove nothing. The note
+    // is an EXTRA line on the banner, not a swap for either refusal sentence.
+    expect(RELOAD_FAILED_NOTE).not.toBe(SAVE_FAILED_SENTENCE)
+    expect(RELOAD_FAILED_NOTE).not.toBe(DRAFT_GONE_SENTENCE)
+  })
+
+  it("F21f — a reload that fails while the loop is NOT halted keeps the cause-neutral line", async () => {
+    // THE GUARD ON THE FIX, and it is the falsification of the obvious over-reach. Without
+    // the `haltedRef` condition in the catch, this arrangement would raise a conflict banner
+    // for a conflict that never happened — telling a person their draft moved under them
+    // when nothing moved at all. That is the same class of lie in the other direction.
+    const h = harness()
+
+    mockedList.mockRejectedValueOnce(transportFailure())
+    await act(async () => {
+      await h.view.result.current.reload()
+    })
+
+    expect(stateOf(h.view)).toEqual({ kind: "error", sentence: SAVE_FAILED_SENTENCE })
+    expect(stateOf(h.view).kind).not.toBe("conflict")
   })
 })
 

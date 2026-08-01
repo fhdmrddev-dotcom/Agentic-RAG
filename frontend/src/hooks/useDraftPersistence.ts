@@ -224,6 +224,29 @@ export const PUBLISHED_CONFLICT_MESSAGE =
   "This version is published and can't be edited — use Tweak to start a new draft"
 
 /**
+ * THE EXIT ITSELF FAILED, AND THAT CHANGED NOTHING (186-14, GAP-4 / CR-02).
+ *
+ * An EXTRA LINE, never a sentence swap, and the distinction is the whole fix. The sentence
+ * that may not be replaced is the banner's — the one that offers the two ways out — because
+ * replacing it is precisely how a dropped request used to take both controls off the screen
+ * with it. So this states what did NOT change and leaves the offer standing.
+ *
+ * WHY A NOTE AND NOT A NEW REFUSAL SENTENCE. `DRAFT_GONE_SENTENCE`'s docblock above records
+ * the rule: the cause-neutral line INVITES a retry, and telling a person to retry something
+ * that cannot work is the lie. Here the retry is exactly the right instinct — pressing
+ * Reload again is what fixes this — so the invitation is honest and the only thing that must
+ * not happen is the person losing the control that makes it possible.
+ *
+ * It is a FIXED client-authored constant with nothing interpolated: no status code, no URL,
+ * no server body (T-186-14-05, the `WorkflowDraftUnreadableError` precedent — a raw body is
+ * logged at the boundary and never rendered).
+ *
+ * ONE HOME, same rule as its neighbours: the banner renders it and must not re-declare it.
+ */
+export const RELOAD_FAILED_NOTE =
+  "We couldn't reach the server to reload — nothing has changed, and both options above still work."
+
+/**
  * The loop's distinguished states, in the `ValidationState` / `PublishOutcome`
  * discriminated-union idiom whose docblock states the rule this inherits: *a binary
  * ok/error handler is FORBIDDEN*. A boolean pair could represent "saved AND refused"; this
@@ -240,7 +263,11 @@ export const PUBLISHED_CONFLICT_MESSAGE =
  *   conflict — the row moved somewhere else. The loop is halted and the person picks an
  *              exit. `currentToken` is what the server holds NOW, carried so that
  *              Overwrite costs ONE request rather than a re-read plus a request. It is
- *              opaque here exactly as everywhere else.
+ *              opaque here exactly as everywhere else. `note` is an OPTIONAL extra line
+ *              the banner may carry BESIDE its locked sentence — optional because the
+ *              ordinary conflict, the one the server refused, needs no explanation beyond
+ *              that sentence. Today it has exactly one producer: a reload that could not
+ *              reach the server (186-14). It never replaces anything.
  *   error    — the write was attempted and refused. It carries no `ok` field BY
  *              CONSTRUCTION, so no path can turn a refusal into a clean reading.
  */
@@ -249,7 +276,7 @@ export type PersistState =
   | { kind: "saving" }
   | { kind: "saved"; at: number }
   | { kind: "held"; sentence: string }
-  | { kind: "conflict"; currentToken: string | null }
+  | { kind: "conflict"; currentToken: string | null; note?: string }
   | { kind: "error"; sentence: string }
 
 export interface DraftPersistenceArgs {
@@ -739,6 +766,31 @@ export function useDraftPersistence(args: DraftPersistenceArgs): DraftPersistenc
    *     response, so adopting it here would leave `tokenRef` holding the loser.
    * The guard is the FIRST thing in the function, before the read: a `listDraftWorkflows`
    * that is going to be thrown away is still a request.
+   *
+   * ── A FAILED EXIT IS NOT A FAILED WRITE (186-14, GAP-4 / CR-02) ──────────────────
+   *
+   * This docblock used to describe only the re-entrancy guard and the success path, and the
+   * failure path it was silent about is where the loop lost its exits. `listDraftWorkflows`
+   * throws on ANY non-2xx and on a dropped connection, the catch replaced the conflict with
+   * `{kind:"error"}`, and the only surface that carries Reload and Overwrite renders on
+   * `state.kind === "conflict" || resolving` — so one flaky request during one click on the
+   * RECOMMENDED DEFAULT exit removed both controls from the DOM while `haltedRef` stayed set
+   * for the rest of the session. Nothing could clear the halt after that: `saveNow` returns
+   * at its halt check, the debounce effect schedules nothing, `dirty` stays true, and the
+   * cause-neutral sentence invited a retry that had become structurally impossible.
+   *
+   * THE RULE, stated so it cannot be split again: the row still moved, so the loop is still
+   * halted, so BOTH ways out must still be on screen. The catch therefore RESTORES the
+   * conflict — the same shape the refusal produced, plus a note saying why the exit failed —
+   * and mutates nothing else. `haltedRef`, `conflictTokenRef`, `tokenRef`, `pendingRef` and
+   * `heldPendingRef` are all deliberately left exactly as they were, because a failed exit
+   * changed nothing about the world. Clearing the halt here would "recover" the loop into
+   * the silent clobber this phase exists to prevent.
+   *
+   * IT IS GUARDED ON `haltedRef`, and that guard is not decoration. A `reload()` that failed
+   * while the loop was NOT halted keeps the cause-neutral line: claiming a conflict that did
+   * not happen — telling a person their draft moved under them when nothing moved — is the
+   * same class of lie in the other direction.
    */
   const reload = useCallback(async (): Promise<void> => {
     if (inFlightRef.current || reloadingRef.current) return
@@ -768,7 +820,18 @@ export function useDraftPersistence(args: DraftPersistenceArgs): DraftPersistenc
       pendingRef.current = false
       setState({ kind: "idle" })
     } catch {
-      setState({ kind: "error", sentence: SAVE_FAILED_SENTENCE })
+      // The exit failed, not the world. While the loop is still halted the conflict is
+      // still the truth AND the only reading that carries the two ways out, so it is
+      // restored rather than replaced — with a note, never a different sentence.
+      if (haltedRef.current) {
+        setState({
+          kind: "conflict",
+          currentToken: conflictTokenRef.current,
+          note: RELOAD_FAILED_NOTE,
+        })
+      } else {
+        setState({ kind: "error", sentence: SAVE_FAILED_SENTENCE })
+      }
     } finally {
       reloadingRef.current = false
       setResolving(false)
