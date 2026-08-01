@@ -234,3 +234,90 @@ def test_action_risk_approval_is_a_registered_validator_kind():
     assert ValidatorSpec.model_validate({"kind": "citations_required"}).timing == "post"
     with pytest.raises(ValidationError):
         ValidatorSpec.model_validate({"kind": "not_a_registered_kind"})
+
+
+# ── Phase 187 (VOCAB-01 / REQ-3, D-187-03) — the name provenance marker ──────────
+#
+# `name_seeded_by_ai` records WHO wrote the stored `name`: the NL generator, or a
+# human. It rides the exact `grounding_escalated` shape — additive-optional,
+# `bool = False`, zero migration — so every stored pre-187 row keeps parsing.
+
+
+# A genuine STORED-ROW shape: a literal dict as it sits in the
+# `workflow_definitions.definition` JSONB today, carrying neither `name` nor the
+# 187 marker. Built as a literal rather than by constructing a PhaseSpec and
+# deleting a field, so it measures what Postgres actually hands back.
+PRE_187_PHASE_ROW = {
+    "slug": "gather",
+    "phase_index": 0,
+    "config": {
+        "phase_type": "llm_agent",
+        "prompt": "Gather the renewal facts.",
+        "available_tools": ["search_documents"],
+    },
+    "validators": [],
+}
+
+
+def test_pre_187_phase_row_parses_without_the_provenance_marker():
+    """REQ-3 acceptance 1: a stored row carrying NEITHER `name` NOR the marker still
+    `model_validate()`s, and the marker reads False.
+
+    This is the whole zero-migration claim, restated for Phase 187. Measured live at
+    plan time: 0 of 57 phases across the 27 well-formed `workflow_definitions` rows
+    carry a non-empty `name`, so EVERY stored row today is this shape.
+    """
+    spec = PhaseSpec.model_validate(copy.deepcopy(PRE_187_PHASE_ROW))
+
+    assert spec.name is None
+    assert spec.name_seeded_by_ai is False
+    # `False` is the ONLY absent-value (D-185-08's rule, inherited): there is no
+    # `None` third state, so "unset" and "explicitly human-typed" are one value.
+    assert spec.model_dump(mode="json")["name_seeded_by_ai"] is False
+
+
+def test_name_provenance_marker_round_trips_through_model_dump():
+    """REQ-3 acceptance 2: a marked phase survives a JSON round trip.
+
+    The draft save path persists `model_dump(mode="json")`, so the marker only
+    survives a save→load cycle if it dumps and re-parses as a plain boolean. Nothing
+    DERIVED is stored alongside it — the node face is computed at render in
+    `phaseVocabulary.ts` and never persisted.
+    """
+    row = copy.deepcopy(PRE_187_PHASE_ROW)
+    row["name"] = "Gather the renewal facts"
+    row["name_seeded_by_ai"] = True
+
+    spec = PhaseSpec.model_validate(row)
+    dumped = spec.model_dump(mode="json")
+
+    assert dumped["name"] == "Gather the renewal facts"
+    assert dumped["name_seeded_by_ai"] is True
+    assert PhaseSpec.model_validate(dumped).name_seeded_by_ai is True
+
+
+def test_misspelt_provenance_marker_is_still_rejected():
+    """T-187-02-01: the `extra="forbid"` union is INTACT after the addition.
+
+    A near-miss key is the tampering shape that matters — a stored row (or a model
+    emission) claiming `name_seeded_by_AI` must 422 rather than silently landing in a
+    field nobody reads.
+    """
+    row = copy.deepcopy(PRE_187_PHASE_ROW)
+    row["name_seeded_by_AI"] = True  # wrong case — one character from the real key
+
+    with pytest.raises(ValidationError):
+        PhaseSpec.model_validate(row)
+
+
+def test_full_pre_187_definition_validates_with_the_marker_absent_everywhere():
+    """REQ-3 acceptance 3: a WHOLE stored definition parses, and every phase reads False.
+
+    `VALID_SEED` is the 5-phase-type literal this module has carried since Phase 090 —
+    a real pre-187 definition shape. Zero migration means zero rows need touching.
+    """
+    wd = WorkflowDefinition.model_validate(copy.deepcopy(VALID_SEED))
+
+    assert len(wd.phases) == 5
+    assert all(p.name_seeded_by_ai is False for p in wd.phases)
+    assert all(p.name is None for p in wd.phases)

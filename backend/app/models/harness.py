@@ -234,6 +234,34 @@ class PhaseSpec(_StrictBase):
     grounding_escalated: bool = False   # GOVERN-01 / D-185-08 — the author hand-locked this step
     action_risk_armed: bool = False     # GOVERN-03 / D-185-08 — stop and ask a human before this step runs
 
+    # ── Phase 187 (VOCAB-01 / REQ-3; D-187-03) — WHO wrote `name` above.
+    #
+    # (a) ADDITIVE / ZERO-MIGRATION, the `grounding_escalated` shape verbatim: a
+    #     pre-187 `workflow_definitions` JSONB row carrying NEITHER this key nor
+    #     `name` still `model_validate()`s and reads False. Measured at plan time:
+    #     0 of 57 phases across the 27 well-formed rows carry a non-empty `name`,
+    #     so EVERY stored row today is exactly that shape. `bool = False`, never
+    #     `bool | None = None` — D-185-08's rule: absence has ONE spelling.
+    #
+    # (b) PROVENANCE, NOT A DERIVATION. This records only that the NL authoring
+    #     generator wrote the stored `name` rather than a human typing it, which is
+    #     what the demote-on-config-edit rule (D-187-07) reads: a config edit clears
+    #     a GENERATOR-seeded name, and never clears a HAND-TYPED one. It is stamped
+    #     SERVER-SIDE after `model_validate()` in
+    #     `app.services.workflow_authoring.generate_workflow_definition` — never
+    #     taken from the model payload, so an emission cannot claim a name was
+    #     hand-typed (T-187-02-02).
+    #
+    # (c) The node FACE is not here and never will be. The layered ladder
+    #     (author name → config-derived → type sentence) is computed AT RENDER in
+    #     `frontend/src/components/workflows/phaseVocabulary.ts` and is NEVER
+    #     stored — same reason as (b) in the block above: the save path persists
+    #     `model_dump(mode="json")`, so a derivation living in this model would be
+    #     BAKED into the JSONB and a stale row could then lie about its own face.
+    #     Nothing here is a model-level validator hook, on purpose — see the
+    #     (b) block above, which names the decorator and explains the trap.
+    name_seeded_by_ai: bool = False     # VOCAB-01 / D-187-03 — the NL generator wrote `name`, not a human
+
 
 # ── 098 co-lock input/asset shapes (CONCLUSION.md §3 verbatim; JSONB makes the ──
 # co-lock free, so Phases 100/103 don't re-touch this model). Behavior deferred:
