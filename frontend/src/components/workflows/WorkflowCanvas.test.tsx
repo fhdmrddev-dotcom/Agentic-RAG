@@ -299,7 +299,11 @@ describe("WorkflowCanvas — the ⌥ Technical-names reveal (D-183-08)", () => {
   it("shows plain-language titles by default and no slug on any node face", () => {
     renderCanvas(evalCoverage, { provider: true })
     expect(screen.getByText("Prepare the inputs")).toBeInTheDocument()
-    expect(screen.getByText("Check with you")).toBeInTheDocument()
+    // 187-04: the `llm_human_input` face is now `derivedFace` tier 4, not the
+    // `PHASE_TYPE_SENTENCES` fallback — that tier reads no id→name lookup, so it
+    // resolves even with the name context omitted (D-187-04). The assertion this
+    // test makes is unchanged: a plain-language title, and no slug on any face.
+    expect(screen.getByText("Wait for your approval")).toBeInTheDocument()
     for (const phase of evalCoverage) {
       const node = screen.getByTestId(`canvas-node-${phase.slug}`)
       expect(node.textContent ?? "").not.toContain(phase.slug)

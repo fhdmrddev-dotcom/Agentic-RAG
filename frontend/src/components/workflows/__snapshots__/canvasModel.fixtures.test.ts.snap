@@ -115,7 +115,7 @@ exports[`toCanvas sweep — 'branching (synthetic skip_to_phase)' > matches its 
       "type": "phase",
     },
     {
-      "ariaLabel": "Phase 4: Check with you (llm_human_input)",
+      "ariaLabel": "Phase 4: Wait for your approval (llm_human_input)",
       "ariaRole": "button",
       "data": {
         "armed": false,
@@ -125,7 +125,7 @@ exports[`toCanvas sweep — 'branching (synthetic skip_to_phase)' > matches its 
         "slug": "escalate",
         "subtitle": "Pauses here until you answer",
         "technicalTitle": "Needs you · escalate",
-        "title": "Check with you",
+        "title": "Wait for your approval",
         "waitsForYou": true,
       },
       "draggable": false,
@@ -294,7 +294,7 @@ exports[`toCanvas sweep — 'doc_qa_human (canonical seed 4)' > matches its comm
       "type": "phase",
     },
     {
-      "ariaLabel": "Phase 2: Check with you (llm_human_input)",
+      "ariaLabel": "Phase 2: Wait for your approval (llm_human_input)",
       "ariaRole": "button",
       "data": {
         "armed": false,
@@ -304,7 +304,7 @@ exports[`toCanvas sweep — 'doc_qa_human (canonical seed 4)' > matches its comm
         "slug": "confirm",
         "subtitle": "Pauses here until you answer",
         "technicalTitle": "Needs you · confirm",
-        "title": "Check with you",
+        "title": "Wait for your approval",
         "waitsForYou": true,
       },
       "draggable": false,
@@ -479,7 +479,7 @@ exports[`toCanvas sweep — 'eval_coverage (the 5-phase maximum)' > matches its 
       "type": "phase",
     },
     {
-      "ariaLabel": "Phase 4: Check with you (llm_human_input)",
+      "ariaLabel": "Phase 4: Wait for your approval (llm_human_input)",
       "ariaRole": "button",
       "data": {
         "armed": false,
@@ -489,7 +489,7 @@ exports[`toCanvas sweep — 'eval_coverage (the 5-phase maximum)' > matches its 
         "slug": "confirm",
         "subtitle": "Pauses here until you answer",
         "technicalTitle": "Needs you · confirm",
-        "title": "Check with you",
+        "title": "Wait for your approval",
         "waitsForYou": true,
       },
       "draggable": false,

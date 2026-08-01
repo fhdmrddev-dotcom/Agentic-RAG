@@ -87,6 +87,15 @@ export interface PhaseSpecJSON {
   grounding_escalated?: boolean
   /** The author armed an action-risk checkpoint: the run stops here and waits. */
   action_risk_armed?: boolean
+  // ── Phase 187 (VOCAB-02 / Req 3) — the provenance marker ────────────────────
+  // Additive-optional in the same register as the two bits above; pre-187 rows read
+  // with it absent and no migration is owed.
+  /** PROVENANCE, not display: the NL generator wrote the stored `name` rather than
+   *  a person. Read ONLY by the demote-on-config-edit rule in `definitionOps.ts` —
+   *  a generator-seeded title is cleared when an edit changes what the derived tier
+   *  would say, while a hand-typed one never is. NO resolver in this module reads
+   *  it; the ladder above cares only whether a title exists. */
+  name_seeded_by_ai?: boolean
 }
 
 // ── The skip_to_phase parse ─────────────────────────────────────────────────────
@@ -120,9 +129,25 @@ export function parseSkipTarget(onFailure: string | null | undefined): string | 
 
 /**
  * D-183-06 — the plain-language business sentence per `phase_type`, anchored to
- * sketch 137-D. Only 10 of 119 live phases carry a real `phase.name`, so this
- * fallback is the DOMINANT node face, not an edge case. It replaces the technical
- * `"AI agent step · retrieve"` read that 137-D was chosen to eliminate.
+ * sketch 137-D. It replaces the technical `"AI agent step · retrieve"` read that
+ * 137-D was chosen to eliminate.
+ *
+ * MEASURED, and corrected in Phase 187-04. This docblock previously carried a
+ * how-many-phases-have-a-name figure that was read at the wrong JSONB depth and is
+ * REFUTED; it is deliberately not restated here, so a grep can prove it is gone.
+ * The measurement live on :54322, **2026-08-02**, is
+ * **0 of 57 phases across the 27 well-formed `workflow_definitions` rows** (the
+ * other 145 rows store `definition` as a double-encoded JSON string that no app read
+ * path can parse — `WorkflowDefinition.model_validate()` 422s on a `str`).
+ *
+ * The correction STRENGTHENS the conclusion this docblock draws rather than
+ * weakening it: at 0 of 57, the type sentence is not merely the dominant node face,
+ * it is the ONLY one the shipped ladder ever reached. That is the measurement Phase
+ * 187 exists to answer.
+ *
+ * It is no longer the last stop before the raw type: 187-04 inserts a CONFIG-DERIVED
+ * tier above it (`derivedFace` below), so a step with something bound now says what
+ * it does and this sentence is the honest floor beneath that.
  */
 export const PHASE_TYPE_SENTENCES: Record<string, string> = {
   programmatic: "Prepare the inputs",
@@ -158,18 +183,39 @@ export const PHASE_TYPE_LABELS: Record<string, string> = {
 }
 
 /**
- * The node title (D-183-06). A real `phase.name` wins when it trims non-empty;
- * otherwise the plain-language sentence for the type; otherwise the raw type string
- * echoed honestly (never invent a sentence for a type we do not know — the
- * `PhaseSpineGraph.tsx:89` precedent).
+ * The node title — FOUR tiers since 187-04 (D-183-06 + D-187-04 / D-187-05):
  *
- * The SLUG NEVER appears in this string. It lives behind the ⌥ Technical-names
- * reveal, via `technicalTitle`.
+ *   1. the stored `phase.name`, when it trims non-empty — a hand-written name is
+ *      never overridden by a derivation;
+ *   2. the CONFIG-DERIVED face (`derivedFaceOf`), computed at render from what the
+ *      step actually has bound and written NOWHERE, so re-binding a skill changes
+ *      the face with no write;
+ *   3. the plain-language sentence for the type;
+ *   4. the raw type string echoed honestly (never invent a sentence for a type we do
+ *      not know — the `PhaseSpineGraph.tsx:89` precedent).
+ *
+ * TWO FLOORS this function carries, both testable:
+ *  - **The SLUG NEVER appears in this string.** It lives behind the ⌥
+ *    Technical-names reveal, via `technicalTitle`.
+ *  - **A name is NEVER fabricated.** Tier 2 reads id→name lookups it does not own;
+ *    an absent context or a lookup that misses falls THROUGH to tier 3 rather than
+ *    rendering a raw UUID. An id-shaped face is worse than a generic one.
+ *
+ * `ctx` is OPTIONAL and defaults to the frozen module-scope empty context, which is
+ * what lets every shipped caller render byte-identically to HEAD without being
+ * touched. The one deliberate exception is `llm_human_input`: tier 4 of `derivedFace`
+ * reads no lookup, so an unnamed human-input step now says "Wait for your approval"
+ * instead of "Check with you" even with the context omitted. That is D-187-04's
+ * intent, and it is pinned by a test rather than left to be discovered.
  */
-export function nodeTitle(phase: PhaseSpecJSON): string {
+export function nodeTitle(phase: PhaseSpecJSON, ctx: NameContext = NO_NAME_CONTEXT): string {
   const name = phase.name?.trim()
   if (name) return name
-  const type = phase.config.phase_type
+  const derived = derivedFaceOf(phase, ctx)
+  if (derived) return derived
+  // `?? ""` rather than a bare read: an absent `config` is a malformed author-supplied
+  // row, and a projection must resolve it rather than throw (CANVAS-01 totality).
+  const type = phase.config?.phase_type ?? ""
   return PHASE_TYPE_SENTENCES[type] ?? type
 }
 
