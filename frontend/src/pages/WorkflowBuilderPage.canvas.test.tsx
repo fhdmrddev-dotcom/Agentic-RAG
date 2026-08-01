@@ -1889,4 +1889,41 @@ describe("WorkflowBuilderPage 186-16 — an outstanding write blocks publish (WR
     releaseWrite()
     await waitFor(() => expect(latest()).toBe(EMPTY_DRAFT_INVITATION))
   })
+
+  // ── CR-03 (186-18) ────────────────────────────────────────────────────────────
+  // The row above proves nothing WRITES on the flag-off surface by ITSELF. It says
+  // nothing about the write a person CHOOSES, and that gap is the defect: D-186-03
+  // deliberately leaves `saveNow` ungated on the canvas flag (its docblock:
+  // "automatic writes obey the flag, chosen ones obey the person"), while `actionGroup`
+  // mounts BOTH `builder-save-draft` and `renderPublish` on BOTH header branches. So a
+  // real outstanding PATCH exists on the reverted surface, and until this row the
+  // refusal that guards it sat one line BELOW a flag short-circuit that returned null.
+  // The premise is ASSERTED here (call count), not argued — if the flag-off Save does
+  // not write, the whole fix is mis-derived and must stop.
+  it("a CHOSEN save on the flag-OFF surface blocks publish too (CR-03) — D-186-03's asymmetry cuts both ways", async () => {
+    const releaseWrite = deferUpdate()
+    const { latest } = renderCapturing(FLAG_OFF_186_16)
+    // `builder-grid` is the flag-off surface's landmark — `builder-view-toggle` exists
+    // only with the flag on.
+    await waitFor(() => expect(screen.getByTestId("builder-grid")).toBeInTheDocument())
+
+    // Captured, never assumed: this row is about the saving branch, not about what the
+    // fixture's validation happens to say on this surface.
+    const before = latest()
+
+    await editOnce("an edit the author then chooses to commit")
+    fireEvent.click(screen.getByTestId("builder-save-draft"))
+
+    // The premise, measured: the chosen write really is reachable with the flag OFF.
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1), { timeout: 5000 })
+
+    // CR-03: while that PATCH is unanswered the publish seam must be told to refuse —
+    // on this surface too. A gauntlet started here would burn a golden run and come
+    // back with an after-the-fact `draft_changed`.
+    await waitFor(() => expect(latest()).toBe(SAVING_PUBLISH_WAIT))
+
+    // …and it is a momentary wait, not a lock-out.
+    releaseWrite()
+    await waitFor(() => expect(latest()).toBe(before))
+  })
 })
