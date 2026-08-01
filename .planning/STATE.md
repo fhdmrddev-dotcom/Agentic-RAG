@@ -4,7 +4,7 @@ milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
 status: executing
 last_updated: "2026-08-01T21:34:50.931Z"
-last_activity: 2026-08-02 -- Phase 187 plan 02 complete (per-step name + provenance marker, zero migration)
+last_activity: 2026-08-02 -- Phase 187 plan 03 complete (unbound_retrieval /validate verdict, D-187-11)
 progress:
   total_phases: 19
   completed_phases: 6
@@ -71,6 +71,26 @@ pinned by three explicit tests); `test_harness_models` **11 → 15**; backend co
 **deliberately RETAINED** (additive-only policy, `harness.py:10-21`). **Carry forward:** the D-187-07
 demote rule must clear `name` **and** the marker together, or a demoted phase keeps claiming AI
 provenance for a name it no longer has.
+
+**Plan 187-03 COMPLETE (Wave 1, 2026-08-02, `3727b006` → `a68132db` → `555fbf35` → `7ef69454`).**
+D-187-11 / VOCAB-02 — `BUG-260731-03`'s **verdict half**. `POST /workflows/validate` mints a new
+per-node **`unbound_retrieval`** finding at severity **`incomplete`** when
+`project_folder_id is None` **and** `grounding.grounding_cause(phase) == "detected"`. Minted in the
+**ROUTE** (`_ROUTE_ASSIGNED_CODES`), deliberately **NOT** in `grounding.grounding_verdicts` — that
+collector is shared with publish (182-06 made publish enforcing), so a rule there would silently
+become a publish blocker; `grep -c "unbound_retrieval" grounding.py` → **0** and
+`test_182_publish_grounding_stage.py` is green unchanged. Registered in **both**
+`_ROUTE_ASSIGNED_CODES` and `_INCOMPLETE_CODES` (`_ERROR_CODES` is derived by subtraction, so one
+registration alone would classify `error` *silently*). The KB-tool intersection is **not copied** —
+the check calls `grounding_cause`, proven falsifiably by a test that monkeypatches a 6th name into
+`KB_TOOLS` and observes the verdict appear. Measured: `test_182_validate` **12 → 18**,
+`test_182_severity_codes` **8 → 9**, backend collection **3517 → 3523**,
+`git diff --stat -- supabase/migrations` **empty**. `BUG-260731-03` stays **`folded`**,
+`verified_closed_by: null` — both halves still owe a live confirmation. **Carry forward:** the check
+tests `"detected"` ONLY (not `already-set` / `escalated`, which do not imply KB reading); and
+`blockedReason` renders this message **verbatim** next to a disabled Publish button, so rewording it
+is a UX change. **UAT owes:** observing the verdict on the canvas with `visual_workflow_canvas` ON
+(G-4) — nothing here was live-verified in a browser.
 
 (`3713a716`), GOVERN-01/02/03 all `Complete`, `nyquist_compliant` true, SECURED 49/49 (`a00b1cc5`).
 Security found one real fail-open BLOCKER — T-185-04-01, a **typed** refusal on an armed checkpoint ran
