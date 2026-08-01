@@ -239,3 +239,72 @@ describe("Builder describe screen, canvas flag OFF — the surface is reachable 
     expect(screen.queryByTestId("builder-header-bar")).toBeNull()
   })
 })
+
+// ── MARKUP: the exact flag-off CTA region, so ANY addition reds with a diff ────────
+
+/**
+ * The CTA region's normalised `outerHTML`, captured from the UNMODIFIED page on
+ * 2026-08-02 (Phase 187 wave 1), BEFORE the template door of plans 187-14 / 187-13 /
+ * 187-15 existed.
+ *
+ * Verbatim, and deliberately so — see the docblock. The button carries `disabled=""`
+ * because the describe box is empty on arrival, which is the state a person actually
+ * lands on; a pin taken with text typed in would be pinning a screen nobody sees first.
+ *
+ * WRITTEN ONCE. The operator-like case below asserts against THIS constant rather than
+ * against a second copied literal, because two literals can drift apart and the sentence
+ * being proved is that these two audiences receive the same bytes.
+ */
+const FLAG_OFF_DESCRIBE_MARKUP =
+  `<div class="flex flex-col items-center gap-3"><button type="button" disabled="" class="rounded-md bg-primary px-5 py-2 text-[14px] font-medium text-primary-foreground transition-opacity disabled:cursor-not-allowed disabled:opacity-40">Draft the workflow</button><p data-testid="describe-hint" class="text-center text-[13px] text-muted-foreground">You describe the goal — the AI <b class="font-medium text-foreground">drafts the phases</b>, <b class="font-medium text-foreground">sets the strictness</b>, and <b class="font-medium text-foreground">asks about anything it had to guess</b>.</p></div>`
+
+describe("Builder describe screen, canvas flag OFF — the markup itself is pinned", () => {
+  it("matches the captured flag-off describe-screen CTA region byte for byte", async () => {
+    await renderDescribeScreen(OFF_VARIANTS[0].value)
+    expect(describeRegion()).toBe(FLAG_OFF_DESCRIBE_MARKUP)
+  })
+
+  it("an OPERATOR-LIKE map produces the IDENTICAL markup (D-181-01, everyone included)", async () => {
+    // Asserted as an equality against the same literal rather than as a second copied
+    // literal. An operator-only affordance appearing on the flag-off describe screen —
+    // the exact shape a carelessly gated template door would take — fails here.
+    await renderDescribeScreen(OFF_VARIANTS[2].value)
+    expect(describeRegion()).toBe(FLAG_OFF_DESCRIBE_MARKUP)
+  })
+
+  it("says NOTHING about a template or a starter — the formatting-independent guard", async () => {
+    /**
+     * The cheap half, and the half that survives a whitespace change. The literal above is
+     * strict enough to red on a stray class, which is exactly what tempts a re-capture; a
+     * re-capture would also silently swallow a leaked door. This one cannot be quieted by
+     * re-running the capture — the words have to actually leave the flag-off screen.
+     *
+     * The picker's trigger wording is fixed in plan 187-10's copy constants; asserted here
+     * as a WORD CLASS rather than a specific sentence, so it bites whatever that copy
+     * turns out to say.
+     */
+    await renderDescribeScreen(OFF_VARIANTS[0].value)
+    const region = ctaRegion()
+    expect(region.textContent ?? "").not.toMatch(/template|starter/i)
+    // …and not hidden in an attribute either (an `aria-label` or a `title` on the door's
+    // trigger would be invisible to `textContent` and perfectly visible to a person).
+    expect(describeRegion()).not.toMatch(/template|starter/i)
+  })
+
+  it("both guards FIND a planted door — the positive control", async () => {
+    /**
+     * A pin that has only ever been seen green is a pin nobody has watched fail. The door
+     * itself cannot be planted here (`WorkflowBuilderPage.tsx` is deliberately untouched by
+     * this plan — the pin's whole credibility rests on that), so the plant is made on the
+     * captured STRING: the shape 187-15 will actually add, one quiet line under the CTA.
+     */
+    await renderDescribeScreen(OFF_VARIANTS[0].value)
+    const doored = FLAG_OFF_DESCRIBE_MARKUP.replace(
+      "</div>",
+      `<button type="button" class="text-[13px]">Start from a template</button></div>`,
+    )
+    expect(doored).not.toBe(FLAG_OFF_DESCRIBE_MARKUP) // the plant actually landed
+    expect(doored).not.toBe(describeRegion()) // the byte pin would red
+    expect(doored).toMatch(/template|starter/i) // the word guard would red
+  })
+})
