@@ -2270,3 +2270,160 @@ describe("WorkflowBuilderPage 187-15 — source guards for the thread", () => {
     expect(builderSource.match(/\[store, nameContext\]/g) ?? []).toHaveLength(2)
   })
 })
+
+// ══════════════════════════════════════════════════════════════════════════════════
+// Phase 187-15 Task 2 (VOCAB-02 / Req 5 / D-187-09) — THE SEED RECEIPT, MOUNTED
+//
+// APPENDED. Plan 187-13 built the component and mounted it nowhere; this block is the
+// page's half — one boolean set beside the SINGLE `setDrafted` transition, so the receipt
+// arrives in the same DOM batch as the graph and cannot imply progress, and one
+// `canvasEnabled`-gated mount.
+//
+// THE GATE IS A CORRECTNESS REQUIREMENT, NOT SCOPE HYGIENE. `useGroundingBundle` is called
+// with `canvasEnabled`, so flag-off `kbTools` is `[]` and every step would read as
+// ungrounded — the receipt would claim zero grounded steps on a workflow that IS gated at
+// run time. That is actively misleading.
+// ══════════════════════════════════════════════════════════════════════════════════
+
+describe("WorkflowBuilderPage 187-15 — the seed receipt arrives with the draft (Req 5)", () => {
+  const ON = { features: { visual_workflow_canvas: true }, loading: false }
+  const OFF = { features: {}, loading: false }
+
+  /** A generated definition whose FIRST step reads the knowledge base, so the receipt has
+   *  something honest to name. The tool id is the server's, handed in through the bundle. */
+  const seededPhases = [
+    {
+      slug: "research",
+      phase_index: 0,
+      config: { phase_type: "llm_agent", available_tools: ["search_documents"] },
+    },
+    { slug: "brief", phase_index: 1, config: { phase_type: "llm_emit" } },
+  ]
+  const seededDef = { ...definition, phases: structuredClone(seededPhases) } as BuilderDefinition
+
+  function renderFresh(
+    features: { features: EffectiveFeatures; loading: boolean } = ON,
+    props: Record<string, unknown> = {},
+  ) {
+    return render(
+      <EffectiveFeaturesProvider value={{ ...features, refetch: vi.fn() }}>
+        <div style={{ width: 1200, height: 800 }}>
+          <WorkflowBuilderPage {...props} />
+        </div>
+      </EffectiveFeaturesProvider>,
+    )
+  }
+
+  /** Type a requirement and press the shipped CTA — the ONE forward path. */
+  async function draftIt(text = "summarise the supplier renewals every week") {
+    await screen.findByTestId("describe-hint")
+    fireEvent.change(screen.getByLabelText("business requirement"), { target: { value: text } })
+    fireEvent.click(screen.getByRole("button", { name: "Draft the workflow" }))
+  }
+
+  beforeEach(() => {
+    // The SERVER's KB-tool list rides on the bundle; the receipt derives nothing of its own.
+    mockBundle.mockResolvedValue({
+      tools: ["search_documents"],
+      folders: [],
+      skills: [],
+      degraded: [],
+      kb_tools: ["search_documents"],
+    })
+    mockGenerate.mockResolvedValue({ ok: true, definition: structuredClone(seededDef) })
+  })
+
+  it("appears after a successful draft, naming the steps and the grounded one", async () => {
+    renderFresh()
+    await draftIt()
+
+    const receipt = await screen.findByTestId("seed-receipt")
+    expect(within(receipt).getByTestId("seed-receipt-heading").textContent ?? "").toContain("2")
+    // The grounded step is named — per-step with its cause, never a summary count.
+    expect(within(receipt).getByTestId("seed-receipt-step-research")).toBeInTheDocument()
+    expect(within(receipt).queryByTestId("seed-receipt-step-brief")).toBeNull()
+    // It arrives WITH the graph, in one batch — no timed reveal, nothing still deciding.
+    expect(screen.getByTestId("builder-grid")).toBeInTheDocument()
+  })
+
+  it("dismissing hides it, and it does not come back while you keep working", async () => {
+    renderFresh()
+    await draftIt()
+    const receipt = await screen.findByTestId("seed-receipt")
+
+    fireEvent.click(within(receipt).getByTestId("seed-receipt-dismiss"))
+    await waitFor(() => expect(screen.queryByTestId("seed-receipt")).toBeNull())
+
+    // Keep working: flip to the canvas and back. The receipt stays gone.
+    fireEvent.click(screen.getByTestId("builder-view-canvas"))
+    await waitFor(() => expect(screen.getByTestId("canvas-node-research")).toBeInTheDocument(), LAZY)
+    expect(screen.queryByTestId("seed-receipt")).toBeNull()
+    fireEvent.click(screen.getByTestId("builder-view-spine"))
+    expect(screen.queryByTestId("seed-receipt")).toBeNull()
+  })
+
+  it("appears on the autoDraft hand-off path too — it is a genuine AI seed", async () => {
+    // D-187-14 / CONTEXT's open discretion, DECIDED here rather than discovered in UAT.
+    // Both paths funnel through `onDraft`'s success branch, so this costs no extra line.
+    renderFresh(ON, {
+      initialDescribe: "summarise the supplier renewals every week",
+      autoDraft: true,
+    })
+    expect(await screen.findByTestId("seed-receipt")).toBeInTheDocument()
+    expect(mockGenerate).toHaveBeenCalledTimes(1)
+  })
+
+  it("with the canvas flag OFF it never renders — an ungated receipt would claim zero grounded steps", async () => {
+    renderFresh(OFF)
+    await draftIt()
+    await waitFor(() => expect(screen.getByTestId("builder-grid")).toBeInTheDocument())
+    expect(screen.queryByTestId("seed-receipt")).toBeNull()
+    expect(screen.queryByTestId("seed-receipt-heading")).toBeNull()
+  })
+
+  it("a draft with NOTHING grounded still gets a receipt, with no grounded list (D-187-10)", async () => {
+    mockGenerate.mockResolvedValue({
+      ok: true,
+      definition: {
+        ...definition,
+        phases: [{ slug: "brief", phase_index: 0, config: { phase_type: "llm_emit" } }],
+      },
+    })
+    renderFresh()
+    await draftIt()
+
+    const receipt = await screen.findByTestId("seed-receipt")
+    expect(within(receipt).getByTestId("seed-receipt-heading")).toBeInTheDocument()
+    expect(within(receipt).queryByTestId("seed-receipt-grounded-list")).toBeNull()
+    expect(within(receipt).queryByTestId("seed-receipt-grounding")).toBeNull()
+  })
+
+  it("an HONEST generate failure produces no receipt at all", async () => {
+    mockGenerate.mockResolvedValue({ ok: false, error: "Couldn't generate the workflow." })
+    renderFresh()
+    await draftIt()
+
+    await screen.findByTestId("generate-error")
+    expect(screen.queryByTestId("seed-receipt")).toBeNull()
+  })
+})
+
+describe("WorkflowBuilderPage 187-15 — source guards for the two mounts", () => {
+  it("still names NO browser-storage API — D-187-09's useState is structural", () => {
+    // The shipped guard, restated where the receipt's dismissal decision lives: a
+    // `localStorage` key per draft id would fail here, which is why the in-memory boolean
+    // is required rather than merely preferred.
+    expect(builderSource).not.toMatch(/localStorage/)
+    expect(builderSource).not.toMatch(/sessionStorage/)
+    expect(builderSource).not.toMatch(/indexedDB/)
+    expect(builderSource).not.toMatch(/document\.cookie/)
+  })
+
+  it("mounts each surface exactly once, and adds no helper or component beside them", () => {
+    expect(builderSource.match(/<SeedReceipt\b/g) ?? []).toHaveLength(1)
+    expect(builderSource.match(/<StarterTemplatePicker\b/g) ?? []).toHaveLength(1)
+    // The door writes into the describe box and nothing else — the seam is `setDescribe`,
+    // never `initialDescribe` (an UPSTREAM prop that is not settable from inside the page).
+    expect(builderSource).toMatch(/onChoose=\{setDescribe\}/)
+  })
+})

@@ -42,7 +42,7 @@
  * door trips the negative guard.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
-import { cleanup, render, screen, waitFor } from "@testing-library/react"
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
 
 // The whole api surface the page reaches, enumerated exactly as the header pin enumerates
 // it. A factory mock that omits one symbol hands back `undefined` and the failure surfaces
@@ -113,6 +113,12 @@ vi.mock("@/lib/api", () => {
 import { WorkflowBuilderPage } from "./WorkflowBuilderPage"
 import { EffectiveFeaturesProvider } from "@/providers/EffectiveFeaturesProvider"
 import type { EffectiveFeatures } from "@/lib/api"
+// Phase 187-15: the door's one line and its seed formatter, IMPORTED rather than re-typed,
+// so a copy change moves the assertion and the surface in one edit.
+import {
+  STARTER_DOOR_LINE,
+  starterSeedSentence,
+} from "@/components/workflows/definitionOps"
 
 /** The canvas flag is OFF in every one of these. Three ways of being off, because
  *  D-181-01 is a statement about all of them and "operators too" is the one that a
@@ -306,5 +312,135 @@ describe("Builder describe screen, canvas flag OFF — the markup itself is pinn
     expect(doored).not.toBe(FLAG_OFF_DESCRIBE_MARKUP) // the plant actually landed
     expect(doored).not.toBe(describeRegion()) // the byte pin would red
     expect(doored).toMatch(/template|starter/i) // the word guard would red
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════════════
+// Phase 187-15 Task 2 (VOCAB-03 / Req 6) — THE TEMPLATE DOOR, MOUNTED
+//
+// APPENDED, never interleaved. Everything above this line is the wave-1 pin, captured
+// against the UNMODIFIED page, and NOT ONE OF ITS ASSERTIONS MOVES: `FLAG_OFF_DESCRIBE_MARKUP`
+// is untouched, and if it ever needed editing that would mean exactly one thing — the door
+// leaked flag-off.
+//
+// The door lands INSIDE the pinned CTA flex column, deliberately. 187-05's carry-forward
+// warns that a SIBLING of that column would not trip the byte pin; mounting inside it means
+// the strongest guard this file has is the one guarding the new line.
+// ══════════════════════════════════════════════════════════════════════════════════
+
+const FLAG_ON = { features: { visual_workflow_canvas: true }, loading: false }
+
+/** Two curated starters in the measured shape (`187-RESEARCH` §"The template door"):
+ *  `llm_agent → llm_emit`, one with a `business_requirement` and one WITHOUT, so the
+ *  documented name-fallback is exercised rather than assumed. */
+const STARTERS = [
+  {
+    id: "st-1",
+    slug: "risk-register",
+    name: "Risk Register",
+    definition: {
+      business_requirement: "Track supplier risks and flag the ones that need a decision.",
+      phases: [
+        { slug: "scan", phase_index: 0, config: { phase_type: "llm_agent" } },
+        { slug: "write", phase_index: 1, config: { phase_type: "llm_emit" } },
+      ],
+    },
+  },
+  {
+    id: "st-2",
+    slug: "weekly-status",
+    name: "Weekly Status Report",
+    definition: {
+      phases: [
+        { slug: "gather", phase_index: 0, config: { phase_type: "llm_agent" } },
+        { slug: "emit", phase_index: 1, config: { phase_type: "llm_emit" } },
+      ],
+    },
+  },
+]
+
+describe("Builder describe screen, canvas flag ON — the template door (Req 6)", () => {
+  it("the door's one quiet line renders INSIDE the pinned CTA region", async () => {
+    mockListStarters.mockResolvedValue(STARTERS)
+    await renderDescribeScreen(FLAG_ON)
+
+    const trigger = screen.getByTestId("starter-door-trigger")
+    expect(trigger).toHaveTextContent(STARTER_DOOR_LINE)
+    // Inside the pinned region, not beside it — so the wave-1 byte pin is the guard.
+    expect(ctaRegion().contains(trigger)).toBe(true)
+  })
+
+  for (const variant of OFF_VARIANTS) {
+    it(`${variant.name} renders NO door at all — the gate is the page's`, async () => {
+      mockListStarters.mockResolvedValue(STARTERS)
+      await renderDescribeScreen(variant.value)
+      expect(screen.queryByTestId("starter-door-trigger")).toBeNull()
+      expect(screen.queryByTestId("starter-door-panel")).toBeNull()
+      // And the byte pin still holds, unedited.
+      expect(describeRegion()).toBe(FLAG_OFF_DESCRIBE_MARKUP)
+    })
+  }
+
+  it("choosing a template FILLS the describe box, keeps you here, and enables the CTA", async () => {
+    mockListStarters.mockResolvedValue(STARTERS)
+    await renderDescribeScreen(FLAG_ON)
+
+    const box = screen.getByLabelText("business requirement") as HTMLTextAreaElement
+    expect(box.value).toBe("")
+    expect(screen.getByRole("button", { name: "Draft the workflow" })).toBeDisabled()
+
+    fireEvent.click(screen.getByTestId("starter-door-trigger"))
+    const row = await screen.findByTestId("starter-door-row-risk-register")
+    fireEvent.click(row)
+
+    // The box now carries the starter's OWN sentence — produced by calling the shipped
+    // formatter here rather than typed, so a copy change moves both sides at once.
+    await waitFor(() => expect(box.value).toBe(starterSeedSentence(STARTERS[0])))
+    // Still on the describe screen: nothing was generated, nothing navigated.
+    expect(screen.getByTestId("describe-hint")).toBeInTheDocument()
+    expect(screen.queryByTestId("builder-grid")).toBeNull()
+    // …and the shipped `canDraft` rule did the rest: a non-empty box enables the CTA.
+    expect(screen.getByRole("button", { name: "Draft the workflow" })).toBeEnabled()
+  })
+
+  it("the row with NO business_requirement seeds its NAME — the documented fallback", async () => {
+    mockListStarters.mockResolvedValue(STARTERS)
+    await renderDescribeScreen(FLAG_ON)
+
+    fireEvent.click(screen.getByTestId("starter-door-trigger"))
+    fireEvent.click(await screen.findByTestId("starter-door-row-weekly-status"))
+
+    const box = screen.getByLabelText("business requirement") as HTMLTextAreaElement
+    await waitFor(() => expect(box.value).toBe("Weekly Status Report"))
+  })
+
+  it("NO second forward path: choosing a template writes nothing and generates nothing", async () => {
+    /**
+     * The whole of Req 6 is that picking a template produces TEXT. The picker's own source
+     * fence lives in the component, so a convenience added at the MOUNT — an "and draft it
+     * now" — would not be caught there. Enumerated here instead: every create / update /
+     * publish / generate symbol the page can reach, each asserted at zero.
+     */
+    mockListStarters.mockResolvedValue(STARTERS)
+    await renderDescribeScreen(FLAG_ON)
+
+    fireEvent.click(screen.getByTestId("starter-door-trigger"))
+    fireEvent.click(await screen.findByTestId("starter-door-row-risk-register"))
+    await waitFor(() =>
+      expect((screen.getByLabelText("business requirement") as HTMLTextAreaElement).value).not.toBe(""),
+    )
+
+    expect(mockGenerate).toHaveBeenCalledTimes(0)
+    expect(mockCreate).toHaveBeenCalledTimes(0)
+    expect(mockUpdate).toHaveBeenCalledTimes(0)
+    expect(mockPublish).toHaveBeenCalledTimes(0)
+  })
+
+  it("the seed receipt does NOT live on the describe screen", async () => {
+    // The receipt is a DRAFTED-view surface (150-B: a card above the canvas). If any part
+    // of it were mounted here it would ship flag-off with the rest of the describe screen.
+    mockListStarters.mockResolvedValue(STARTERS)
+    await renderDescribeScreen(FLAG_ON)
+    expect(screen.queryByTestId("seed-receipt")).toBeNull()
   })
 })
