@@ -136,7 +136,7 @@ import {
   CORPUS_FOLDER_ID,
   CORPUS_SKILL_ID,
 } from "@/components/workflows/__fixtures__/canvasFixtures"
-import { nodeTitle } from "@/components/workflows/phaseVocabulary"
+import { nodeTitle, PHASE_TYPE_SENTENCES } from "@/components/workflows/phaseVocabulary"
 // Phase 185-08: the ONE home of the locked-row sentence. IMPORTED, never re-typed, so
 // the assertions below are character-identity rather than a second copy of the copy.
 import { GOVERNANCE_GATE_ROW_LABEL } from "@/components/workflows/definitionOps"
@@ -1985,8 +1985,20 @@ const TEMPLATE_FILE = "quarterly-brief.docx"
  */
 const vocabularyPhases = [
   { slug: "research", phase_index: 0, config: { phase_type: "llm_agent", skill_ref: CORPUS_SKILL_ID } },
-  { slug: "scan", phase_index: 1, config: { phase_type: "llm_single", folder_scope: [CORPUS_FOLDER_ID] } },
-  { slug: "brief", phase_index: 2, config: { phase_type: "llm_emit" } },
+  // 187-17 (WR-02) — RETYPED from `llm_single`. The folder tier is gated on
+  // `GROUNDING_DIAL_TYPES`, because `folder_scope` rides every LLM config member for
+  // shape symmetry and is INERT on the ones with no tools (`LlmSinglePhaseConfig`
+  // says so itself), so the shipped fixture asked the page to prove a face that is a
+  // fabricated capability claim. `llm_batch_agents` keeps this row a real folder-tier
+  // witness AND covers the half of the gated set that had no page coverage at all.
+  { slug: "scan", phase_index: 1, config: { phase_type: "llm_batch_agents", folder_scope: [CORPUS_FOLDER_ID] } },
+  // 187-17 (WR-02) — the NEGATIVE witness, added without changing the phase count so
+  // no other row of this suite moves. `llm_emit` is deliberately outside the gate:
+  // `_exec_llm_emit` is a sealed forced emit that never builds a phase tool context
+  // and never reads `folder_scope`. With a template present tier (2) wins anyway; the
+  // malformed-`assets` rows below are where this binding is the only thing the face
+  // could over-claim from.
+  { slug: "brief", phase_index: 2, config: { phase_type: "llm_emit", folder_scope: [CORPUS_FOLDER_ID] } },
 ]
 
 /** The definition, with whatever `assets` the row under test wants — including the two
@@ -2110,6 +2122,14 @@ describe("WorkflowBuilderPage 187-15 — one name context, two graph views (Req 
       await waitFor(() => expect(spineFace("research")).toContain(`Run the ${SKILL_NAME}`))
       expect(spineFace("brief")).not.toContain("Fill ")
       expect(spineFace("brief")).not.toContain("not-a-list.docx")
+      // 187-17 (WR-02) — …and no FOLDER face either. `brief` carries a sole RESOLVABLE
+      // `folder_scope` and the maps ARE resolved here, so with tier (2) missing this is
+      // the one place on the page where only the gate stands between the user and a
+      // claim the step cannot honour. The floor is the plain type sentence, never a
+      // search and never an id.
+      expect(spineFace("brief")).toContain(PHASE_TYPE_SENTENCES.llm_emit)
+      expect(spineFace("brief")).not.toContain(`Search ${FOLDER_NAME}`)
+      expect(spineFace("brief")).not.toContain(CORPUS_FOLDER_ID)
     })
   }
 

@@ -388,6 +388,13 @@ export function actionRiskArmed(phase: PhaseSpecJSON): boolean {
 //
 // NEVER FABRICATE. Absent context, or a lookup that misses, falls THROUGH to the
 // type sentence. An id-shaped face is worse than a generic one.
+//
+// AND NEVER FABRICATE A CAPABILITY (187-17 / WR-02). The floor is not only about
+// NAMES. Two of the five tiers are TYPE-GATED, because the fields they read ride the
+// config family for shape symmetry rather than behaviour: rendering `Search {folder}`
+// on a step whose executor performs no retrieval states something the step cannot do.
+// A gated-out binding falls through to the plain type sentence by the same rule — a
+// generic face is always better than a false one.
 
 /** The one type that pauses for a person — the literal `waitsForYou` also reads. */
 const HUMAN_INPUT_PHASE_TYPE = "llm_human_input"
@@ -424,24 +431,33 @@ const NO_NAME_CONTEXT: NameContext = Object.freeze({})
  * phase-shaped adapter and BOTH consumers reach this one body.
  */
 export interface DerivedFaceInputs {
-  /** The step's `phase_type`. Gates tiers 2 and 4. */
+  /** The step's `phase_type`. Gates tiers 2, 3 and 4. */
   phaseType: string
   /** The bound skill's display name, already resolved. */
   skillName?: string
   /** The definition's template filename, already resolved. */
   templateFilename?: string
-  /** The single scoped folder's display name, already resolved. */
+  /** The single scoped folder's display name, already resolved. IGNORED outside
+   *  `GROUNDING_DIAL_TYPES` (187-17 / WR-02): `folder_scope` rides every LLM config
+   *  member for shape symmetry and is INERT on the ones that carry no tools, so a
+   *  face claiming a search there would be claiming a capability the step lacks. */
   folderName?: string
 }
 
 /**
- * Resolve what THIS step does from its config, or `null` when nothing is bound.
+ * Resolve what THIS step does from its config, or `null` when nothing USABLE is bound.
  * TOTAL — every input shape returns and none of them throws.
  *
  * The ORDER is the decision (D-187-04), so it is numbered in the source: the rule is
  * MOST-SPECIFIC-FIRST, and any future tier is inserted by that test rather than by
  * taste. SPEC Req 1's "folder scope → bound skill → template" is a drafting slip and
  * is OVERRIDDEN by D-187-04.
+ *
+ * TWO of the five tiers are TYPE-GATED, and `null` therefore means "no tier this step
+ * can honestly claim", not merely "no field set": tier (2) fires only on `llm_emit`
+ * (the template is definition-level) and tier (3) only on `GROUNDING_DIAL_TYPES`
+ * (`folder_scope` is inert on the types with no tools — 187-17 / WR-02). A gated-out
+ * binding falls THROUGH to the plain type sentence; it never produces a face.
  */
 export function derivedFace(inputs: DerivedFaceInputs): string | null {
   // (1) BOUND SKILL — a bound skill states what *this* step does, so it wins over
@@ -458,12 +474,48 @@ export function derivedFace(inputs: DerivedFaceInputs): string | null {
     return `Fill ${inputs.templateFilename}`
   }
 
-  // (3) FOLDER SCOPE — last of the three config tiers, deliberately. `folder_scope`
-  //     is a subset of the single `project_folder_id`
+  // (3) FOLDER SCOPE — GATED on `GROUNDING_DIAL_TYPES`, and last of the three config
+  //     tiers. Two independent constraints, both load-bearing:
+  //
+  //     WHY GATED (187-17 / WR-02). `folder_scope` is carried on the non-retrieval
+  //     LLM config members for SHAPE SYMMETRY and is inert there — the field says so
+  //     itself: `LlmSinglePhaseConfig.folder_scope` (`backend/app/models/harness.py`)
+  //     reads *"Load-bearing on llm_agent + llm_batch_agents; inert on llm_single (no
+  //     tools). Carried here for shape symmetry across the family."* Its only run-time
+  //     consumer is the per-phase narrowing inside `_build_phase_tool_context`
+  //     (`backend/app/services/harness/phase_types.py`), the sub-agent tool-context
+  //     build, which serves the tool-carrying types alone. So an ungated tier renders
+  //     `Search {folder}` on a step that performs no retrieval — a fabricated claim
+  //     about what the step DOES, and the same never-fabricate floor as D-187-05's
+  //     fabricated NAME, only narrower.
+  //
+  //     WHY *THIS* CONSTANT AND NOT A NEW LIST. `grounding.grounding_cause` declines
+  //     to read `folder_scope` for the identical reason, in its own words: *"it exists
+  //     on all five LLM config members (including llm_single, which has no tools at
+  //     all), so reading it would auto-lock steps that read nothing."* Same question —
+  //     which types can actually reach the knowledge base — so the same answer. The
+  //     constant is READ here and NEVER edited: it mirrors the backend grounding rule
+  //     exactly, and a third member would change grounding semantics (D-185-15, a
+  //     Phase-185 red line).
+  //
+  //     WHY `llm_emit` IS NOT A MEMBER, against its own field docblock.
+  //     `LlmEmitPhaseConfig.folder_scope` claims to be *"load-bearing in the executor
+  //     plan — bound-scope retrieval + skill composition feeding the emit"*. That is a
+  //     PLAN-ERA claim and the shipped executor refutes it: `_exec_llm_emit`
+  //     (`backend/app/services/harness/phase_types.py`) is a SEALED FORCED EMIT — it
+  //     never drives the agent loop, never calls `_build_phase_tool_context`, and
+  //     never reads `folder_scope` or `folder_subtree_ids`. Its evidence comes from
+  //     `_emit_evidence(accumulated_outputs)`, i.e. the retrieval PRIOR phases already
+  //     performed. Recorded here so the next reader does not re-inherit the claim.
+  //
+  //     WHY LAST OF THE THREE (D-187-04, unchanged — the gate is ADDITIVE to it).
+  //     `folder_scope` is a subset of the single `project_folder_id`
   //     (`harness.py:_folder_scope_requires_project`), so most steps in one workflow
   //     share it and folder-first would collapse distinct steps back into identical
   //     faces — defeating the phase's own falsifiable bar.
-  if (inputs.folderName) return `Search ${inputs.folderName}`
+  if (inputs.folderName && GROUNDING_DIAL_TYPES.includes(inputs.phaseType)) {
+    return `Search ${inputs.folderName}`
+  }
 
   // (4) HUMAN INPUT — nothing is bound, but the type alone says what happens.
   if (inputs.phaseType === HUMAN_INPUT_PHASE_TYPE) return "Wait for your approval"
