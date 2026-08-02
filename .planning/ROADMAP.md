@@ -382,36 +382,36 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 187-01-PLAN.md — SC#6 property test over author-declared validator sets, observed RED on HEAD (wave 1)
-- [ ] 187-02-PLAN.md — per-step `name` in AUTHORING_SYSTEM_PROMPT + the additive-optional provenance marker on PhaseSpec (wave 1)
-- [ ] 187-03-PLAN.md — D-187-11: the `unbound_retrieval` `incomplete` verdict in /validate + BUG-260731-03 frontmatter (wave 1)
-- [ ] 187-04-PLAN.md — the config-derived node-face tier in phaseVocabulary.ts (D-187-04 / D-187-05) (wave 1)
-- [ ] 187-05-PLAN.md — the D-181-01 flag-OFF describe-screen markup pin, captured before the template door (wave 1)
+- [x] 187-01-PLAN.md — SC#6 property test over author-declared validator sets, observed RED on HEAD (wave 1)
+- [x] 187-02-PLAN.md — per-step `name` in AUTHORING_SYSTEM_PROMPT + the additive-optional provenance marker on PhaseSpec (wave 1)
+- [x] 187-03-PLAN.md — D-187-11: the `unbound_retrieval` `incomplete` verdict in /validate + BUG-260731-03 frontmatter (wave 1)
+- [x] 187-04-PLAN.md — the config-derived node-face tier in phaseVocabulary.ts (D-187-04 / D-187-05) (wave 1)
+- [x] 187-05-PLAN.md — the D-181-01 flag-OFF describe-screen markup pin, captured before the template door (wave 1)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 187-06-PLAN.md — SC#6 fix shape C: the hoisted pre-body armed checkpoint + the closed Pitfall-4 fail-open (wave 2)
-- [ ] 187-07-PLAN.md — SC#10: the 8-provider authoring roster derived from MODEL_CAPABILITIES (wave 2)
-- [ ] 187-08-PLAN.md — thread the name context through toCanvas + WorkflowCanvas (wave 2)
-- [ ] 187-09-PLAN.md — Req 4: the reveal swaps the canvas subtitle; the spine keeps its plain title (wave 2)
-- [ ] 187-10-PLAN.md — Req 3 demote-on-identity-edit + the receipt/door copy constants in definitionOps (wave 2)
+- [x] 187-06-PLAN.md — SC#6 fix shape C: the hoisted pre-body armed checkpoint + the closed Pitfall-4 fail-open (wave 2)
+- [x] 187-07-PLAN.md — SC#10: the 8-provider authoring roster derived from MODEL_CAPABILITIES (wave 2)
+- [x] 187-08-PLAN.md — thread the name context through toCanvas + WorkflowCanvas (wave 2)
+- [x] 187-09-PLAN.md — Req 4: the reveal swaps the canvas subtitle; the spine keeps its plain title (wave 2)
+- [x] 187-10-PLAN.md — Req 3 demote-on-identity-edit + the receipt/door copy constants in definitionOps (wave 2)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 187-11-PLAN.md — the SC#6 test census re-shape, the green property and the observed falsification (wave 3)
-- [ ] 187-12-PLAN.md — SC#5 checks 1 and 2 as pure-function sweeps over the shipped corpus (wave 3)
-- [ ] 187-13-PLAN.md — Req 5: the post-draft seed receipt (wave 3)
-- [ ] 187-14-PLAN.md — Req 6: the starter template door that seeds the describe box (wave 3)
+- [x] 187-11-PLAN.md — the SC#6 test census re-shape, the green property and the observed falsification (wave 3)
+- [x] 187-12-PLAN.md — SC#5 checks 1 and 2 as pure-function sweeps over the shipped corpus (wave 3)
+- [x] 187-13-PLAN.md — Req 5: the post-draft seed receipt (wave 3)
+- [x] 187-14-PLAN.md — Req 6: the starter template door that seeds the describe box (wave 3)
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 187-15-PLAN.md — the two gated page mounts, the name-context thread and the phase gates (wave 4)
+- [x] 187-15-PLAN.md — the two gated page mounts, the name-context thread and the phase gates (wave 4)
 
 **Wave 5** *(gap closure — `/gsd:verify-work 187` returned `gaps_found` 9/11 with one BLOCKER; operator-scoped to CR-01/CR-02 + the two folded Warnings; no shared files, run in parallel)*
 
-- [ ] 187-16-PLAN.md — **CR-01 (BLOCKER) + CR-02**: the seed receipt stops claiming the AI applied a gate the author's own `citation_policy` applied. The "so I set them to must prove it" lead and the one-way rule count ONLY `detected` steps; `already-set` and `escalated` steps keep their row and gain their own authorship-free sentence, so no ⛨ seal on the canvas is left unexplained (the sketch's own rule — filtering the list would have traded a false sentence for a silent mark). The suite's `citation_policy: "loose"` fixtures — a value the backend `Literal` forbids — become the real default `"strict"`, which is what makes the regression visible at all (wave 5)
-- [ ] 187-17-PLAN.md — **WR-02**: `derivedFace`'s folder tier is gated on the shipped `GROUNDING_DIAL_TYPES`, so a step type that cannot search never renders "Search {folder}". `llm_emit` is deliberately EXCLUDED on measured evidence — `_exec_llm_emit` is a sealed forced emit that builds no phase tool context and never reads `folder_scope`, refuting `LlmEmitPhaseConfig`'s plan-era docblock claim. Closes the test blind spot where every folder case used `llm_agent` (wave 5)
-- [ ] 187-18-PLAN.md — **WR-03**: the `＋` menu row stops reading `PHASE_TYPE_SENTENCES` directly and asks `nodeTitle` over the phase `minimalPhaseFor` will build, so the row and the card can never say two things one click apart. Fix (a), not (b): sketch 148-C keeps BOTH strings, so editing the locked map or deleting derived tier (4) would change the design to hide a consumer bug. Five of six rows proved byte-identical (wave 5)
+- [x] 187-16-PLAN.md — **CR-01 (BLOCKER) + CR-02**: the seed receipt stops claiming the AI applied a gate the author's own `citation_policy` applied. The "so I set them to must prove it" lead and the one-way rule count ONLY `detected` steps; `already-set` and `escalated` steps keep their row and gain their own authorship-free sentence, so no ⛨ seal on the canvas is left unexplained (the sketch's own rule — filtering the list would have traded a false sentence for a silent mark). The suite's `citation_policy: "loose"` fixtures — a value the backend `Literal` forbids — become the real default `"strict"`, which is what makes the regression visible at all (wave 5)
+- [x] 187-17-PLAN.md — **WR-02**: `derivedFace`'s folder tier is gated on the shipped `GROUNDING_DIAL_TYPES`, so a step type that cannot search never renders "Search {folder}". `llm_emit` is deliberately EXCLUDED on measured evidence — `_exec_llm_emit` is a sealed forced emit that builds no phase tool context and never reads `folder_scope`, refuting `LlmEmitPhaseConfig`'s plan-era docblock claim. Closes the test blind spot where every folder case used `llm_agent` (wave 5)
+- [x] 187-18-PLAN.md — **WR-03**: the `＋` menu row stops reading `PHASE_TYPE_SENTENCES` directly and asks `nodeTitle` over the phase `minimalPhaseFor` will build, so the row and the card can never say two things one click apart. Fix (a), not (b): sketch 148-C keeps BOTH strings, so editing the locked map or deleting derived tier (4) would change the design to hide a consumer bug. Five of six rows proved byte-identical (wave 5)
 
 **Wave 6** *(blocked on Wave 5 — records what Wave 5 measured)*
 
