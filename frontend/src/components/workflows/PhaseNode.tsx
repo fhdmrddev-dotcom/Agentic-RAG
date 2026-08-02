@@ -141,7 +141,6 @@ function PhaseNodeImpl({ data, selected }: NodeProps<PhaseCanvasNode>) {
   // The ⌥ reveal rides on `data` (set by the shell), so this leaf has no context
   // dependency of its own and there can never be a second technical-names state.
   const technical = data.technical === true
-  const title = technical ? data.technicalTitle : data.title
 
   // The 3D mark is resolved by `nodePresentation.renderPhaseMark`, a module-scope
   // helper in another file since the 184-03 split — see its docblock for why the
@@ -186,6 +185,26 @@ function PhaseNodeImpl({ data, selected }: NodeProps<PhaseCanvasNode>) {
   // because a comment that still names a slot the component now fills is the same defect
   // as a false docblock.
   //
+  // 187-09 IS THE FIRST CHANGE TO THIS LINE THAT DOES NOT REMOVE A NAME FROM IT, and the
+  // distinction is the whole point. Req 4 / D-187-16 moves the ⌥ reveal out of the TITLE
+  // slot and into the SUBTITLE slot below — a slot the card ALREADY renders and this
+  // adapter ALREADY fills. Nothing was added to the card and no reserved slot was spent:
+  // `technicalLine` is still Phase 188's, and choosing it instead (sketch 149-B) would
+  // have been a Phase 188 scope decision this phase declines to make.
+  //
+  // WHY THE SLOT MOVED. The shipped reveal was a title SWAP, which was cheap while the
+  // plain title was the generic "Work out how to do it"; 187-04's config-derived tier
+  // makes it SPECIFIC, so the same swap destroys real meaning. It also truncated the one
+  // token the reveal exists to show — the title slot is `truncate` at 14px in a 248px
+  // card, so `technicalTitle` rendered as `AI agent step · find-renewal-t…` and the SLUG
+  // clipped. The subtitle slot wraps, so the whole slug reaches the DOM there.
+  //
+  // D-187-06: the type subtitle ALWAYS stays in the reveal-OFF state. Suppressing it
+  // when the derived tier resolved would make card height depend on which tier won and
+  // make the reveal ADD a line rather than swap one. The measured redundancy is confined
+  // to `llm_human_input` and `llm_emit`; it is an accepted cost, recorded, not designed
+  // away.
+  //
   // `data.armed` IS DELIBERATELY UNCONSUMED HERE, and it is not an oversight: the armed
   // action-risk mark is an EDGE, not a node change (plan 185-10 — the detour arc, sketch
   // 147). Do not look for it on the card, and do not add it: a second mark on the face
@@ -195,8 +214,8 @@ function PhaseNodeImpl({ data, selected }: NodeProps<PhaseCanvasNode>) {
       slug={data.slug}
       phaseType={data.phaseType}
       icon={renderPhaseMark(data.phaseType)}
-      title={title}
-      subtitle={data.subtitle}
+      title={data.title}
+      subtitle={technical ? data.technicalTitle : data.subtitle}
       tint={tint}
       badges={badges}
       verdict={verdict}
