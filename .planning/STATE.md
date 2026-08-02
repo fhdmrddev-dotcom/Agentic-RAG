@@ -4,13 +4,13 @@ milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
 status: executing
 last_updated: "2026-08-01T21:34:50.931Z"
-last_activity: 2026-08-02 -- Phase 187 plan 08 complete (nameContext threaded to toCanvas + the tray)
+last_activity: 2026-08-02 -- Phase 187 plan 09 complete (the ⌥ reveal swaps the subtitle; spine title agreement)
 progress:
   total_phases: 19
   completed_phases: 6
   total_plans: 87
-  completed_plans: 72
-  percent: 32
+  completed_plans: 73
+  percent: 33
 ---
 
 # Project State
@@ -227,6 +227,39 @@ holds `phases`, not the definition. **187-15 owes the page-level `assets[] where
 inherited unmeasured. (3) One deviation, in the open: the tray leans on `nodeTitle`'s OWN default
 parameter instead of re-declaring `NO_NAME_CONTEXT` (187-04 kept it module-private) — the identical
 frozen reference, without a fourth copy or a needless export.
+
+**Plan 187-09 COMPLETE (Wave 2, 2026-08-02, `37c898e8` → `3a9f5723` → `0b30dcac` → `8e54edee`).**
+VOCAB-01 / SPEC Req 4 / D-187-06 / D-187-16 — **the ⌥ reveal stops destroying the title, on both
+graph views.** The canvas change is three lines in the ADAPTER and nothing else: `title={data.title}`
+unconditionally, `subtitle={technical ? data.technicalTitle : data.subtitle}`. `technicalTitle`
+already rode on `data`, so **no new `PhaseNodeData` key, no projection change, no snapshot movement**
+(`git status --porcelain` empty for `PhaseNodeCard.tsx`, `canvasModel.ts` and `__snapshots__/`).
+With the reveal ON the card title now EQUALS its reveal-OFF title and the **whole slug reaches the
+DOM uncut** — the subtitle slot wraps where the title slot is `truncate` at 14px in a 248px card,
+which is the measured finding that decided sketch 149-C. `technicalLine` is still NOT passed: the
+slot stays Phase 188's, and the reservation comment was MAINTAINED to say so rather than left.
+The spine got **title agreement only** (D-187-16): `nodeTitle(phase, nameContext)` in both toggle
+states, a new optional `nameContext` prop threaded to that call and nowhere else, and its raw
+`phase_type` chip / `phase_index` line / `aria-label` template untouched — **0 non-comment diff
+lines** match any of the three. `PhaseNode.test.tsx` is **net-new (13 tests)**: the adapter had no
+suite of its own, which is why the reveal could destroy the title unnoticed for four phases.
+`PhaseSpineGraph.test.tsx` 14 → **20**; `PhaseNodeCard.test.tsx` unchanged at 68; the 8-file
+verification set **980 passed, 0 failed** (bar 863); the three `WorkflowCanvas` suites 111 passed;
+7 consumer suites 265 passed. **Both halves observed RED** — 5/13 then 6/20 — before GREEN.
+**Carry forward:** (1) **`PhaseSpineGraph` is no longer a `TechnicalNamesProvider` consumer.** With
+the title no longer swapping, nothing it renders depends on the reveal, and BOTH `tsc -b` (TS6133)
+and ESLint refused the dead read — so the subscription was removed, not left. The app-wide provider
+is untouched and still the ONE technical-names state; a consumer was removed, none added.
+(2) **187-15 owes `nameContext` to the spine mount** in `WorkflowBuilderPage.tsx`, one prop beside
+the canvas prop 187-08 added; omitting it is byte-identical to HEAD and is pinned by its own test.
+(3) **The D-ITEM-183-02 guard trap fired TWICE during execution** — two first-draft source guards
+were satisfiable only by deleting the explanation of the change they checked. Both re-anchored on
+code-only forms; the retired swap expression now survives exactly once, as a guard's positive
+control. Anchor every 187 source guard on a form only CODE can have. (4) `tsc -b` re-measured
+independently: **33 errors, 0 in `components/workflows`, identical before and after** — D-ITEM-01's
+reading holds, inherited unmeasured. (5) `ProblemsTray` was audited for a card↔row disagreement and
+has none: it never swapped — it keeps the plain name and ADDS a mono technical line, the same
+principle 149-C locks. No edit, no deferred item.
 
 (`3713a716`), GOVERN-01/02/03 all `Complete`, `nyquist_compliant` true, SECURED 49/49 (`a00b1cc5`).
 Security found one real fail-open BLOCKER — T-185-04-01, a **typed** refusal on an armed checkpoint ran
