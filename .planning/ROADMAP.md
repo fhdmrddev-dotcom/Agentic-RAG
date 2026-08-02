@@ -415,7 +415,7 @@ Plans:
 
 **Wave 6** *(blocked on Wave 5 — records what Wave 5 measured)*
 
-- [ ] 187-19-PLAN.md — G-4 closure: `187-VALIDATION.md` gains the six closure task rows, four new lived-experience rows (receipt honesty on a real `llm_agent → llm_emit` draft, the zero-detected arrival, the non-retrieval node face, the picker→card agreement), and **M3 is unblocked** — the row the BLOCKER was holding, since the operator would otherwise have been confirming a receipt that lies. Re-measures the zero-migration gate and the D-187-14 mount cap with raw output (wave 6)
+- [x] 187-19-PLAN.md — G-4 closure: `187-VALIDATION.md` gains the six closure task rows, four new lived-experience rows (receipt honesty on a real `llm_agent → llm_emit` draft, the zero-detected arrival, the non-retrieval node face, the picker→card agreement), and **M3 is unblocked** — the row the BLOCKER was holding, since the operator would otherwise have been confirming a receipt that lies. Re-measures the zero-migration gate and the D-187-14 mount cap with raw output (wave 6)
 
 **Cross-cutting constraints:**
 
