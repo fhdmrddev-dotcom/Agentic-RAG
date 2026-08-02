@@ -38,28 +38,41 @@ def _phase(slug="p", on_failure="ask_user"):
     )
 
 
-def _armed_phase(slug="send-the-notice"):
-    """Phase 185 (GOVERN-03) — a phase carrying the ARMED action-risk pre-gate, as
-    ``grounding.effective_phase`` synthesizes it: ``timing="pre"``,
-    ``on_failure="ask_user"``, ``max_retries=0``, prompt in ``config``."""
+def _armed_phase(slug="send-the-notice", *, author_validators=None):
+    """Phase 187 (D-187-01) — the phase the ARMED CHECKPOINT hands this helper.
+
+    RE-SHAPED, and the reason is the whole of plan 187-06. Phase 185 expressed "armed"
+    as a synthesized ``action_risk_approval`` ValidatorSpec that
+    ``grounding.effective_phase`` APPENDED to ``phase.validators`` — so this fixture used
+    to build that spec. ``run_gates`` is first-failure-wins and the append put the armed
+    spec LAST, so any author-declared failing pre gate returned first and the armed one
+    was never evaluated (SEED-137). D-187-01 hoisted the guarantee out of the author's
+    list entirely: arming is now the ``action_risk_armed`` BOOLEAN on the phase, and
+    ``effective_phase`` synthesizes no approval spec at all. A fixture still carrying that
+    spec would be measuring a shape the engine can no longer produce.
+
+    So this is what the hoisted checkpoint actually passes: an ``action_risk_armed=True``
+    phase carrying **the author's own validators** — an empty list by default, because an
+    armed phase owes nothing to the author's list, and a parametrizable set for the tests
+    that need one (see the ``fail_run`` fail-open test at the bottom of this file).
+    """
     from app.models.harness import PhaseSpec, ValidatorSpec
 
     return PhaseSpec(
         slug=slug,
         phase_index=1,
         config={"phase_type": "programmatic", "fn": "noop"},
-        validators=[
-            ValidatorSpec(
-                kind="action_risk_approval",
-                timing="pre",
-                on_failure="ask_user",
-                max_retries=0,
-                config={"prompt": "Step 2 of 4 is about to run."},
-            )
-        ],
+        action_risk_armed=True,
+        validators=[ValidatorSpec(**v) for v in (author_validators or [])],
     )
 
 
+# The wire format the checkpoint sends, NOT a predicate (D-187-01). ``_resolve_failure_
+# with_ask_user``'s DELTA 1 still splits the person's prompt back out of it on ``"|"``, so
+# every armed drive below still passes a prefixed message. What changed is that the ARMED
+# TREATMENT is now requested EXPLICITLY with ``is_action_risk=True`` rather than sniffed
+# out of this string — the caller knows which gate it is, and a helper shared with the
+# author's own ``ask_user`` gates must never guess.
 _ARMED_FINDING = "action_risk:approval|Step 2 of 4 is about to run."
 
 
@@ -363,9 +376,9 @@ def test_armed_decline_fails_the_run_and_writes_no_approval():
          patch("app.services.ask_user_service.subscribe_for_response", subscribe):
         outcome = asyncio.run(
             harness_engine._resolve_failure_with_ask_user(
-                _armed_phase(), _ARMED_FINDING, 0, 0,
+                _armed_phase(), _ARMED_FINDING, 0, None,
                 run_id=uuid4(), pool=object(), redis=object(), ctx=_ctx(),
-                _audit_user_id=uuid4(), is_pre=True,
+                _audit_user_id=uuid4(), is_pre=True, is_action_risk=True,
             )
         )
 
@@ -389,9 +402,9 @@ def test_armed_approval_runs_the_body_and_writes_the_receipt():
          patch("app.services.ask_user_service.subscribe_for_response", subscribe):
         outcome = asyncio.run(
             harness_engine._resolve_failure_with_ask_user(
-                _armed_phase(), _ARMED_FINDING, 0, 0,
+                _armed_phase(), _ARMED_FINDING, 0, None,
                 run_id=uuid4(), pool=object(), redis=object(), ctx=_ctx(),
-                _audit_user_id=uuid4(), is_pre=True,
+                _audit_user_id=uuid4(), is_pre=True, is_action_risk=True,
             )
         )
 
@@ -400,6 +413,23 @@ def test_armed_approval_runs_the_body_and_writes_the_receipt():
     _, kwargs = write_audit.await_args
     assert kwargs["event_type"] == "validator_ask_user_approved"
     assert kwargs["metadata"]["choice"] == "Approve and run this step"
+
+    # ── D-187-18 — THE GOVERNANCE-LEDGER SHAPE CHANGE, PINNED ────────────────────
+    # ``metadata["validator"]`` is ``None`` on a HOISTED armed checkpoint's receipt, and
+    # the key stays PRESENT. This is DELIBERATE, not an oversight. Before D-187-01 the
+    # armed gate was a member of ``phase.validators``, so the receipt could name its
+    # index; after the hoist the checkpoint is not in that list at all and there IS no
+    # index — writing one would be a fiction. The key is kept so there is exactly ONE row
+    # shape per ``event_type`` (two shapes for one event type is worse than an honest
+    # null), and every pre-187 row keeps its int. Both halves are asserted so a future
+    # edit can neither quietly drop the key nor quietly invent an index.
+    assert "validator" in kwargs["metadata"], (
+        "the receipt dropped the 'validator' key — one event_type must keep one row shape"
+    )
+    assert kwargs["metadata"]["validator"] is None, (
+        f"the hoisted checkpoint's receipt named validator index "
+        f"{kwargs['metadata']['validator']!r} — after D-187-01 it has no index (D-187-18)"
+    )
 
 
 def test_armed_empty_answer_fails_the_run():
@@ -417,9 +447,9 @@ def test_armed_empty_answer_fails_the_run():
          patch("app.services.ask_user_service.subscribe_for_response", subscribe):
         outcome = asyncio.run(
             harness_engine._resolve_failure_with_ask_user(
-                _armed_phase(), _ARMED_FINDING, 0, 0,
+                _armed_phase(), _ARMED_FINDING, 0, None,
                 run_id=uuid4(), pool=object(), redis=object(), ctx=_ctx(),
-                _audit_user_id=uuid4(), is_pre=True,
+                _audit_user_id=uuid4(), is_pre=True, is_action_risk=True,
             )
         )
 
@@ -443,9 +473,9 @@ def test_armed_decline_by_choice_index_also_fails():
          patch("app.services.ask_user_service.subscribe_for_response", subscribe):
         outcome = asyncio.run(
             harness_engine._resolve_failure_with_ask_user(
-                _armed_phase(), _ARMED_FINDING, 0, 0,
+                _armed_phase(), _ARMED_FINDING, 0, None,
                 run_id=uuid4(), pool=object(), redis=object(), ctx=_ctx(),
-                _audit_user_id=uuid4(), is_pre=True,
+                _audit_user_id=uuid4(), is_pre=True, is_action_risk=True,
             )
         )
 
@@ -475,7 +505,7 @@ def test_armed_decline_by_choice_index_also_fails():
 # free-text box, not the buttons. The 14 tests above are untouched.
 
 
-def _drive(phase, finding, payload, *, is_pre=True):
+def _drive(phase, finding, payload, *, is_pre=True, is_action_risk=False):
     """Drive ONE answer through ``_resolve_failure_with_ask_user`` and return
     ``(outcome, write_audit_mock)``.
 
@@ -484,6 +514,13 @@ def _drive(phase, finding, payload, *, is_pre=True):
     insert), ``write_audit`` patched on the engine module (the receipt counter), and
     ``ask_user_service.subscribe_for_response`` patched to hand back ``payload`` (the
     085 block primitive). No conftest, no fixture — same shape, one place.
+
+    ``is_action_risk`` (D-187-01) requests the ARMED TREATMENT explicitly, the way the
+    hoisted checkpoint does. It defaults to ``False``, so every NON-armed caller of this
+    helper — including the D-14 regression fence below — drives byte-identically to what
+    shipped. ``failed_idx`` follows it: an armed checkpoint has NO index into
+    ``phase.validators`` (that is the whole point of the hoist), so it passes ``None``,
+    while the non-armed path keeps the ``0`` it always passed.
     """
     from app.services import harness_engine
 
@@ -494,9 +531,9 @@ def _drive(phase, finding, payload, *, is_pre=True):
          patch("app.services.ask_user_service.subscribe_for_response", subscribe):
         outcome = asyncio.run(
             harness_engine._resolve_failure_with_ask_user(
-                phase, finding, 0, 0,
+                phase, finding, 0, None if is_action_risk else 0,
                 run_id=uuid4(), pool=object(), redis=object(), ctx=_ctx(),
-                _audit_user_id=uuid4(), is_pre=is_pre,
+                _audit_user_id=uuid4(), is_pre=is_pre, is_action_risk=is_action_risk,
             )
         )
     return outcome, write_audit
@@ -551,7 +588,7 @@ def test_armed_typed_refusal_is_never_approval():
     """
     for answer in _ARMED_NON_APPROVALS:
         outcome, write_audit = _drive(
-            _armed_phase(), _ARMED_FINDING, _typed(answer)
+            _armed_phase(), _ARMED_FINDING, _typed(answer), is_action_risk=True
         )
         assert outcome is not None, (
             f"answer {answer!r} returned None on a PRE gate — the risky step body "
@@ -570,7 +607,8 @@ def test_armed_typed_refusal_is_never_approval():
     # POSITIVE CONTROL, same harness, same run. Without it "0 receipts" could be
     # vacuously true — this proves the counter moves and the assertions above can fail.
     outcome, write_audit = _drive(
-        _armed_phase(), _ARMED_FINDING, _typed("Approve and run this step")
+        _armed_phase(), _ARMED_FINDING, _typed("Approve and run this step"),
+        is_action_risk=True,
     )
     assert outcome is None, "the exact presented label must proceed (pre-gate → None)"
     assert write_audit.await_count == 1
@@ -587,6 +625,7 @@ def test_armed_approval_by_choice_index_still_proceeds():
     outcome, write_audit = _drive(
         _armed_phase(), _ARMED_FINDING,
         {"kind": "response", "response_text": "", "choice_index": 0},
+        is_action_risk=True,
     )
 
     assert outcome is None, "clicking Approve must run the body (pre-gate → None)"
@@ -670,3 +709,80 @@ def test_approve_label_has_exactly_one_home():
         "the approve label classifies as abort-like — the armed path would fail_run on "
         "its own approval before reaching the allow-list"
     )
+
+
+# ══ Phase 187 (D-187-01 / RESEARCH Pitfall 4) — THE DISPOSITION FAIL-OPEN ══════
+#
+# The Phase-185 armed gate was a MEMBER of ``phase.validators``, so when it failed,
+# ``failed_idx`` pointed at it and ``_failing_on_failure`` read the armed spec's own
+# ``ask_user``. After the hoist the checkpoint has NO index — and
+# ``_failing_on_failure(phase, None)`` falls back to ``validators[0]``, i.e. to an
+# AUTHOR's disposition. An author who wrote ``on_failure: "fail_run"`` on an ordinary
+# gate would therefore route the armed checkpoint straight into ``_route_on_failure``
+# and THE PERSON WOULD NEVER BE ASKED — the same class of fail-open as the Phase-185
+# BLOCKER T-185-04-01, reached by a completely different road.
+#
+# The SC#6 property test (``test_187_armed_checkpoint_property.py``) sees this through
+# its ``pre_pass_fail_run_disposition`` row. This test asserts the same short-circuit at
+# the HELPER, one layer down, so the guarantee does not depend on a single observer.
+
+
+def test_armed_checkpoint_on_a_fail_run_phase_still_asks():
+    """T-187-11-04. An armed checkpoint on a phase whose AUTHOR declared
+    ``on_failure: "fail_run"`` still PAUSES for a person.
+
+    ``is_action_risk=True`` must SHORT-CIRCUIT the disposition resolution entirely —
+    ``_failing_on_failure`` is not consulted, so ``validators[0].on_failure`` cannot
+    speak for the checkpoint. The observable is the rendezvous itself: if
+    ``subscribe_for_response`` was never awaited, nobody was asked, and whatever the
+    outcome says the guarantee is broken.
+
+    The negative control is in the same test: the SAME phase and the SAME finding
+    WITHOUT the parameter delegates to ``_route_on_failure`` and never subscribes — which
+    is both the correct non-armed behaviour and the proof that this assertion is not
+    vacuous (a helper that always subscribed would satisfy the positive half too).
+    """
+    from app.services import harness_engine
+
+    author_fail_run = [{"kind": "freshness", "timing": "pre", "on_failure": "fail_run"}]
+
+    # ── the ARMED call: the author's fail_run must not speak for the checkpoint ──
+    subscribe = AsyncMock(
+        return_value={"kind": "response", "response_text": "Approve and run this step"}
+    )
+    with patch.object(harness_engine, "write_audit", AsyncMock()), \
+         patch("app.services.ask_user_service.subscribe_for_response", subscribe):
+        outcome = asyncio.run(
+            harness_engine._resolve_failure_with_ask_user(
+                _armed_phase(author_validators=author_fail_run),
+                _ARMED_FINDING, 0, None,
+                run_id=uuid4(), pool=object(), redis=object(), ctx=_ctx(),
+                _audit_user_id=uuid4(), is_pre=True, is_action_risk=True,
+            )
+        )
+
+    subscribe.assert_awaited(), (
+        "the armed checkpoint never reached the rendezvous — the author's "
+        "validators[0].on_failure='fail_run' routed it away and NOBODY WAS ASKED "
+        "(RESEARCH Pitfall 4)"
+    )
+    assert subscribe.await_count == 1
+    assert outcome is None, "an approval on a PRE gate must return None (run the body)"
+
+    # ── the NEGATIVE CONTROL, same phase, same finding, no parameter ──
+    # Without ``is_action_risk`` this is an ordinary gate failure on a phase whose first
+    # validator says fail_run, so the sync mapper handles it and nobody is asked. That is
+    # correct AND it proves the assertion above measures something.
+    subscribe2 = AsyncMock()
+    with patch.object(harness_engine, "write_audit", AsyncMock()), \
+         patch("app.services.ask_user_service.subscribe_for_response", subscribe2):
+        plain = asyncio.run(
+            harness_engine._resolve_failure_with_ask_user(
+                _armed_phase(author_validators=author_fail_run),
+                _ARMED_FINDING, 0, 0,
+                run_id=uuid4(), pool=object(), redis=object(), ctx=_ctx(),
+                _audit_user_id=uuid4(), is_pre=True,
+            )
+        )
+    subscribe2.assert_not_awaited()
+    assert plain is not None and plain.kind == "fail_run"
