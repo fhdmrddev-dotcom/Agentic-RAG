@@ -32,20 +32,40 @@
  *   - the spine now renders the 3D fluent-emoji marks (finishing the Phase 127
  *     migration this file was left out of);
  *   - the DEFAULT node face is the plain-language business sentence (D-183-06), and
- *     the slug stays REVEALABLE through the app-wide ⌥ Technical-names state
- *     (D-183-08). The spine is a leaf CONSUMER of that state — the control ships in
- *     Settings, the operator band and (from 183) the canvas header, never here, so
- *     two controls can never disagree.
+ *     the slug stays REVEALABLE — see the paragraph below for where, since 187-09.
+ *
+ * Phase 187-09 (SPEC Req 4 / D-187-16) — THIS COMPONENT IS NO LONGER A CONSUMER OF THE
+ * ⌥ TECHNICAL-NAMES STATE, and the removal is the point rather than an oversight. 183-04
+ * made the spine SWAP its title under the reveal, mirroring the canvas card. 187-04 gave
+ * `nodeTitle` a config-derived tier, which makes the plain title SPECIFIC — so the swap
+ * began destroying real meaning, and on the card it also truncated the slug it existed
+ * to show. The canvas therefore moved its reveal into the card's SUBTITLE slot; this
+ * surface has no subtitle slot, so it stops swapping instead, and the two views one
+ * toggle apart agree on the TITLE in both toggle states.
+ *
+ * Nothing was hidden by that. The technical vocabulary was never behind the reveal HERE:
+ * the mono chip beside each title prints the RAW `phase_type` unconditionally, the line
+ * beneath prints the RAW `phase_index`, and the `aria-label` carries the raw type — all
+ * three with the reveal OFF. With the title no longer swapping, no rendered value on this
+ * surface depends on the reveal at all, so the subscription that used to read it was dead
+ * code and is gone (`tsc -b` and ESLint both said so, which is how it was found rather
+ * than assumed). The app-wide `TechnicalNamesProvider` is untouched and remains the ONE
+ * technical-names state; the canvas is still its consumer, and the control still ships in
+ * Settings, the operator band and the canvas header — never here.
+ *
+ * `nameContext` (D-187-05) is the page-owned folder/skill id→name lookup the derived tier
+ * needs. It is OPTIONAL, it reaches `nodeTitle` and nowhere else, and an absent one makes
+ * every derived tier MISS — the generic type sentence renders, never a fabricated or
+ * id-shaped face — so a caller that omits it renders byte-identically to HEAD.
  */
 import { PHASE_GLYPHS } from "@/components/workflows/soulData"
 import {
   nodeTitle,
   parseSkipTarget,
-  technicalTitle,
+  type NameContext,
   type PhaseSpecJSON,
 } from "@/components/workflows/phaseVocabulary"
 import { phaseGlyph } from "@/lib/phaseGlyph"
-import { useTechnicalNamesOptional } from "@/providers/TechnicalNamesProvider"
 
 /** The verbatim read-only legend (locked contract — sketch 019-D / 103-PLAN). */
 export const READ_ONLY_LEGEND =
@@ -58,17 +78,18 @@ export interface PhaseSpineGraphProps {
   selectedSlug: string | null
   /** Selection only — NEVER reorders. Fires the clicked phase's slug. */
   onSelectNode: (slug: string) => void
+  /** The page-owned folder/skill id→name maps and the definition's template filename
+   *  (Phase 187 / D-187-05). Absent ⇒ every derived tier misses and the generic type
+   *  sentence renders — never a fabricated or id-shaped face. */
+  nameContext?: NameContext
 }
 
-export function PhaseSpineGraph({ phases, selectedSlug, onSelectNode }: PhaseSpineGraphProps) {
-  // D-183-08 — the app-wide ⌥ Technical-names reveal, read (never owned) here. The
-  // OPTIONAL accessor is deliberate: outside a provider it returns null and the
-  // spine falls back to plain language, so this component still renders in a
-  // provider-less unit test. The canvas (183-06) reads the SAME state with the SAME
-  // fallback ordering, which is what makes a Spine/Canvas title disagreement
-  // structurally impossible.
-  const showTechnical = useTechnicalNamesOptional()?.showTechnical ?? false
-
+export function PhaseSpineGraph({
+  phases,
+  selectedSlug,
+  onSelectNode,
+  nameContext,
+}: PhaseSpineGraphProps) {
   // Sort by phase_index (strict run order). The input array order is irrelevant.
   const ordered = [...phases].sort((a, b) => a.phase_index - b.phase_index)
   const slugSet = new Set(ordered.map((p) => p.slug))
@@ -122,7 +143,35 @@ export function PhaseSpineGraph({ phases, selectedSlug, onSelectNode }: PhaseSpi
           const glyphFallback = PHASE_GLYPHS[phase.config.phase_type] ?? "•"
           // Resolved ONCE and used in BOTH the visible title and the accessible
           // name, so they can never drift apart (WCAG 2.5.3 label-in-name).
-          const title = showTechnical ? technicalTitle(phase) : nodeTitle(phase)
+          //
+          // THE SPINE NO LONGER SWAPS THIS (Phase 187 / SPEC Req 4 / D-187-16). Until
+          // 187-09 this line was a ternary on the ⌥ reveal, choosing the technical
+          // `<type label> · <slug>` form over the plain one and mirroring the canvas
+          // card's swap. (The retired expression is quoted verbatim exactly once, as the
+          // positive control of the source guard in `PhaseSpineGraph.test.tsx` — a
+          // control string is the one place it cannot be mistaken for live code, and it
+          // keeps this file's acceptance grep for the retired form honestly at zero.)
+          // The canvas moved its ⌥ reveal into the
+          // card's SUBTITLE slot, because 187-04's config-derived tier makes the plain
+          // title specific and the swap destroyed it (and truncated the slug it was
+          // meant to reveal). This surface has NO subtitle slot to move into, so the
+          // only way the two views one toggle apart can still agree is for the spine to
+          // stop swapping.
+          //
+          // THE ASYMMETRY IS RECORDED, NOT DESIGNED AWAY, and it costs nothing because
+          // this surface never hid the technical vocabulary in the first place: the mono
+          // chip below prints the RAW `phase_type` unconditionally, the line beneath it
+          // prints the RAW `phase_index`, and the `aria-label` carries the raw type too —
+          // all three with the reveal OFF. So Req 4's "both graph views agree in both
+          // toggle states" is satisfied on the TITLE, which is exactly what the SPEC's
+          // acceptance criterion says. Giving the spine a subtitle consumer, or stripping
+          // its raw chrome, would both grow scope into this component's layout for no
+          // Req-4 gain.
+          //
+          // `nameContext` (D-187-05) is the page-owned id→name lookup 187-04's derived
+          // tier needs; it reaches `nodeTitle` and nowhere else. Absent ⇒ every derived
+          // tier misses and the generic type sentence renders, byte-identically to HEAD.
+          const title = nodeTitle(phase, nameContext)
           const isEmit = phase.config.phase_type === "llm_emit"
           // The dashed on-fail edges originating at THIS node (rendered as a labeled
           // skip-branch row beneath the node; the target slug is declared for assertion).

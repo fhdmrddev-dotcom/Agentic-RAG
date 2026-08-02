@@ -495,17 +495,38 @@ describe("PhaseSpineGraph — the injected name context (D-187-05)", () => {
 
   it("the SOURCE stops swapping the title and spends the context in ONE place", () => {
     // The `?raw` house idiom, carrying the D-187-16 change as a machine-checkable fact.
-    // Anchored on the SWAP EXPRESSION, not on the bare identifier, so this file's own
-    // prose above may keep explaining what the spine used to do.
-    expect(phaseSpineGraphSource).not.toMatch(/showTechnical \? technicalTitle/)
-    // Positive control: the same regex matches the expression as it was shipped.
-    expect("const t = showTechnical ? technicalTitle(phase) : nodeTitle(phase)").toMatch(
-      /showTechnical \? technicalTitle/,
+    //
+    // ANCHORED ON THE ASSIGNMENT FORM, not on the swap expression alone. The component's
+    // own comment must be free to QUOTE the line it replaced — that quotation is how a
+    // later reader learns what the spine used to do — and a needle spelling only
+    // `showTechnical ? technicalTitle` would then be findable in the prose, so the guard
+    // could pass only by deleting the explanation. That is the D-ITEM-183-02 trap this
+    // project has hit half a dozen times, and it fired HERE on the first run of this
+    // test; the fix is a form only CODE can have.
+    expect(phaseSpineGraphSource).not.toMatch(/const title = showTechnical/)
+    // Positive control: the same regex matches the statement as it was shipped.
+    expect("const title = showTechnical ? technicalTitle(phase) : nodeTitle(phase)").toMatch(
+      /const title = showTechnical/,
     )
-    // The context reaches `nodeTitle` and nothing else: declared on the props, taken off
-    // the props, and used once. Three occurrences, no fourth.
+    // The reveal subscription itself is gone, because with the title no longer swapping
+    // NOTHING this component renders depends on it — `tsc -b` and ESLint both refused the
+    // dead read. Anchored on the CALL form so the docblock may still name the provider
+    // when explaining that the app-wide state is untouched.
+    expect(phaseSpineGraphSource).not.toMatch(/useTechnicalNamesOptional\(/)
+    expect("const s = useTechnicalNamesOptional()?.showTechnical").toMatch(
+      /useTechnicalNamesOptional\(/,
+    )
+    // The context reaches `nodeTitle` and NOTHING else. Counted on the ARGUMENT form
+    // rather than on the bare identifier for the same reason as above: the component's
+    // docblock and the prop's own JSDoc both name it in prose, and a bare-identifier
+    // count would be measuring how much was written about it. (That is not
+    // hypothetical — the first draft of this assertion counted 5 where it expected 3,
+    // and all five were honest: two declarations, one call and two explanations.)
     expect(phaseSpineGraphSource).toMatch(/nodeTitle\(phase, nameContext\)/)
-    expect((phaseSpineGraphSource.match(/nameContext/g) ?? []).length).toBe(3)
+    expect((phaseSpineGraphSource.match(/nameContext\)/g) ?? []).length).toBe(1)
+    // …declared exactly once on the props, and resolved by exactly one `nodeTitle` call.
+    expect((phaseSpineGraphSource.match(/nameContext\?: NameContext/g) ?? []).length).toBe(1)
+    expect((phaseSpineGraphSource.match(/nodeTitle\(/g) ?? []).length).toBe(1)
     // The raw chrome is still declared here — the fence is not passing because the
     // markup it guards disappeared.
     expect(phaseSpineGraphSource).toMatch(/phase\.config\.phase_type/)
