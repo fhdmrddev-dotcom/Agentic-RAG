@@ -417,6 +417,14 @@ Plans:
 
 - [x] 187-19-PLAN.md — G-4 closure: `187-VALIDATION.md` gains the six closure task rows, four new lived-experience rows (receipt honesty on a real `llm_agent → llm_emit` draft, the zero-detected arrival, the non-retrieval node face, the picker→card agreement), and **M3 is unblocked** — the row the BLOCKER was holding, since the operator would otherwise have been confirming a receipt that lies. Re-measures the zero-migration gate and the D-187-14 mount cap with raw output (wave 6)
 
+**Wave 7** *(gap closure round 3 — `/gsd:verify-work 187` re-verified `gaps_found` 10/11; the round-2 fix for CR-01 introduced its own unguarded sentence; operator-scoped to CR-03 + WR-09 ONLY)*
+
+- [ ] 187-20-PLAN.md — **CR-03 (BLOCKER) + WR-09**: the seed receipt's carried paragraph (`seed-receipt-carried`) gains the rendered coverage its sibling already has — presence, count, character-identity against `seedReceiptCarriedLead`, and the zero case — and the sentence itself stops attributing the seal to a cause it cannot know. Measured at HEAD: `grep -rn "seed-receipt-carried" frontend/src/` returns ONE hit, the component's own attribute, so the paragraph could be deleted, print the wrong number or drift from its formatter with all 452 tests green. WR-09 fix shape (a) — cause-agnostic by DELETING the false ` by its own settings` clause, not the reviewer's suggested replacement: "more" is an antecedent word and the paragraph renders ALONE on the typical non-KB draft, which `definitionOps.test.ts`'s own self-containment regex forbids. Four falsification probes (delete the paragraph / corrupt the count / drift the text / blind the guard) are each observed RED and reverted — the property, not the patch (wave 7)
+
+**Wave 8** *(blocked on Wave 7 — records what Wave 7 measured)*
+
+- [ ] 187-21-PLAN.md — G-4 closure for round 3: `187-VALIDATION.md` gains the three task rows, the four probe records, the before/after testid-coverage sweep and every re-measured gate with raw output. **M3 and M9's notes are repaired** — both currently warn the operator to expect an internally-contradictory card on an escalated draft, which stops being true once 187-20 lands — and a new **M13** covers the escalated-only draft head-on, the exact case WR-09 broke and no shipped row tests directly. WR-08 is named as rolled into Phase 188, never as closed. Nothing is ticked (wave 8)
+
 **Cross-cutting constraints:**
 
 - ZERO migration files are added
