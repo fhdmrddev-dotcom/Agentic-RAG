@@ -1,23 +1,33 @@
 ---
 phase: 187-business-vocabulary-ai-seeded-canvas
-verified: 2026-08-02T03:25:40Z
+verified: 2026-08-02T09:30:00Z
 status: gaps_found
-score: 9/11 must-haves verified
+score: 10/11 must-haves verified
 overrides_applied: 0
+re_verification:
+  previous_status: gaps_found
+  previous_score: 9/11
+  gaps_closed:
+    - "CR-01: the receipt's lead sentence no longer counts already-set/escalated steps under a 'so I set them' authorship claim — confirmed live at HEAD, SeedReceipt.tsx:212-217 splits detectedCount from carriedCount at the point of use"
+    - "CR-02: SeedReceipt.test.tsx's llm_emit fixtures now use the shipped, real backend default citation_policy: 'strict' (not the unrepresentable 'loose'), with a representability guard pinning the member set"
+    - "WR-02: derivedFace's folder tier (3) is now gated on GROUNDING_DIAL_TYPES (llm_agent, llm_batch_agents only) — confirmed live at phaseVocabulary.ts:516, a step type that cannot search no longer renders 'Search {folder}'"
+  gaps_remaining:
+    - "VOCAB-02 Req 5 (seed receipt legibility) is STILL FAILED, for a narrower, DIFFERENT reason than round 1. CR-01's fix (187-16) introduced a new sentence, seedReceiptCarriedLead ('N steps were already set to must prove it by its own settings'), which has ZERO test assertions anywhere in the repo (CR-03, confirmed live) and misattributes the 'escalated' cause (an author's deliberate hand-toggle) to 'its own settings' — a passive-policy phrase that is true of 'already-set' but false of 'escalated' (WR-09, confirmed live). This is the same failure class (a sentence claiming something false about who did what) recurring inside the very fix that closed the first instance."
+  regressions: []
 gaps:
-  - truth: "A seeded draft with grounded steps shows a receipt naming exactly those steps, with reasons; a seeded draft with zero grounded steps shows no grounded-step list (SPEC Req 5 acceptance)"
+  - truth: "A seeded draft with grounded steps shows a receipt naming exactly those steps, with reasons; a seeded draft with zero grounded steps shows no grounded-step list; every rendered sentence is honest about who applied the gate (SPEC Req 5 acceptance, extended by the CR-01 closure's own stated properties)"
     status: failed
-    reason: "SeedReceipt.tsx includes ALL non-null groundingCauseOf results ('detected', 'already-set', 'escalated') under one lead sentence ('N steps read your documents, so I set them to must prove it') that is only true for 'detected'. LlmEmitPhaseConfig.citation_policy defaults to 'strict' (backend/app/models/harness.py:155) and POST /generate emits Pydantic defaults, so virtually every generated llm_emit phase resolves to 'already-set' and is counted — even when the step reads no documents. Both curated starter spines are llm_agent -> llm_emit (StarterTemplatePicker.tsx:50-53), so this fires on the typical draft, not an edge case. Confirmed live at HEAD by direct code read (not from REVIEW.md alone): SeedReceipt.tsx:173-186 `if (cause === null) continue`, definitionOps.ts:556-563 `seedReceiptGroundingLead` composes one sentence over the raw row count regardless of which cause populated it. This falsifies SC#3's legibility purpose for the surface built to discharge it — the receipt states a governance action the AI did not take."
+    reason: "CR-01/CR-02 (round 1's blocker) are genuinely closed — confirmed independently: SeedReceipt.tsx:212-217 splits detectedCount from carriedCount, the detected-only lead is the only sentence making the 'so I set them' authorship claim, and SeedReceipt.test.tsx:104-109/127-150 use the real backend default 'strict' instead of the unrepresentable 'loose'. But the CR-01 fix introduced a NEW sentence — seedReceiptCarriedLead (definitionOps.ts:613-620), rendered as the 'seed-receipt-carried' paragraph (SeedReceipt.tsx:274-281) — that has two independently confirmed defects: (1) CR-03 — `grep -rn \"seed-receipt-carried\" frontend/src/` returns exactly ONE hit, the component's own data-testid attribute; no test file queries it, imports seedReceiptCarriedLead for a rendered assertion, or checks its count, so the paragraph could be deleted, show the wrong count, or drift from its formatter and all 452 passing tests would stay green — directly contradicting SeedReceipt.test.tsx's own docblock claim that 'every sentence is compared character-for-character against its definitionOps export'; (2) WR-09 — the sentence conflates 'already-set' (a policy default) and 'escalated' (the author's deliberate hand-toggle) into one claim, 'was already set to must prove it by its own settings' — which is literally false for an escalated step, since GROUNDING_WHY_ESCALATED (definitionOps.ts:475) and seedReceiptStepReason('escalated') (definitionOps.ts:654) both correctly say 'you turned this on by hand' two lines below the SAME card. On an escalated-only draft the receipt contradicts itself between its lead paragraph and its own per-step reason. This is CR-01's exact failure shape (a sentence misattributing who applied a governance gate) recurring inside the code that fixed CR-01, one plan later, unguarded by any test."
     artifacts:
       - path: "frontend/src/components/workflows/SeedReceipt.tsx"
-        issue: "rows built from `if (cause === null) continue` (line ~177) — keeps already-set/escalated causes under the detected-only lead sentence (CR-01, confirmed live)"
+        issue: "lines 274-281 render the carried paragraph with data-testid=seed-receipt-carried; confirmed zero test files query this testid (only the component itself references the string)"
       - path: "frontend/src/components/workflows/definitionOps.ts"
-        issue: "seedReceiptGroundingLead (line ~556) composes 'N steps read your documents, so I set them to must prove it' over the total row count irrespective of cause"
+        issue: "seedReceiptCarriedLead (line 613-620) merges already-set + escalated into one 'by its own settings' claim; false for the escalated cause, whose own per-step reason (line 654, 'you turned this on by hand') directly contradicts it on the same card"
       - path: "frontend/src/components/workflows/SeedReceipt.test.tsx"
-        issue: "llm_emit fixtures (lines 91, 107) use citation_policy: 'loose', which is NOT a member of the backend Literal['strict','flag','partial','draft'] (harness.py:155) — an unrepresentable state is what lets 'lists EXACTLY the steps that read the documents' and the zero-grounded case pass (CR-02, confirmed live)"
+        issue: "does not import seedReceiptCarriedLead, never queries seed-receipt-carried, and its 'renders each sentence identically to its definitionOps export' case enumerates heading/lead/one-way/close and stops before the carried sentence"
     missing:
-      - "Restrict SeedReceipt's rows list to cause === 'detected' only, or compose a distinct sentence per cause instead of one sentence over the total (the review's proposed fix at REVIEW.md CR-01)"
-      - "Fix SeedReceipt.test.tsx's llm_emit fixtures to citation_policy: 'strict' (the real, only-reachable default) and add a case pinning what the receipt says about an already-set step and an escalated step, so this regression class is observable going forward"
+      - "Add SeedReceipt.test.tsx assertions for the carried paragraph: presence, count (character-identical to seedReceiptCarriedLead(carriedCount)), and the zero-carried case where it must be absent — the same rigor already applied to its sibling detected paragraph"
+      - "Either give 'escalated' its own sentence, or make seedReceiptCarriedLead cause-agnostic (e.g. 'N more steps were already set to must prove it before I started' — claims nothing about settings vs. hand-toggle) so it is true of both causes it covers"
 human_verification:
   - test: "M1 — every node face says what THIS step does (reads distinctly to a business user)"
     expected: "Generate a real 5-step workflow; every face is specific, none is a generic type sentence when a skill/template/folder is bound"
@@ -26,14 +36,14 @@ human_verification:
     expected: "Toggling ⌥ ON/OFF x3 on canvas and spine: title unchanged, no height jump, full slug visible with no ellipsis"
     why_human: "Perceptual layout stability cannot be asserted from jsdom (Req 4)"
   - test: "M3 — the seed receipt arrives once, its seal pulses once, and implies nothing is still deciding"
-    expected: "Watch arrival on a throttled connection; single batch entrance, no staged/staggered reveal"
-    why_human: "Temporal + perceptual behavior (Req 5) — NOTE: fix the CR-01 gap before running this, or the operator will be confirming a receipt that lies"
+    expected: "Watch arrival on a throttled connection on a REAL generated draft; single batch entrance, no staged/staggered reveal"
+    why_human: "Temporal + perceptual behavior (Req 5) — unblocked by the CR-01 fix, but NOTE the residual CR-03/WR-09 gap above means the operator should also read the carried sentence against the per-step reasons on an escalated draft, not just watch the animation"
   - test: "M4 — the derived face tracks a skill bind/unbind live, without a save and without flicker"
     expected: "Bind a skill to a step, then unbind, watching the face update on the async name-map settle"
     why_human: "The mount-fetch settle (miss-on-first-paint, resolve-on-mount) is only observable live, not in a render test (Req 1 / Pitfall-1)"
   - test: "M5 — the seeded describe text reads like something a person typed"
     expected: "Pick each of the 3 starter templates; the filled describe box reads naturally"
-    why_human: "Copy-quality judgement (Req 6)"
+    why_human: "Copy-quality judgement (Req 6) — unchanged and still owed, untouched by the closure round"
   - test: "M6 — SC#6 live: an armed checkpoint cannot be preempted by an author-declared pre-gate"
     expected: "Run an armed phase carrying a timing=\"pre\" ask_user validator. Answer the author's gate Proceed; confirm the ARMED checkpoint still appears in the chat PendingAskCard. Refuse it. Confirm the step did NOT run and harness_audit has ZERO validator_ask_user_approved rows for it."
     why_human: "Needs a live Redis rendezvous + a real browser answer; the property test proves the property in isolation but this is the end-to-end confirmation the SPEC's own acceptance criteria require"
@@ -42,18 +52,32 @@ human_verification:
     why_human: "Requires a backend restart; the 8-row roster test proves the service function in isolation, not the env-to-running-process path"
   - test: "M8 — flag-OFF Builder first screen is byte-identical to today (whole-screen read)"
     expected: "Turn visual_workflow_canvas OFF; open the Builder's first screen; confirm no template line and nothing else changed"
-    why_human: "An automated byte-pin (D-181-01, WorkflowBuilderPage.describe.test.tsx) covers the CTA flex column only; the manual row looks at the whole screen"
+    why_human: "An automated byte-pin (D-181-01, WorkflowBuilderPage.describe.test.tsx) covers the CTA flex column only; the manual row looks at the whole screen — unchanged by the closure round, re-confirmed byte-identical (git diff --numstat ee5fff3b HEAD -- WorkflowBuilderPage.tsx is empty)"
+  - test: "M9 — the receipt's two paragraphs read as ONE honest account on a typical generated draft"
+    expected: "Generate a real llm_agent -> llm_emit draft; the detected sentence counts only steps that actually retrieved; the deliverable still explains its own seal; no sentence claims the AI applied a gate its own citation_policy default applied; the one-way rule sits only with the detected paragraph"
+    why_human: "Whether two sentences read one after another as coherent or contradictory is a judgement only a person can make (Req 5 / VOCAB-02, CR-01 closure)"
+  - test: "M10 — the zero-detected draft still arrives as one thing, not a card with a hole in it"
+    expected: "Describe a workflow with no retrieval at all; the receipt still arrives whole, with heading and closing line intact and the one-way sentence absent"
+    why_human: "A person is needed to see whether a component with a paragraph removed still reads as compositionally whole (Req 5 / D-187-10)"
+  - test: "M11 — the card states no capability the step lacks, and still states the one it has"
+    expected: "Bind a folder on a step type that cannot search (e.g. llm_single or human-input): the card must NOT say 'Search {folder}'. Bind the same folder on an agent step: it must say 'Search {folder}'. Read both side by side."
+    why_human: "The contrast is only convincing when two cards are seen together — two isolated unit tests never show it (Req 1 / VOCAB-01, WR-02 closure)"
+  - test: "M12 — the + row promises the sentence the card that lands actually says"
+    expected: "Open + on the lane, read every row aloud, click the human-input row, confirm the card says the same sentence the row promised; repeat with a control row"
+    why_human: "The drift this row is testing for was semantic, not lexical — a person reading two sentences one click apart is the only instrument that catches it (Req 1 / VOCAB-01, WR-03 closure) — NOTE: confirmed live that WR-03's fix is only PARTIAL (WR-08): StepTypePickerProps carries no nameContext field at all, so an llm_emit row with a template asset will still read 'Produce the deliverable' in the menu while the card that lands reads 'Fill <filename>.docx' — the operator running this row should specifically try the deliverable/llm_emit row on a template-bearing draft, not just the human-input control"
 ---
 
 # Phase 187: Business Vocabulary + AI-Seeded Canvas Verification Report
 
 **Phase Goal:** A business user sees plain-language node verbs and can describe a workflow in
-natural language to get a safe, editable seeded canvas draft — the AI seed respects grounding mode
-(a seeded grounded node auto-gets its citation/confidence gate — safe-by-construction).
+natural language to get a safe, editable seeded canvas draft (AI + visual, not either/or) — and the
+AI seed respects grounding mode (a seeded grounded node auto-gets its citation/confidence gate —
+safe-by-construction).
 **Requirements:** VOCAB-01, VOCAB-02, VOCAB-03 (+ SC#6 / SEED-137, folded 2026-07-31)
-**Verified:** 2026-08-02T03:25:40Z
+**Verified:** 2026-08-02T09:30:00Z
 **Status:** gaps_found
-**Re-verification:** No — initial verification
+**Re-verification:** Yes — after gap closure (plans 187-16, 187-17, 187-18, 187-19; round-2 code
+review `187-REVIEW.md`, commit `025fb4c3`)
 
 ## Goal Achievement
 
@@ -61,117 +85,143 @@ natural language to get a safe, editable seeded canvas draft — the AI seed res
 
 | # | Truth | Status | Evidence |
 |---|-------|--------|----------|
-| 1 | VOCAB-01 (Req 1): `nodeTitle()` resolves 3 tiers (name → derived → type sentence), derived tier pure/unstored, never fabricates, totality holds | ✓ VERIFIED (1 Warning) | `phaseVocabulary.ts` `derivedFace()` implements bound-skill → template(llm_emit) → folder → human-input → null, most-specific-first (D-187-04). `phaseVocabulary.test.ts` + `phaseVocabulary.corpus.test.ts` green (1331/1331 across the 13-file isolated set). **Warning (REVIEW WR-02, confirmed live):** tier 3 (folder) is ungated by phase type — an `llm_single` step with a bound folder renders "Search {folder}" though `llm_single` cannot search (harness.py:74-75 says the field is inert there). A real but narrow fabrication-of-capability defect, not a fabrication-of-name defect. |
-| 2 | VOCAB-01 (Req 3): identity-bearing config edit clears a **generator-seeded** name, leaves a **hand-typed** name untouched; pre-187 rows load with the marker absent; zero migration | ✓ VERIFIED | `definitionOps.test.ts` green; `git diff --stat -- supabase/migrations` empty (confirmed independently); `name_seeded_by_ai` is additive-optional JSONB, same shape as `grounding_escalated`. |
-| 3 | VOCAB-01 (Req 4): ⌥ reveal swaps the canvas card's SUBTITLE not its TITLE; canvas and spine agree on **title** in both toggle states | ✓ VERIFIED (documented narrowing) | `PhaseNode.test.tsx` / `PhaseNodeCard.test.tsx` / `PhaseSpineGraph.test.tsx` green. D-187-16 narrows "both views agree" to the title only — `PhaseSpineGraph` has no subtitle slot and prints a raw `phase_type` chip unconditionally (pre-existing, not this phase's regression); this is stated in-source and in CONTEXT, not silently dropped. |
-| 4 | VOCAB-02 (Req 2): NL generator writes a non-empty per-step `name` on every phase; provider-call budget unchanged (1 valid / 2 on retry / never 3) | ✓ VERIFIED (1 real cross-provider finding) | `test_187_authoring_step_names.py` green (in the 125/125 backend run). Live 8-provider roster (187-07): 5/8 rows fully pass. **OpenRouter is a genuine, non-deterministic VOCAB-02 finding** — one of two identical samples emitted a fully valid definition with 0/5 phases named. Mitigated by Req 1's derived-face ladder (an unnamed phase falls to its config-derived face rather than rendering blank), so the product degrades rather than breaks — but the instruction is not reliably honoured on the non-native tool path. Recorded ❌ with reason, not omitted (roster rule honored). OpenAI/MiniMax ❌ rows are registry/emission defects unrelated to naming (verified: OpenAI's `gpt-5.5` sibling passed 5/5 named same day). |
-| 5 | VOCAB-02 (Req 5): a seeded draft with grounded steps shows a receipt naming **exactly** those steps with reasons, verbatim from the server derivation; zero grounded steps shows **no** grounded-step list | ✗ **FAILED — BLOCKER (CR-01/CR-02, confirmed live at HEAD)** | See Gaps below. `SeedReceipt.test.tsx` is green only because its fixtures use an unrepresentable `citation_policy` value; the real default fires the bug on nearly every generated draft with an `llm_emit` step. |
-| 6 | VOCAB-02 (Req 7 / SC#6): an armed action-risk checkpoint is asked before the body runs regardless of author-declared validators; property test observed RED on HEAD before the fix and green after; a refusal writes ZERO approval receipts; `test_185_engine_attachment.py:153-165` stays green | ✓ VERIFIED (2 narrow Warnings) | `test_187_armed_checkpoint_property.py` — RED-before signature recorded (187-01 T3), green after hoist (187-11), falsification re-observed (187-11 T3). Independently re-ran the full 187-owned backend set: **125/125 passed**, including `test_185_engine_attachment.py:153-165`'s `validators[0].max_retries == 7` assertion (confirmed by direct read, still present and green). **Warnings (not blockers, per review + my own read):** WR-01 — a `redis is None` no-transport fail-safe re-introduces author-routing on an armed checkpoint (narrow, no production caller passes `redis=None`, not exercised by the property test's own space). WR-05 — the now-vestigial `action_risk_approval` validator kind still offers the armed *choices* with un-armed *semantics* if ever author-reachable; fenced today by `publish_service.py:464-503` refusing author-declared `ask_user` validators, but that fence is named in-source as slated for removal by the deferred Phase-103 background-job publish — a live landmine for a future phase, not this one. |
-| 7 | D-187-11 (folded `BUG-260731-03` verdict half): an unbound retrieval workflow earns a deterministic `incomplete` verdict from `/validate` before a golden run is spent | ✓ VERIFIED | `test_182_validate.py` + `test_182_severity_codes.py` green (in the 125/125 run). `unbound_retrieval` confirmed canvas-only, registered in both `_ROUTE_ASSIGNED_CODES` and `_INCOMPLETE_CODES` (REVIEW summary, independently spot-checked). `BUG-260731-03` frontmatter still reads `status: folded` — correctly NOT flipped to closed, since the re-open trigger requires BOTH halves (186's re-bind + 187's verdict) verified together; this is a bookkeeping item for the bug tracker, not a code gap. |
-| 8 | VOCAB-03 (Req 6): choosing a template fills the describe box and leaves the user on the describe screen with the CTA enabled; no first-screen path places a definition on the canvas without generation; the flag-OFF describe screen is byte-identical (D-181-01) | ✓ VERIFIED | `StarterTemplatePicker.test.tsx` green (40 tests). REVIEW confirms `StarterTemplatePicker`'s only `@/lib/api` import is `listStarterWorkflows` — no create/update/publish/generate/validate symbol reachable. `WorkflowBuilderPage.describe.test.tsx` (D-181-01 byte pin, captured against the unmodified page) still green. |
-| 9 | SC#5 check 1 (no jargon leak) and check 2 (no two materially-different steps share a face), over the named corpus (3 starters + 4 canonical seeds + PM pack) | ✓ VERIFIED (documented narrowing, D-187-15) | `phaseVocabulary.corpus.test.ts` green as a pure-function sweep (not a DOM scrape — correctly avoids the spine's pre-existing raw `phase_type` chip). Check 2 is narrowed to "materially different config" with `plan_execute_verify`'s two identical-config `llm_single` steps recorded as the documented, measured exception rather than edited away. |
-| 10 | SC#10: roster driven honestly, blocked/failed rows recorded with reasons, never silently omitted | ✓ VERIFIED (method superseded, honestly recorded) | The SPEC's assumption that `harness_authoring_model` is a driveable app setting is refuted (it is env-only) — 187-07/CONTEXT (D-187-13) supersedes this with an equivalent-strength method: 8/8 real `forced_emit` calls, one stub `settings` per row (no global mutation, independently verifiable since `generate_workflow_definition` takes `settings` as a parameter). All 8 rows executed; 0 blocked; 3 red rows recorded with reasons (not omitted) — see truth #4 for the naming-relevant one. |
-| 11 | Zero migrations added by this phase | ✓ VERIFIED | `git diff --stat 35261e96 HEAD -- supabase/migrations` and `git status --porcelain supabase/migrations` both empty (re-confirmed independently). `git diff --name-only 3bf72490 HEAD -- backend/app frontend/src` touches only the files already reviewed; no `supabase/migrations/` entries anywhere in the phase's diff range. |
+| 1 | VOCAB-01 (Req 1): `nodeTitle()` resolves 3 tiers (name → derived → type sentence), derived tier pure/unstored, never fabricates, totality holds | ✓ VERIFIED (2 Warnings) | Unchanged core resolver, re-confirmed. **WR-02 is now CLOSED** (independently re-derived): `phaseVocabulary.ts:516` — `if (inputs.folderName && GROUNDING_DIAL_TYPES.includes(inputs.phaseType))`, `GROUNDING_DIAL_TYPES = ["llm_agent", "llm_batch_agents"]` (`:277`); a folder-bound `llm_single` or human-input step no longer renders `Search {folder}`. **New Warning (WR-08, confirmed live):** `StepTypePicker.tsx`'s `StepTypePickerProps` interface (`:90-101`) carries NO `nameContext` field at all — the `＋` row's preview (`nodeTitle(minimalPhaseFor(choice.type, PREVIEW_SLUG, index))`, line 185) cannot see a template asset, while the real caller's card resolves through a `nameContext` built from `templateFilename` (`WorkflowBuilderPage.tsx:613-617`). Confirmed by reading the props interface directly — no threading exists to omit accidentally, it structurally cannot be there. |
+| 2 | VOCAB-01 (Req 3): identity-bearing config edit clears a **generator-seeded** name, leaves a **hand-typed** name untouched; pre-187 rows load with the marker absent; zero migration | ✓ VERIFIED | Unaffected by the closure round; re-confirmed empty migrations diff independently (below). |
+| 3 | VOCAB-01 (Req 4): ⌥ reveal swaps the canvas card's SUBTITLE not its TITLE; canvas and spine agree on **title** in both toggle states | ✓ VERIFIED (documented narrowing) | Unaffected by the closure round; `WorkflowBuilderPage.tsx` untouched by `ee5fff3b..HEAD` (confirmed: `git diff --numstat` empty). |
+| 4 | VOCAB-02 (Req 2): NL generator writes a non-empty per-step `name` on every phase; provider-call budget unchanged (1 valid / 2 on retry / never 3) | ✓ VERIFIED (1 real cross-provider finding, unchanged) | Backend untouched by the closure round (`git diff --name-only ee5fff3b HEAD -- backend/` empty); the OpenRouter non-deterministic name-drop finding and its mitigation (Req 1's derived-face fallback) stand as previously recorded. |
+| 5 | VOCAB-02 (Req 5): a seeded draft with grounded steps shows a receipt naming **exactly** those steps with reasons, verbatim from the server derivation; zero grounded steps shows **no** grounded-step list; every rendered sentence is honest about who applied the gate | ✗ **FAILED — BLOCKER (CR-03 + WR-09, confirmed live at HEAD)** | Round 1's blocker (CR-01/CR-02) is genuinely closed. A NEW, narrower defect ships inside the fix itself — see Gaps below. |
+| 6 | VOCAB-02 (Req 7 / SC#6): an armed action-risk checkpoint is asked before the body runs regardless of author-declared validators; property test observed RED on HEAD before the fix and green after; a refusal writes ZERO approval receipts; `test_185_engine_attachment.py:153-165` stays green | ✓ VERIFIED (2 narrow Warnings, unchanged) | Backend untouched by the closure round. Independently re-ran: `pytest tests/unit/test_187_armed_checkpoint_property.py tests/unit/test_187_authoring_step_names.py tests/unit/test_182_validate.py tests/unit/test_182_severity_codes.py tests/unit/test_185_engine_attachment.py tests/unit/test_ask_user_disposition.py tests/unit/test_harness_models.py tests/unit/test_pre_post_timing.py -q` → **125 passed, 0 failed**, reproduced this session. WR-01/WR-05 carried forward, unchanged. |
+| 7 | D-187-11 (folded `BUG-260731-03` verdict half): an unbound retrieval workflow earns a deterministic `incomplete` verdict from `/validate` before a golden run is spent | ✓ VERIFIED | Included in the 125/125 re-run above (`test_182_validate.py`, `test_182_severity_codes.py`); unaffected by the closure round. |
+| 8 | VOCAB-03 (Req 6): choosing a template fills the describe box and leaves the user on the describe screen with the CTA enabled; no first-screen path places a definition on the canvas without generation; the flag-OFF describe screen is byte-identical (D-181-01) | ✓ VERIFIED | Unaffected by the closure round; `StarterTemplatePicker.tsx`/`.test.tsx` untouched by `ee5fff3b..HEAD`. |
+| 9 | SC#5 check 1 (no jargon leak) and check 2 (no two materially-different steps share a face), over the named corpus (3 starters + 4 canonical seeds + PM pack) | ✓ VERIFIED (documented narrowing, unchanged) | `phaseVocabulary.corpus.test.ts` re-confirmed green in this session's independent 452-test run; strengthened by the WR-02 gate landing underneath it. |
+| 10 | SC#10: roster driven honestly, blocked/failed rows recorded with reasons, never silently omitted | ✓ VERIFIED (method superseded, honestly recorded, unchanged) | Backend untouched by the closure round; the 8-row roster and its 3 named ❌ rows stand unchanged, confirmed not re-run and not needing to be (no frontend fix could move a provider-side finding). |
+| 11 | Zero migrations added by this phase (including the closure round) | ✓ VERIFIED | Independently re-confirmed this session: `git diff --stat 35261e96 HEAD -- supabase/migrations` and `git status --porcelain supabase/migrations` both empty; also `git diff --numstat ee5fff3b HEAD -- frontend/src/pages/WorkflowBuilderPage.tsx` empty (the D-187-14 mount cap is untouched by the closure round — all four fixes landed inside `components/workflows/`). |
 
-**Score:** 9/11 truths verified (1 hard FAILED/BLOCKER, all others pass with named, non-blocking Warnings carried forward as findings).
+**Score:** 10/11 truths verified (1 hard FAILED/BLOCKER — narrower in scope than round 1, but a
+genuine, independently-confirmed live defect, not a residual test-coverage nit).
 
 ### Required Artifacts
 
 | Artifact | Expected | Status | Details |
 |---|---|---|---|
-| `frontend/src/components/workflows/phaseVocabulary.ts` (`derivedFace`, `nodeTitle`, `groundingCauseOf`) | 3-tier resolution, ONE vocabulary module | ✓ VERIFIED | Present, wired into both graph views, `?raw` source guards green |
-| `backend/app/services/workflow_authoring.py` (`AUTHORING_SYSTEM_PROMPT`) | per-step `name` instruction | ✓ VERIFIED | Confirmed in `test_187_authoring_step_names.py` (green) and the 8-row live roster |
-| `backend/app/models/harness.py` (`PhaseSpec.name_seeded_by_ai`) | additive-optional JSONB provenance marker | ✓ VERIFIED | `test_harness_models.py` green; zero-migration confirmed |
-| `backend/app/services/harness_engine.py` (hoisted armed checkpoint) | armed ⇒ asked as a property, not a position | ✓ VERIFIED | `test_187_armed_checkpoint_property.py` + `test_185_engine_attachment.py` green; 2 narrow Warnings (WR-01, WR-05) noted above |
-| `frontend/src/components/workflows/SeedReceipt.tsx` | post-draft grounding receipt | ✗ **STUB-EQUIVALENT (CR-01)** | Component renders and is wired, but its core claim ("N steps read your documents, so I set them...") is FALSE on the typical generated draft — exists + wired + tested green, but the behavior is wrong and the test cannot see it (CR-02) |
-| `frontend/src/components/workflows/StarterTemplatePicker.tsx` | template door on the Builder's first screen | ✓ VERIFIED | Wired, gated on `canvasEnabled`, no forward seam to canvas (REVIEW confirmed, no create/publish/generate symbol reachable) |
-| `backend/app/api/workflows.py` (`/validate` `unbound_retrieval` check) | deterministic `incomplete` verdict | ✓ VERIFIED | Registered in `_ROUTE_ASSIGNED_CODES` + `_INCOMPLETE_CODES`; canvas-only, no publish-path leak |
+| `frontend/src/components/workflows/phaseVocabulary.ts` (`derivedFace`, `nodeTitle`, `groundingCauseOf`, `GROUNDING_DIAL_TYPES`) | 3-tier resolution, folder tier gated to types that can retrieve | ✓ VERIFIED | Re-confirmed live: `GROUNDING_DIAL_TYPES = ["llm_agent", "llm_batch_agents"]` (`:277`), gate at `:516`. WR-02 closed. |
+| `frontend/src/components/workflows/SeedReceipt.tsx` + `definitionOps.ts` (`seedReceiptGroundingLead`, `seedReceiptCarriedLead`) | post-draft grounding receipt, every sentence honest about who applied the gate | ✗ **PARTIALLY FIXED — the NEW `carriedLead` sentence is unguarded and misattributes `escalated`** | `seedReceiptGroundingLead`'s claim is now correctly scoped to `detected` only (CR-01 fixed). `seedReceiptCarriedLead` (its sibling, introduced by the same fix) has zero test coverage (CR-03) and states "by its own settings" for the `escalated` cause, which `seedReceiptStepReason('escalated')` two lines below correctly calls "you turned this on by hand" — a live self-contradiction on an escalated-only draft (WR-09). |
+| `frontend/src/components/workflows/StepTypePicker.tsx` | the `＋` row previews the exact sentence the card that lands will say, for all six step types | ⚠️ **PARTIALLY FIXED** | `PHASE_TYPE_SENTENCES` import removed, now reads `nodeTitle` — the symptom (a locally-declared sentence table) is gone. But `StepTypePickerProps` has no `nameContext` field, so an `llm_emit` row with a template asset previews `PHASE_TYPE_SENTENCES.llm_emit`-equivalent generic copy while the landed card reads `Fill <filename>` — the property the plan's own must_have claims ("for every one of the six step types") does not hold. Not promoted to a failed truth (matches the code review's own Warning-level classification, WR-08), but flagged here because it is the direct, confirmed non-closure of one of the round's four scoped items. |
+| `backend/app/models/harness.py`, `harness_engine.py`, `/validate` route | unaffected by this round | ✓ VERIFIED (unchanged) | Confirmed `git diff --name-only ee5fff3b HEAD -- backend/` empty; all backend-owned truths (#4, #6, #7, #10) stand on the same evidence as round 1, independently re-run. |
 
 ### Key Link Verification
 
 | From | To | Via | Status | Details |
 |---|---|---|---|---|
-| `WorkflowBuilderPage.tsx` | `SeedReceipt` | one gated mount line, `nameContext`/`kbTools` props | WIRED | Confirmed by `WorkflowBuilderPage.canvas.test.tsx` (green) and the D-187-14 diff-cap gate (46 ins / 5 del, at the cap) |
-| `WorkflowBuilderPage.tsx` | `StarterTemplatePicker` | one gated mount line, `initialDescribe` seam | WIRED | Reuses the shipped Phase-124 seam; no new channel |
-| `SeedReceipt` | `groundingCauseOf` (`phaseVocabulary.ts`) | direct import, "the one client grounding derivation" | WIRED but MISUSED | The link is real and the derivation itself is correct; the DEFECT is in how `SeedReceipt` filters/interprets the derivation's output (CR-01) — a wiring success that still produces a wrong result |
-| `harness_engine.py` pre-gate block | the hoisted armed checkpoint | `is_action_risk` as an explicit parameter | WIRED | REVIEW confirmed `is_action_risk` is never a `phase` read inside the shared `_resolve_failure_with_ask_user` helper — the exact hazard CONTEXT's corrections section called out is closed |
-| `grounding.py` `effective_phase` | armed `ValidatorSpec` append | REMOVED (D-187-03) | WIRED (removal verified) | `_is_action_risk_finding` string-prefix sniff fully deleted, no stale references (REVIEW confirmed) |
+| `SeedReceipt` | `seedReceiptCarriedLead` (`definitionOps.ts`) | direct import, rendered as the `seed-receipt-carried` paragraph | WIRED but **UNTESTED AND PARTIALLY WRONG** | The link exists and renders at runtime (confirmed by direct source read), but no test exercises the rendered output, and the underlying formatter's claim is false for the `escalated` cause (WR-09). A wiring success producing a wrong, unguarded result — the same shape CR-01 was. |
+| `StepTypePicker` | `nodeTitle` (`phaseVocabulary.ts`) | direct call, no `nameContext` argument | PARTIAL — **structurally cannot carry the caller's context** | `StepTypePickerProps` has no `nameContext` field (confirmed by reading the interface); the resolver call is correct in isolation but the caller-side context that would make its preview match the landed card is never threaded through. |
+| `WorkflowBuilderPage.tsx` | `SeedReceipt` / `StarterTemplatePicker` | two gated mount lines, unchanged | WIRED | Re-confirmed: `git diff --numstat ee5fff3b HEAD -- frontend/src/pages/WorkflowBuilderPage.tsx` is empty — the closure round spent none of the D-187-14 mount-cap budget. |
 
 ### Requirements Coverage
 
 | Requirement | Source Plans | Description | Status | Evidence |
 |---|---|---|---|---|
-| VOCAB-01 | 187-02, 04, 08, 09, 10, 12, 15 | Plain-language node verbs + Technical-names reveal | ✓ SATISFIED (1 Warning: WR-02 folder-tier over-claim) | Truths #1–3, #9 |
-| VOCAB-02 | 187-01, 02, 03, 06, 07, 10, 11, 13, 15 | NL → safe seeded editable canvas draft, AI seed structurally safe | ✗ **BLOCKED on Req 5** (seed receipt) | Truth #5 FAILED; truths #4, #6, #7, #10 verified |
-| VOCAB-03 | 187-05, 14, 15 | Start from a template/starter on the canvas | ✓ SATISFIED | Truth #8 |
+| VOCAB-01 | 187-02, 04, 08, 09, 10, 12, 15, 17, 18 | Plain-language node verbs + Technical-names reveal | ✓ SATISFIED (2 Warnings: WR-08 residual picker/card mismatch on `llm_emit`+template; other carried-forward items unchanged) | Truths #1–3, #9 |
+| VOCAB-02 | 187-01, 02, 03, 06, 07, 10, 11, 13, 15, 16 | NL → safe seeded editable canvas draft, AI seed structurally safe | ✗ **STILL BLOCKED on Req 5** (seed receipt) — narrower cause than round 1 | Truth #5 FAILED; truths #4, #6, #7, #10 verified |
+| VOCAB-03 | 187-05, 14, 15 | Start from a template/starter on the canvas | ✓ SATISFIED | Truth #8, unchanged |
 
-No orphaned requirements: `.planning/REQUIREMENTS.md` maps only VOCAB-01/02/03 to Phase 187, and all three are declared across the 15 plans' `requirements:` frontmatter. `REQUIREMENTS.md`'s status column still reads "Pending" for all three — correct, since that flip is this verification's own downstream action, not something to expect pre-verification.
-
-### SPEC Success-Criteria Judgement
-
-- **SC#3 (safe-by-construction / legibility) — NOT achieved.** The server-side enforcement (`citations_required` at `grounding.py:940`, unconditional at the run seam) is real and independently verified — a grounded step cannot skip its gate. But the SPEC's own stated purpose for this phase's receipt is to make that safety **legible**, and CR-01 makes the receipt say something false about *why* a step is gated on the majority of generated drafts. A surface that misexplains governance is arguably worse for trust than a surface with no explanation, because it teaches the user a wrong mental model of what the AI did. This is the single reason this phase does not pass.
-- **SC#5 (no jargon leak / no over-simplification)** — met, with the honest, measured narrowing (D-187-15/16) recorded in-source rather than hidden.
-- **SC#6 (armed checkpoint always asked)** — met on the property + the regression suite. The live end-to-end confirmation (M6) is still owed to the operator (see Human Verification below); two narrow, non-blocking Warnings (WR-01, WR-05) are carried forward as findings for a future phase, not blockers to this one.
-- **SC#10 (cross-provider roster)** — met as an honest scoreboard; the one real naming defect it surfaced (OpenRouter) is a provider-emission finding, not an implementation gap, and Req 1's derived-face ladder is the documented graceful degradation for it.
+No orphaned requirements: `.planning/REQUIREMENTS.md` maps only VOCAB-01/02/03 to Phase 187 and still
+reads "Pending" for all three (re-confirmed this session) — correct, since that flip is downstream of
+this verification passing, not something to expect pre-verification.
 
 ### Anti-Patterns Found
 
 | File | Line(s) | Pattern | Severity | Impact |
 |---|---|---|---|---|
-| `frontend/src/components/workflows/SeedReceipt.tsx` | ~173-186 | Over-inclusive filter feeding an under-qualified sentence | 🛑 Blocker (CR-01) | False governance claim on the majority of generated drafts |
-| `frontend/src/components/workflows/SeedReceipt.test.tsx` | 91, 107 | Test fixture uses a value the backend model cannot produce | 🛑 Blocker (CR-02) | The regression suite cannot detect CR-01; green is not evidence |
-| `frontend/src/components/workflows/phaseVocabulary.ts` | ~466 | Ungated capability claim (tier 3 folder search on non-retrieval types) | ⚠️ Warning (WR-02) | "Search {folder}" rendered on a step type that cannot search |
-| `frontend/src/components/workflows/StepTypePicker.tsx` | ~156 | Reads `PHASE_TYPE_SENTENCES` directly instead of through `nodeTitle` | ⚠️ Warning (WR-03) | Picker row promises "Check with you"; the card that lands says "Wait for your approval" — one click, two sentences |
-| `backend/app/services/harness_engine.py` | 1065-1066 | No-transport fail-safe re-reads author disposition on an armed phase | ⚠️ Warning (WR-01) | Narrow (`redis is None`), not production-reachable today |
-| `backend/app/services/harness/validator_kinds.py` | 714-744 | Vestigial validator kind offers armed choices with un-armed semantics | ⚠️ Warning (WR-05) | Fenced today by publish; landmine for the deferred Phase-103 rework |
-| `backend/app/models/harness.py` / `frontend/definitionOps.ts` | 262 / 263-289 | `name_seeded_by_ai` is client-writable on non-generate write paths | ⚠️ Warning (WR-06) | A hand-typed name falsely marked seeded can be silently deleted later |
-| `backend/app/services/harness_engine.py` | 766 | Dead-in-production fallback composes a false step-position sentence | ⚠️ Warning (WR-07) | Governance-prompt honesty risk if a second call site is ever added |
-| 5 Info-level items | various | Stale docblocks, minor a11y/state-purity nits | ℹ️ Info | See `187-REVIEW.md` IN-01..IN-05 |
+| `frontend/src/components/workflows/SeedReceipt.tsx` / `.test.tsx` | 274-281 / (absent) | A user-visible sentence with zero test assertions anywhere in the repo | 🛑 Blocker (CR-03, confirmed live) | The receipt's own suite docblock claims character-for-character coverage of every sentence; this one is exempt from that claim by omission, not by design |
+| `frontend/src/components/workflows/definitionOps.ts` | 613-620 | One sentence spanning two causes the module keeps apart everywhere else | ⚠️ Warning (WR-09, confirmed live) | On an escalated-only draft the receipt's lead paragraph and its own per-step reason contradict each other, two lines apart, on the same card |
+| `frontend/src/components/workflows/StepTypePicker.tsx` | 90-101, 185 | Preview resolver deliberately called with no name context | ⚠️ Warning (WR-08, confirmed live) | The picker row for `llm_emit` with a template asset promises different copy than the card that lands — the exact defect class WR-03 was raised to close, recurring on a type WR-03's own fix didn't cover |
+| `backend/app/services/harness_engine.py` | 1065-1066 | No-transport fail-safe re-reads author disposition on an armed phase | ⚠️ Warning (WR-01, carried forward, unchanged) | Narrow (`redis is None`), not production-reachable today |
+| `backend/app/services/harness/validator_kinds.py` | 714-744 | Vestigial validator kind offers armed choices with un-armed semantics | ⚠️ Warning (WR-05, carried forward, unchanged) | Fenced today by publish; landmine for the deferred Phase-103 rework |
+| Various | — | WR-04, WR-06, WR-07, IN-01…IN-05 | ⚠️/ℹ️ carried forward, unchanged | Out of the closure round's operator-scoped four items; see `187-REVIEW.md` |
 
-No debt markers (`TBD`/`FIXME`/`XXX`) found in any file touched by this phase (`git diff --name-only 3bf72490 HEAD` swept clean).
+No debt markers (`TBD`/`FIXME`/`XXX`) found in any file touched by the closure round (re-confirmed this
+session across all 10 files in `git diff --name-only ee5fff3b HEAD -- frontend/src`).
 
-### Behavioral Spot-Checks / Test Evidence (re-run independently, not transcribed)
+### Behavioral Spot-Checks / Test Evidence (re-run independently this session, not transcribed)
 
 | Check | Command | Result |
 |---|---|---|
+| The five closure-round frontend suites | `npx vitest run src/components/workflows/SeedReceipt.test.tsx src/components/workflows/StepTypePicker.test.tsx src/components/workflows/phaseVocabulary.test.ts src/components/workflows/phaseVocabulary.corpus.test.ts src/components/workflows/definitionOps.test.ts` | **5 files, 452 passed, 0 failed** — matches `187-REVIEW.md`'s figure independently |
 | Phase-owned backend suite | `pytest tests/unit/test_187_armed_checkpoint_property.py tests/unit/test_187_authoring_step_names.py tests/unit/test_182_validate.py tests/unit/test_182_severity_codes.py tests/unit/test_185_engine_attachment.py tests/unit/test_ask_user_disposition.py tests/unit/test_harness_models.py tests/unit/test_pre_post_timing.py -q` | **125 passed, 0 failed** |
-| Frontend 13-file vocabulary/canvas/receipt/door set | `npx vitest run` (phaseVocabulary·corpus, canvasModel×4, PhaseSpine×2, PhaseNodeCard, PhaseNode, SeedReceipt, StarterTemplatePicker, definitionOps) | **1331 passed, 0 failed** |
-| Frontend consumer + WorkflowBuilderPage set | `npx vitest run` (WorkflowCanvas, PublishGauntlet, ProblemsTray, WorkflowBuilderPage.canvas/describe/header/page/session) | **286 passed, 0 failed** |
 | Zero-migration gate | `git diff --stat 35261e96 HEAD -- supabase/migrations` + `git status --porcelain supabase/migrations` | both **empty** |
-| Debt-marker sweep | `TBD\|FIXME\|XXX` over every file in `git diff --name-only 3bf72490 HEAD` | **zero matches** |
-| CR-01 live confirmation | Direct read of `SeedReceipt.tsx:173-186`, `definitionOps.ts:556-563`, `harness.py:155` | **Confirmed unfixed at HEAD** — no commit after the `20ae79b6` review touches these files |
-| CR-02 live confirmation | `grep -n 'citation_policy: "loose"' SeedReceipt.test.tsx` | **2 matches (lines 91, 107)** — confirmed unfixed |
+| D-187-14 mount cap, closure round | `git diff --numstat ee5fff3b HEAD -- frontend/src/pages/WorkflowBuilderPage.tsx` | **empty** — the closure round spent none of the budget |
+| WR-02 closure | Direct read of `phaseVocabulary.ts:277,516` | **Confirmed**: `GROUNDING_DIAL_TYPES` gates the folder tier |
+| CR-03 (the new blocker) | `grep -rn "seed-receipt-carried" frontend/src/` | **1 hit — the component's own testid attribute.** No test file queries it. |
+| WR-09 (the new warning) | Direct read of `definitionOps.ts:475,613-620,654` | **Confirmed**: `seedReceiptCarriedLead`'s "by its own settings" contradicts `seedReceiptStepReason('escalated')`'s "you turned this on by hand" |
+| WR-08 (WR-03's residual) | Direct read of `StepTypePicker.tsx:90-101` (`StepTypePickerProps`) | **Confirmed**: no `nameContext` field exists on the interface |
+| Debt-marker sweep | `TBD\|FIXME\|XXX` over the 10 files touched by the closure round | **zero matches** |
 
-Backend full-suite 211 failures and the 62-failure `tests/unit` baseline are pre-existing rot per the measured baseline provided to this verification — not attributed to this phase (this phase committed zero backend files outside the ones listed above, confirmed by `git diff --name-only`).
+Backend full-suite pre-existing rot (211 failures) is unaffected — the closure round committed zero
+backend files (`git diff --name-only ee5fff3b HEAD -- backend/` empty, re-confirmed).
 
 ### Human Verification Required
 
-**G-4 lived-experience gate.** Per CLAUDE.md, wire format + a screenshot are insufficient for phases touching live UI; these are the operator's, driven by Chrome MCP, not attempted here. All 8 rows (`187-VALIDATION.md` M1-M8) are recorded as **unperformed** at the close of the phase and remain so. Full detail in the frontmatter `human_verification` block above; summarized:
+**G-4 lived-experience gate.** Per CLAUDE.md, wire format + a screenshot are insufficient for phases
+touching live UI. `187-VALIDATION.md` records all **twelve** rows (M1–M12) as UNPERFORMED at the close
+of the gap-closure round — M3 was unblocked by the CR-01 fix but not performed, and the round added
+M9–M12 for its own user-visible changes. Full detail in the frontmatter `human_verification` block
+above. Because code-level gaps (CR-03/WR-09) remain, `gaps_found` takes priority over `human_needed`
+per the verification decision tree — but the manual board still stands and is unchanged in scope. Two
+rows now carry an extra note from this re-verification:
 
-1. **M1** — every node face reads as business-specific to a human (Req 1/SC#5)
-2. **M2** — the plain title survives the ⌥ reveal without layout jump, both views (Req 4)
-3. **M3** — the receipt arrives once with one seal pulse — **recommend deferring this row until CR-01 is fixed**, otherwise the operator is confirming presentation of a false claim
-4. **M4** — the derived face tracks a live skill bind/unbind without flicker (Req 1, Pitfall-1)
-5. **M5** — the seeded describe text reads naturally, all 3 templates (Req 6)
-6. **M6** — SC#6 live: an armed checkpoint survives an author Proceed and is actually asked; a refusal writes zero approval receipts
-7. **M7** — SC#10 live: `HARNESS_AUTHORING_MODEL` env path reaches `resolve_authoring_model` after a backend restart
-8. **M8** — flag-OFF Builder first screen is byte-identical to today, whole-screen read
+- **M3** — should be run only after weighing that the receipt's residual WR-09 defect means an
+  escalated-only draft will still show an internally-contradictory card; the operator should read the
+  carried sentence against the per-step reasons, not just watch the arrival animation.
+- **M12** — should specifically try the deliverable/`llm_emit` row on a template-bearing draft (not
+  only the human-input control), since WR-08 confirms the picker's preview still diverges from the
+  landed card in exactly that case.
 
 ### Deferred Items (by name, with re-open trigger — not gaps)
 
-These were explicitly deferred during discuss-phase/research, each with a concrete trigger, and are **not** counted against this verification:
+Unchanged from round 1's list — re-confirmed still accurate, since the closure round touched only the
+files named in the four scoped findings:
 
-- `definitionOps.canRemovePhase`'s refusal notice stays on the undecorated `nodeTitle()` call (not threaded with `nameContext`) — **re-open trigger: Phase 188's `WorkflowCanvas.tsx` extraction** (asserted in-source at `WorkflowBuilderPage.canvas.test.tsx`, verified unmoved).
-- The armed-phase / synchronous-publish hole (D-187-12: `_interactive_phase_failures` reads the raw definition, so an armed phase's checkpoint could fire inside a golden run with no subscriber) — **re-open trigger:** the deferred Phase-103 background-job publish rework, or the first live wedge.
-- Making `harness_authoring_model` a real dynamic setting (Settings UI + `app_settings` row) — **re-open trigger:** `BUG-260731-01`'s investigation or SEED-117 revival.
-- Per-node review state (✦/✓), filling `technicalLine`, a direct template→canvas fork — all excluded by SPEC with named re-open triggers (Phase 188 in each case), unchanged.
-- `tsc -b`'s 33 pre-existing errors (`deferred-items.md` D-ITEM-01) — zero delta from this phase, zero inside `components/workflows` or `WorkflowBuilderPage*`, confirmed identical before/after.
+- `definitionOps.canRemovePhase`'s refusal notice stays on the undecorated `nodeTitle()` call — **re-open trigger: Phase 188's `WorkflowCanvas.tsx` extraction**.
+- The armed-phase / synchronous-publish hole (D-187-12) — **re-open trigger:** the deferred Phase-103 background-job publish rework, or the first live wedge.
+- Making `harness_authoring_model` a real dynamic setting — **re-open trigger:** `BUG-260731-01`'s investigation or SEED-117 revival.
+- Per-node review state, `technicalLine`, a direct template→canvas fork — excluded by SPEC, Phase 188.
+- `tsc -b`'s 33 pre-existing errors (`D-ITEM-01`) — zero delta from the closure round too (re-confirmed: `33 → 33`, 0 in touched files).
 
 ### Gaps Summary
 
-One BLOCKER: the seed receipt (VOCAB-02 Req 5) — the surface this phase built specifically to make Phase 185's grounding enforcement legible — states a false governance claim on the majority of generated drafts, because it treats the author's own default `citation_policy` and a hand-escalated dial as if the AI's seed had applied them. The regression suite that should catch this is itself broken in a way that hides the bug (its `llm_emit` fixtures use a `citation_policy` value the backend cannot produce). Both defects were independently confirmed live against HEAD, not taken on the strength of `187-REVIEW.md` alone. Everything else — the layered node-face ladder, the generator-authored names, the demote-on-edit rule, the subtitle-only reveal, the hoisted armed checkpoint (SC#6), the unbound-retrieval verdict, the template door (VOCAB-03), and the SC#5/SC#10 measurement discipline — is real, wired, and independently re-verified as green. The fix is narrow and already specified in the review (restrict `SeedReceipt`'s row filter to `cause === "detected"`, and repair the two test fixtures) — this is a closure-plan-sized gap, not a re-plan of the phase.
+The round-1 BLOCKER (CR-01/CR-02) is genuinely closed — independently re-confirmed by direct source
+read and an independent test run (452/452), not taken on the strength of `187-REVIEW.md` alone. WR-02
+is also genuinely closed. But the closure round's own fix for CR-01 introduced a **new**, narrower
+defect inside the exact surface it was repairing: `seedReceiptCarriedLead`, the sentence covering
+`already-set` and `escalated` steps, has zero test coverage anywhere in the repo (CR-03) and states a
+claim ("by its own settings") that directly contradicts the correct, adjacent per-step reason for an
+`escalated` cause ("you turned this on by hand" — WR-09). This is confirmed live at HEAD by direct
+code read, not inherited from the review. Because the seed receipt is specifically the surface this
+phase built to make Phase 185's grounding enforcement legible (SC#3), and because this defect recurs
+inside the very code that closed the first instance of the same failure class, VOCAB-02 Req 5 remains
+not fully achieved — narrower in blast radius (only the `escalated` cause, not the typical
+`llm_agent → llm_emit` draft that broke round 1), but real and unguarded. Separately, WR-03's fix
+(187-18) is only partial: the `＋` picker structurally cannot preview an `llm_emit` row's real card
+because `StepTypePickerProps` carries no `nameContext` field at all — this is Warning-level (matches
+the code review's own classification) rather than promoted to a failed truth, but it is the direct,
+confirmed non-closure of one of the round's four operator-scoped items, so it is named here rather
+than left silent. Everything else — the 3-tier node-face ladder (now correctly gated), the
+generator-authored names, the demote-on-edit rule, the subtitle-only reveal, the hoisted armed
+checkpoint (SC#6), the unbound-retrieval verdict, the template door (VOCAB-03), and the SC#5/SC#10
+measurement discipline — is real, wired, and independently re-verified as green in this session, with
+zero migrations and the D-187-14 mount cap untouched by the closure round.
+
+The fix is narrow: add SeedReceipt.test.tsx coverage for the carried paragraph (presence, count,
+character identity, and the zero case — the same rigor the detected paragraph already has), and either
+split `seedReceiptCarriedLead` into a cause-specific sentence or make it cause-agnostic so it claims
+nothing false about either cause. This is a closure-plan-sized gap, not a re-plan of the phase.
+
+All twelve manual rows (M1–M12) on `187-VALIDATION.md` remain unperformed and are the operator's;
+`human_verification` items are recorded in this report's frontmatter but do not change the `gaps_found`
+status, since a code-level BLOCKER (CR-03/WR-09) takes priority in the decision tree.
 
 ---
 
-*Verified: 2026-08-02T03:25:40Z*
+*Verified: 2026-08-02T09:30:00Z*
 *Verifier: Claude (gsd-verifier)*
