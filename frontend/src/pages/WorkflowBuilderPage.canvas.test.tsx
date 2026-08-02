@@ -2052,8 +2052,11 @@ describe("WorkflowBuilderPage 187-15 — one name context, two graph views (Req 
     await openCanvas()
     expect(canvasFace("research")).toContain(`Run the ${SKILL_NAME}`)
     expect(onTheSpine).toContain(`Run the ${SKILL_NAME}`)
-    // …and neither view fell back to the generic sentence for that step.
-    expect(canvasFace("research")).not.toContain("Searches and decides")
+    // The derived face is the card's TITLE, so it leads the node's text. (The card's
+    // SUBTITLE still carries the plain type sentence — that is 187-09's shape, and
+    // asserting its absence here would be asserting the wrong thing.)
+    expect(canvasFace("research").startsWith(`Run the ${SKILL_NAME}`)).toBe(true)
+    expect(canvasFace("research")).not.toContain(CORPUS_SKILL_ID)
   })
 
   it("a single scoped folder names its step on both views", async () => {
@@ -2201,18 +2204,26 @@ describe("WorkflowBuilderPage 187-15 — the announcements name a step the way i
     mockListSkills.mockResolvedValue([])
     await openCanvasFor({ ...definition, phases: structuredClone(evalCoverage) } as BuilderDefinition)
 
+    /** Every canvas node's testid, so the ADDED one is FOUND rather than guessed — the
+     *  slug `slugForType` derives is not this test's to assume. */
+    const nodeIds = () =>
+      Array.from(document.querySelectorAll("[data-testid^='canvas-node-']")).map(
+        (n) => n.getAttribute("data-testid") ?? "",
+      )
+    const before = new Set(nodeIds())
+
     fireEvent.click(screen.getByTestId("canvas-insert-2"))
     fireEvent.click(screen.getByTestId("step-type-choice-llm_human_input"))
 
     const message = await screen.findByTestId("canvas-notice-action")
     const subject = message.querySelector("strong")?.textContent ?? ""
     expect(subject.length).toBeGreaterThan(0)
+
     // Two surfaces compared, not one function compared with itself: whatever the notice
     // called the step, the card it just drew must call it the same.
-    const added = message.parentElement?.ownerDocument ?? document
-    const card = added.querySelector('[data-testid^="canvas-node-"][data-testid$="approve"]')
-    expect(card).not.toBeNull()
-    expect(card!.textContent ?? "").toContain(subject)
+    await waitFor(() => expect(nodeIds().filter((id) => !before.has(id))).toHaveLength(1))
+    const addedId = nodeIds().filter((id) => !before.has(id))[0]
+    expect(screen.getByTestId(addedId).textContent ?? "").toContain(subject)
   })
 
   it("THE DEFERRAL, ASSERTED — a refusal still names its referrer with the undecorated title", async () => {

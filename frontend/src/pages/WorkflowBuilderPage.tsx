@@ -151,6 +151,7 @@ import { PhaseSpineGraph } from "@/components/workflows/PhaseSpineGraph"
 import {
   groundingCauseOf,
   nodeTitle,
+  type NameContext,
   type PhaseSpecJSON,
 } from "@/components/workflows/phaseVocabulary"
 import {
@@ -597,6 +598,20 @@ export function WorkflowBuilderPage({
   // `renderPublish` seam; the ONLY reader is the write loop's hold gate.
   const [publishInFlight, setPublishInFlight] = useState(false)
 
+  // Phase 187-15 (Req 1 / D-187-05) — the ONE name context: values this page already holds,
+  // memoised so the memoised `toCanvas` does not re-project on every render. `assets` is
+  // DEFINITION-level (a property of the workflow, never of a phase), which is why 187-04
+  // gates the template tier on `llm_emit`; read defensively — it may be absent, null or not
+  // an array. PITFALL 1, ACCEPTED: the maps land asynchronously, so derived faces SETTLE
+  // when the mount fetch resolves, exactly as `PhaseFormPanel` already behaves. Rejected:
+  // holding the tier until the maps are non-empty (a late canvas for a cosmetic reason).
+  // Never available: inventing a placeholder.
+  const nameContext = useMemo<NameContext>(() => {
+    const assets = Array.isArray(meta.assets) ? (meta.assets as Array<Record<string, unknown>>) : []
+    const filename = assets.find((a) => a?.kind === "template")?.filename
+    return { folderNames, skillNames, templateFilename: typeof filename === "string" ? filename : undefined }
+  }, [folderNames, skillNames, meta])
+
   const canDraft = describe.trim().length > 0 && builderPhase !== "composing"
   const panelOpen = selectedSlug !== null
 
@@ -982,11 +997,12 @@ export function WorkflowBuilderPage({
       setCanvasNotice({
         kind: "action",
         lead: "Added",
-        subject: nodeTitle(added),
+        // 187-15 (RESEARCH Open Q6): the SAME face the card the author just created shows.
+        subject: nodeTitle(added, nameContext),
         detail: renumberedPhrase(countMoved(before, after)),
       })
     },
-    [store],
+    [store, nameContext],
   )
 
   /**
@@ -1022,7 +1038,7 @@ export function WorkflowBuilderPage({
         return
       }
 
-      const subject = nodeTitle(before[at])
+      const subject = nodeTitle(before[at], nameContext)
       actions.removePhaseBySlug(slug)
       const after = renumber(store.getState().phases)
 
@@ -1041,7 +1057,7 @@ export function WorkflowBuilderPage({
         },
       })
     },
-    [store],
+    [store, nameContext],
   )
 
   /**
@@ -1521,6 +1537,8 @@ export function WorkflowBuilderPage({
           // Phase 185 (D-185-09) — the SAME list the panel's dial and `gatesFor` read.
           // One value, three readers; the canvas derives none of it and fetches none of it.
           kbTools={kbTools}
+          // 187-15 — the same context the spine gets; two views cannot name one step twice.
+          nameContext={nameContext}
           // Phase 184-11 — the editing half, composed HERE and nowhere else. This branch
           // is unreachable unless `canvasEnabled` is true (`activeGraphView` pins to
           // "spine" otherwise), so the flag is passed explicitly rather than assumed.
@@ -1545,6 +1563,8 @@ export function WorkflowBuilderPage({
         phases={phases}
         selectedSlug={selectedSlug}
         onSelectNode={handleSelectNode}
+        // D-14 — SPREAD-CONDITIONAL: flag-off, genuinely ABSENT, not present-and-undefined.
+        {...(canvasEnabled ? { nameContext } : {})}
       />
     )
 
