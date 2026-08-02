@@ -39,6 +39,7 @@ import {
   PHASE_TYPE_SUBTITLES,
   PHASE_TYPE_LABELS,
   SKIP_PREFIX,
+  GROUNDING_DIAL_TYPES,
   type NameContext,
   type PhaseSpecJSON,
 } from "./phaseVocabulary"
@@ -204,10 +205,21 @@ describe("phaseVocabulary.derivedFace — the flat core, most-specific-first (D-
     ).toBe("Search Supplier Contracts")
   })
 
-  it("(3) a folder resolves last of the three config tiers, and beats human input", () => {
-    expect(derivedFace({ phaseType: "llm_human_input", folderName: "Board Papers" })).toBe(
+  it("(3) a folder resolves last of the three config tiers, ahead of the human-input tier", () => {
+    // RE-DERIVED at 187-17 (WR-02), with the reason recorded rather than the
+    // assertion quietly deleted. This case shipped asserting `llm_human_input` +
+    // a bound folder ⇒ "Search Board Papers", which proved tier (3) sits ABOVE
+    // tier (4). The ORDERING claim is still true and still worth pinning — but the
+    // subject was wrong: an `llm_human_input` step performs no retrieval, so that
+    // face was a fabricated capability claim (the second over-claim WR-02 removes;
+    // its replacement is asserted in the WR-02 block below). The same ordering is
+    // therefore proved on a type where the folder tier is honestly reachable.
+    expect(derivedFace({ phaseType: "llm_agent", folderName: "Board Papers" })).toBe(
       "Search Board Papers",
     )
+    // …and it really is tier (3) beating a LOWER tier, not merely tier (3) alone:
+    // `llm_agent` reaches no tier (4), so the ordering is pinned by the human-input
+    // case in the WR-02 block, which now falls to "Wait for your approval".
   })
 
   it("(4) an llm_human_input step with nothing bound waits for you", () => {
@@ -303,6 +315,155 @@ describe("phaseVocabulary.derivedFaceOf — the phase-shaped adapter (D-187-05)"
   })
 })
 
+// ── Phase 187-17 (VOCAB-01 / WR-02) — the folder tier claims no capability ──────
+//
+// `derivedFace`'s own never-fabricate floor (D-187-05) is not only about NAMES. A
+// face that says "Search Supplier Contracts" on a step whose executor performs no
+// retrieval is a fabricated claim about what the step DOES — narrower than a
+// fabricated name, the same floor.
+//
+// MEASURED, at live HEAD, and re-read for this plan rather than inherited:
+//  - `LlmSinglePhaseConfig.folder_scope` (`backend/app/models/harness.py`) states it
+//    itself: *"Load-bearing on llm_agent + llm_batch_agents; inert on llm_single (no
+//    tools). Carried here for shape symmetry across the family."* The field rides
+//    every LLM config member for SHAPE, not for behaviour.
+//  - The only run-time consumer of a phase's `folder_scope` is the per-phase
+//    narrowing inside `_build_phase_tool_context`
+//    (`backend/app/services/harness/phase_types.py`) — the sub-agent tool-context
+//    build, which serves the tool-carrying types only.
+//  - `grounding.grounding_cause` declines to read `folder_scope` for the IDENTICAL
+//    reason ("it exists on all five LLM config members … so reading it would
+//    auto-lock steps that read nothing"). Same question, so the same predicate:
+//    `GROUNDING_DIAL_TYPES`, imported here and never re-typed below.
+//
+// The sweep derives its expectation from that imported constant, so this suite
+// cannot drift from the rule it guards — and it cannot be satisfied by widening the
+// constant either, because widening it would change grounding semantics (D-185-15).
+
+/** The six shipped phase types, DERIVED from the vocabulary so a seventh is covered
+ *  the day it is added — the same idiom the corpus sweep uses for its token list. */
+const ALL_PHASE_TYPES = Object.keys(PHASE_TYPE_SENTENCES)
+
+describe("phaseVocabulary.derivedFace — the folder tier reaches only retrieval types (WR-02)", () => {
+  it("llm_single with a bound folder states NO search — folder_scope is inert there", () => {
+    expect(derivedFace({ phaseType: "llm_single", folderName: "Supplier Contracts" })).toBeNull()
+  })
+
+  it("programmatic with a bound folder states NO search — a server step runs no agent loop", () => {
+    expect(derivedFace({ phaseType: "programmatic", folderName: "Supplier Contracts" })).toBeNull()
+  })
+
+  it("llm_emit with a bound folder and NO template states NO search", () => {
+    // `llm_emit` is DELIBERATELY excluded, against the field's own docblock.
+    // `LlmEmitPhaseConfig.folder_scope` claims to be "load-bearing in the executor
+    // plan — bound-scope retrieval + skill composition feeding the emit". That is a
+    // PLAN-ERA claim and the shipped executor refutes it: `_exec_llm_emit`
+    // (`backend/app/services/harness/phase_types.py`) is a SEALED FORCED EMIT — it
+    // never drives the agent loop, never calls `_build_phase_tool_context`, and never
+    // reads `folder_scope` or `folder_subtree_ids`. Its evidence comes from
+    // `_emit_evidence(accumulated_outputs)`, i.e. the retrieval PRIOR phases already
+    // performed. Re-measured at live HEAD for 187-17: zero functional hits for either
+    // symbol across the whole `_exec_llm_emit` body.
+    expect(derivedFace({ phaseType: "llm_emit", folderName: "Supplier Contracts" })).toBeNull()
+  })
+
+  it("llm_emit with a bound folder AND a template still renders Fill — tier (2) is undisturbed", () => {
+    expect(
+      derivedFace({
+        phaseType: "llm_emit",
+        templateFilename: "Renewal Summary.pptx",
+        folderName: "Supplier Contracts",
+      }),
+    ).toBe("Fill Renewal Summary.pptx")
+  })
+
+  it("llm_human_input with a bound folder waits for you — the second over-claim, removed", () => {
+    // Shipped behaviour was "Search Board Papers", because tier (3) is reached before
+    // tier (4). A step that pauses for a person searches nothing; the gate drops it
+    // through to the tier that describes what it actually does.
+    expect(derivedFace({ phaseType: "llm_human_input", folderName: "Board Papers" })).toBe(
+      "Wait for your approval",
+    )
+  })
+
+  it("POSITIVE CONTROL — llm_agent still searches (the gate must not over-tighten)", () => {
+    expect(derivedFace({ phaseType: "llm_agent", folderName: "Supplier Contracts" })).toBe(
+      "Search Supplier Contracts",
+    )
+  })
+
+  it("POSITIVE CONTROL — llm_batch_agents still searches (half the gated set was unmeasured)", () => {
+    expect(derivedFace({ phaseType: "llm_batch_agents", folderName: "Supplier Contracts" })).toBe(
+      "Search Supplier Contracts",
+    )
+  })
+
+  it("TYPE-SPACE SWEEP: a sole bound folder faces iff the type is in GROUNDING_DIAL_TYPES", () => {
+    // The expectation is DERIVED from the imported constant, never from a re-typed
+    // list — so the suite guards the rule rather than a snapshot of it.
+    const observed = ALL_PHASE_TYPES.map((phaseType) => [
+      phaseType,
+      derivedFace({ phaseType, folderName: "Supplier Contracts" }) === "Search Supplier Contracts",
+    ])
+    const expected = ALL_PHASE_TYPES.map((phaseType) => [
+      phaseType,
+      GROUNDING_DIAL_TYPES.includes(phaseType),
+    ])
+    expect(observed).toEqual(expected)
+    // Non-vacuity in both directions: the sweep would pass over an all-true or an
+    // all-false rule too, so both halves are asserted to be non-empty.
+    expect(expected.filter(([, hit]) => hit)).toHaveLength(GROUNDING_DIAL_TYPES.length)
+    expect(GROUNDING_DIAL_TYPES.length).toBeGreaterThan(0)
+    expect(GROUNDING_DIAL_TYPES.length).toBeLessThan(ALL_PHASE_TYPES.length)
+  })
+
+  it("an unknown phase_type never reaches the folder tier either", () => {
+    expect(derivedFace({ phaseType: "llm_future_type", folderName: "Supplier Contracts" })).toBeNull()
+  })
+})
+
+describe("phaseVocabulary — WR-02 on the PHASE-SHAPED path real callers use", () => {
+  it("derivedFaceOf: a sole resolvable folder_scope on llm_single resolves to nothing", () => {
+    const p = phase({ config: { phase_type: "llm_single", folder_scope: [FOLDER_ID] } })
+    expect(derivedFaceOf(p, CTX)).toBeNull()
+  })
+
+  it("derivedFaceOf: the same binding on llm_batch_agents DOES resolve", () => {
+    const p = phase({ config: { phase_type: "llm_batch_agents", folder_scope: [FOLDER_ID] } })
+    expect(derivedFaceOf(p, CTX)).toBe("Search Supplier Contracts")
+  })
+
+  it("nodeTitle: an llm_single step with a bound folder renders the plain type sentence", () => {
+    const p = phase({ config: { phase_type: "llm_single", folder_scope: [FOLDER_ID] } })
+    const title = nodeTitle(p, CTX)
+    expect(title).toBe(PHASE_TYPE_SENTENCES.llm_single)
+    // Never a folder claim, and never an id — the never-fabricate floor is
+    // STRENGTHENED by the gate, not relaxed (D-187-05).
+    expect(title).not.toContain("Supplier Contracts")
+    expect(title).not.toContain(FOLDER_ID)
+  })
+
+  it("nodeTitle: a programmatic step with a bound folder renders the plain type sentence", () => {
+    const p = phase({ config: { phase_type: "programmatic", folder_scope: [FOLDER_ID] } })
+    const title = nodeTitle(p, CTX)
+    expect(title).toBe(PHASE_TYPE_SENTENCES.programmatic)
+    expect(title).not.toContain("Supplier Contracts")
+    expect(title).not.toContain(FOLDER_ID)
+  })
+
+  it("nodeTitle: an llm_human_input step with a bound folder waits for your approval", () => {
+    const p = phase({ config: { phase_type: "llm_human_input", folder_scope: [FOLDER_ID] } })
+    expect(nodeTitle(p, CTX)).toBe("Wait for your approval")
+  })
+
+  it("nodeTitle: a stored name still wins over the gated-out tier, on every type", () => {
+    for (const phaseType of ALL_PHASE_TYPES) {
+      const p = phase({ name: "Board-ready renewal pack", config: { phase_type: phaseType, folder_scope: [FOLDER_ID] } })
+      expect(nodeTitle(p, CTX)).toBe("Board-ready renewal pack")
+    }
+  })
+})
+
 describe("phaseVocabulary.derivedFaceOf — TOTALITY over the LOOSE JSONB (CANVAS-01)", () => {
   it("an absent config does not throw", () => {
     const p = { slug: "x", phase_index: 0 } as unknown as PhaseSpecJSON
@@ -338,6 +499,27 @@ describe("phaseVocabulary.derivedFaceOf — TOTALITY over the LOOSE JSONB (CANVA
     const p = phase({ config: { phase_type: "llm_emit", assets: "nope" } })
     expect(() => derivedFaceOf(p, CTX)).not.toThrow()
     expect(derivedFaceOf(p, CTX)).toBe("Fill Renewal Summary.pptx")
+  })
+})
+
+describe("phaseVocabulary — WR-02 reuses the shipped constant, never a second list (T-187-17-02)", () => {
+  it("the folder tier names GROUNDING_DIAL_TYPES by identifier", () => {
+    // Three reads: the declaration, `groundingCause`'s dial check, and the folder
+    // tier's gate. A gate written as an inline literal would leave this at two.
+    const hits = phaseVocabularySource.match(/GROUNDING_DIAL_TYPES/g) ?? []
+    expect(hits.length).toBeGreaterThanOrEqual(3)
+  })
+
+  it("the two dial type strings appear together in exactly ONE array literal", () => {
+    // D-185-15 red line: the constant mirrors the backend grounding rule, so a
+    // SECOND copy of its members would be a second answer to a safety question.
+    const literals =
+      phaseVocabularySource.match(/\[\s*"llm_agent"\s*,\s*"llm_batch_agents"\s*\]/g) ?? []
+    expect(literals).toHaveLength(1)
+  })
+
+  it("the constant itself is NOT widened — still exactly the two backend dial types", () => {
+    expect([...GROUNDING_DIAL_TYPES]).toEqual(["llm_agent", "llm_batch_agents"])
   })
 })
 

@@ -33,6 +33,7 @@ import { describe, it, expect, afterAll } from "vitest"
 import {
   nodeTitle,
   PHASE_TYPE_SENTENCES,
+  GROUNDING_DIAL_TYPES,
   type NameContext,
   type PhaseSpecJSON,
 } from "./phaseVocabulary"
@@ -116,6 +117,15 @@ function containsToken(haystack: string, token: string): boolean {
  * over-simplification SC#5 check 2 exists to catch. Deliberately excluded: `prompt`,
  * `model`, `max_steps`, `temperature` — D-187-07's list of fields that leave the face
  * alone, because a tier that read them would be fabricating a name.
+ *
+ * Phase 187-17 (WR-02) — BOTH gated tiers are mirrored here, for one reason: this key
+ * carries "exactly the fields the derived tier READS", and a tier that is GATED does
+ * not read its field outside the gate. The template half already worked this way
+ * (`templateApplies` asks the `llm_emit` question the resolver asks); the folder half
+ * now asks the `GROUNDING_DIAL_TYPES` question the resolver asks. Mirroring — rather
+ * than loosening check 2 — is what keeps the check biting: a folder binding on a step
+ * that cannot search is not a material difference, because it changes nothing the user
+ * can see and nothing the executor does.
  */
 function materialConfigKey(phase: PhaseSpecJSON, templateFilename?: string): string {
   const config = phase.config ?? { phase_type: "" }
@@ -126,8 +136,12 @@ function materialConfigKey(phase: PhaseSpecJSON, templateFilename?: string): str
     Array.isArray(scope) && scope.length === 1 && typeof scope[0] === "string"
       ? scope[0]
       : null
+  // The gate is READ from the shipped constant, never re-typed — the same rule the
+  // resolver applies, so the two cannot drift (D-185-15: the constant is never widened).
+  const folderApplies = GROUNDING_DIAL_TYPES.includes(phaseType)
+  const materialFolder = folderApplies ? soleFolder : null
   const templateApplies = phaseType === EMIT_PHASE_TYPE && Boolean(templateFilename)
-  return JSON.stringify([phaseType, skillRef, soleFolder, templateApplies])
+  return JSON.stringify([phaseType, skillRef, materialFolder, templateApplies])
 }
 
 /** Every (fixture, phase) pair check 1 actually visited — the DoS control (T-187-12-03)
@@ -173,6 +187,34 @@ describe("SC#5 corpus — the sweep covers what it claims to", () => {
     expect(
       ALL_FIXTURES.filter((f) => f.assets?.some((a) => a.kind === "template")).length,
     ).toBeGreaterThanOrEqual(3)
+  })
+
+  /**
+   * Phase 187-17 (WR-02) — the blind spot the review named, closed on the corpus half.
+   *
+   * The folder tier is gated on `GROUNDING_DIAL_TYPES` because `folder_scope` rides
+   * every LLM config member for SHAPE symmetry and is inert on the ones with no tools
+   * (`LlmSinglePhaseConfig.folder_scope` says so itself). A sweep whose only
+   * folder-bearing phases sat on retrieval types could never see the difference — it
+   * would be green before AND after the gate. Both sides are therefore asserted to be
+   * present, so the corpus cannot silently return to covering one half of the rule.
+   */
+  it("carries a folder-bearing phase on BOTH sides of the GROUNDING_DIAL_TYPES gate", () => {
+    const folderBearing = ALL_FIXTURES.flatMap((f) => f.phases).filter((p) =>
+      Array.isArray(p.config?.folder_scope),
+    )
+    const typeOf = (p: PhaseSpecJSON) =>
+      typeof p.config?.phase_type === "string" ? p.config.phase_type : ""
+
+    const insideGate = folderBearing.filter((p) => GROUNDING_DIAL_TYPES.includes(typeOf(p)))
+    const outsideGate = folderBearing.filter((p) => !GROUNDING_DIAL_TYPES.includes(typeOf(p)))
+
+    expect(insideGate.length).toBeGreaterThan(0)
+    expect(outsideGate.length).toBeGreaterThan(0)
+    // Named, so a future reader can find the witnesses without re-deriving them:
+    // `pm-*.retrieve` (llm_agent) inside, `non-contiguous.stranded` (llm_single) and
+    // `pm-*.emit` (llm_emit) outside.
+    expect(outsideGate.map(typeOf)).toContain("llm_single")
   })
 
   it("derives the six forbidden type tokens from the shipped vocabulary", () => {
@@ -311,12 +353,37 @@ describe("SC#5 check 2 — the check bites (falsification control)", () => {
   const violatingMembers = (face: (p: PhaseSpecJSON, ctx: NameContext) => string) =>
     ALL_FIXTURES.filter((f) => check2Violations(f, face).length > 0).map((f) => f.name)
 
-  it("FAILS on the pre-187 resolution for exactly the two same-type bound pairs", () => {
+  it("FAILS on the pre-187 resolution for the corpus's materially-different same-face pair", () => {
     const failing = violatingMembers((p) => preDerivedFace(p))
-    expect(failing).toEqual([
-      "branching (synthetic skip_to_phase)",
-      "non-contiguous phase_index [0,1,3]",
-    ])
+    // RE-DERIVED at 187-17 (WR-02). This shipped asserting TWO members. The second,
+    // `non-contiguous phase_index [0,1,3]`, was a pair of bare `llm_single` steps
+    // distinguished only by a `folder_scope` — and WR-02 measured that a folder
+    // binding on `llm_single` is INERT (`LlmSinglePhaseConfig.folder_scope`: "inert on
+    // llm_single (no tools)"). So that pair is no longer MATERIALLY different, and its
+    // disappearance from this list is the narrowing working, not the control being
+    // loosened. The very next case asserts that reason as a measurement rather than
+    // leaving it as prose.
+    expect(failing).toEqual(["branching (synthetic skip_to_phase)"])
+  })
+
+  it("…and non-contiguous dropped out for a MEASURED reason, not a loosened check", () => {
+    const fixture = ALL_FIXTURES.find((f) => f.name.startsWith("non-contiguous"))!
+    const ctx = contextFor(fixture)
+    const bySlug = (slug: string) => fixture.phases.find((p) => p.slug === slug)!
+    const second = bySlug("second")
+    const stranded = bySlug("stranded")
+
+    // The binding is REAL and still transcribed — it was not deleted from the corpus.
+    expect(stranded.config.folder_scope).toEqual([CORPUS_FOLDER_ID])
+    expect(second.config.folder_scope).toBeUndefined()
+    // …and yet the two steps are the same KIND of step, because the binding is inert
+    // on their type. Equal keys ⇒ an identical face is honest, exactly as it is for
+    // `plan` and `verify` above.
+    expect(materialConfigKey(second, ctx.templateFilename)).toBe(
+      materialConfigKey(stranded, ctx.templateFilename),
+    )
+    expect(nodeTitle(second, ctx)).toBe(nodeTitle(stranded, ctx))
+    expect(nodeTitle(stranded, ctx)).toBe(PHASE_TYPE_SENTENCES.llm_single)
   })
 
   it("PASSES on the shipped four-tier ladder for every corpus member", () => {
@@ -359,11 +426,45 @@ describe("SC#5 — the two bound witnesses resolve through the derived tier", ()
 
   it("names the bound skill, the scoped folder and the bound template", () => {
     expect(faceOf("branching", "assess")).toBe("Run the pricing policy check")
-    expect(faceOf("non-contiguous", "stranded")).toBe("Search Supplier Contracts")
+    // RE-DERIVED at 187-17 (WR-02): the folder witness moved from the hand-authored
+    // `non-contiguous.stranded` (an `llm_single` step, which searches nothing) to the
+    // REAL transcribed PM-pack `retrieve` (an `llm_agent`, which does). The corpus's
+    // folder tier is therefore now demonstrated on a member copied from a checked-in
+    // seed script rather than on a synthetic edge case — strictly better evidence.
     expect(faceOf("pm-weekly-status-report", "retrieve")).toBe(
       "Search PM Demo Project (sample data)",
     )
+    expect(faceOf("pm-risk-register", "retrieve")).toBe("Search PM Demo Project (sample data)")
     expect(faceOf("risk-register", "emit")).toBe("Fill risk-register.docx")
+  })
+
+  /**
+   * Phase 187-17 (WR-02) — the corpus witness for the gate itself.
+   *
+   * `stranded` is bound to exactly one RESOLVABLE folder and the map that resolves it
+   * is populated, so the only reason its face states no search is its `phase_type`.
+   * Asserting the binding alongside the face is what stops this from passing
+   * vacuously the day somebody drops `folder_scope` off the fixture.
+   */
+  it("WR-02: a folder-bound step that cannot search states no search — and the binding is real", () => {
+    const fixture = ALL_FIXTURES.find((f) => f.name.startsWith("non-contiguous"))!
+    const stranded = fixture.phases.find((p) => p.slug === "stranded")!
+
+    expect(stranded.config.phase_type).toBe("llm_single")
+    expect(GROUNDING_DIAL_TYPES).not.toContain("llm_single")
+    expect(stranded.config.folder_scope).toEqual([CORPUS_FOLDER_ID])
+    expect(FOLDER_NAMES[CORPUS_FOLDER_ID]).toBe("Supplier Contracts")
+
+    const face = faceOf("non-contiguous", "stranded")
+    expect(face).toBe(PHASE_TYPE_SENTENCES.llm_single)
+    expect(face).not.toContain("Supplier Contracts")
+    expect(face).not.toContain(CORPUS_FOLDER_ID)
+
+    // POSITIVE CONTROL, same binding SHAPE, a type that can search: the gate is the
+    // type, not the presence of a folder.
+    expect(faceOf("pm-weekly-status-report", "retrieve")).toBe(
+      "Search PM Demo Project (sample data)",
+    )
   })
 
   it("never leaks an id when a lookup misses — the never-fabricate floor", () => {
