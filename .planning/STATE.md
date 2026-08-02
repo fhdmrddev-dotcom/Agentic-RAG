@@ -4,13 +4,13 @@ milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
 status: executing
 last_updated: "2026-08-01T21:34:50.931Z"
-last_activity: 2026-08-02 -- Phase 187 plan 09 complete (the ⌥ reveal swaps the subtitle; spine title agreement)
+last_activity: 2026-08-02 -- Phase 187 plan 10 complete (the demote-on-identity-edit rule + the two new surfaces' copy)
 progress:
   total_phases: 19
   completed_phases: 6
   total_plans: 87
-  completed_plans: 73
-  percent: 33
+  completed_plans: 74
+  percent: 34
 ---
 
 # Project State
@@ -260,6 +260,37 @@ independently: **33 errors, 0 in `components/workflows`, identical before and af
 reading holds, inherited unmeasured. (5) `ProblemsTray` was audited for a card↔row disagreement and
 has none: it never swapped — it keeps the plain name and ADDS a mono technical line, the same
 principle 149-C locks. No edit, no deferred item.
+
+**Plan 187-10 COMPLETE (Wave 2, 2026-08-02, `fcd94282` → `4f0f9787`).** VOCAB-01/02/03 / D-187-07 /
+D-187-08 / D-187-10 — **a seeded name now has an invalidation story, and both new surfaces have
+their sentences in the one copy home.** `IDENTITY_BEARING_CONFIG_KEYS` (`definitionOps.ts:220`) is
+one exported `ReadonlySet` — `skill_ref`, `folder_scope`, `available_tools` — and `patchPhaseConfig`
+reads the trigger off the PATCH's keys once, then clears **both** `name` and `name_seeded_by_ai` with
+`delete` (never `= undefined`, so a phase that carried no name comes back with no name KEY). The
+face then falls to `derivedFaceOf` and resumes tracking: the named test asserts the user-visible
+consequence through `nodeTitle`, `"Check supplier pricing"` → `"Run the pricing policy check"`. A
+**hand-typed** name survives every identity-bearing patch (marker absent AND explicit `false` both
+tested). `setPhaseGovernance` is untouched — `git diff -U0 | grep -c PhaseGovernancePatch` returns
+**0** across both commits. Task 2 added **11 exports** in the shipped copy-constant register:
+`SEED_RECEIPT_*` (7) and `STARTER_DOOR_*` + `StarterChoiceJSON` (4). `definitionOps.test.ts`
+**189 → 222**; both tasks observed RED (6/203, then a collection error); `tsc -b` **33 errors, 0 in
+`components/workflows`, identical before and after** (D-ITEM-01, re-measured a third time).
+**Carry forward — 187-13 and 187-14 own the two unwired surfaces:**
+(1) **`seedReceiptGroundingLead(0)` returns `""`** — 187-13 must call it FIRST and render the
+grounding paragraph + step list only when non-empty; that IS D-187-10's zero case and the whole of
+the conditional. Each step's `cause` comes from `groundingCauseOf(phase, kbTools)` and the `tool`
+from the real `available_tools ∩ kbTools` intersection — **do not hardcode `search_documents`**.
+(2) **`StarterChoiceJSON` accepts a raw `listStarterWorkflows` row with no adapter**, pinned at
+compile time by a type-only `PublishedWorkflow` assignment in `definitionOps.test.ts`.
+(3) **One honesty correction, in the open:** the plan's phrasing "the fields the derived tier READS"
+does not literally cover `available_tools` (`derivedFace` never reads it). The docblock states the
+rule one notch wider — *an edit that could change what the step's face SAYS about that step* — and
+justifies `available_tools` on its own terms (it decides `groundingCauseOf`'s `detected` branch).
+D-187-07's member list is unchanged. `phase_type` is deliberately absent, measured: `PhaseFormPanel`
+only READS it (`:719`), so no patch through this seam can carry it.
+(4) **The template arm of the demote is DORMANT, not reachable** — the template filename is
+definition-level (`assets[]`) and `frontend/src` has **zero** `assets` references outside docblocks.
+Implemented and tested at the pure-function level only; nobody may claim a user can trigger it.
 
 (`3713a716`), GOVERN-01/02/03 all `Complete`, `nyquist_compliant` true, SECURED 49/49 (`a00b1cc5`).
 Security found one real fail-open BLOCKER — T-185-04-01, a **typed** refusal on an armed checkpoint ran
