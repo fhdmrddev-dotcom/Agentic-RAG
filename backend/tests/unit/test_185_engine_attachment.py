@@ -167,35 +167,86 @@ def test_a_deliberately_weak_author_spec_cannot_loosen_the_gate():
 
 
 # ── criterion 18 — arming adds no phase ───────────────────────────────────────
+#
+# RE-SHAPED IN PLAN 187-11, VISIBLY AND WITH THE REASONING RECORDED (D-187-01).
+#
+# WHAT THIS TEST ASSERTED BEFORE. Criterion 18's substance — arming adds no phase and
+# shifts no ``phase_index`` — plus a MECHANISM assertion: that ``effective_phase``
+# returned a copy whose ``validators[0]`` was a synthesized ``action_risk_approval``
+# spec (``timing="pre"``, ``on_failure="ask_user"``, ``max_retries=0``) carrying the
+# approval sentence in its ``config["prompt"]``, and that the sentence obeyed the
+# D-185-14 honesty rules.
+#
+# WHY THE MECHANISM CHANGED. D-187-01: the guarantee is a PROPERTY OF THE PHASE, not a
+# position in a list. ``run_gates`` is first-failure-wins and ``effective_phase``
+# APPENDS, so the armed spec sat LAST and any author-declared failing pre gate returned
+# ahead of it — an ``ask_user`` Proceed then ran the body with nobody asked (SEED-137).
+# No ordering rule fixes that, so the approval gate was hoisted out of ``phase.validators``
+# entirely into an explicit pre-body checkpoint in ``_run_phase_with_gates``.
+# ``effective_phase`` now synthesizes exactly ONE spec — the ``citations_required`` gate a
+# DETECTED step earns — and nothing else.
+#
+# THE SUBSTANCE IS UNCHANGED, AND IS STILL ASSERTED BELOW: five phases in, five phases
+# out, every ``phase_index`` and every ``slug`` identical, and the source definition
+# untouched. What moved is only HOW arming is represented. The sentence assertions moved
+# onto ``grounding._approval_sentence`` DIRECTLY — that is where the honesty rules live,
+# and it is how ``test_armed_prompt_is_the_generated_sentence_character_identically``
+# already reads them.
+#
+# WHY THIS IS A RE-SHAPE AND NOT A DELETION. The ROADMAP threat-model item permits a
+# visible re-shape with reasoning recorded; it does not permit a silent removal. The
+# phase-level armed reading this test used to observe still has TWO independent
+# observers in this file — the run-time checkpoint (driven by
+# ``test_an_armed_pre_gate_records_a_pause_not_a_failure``) and the boot-time resume
+# predicate ``_is_armed_action_risk`` (pinned by
+# ``test_the_two_resume_predicates_are_independent`` at the bottom of this file). That
+# pair is exactly why D-187-03's "exactly ONE reading of armed survives" was recorded as
+# RECONCILED rather than delivered: two survive, deliberately, and they are independent.
 def test_arming_adds_no_phase_and_moves_no_phase_index():
     """Criterion 18 / D-185-12. Applied across a 5-phase definition — every phase armed
     — the result is still 5 phases with every ``phase_index`` unchanged, and the source
-    definition still has 5. The armed checkpoint is a VALIDATOR, not a step, so nothing
-    downstream that reasons about position (the spine, the timeline, skip_to_phase)
-    can be shifted by arming."""
-    from app.services.harness.grounding import effective_phase
+    definition still has 5. Arming is a PROPERTY of the phase, not a step, so nothing
+    downstream that reasons about position (the spine, the timeline, skip_to_phase) can
+    be shifted by it."""
+    from app.services.harness.grounding import _approval_sentence, effective_phase
 
     phases = [
         _agent_phase(slug=f"p{i}", phase_index=i, armed=True, name=f"Step {i}")
         for i in range(5)
     ]
+    definition = _definition_with(*phases)
+    assert len(definition.phases) == 5
+    before = [(p.slug, p.phase_index) for p in definition.phases]
+
     effective = [effective_phase(p, total_phases=len(phases)) for p in phases]
 
+    # ── THE SUBSTANCE: no phase added, no phase_index moved, source untouched ──
     assert len(effective) == 5
     assert len(phases) == 5
+    assert len(definition.phases) == 5
+    assert [(p.slug, p.phase_index) for p in definition.phases] == before
     assert [p.phase_index for p in effective] == [0, 1, 2, 3, 4]
     assert [p.slug for p in effective] == [f"p{i}" for i in range(5)]
 
-    # Each armed phase gained a timing="pre" approval gate whose disposition is the
-    # shipped ask_user pause (D-185-12/13), carrying the engine-generated sentence.
-    pre = effective[1].validators[0]
-    assert pre.kind == "action_risk_approval"
-    assert pre.timing == "pre"
-    assert pre.on_failure == "ask_user"
-    assert pre.max_retries == 0
-    assert pre.config["prompt"].startswith('Step 2 of 5, "Step 1", is about to run.')
+    # ── THE MECHANISM, AS IT IS AFTER THE HOIST ──
+    # These phases carry ``search_documents`` (``_agent_phase``'s default), so each one is
+    # DETECTED and owes exactly the citations gate — and NOTHING else. Arming contributes
+    # no spec at all.
+    for eff in effective:
+        assert [v.kind for v in eff.validators] == ["citations_required"], (
+            f"{eff.slug} came back with {[v.kind for v in eff.validators]} — after "
+            f"D-187-01 the only spec effective_phase synthesizes is the citations gate"
+        )
+
+    # An armed phase that owes NO citations gate is returned BY REFERENCE — arming alone
+    # is now literally nothing to synthesize. (``execute_code`` is not a KB tool.)
+    bare_armed = _agent_phase(slug="bare", phase_index=0, armed=True, tools=["execute_code"])
+    assert effective_phase(bare_armed, total_phases=5) is bare_armed
+
+    # ── THE SENTENCE, READ FROM ITS ONE AUTHOR ──
     # D-185-14 honesty (SPEC Req 9): position, identity, consequence — never a verdict.
-    prompt = pre.config["prompt"]
+    prompt = _approval_sentence(phases[1], 5)
+    assert prompt.startswith('Step 2 of 5, "Step 1", is about to run.')
     assert "waiting" in prompt
     for forbidden in ("approved", "safe", "proven"):
         assert forbidden not in prompt.lower()
@@ -297,11 +348,14 @@ def test_grounding_declares_no_model_validator_in_CODE():
 
 
 def _armed_effective_phase(*, total_phases: int = 4, index: int = 1, label: str = "Send the renewal notice"):
-    """The phase as the ENGINE sees it: run the real synthesis so the prompt under test
-    is the real generated sentence, never a hand-copied twin that could drift.
+    """The phase as the ENGINE sees it: run the real synthesis so the phase under test is
+    the real effective one, never a hand-built twin that could drift.
 
-    ``execute_code`` (not a KB tool) keeps the citation gate off, so ``validators[0]``
-    is unambiguously the armed pre-gate."""
+    ``execute_code`` (not a KB tool) keeps the citation gate off. Before D-187-01 that
+    made ``validators[0]`` unambiguously the armed pre-gate; after the hoist there is no
+    armed spec at all, so ``effective_phase`` returns this phase BY REFERENCE with an
+    empty validator list — and the armed prompt is composed by ``_armed_finding`` below
+    rather than read out of a spec's ``config``."""
     from app.services.harness.grounding import effective_phase
 
     authored = _agent_phase(
@@ -309,6 +363,26 @@ def _armed_effective_phase(*, total_phases: int = 4, index: int = 1, label: str 
         tools=["execute_code"], validators=[], armed=True,
     )
     return authored, effective_phase(authored, total_phases=total_phases)
+
+
+def _armed_finding(phase, total_phases: int = 4) -> str:
+    """The finding string the HOISTED checkpoint sends into
+    ``_resolve_failure_with_ask_user`` — the engine's own wire format (D-187-01).
+
+    This replaces the pre-187 idiom ``"action_risk:approval|" +
+    eff.validators[0].config["prompt"]``, which read the sentence out of a synthesized
+    spec that no longer exists. Both halves are taken from the engine so neither can
+    drift: the prefix from ``_ACTION_RISK_FINDING_PREFIX`` (retained as a WIRE FORMAT —
+    the helper's DELTA 1 still splits the person's prompt back out of it on ``"|"``), and
+    the sentence from ``grounding._approval_sentence``, its one author.
+
+    The checkpoint's own call site (``harness_engine.py``, the block keyed on
+    ``phase.action_risk_armed``) composes exactly this.
+    """
+    from app.services.harness.grounding import _approval_sentence
+    from app.services.harness_engine import _ACTION_RISK_FINDING_PREFIX
+
+    return _ACTION_RISK_FINDING_PREFIX + _approval_sentence(phase, total_phases)
 
 
 def _armed_ctx(*, supabase=None, thread_id=None):
@@ -334,17 +408,19 @@ def test_armed_gate_subscribes_with_no_timeout_at_all():
 
     from app.services import harness_engine
 
-    _authored, eff = _armed_effective_phase()
-    finding = "action_risk:approval|" + eff.validators[0].config["prompt"]
+    authored, eff = _armed_effective_phase()
+    # D-187-01: the armed treatment is REQUESTED by the caller (is_action_risk=True),
+    # never sniffed out of the finding, and the checkpoint has no validator index.
+    finding = _armed_finding(authored)
     subscribe = AsyncMock(return_value={"kind": "response", "response_text": "Approve and run this step"})
 
     with patch.object(harness_engine, "write_audit", AsyncMock()), \
          patch("app.services.ask_user_service.subscribe_for_response", subscribe):
         asyncio.run(
             harness_engine._resolve_failure_with_ask_user(
-                eff, finding, 0, 0,
+                eff, finding, 0, None,
                 run_id=uuid4(), pool=object(), redis=object(), ctx=_armed_ctx(),
-                _audit_user_id=uuid4(), is_pre=True,
+                _audit_user_id=uuid4(), is_pre=True, is_action_risk=True,
             )
         )
 
@@ -384,8 +460,8 @@ def test_criterion_19_unanswered_armed_gate_does_not_advance_the_run():
 
     from app.services import harness_engine
 
-    _authored, eff = _armed_effective_phase()
-    finding = "action_risk:approval|" + eff.validators[0].config["prompt"]
+    authored, eff = _armed_effective_phase()
+    finding = _armed_finding(authored)
     write_audit = AsyncMock()
 
     with patch.object(harness_engine, "write_audit", write_audit), \
@@ -393,9 +469,9 @@ def test_criterion_19_unanswered_armed_gate_does_not_advance_the_run():
                AsyncMock(return_value=None)):
         outcome = asyncio.run(
             harness_engine._resolve_failure_with_ask_user(
-                eff, finding, 0, 0,
+                eff, finding, 0, None,
                 run_id=uuid4(), pool=object(), redis=object(), ctx=_armed_ctx(),
-                _audit_user_id=uuid4(), is_pre=True,
+                _audit_user_id=uuid4(), is_pre=True, is_action_risk=True,
             )
         )
 
@@ -419,7 +495,7 @@ def test_armed_prompt_is_the_generated_sentence_character_identically():
 
     authored, eff = _armed_effective_phase(total_phases=4, index=1)
     expected = _approval_sentence(authored, 4)
-    finding = "action_risk:approval|" + eff.validators[0].config["prompt"]
+    finding = _armed_finding(authored)
 
     supabase = MagicMock()
     ctx = _armed_ctx(supabase=supabase, thread_id=uuid4())
@@ -430,9 +506,9 @@ def test_armed_prompt_is_the_generated_sentence_character_identically():
                AsyncMock(return_value={"kind": "response", "response_text": "Do not run it"})):
         asyncio.run(
             harness_engine._resolve_failure_with_ask_user(
-                eff, finding, 0, 0,
+                eff, finding, 0, None,
                 run_id=uuid4(), pool=object(), redis=object(), ctx=ctx,
-                _audit_user_id=uuid4(), is_pre=True,
+                _audit_user_id=uuid4(), is_pre=True, is_action_risk=True,
             )
         )
 
@@ -463,8 +539,8 @@ def test_armed_prompt_and_row_carry_a_null_deadline_never_zero():
 
     from app.services import harness_engine
 
-    _authored, eff = _armed_effective_phase()
-    finding = "action_risk:approval|" + eff.validators[0].config["prompt"]
+    authored, eff = _armed_effective_phase()
+    finding = _armed_finding(authored)
     supabase = MagicMock()
     ctx = _armed_ctx(supabase=supabase, thread_id=uuid4())
 
@@ -474,9 +550,9 @@ def test_armed_prompt_and_row_carry_a_null_deadline_never_zero():
                AsyncMock(return_value={"kind": "response", "response_text": "Do not run it"})):
         asyncio.run(
             harness_engine._resolve_failure_with_ask_user(
-                eff, finding, 0, 0,
+                eff, finding, 0, None,
                 run_id=uuid4(), pool=object(), redis=object(), ctx=ctx,
-                _audit_user_id=uuid4(), is_pre=True,
+                _audit_user_id=uuid4(), is_pre=True, is_action_risk=True,
             )
         )
 
@@ -504,8 +580,8 @@ def test_shutdown_mid_wait_leaves_an_armed_run_resumable():
 
     from app.services import harness_engine
 
-    _authored, eff = _armed_effective_phase()
-    finding = "action_risk:approval|" + eff.validators[0].config["prompt"]
+    authored, eff = _armed_effective_phase()
+    finding = _armed_finding(authored)
 
     with patch.object(harness_engine, "write_audit", AsyncMock()), \
          patch("app.services.ask_user_service.subscribe_for_response",
@@ -513,9 +589,9 @@ def test_shutdown_mid_wait_leaves_an_armed_run_resumable():
         with pytest.raises(asyncio.CancelledError):
             asyncio.run(
                 harness_engine._resolve_failure_with_ask_user(
-                    eff, finding, 0, 0,
+                    eff, finding, 0, None,
                     run_id=uuid4(), pool=object(), redis=object(), ctx=_armed_ctx(),
-                    _audit_user_id=uuid4(), is_pre=True,
+                    _audit_user_id=uuid4(), is_pre=True, is_action_risk=True,
                 )
             )
 
@@ -635,6 +711,62 @@ def _drive_failing_pre_gate(finding: str):
     return write_audit, emit
 
 
+def _drive_armed_checkpoint(*, total_phases: int = 4):
+    """Phase 187 (D-187-01) — run the HOISTED armed checkpoint and return
+    ``(write_audit_mock, emit_mock)``.
+
+    THE ENTRY POINT MOVED, WHICH IS WHY THIS EXISTS. Before the hoist an armed step
+    reached the pause through a FAILING pre gate — the armed spec was a member of
+    ``phase.validators``, ``run_gates`` returned its ``action_risk:approval|`` finding, and
+    the sibling ``_drive_failing_pre_gate`` below reproduced that by patching ``run_gates``
+    to fail. After D-187-01 no member of ``phase.validators`` is ever the armed one, so
+    that drive can no longer reach the checkpoint at all. An armed phase now reaches the
+    pause through ``_run_phase_with_gates``'s EXPLICIT pre-body checkpoint, which fires
+    on ``phase.action_risk_armed`` AFTER the pre-gate pass has passed.
+
+    So this driver does the opposite of its sibling: it lets the pre-gate pass PASS (the
+    effective armed phase carries no validators at all, so the real ``run_gates`` returns
+    a passing result with no patch — the ``timing`` filter and the empty-list path run for
+    real) and the checkpoint is what fires. ``_resolve_failure_with_ask_user`` is stubbed
+    to a terminal outcome so the function returns immediately after the block under test;
+    the disposition itself is covered by the 185-04 tests above, and the stub also keeps
+    the executor body from ever running.
+
+    ``_drive_failing_pre_gate`` below is left EXACTLY as it shipped — it is still the
+    correct drive for an AUTHOR's failing pre gate, which is what
+    ``test_a_freshness_pre_gate_still_fails_exactly_as_it_shipped`` measures.
+    """
+    import asyncio
+    from unittest.mock import AsyncMock, patch
+    from uuid import uuid4
+
+    from app.services import harness_engine
+
+    _authored, eff = _armed_effective_phase(total_phases=total_phases)
+    assert list(eff.validators) == [], (
+        "the armed effective phase carries a validator — after D-187-01 arming "
+        "synthesizes no spec, and this drive's passing pre-gate assumption is broken"
+    )
+    write_audit = AsyncMock()
+    emit = AsyncMock()
+
+    with patch.object(harness_engine, "write_audit", write_audit), \
+         patch.object(harness_engine, "_emit", emit), \
+         patch.object(
+             harness_engine, "_resolve_failure_with_ask_user",
+             AsyncMock(return_value=harness_engine.PhaseOutcome(
+                 "fail_run", None, None, "stub — the disposition is tested above")),
+         ):
+        asyncio.run(
+            harness_engine._run_phase_with_gates(
+                eff, {}, _armed_ctx(),
+                run_id=uuid4(), pool=object(), redis=object(),
+                wall_clock=60, _audit_user_id=uuid4(), total_phases=total_phases,
+            )
+        )
+    return write_audit, emit
+
+
 def _audit_event_types(write_audit) -> list[str]:
     return [c.kwargs.get("event_type") for c in write_audit.await_args_list]
 
@@ -649,10 +781,12 @@ def test_an_armed_pre_gate_records_a_pause_not_a_failure():
     audit row, under ``action_risk_pending`` — and ZERO ``gate_failed`` rows. The
     metadata carries the phase and the timing, never the raw finding: the finding IS
     the person's prompt sentence, and the ledger's job here is the consequence (the
-    run paused), not the message (T-185-05-04)."""
-    write_audit, _emit = _drive_failing_pre_gate(
-        "action_risk:approval|Step 2 of 4 is about to run."
-    )
+    run paused), not the message (T-185-05-04).
+
+    D-187-01 moved the ENTRY POINT, not the claim: the pause is now announced by the
+    explicit pre-body checkpoint rather than by a failing armed pre-gate, so this drives
+    ``_drive_armed_checkpoint``. Every assertion below is the one that shipped."""
+    write_audit, _emit = _drive_armed_checkpoint()
 
     types = _audit_event_types(write_audit)
     assert types == ["action_risk_pending"], f"the armed pause wrote {types}"
@@ -667,10 +801,10 @@ def test_an_armed_pre_gate_never_announces_gate_failed_to_the_frontend():
     """L-5, the SSE half. The producer stream sees ``action_risk_pending`` and NEVER
     ``gate_failed`` — the frontend's shipped ``gate_failed`` handler renders a problem,
     and a step that is merely waiting is not one. The payload carries ``phase`` only;
-    the sentence the person reads rides the ``ask_user_prompt`` emit (D-185-13)."""
-    _write_audit, emit = _drive_failing_pre_gate(
-        "action_risk:approval|Step 2 of 4 is about to run."
-    )
+    the sentence the person reads rides the ``ask_user_prompt`` emit (D-185-13).
+
+    D-187-01 moved the ENTRY POINT, not the claim — see the sibling above."""
+    _write_audit, emit = _drive_armed_checkpoint()
 
     names = _emitted_event_names(emit)
     assert names == ["action_risk_pending"], f"the armed pause emitted {names}"
