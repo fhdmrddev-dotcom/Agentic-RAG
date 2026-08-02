@@ -327,6 +327,37 @@ armed `execute_code` phase's effective validator list is empty. Compose the find
 against a pre-dispatch baseline of 86 / 1668. The 24 in-flight went to 0 and the 62 pre-existing rot
 stayed at 62, identical file-for-file. Compare deltas against a measured baseline, not against zero.
 
+**Plan 187-12 COMPLETE (Wave 3, 2026-08-02, `cb0ca5d9` → `46ba6915`).** VOCAB-01 / SC#5 / D-187-15 /
+D-187-16 — **both SC#5 checks are now falsifiable over the shipped corpus, as pure-function sweeps.**
+`phaseVocabulary.corpus.test.ts` is **42/42**; the 8-file vocabulary set plus it is **1022 passed, 0
+failed**. Check 1 (no slug, no raw `phase_type` token in any reveal-OFF face) matches on word
+boundaries and derives its forbidden list from `PHASE_TYPE_SENTENCES`, so a 7th type is covered the day
+it exists. Check 2 is D-187-15's narrowing, made executable as `materialConfigKey` = `phase_type` +
+`skill_ref` + sole `folder_scope` + template applicability.
+**The SPEC's "check 2 FAILS on HEAD today" is now a count over named members, not a slogan:** under the
+pre-187 two-tier resolution **2 of 15** members violate it — `branching` (`assess` + `draft`) and
+`non-contiguous phase_index [0,1,3]` (`second` + `stranded`), both rendering `"Write it up"` — and
+**0 of 15** under the shipped four-tier ladder. Observed, not asserted: the sweep was momentarily
+pointed at `preDerivedFace` and ran **2 failed / 40 passed**, then restored green; both states are
+pinned permanently by a falsification-control block.
+**Carry forward, four things:**
+(1) **The honest scope of that result** — both violating members are the two HAND-AUTHORED fixtures
+this plan extended. No *real* transcribed member (4 seeds / 3 starters / PM pack) has a
+materially-different pair at all, because every step that differs materially also differs in
+`phase_type`. A test records exactly that, so nobody later reads the 2→0 as bigger than it is.
+(2) **`contextFor(fixture)` in the corpus test is the 3-line shape 187-15 owes at the page** —
+`assets.find(a => a.kind === "template")?.filename` → `NameContext.templateFilename`. The fixture
+transcribes `assets[]` WITH its `kind` rather than a pre-resolved filename precisely so the filter
+under test is not deleted.
+(3) **A new derived tier must edit `materialConfigKey` in the same commit**, or check 2 stops measuring
+it and goes quietly green.
+(4) **Do not add an `ALL_FIXTURES` entry casually** — it writes a new projection snapshot block, and
+the plan gates on `__snapshots__` staying byte-identical. Both new witnesses extend existing
+hand-authored fixtures. `conftest.py` was NOT edited (`git status` empty, plus a named test asserting
+the seed shape). The directory-wide vitest run shows 7–8 failures across `PublishGauntlet`,
+`WorkflowCanvas` and `WorkflowBuilderPage.canvas` — **all three are 100% green in isolation (46 / 35 /
+88)**; that is SEED-056 flake, re-confirming 187-CONTEXT's correction, and is not this plan's.
+
 (`3713a716`), GOVERN-01/02/03 all `Complete`, `nyquist_compliant` true, SECURED 49/49 (`a00b1cc5`).
 Security found one real fail-open BLOCKER — T-185-04-01, a **typed** refusal on an armed checkpoint ran
 the step and filed a false approval receipt — fixed by quick task `260731-3y4` (`417728bd`) and
