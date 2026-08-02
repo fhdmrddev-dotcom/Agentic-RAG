@@ -4,7 +4,7 @@ milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
 status: executing
 last_updated: "2026-08-01T21:34:50.931Z"
-last_activity: 2026-08-02 -- Phase 187 plan 11 complete (SC#6 green + the falsification observed)
+last_activity: 2026-08-02 -- Phase 187 plan 13 complete (the seed receipt + its source fence)
 progress:
   total_phases: 19
   completed_phases: 6
@@ -357,6 +357,38 @@ hand-authored fixtures. `conftest.py` was NOT edited (`git status` empty, plus a
 the seed shape). The directory-wide vitest run shows 7–8 failures across `PublishGauntlet`,
 `WorkflowCanvas` and `WorkflowBuilderPage.canvas` — **all three are 100% green in isolation (46 / 35 /
 88)**; that is SEED-056 flake, re-confirming 187-CONTEXT's correction, and is not this plan's.
+
+**Plan 187-13 COMPLETE (Wave 3, 2026-08-02, `a91a5ed7` → `a50ca3de`).** VOCAB-02 / Req 5 / D-187-08 /
+D-187-09 / D-187-10 / D-187-14 — **the seed receipt exists as its own component file** (296 L) with a
+33-test suite (533 L). `SeedReceipt` is a pure caller-driven leaf: `{ phases, kbTools, nameContext?,
+open, onDismiss }`, `open === false` returns null, and it authors **no sentence of its own** — all four
+sentences and both per-step reasons are asserted character-identically against their `definitionOps`
+exports. The cause per step comes from the shipped `groundingCauseOf` over the server's `kbTools` prop
+and the named tool is the **real** `available_tools ∩ kbTools` intersection: `grep -c
+"search_documents\|KB_TOOLS"` is **0**, and a test grounds a step on a tool id (`consult_the_archive`)
+that appears in no fixture and no constant, proving the palette is the server's. D-187-10's zero case
+is the whole of the conditional — `seedReceiptGroundingLead(0) === ""` — so a bare draft still renders
+the heading and the nothing-committed close with **no list node at all**.
+**Falsification observed, not assumed (three ways):** the suite's own first run was **5 failed / 28
+passed**; making the grounding block unconditional reds **5**; naming the head of `available_tools`
+instead of the intersection reds **2** (the second fixture row lists a non-KB tool first precisely for
+this). Both mutations reverted and re-verified green before either commit.
+**Carry forward, four things:**
+(1) **`WorkflowBuilderPage.tsx` is untouched** (`git status --porcelain` empty) — the single gated
+mount line is **187-15's**, per D-187-14. The receipt is indifferent to where it mounts; `open` and the
+in-memory per-draft dismissal (D-187-09 — a reload re-showing it is CORRECT) are the page's.
+(2) **`grep -ci delay` on `SeedReceipt.tsx` must stay 0.** The no-staging fence is outright, in code
+AND in prose — a comment is where "we could stagger this later" gets written down. Three component
+comments were reworded to *"waits its turn"* so the strong fence could stand.
+(3) **No reveal accessor is read**, deliberately: the receipt shows no technical token of its own (a
+test asserts none of the five fixture slugs appears in its `textContent`). The tool id inside a
+`detected` reason is NOT gated — `seedReceiptStepReason` reserves its unqualified form for *"the tool
+is not known"*, so hiding a tool we do know would make the copy claim something false.
+(4) **Three guard defects were found and fixed on the suite's first run** — a membership helper that
+resolved a row's CHILDREN as rows (now `[data-slug]`, never a testid prefix), a fixture whose slug
+`pricing` sat inside its own step name, and a `\bhidden\b=` fence that fired on the component's own
+correct `aria-hidden`. All three are the same class: a guard that measures something other than what it
+claims. `npx tsc -b` = **33 / 0 in `components/workflows`**, identical to HEAD (D-ITEM-01).
 
 (`3713a716`), GOVERN-01/02/03 all `Complete`, `nyquist_compliant` true, SECURED 49/49 (`a00b1cc5`).
 Security found one real fail-open BLOCKER — T-185-04-01, a **typed** refusal on an armed checkpoint ran
