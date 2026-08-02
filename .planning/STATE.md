@@ -4,12 +4,12 @@ milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
 status: executing
 last_updated: "2026-08-01T21:34:50.931Z"
-last_activity: 2026-08-02 -- Phase 187 plan 10 complete (the demote-on-identity-edit rule + the two new surfaces' copy)
+last_activity: 2026-08-02 -- Phase 187 plan 11 complete (SC#6 green + the falsification observed)
 progress:
   total_phases: 19
   completed_phases: 6
   total_plans: 87
-  completed_plans: 74
+  completed_plans: 75
   percent: 34
 ---
 
@@ -291,6 +291,41 @@ only READS it (`:719`), so no patch through this seam can carry it.
 (4) **The template arm of the demote is DORMANT, not reachable** — the template filename is
 definition-level (`assets[]`) and `frontend/src` has **zero** `assets` references outside docblocks.
 Implemented and tested at the pure-function level only; nobody may claim a user can trigger it.
+
+**Plan 187-11 COMPLETE (Wave 3, 2026-08-02, `3dfd47a4` → `a8410b27`).** VOCAB-02 / SC#6 / SEED-137 /
+D-187-01 / D-187-18 — **the armed-checkpoint property is green AND has been watched fail again.**
+`test_187_armed_checkpoint_property.py` is **30/30** (one keyword: `_drive` now passes
+`total_phases=TOTAL_PHASES`, matching `run_workflow`'s one production call site — 187-06's diagnosis
+was re-verified from the failure text, not trusted). Then the whole 49-line checkpoint block was
+**removed** from `harness_engine.py` and the property went **17 failed / 13 passed on the RECORDED
+assertions** (`assert armed_orders` / `assert len(armed_orders) == 1`, observed 0 prompts,
+`body_invoked=True`, `outcome='completed'`), before being restored and re-verified green.
+**The falsified RED set is a strict SUPERSET of 187-01's HEAD RED set (8 ids), and the reason is
+measured:** on HEAD `effective_phase` still appended the armed spec, so the four rows with no author
+pre gate ahead of it were still asked; 187-06 deleted that synthesis too, so with the checkpoint gone
+NOTHING can ask. `pre_fail_run` / `pre_skip_to_phase` stay green in **both** states (D-187-02). All of
+it is written into the file under `## Falsification observed after the fix`.
+**Census re-shaped:** `_armed_phase()` rebuilt as `action_risk_armed=True` + the AUTHOR's validators;
+9 shipped armed tests re-pointed at `is_action_risk=True` / `failed_idx=None`; criterion 18 re-shaped
+VISIBLY with a 30-line D-187-01 comment (substance — 5 phases in / 5 out, every `phase_index` and
+`slug` identical — asserted more strongly than before, on a real `WorkflowDefinition`). **One net-new
+test** proves an armed checkpoint on a `fail_run`-declaring phase still awaits the rendezvous.
+**Carry forward, four things:**
+(1) **The four regression-net tests are AST-identical to HEAD** — measured with `ast.parse` over
+`git show HEAD:<file>`, because the plan's `git diff | grep` form returns **2** benign hits (a git
+hunk-header function label + one prose reference in a new docstring). Use the AST form; the grep
+cannot tell a body edit from a context label.
+(2) **`_drive_failing_pre_gate` must stay byte-identical.** After the hoist it can only reach an
+AUTHOR's failing pre gate, which is exactly what the freshness regression net measures. The armed
+rows use the new sibling `_drive_armed_checkpoint`, which lets the REAL `run_gates` pass and asserts
+the effective armed phase carries **zero** validators up front.
+(3) **`"action_risk:approval|" + eff.validators[0].config["prompt"]` now raises `IndexError`** — an
+armed `execute_code` phase's effective validator list is empty. Compose the finding with
+`_armed_finding()` (engine prefix + `grounding._approval_sentence`), never from a spec's config.
+(4) **`pytest tests/ → 0 failed` is NOT a usable gate on this tree.** Measured: `tests/` = 211 failed
+(mostly `tests/integration`, needs live Redis/Supabase); `tests/unit` = **62 failed / 1693 passed**,
+against a pre-dispatch baseline of 86 / 1668. The 24 in-flight went to 0 and the 62 pre-existing rot
+stayed at 62, identical file-for-file. Compare deltas against a measured baseline, not against zero.
 
 (`3713a716`), GOVERN-01/02/03 all `Complete`, `nyquist_compliant` true, SECURED 49/49 (`a00b1cc5`).
 Security found one real fail-open BLOCKER — T-185-04-01, a **typed** refusal on an armed checkpoint ran
