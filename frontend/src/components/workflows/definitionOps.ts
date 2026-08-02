@@ -189,6 +189,41 @@ export function removePhase(
 }
 
 /**
+ * D-187-07 — the config keys whose edit invalidates a GENERATOR-SEEDED name.
+ *
+ * JUSTIFIED, NOT ENUMERATED. The rule is: a config edit clears a generator-seeded name
+ * precisely when it could change what the step's face says about that step. Written that
+ * way the rule stays correct automatically as the face's inputs grow — a new member is
+ * added here by asking "would the derived face, or what this step actually does, read
+ * differently after this edit?", never by taste and never by copying a list.
+ *
+ * The current members and why each qualifies:
+ *
+ *   - `skill_ref`      — tier (1) of `derivedFace`. A bound skill IS the face.
+ *   - `folder_scope`   — tier (3) of `derivedFace`. The single scoped folder names the step.
+ *   - `available_tools`— not read by `derivedFace`, and included DELIBERATELY rather than
+ *                        by oversight: it is what decides whether the step reads your
+ *                        documents at all (`groundingCauseOf`'s `detected` branch), so a
+ *                        seeded name written for a step that searched your files no longer
+ *                        describes it once those tools are switched off.
+ *
+ * THE TEMPLATE ARM IS DEFINITION-LEVEL AND CURRENTLY DORMANT. `derivedFace` tier (2)
+ * reads the definition's `assets[]` template filename, which is NOT a phase config key —
+ * and measured this session, `frontend/src` contains zero `assets` references outside
+ * docblocks, so no builder surface can edit it yet. The rule is implemented and tested at
+ * the pure-function level; nobody should claim a user can trigger it today.
+ *
+ * `phase_type` is absent for the same reason, measured rather than assumed: it is the
+ * union discriminator and `PhaseFormPanel` only ever READS it (`:719`) — the type is
+ * chosen once, at add time, and the slug is derived from it.
+ */
+export const IDENTITY_BEARING_CONFIG_KEYS: ReadonlySet<string> = new Set<string>([
+  "skill_ref",
+  "folder_scope",
+  "available_tools",
+])
+
+/**
  * Merge a phase-form patch into one phase's config, immutably.
  *
  * Deliberately does NOT renumber and does NOT reorder: a config edit cannot change run
@@ -198,15 +233,57 @@ export function removePhase(
  * (`Record<string, unknown>`). It is spelled inline rather than imported so this pure
  * module stays free of any component import; the two are mutually assignable, so the
  * 184-04 repoint needs no adapter.
+ *
+ * ── Phase 187 (D-187-07) — THE DEMOTE, and why it lives here ──────────────────────
+ *
+ * This is the ONE config-edit home (`builderStore.ts:519` ← `WorkflowBuilderPage`'s
+ * `onPhaseChange`), so the rule is stated once and cannot be reached around. It is
+ * deliberately NOT added to `setPhaseGovernance` below, whose patch type admits only the
+ * two governance booleans (T-185-06-02) — widening that into a general `PhaseSpec` writer
+ * would be a typecheck error, which is the point.
+ *
+ * A stored name has no invalidation story of its own. Re-bind a step's skill and a
+ * generator-written name still promises the old behaviour: the face lies. Clearing the
+ * seeded name lets the face fall back to `derivedFace`, which tracks the config for free —
+ * so no stale-name marker and no second corner on the card is needed.
+ *
+ * It clears BOTH `name` and `name_seeded_by_ai`. Clearing only the name would leave a
+ * provenance marker describing a name that no longer exists.
+ *
+ * A HAND-TYPED name — `name` present with `name_seeded_by_ai` absent or `false` — is never
+ * cleared by any config edit (SPEC Req 3). That asymmetry is the entire reason the marker
+ * exists, and losing an author's writing to an unrelated edit would be data loss
+ * (T-187-10-01).
+ *
+ * The keys are `delete`d rather than set to `undefined`: a phase that carried no name must
+ * come back with no name KEY, not with an explicit `undefined` the round trip would
+ * serialize (`extra="forbid"` on the backend union, and R2's round-trip identity).
  */
 export function patchPhaseConfig(
   phases: readonly PhaseSpecJSON[],
   slug: string,
   patch: Readonly<Record<string, unknown>>,
 ): PhaseSpecJSON[] {
-  return phases.map((p) =>
-    p.slug === slug ? { ...p, config: { ...p.config, ...patch } } : p,
+  // Read the trigger off the PATCH's keys, once, before the walk: the rule is a property
+  // of the edit, not of the phase.
+  const invalidatesTheFace = Object.keys(patch).some((key) =>
+    IDENTITY_BEARING_CONFIG_KEYS.has(key),
   )
+
+  return phases.map((p) => {
+    if (p.slug !== slug) return p
+    const next: PhaseSpecJSON = { ...p, config: { ...p.config, ...patch } }
+    // Gated on a seeded name that actually EXISTS — a marker with nothing to describe is
+    // not a state the server's stamp can produce, and clearing it would be a write with
+    // no user-visible consequence.
+    const seededName =
+      next.name_seeded_by_ai === true && typeof next.name === "string" && next.name.trim() !== ""
+    if (invalidatesTheFace && seededName) {
+      delete next.name
+      delete next.name_seeded_by_ai
+    }
+    return next
+  })
 }
 
 /** The only two fields `setPhaseGovernance` may write (D-185-10). */

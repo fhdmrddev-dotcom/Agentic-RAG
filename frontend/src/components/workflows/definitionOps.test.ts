@@ -44,10 +44,11 @@ import {
   GROUNDING_TOOL_LIST_IS_THE_CONTROL,
   GROUNDING_WHY_DETECTED,
   GROUNDING_WHY_ESCALATED,
+  IDENTITY_BEARING_CONFIG_KEYS,
   type PhaseTypeId,
 } from "./definitionOps"
 import { ALL_FIXTURES } from "./__fixtures__/canvasFixtures"
-import type { PhaseSpecJSON } from "./phaseVocabulary"
+import { nodeTitle, type NameContext, type PhaseSpecJSON } from "./phaseVocabulary"
 
 /**
  * The whole-suite network tripwire. R10 forbids either refusal from consulting the
@@ -367,6 +368,199 @@ describe("definitionOps — patchPhaseConfig preserves everything it is not aske
     const before = clone(shaped)
     patchPhaseConfig(shaped, "emit", { citation_policy: "draft" })
     expect(shaped).toStrictEqual(before)
+  })
+})
+
+// ── Phase 187 (D-187-07) — the demote-on-identity-edit rule ───────────────────
+//
+// A stored name has no invalidation story of its own. Re-bind a step's skill and a
+// GENERATOR-written name still promises the old behaviour — the face lies. Clearing
+// the seeded name (and its provenance marker) lets the face fall back to the derived
+// tier, which tracks the config for free. A HAND-TYPED name is the author's writing
+// and is never cleared by any config edit (SPEC Req 3) — that asymmetry is the whole
+// reason the marker exists.
+
+describe("definitionOps — patchPhaseConfig demotes a SEEDED name (D-187-07)", () => {
+  const SKILL_A = "11111111-1111-4111-8111-111111111111"
+  const SKILL_B = "22222222-2222-4222-8222-222222222222"
+  const FOLDER_A = "33333333-3333-4333-8333-333333333333"
+
+  /** The injected name lookups the derived tier reads (D-187-05). */
+  const ctx: NameContext = {
+    skillNames: { [SKILL_A]: "supplier check", [SKILL_B]: "pricing policy check" },
+    folderNames: { [FOLDER_A]: "Supplier Contracts" },
+  }
+
+  /** One seeded step plus an innocent bystander. */
+  const seeded = (): PhaseSpecJSON[] => [
+    {
+      slug: "search",
+      phase_index: 0,
+      name: "Check supplier pricing",
+      name_seeded_by_ai: true,
+      config: {
+        phase_type: "llm_agent",
+        prompt: "look it up",
+        available_tools: ["search_documents"],
+        skill_ref: SKILL_A,
+      },
+      validators: [{ kind: "citations_required", on_failure: "fail_run" }],
+    },
+    { slug: "after", phase_index: 1, config: { phase_type: "llm_single", prompt: "x" } },
+  ]
+
+  /** The same step, but the name is the AUTHOR's — the marker is simply absent. */
+  const handTyped = (): PhaseSpecJSON[] => {
+    const phases = seeded()
+    const author = { ...phases[0] }
+    delete author.name_seeded_by_ai
+    return [author, phases[1]]
+  }
+
+  it("re-binding skill_ref clears BOTH the seeded name and its provenance marker", () => {
+    const out = patchPhaseConfig(seeded(), "search", { skill_ref: SKILL_B })
+    expect(out[0].name).toBeUndefined()
+    expect(out[0].name_seeded_by_ai).toBeUndefined()
+    // No spurious key survives with an `undefined` value either.
+    expect("name" in out[0]).toBe(false)
+    expect("name_seeded_by_ai" in out[0]).toBe(false)
+  })
+
+  it("the FACE then falls to the derived tier and tracks the new binding", () => {
+    const before = seeded()
+    expect(nodeTitle(before[0], ctx)).toBe("Check supplier pricing")
+    const out = patchPhaseConfig(before, "search", { skill_ref: SKILL_B })
+    // The user-visible consequence, not a field read: the face now says what the
+    // step actually does after the re-bind.
+    expect(nodeTitle(out[0], ctx)).toBe("Run the pricing policy check")
+  })
+
+  it("a HAND-TYPED name survives every identity-bearing patch (SPEC Req 3, T-187-10-01)", () => {
+    for (const patch of [
+      { skill_ref: SKILL_B },
+      { folder_scope: [FOLDER_A] },
+      { available_tools: ["search_documents", "list_documents"] },
+    ]) {
+      const out = patchPhaseConfig(handTyped(), "search", patch)
+      expect(out[0].name).toBe("Check supplier pricing")
+      expect(nodeTitle(out[0], ctx)).toBe("Check supplier pricing")
+    }
+  })
+
+  it("a hand-typed name with an explicit `name_seeded_by_ai: false` also survives", () => {
+    const explicit = seeded().map((p, i) =>
+      i === 0 ? { ...p, name_seeded_by_ai: false } : p,
+    )
+    const out = patchPhaseConfig(explicit, "search", { skill_ref: SKILL_B })
+    expect(out[0].name).toBe("Check supplier pricing")
+    expect(out[0].name_seeded_by_ai).toBe(false)
+  })
+
+  it("folder_scope and available_tools demote a seeded name too", () => {
+    for (const patch of [
+      { folder_scope: [FOLDER_A] },
+      { available_tools: ["search_documents"] },
+    ]) {
+      const out = patchPhaseConfig(seeded(), "search", patch)
+      expect(out[0].name).toBeUndefined()
+      expect(out[0].name_seeded_by_ai).toBeUndefined()
+    }
+  })
+
+  it("prompt / model / max_steps / wall_clock_seconds / temperature do NOT demote", () => {
+    for (const patch of [
+      { prompt: "a completely different instruction" },
+      { model: "gpt-5" },
+      { max_steps: 12 },
+      { wall_clock_seconds: 90 },
+      { temperature: 0.2 },
+    ]) {
+      const out = patchPhaseConfig(seeded(), "search", patch)
+      expect(out[0].name).toBe("Check supplier pricing")
+      expect(out[0].name_seeded_by_ai).toBe(true)
+      expect(nodeTitle(out[0], ctx)).toBe("Check supplier pricing")
+    }
+  })
+
+  it("a multi-key patch demotes when ANY key is identity-bearing", () => {
+    const out = patchPhaseConfig(seeded(), "search", {
+      prompt: "still fine",
+      temperature: 0.1,
+      skill_ref: SKILL_B,
+    })
+    expect(out[0].name).toBeUndefined()
+    // The rest of the patch still landed — the demote is not a short-circuit.
+    expect(out[0].config.prompt).toBe("still fine")
+    expect(out[0].config.temperature).toBe(0.1)
+  })
+
+  it("a multi-key patch with NO identity-bearing key leaves the name alone", () => {
+    const out = patchPhaseConfig(seeded(), "search", { prompt: "p", temperature: 0.1 })
+    expect(out[0].name).toBe("Check supplier pricing")
+    expect(out[0].name_seeded_by_ai).toBe(true)
+  })
+
+  it("demoting one phase never touches another — the carry-through invariant", () => {
+    const before = seeded()
+    const out = patchPhaseConfig(before, "search", { skill_ref: SKILL_B })
+    expect(out[1]).toBe(before[1])
+    expect(out).toHaveLength(2)
+    expect(indicesOf(out)).toEqual([0, 1])
+  })
+
+  it("the demote writes NOTHING beyond `config`, `name` and the marker", () => {
+    const before = seeded()
+    const out = patchPhaseConfig(before, "search", { skill_ref: SKILL_B })
+    expect(out[0].slug).toBe("search")
+    expect(out[0].phase_index).toBe(0)
+    expect(out[0].validators).toStrictEqual(before[0].validators)
+    // Every remaining key is untouched; only these three could have changed.
+    expect(Object.keys(out[0]).sort()).toEqual(["config", "phase_index", "slug", "validators"])
+  })
+
+  it("never mutates the input array or any of its member objects", () => {
+    const before = seeded()
+    const snapshot = clone(before)
+    patchPhaseConfig(before, "search", { skill_ref: SKILL_B })
+    patchPhaseConfig(before, "search", { folder_scope: [FOLDER_A] })
+    expect(before).toStrictEqual(snapshot)
+    expect(before[0].name).toBe("Check supplier pricing")
+    expect(before[0].name_seeded_by_ai).toBe(true)
+  })
+
+  it("a phase with NO name is unaffected — nothing cleared, no spurious key written", () => {
+    const unnamed: PhaseSpecJSON[] = [
+      { slug: "search", phase_index: 0, config: { phase_type: "llm_agent", prompt: "" } },
+    ]
+    const out = patchPhaseConfig(unnamed, "search", { skill_ref: SKILL_B })
+    expect(Object.keys(out[0]).sort()).toEqual(["config", "phase_index", "slug"])
+    expect("name" in out[0]).toBe(false)
+    expect("name_seeded_by_ai" in out[0]).toBe(false)
+  })
+
+  it("an unknown slug still hands every phase back toBe-identical", () => {
+    const before = seeded()
+    const out = patchPhaseConfig(before, "no-such-step", { skill_ref: SKILL_B })
+    out.forEach((phase, i) => expect(phase).toBe(before[i]))
+  })
+
+  it("IDENTITY_BEARING_CONFIG_KEYS is the ONE source of truth, and it is what fires", () => {
+    // Named members (the template arm is definition-level and has no config key today).
+    expect([...IDENTITY_BEARING_CONFIG_KEYS].sort()).toEqual([
+      "available_tools",
+      "folder_scope",
+      "skill_ref",
+    ])
+    // Every member demotes; nothing outside it does. This is the property, not a list.
+    for (const key of IDENTITY_BEARING_CONFIG_KEYS) {
+      expect(patchPhaseConfig(seeded(), "search", { [key]: null })[0].name).toBeUndefined()
+    }
+    for (const key of ["prompt", "model", "max_steps", "wall_clock_seconds", "temperature"]) {
+      expect(IDENTITY_BEARING_CONFIG_KEYS.has(key)).toBe(false)
+      expect(patchPhaseConfig(seeded(), "search", { [key]: null })[0].name).toBe(
+        "Check supplier pricing",
+      )
+    }
   })
 })
 
