@@ -7,6 +7,12 @@ wave_0_complete: true
 created: 2026-08-02
 gates_measured: 2026-08-02
 phase_base: 35261e96
+gap_closure_round: 2026-08-02
+gap_closure_plans: [187-16, 187-17, 187-18, 187-19]
+gap_closure_base: ee5fff3b
+gap_closure_gates_measured: 2026-08-02
+manual_rows: 12
+manual_rows_performed: 0
 ---
 
 # Phase 187 — Validation Strategy
@@ -69,6 +75,47 @@ of "~14–17 pre-existing frontend vitest failures". Do not attribute either num
 
 ---
 
+## The gap-closure round — 2026-08-02
+
+`187-VERIFICATION.md` (2026-08-02T03:25:40Z) closed the phase at **`gaps_found`, 9/11 must-haves**,
+with one BLOCKER and seven Warnings. The operator folded four findings into a gap-closure round of
+four plans:
+
+| Plan | Finding it closes | Severity as recorded | Wave |
+|---|---|---|---|
+| **187-16** | **CR-01** (the receipt claims a governance action the AI did not take) + **CR-02** (the suite's `llm_emit` fixtures use a `citation_policy` the backend `Literal` cannot produce, so the suite cannot see CR-01) | 🛑 Blocker ×2 — the *only* reason the phase did not pass | 5 |
+| **187-17** | **WR-02** (`derivedFace` tier 3 renders `Search {folder}` on step types that cannot search) | ⚠️ Warning, operator-folded | 5 |
+| **187-18** | **WR-03** (the ＋ picker row promises *"Check with you"*; the card that lands says *"Wait for your approval"*) | ⚠️ Warning, operator-folded | 5 |
+| **187-19** | this record — the closure round's own rows, the M3 unblock, and the measured gates | — | 6 |
+
+**Scope discipline, stated rather than implied.** The round is scoped to CR-01 / CR-02 / WR-02 /
+WR-03 **only**. WR-01, WR-04, WR-05, WR-06, WR-07 and IN-01…IN-05 are unchanged, still recorded in
+`187-REVIEW.md`, and carried forward as findings — none was silently absorbed into this round and
+none was silently dropped.
+
+**Base commit for every gate below: `ee5fff3b`** (`docs(187): record gap-closure planning — 4 plans,
+ready to execute`) — the tip immediately before `77668751`, the round's first commit. This is a
+*different* base from the phase's own `35261e96`; both are stated so no figure in this file is
+ambiguous about which range it measures.
+
+**Two forks were resolved against the reviewer's own suggested minimum, and both are recorded here
+because they change what a reader should expect the shipped code to do:**
+
+- **CR-01 — the receipt keeps ALL THREE causes and splits the LEAD**, rather than taking the
+  reviewer's minimal `if (cause !== "detected") continue`. Filtering the list would have left the
+  typical draft's deliverable wearing an unexplained ⛨ seal — trading a false sentence for exactly
+  the SC#3 hole the receipt exists to close (187-16, verified live: `canvasModel.isGrounded` is
+  `groundingCauseOf(...) !== null`, so the card seals for all three causes).
+- **WR-02 — `llm_emit` is EXCLUDED from the gated set, against its own field docblock.**
+  `LlmEmitPhaseConfig.folder_scope` claims to be *"load-bearing in the executor plan"*; re-read at
+  live HEAD, `_exec_llm_emit` (`phase_types.py:1151-1601`) contains **zero functional reads** of
+  `folder_scope` / `folder_subtree_ids` / `ToolContext` / `_build_phase_tool_context`. The plan-era
+  claim is refuted by the shipped executor, and the refutation is recorded in-source so it cannot be
+  re-inherited (187-17). The reviewer's parenthetical *"`llm_emit` should be added to that predicate
+  only if the emit executor really does bound-scope retrieval"* is therefore answered **no**.
+
+---
+
 ## Per-Task Verification Map
 
 > Filled per-task at plan time. Every task must land in this table with an automated command or an
@@ -114,8 +161,19 @@ of "~14–17 pre-existing frontend vitest failures". Do not attribute either num
 | **187-15-T1** | **15** | **4** | VOCAB-01 | T-187-15-01/07 | Both graph views resolve the face from ONE memoised context; flag-off the spine prop is genuinely ABSENT; both announcements name a step the way its card does | render + prop recorder + source guard | `vitest run …/WorkflowBuilderPage.canvas.test.tsx` | ✅ | ✅ green |
 | **187-15-T2** | **15** | **4** | VOCAB-02, VOCAB-03 | T-187-15-01/02/04 | The receipt and the door mount behind the canvas flag in one line each; the flag-off describe screen is byte-identical | render + byte pin + source guard | `vitest run …/WorkflowBuilderPage.canvas.test.tsx …/WorkflowBuilderPage.describe.test.tsx` | ✅ | ✅ green |
 | **187-15-T3** | **15** | **4** | all | T-187-15-03/05/06 | Every phase gate measured with raw output; no false completion record written | structural | `git diff --numstat`, `git status --porcelain` (see §Phase gates) | ✅ | ✅ green |
+| **187-16-T1** | **16** | **5** | VOCAB-02 (Req 5) | T-187-16-05 | **CR-02 closed** — every `citation_policy` literal in the suite is a member of the backend `Literal["strict","flag","partial","draft"]` (`harness.py:155`), and the shipped default `strict` is exercised; the falsification was **observed RED before any component edit** (12 failed / 34 passed, signature in the SUMMARY) | falsification + fixture-representability guard | `cd frontend && npx vitest run src/components/workflows/SeedReceipt.test.tsx` | ✅ | ✅ green |
+| **187-16-T2** | **16** | **5** | VOCAB-02 (Req 5) | T-187-16-01/03/04/06 | **CR-01 closed** — the *"…read your documents, so I set them to must prove it"* lead counts ONLY `cause === "detected"` steps; a sibling passive sentence covers `already-set` + `escalated`; **every sealed step is still listed** so no ⛨ arrives unexplained; a word-class fence with a positive control asserts no first-person application claim over a non-detected draft | unit + render + word-class fence | `cd frontend && npx vitest run src/components/workflows/SeedReceipt.test.tsx src/components/workflows/definitionOps.test.ts` | ✅ | ✅ green — 274 passed, 0 failed |
+| **187-17-T1** | **17** | **5** | VOCAB-01 (Req 1) | T-187-17-01/02 | The folder tier is exercised across the **whole phase-type space**, with the expectation DERIVED from the shipped `GROUNDING_DIAL_TYPES` rather than re-typed, plus non-vacuity assertions on both halves of the partition; observed **RED before any resolver edit** (13 failed / 122 passed — four of six types over-claimed) | falsification + type-space sweep | `cd frontend && npx vitest run src/components/workflows/phaseVocabulary.test.ts src/components/workflows/phaseVocabulary.corpus.test.ts` | ✅ | ✅ green |
+| **187-17-T2** | **17** | **5** | VOCAB-01 (Req 1) | T-187-17-01/03/04/05 | **WR-02 closed** — a step type that cannot perform bound-scope retrieval never renders `Search {folder}`; the gated-out path falls THROUGH to the plain type sentence, never to a folder name or a raw id; `materialConfigKey` was repaired to mirror both gated tiers rather than SC#5 check 2 being loosened | unit + corpus + source fence + snapshot | `cd frontend && npx vitest run src/components/workflows/phaseVocabulary.test.ts src/components/workflows/phaseVocabulary.corpus.test.ts src/components/workflows/canvasModel.test.ts src/components/workflows/canvasModel.purity.test.ts src/components/workflows/canvasModel.fixtures.test.ts` | ✅ | ✅ green — 1043 passed, 0 failed (9-file set) |
+| **187-18-T1** | **18** | **5** | VOCAB-01 (Req 1) | T-187-18-01/02 | The row's expectation becomes `nodeTitle(minimalPhaseFor(type, …))` — the picker is measured against the **resolver the card asks**, not against the sentence map; observed **RED before any picker edit** (4 failed / 39 passed) with the whole-frame diff showing **exactly one of six rows moving** | falsification + whole-frame equality | `cd frontend && npx vitest run src/components/workflows/StepTypePicker.test.tsx` | ✅ | ✅ green |
+| **187-18-T2** | **18** | **5** | VOCAB-01 (Req 1) | T-187-18-01/03 | **WR-03 closed** — the ＋ row is a PREVIEW of the card it creates; source fence proves zero `PHASE_TYPE_SENTENCES` reads in the picker (identifier assembled from parts) with positive controls for `nodeTitle` + `minimalPhaseFor`; the stale docblock naming the deleted map read was rewritten in the same commit | unit + source fence | `cd frontend && npx vitest run src/components/workflows/StepTypePicker.test.tsx src/components/workflows/WorkflowCanvas.test.tsx` | ✅ | ✅ green — 78 passed, 0 failed |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
+
+> **The six closure rows above were re-run at the closure commit** as part of plan 187-19 Task 2 —
+> see §"Phase gates — gap-closure round". Their Status cells are taken from each plan's own recorded
+> SUMMARY result and cross-checked against that re-run; where the two ever disagreed, both are
+> recorded in §"Phase gates — gap-closure round" and the re-run is the measurement.
 
 ### Requirement → proof map (from RESEARCH.md — bind tasks to these rows)
 
@@ -402,12 +460,16 @@ called from this executor — all three write false records in this project.
 |---|----------|-------------|------------|-------------------|
 | M1 | Every node face says what *that* step does | Req 1 / SC#5 | "Reads distinctly to a business user" is a judgement | Generate a real 5-step workflow; read every face aloud |
 | M2 | The plain title survives the ⌥ reveal; layout does not jump | Req 4 | Height/jump is perceptual | Toggle ⌥ Technical-names ON/OFF ×3 on **both** views |
-| M3 | The receipt arrives once, seal pulses once, implies nothing still-deciding | Req 5 | Temporal + perceptual | Watch arrival on a throttled connection |
+| M3 | The receipt arrives once, seal pulses once, implies nothing still-deciding | Req 5 | Temporal + perceptual | **UNBLOCKED 2026-08-02 — still UNPERFORMED and UNTICKED.** `187-VERIFICATION.md` held this row with its blocking reason recorded verbatim: *"NOTE: fix the CR-01 gap before running this, or the operator will be confirming a receipt that lies."* **CR-01 was closed by plan 187-16** (commits `77668751` RED, `5c613bf4` GREEN); the receipt no longer states a governance action the AI did not take, so the hold no longer applies. **Unblocking a row is not performing it.** To perform: watch arrival on a throttled connection on a REAL generated draft — the receipt enters ONCE as one batch, the seal pulses once, and nothing on the card reads as still-deciding. |
 | M4 | The face tracks a skill bind/unbind without a save and without flicker | Req 1 | The async-map settle is only visible live (Pitfall 1) | Bind a skill to a step, then unbind, watching the face |
 | M5 | The seeded describe text reads like something a person typed | Req 6 | Copy quality | Pick each of the 3 templates |
 | M6 | **SC#6 live** — armed checkpoint cannot be preempted | Req 7 / SC#6 | Needs a live Redis rendezvous + a real browser answer | Run an armed phase carrying a `timing="pre"` `ask_user` validator. Answer the author's gate **Proceed**; confirm the armed checkpoint appears in the chat `PendingAskCard`. **Refuse** it. Confirm the step did NOT run and `harness_audit` has **zero** `validator_ask_user_approved` rows for it. |
 | M7 | **SC#10 live row** — the env path reaches `resolve_authoring_model` | SC#10 | Requires a backend restart | Restart backend with `HARNESS_AUTHORING_MODEL` set; generate; confirm the model actually used |
 | M8 | Flag-OFF Builder first screen is byte-identical to today | D-181-01 | No shipped test covers it | Turn `visual_workflow_canvas` OFF; open the Builder's first screen; confirm no template line |
+| **M9** | **The receipt's two paragraphs read as ONE honest account** on a typical generated draft | Req 5 / VOCAB-02 (CR-01) | The automated half can prove *which steps each sentence counts*. It cannot say whether two sentences, read one after the other by a person, add up to one coherent account or to a contradiction. That judgement is the whole point of the surface. | Generate a REAL draft whose spine is `llm_agent → llm_emit` (the shape **both** curated starters produce — `StarterTemplatePicker.tsx:50-53`). Then confirm, reading the card as a person: (1) the *"…read your documents, so I set them to must prove it"* sentence counts **only** the steps that actually read documents — cross-check its number against the steps you can see retrieving; (2) the deliverable step is **still named** and **still explains its own seal**; (3) **no** sentence claims the AI applied a gate that the step's own `citation_policy` default applied; (4) the *"You can't turn that off"* line sits with the detected paragraph and nowhere else. Cross-check the receipt's counts against the ⛨ seals the canvas actually draws. |
+| **M10** | **The zero-detected draft still arrives as one thing**, not a card with a hole in it | Req 5 / D-187-10 | The suite can assert one paragraph is absent. It cannot assert that what remains still *looks* whole — a component with a paragraph removed can be individually correct and compositionally broken, and only a person can see the difference. | Describe a workflow with **no retrieval at all** (nothing that reads documents). Confirm the receipt **still arrives**, with its heading and its closing line intact; the *"You can't turn that off"* sentence is **absent**; and whatever remains reads as ONE deliberate arrival rather than a truncated card. Watch the entrance, not just the final frame. |
+| **M11** | **The card states no capability the step lacks — and still states the one it has** | Req 1 / VOCAB-01 (WR-02) | The negative half alone can pass by over-tightening. The **positive** half is what proves the gate did not, and the pair is only convincing when a person sees both cards at once — two green unit tests on separate halves never show the contrast. | Bind a folder on a step type that **cannot** search (e.g. a *Write it up* / `llm_single` step, or a human-input step): confirm the card **no longer** says *"Search {folder}"* and reads its plain type sentence instead, with no folder name and no raw id anywhere on it. Then bind the **same** folder on an **agent** step: confirm it **does** say *"Search {folder}"*. Read the two cards side by side on the same canvas. |
+| **M12** | **The ＋ row promises the sentence the card that lands actually says** | Req 1 / VOCAB-01 (WR-03) | The drift was **semantic, not lexical** — both strings were imported identifiers, so every `?raw` source fence stayed green through the whole defect. A person reading two sentences one click apart is the only instrument that catches this class. | Open `＋` on the lane and **read every row aloud**. Click the **human-input** row. Confirm the card that lands says the **same sentence the row promised** (*"Wait for your approval"*), not a second wording. Repeat once with a different row (e.g. the deliverable step) as a control that nothing else moved. |
 
 **Roster rule:** blocked rows are recorded **⛔ with the reason and blocking id — never omitted.**
 Measured: all 8 provider keys are configured locally ⇒ **zero ⛔ rows expected**.
@@ -424,6 +486,24 @@ to whoever runs them:
 - **M8** (flag-OFF Builder first screen) now has an automated companion — the wave-1 byte pin, still
   green with its literal unedited — but the pin covers the CTA flex column only. The manual row is
   still the one that looks at the whole screen.
+
+**Status after the gap-closure round (2026-08-02): twelve rows, all UNPERFORMED and UNTICKED.**
+The closure round added **M9–M12** — one row per user-visible change the three fix plans made, which
+is what G-4 requires of a round that touched live UI — and **unblocked M3** without performing it.
+
+Nothing was ticked, softened, re-scoped or dropped by this round. In particular:
+
+- **M5** (the three starter templates' seeded describe copy, VOCAB-03) is **unchanged and still
+  owed**. No plan in this round touched `StarterTemplatePicker`'s copy.
+- **M8** (the flag-OFF first screen, D-181-01) is **unchanged and still owed**. Re-measured for this
+  round: `git diff --numstat ee5fff3b HEAD -- frontend/src/pages/WorkflowBuilderPage.tsx` is **empty**
+  (§gap-closure gates), so the flag-OFF screen this row inspects is byte-identical to the one the
+  phase shipped — which makes the row *cheaper* to run, not less owed.
+- **M1, M2, M4, M6, M7** are untouched by this round and remain exactly as the phase left them.
+
+**M9–M12 are the operator's, like M1–M8.** None of the four can be discharged by a render test:
+three are judgements about whether prose or composition reads honestly to a person, and the fourth
+(M11) is a contrast that only exists when two cards are on screen together.
 
 ---
 
@@ -544,5 +624,30 @@ Two further limits are named rather than implied: the **backend full suite's 211
 pre-existing rot** measured identical to the pre-dispatch baseline (§d), and **`tsc -b` has never
 exited 0 here** (§e, `D-ITEM-01`).
 
-**Approval:** ready for `/gsd:verify-work` — the eight Manual-Only G-4 rows are the operator's and
-remain unperformed.
+**Approval (recorded at the close of the phase, 2026-08-02, left verbatim):** ready for
+`/gsd:verify-work` — the eight Manual-Only G-4 rows are the operator's and remain unperformed.
+
+### Gap-closure round sign-off — 2026-08-02
+
+Added, not substituted. Everything above stands as written at the close of the phase; the lines below
+are this round's own.
+
+- [x] The four closure findings each have per-task rows with a non-empty automated command taken from
+      the plan's own `<verify>` block — **six rows** (`187-16-T1/T2`, `187-17-T1/T2`, `187-18-T1/T2`)
+- [x] All three fix plans observed their falsification **RED before the fix**, with the signature
+      recorded verbatim in each SUMMARY (12/34 · 13/122 · 4/39) — the Phase-185 *"observe
+      falsification RED first"* lesson honoured three times
+- [x] **M3 unblocked** — its blocking reason quoted, the plan that closed CR-01 named, the row left
+      UNPERFORMED and UNTICKED
+- [x] **G-4 honoured for the round** — one lived-experience row per user-visible change (M9–M12),
+      authored here in VALIDATION.md and **never inside a PLAN task**
+- [x] **No shipped row dropped, softened or re-scoped** — M1, M2, M4, M5, M6, M7, M8 unchanged; the
+      three deliberately-red SC#10 rows and their reasons unchanged
+- [x] `nyquist_compliant`'s stated meaning unchanged — it claims every requirement row has an
+      instrument that was **RUN and recorded**, never that every instrument came back green
+
+**What this round does NOT claim.** It closed one BLOCKER and two operator-folded Warnings. It did
+**not** touch WR-01, WR-04, WR-05, WR-06, WR-07 or IN-01…IN-05, which remain open findings in
+`187-REVIEW.md`. It did **not** perform any manual row: all **twelve** (M1–M12) remain the
+operator's and remain unperformed. And it did not re-run the SC#10 live roster — those three ❌ rows
+are unchanged, provider-side findings that no frontend fix could move.
