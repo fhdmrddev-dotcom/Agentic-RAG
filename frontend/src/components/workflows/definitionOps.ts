@@ -49,6 +49,7 @@
 import {
   nodeTitle,
   parseSkipTarget,
+  type GroundingCause,
   type PhaseSpecJSON,
 } from "@/components/workflows/phaseVocabulary"
 
@@ -499,6 +500,174 @@ export const ACTION_RISK_ARM_LABEL = "Stop and ask me first"
 /** What arming costs, said plainly: an indefinite wait, not a timeout that advances. */
 export const ACTION_RISK_ARMED_NOTE =
   "When this step is reached the run stops and waits for your answer. It will not continue on its own."
+
+// ── Phase 187 (VOCAB-02 / Req 5) — the seed receipt (sketch 150-B) ─────────────
+//
+// WHY THE RECEIPT EXISTS. A seeded draft arrives with steps already carrying a
+// governance seal the user never asked for, and nothing on the canvas explains why.
+// Safety nobody can see is indistinguishable from magic, and magic is not trust. The
+// receipt names the steps and their REASON — it is the surface that discharges SC#3.
+//
+// WHY THE COPY LIVES HERE and not in the component that draws it: the same rule the
+// governance block above states. `GovernanceSection.tsx` AUTHORS NO SENTENCE OF ITS
+// OWN, and neither may the receipt — a sentence inside a component is a sentence
+// nobody can test for drift (T-187-10-05).
+//
+// WHAT IS LOCKED vs WHAT IS CLAUDE'S. Sketch 150-B's four load-bearing properties are
+// locked: per-step WITH its cause, the one-way rule stated plainly, dismissible, and a
+// close that says nothing is committed. The wording below is discretionary — except
+// where it reaches for the governance vocabulary, which is Req 7's LOCK and is
+// therefore COMPOSED from `GOVERNANCE_SEAL_LABEL` rather than re-typed.
+//
+// THE RECEIPT RENDERS A REASON, IT NEVER DECIDES ONE (D-187-08 / T-187-10-04). The
+// per-step formatter takes a `GroundingCause` and the intersecting tool as INPUTS.
+// Classification stays where Phase 185 put it — `groundingCauseOf` over the server's
+// `kb_tools` — so this module cannot become a second grounding derivation.
+
+/** Total, non-negative whole count. NaN / negative / fractional all resolve (TOTALITY:
+ *  a copy formatter is handed numbers derived from author-supplied JSONB). */
+function wholeCount(value: number): number {
+  if (!Number.isFinite(value)) return 0
+  const whole = Math.trunc(value)
+  return whole > 0 ? whole : 0
+}
+
+/**
+ * The receipt's heading: orientation first — what did it build, and how much of it.
+ * A formatter over a number, so 0 / 1 / N are one rule rather than three literals.
+ */
+export function seedReceiptHeading(stepCount: number): string {
+  const count = wholeCount(stepCount)
+  return `Here's what I built — ${count} ${count === 1 ? "step" : "steps"}`
+}
+
+/**
+ * The grounding lead: how many steps read your documents, and what that cost them.
+ *
+ * ZERO returns the EMPTY STRING, deliberately (D-187-10). With no auto-grounded steps
+ * the receipt still appears — the orientation half and the nothing-committed half are
+ * useful regardless — but there is no grounding paragraph and no step list, because a
+ * grounded list that is empty or invented is exactly what Req 5 forbids. The caller
+ * renders this paragraph only when it is non-empty.
+ *
+ * The binding phrase is COMPOSED from `GOVERNANCE_SEAL_LABEL`, never re-typed: Req 7's
+ * vocabulary is a lock, and two copies of a locked word in two places can drift.
+ */
+export function seedReceiptGroundingLead(groundedCount: number): string {
+  const count = wholeCount(groundedCount)
+  if (count === 0) return ""
+  const words = GOVERNANCE_SEAL_LABEL.toLowerCase()
+  return count === 1
+    ? `1 step reads your documents, so I set it to ${words}.`
+    : `${count} steps read your documents, so I set them to ${words}.`
+}
+
+/**
+ * The one-way rule, STATED rather than discovered. Detection wins over author intent
+ * and the lock cannot be undone (D-185-07) — a user who learns that by pressing the
+ * loose side and being refused has learned it the expensive way. The second clause is
+ * the honest compensation: it cannot be turned off, but exactly where it applies is
+ * visible, on this card, right now.
+ */
+export const SEED_RECEIPT_ONE_WAY_RULE =
+  "You can't turn that off — but you can see exactly where it applies."
+
+/**
+ * One step's reason, RENDERED from the cause it is handed — this function classifies
+ * nothing (D-187-08). `tool` is the KB tool the step's `available_tools` actually
+ * intersects; naming it is what makes the reason a fact about THIS step rather than a
+ * generic phrase. An absent or blank tool falls through to the unqualified sentence:
+ * never fabricate, the same floor `derivedFace` holds.
+ *
+ * A `null` cause yields the empty string — a step with nothing to explain is never
+ * listed, so there is no line for it to render.
+ */
+export function seedReceiptStepReason(cause: GroundingCause, tool?: string | null): string {
+  const named = typeof tool === "string" && tool.trim() !== "" ? tool.trim() : null
+  switch (cause) {
+    case "detected":
+      return named ? `it reads your documents (${named})` : "it reads your documents"
+    case "already-set":
+      return "it already has to cite its sources"
+    case "escalated":
+      return "you turned this on by hand"
+    default:
+      return ""
+  }
+}
+
+/** The close: everything else is the author's, and nothing has been committed. The
+ *  draft is not saved and not published — sketch 150-B's fourth load-bearing property. */
+export const SEED_RECEIPT_NOTHING_COMMITTED =
+  "Everything else is yours to change. Nothing is saved or published yet."
+
+/** The dismiss control's ACCESSIBLE label. Carries no glyph, for the same reason
+ *  `GOVERNANCE_SEAL_LABEL` does not: the mark renders as an `aria-hidden` child and a
+ *  screen reader must not hear it twice (185-09). The receipt is dismissible because
+ *  the canvas underneath is the real product — it may never become a blocker. */
+export const SEED_RECEIPT_DISMISS_LABEL = "Dismiss"
+
+/** The dismiss MARK. `✕` already ships as a plain dismiss outside the canvas
+ *  (`PhaseFormPanel.tsx:766`, `PublishGauntlet.tsx:228`) — icon-convention §4. It is a
+ *  separate export so the label above stays glyph-free and the pair cannot drift. */
+export const SEED_RECEIPT_DISMISS_GLYPH = "✕"
+
+// ── Phase 187 (VOCAB-03 / Req 6) — the template door (sketch 151-C) ────────────
+//
+// ONE FORWARD PATH, ALWAYS. Picking a starter SEEDS THE DESCRIBE BOX with the
+// workflow's own plain-language sentence; it never forks straight to a canvas. A
+// direct fork would be a second way a workflow comes into existence, with its own code
+// and its own failure modes — and the curated fork already has a home on the Workflows
+// page (the three-homes contract, finding #19). The cost is recorded rather than waved
+// away: re-deriving from a sentence may come back different from the curated
+// definition a human shaped.
+//
+// A STARTER IS ITS PHASE SPINE, never one phase-type glyph (icon-convention §4,
+// finding #36) — which is why nothing here exports a category icon.
+
+/**
+ * The read shape of one starter row as `listStarterWorkflows` hands it over
+ * (`api.ts:1303`'s `PublishedWorkflow`). Spelled structurally rather than imported so
+ * this pure module stays free of the API client — the same reason `patchPhaseConfig`
+ * spells its patch type inline. `definition` is the LOOSE JSONB
+ * (`WorkflowDefinitionJSON = Record<string, unknown>`), so every read below is guarded.
+ */
+export interface StarterChoiceJSON {
+  name: string
+  definition?: Readonly<Record<string, unknown>> | null
+}
+
+/** The one quiet line at rest under the describe box. ONE extra line is the whole
+ *  budget: finding #11 (describe-box-only first screen) and #12 (the 3-second read)
+ *  are what a gallery here would spend. */
+export const STARTER_DOOR_LINE = "Not sure where to start? Start from a template."
+
+/** The picker panel's heading. */
+export const STARTER_DOOR_HEADING = "Start from a template"
+
+/** What picking one actually does, said before it happens — the surface never seeds a
+ *  box the user did not expect to be filled, and the text stays editable. */
+export const STARTER_DOOR_NOTE =
+  "Picking one fills the describe box with its own words. You can edit it before anything is generated."
+
+/**
+ * The sentence a chosen starter seeds the describe box with.
+ *
+ * It is the workflow's OWN `business_requirement` (`harness.py:309`) — its declared
+ * plain-language goal — so the box reads like something a person would have typed
+ * rather than a machine-generated summary of a definition.
+ *
+ * FALLBACK, and why it is the name: a starter with no requirement must still seed
+ * something the user can edit, and its name is the only other plain-language string it
+ * carries that a human wrote. An empty box would silently swallow the click, and a
+ * fabricated sentence would put words in the starter's mouth. TOTAL — a starter with
+ * neither yields `""` rather than throwing.
+ */
+export function starterSeedSentence(starter: StarterChoiceJSON): string {
+  const requirement = starter.definition?.business_requirement
+  if (typeof requirement === "string" && requirement.trim() !== "") return requirement.trim()
+  return typeof starter.name === "string" ? starter.name.trim() : ""
+}
 
 // ── D-184-11 — slug generation and the minimal valid phase ─────────────────────
 

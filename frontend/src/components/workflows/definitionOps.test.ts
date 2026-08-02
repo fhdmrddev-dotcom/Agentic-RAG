@@ -35,6 +35,7 @@ import {
   ACTION_RISK_ARM_LABEL,
   ACTION_RISK_ARMED_NOTE,
   GOVERNANCE_GATE_ROW_LABEL,
+  GOVERNANCE_SEAL_LABEL,
   GROUNDING_ALREADY_SET_NOTE,
   GROUNDING_ATTACHED_GATE,
   GROUNDING_DIAL_LOOSE_LABEL,
@@ -45,9 +46,21 @@ import {
   GROUNDING_WHY_DETECTED,
   GROUNDING_WHY_ESCALATED,
   IDENTITY_BEARING_CONFIG_KEYS,
+  seedReceiptHeading,
+  seedReceiptGroundingLead,
+  seedReceiptStepReason,
+  SEED_RECEIPT_ONE_WAY_RULE,
+  SEED_RECEIPT_NOTHING_COMMITTED,
+  SEED_RECEIPT_DISMISS_LABEL,
+  SEED_RECEIPT_DISMISS_GLYPH,
+  starterSeedSentence,
+  STARTER_DOOR_LINE,
+  STARTER_DOOR_HEADING,
+  STARTER_DOOR_NOTE,
   type PhaseTypeId,
 } from "./definitionOps"
 import { ALL_FIXTURES } from "./__fixtures__/canvasFixtures"
+import type { PublishedWorkflow } from "@/lib/api"
 import { nodeTitle, type NameContext, type PhaseSpecJSON } from "./phaseVocabulary"
 
 /**
@@ -746,6 +759,225 @@ describe("definitionOps — the governance copy is a lock, not a suggestion", ()
 
   it("every sentence is a distinct string — no constant is an alias of another", () => {
     expect(new Set(GOVERNANCE_COPY).size).toBe(GOVERNANCE_COPY.length)
+  })
+})
+
+// ── Phase 187 (VOCAB-02 / Req 5) — the seed receipt's sentences ────────────────
+//
+// Same lock as the governance copy above: every sentence the receipt renders is an
+// exported identifier asserted CHARACTER-IDENTICALLY here, because a sentence that
+// lives inside a component is a sentence nobody can test for drift (T-187-10-05).
+
+describe("definitionOps — the seed-receipt copy is a lock (sketch 150-B)", () => {
+  it("the heading names the step count, and pluralises 0 / 1 / N", () => {
+    expect(seedReceiptHeading(0)).toBe("Here's what I built — 0 steps")
+    expect(seedReceiptHeading(1)).toBe("Here's what I built — 1 step")
+    expect(seedReceiptHeading(5)).toBe("Here's what I built — 5 steps")
+  })
+
+  it("the heading is TOTAL — a non-finite or negative count never throws", () => {
+    expect(seedReceiptHeading(Number.NaN)).toBe("Here's what I built — 0 steps")
+    expect(seedReceiptHeading(-3)).toBe("Here's what I built — 0 steps")
+    expect(seedReceiptHeading(2.7)).toBe("Here's what I built — 2 steps")
+  })
+
+  it("the grounding lead names the count and the SHIPPED governance words", () => {
+    expect(seedReceiptGroundingLead(1)).toBe(
+      "1 step reads your documents, so I set it to must prove it.",
+    )
+    expect(seedReceiptGroundingLead(2)).toBe(
+      "2 steps read your documents, so I set them to must prove it.",
+    )
+    // It must speak the shipped vocabulary, not a synonym of it.
+    for (const count of [1, 2, 7]) {
+      expect(seedReceiptGroundingLead(count)).toContain(GOVERNANCE_SEAL_LABEL.toLowerCase())
+    }
+  })
+
+  it("ZERO grounded steps yields NO grounding paragraph at all (D-187-10)", () => {
+    // The orientation half and the nothing-committed half are useful regardless; only
+    // the grounding paragraph is conditional. An empty string is the caller's signal.
+    expect(seedReceiptGroundingLead(0)).toBe("")
+    expect(seedReceiptGroundingLead(Number.NaN)).toBe("")
+    expect(seedReceiptGroundingLead(-1)).toBe("")
+  })
+
+  it("states the one-way rule plainly rather than letting the user discover it", () => {
+    expect(SEED_RECEIPT_ONE_WAY_RULE).toBe(
+      "You can't turn that off — but you can see exactly where it applies.",
+    )
+  })
+
+  it("the per-step reason NAMES the actual intersecting tool (D-187-08)", () => {
+    expect(seedReceiptStepReason("detected", "search_documents")).toBe(
+      "it reads your documents (search_documents)",
+    )
+    expect(seedReceiptStepReason("detected", "list_documents")).toBe(
+      "it reads your documents (list_documents)",
+    )
+  })
+
+  it("the reason formatter CLASSIFIES nothing — it renders the cause it is handed", () => {
+    expect(seedReceiptStepReason("already-set")).toBe("it already has to cite its sources")
+    expect(seedReceiptStepReason("escalated")).toBe("you turned this on by hand")
+    // No cause ⇒ no sentence. A step with nothing to explain is never listed.
+    expect(seedReceiptStepReason(null)).toBe("")
+    expect(seedReceiptStepReason(null, "search_documents")).toBe("")
+  })
+
+  it("never fabricates a tool name when none was handed to it", () => {
+    for (const tool of [undefined, null, "", "   "]) {
+      expect(seedReceiptStepReason("detected", tool)).toBe("it reads your documents")
+    }
+  })
+
+  it("closes by saying nothing is committed, and offers a dismiss", () => {
+    expect(SEED_RECEIPT_NOTHING_COMMITTED).toBe(
+      "Everything else is yours to change. Nothing is saved or published yet.",
+    )
+    expect(SEED_RECEIPT_DISMISS_LABEL).toBe("Dismiss")
+    // The glyph is a separate export precisely so the ACCESSIBLE label carries none —
+    // the GOVERNANCE_SEAL_LABEL precedent (185-09).
+    expect(SEED_RECEIPT_DISMISS_GLYPH).toBe("✕")
+    expect(SEED_RECEIPT_DISMISS_LABEL).not.toContain(SEED_RECEIPT_DISMISS_GLYPH)
+  })
+})
+
+// ── Phase 187 (VOCAB-03 / Req 6) — the template door's sentences ───────────────
+
+describe("definitionOps — the template-door copy is a lock (sketch 151-C)", () => {
+  /** A starter as `listStarterWorkflows` hands it over (`api.ts:1303`). */
+  const riskRegister = {
+    name: "Risk Register",
+    definition: {
+      slug: "risk-register",
+      business_requirement: "Track and report the risks on my active projects.",
+    },
+  }
+
+  it("ships exactly one quiet line at rest, plus the panel's heading and its note", () => {
+    expect(STARTER_DOOR_LINE).toBe("Not sure where to start? Start from a template.")
+    expect(STARTER_DOOR_HEADING).toBe("Start from a template")
+    expect(STARTER_DOOR_NOTE).toBe(
+      "Picking one fills the describe box with its own words. You can edit it before anything is generated.",
+    )
+  })
+
+  it("seeds the describe box with the starter's OWN plain-language sentence", () => {
+    expect(starterSeedSentence(riskRegister)).toBe(
+      "Track and report the risks on my active projects.",
+    )
+  })
+
+  it("falls back to the starter's NAME — never an empty string, never a fabrication", () => {
+    for (const definition of [
+      undefined,
+      null,
+      {},
+      { business_requirement: null },
+      { business_requirement: "" },
+      { business_requirement: "   " },
+      { business_requirement: 42 },
+    ]) {
+      expect(starterSeedSentence({ name: "Risk Register", definition })).toBe("Risk Register")
+    }
+  })
+
+  it("is TOTAL — a starter with neither a requirement nor a name never throws", () => {
+    expect(starterSeedSentence({ name: "" })).toBe("")
+    expect(starterSeedSentence({ name: "   ", definition: {} })).toBe("")
+  })
+
+  it("trims, so a padded requirement does not seed the box with whitespace", () => {
+    expect(
+      starterSeedSentence({ name: "X", definition: { business_requirement: "  Do a thing.  " } }),
+    ).toBe("Do a thing.")
+  })
+
+  it("accepts a REAL `listStarterWorkflows` row without an adapter (187-14's contract)", () => {
+    // `PublishedWorkflow` is imported as a TYPE only — erased at compile, so the pure
+    // module still names no API client and the `?raw` fence above is untouched. This
+    // assignment is the actual guard: if `StarterChoiceJSON` ever drifts away from the
+    // shipped row shape, this file stops compiling rather than 187-14 discovering it.
+    const row: PublishedWorkflow = {
+      id: "00000000-0000-4000-8000-000000000000",
+      slug: "weekly-status-report",
+      name: "Weekly Status Report",
+      definition: { business_requirement: "Summarise the week for stakeholders." },
+    }
+    expect(starterSeedSentence(row)).toBe("Summarise the week for stakeholders.")
+  })
+})
+
+// ── Phase 187 — the new copy obeys the shipped honesty + glyph rules ───────────
+
+describe("definitionOps — the Phase 187 copy carries no overclaim and no unshipped glyph", () => {
+  /** EVERY string the two new surfaces can render, formatters included. */
+  const PHASE_187_COPY = [
+    seedReceiptHeading(0),
+    seedReceiptHeading(1),
+    seedReceiptHeading(5),
+    seedReceiptGroundingLead(1),
+    seedReceiptGroundingLead(2),
+    SEED_RECEIPT_ONE_WAY_RULE,
+    seedReceiptStepReason("detected", "search_documents"),
+    seedReceiptStepReason("detected"),
+    seedReceiptStepReason("already-set"),
+    seedReceiptStepReason("escalated"),
+    SEED_RECEIPT_NOTHING_COMMITTED,
+    SEED_RECEIPT_DISMISS_LABEL,
+    SEED_RECEIPT_DISMISS_GLYPH,
+    STARTER_DOOR_LINE,
+    STARTER_DOOR_HEADING,
+    STARTER_DOOR_NOTE,
+    starterSeedSentence({ name: "Risk Register" }),
+  ]
+
+  it("uses none of the three overclaiming words", () => {
+    // Assembled from parts so a grep of THIS file for the banned words is not itself
+    // what fails (the D-ITEM-183-02 trap the governance block above also avoids).
+    const banned = new RegExp(
+      `\\b(${[["sa", "fe"].join(""), ["appro", "ved"].join(""), ["prov", "en"].join("")].join("|")})\\b`,
+      "i",
+    )
+    for (const sentence of PHASE_187_COPY) expect(sentence).not.toMatch(banned)
+  })
+
+  it("the overclaim check is a REAL control — it finds each planted term", () => {
+    const banned = new RegExp(
+      `\\b(${[["sa", "fe"].join(""), ["appro", "ved"].join(""), ["prov", "en"].join("")].join("|")})\\b`,
+      "i",
+    )
+    for (const word of [["sa", "fe"].join(""), ["appro", "ved"].join(""), ["prov", "en"].join("")]) {
+      expect(`This step is ${word}.`).toMatch(banned)
+    }
+    // …and it does NOT fire on the shipped words that merely contain those letters.
+    expect("Nothing is saved or published yet.").not.toMatch(banned)
+    expect("so I set them to must prove it.").not.toMatch(banned)
+  })
+
+  it("carries no UNSHIPPED canvas glyph (icon-convention §4)", () => {
+    // The two sketch-150-C proposals, assembled from escapes so this guard is not the
+    // thing a source grep for them finds.
+    const unshipped = [String.fromCharCode(0x2726), String.fromCharCode(0x2713)]
+    for (const sentence of PHASE_187_COPY) {
+      for (const glyph of unshipped) expect(sentence).not.toContain(glyph)
+    }
+    for (const glyph of unshipped) expect(definitionOpsSource).not.toContain(glyph)
+  })
+
+  it("every new sentence is non-empty and distinct — no constant is an alias", () => {
+    const constants = [
+      SEED_RECEIPT_ONE_WAY_RULE,
+      SEED_RECEIPT_NOTHING_COMMITTED,
+      SEED_RECEIPT_DISMISS_LABEL,
+      SEED_RECEIPT_DISMISS_GLYPH,
+      STARTER_DOOR_LINE,
+      STARTER_DOOR_HEADING,
+      STARTER_DOOR_NOTE,
+    ]
+    for (const sentence of constants) expect(sentence.length).toBeGreaterThan(0)
+    expect(new Set(constants).size).toBe(constants.length)
   })
 })
 
