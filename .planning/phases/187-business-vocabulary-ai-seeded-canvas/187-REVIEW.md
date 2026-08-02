@@ -1,213 +1,197 @@
 ---
 phase: 187-business-vocabulary-ai-seeded-canvas
-reviewed: 2026-08-02T03:17:14Z
+reviewed: 2026-08-02T08:43:10Z
 depth: standard
-files_reviewed: 38
+round: 2 (gap closure)
+prior_round:
+  reviewed: 2026-08-02T03:17:14Z
+  commit: 20ae79b6
+  path: .planning/phases/187-business-vocabulary-ai-seeded-canvas/187-REVIEW.md
+  findings: 2 critical / 7 warning / 5 info
+  scope: 38 files (the full phase)
+diff_base: ee5fff3b
+files_reviewed: 10
 files_reviewed_list:
-  - backend/app/api/workflows.py
-  - backend/app/models/harness.py
-  - backend/app/services/harness/grounding.py
-  - backend/app/services/harness_engine.py
-  - backend/app/services/workflow_authoring.py
-  - backend/tests/integration/test_187_authoring_roster.py
-  - backend/tests/unit/test_182_severity_codes.py
-  - backend/tests/unit/test_182_validate.py
-  - backend/tests/unit/test_185_engine_attachment.py
-  - backend/tests/unit/test_187_armed_checkpoint_property.py
-  - backend/tests/unit/test_187_authoring_step_names.py
-  - backend/tests/unit/test_ask_user_disposition.py
-  - backend/tests/unit/test_harness_models.py
-  - frontend/src/components/workflows/PhaseNode.test.tsx
-  - frontend/src/components/workflows/PhaseNode.tsx
-  - frontend/src/components/workflows/PhaseSpineGraph.test.tsx
-  - frontend/src/components/workflows/PhaseSpineGraph.tsx
-  - frontend/src/components/workflows/ProblemsTray.test.tsx
-  - frontend/src/components/workflows/ProblemsTray.tsx
   - frontend/src/components/workflows/SeedReceipt.test.tsx
   - frontend/src/components/workflows/SeedReceipt.tsx
-  - frontend/src/components/workflows/StarterTemplatePicker.test.tsx
-  - frontend/src/components/workflows/StarterTemplatePicker.tsx
-  - frontend/src/components/workflows/WorkflowCanvas.test.tsx
-  - frontend/src/components/workflows/WorkflowCanvas.tsx
-  - frontend/src/components/workflows/__fixtures__/canvasFixtures.ts
-  - frontend/src/components/workflows/__snapshots__/canvasModel.fixtures.test.ts.snap
-  - frontend/src/components/workflows/canvasModel.purity.test.ts
-  - frontend/src/components/workflows/canvasModel.test.ts
-  - frontend/src/components/workflows/canvasModel.ts
+  - frontend/src/components/workflows/StepTypePicker.test.tsx
+  - frontend/src/components/workflows/StepTypePicker.tsx
   - frontend/src/components/workflows/definitionOps.test.ts
   - frontend/src/components/workflows/definitionOps.ts
   - frontend/src/components/workflows/phaseVocabulary.corpus.test.ts
   - frontend/src/components/workflows/phaseVocabulary.test.ts
   - frontend/src/components/workflows/phaseVocabulary.ts
   - frontend/src/pages/WorkflowBuilderPage.canvas.test.tsx
-  - frontend/src/pages/WorkflowBuilderPage.describe.test.tsx
-  - frontend/src/pages/WorkflowBuilderPage.tsx
 findings:
-  critical: 2
-  warning: 7
+  critical: 1
+  warning: 3
   info: 5
-  total: 14
+  total: 9
+carried_forward:
+  critical: 0
+  warning: 5
+  info: 5
+  total: 10
 status: issues_found
 ---
 
-# Phase 187: Code Review Report
+# Phase 187: Code Review Report — Round 2 (gap closure)
 
-**Reviewed:** 2026-08-02T03:17:14Z
+**Reviewed:** 2026-08-02T08:43:10Z
 **Depth:** standard
-**Files Reviewed:** 38 (15 production source, 23 test/fixture/snapshot)
+**Round:** 2 (gap closure — plans 187-16 / 187-17 / 187-18, diff base `ee5fff3b`)
+**Files Reviewed:** 10 (3 production source, 7 test)
 **Status:** issues_found
 
 ## Summary
 
-The four items flagged as highest-risk in the review brief hold up under adversarial reading:
+The closure round was scoped to four round-1 findings. **Three are genuinely closed
+(CR-01, CR-02, WR-02); one is closed for the symptom it named but not for the property
+its fix docblock now claims (WR-03).** The evidence is code, not commit messages — see
+`## Round 1 disposition`.
 
-- **The `harness_engine.py` armed-checkpoint hoist is correct on the paths it covers.** The
-  checkpoint sits between the pre-gate pass and the `while True:` loop; `is_action_risk` is a
-  caller-supplied parameter (never a `phase` read inside the helper); the Pitfall-4 disposition
-  short-circuit at `harness_engine.py:1055-1059` genuinely skips `_failing_on_failure` rather
-  than computing-then-overriding it; every non-approval branch returns a non-`None` outcome so
-  the body cannot run. `_is_action_risk_finding` is fully deleted with no stale references.
-  One residual fail-safe path is flagged below (WR-01) — it is fail-*closed* on "does the body
-  run", but it re-introduces the exact `_failing_on_failure(phase, None)` read the block above
-  it removes, and no test drives it.
-- **Provenance stamping cannot be forged.** `workflow_authoring.py:355-365` recomputes
-  `name_seeded_by_ai` from the trimmed `name` unconditionally after `model_validate()`, so a
-  model payload claiming either value is discarded. (A separate non-generate write path is
-  flagged as WR-05.)
-- **`unbound_retrieval` is canvas-only.** It is minted inside `validate_workflow` only, sits
-  outside the sealed grounding `try/except`, and calls the pure zero-I/O `grounding_cause`.
-  It is registered in both `_ROUTE_ASSIGNED_CODES` and `_INCOMPLETE_CODES`, so `_severity`
-  never takes the fail-loud branch. No publish path reaches it.
-- **`StarterTemplatePicker` reaches no forward seam.** Its only `@/lib/api` import is
-  `listStarterWorkflows`; no router, no store, no create/update/publish/generate/validate
-  symbol is imported or referenced. Both new surfaces are correctly gated on `canvasEnabled`.
-- **`toCanvas` stays pure** — it mutates nothing, captures only frozen module-scope defaults,
-  and the purity suite exercises the injected `nameContext` path.
+Verification actually run for this pass:
 
-The defects that survive are concentrated in the two net-new user-facing surfaces and in the
-new derived-face tier, where the phase's own "never fabricate / never invent a reason" floors
-are breached by reachable, default-valued configuration. Two of them are load-bearing enough
-to block: the seed receipt will state a falsehood about governance on essentially every
-generated workflow, and the test fixture that would have caught it uses a value the backend
-cannot produce.
+- `npx vitest run` over the five changed workflow suites: **5 files / 452 tests passed**.
+- `npx vitest run src/pages/WorkflowBuilderPage.canvas.test.tsx`: **113 passed**.
+- The WR-02 backend justification was re-derived rather than inherited:
+  `_build_phase_tool_context` is called from **exactly two** executors —
+  `_exec_llm_agent` (`backend/app/services/harness/phase_types.py:521`) and
+  `_exec_llm_batch_agents` (`:635`). `_exec_llm_single` (`:466`),
+  `_exec_llm_human_input` (`:686`) and `_exec_llm_emit` (`:1151`) never call it. The
+  gate's membership is correct.
+- `LlmEmitPhaseConfig.citation_policy` at live HEAD is
+  `Literal["strict","flag","partial","draft"] = "strict"` — `backend/app/models/harness.py:158`
+  (round 1 cited `:155`; the value set is unchanged).
+- `canvasModel.isGrounded` really is `groundingCauseOf(phase, kbTools) !== null`
+  (`canvasModel.ts:256`), so `SeedReceipt`'s `data-grounded-count === the number of ⛨
+  marks the canvas draws` is a true claim.
+
+What survives is concentrated in the **new** surface the fix introduced. The CR-01 repair
+split one sentence into two; the second sentence — `seedReceiptCarriedLead`, the receipt's
+only statement about `already-set` and `escalated` steps — reached production with **zero
+assertions anywhere in the repo**, inside the very suite whose docblock claims *"every
+sentence is compared character-for-character against its `definitionOps` export"*. That is
+the CR-02 failure class recurring one plan later, and it is why this round still blocks.
 
 ---
 
-## Critical Issues
+## Round 1 disposition
 
-### CR-01: The seed receipt reports non-KB-reading steps as "reads your documents", and the `llm_emit` default makes it fire on nearly every generated draft
+### CR-01 — **CLOSED**
 
-**File:** `frontend/src/components/workflows/SeedReceipt.tsx:173-190`, `frontend/src/components/workflows/definitionOps.ts:556-565`
+Round 1: the receipt's lead counted every non-null `groundingCause` and asserted *"N steps
+read your documents, so I set them to must prove it"* over steps the AI never touched.
 
-**Issue:**
-`SeedReceipt` builds its `rows` list from **any** non-null `groundingCauseOf` result:
+Evidence of closure:
 
-```ts
-const cause: GroundingCause = groundingCauseOf(phase, kbTools)
-if (cause === null) continue
-found.push({ ... })
-```
+- `SeedReceipt.tsx:212-217` splits the counts at the point of use:
+  ```ts
+  const detectedCount = rows.filter((row) => row.cause === "detected").length
+  const carriedCount = rows.length - detectedCount
+  const groundingLead = seedReceiptGroundingLead(detectedCount)
+  const carriedLead  = seedReceiptCarriedLead(carriedCount)
+  ```
+- `SEED_RECEIPT_ONE_WAY_RULE` now lives **inside** the detected `<p>`
+  (`SeedReceipt.tsx:262-272`) and is unreachable when `detectedCount === 0`. That closes
+  the second half of CR-01 — round 1's concrete failure scenario rendered the one-way lock
+  over an `already-set` step.
+- `GroundedRow` gained `cause: Exclude<GroundingCause, null>` and each `<li>` carries
+  `data-cause` (`:295`), so "the lead counts only these" is checkable rather than asserted
+  in prose.
+- The chosen shape deviates from round 1's *minimal* suggested fix (`if (cause !== "detected") continue`)
+  and keeps all three causes in the list. That is the **better** of the two options round 1
+  offered ("or split the lead so each cause gets its own honest sentence") and it is the
+  one consistent with `canvasModel.isGrounded`: every step the canvas seals is still
+  explained. Verified: `SeedReceipt.test.tsx:439-451` drives both the zero-detected and
+  the escalated-only drafts and asserts the receipt's whole `textContent` does not contain
+  the assembled needle `"so I set"`, with a positive control at `:430-437`.
 
-`GroundingCause` has three non-null values — `"detected"`, `"already-set"`, `"escalated"` —
-and only `"detected"` means "this step reads your documents". `rows.length` is then handed
-straight to `seedReceiptGroundingLead`, which asserts *both* halves of a claim that is only
-true for `detected`:
+Residual (new, not a CR-01 regression): the *carried* sentence is unguarded — **CR-03** —
+and merges two causes that the module's own vocabulary keeps apart — **WR-09**.
 
-```ts
-`${count} steps read your documents, so I set them to ${words}.`
-```
+### CR-02 — **CLOSED**
 
-For an `already-set` step neither half is true (it does not read documents, and the AI did
-not set it — the author's `citation_policy` did). For an `escalated` step the second half is
-false by definition (`seedReceiptStepReason` even renders "you turned this on by hand" on the
-row directly beneath the lead that says "so I set them to must prove it").
+Round 1: `citation_policy: "loose"` is not a member of the backend `Literal`, so the
+`already-set` branch was switched off inside the only suite guarding the receipt.
 
-**This is not an edge case.** `LlmEmitPhaseConfig.citation_policy`
-(`backend/app/models/harness.py:155`) is `Literal["strict","flag","partial","draft"] = "strict"`,
-and `/generate` returns `wd.model_dump(mode="json")` (`workflow_authoring.py:377`), which emits
-defaults. So **every** `llm_emit` phase in **every** generated definition arrives at the client
-with `citation_policy: "strict"`, which `groundingCauseOf`'s branch (2) resolves to
-`"already-set"`. Both curated starter spines are `llm_agent → llm_emit`
-(`StarterTemplatePicker.tsx:50-53`), so the deliverable step of the typical draft is listed.
+Evidence of closure:
 
-**Failure scenario (concrete):** describe *"summarise last quarter's board minutes"* → the
-generator emits `[llm_single "Draft the summary", llm_emit "Produce the deck"]` with no KB
-tools anywhere. `kbTools ∩ available_tools = ∅` on both phases, so zero steps read the KB —
-but `rows.length === 1` (the emit phase's default-strict policy), and the receipt renders:
+- `SeedReceipt.test.tsx:127-150` — the `emit` fixture now carries the **shipped default**
+  `citation_policy: "strict"`, which is the value `/generate`'s `model_dump(mode="json")`
+  actually emits. `groundingCauseOf` therefore reports `already-set` and the branch is
+  live: `SEALED_SLUGS` is 3 while `DETECTED_SLUGS` is 2 (`:161-163`).
+- The zero-grounded case (`BARE_PHASES`, `:173-182`) reaches zero with `"draft"` — still a
+  representable member — rather than with an unrepresentable one.
+- A representability guard was added (`:293-306`): every fixture policy must be in
+  `REPRESENTABLE_CITATION_POLICIES`, the assembled `POLICY_NEVER_REPRESENTABLE` must not
+  be, and `"strict"` must be *exercised*, not merely permitted.
+- The single conflated assertion round 1 named was split into two (`:248-265`): membership
+  of the SEALED list and membership of the DETECTED subset. Strictly stronger.
 
-> 1 step reads your documents, so I set it to must prove it.
-> You can't turn that off — but you can see exactly where it applies.
-> ⛨ **Produce the deck** — it already has to cite its sources
+Residual: the guard's member list is a hand-transcribed copy of the backend `Literal` with
+no cross-language pin — **WR-10** — and its title over-claims its own scope — **IN-09**.
 
-This directly falsifies two locked acceptance criteria:
-- *"A seeded draft with grounded steps shows a receipt naming exactly those steps"*
-- *"A seeded draft with zero grounded steps shows no grounded-step list"*
+### WR-02 — **CLOSED**
 
-and it makes the surface built to discharge SC#3 state something false about what the AI did.
+Round 1: `derivedFace` tier (3) rendered `Search {folder}` on phase types that perform no
+retrieval.
 
-**Fix:** either restrict the list to the cause the lead sentence describes, or split the lead
-so each cause gets its own honest sentence. The minimal, honest form:
+Evidence of closure:
 
-```ts
-// SeedReceipt.tsx — the receipt explains what the SEED applied. `already-set` is the
-// author's own citation_policy and `escalated` is the author's own hand; neither was
-// applied by this generation, so neither belongs under "so I set them to …".
-const cause: GroundingCause = groundingCauseOf(phase, kbTools)
-if (cause !== "detected") continue
-```
+- `phaseVocabulary.ts:516` — `if (inputs.folderName && GROUNDING_DIAL_TYPES.includes(inputs.phaseType))`.
+  The shared constant is **read**, not re-typed, and `phaseVocabulary.test.ts` pins it at
+  exactly `["llm_agent","llm_batch_agents"]` and at exactly one array literal in the
+  module.
+- The type-space sweep (`phaseVocabulary.test.ts`, "TYPE-SPACE SWEEP") derives its
+  expectation from the imported constant and asserts non-vacuity in both directions.
+- The two blind spots round 1 named are both now witnesses rather than assumptions: the
+  corpus suite asserts a folder-bearing phase exists on **both** sides of the gate, and
+  `WorkflowBuilderPage.canvas.test.tsx:2125-2132` adds the page-level negative witness
+  (`brief`, an `llm_emit` with a sole *resolvable* `folder_scope`, must read the plain
+  type sentence and never `Search Supplier Contracts`).
+- Round 1 speculated that `llm_emit` "should be added to that predicate … the
+  `LlmEmitPhaseConfig` docblock says it does [bound-scope retrieval]". The closure round
+  **refuted that speculation with the executor** rather than inheriting it, and I
+  independently confirmed it: `_exec_llm_emit` never calls `_build_phase_tool_context`.
+  Excluding `llm_emit` is correct.
 
-and correspondingly tighten `seedReceiptGroundingLead`'s docblock to say it counts *detected*
-steps only. If the wider list is wanted, `seedReceiptGroundingLead` must take the per-cause
-counts and compose a sentence per cause rather than one sentence over a total.
+Residual: the `IDENTITY_BEARING_CONFIG_KEYS` docblock in `definitionOps.ts` still
+describes `folder_scope` as unconditional tier (3) — **IN-08**.
 
----
+### WR-03 — **PARTIALLY CLOSED**
 
-### CR-02: `SeedReceipt.test.tsx` cannot detect CR-01 — its `llm_emit` fixtures use a `citation_policy` value the backend `Literal` forbids
+Round 1: the `＋` menu row read `PHASE_TYPE_SENTENCES` directly, so it said *"Check with
+you"* while the card that landed said *"Wait for your approval"*.
 
-**File:** `frontend/src/components/workflows/SeedReceipt.test.tsx:88-92`, `:104-108`
+Closed for the named symptom:
 
-**Issue:**
-The suite's two `llm_emit` fixtures are:
+- `StepTypePicker.tsx:185` now reads
+  `nodeTitle(minimalPhaseFor(choice.type, PREVIEW_SLUG, index))`, and the file's
+  `PHASE_TYPE_SENTENCES` import is gone.
+- `StepTypePicker.test.tsx:517-523` fences the file at **zero** occurrences of the
+  assembled `PHASE_TYPE_SENTENCES` identifier and at zero locally-declared sentence
+  tables, with a planted-literal control at `:525-538`.
+- `:196-246` measures each row against the resolver rather than against a string, with a
+  blast-radius control derived by *filtering* `PHASE_TYPE_ORDER` (never a hand-typed list
+  of five) and an explicit non-vacuity assertion that the two strings really differ.
 
-```ts
-{ slug: "emit", phase_index: 4, name: "Produce the renewal pack",
-  config: { phase_type: "llm_emit", citation_policy: "loose" } }
-```
+**Not closed for the property the fix now claims.** The new docblock states the row
+*"asks `nodeTitle` … over the very phase the caller will build"*, and the deliberate
+omission of the page's `NameContext` breaks that for `llm_emit`. See **WR-08**.
 
-`"loose"` is **not a member** of `LlmEmitPhaseConfig.citation_policy`
-(`backend/app/models/harness.py:155` — `Literal["strict","flag","partial","draft"]`, default
-`"strict"`). No server response and no `model_validate()`-passing stored row can ever carry it.
-Because `groundingCauseOf`'s `already-set` branch tests `citationPolicy === "strict"` exactly,
-the fixture value silently disables that branch — which is precisely what lets
+### Out of scope in round 1 — carried forward, unchanged
 
-- `"lists EXACTLY the steps that read the documents, and no others"` (`:145-148`), and
-- the D-187-10 zero-grounded case over `BARE_PHASES` (`:98-108`)
+The brief names "seven"; the committed round-1 body actually holds **ten** untouched
+findings — five warnings (WR-01, WR-04, WR-05, WR-06, WR-07) and five infos (IN-01 … IN-05).
+All ten are reproduced verbatim below. None of them was touched by `ee5fff3b..HEAD` (no
+backend file and no other frontend file appears in the diff), so **all ten remain open**.
+They are not re-litigated here.
 
-pass. Swap `"loose"` for the real default `"strict"` and both assertions go red on today's
-component. This is a guard that measures an unrepresentable state and reports it as coverage of
-the represented one — the exact failure class the phase's own RED-first discipline exists to
-prevent.
+<details>
+<summary>Carried-forward round-1 findings (verbatim)</summary>
 
-**Fix:** make the fixtures use values the model can actually produce, and add the default-value
-row explicitly:
-
-```ts
-// The value the server ACTUALLY emits: `citation_policy` defaults to "strict" on every
-// llm_emit phase (harness.py:155), and /generate model_dump()s defaults. A fixture that
-// avoids the default is a fixture that avoids the shipped shape.
-{ slug: "emit", phase_index: 4, name: "Produce the renewal pack",
-  config: { phase_type: "llm_emit", citation_policy: "strict" } }
-```
-
-plus a dedicated case pinning what the receipt says about an `already-set` step and about an
-`escalated` step, so the lead sentence can never again claim authorship of a cause it did not
-create.
-
----
-
-## Warnings
-
-### WR-01: The armed checkpoint's no-transport fail-safe re-introduces the `_failing_on_failure` read the Pitfall-4 short-circuit exists to delete
+#### WR-01: The armed checkpoint's no-transport fail-safe re-introduces the `_failing_on_failure` read the Pitfall-4 short-circuit exists to delete
 
 **File:** `backend/app/services/harness_engine.py:1065-1066`
 
@@ -259,95 +243,7 @@ and add a `redis=None` row to `test_187_armed_checkpoint_property.py`'s space.
 
 ---
 
-### WR-02: `derivedFace`'s folder tier claims "Search &lt;folder&gt;" on step types that cannot search
-
-**File:** `frontend/src/components/workflows/phaseVocabulary.ts:466`
-
-**Issue:**
-Tier (3) is ungated by `phaseType`, unlike tier (2) which is explicitly gated on `llm_emit`
-with a stated rationale:
-
-```ts
-if (inputs.folderName) return `Search ${inputs.folderName}`
-```
-
-`folder_scope` exists on `LlmSinglePhaseConfig` purely for shape symmetry, and the model says
-so in the source: *"Load-bearing on llm_agent + llm_batch_agents; **inert on llm_single (no
-tools)**. Carried here for shape symmetry across the family"* (`backend/app/models/harness.py:74-75`).
-`grounding.grounding_cause`'s docblock makes the same point independently — `folder_scope` is
-deliberately not an input there because *"it exists on all five LLM config members (including
-`llm_single`, which has no tools at all), so reading it would auto-lock steps that read nothing."*
-
-**Failure scenario:** a generated definition with
-`{phase_type: "llm_single", prompt: "Draft the summary", folder_scope: ["<supplier-contracts-uuid>"]}`
-and a populated `folderNames` map renders the node face **"Search Supplier Contracts"**. The
-step performs no retrieval; the face states a capability the step does not have. That is a
-fabricated claim about what the step does, which is the floor `derivedFace`'s own docblock
-(`:200-202`) says it holds.
-
-The test suite cannot catch it: every folder-tier case in `phaseVocabulary.test.ts`
-(`:249-290`) and `phaseVocabulary.corpus.test.ts` uses `phase_type: "llm_agent"`.
-
-**Fix:** gate tier (3) on the types where `folder_scope` is load-bearing, reusing the shared
-constant rather than a new literal list:
-
-```ts
-// (3) FOLDER SCOPE — gated on the RETRIEVAL types, for the same reason tier (2) is gated
-//     on llm_emit. `folder_scope` is carried on llm_single for shape symmetry and is
-//     INERT there (harness.py:74-75), so "Search <folder>" on one is a claim the step
-//     cannot honour.
-if (inputs.folderName && GROUNDING_DIAL_TYPES.includes(inputs.phaseType)) {
-  return `Search ${inputs.folderName}`
-}
-```
-
-(`llm_emit` should be added to that predicate only if the emit executor really does bound-scope
-retrieval — the `LlmEmitPhaseConfig` docblock says it does, so a 3-member tuple named for its
-meaning is the honest spelling.)
-
----
-
-### WR-03: The new `llm_human_input` face contradicts the step-type picker one click earlier
-
-**File:** `frontend/src/components/workflows/phaseVocabulary.ts:469`, `frontend/src/components/workflows/StepTypePicker.tsx:156`
-
-**Issue:**
-`derivedFace` tier (4) returns `"Wait for your approval"` for `llm_human_input`
-unconditionally — with or without a name context — so `nodeTitle` can no longer reach
-`PHASE_TYPE_SENTENCES.llm_human_input` (`"Check with you"`) for that type. The
-`nodeTitle` docblock names this as a deliberate exception.
-
-But `StepTypePicker` still renders its rows from that same map:
-
-```ts
-const sentence = PHASE_TYPE_SENTENCES[choice.type] ?? choice.type
-```
-
-**Failure scenario:** the author opens ＋ on the lane, reads the row **"Check with you"**,
-clicks it, and the card that lands says **"Wait for your approval"**. Two sentences for one
-choice, one click apart, both sourced from the module whose whole premise is *"a second copy of
-the title resolution … is the drift this phase's red line forbids."* The picker's `?raw` /
-copy-identity guards pass because both strings are still imported identifiers — the drift is
-semantic, not lexical.
-
-**Fix:** make the picker ask the same resolver the card will:
-
-```ts
-// The row must promise what the CARD will say — nodeTitle is the one resolver, and
-// derivedFace tier (4) overrides the type sentence for llm_human_input (187-04).
-const sentence = nodeTitle(
-  { slug: "", phase_index: 0, config: { phase_type: choice.type } },
-  /* no name context — the picker knows nothing bound yet */
-)
-```
-
-or, if the picker must stay a pure map read, change
-`PHASE_TYPE_SENTENCES.llm_human_input` to `"Wait for your approval"` and delete tier (4)'s
-special case, so one string serves both surfaces.
-
----
-
-### WR-04: The CANVAS-01 totality hardening added to `nodeTitle` is unreachable through the canvas — three sibling resolvers on the same object still throw
+#### WR-04: The CANVAS-01 totality hardening added to `nodeTitle` is unreachable through the canvas — three sibling resolvers on the same object still throw
 
 **File:** `frontend/src/components/workflows/canvasModel.ts:290`, `frontend/src/components/workflows/phaseVocabulary.ts:227`, `:347`, `:533`
 
@@ -390,7 +286,7 @@ const phaseType = phase.config?.phase_type ?? ""
 
 ---
 
-### WR-05: `action_risk_approval` validators now get the armed *choices* with un-armed *semantics* — a regression of the T-185-04-01 allow-list on that path
+#### WR-05: `action_risk_approval` validators now get the armed *choices* with un-armed *semantics* — a regression of the T-185-04-01 allow-list on that path
 
 **File:** `backend/app/services/harness/validator_kinds.py:714-744`, `backend/app/services/harness_engine.py:942-943`, `:1082`, `:1104`, `:1272`
 
@@ -442,7 +338,7 @@ rows still `model_validate()`.
 
 ---
 
-### WR-06: `name_seeded_by_ai` is client-writable on the create/update path, so a hand-typed name can be made deletable
+#### WR-06: `name_seeded_by_ai` is client-writable on the create/update path, so a hand-typed name can be made deletable
 
 **File:** `backend/app/models/harness.py:262`, `frontend/src/components/workflows/definitionOps.ts:263-289`
 
@@ -478,7 +374,7 @@ transition of `False → True`.
 
 ---
 
-### WR-07: `total_phases`'s fallback composes a false position in the approval prompt
+#### WR-07: `total_phases`'s fallback composes a false position in the approval prompt
 
 **File:** `backend/app/services/harness_engine.py:766`
 
@@ -516,9 +412,7 @@ sentence = _approval_sentence(phase, total_phases)
 
 ---
 
-## Info
-
-### IN-01: Stale docblock — `_ROUTE_ASSIGNED_CODES` is described as "the 2 codes"
+#### IN-01: Stale docblock — `_ROUTE_ASSIGNED_CODES` is described as "the 2 codes"
 
 **File:** `backend/app/api/workflows.py:441`
 **Issue:** The WR-05 composition table still reads
@@ -527,7 +421,7 @@ sentence = _approval_sentence(phase, total_phases)
 not.
 **Fix:** `— the 3 codes THIS route mints itself`.
 
-### IN-02: Stale docblock — `technicalLine` still says "the reveal is a title swap today"
+#### IN-02: Stale docblock — `technicalLine` still says "the reveal is a title swap today"
 
 **File:** `frontend/src/components/workflows/PhaseNodeCard.tsx:194-197`
 **Issue:** `/** An extra ⌥-reveal line. **Not passed by the 184 adapter** — the reveal is a
@@ -538,7 +432,7 @@ false docblock.
 **Fix:** replace "the reveal is a title swap today" with "the reveal swaps the SUBTITLE since
 187-09 (D-187-16)"; leave the "still Phase 188's" claim, which is accurate.
 
-### IN-03: `PanelState` comment claims four states over a three-member union
+#### IN-03: `PanelState` comment claims four states over a three-member union
 
 **File:** `frontend/src/components/workflows/StarterTemplatePicker.tsx:88-95`
 **Issue:** *"Four states, because a fetch has four outcomes"* sits directly above a union with
@@ -547,7 +441,7 @@ into `ready` and only reappears as a `rows.length === 0` branch at `:265`.
 **Fix:** say so — "Three variants; the fourth outcome (succeeded-and-empty) is `ready` with an
 empty `rows`, distinguished at render."
 
-### IN-04: `load()` is invoked from inside a `setState` updater
+#### IN-04: `load()` is invoked from inside a `setState` updater
 
 **File:** `frontend/src/components/workflows/StarterTemplatePicker.tsx:160-165`
 **Issue:**
@@ -566,7 +460,7 @@ const toggle = useCallback(() => {
 }, [open, load])
 ```
 
-### IN-05: `role="status"` and the heading/note paragraphs are non-`menuitem` children of `role="menu"`
+#### IN-05: `role="status"` and the heading/note paragraphs are non-`menuitem` children of `role="menu"`
 
 **File:** `frontend/src/components/workflows/StarterTemplatePicker.tsx:270-300`
 **Issue:** The panel declares `role="menu"` but its first three children are a heading div, a
@@ -578,23 +472,370 @@ arrow-key roving focus, which `menu` semantics imply.
 buttons), or move the heading, note and status outside the `role="menu"` element and
 `aria-describedby` them from the trigger.
 
+</details>
+
+---
+
+## Round 2 findings
+
+New defects in the 10 changed files. Ids continue round 1's sequence so they cannot collide.
+
+### Critical Issues
+
+#### CR-03: The carried paragraph — the sentence the CR-01 fix introduced — has ZERO assertions anywhere in the repo, and the suite's own stated invariant is now false
+
+**File:** `frontend/src/components/workflows/SeedReceipt.tsx:274-281`, `frontend/src/components/workflows/SeedReceipt.test.tsx:57-66`, `:530-578`
+
+**Issue:**
+187-16 split one lead into two. The second one is the receipt's **only** statement about
+`already-set` and `escalated` steps:
+
+```tsx
+{carriedLead ? (
+  <p data-testid="seed-receipt-carried" ...>{carriedLead}</p>
+) : null}
+```
+
+Measured, repo-wide:
+
+```
+$ grep -rn "seed-receipt-carried" frontend/src/
+frontend/src/components/workflows/SeedReceipt.tsx:276:          data-testid="seed-receipt-carried"
+```
+
+**One hit — the component itself.** `SeedReceipt.test.tsx` does not import
+`seedReceiptCarriedLead` (its import block, `:57-66`, lists eight names and that is not one of
+them), never queries `seed-receipt-carried`, and its "renders each sentence identically to its
+`definitionOps` export" case (`:533-549`) enumerates *heading / lead / one-way / close* and
+stops. No page suite touches it either.
+
+Consequences, all of which ship green today:
+
+1. **The paragraph could be deleted entirely** and every one of the 452 passing tests would
+   still pass. Nothing asserts its presence.
+2. **The count could be wrong** — `carriedCount` could be `rows.length`, or `0`, or
+   `detectedCount` — and nothing would notice. `data-detected-count` and
+   `data-grounded-count` are pinned; the carried number is pinned nowhere, and it is not
+   exposed as an attribute either.
+3. **The text could drift from `definitionOps`.** The suite's docblock (`:20-26`) states as a
+   named property that *"every sentence is compared character-for-character against its
+   `definitionOps` export, never against a hand-typed copy, because a hand-typed copy drifts
+   in exactly the same silence the copy module exists to break (T-187-13-05)"*. That sentence
+   is now false, and the exception is the sentence this round added. Under this project's own
+   rule (`PhaseNode.tsx:183-186` — a comment that misdescribes is the same defect as a false
+   docblock) the docblock is a defect independent of the coverage gap.
+
+The nearest thing to coverage is the authorship fence at `:439-451`, which asserts the whole
+receipt's `textContent` does **not** contain `"so I set"`. That passes if the carried paragraph
+is absent, empty, or printing the wrong number — it only ever measures an absence.
+
+This is CR-02's failure class one plan later: the closure round's own recorded lesson was
+*"green over an unrepresentable fixture is not coverage"*, and the fix it wrote is protected by
+no fixture at all. Because the receipt is SC#3's surface and the carried sentence is a
+governance claim about who applied a lock, an unguarded regression here re-opens CR-01 silently.
+
+**Fix:** import the formatter and assert it the same way its sibling is asserted — presence,
+count and character identity — including the zero case.
+
+```tsx
+// SeedReceipt.test.tsx
+import { seedReceiptCarriedLead, ... } from "./definitionOps"
+
+describe("SeedReceipt — the carried paragraph", () => {
+  it("renders the carried sentence character-identically, over the CARRIED count", () => {
+    renderReceipt() // 3 sealed, 2 detected ⇒ 1 carried
+    expect(screen.getByTestId("seed-receipt-carried").textContent).toBe(
+      seedReceiptCarriedLead(SEALED_SLUGS.length - DETECTED_SLUGS.length),
+    )
+  })
+
+  it("renders it ALONE on the typical non-KB draft — no detected paragraph above it", () => {
+    renderReceipt({ phases: STRICT_EMIT_ONLY_PHASES })
+    expect(screen.queryByTestId("seed-receipt-grounding")).toBeNull()
+    expect(screen.getByTestId("seed-receipt-carried").textContent).toBe(
+      seedReceiptCarriedLead(1),
+    )
+  })
+
+  it("renders NO carried paragraph when every seal is the AI's own doing", () => {
+    // 2 detected, 0 carried — the zero case, which is what makes the two above bite.
+    renderReceipt({ phases: [phaseBySlug(GROUNDED_PHASES, "contracts")] })
+    expect(screen.queryByTestId("seed-receipt-carried")).toBeNull()
+  })
+})
+```
+
+and add the missing entry to the section-4 identity case so the docblock's claim becomes true
+again. Consider also emitting `data-carried-count={carriedCount}`, so the third fact is
+checkable the same way the other two are.
+
+---
+
+### Warnings
+
+#### WR-08: The `＋` row still fails to preview the card for `llm_emit` whenever the definition carries a template asset — WR-03's stated property does not hold
+
+**File:** `frontend/src/components/workflows/StepTypePicker.tsx:180-185`
+
+**Issue:**
+The fix's own docblock (`:8-16`) states the property it establishes: *"The row title asks
+`nodeTitle` — THE one title resolution — over the very phase the caller will build with
+`minimalPhaseFor` once `onChoose` fires."* But the call deliberately omits the name context:
+
+```ts
+const sentence = nodeTitle(minimalPhaseFor(choice.type, PREVIEW_SLUG, index))
+```
+
+The caller does **not** omit it. `WorkflowBuilderPage.tsx:613-617` builds one `nameContext`
+whose `templateFilename` is read off the DEFINITION's `assets[]`, and both the card and the
+"Added …" notice resolve through it (`:1005`, `:1551`, `:1577`, `:1639`). `derivedFace` tier
+(2) fires on `llm_emit` from `templateFilename` alone — no phase-level binding is required
+(`phaseVocabulary.ts:473-475`), and `phaseVocabulary.test.ts:251-254` pins exactly that: *"an
+`llm_emit` step with only the definition template renders `Fill <filename>`"*.
+
+**Failure scenario (concrete, and it is the shipped starter path):** fork the `risk-register`
+starter — migration 094 ships it with a `template` asset, and `phaseVocabulary.corpus.test.ts`
+asserts ≥3 corpus fixtures carry one. Open the canvas, press `＋` at any lane at or before the
+deliverable (`allowedTypesAt` only refuses strictly *after* the last `llm_emit`, so the row is
+enabled). The menu reads **"Produce the deliverable"**. Click it. The card that lands, and the
+canvas notice that announces it, both read **"Fill risk-register.docx"**. Two sentences for one
+choice, one click apart — verbatim the defect WR-03 was raised for, on a different type.
+
+The suite cannot see it: `cardFaceFor` (`StepTypePicker.test.tsx:117-118`) calls `nodeTitle`
+with no context either, so expectation and subject share the same blind spot, and the
+blast-radius control at `:224-230` actively *pins* `llm_emit`'s row to
+`PHASE_TYPE_SENTENCES.llm_emit`.
+
+**Fix:** thread the context the caller will use, and prove the property rather than restating
+it.
+
+```tsx
+// StepTypePickerProps
+/** The page's ONE name context — the same object the card will resolve through
+ *  (WorkflowBuilderPage.tsx:613). Omitted only where no caller holds one; a row that
+ *  resolves through a different context is not a preview of the card. */
+nameContext?: NameContext
+
+// …in the row
+const sentence = nodeTitle(minimalPhaseFor(choice.type, PREVIEW_SLUG, index), nameContext)
+```
+
+and add the falsifying case — with a template-bearing context, the `llm_emit` row must read
+`Fill <filename>` and must NOT read `PHASE_TYPE_SENTENCES.llm_emit`. If threading is rejected,
+the docblock must be narrowed to the claim the code actually holds ("the row previews the card
+for a definition with no template asset") rather than left stating the general one.
+
+---
+
+#### WR-09: `seedReceiptCarriedLead` merges `already-set` and `escalated` into one "by its own settings" sentence, which misattributes the author's own act
+
+**File:** `frontend/src/components/workflows/definitionOps.ts:613-620`, `frontend/src/components/workflows/SeedReceipt.tsx:213`
+
+**Issue:**
+```ts
+? `1 step was already set to ${words} by its own settings.`
+: `${count} steps were already set to ${words} by their own settings.`
+```
+
+`carriedCount` is `rows.length - detectedCount`, i.e. **`already-set` plus `escalated`**. The
+two are not the same fact and this module keeps them apart everywhere else:
+
+- `seedReceiptStepReason("already-set")` → `"it already has to cite its sources"`
+- `seedReceiptStepReason("escalated")`  → `"you turned this on by hand"`
+- `GROUNDING_WHY_ESCALATED` (`:475`)    → `"Because you turned this on by hand."`
+
+So on an escalated-only draft the card reads, two lines apart:
+
+> 1 step **was already set** to must prove it **by its own settings**.
+> ⛨ **Weigh the supplier options** — **you turned this on by hand**
+
+"already set … by its own settings" describes a policy default; `grounding_escalated` is the
+author's deliberate act, and the receipt's whole job is saying *who did what*. This is CR-01's
+shape at smaller scale — one sentence spanning two causes — and the fix's own docblock
+(`:596-598`) asserts the property it breaks: *"the sentence … names the step's own settings as
+what holds it"*.
+
+Reachability is narrow but not zero: `grounding_escalated` is an ordinary `PhaseSpec` field and
+`generate_workflow_definition` neither strips nor re-derives it (grepped: the symbol does not
+appear in `backend/app/services/workflow_authoring.py`), so a model emission carrying it
+validates and reaches the receipt. `SeedReceipt.test.tsx:387-402` already drives exactly this
+draft — it just never reads the sentence (see CR-03).
+
+**Fix:** either give the escalated cause its own sentence, or make the shared one
+cause-agnostic so it claims nothing about *what* holds the step:
+
+```ts
+// Cause-agnostic, and true of both carried causes:
+return count === 1
+  ? `1 more step was already set to ${words} before I started.`
+  : `${count} more steps were already set to ${words} before I started.`
+```
+
+(The "before I started" framing keeps property 2 — no authorship claim — while dropping the
+false attribution to "settings". If the two causes are split instead, `SeedReceipt` already
+carries `row.cause`, so the counts are one `filter` away.)
+
+---
+
+#### WR-10: The CR-02 representability guard is a hand-transcribed copy of the backend `Literal` with no cross-language pin — it can rot exactly the way CR-02 did
+
+**File:** `frontend/src/components/workflows/SeedReceipt.test.tsx:104-109`
+
+**Issue:**
+```ts
+const REPRESENTABLE_CITATION_POLICIES: readonly string[] = [
+  "strict", "flag", "partial", "draft",
+]
+```
+
+This is the entire mechanism keeping CR-02 closed, and it is a *transcription*. Nothing
+connects it to `backend/app/models/harness.py:158`. If the backend `Literal` gains, loses or
+renames a member — or, worse, if the **default** moves off `"strict"`, which is what makes the
+`already-set` branch fire at all — this list stays green while describing a value set the
+product no longer has. That is the same shape as the `"loose"` fixture: a local claim about a
+remote type, unverified.
+
+The project already has the right idiom for this and uses it 200 lines up the same module
+family: `phaseVocabulary.ts:118-120` — `__fixtures__/skipParseCases.json` is *read by both*
+the vitest suite and `backend/tests/unit/test_183_skip_parse_parity.py`, *"so neither language
+can drift alone."* The CR-02 fix did not reach for it.
+
+**Fix:** pin the member set and the default across the language boundary, in the shipped
+fixture idiom:
+
+```jsonc
+// frontend/src/components/workflows/__fixtures__/citationPolicy.json
+{ "members": ["strict", "flag", "partial", "draft"], "default": "strict" }
+```
+
+read by `SeedReceipt.test.tsx` for `REPRESENTABLE_CITATION_POLICIES` **and** by a backend unit
+test asserting `get_args(LlmEmitPhaseConfig.model_fields["citation_policy"].annotation)` and
+`.default` match it. Then a backend edit fails a backend test instead of silently un-covering a
+frontend branch.
+
+---
+
+### Info
+
+#### IN-06: The `GROUNDING_DIAL_TYPES` occurrence fence states a count that is wrong and cannot detect the deletion it describes
+
+**File:** `frontend/src/components/workflows/phaseVocabulary.test.ts` (the T-187-17-02 block)
+
+**Issue:**
+```ts
+// Three reads: the declaration, `groundingCause`'s dial check, and the folder
+// tier's gate. A gate written as an inline literal would leave this at two.
+const hits = phaseVocabularySource.match(/GROUNDING_DIAL_TYPES/g) ?? []
+expect(hits.length).toBeGreaterThanOrEqual(3)
+```
+
+Measured at HEAD: `grep -c GROUNDING_DIAL_TYPES phaseVocabulary.ts` → **6**, of which only
+three are code (`:277` declaration, `:312` dial check, `:516` gate). The other three
+(`:441`, `:458`, `:477`) are prose. Deleting the gate at `:516` leaves **five** hits, so the
+`>= 3` threshold still passes — the fence cannot fail for the reason its comment gives, and
+"would leave this at two" is arithmetically wrong.
+
+Its sibling ("the two dial type strings appear together in exactly ONE array literal") *does*
+catch the inline-literal variant, so the pair is not useless — only the numeric one is
+non-biting and mis-documented.
+
+**Fix:** count code occurrences, not prose, e.g. strip block comments before matching, or
+assert on the gate expression itself:
+```ts
+expect(phaseVocabularySource).toMatch(
+  /if \(inputs\.folderName && GROUNDING_DIAL_TYPES\.includes\(inputs\.phaseType\)\)/,
+)
+```
+
+#### IN-07: `"(3) a folder resolves last of the three config tiers, ahead of the human-input tier"` no longer demonstrates any ordering, and its comment contradicts itself
+
+**File:** `frontend/src/components/workflows/phaseVocabulary.test.ts:208-223`
+
+**Issue:** The body now reads
+`derivedFace({ phaseType: "llm_agent", folderName: "Board Papers" })` → `"Search Board Papers"`.
+After the WR-02 gate, tier (3) fires only on `GROUNDING_DIAL_TYPES` and tier (4) only on
+`llm_human_input`, so **no input can reach both tiers** and the (3)-above-(4) ordering is now
+unobservable by construction. The `it` title still claims it, and the trailing comment says
+both *"it really is tier (3) beating a LOWER tier, not merely tier (3) alone"* **and**
+*"`llm_agent` reaches no tier (4)"* — the second sentence refutes the first.
+
+**Fix:** rename to what it now proves (`"(3) a folder names a retrieval step"`) and record in
+the comment that the (3)/(4) ordering became unreachable when the gate landed, so a future
+reader does not go looking for the assertion that used to prove it.
+
+#### IN-08: `IDENTITY_BEARING_CONFIG_KEYS`'s stated rule is now violated by its own `folder_scope` member
+
+**File:** `frontend/src/components/workflows/definitionOps.ts:193-225`
+
+**Issue:** The docblock states the rule as *"a config edit clears a generator-seeded name
+precisely when it could change what the step's face says about that step"* and justifies
+`folder_scope` as *"tier (3) of `derivedFace`. The single scoped folder names the step."*
+After 187-17 that is only true on `llm_agent` / `llm_batch_agents`. On the other four types a
+`folder_scope` edit provably cannot change the face, yet `patchPhaseConfig` (`:270-287`) still
+clears both `name` and `name_seeded_by_ai`. No UI path reaches it today —
+`FolderScopeField` (`PhaseFormPanel.tsx:347`, `:835`) is a read-only display — so this is
+recorded, not blocking.
+
+**Fix:** update the justification to name the gate (as the `available_tools` entry already
+does for its own deliberate over-breadth), or gate the demote on the phase type the same way
+the tier is gated.
+
+#### IN-09: The CR-02 representability guard's title over-claims — it skips `ESCALATED_PHASES` and every inline fixture
+
+**File:** `frontend/src/components/workflows/SeedReceipt.test.tsx:293-306`
+
+**Issue:** `it("every fixture policy in this file is a value the backend can produce (CR-02)")`
+sweeps exactly three arrays (`GROUNDED_PHASES`, `BARE_PHASES`, `STRICT_EMIT_ONLY_PHASES`).
+`ESCALATED_PHASES` (`:198-207`) and the four `phases` arrays declared inside `it` bodies
+(`:324-331`, `:565-569`, `:594-604`, `:645-652`) are not covered. None carries a
+`citation_policy` today, so the guard is correct now — but a future inline `llm_emit` fixture
+with an unrepresentable policy would re-create CR-02 without tripping the guard named after it.
+
+**Fix:** collect from one place — export a `const ALL_FIXTURE_PHASES` the guard sweeps and the
+cases draw from — or narrow the title to the three arrays it actually reads.
+
+#### IN-10: The receipt lists rows in array order, not run order, and duplicate slugs collide on `key` and `data-testid`
+
+**File:** `frontend/src/components/workflows/SeedReceipt.tsx:193-206`, `:288-291`
+
+**Issue:** Two small totality gaps in the row builder, both pre-existing but now more visible
+because the list is the round's subject:
+
+- The `for (const phase of phases)` walk uses the caller's array order. Every other module in
+  this family resolves render order first (`definitionOps.orderPhases`, `canvasModel`'s
+  identical comparator), so a definition whose JSONB order differs from `phase_index` order
+  lists the receipt's steps in a different order from the canvas it explains. The prop doc
+  ("The drafted definition's phases, in order") is an assumption, not a guarantee.
+- `key={row.slug}` and `data-testid={`seed-receipt-step-${row.slug}`}` assume slug uniqueness.
+  `removePhase`'s own docblock (`definitionOps.ts:180-182`) records that duplicate slugs are
+  legal in the JSONB. Two sealed duplicates give React a duplicate key and make
+  `getByTestId` throw in any future test that resolves that row.
+
+**Fix:** sort by `(phase_index, slug)` before building rows (or accept the caller's order
+explicitly in the prop doc), and key on `` `${row.slug}-${index}` `` while keeping `data-slug`
+as the semantic hook the suite already resolves by.
+
 ---
 
 ## Notes on scope
 
-Items named in `<known_and_not_findings>` (the 33 pre-existing `tsc -b` errors, the
-`PublishGauntlet`/`WorkflowBuilderPage.session` cross-file flake, the 62 backend unit failures,
-the deliberately un-threaded `canRemovePhase`, the dormant template arm, and `WorkflowCanvas.tsx`'s
-size) were verified as already-owned and are **not** reported above.
-
-Two brief items were checked and found sound, recorded here so they are not re-litigated:
-`toCanvas` non-mutation and frozen-default identity hold under the injected `nameContext`
-(`canvasModel.purity.test.ts:280-354`); and the `graphColumn` grid rewrite
-(`grid-rows-[auto_auto_minmax(0,1fr)]` + `[&>*:last-child]:row-start-3`) places correctly in
-both the receipt-open and receipt-dismissed child counts.
+- Items listed as known-and-not-findings were verified as already-owned and are **not**
+  reported: the `PublishGauntlet` / `WorkflowCanvas` axe-concurrency flake under whole-glob
+  parallel load (D-ITEM-02), and the 33 pre-existing repo-wide `tsc -b` errors (0 in
+  `src/components/workflows/`, unchanged by this round).
+- Performance is out of v1 scope. Not reported: `StepTypePicker` now allocates six
+  `minimalPhaseFor` objects per render, and `SeedReceipt`'s `detectedCount` filter runs outside
+  the `useMemo`. Neither is a correctness issue.
+- Checked and found sound, recorded so they are not re-litigated: `canvasModel.isGrounded`
+  and the receipt share one predicate, so `data-grounded-count` is honest; the
+  `WorkflowBuilderPage.canvas.test.tsx` retype of `scan` from `llm_single` to
+  `llm_batch_agents` loses no coverage and adds the previously-unmeasured half of the gated
+  set; the corpus check-2 falsification control dropping from two members to one is the
+  narrowing working (the replacement case measures the *reason* rather than asserting it in
+  prose), and it still fails loudly if its remaining member is edited.
 
 ---
 
-_Reviewed: 2026-08-02T03:17:14Z_
+_Reviewed: 2026-08-02T08:43:10Z_
 _Reviewer: Claude (gsd-code-reviewer)_
-_Depth: standard_
+_Depth: standard · Round 2 (gap closure)_
