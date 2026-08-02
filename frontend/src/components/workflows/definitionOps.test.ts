@@ -57,6 +57,9 @@ import {
   STARTER_DOOR_LINE,
   STARTER_DOOR_HEADING,
   STARTER_DOOR_NOTE,
+  STARTER_DOOR_LOADING,
+  STARTER_DOOR_UNAVAILABLE,
+  STARTER_DOOR_EMPTY,
   type PhaseTypeId,
 } from "./definitionOps"
 import { ALL_FIXTURES } from "./__fixtures__/canvasFixtures"
@@ -863,6 +866,17 @@ describe("definitionOps — the template-door copy is a lock (sketch 151-C)", ()
     )
   })
 
+  it("keeps 'we could not look' and 'there are none' as DIFFERENT sentences (187-14)", () => {
+    // The picker fetches, and a fetch has three outcomes besides success. Collapsing a
+    // failure into an empty state would let the surface report a fact it does not have.
+    expect(STARTER_DOOR_LOADING).toBe("Looking up the templates…")
+    expect(STARTER_DOOR_UNAVAILABLE).toBe(
+      "The templates could not be loaded just now. Describe what you need instead.",
+    )
+    expect(STARTER_DOOR_EMPTY).toBe("There are no templates to start from yet.")
+    expect(STARTER_DOOR_UNAVAILABLE).not.toBe(STARTER_DOOR_EMPTY)
+  })
+
   it("seeds the describe box with the starter's OWN plain-language sentence", () => {
     expect(starterSeedSentence(riskRegister)).toBe(
       "Track and report the risks on my active projects.",
@@ -930,6 +944,9 @@ describe("definitionOps — the Phase 187 copy carries no overclaim and no unshi
     STARTER_DOOR_LINE,
     STARTER_DOOR_HEADING,
     STARTER_DOOR_NOTE,
+    STARTER_DOOR_LOADING,
+    STARTER_DOOR_UNAVAILABLE,
+    STARTER_DOOR_EMPTY,
     starterSeedSentence({ name: "Risk Register" }),
   ]
 
@@ -975,6 +992,9 @@ describe("definitionOps — the Phase 187 copy carries no overclaim and no unshi
       STARTER_DOOR_LINE,
       STARTER_DOOR_HEADING,
       STARTER_DOOR_NOTE,
+      STARTER_DOOR_LOADING,
+      STARTER_DOOR_UNAVAILABLE,
+      STARTER_DOOR_EMPTY,
     ]
     for (const sentence of constants) expect(sentence.length).toBeGreaterThan(0)
     expect(new Set(constants).size).toBe(constants.length)

@@ -650,6 +650,28 @@ export const STARTER_DOOR_HEADING = "Start from a template"
 export const STARTER_DOOR_NOTE =
   "Picking one fills the describe box with its own words. You can edit it before anything is generated."
 
+// The three states the panel can be in other than "here are the templates". Plan 187-10
+// shipped the door's three affirmative sentences; the picker (187-14) fetches, and a
+// fetch has three other outcomes. They live HERE for 187-10's own stated reason — a
+// sentence inside a component is a sentence nobody can test for drift — and each is a
+// DISTINCT fact, because collapsing them would make the surface say something it does
+// not know.
+
+/** In flight. Said in words rather than shown as a wordless spinner: the panel opened
+ *  because the user asked a question, and a blank box is not an answer to it. */
+export const STARTER_DOOR_LOADING = "Looking up the templates…"
+
+/** The request FAILED. The panel says so and offers nothing — no cached list, no
+ *  remembered rows, nothing fabricated. The describe box is still the way forward, which
+ *  is exactly why one forward path is worth the constraint. */
+export const STARTER_DOOR_UNAVAILABLE =
+  "The templates could not be loaded just now. Describe what you need instead."
+
+/** The request SUCCEEDED and returned nothing. A different fact from a failure, and
+ *  keeping the two apart is the difference between "there are none" and "we could not
+ *  look" — a surface that says the first when it means the second is lying quietly. */
+export const STARTER_DOOR_EMPTY = "There are no templates to start from yet."
+
 /**
  * The sentence a chosen starter seeds the describe box with.
  *
