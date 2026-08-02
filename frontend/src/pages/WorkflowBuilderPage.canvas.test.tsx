@@ -2419,6 +2419,18 @@ describe("WorkflowBuilderPage 187-15 — source guards for the two mounts", () =
     expect(builderSource).not.toMatch(/document\.cookie/)
   })
 
+  it("the graph keeps the fillable row even when the receipt renders NOTHING", () => {
+    /**
+     * A LAYOUT BUG JSDOM CANNOT SEE, so it is pinned at the source. The receipt sits in the
+     * graph column's grid, and a DISMISSED receipt returns `null` — no DOM node — so grid
+     * auto-placement would drop the graph into the second `auto` row and collapse it. The
+     * column therefore declares three rows AND pins its LAST child (always the graph) to
+     * the `minmax(0,1fr)` one, rather than trusting the receipt to occupy a slot.
+     */
+    expect(builderSource).toMatch(/grid-rows-\[auto_auto_minmax\(0,1fr\)\]/)
+    expect(builderSource).toMatch(/\[&>\*:last-child\]:row-start-3/)
+  })
+
   it("mounts each surface exactly once, and adds no helper or component beside them", () => {
     expect(builderSource.match(/<SeedReceipt\b/g) ?? []).toHaveLength(1)
     expect(builderSource.match(/<StarterTemplatePicker\b/g) ?? []).toHaveLength(1)

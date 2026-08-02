@@ -171,6 +171,8 @@ import { BuilderStoreProvider } from "@/components/workflows/BuilderStoreProvide
 // file, so composing autosave into this page did not grow it.
 import { BuilderSaveRegion } from "@/components/workflows/BuilderSaveRegion"
 import { BuilderHeaderBar } from "@/components/workflows/BuilderHeaderBar"
+import { SeedReceipt } from "@/components/workflows/SeedReceipt"
+import { StarterTemplatePicker } from "@/components/workflows/StarterTemplatePicker"
 import { useEffectiveFeaturesOptional } from "@/providers/EffectiveFeaturesProvider"
 import { cn } from "@/lib/utils"
 // ── Phase 184-11: the composition seams. Every one of these is a HOOK or a PURE
@@ -597,15 +599,17 @@ export function WorkflowBuilderPage({
   // D-186-12 — is a publish gauntlet running? Reported by the publish surface through the
   // `renderPublish` seam; the ONLY reader is the write loop's hold gate.
   const [publishInFlight, setPublishInFlight] = useState(false)
-
-  // Phase 187-15 (Req 1 / D-187-05) — the ONE name context: values this page already holds,
-  // memoised so the memoised `toCanvas` does not re-project on every render. `assets` is
-  // DEFINITION-level (a property of the workflow, never of a phase), which is why 187-04
-  // gates the template tier on `llm_emit`; read defensively — it may be absent, null or not
-  // an array. PITFALL 1, ACCEPTED: the maps land asynchronously, so derived faces SETTLE
-  // when the mount fetch resolves, exactly as `PhaseFormPanel` already behaves. Rejected:
-  // holding the tier until the maps are non-empty (a late canvas for a cosmetic reason).
-  // Never available: inventing a placeholder.
+  // 187-15 (Req 5 / D-187-09) — the seed receipt, once per generated draft. Dismissal is IN-MEMORY
+  // and a reload re-shows it, correctly: the grounding is still true and nothing was persisted. No
+  // draft id exists yet (`setDraftId(null)`), and a storage key would fail this file's own guard.
+  const [showReceipt, setShowReceipt] = useState(false)
+  // 187-15 (Req 1 / D-187-05) — the ONE name context: values this page already holds, memoised
+  // so the memoised `toCanvas` does not re-project every render. `assets` is DEFINITION-level
+  // (a workflow's, never a phase's), which is why 187-04 gates the template tier on
+  // `llm_emit`; read defensively — it may be absent, null or not an array. PITFALL 1,
+  // ACCEPTED: the maps land asynchronously, so derived faces SETTLE when the mount fetch
+  // resolves, exactly as `PhaseFormPanel` already behaves. Rejected: holding the tier until
+  // the maps are non-empty (a late canvas for a cosmetic reason). Never: a placeholder.
   const nameContext = useMemo<NameContext>(() => {
     const assets = Array.isArray(meta.assets) ? (meta.assets as Array<Record<string, unknown>>) : []
     const filename = assets.find((a) => a?.kind === "template")?.filename
@@ -1202,6 +1206,9 @@ export function WorkflowBuilderPage({
         const def = result.definition as unknown as BuilderDefinition
         if (projectFolderId && !def.project_folder_id) def.project_folder_id = projectFolderId
         store.getState().setDrafted(def)
+        // 187-15 — beside the SINGLE transition, so the receipt lands in the SAME DOM batch
+        // as the graph. `autoDraft` funnels through here too, deliberately (D-187-14).
+        setShowReceipt(true)
       } else {
         // ok:false is an HONEST failure — never a renderable broken draft.
         store.getState().setErrorState(result.error, result.detail)
@@ -1478,6 +1485,9 @@ export function WorkflowBuilderPage({
               <b className="font-medium text-foreground">sets the strictness</b>, and{" "}
               <b className="font-medium text-foreground">asks about anything it had to guess</b>.
             </p>
+            {/* 187-15 (Req 6 / 151-C) — ONE quiet line, gated HERE because `describeScreen` is
+                built on both branches and the picker holds no flag. Still one way in. */}
+            {canvasEnabled && <StarterTemplatePicker onChoose={setDescribe} />}
           </div>
 
           {/* HONEST FAILURE — never a renderable broken draft (T-103-04-01). */}
@@ -1572,7 +1582,7 @@ export function WorkflowBuilderPage({
   // flag off `graphChild` IS the grid's first child, exactly as it ships today: no
   // wrapper element, no strip, no reserved space, nothing of the canvas in the DOM.
   const graphColumn = canvasEnabled ? (
-    <div className="grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden">
+    <div className="grid min-h-0 min-w-0 grid-rows-[auto_auto_minmax(0,1fr)] overflow-hidden [&>*:last-child]:row-start-3">
       {/* The house segmented control (`SkillStudioPage.tsx:191-212`). A plain div
           host, never a nav landmark — the Phase 155 A11Y-01 rule (an interactive
           "tablist" role must not override a landmark). Tablist semantics only. */}
@@ -1619,6 +1629,17 @@ export function WorkflowBuilderPage({
           Canvas
         </button>
       </div>
+      {/* 187-15 (Req 5 / 150-B) — above the graph, gated STRUCTURALLY by this branch: flag-off
+          `kbTools` is `[]`, so an ungated receipt would report zero grounded steps on a workflow
+          the run-time gate still binds. DISMISSED IT RENDERS NO NODE, which is why the graph is
+          pinned to the 1fr row by `*:last-child` rather than by auto-placement. */}
+      <SeedReceipt
+        phases={phases}
+        kbTools={kbTools}
+        nameContext={nameContext}
+        open={showReceipt}
+        onDismiss={() => setShowReceipt(false)}
+      />
       {graphChild}
     </div>
   ) : (
