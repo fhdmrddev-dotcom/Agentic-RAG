@@ -4,12 +4,12 @@ milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
 status: executing
 last_updated: "2026-08-01T21:34:50.931Z"
-last_activity: 2026-08-02 -- Phase 187 plan 13 complete (the seed receipt + its source fence)
+last_activity: 2026-08-02 -- Phase 187 plan 14 complete (the template door -- seeds the describe box, forks nothing)
 progress:
   total_phases: 19
   completed_phases: 6
   total_plans: 87
-  completed_plans: 75
+  completed_plans: 76
   percent: 34
 ---
 
