@@ -39,6 +39,7 @@
  * OFF — on the shipped surface where the defect actually lives. Asserting in only one
  * view is how this stayed invisible through eight plans of gates.
  */
+import { createElement } from "react"
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 
@@ -84,6 +85,32 @@ const { mockListDrafts } = vi.hoisted(() => ({ mockListDrafts: vi.fn() }))
 // one more api symbol. Declared as its own hoisted block so the diff stays additive.
 const { mockPublish } = vi.hoisted(() => ({ mockPublish: vi.fn() }))
 
+/**
+ * Phase 187-15 Task 1 — THE SPINE PROP RECORDER.
+ *
+ * D-14's spread-conditional promise ("with the flag off the prop must be genuinely
+ * ABSENT, not present-and-undefined") is not observable from the DOM: an undefined prop
+ * and an absent one render the same bytes, which is exactly why a source guard alone
+ * would be the weaker instrument. So the spine is wrapped rather than replaced — the
+ * wrapper RECORDS the props object it was handed and then renders the REAL component
+ * through `createElement`, so every shipped spine assertion in this file keeps passing
+ * against the real element while `'nameContext' in props` becomes directly measurable.
+ */
+const { spineProps } = vi.hoisted(() => ({ spineProps: [] as Array<Record<string, unknown>> }))
+vi.mock("@/components/workflows/PhaseSpineGraph", async () => {
+  const actual = await vi.importActual<Record<string, unknown>>(
+    "@/components/workflows/PhaseSpineGraph",
+  )
+  const Real = actual.PhaseSpineGraph as React.ComponentType<Record<string, unknown>>
+  return {
+    ...actual,
+    PhaseSpineGraph: (props: Record<string, unknown>) => {
+      spineProps.push(props)
+      return createElement(Real, props)
+    },
+  }
+})
+
 // The component SOURCE via Vite's ?raw loader — the idiomatic way to make a scope
 // fence machine-checkable (the `PhaseSpineGraph.test.tsx:20-22` precedent).
 import builderSource from "./WorkflowBuilderPage?raw"
@@ -102,6 +129,13 @@ import { PublishGauntlet } from "@/components/workflows/PublishGauntlet"
 // makes R10a's orphaning case reachable, and the plain-language title accessor, read
 // rather than hardcoded so an assertion cannot drift from the card's own vocabulary.
 import { branching, evalCoverage } from "@/components/workflows/__fixtures__/canvasFixtures"
+// Phase 187-15, on their own line so this file's diff stays additive: the corpus's two
+// bindable ids, READ rather than re-typed, so the fixtures below and the shipped
+// `branching` fixture cannot disagree about which skill `assess` is bound to.
+import {
+  CORPUS_FOLDER_ID,
+  CORPUS_SKILL_ID,
+} from "@/components/workflows/__fixtures__/canvasFixtures"
 import { nodeTitle } from "@/components/workflows/phaseVocabulary"
 // Phase 185-08: the ONE home of the locked-row sentence. IMPORTED, never re-typed, so
 // the assertions below are character-identity rather than a second copy of the copy.
@@ -1925,5 +1959,303 @@ describe("WorkflowBuilderPage 186-16 — an outstanding write blocks publish (WR
     // …and it is a momentary wait, not a lock-out.
     releaseWrite()
     await waitFor(() => expect(latest()).toBe(before))
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════════════
+// Phase 187-15 Task 1 (VOCAB-01 / Req 1 / D-187-05) — THE ONE NAME CONTEXT, THREADED
+//
+// APPENDED, never interleaved. Plans 187-04 / 187-08 / 187-09 built the ladder and the
+// two optional props; NOTHING passed them. This block is the page's half: one memoised
+// context, built from values the page already holds, reaching the canvas, the spine and
+// both `canvasNotice` announcement sites — and reaching `definitionOps.canRemovePhase`
+// deliberately NOT AT ALL, which is asserted below so the deferral cannot be closed by
+// accident and then quietly reopened.
+// ══════════════════════════════════════════════════════════════════════════════════
+
+const SKILL_NAME = "Invoice Checker"
+const FOLDER_NAME = "Supplier Contracts"
+const TEMPLATE_FILE = "quarterly-brief.docx"
+
+/**
+ * Three steps, each reaching a DIFFERENT derived tier (D-187-04's most-specific-first
+ * order): a bound skill, a single scoped folder, and an `llm_emit` that can only be
+ * named by the DEFINITION's template. The third is the whole point of this plan — the
+ * template tier has had no producer since 187-04 shipped it.
+ */
+const vocabularyPhases = [
+  { slug: "research", phase_index: 0, config: { phase_type: "llm_agent", skill_ref: CORPUS_SKILL_ID } },
+  { slug: "scan", phase_index: 1, config: { phase_type: "llm_single", folder_scope: [CORPUS_FOLDER_ID] } },
+  { slug: "brief", phase_index: 2, config: { phase_type: "llm_emit" } },
+]
+
+/** The definition, with whatever `assets` the row under test wants — including the two
+ *  malformed shapes a hand-editable JSONB column can actually hold. */
+function vocabularyDef(assets?: unknown): BuilderDefinition {
+  return {
+    ...definition,
+    phases: structuredClone(vocabularyPhases),
+    ...(assets === undefined ? {} : { assets }),
+  } as BuilderDefinition
+}
+
+/** The `assets[]` shape `AssetRef` declares (`backend/app/models/harness.py:255-282`):
+ *  a `kind` of `"template" | "reference"` and a `filename`. The reference row is FIRST
+ *  so a `find` that ignored `kind` would pick the wrong file and the assertion would
+ *  say so. */
+const REAL_ASSETS = [
+  { kind: "reference", filename: "last-quarter.pdf" },
+  { kind: "template", filename: TEMPLATE_FILE },
+]
+
+describe("WorkflowBuilderPage 187-15 — one name context, two graph views (Req 1)", () => {
+  const ON = { features: { visual_workflow_canvas: true }, loading: false }
+  const OFF = { features: {}, loading: false }
+
+  /** The maps the page fetches once on mount. Resolved BEFORE the render so the settle
+   *  is not what is being measured here — Pitfall 1 has its own row below. */
+  function withMaps() {
+    mockListFolders.mockResolvedValue([{ id: CORPUS_FOLDER_ID, name: FOLDER_NAME }])
+    mockListSkills.mockResolvedValue([{ id: CORPUS_SKILL_ID, name: SKILL_NAME }])
+  }
+
+  function renderVocab(
+    def: BuilderDefinition,
+    features: { features: EffectiveFeatures; loading: boolean } = ON,
+  ) {
+    return render(
+      <EffectiveFeaturesProvider value={{ ...features, refetch: vi.fn() }}>
+        <div style={{ width: 1200, height: 800 }}>
+          <WorkflowBuilderPage initial={{ definition: def, draftId: "draft-1" }} />
+        </div>
+      </EffectiveFeaturesProvider>,
+    )
+  }
+
+  const spineFace = (slug: string) => screen.getByTestId(`spine-node-${slug}`).textContent ?? ""
+  const canvasFace = (slug: string) => screen.getByTestId(`canvas-node-${slug}`).textContent ?? ""
+
+  async function openCanvas() {
+    fireEvent.click(screen.getByTestId("builder-view-canvas"))
+    await waitFor(() => expect(screen.getByTestId("canvas-node-research")).toBeInTheDocument(), LAZY)
+  }
+
+  it("a bound skill names the step on the canvas AND on the spine, identically", async () => {
+    withMaps()
+    renderVocab(vocabularyDef(REAL_ASSETS))
+    await screen.findByTestId("builder-view-toggle")
+    await waitFor(() => expect(spineFace("research")).toContain(`Run the ${SKILL_NAME}`))
+
+    // The two surfaces are read one after the other and compared as STRINGS — this is
+    // the card↔spine agreement, not two calls of one function.
+    const onTheSpine = spineFace("research")
+    await openCanvas()
+    expect(canvasFace("research")).toContain(`Run the ${SKILL_NAME}`)
+    expect(onTheSpine).toContain(`Run the ${SKILL_NAME}`)
+    // …and neither view fell back to the generic sentence for that step.
+    expect(canvasFace("research")).not.toContain("Searches and decides")
+  })
+
+  it("a single scoped folder names its step on both views", async () => {
+    withMaps()
+    renderVocab(vocabularyDef(REAL_ASSETS))
+    await screen.findByTestId("builder-view-toggle")
+    await waitFor(() => expect(spineFace("scan")).toContain(`Search ${FOLDER_NAME}`))
+    await openCanvas()
+    expect(canvasFace("scan")).toContain(`Search ${FOLDER_NAME}`)
+  })
+
+  it("the DEFINITION's template asset names the llm_emit step — the tier that had no producer", async () => {
+    withMaps()
+    renderVocab(vocabularyDef(REAL_ASSETS))
+    await screen.findByTestId("builder-view-toggle")
+    // `assets[]` is definition-level and the entry is chosen by `kind === "template"`,
+    // never by position: the reference row sits FIRST in the fixture.
+    await waitFor(() => expect(spineFace("brief")).toContain(`Fill ${TEMPLATE_FILE}`))
+    expect(spineFace("brief")).not.toContain("last-quarter.pdf")
+    await openCanvas()
+    expect(canvasFace("brief")).toContain(`Fill ${TEMPLATE_FILE}`)
+  })
+
+  it("BEFORE the maps resolve both views render the plain type sentence — never an id-shaped face", async () => {
+    // Pitfall 1, ACCEPTED and asserted: the mount fetch is left hanging, which is exactly
+    // the first paint. The floor is that a miss falls THROUGH to the type sentence; an
+    // id-shaped face is worse than a generic one, and a placeholder is never available.
+    mockListFolders.mockReturnValue(new Promise(() => {}))
+    mockListSkills.mockReturnValue(new Promise(() => {}))
+    const { container } = renderVocab(vocabularyDef(REAL_ASSETS))
+    await screen.findByTestId("builder-view-toggle")
+
+    expect(spineFace("research")).not.toContain(SKILL_NAME)
+    expect(spineFace("scan")).not.toContain(FOLDER_NAME)
+    expect(container.textContent ?? "").not.toContain(CORPUS_SKILL_ID)
+    expect(container.textContent ?? "").not.toContain(CORPUS_FOLDER_ID)
+    // The template tier is DEFINITION-level and needs no fetch, so it is already there.
+    expect(spineFace("brief")).toContain(`Fill ${TEMPLATE_FILE}`)
+  })
+
+  for (const [label, assets] of [
+    ["a NULL assets", null],
+    ["a non-array assets", { kind: "template", filename: "not-a-list.docx" }],
+    ["an ABSENT assets", undefined],
+    ["an assets whose rows are not objects", ["quarterly-brief.docx", 7, null]],
+  ] as Array<[string, unknown]>) {
+    it(`${label} renders without throwing and produces no template face`, async () => {
+      withMaps()
+      renderVocab(vocabularyDef(assets))
+      await screen.findByTestId("builder-view-toggle")
+      await waitFor(() => expect(spineFace("research")).toContain(`Run the ${SKILL_NAME}`))
+      expect(spineFace("brief")).not.toContain("Fill ")
+      expect(spineFace("brief")).not.toContain("not-a-list.docx")
+    })
+  }
+
+  it("with the flag OFF the spine element carries NO nameContext KEY at all (D-14)", async () => {
+    withMaps()
+    spineProps.length = 0
+    renderVocab(vocabularyDef(REAL_ASSETS), OFF)
+    await waitFor(() => expect(screen.getByTestId("builder-grid")).toBeInTheDocument())
+    await waitFor(() => expect(spineProps.length).toBeGreaterThan(0))
+
+    // Present-and-undefined is NOT absent. The spread-conditional is what makes this
+    // true, and this is the assertion that can tell the two apart.
+    for (const props of spineProps) {
+      expect("nameContext" in props).toBe(false)
+    }
+  })
+
+  it("with the flag ON the spine IS handed the context, and its identity is stable", async () => {
+    withMaps()
+    spineProps.length = 0
+    renderVocab(vocabularyDef(REAL_ASSETS))
+    await screen.findByTestId("builder-view-toggle")
+    await waitFor(() => expect(spineFace("research")).toContain(`Run the ${SKILL_NAME}`))
+
+    const withKey = spineProps.filter((p) => "nameContext" in p)
+    expect(withKey.length).toBeGreaterThan(0)
+    const ctx = withKey[withKey.length - 1].nameContext as {
+      folderNames?: Record<string, string>
+      skillNames?: Record<string, string>
+      templateFilename?: string
+    }
+    expect(ctx.skillNames?.[CORPUS_SKILL_ID]).toBe(SKILL_NAME)
+    expect(ctx.folderNames?.[CORPUS_FOLDER_ID]).toBe(FOLDER_NAME)
+    expect(ctx.templateFilename).toBe(TEMPLATE_FILE)
+
+    // MEMOISED: once the maps have landed, a re-render that changes none of the three
+    // inputs must hand back the SAME object — `toCanvas` is memoised on its options and
+    // a fresh context every render would re-project the whole canvas.
+    const settled = withKey[withKey.length - 1].nameContext
+    fireEvent.click(screen.getByTestId("spine-node-research"))
+    await waitFor(() => expect(screen.getByLabelText("Refine step: research")).toBeInTheDocument())
+    const later = spineProps.filter((p) => "nameContext" in p)
+    expect(later.length).toBeGreaterThan(withKey.length)
+    expect(later[later.length - 1].nameContext).toBe(settled)
+  })
+})
+
+describe("WorkflowBuilderPage 187-15 — the announcements name a step the way its card does", () => {
+  const ON = { features: { visual_workflow_canvas: true }, loading: false }
+
+  function renderNoticeBuilder(def: BuilderDefinition) {
+    return render(
+      <EffectiveFeaturesProvider value={{ ...ON, refetch: vi.fn() }}>
+        <div style={{ width: 1200, height: 800 }}>
+          <WorkflowBuilderPage initial={{ definition: def, draftId: "draft-1" }} />
+        </div>
+      </EffectiveFeaturesProvider>,
+    )
+  }
+
+  async function openCanvasFor(def: BuilderDefinition) {
+    renderNoticeBuilder(def)
+    await screen.findByTestId("builder-view-toggle")
+    fireEvent.click(screen.getByTestId("builder-view-canvas"))
+    await waitFor(
+      () => expect(screen.getByTestId(`canvas-node-${def.phases[0].slug}`)).toBeInTheDocument(),
+      LAZY,
+    )
+  }
+
+  it("REMOVED names the deleted step with the SAME face its card showed", async () => {
+    // `assess` carries `skill_ref`, so the derived tier fires — untouched, this notice
+    // announces the generic sentence for a card that reads "Run the Invoice Checker".
+    mockListFolders.mockResolvedValue([])
+    mockListSkills.mockResolvedValue([{ id: CORPUS_SKILL_ID, name: SKILL_NAME }])
+    await openCanvasFor({ ...definition, phases: structuredClone(branching) } as BuilderDefinition)
+    await waitFor(() =>
+      expect(screen.getByTestId("canvas-node-assess").textContent ?? "").toContain(
+        `Run the ${SKILL_NAME}`,
+      ),
+    )
+
+    fireEvent.click(screen.getByTestId("canvas-remove-assess"))
+    const message = await screen.findByTestId("canvas-notice-action")
+    expect(message.textContent).toContain(`Removed Run the ${SKILL_NAME}`)
+    // …and NOT the pre-187 generic sentence the shipped call site produced.
+    expect(message.textContent).not.toContain(`Removed ${nodeTitle(branching[1])}`)
+  })
+
+  it("ADDED names the new step with the SAME face its freshly-drawn card shows", async () => {
+    mockListFolders.mockResolvedValue([])
+    mockListSkills.mockResolvedValue([])
+    await openCanvasFor({ ...definition, phases: structuredClone(evalCoverage) } as BuilderDefinition)
+
+    fireEvent.click(screen.getByTestId("canvas-insert-2"))
+    fireEvent.click(screen.getByTestId("step-type-choice-llm_human_input"))
+
+    const message = await screen.findByTestId("canvas-notice-action")
+    const subject = message.querySelector("strong")?.textContent ?? ""
+    expect(subject.length).toBeGreaterThan(0)
+    // Two surfaces compared, not one function compared with itself: whatever the notice
+    // called the step, the card it just drew must call it the same.
+    const added = message.parentElement?.ownerDocument ?? document
+    const card = added.querySelector('[data-testid^="canvas-node-"][data-testid$="approve"]')
+    expect(card).not.toBeNull()
+    expect(card!.textContent ?? "").toContain(subject)
+  })
+
+  it("THE DEFERRAL, ASSERTED — a refusal still names its referrer with the undecorated title", async () => {
+    /**
+     * `definitionOps.canRemovePhase` is deliberately NOT threaded (187-15 Task 1): widening
+     * that pure module's signature is a separate decision, and its refusal sentence is a
+     * SHAPE predicate rather than a node face. The consequence is real and is named rather
+     * than buried — a user can be told "Run the Invoice Checker" on one notice and the
+     * generic sentence on the next, in the same notice surface.
+     *
+     * RE-OPEN TRIGGER: Phase 188's `WorkflowCanvas.tsx` extraction, which reopens these
+     * seams anyway. This row exists so the gap cannot be closed silently and then quietly
+     * reopened — closing it reds this test, which is the point.
+     */
+    mockListFolders.mockResolvedValue([])
+    mockListSkills.mockResolvedValue([{ id: CORPUS_SKILL_ID, name: SKILL_NAME }])
+    await openCanvasFor({ ...definition, phases: structuredClone(branching) } as BuilderDefinition)
+    await waitFor(() =>
+      expect(screen.getByTestId("canvas-node-assess").textContent ?? "").toContain(
+        `Run the ${SKILL_NAME}`,
+      ),
+    )
+
+    fireEvent.click(screen.getByTestId("canvas-remove-escalate"))
+    const refusal = await screen.findByTestId("canvas-notice-refusal")
+    expect(refusal.textContent).toContain(nodeTitle(branching[1]))
+    expect(refusal.textContent).not.toContain(`Run the ${SKILL_NAME}`)
+  })
+})
+
+describe("WorkflowBuilderPage 187-15 — source guards for the thread", () => {
+  it("the spine's context rides the SPREAD-CONDITIONAL, never a bare prop (D-14)", () => {
+    expect(builderSource).toMatch(/canvasEnabled \? \{ nameContext \}/)
+  })
+
+  it("no second fetch was added for the maps", () => {
+    // The context is built from data the mount effect already fetched once.
+    expect(builderSource.match(/listFolders\(|listSkills\(/g) ?? []).toHaveLength(3)
+  })
+
+  it("both announcement callbacks re-declared their dependencies", () => {
+    expect(builderSource).toMatch(/nodeTitle\(added, nameContext\)/)
+    expect(builderSource).toMatch(/nodeTitle\(before\[at\], nameContext\)/)
+    expect(builderSource.match(/\[store, nameContext\]/g) ?? []).toHaveLength(2)
   })
 })
