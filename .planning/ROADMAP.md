@@ -377,7 +377,7 @@ Plans:
   5. Vocabulary expressiveness is validated against the PM pack + Starter Library + all 4 canonical seed shapes as the acceptance bar — no jargon leak, no over-simplification (not a toy demo).
   6. **An armed action-risk checkpoint is ALWAYS asked, regardless of what else the phase declares — the guarantee is structural, not positional (SEED-137, folded 2026-07-31).** Today the engine APPENDS the armed spec (`grounding.py:951-953`), `run_gates` returns on the FIRST failure (`validators.py:230`), and an ask_user Proceed falls through to the body without re-running the remaining pre-gates (`harness_engine.py:737-739`) — so an author-declared `timing="pre"` / `on_failure="ask_user"` validator preempts the armed gate, the person is shown the wrong choices, `action_risk_pending` is never emitted, and the step runs unapproved. **This is SC#3's counterexample: "safe-by-construction" cannot ship while a governance gate can be silently skipped.** Fenced today only by `publish_service.py:464-503` refusing author-declared `ask_user` validators — a fence explicitly slated for removal by the deferred Phase-103 background-job publish (`publish_service.py:478-479`).
 
-**Plans**: 15 plans in 4 waves
+**Plans**: 19 plans in 6 waves (15 shipped + 4 gap closure)
 
 Plans:
 **Wave 1**
@@ -406,6 +406,16 @@ Plans:
 **Wave 4** *(blocked on Wave 3 completion)*
 
 - [ ] 187-15-PLAN.md — the two gated page mounts, the name-context thread and the phase gates (wave 4)
+
+**Wave 5** *(gap closure — `/gsd:verify-work 187` returned `gaps_found` 9/11 with one BLOCKER; operator-scoped to CR-01/CR-02 + the two folded Warnings; no shared files, run in parallel)*
+
+- [ ] 187-16-PLAN.md — **CR-01 (BLOCKER) + CR-02**: the seed receipt stops claiming the AI applied a gate the author's own `citation_policy` applied. The "so I set them to must prove it" lead and the one-way rule count ONLY `detected` steps; `already-set` and `escalated` steps keep their row and gain their own authorship-free sentence, so no ⛨ seal on the canvas is left unexplained (the sketch's own rule — filtering the list would have traded a false sentence for a silent mark). The suite's `citation_policy: "loose"` fixtures — a value the backend `Literal` forbids — become the real default `"strict"`, which is what makes the regression visible at all (wave 5)
+- [ ] 187-17-PLAN.md — **WR-02**: `derivedFace`'s folder tier is gated on the shipped `GROUNDING_DIAL_TYPES`, so a step type that cannot search never renders "Search {folder}". `llm_emit` is deliberately EXCLUDED on measured evidence — `_exec_llm_emit` is a sealed forced emit that builds no phase tool context and never reads `folder_scope`, refuting `LlmEmitPhaseConfig`'s plan-era docblock claim. Closes the test blind spot where every folder case used `llm_agent` (wave 5)
+- [ ] 187-18-PLAN.md — **WR-03**: the `＋` menu row stops reading `PHASE_TYPE_SENTENCES` directly and asks `nodeTitle` over the phase `minimalPhaseFor` will build, so the row and the card can never say two things one click apart. Fix (a), not (b): sketch 148-C keeps BOTH strings, so editing the locked map or deleting derived tier (4) would change the design to hide a consumer bug. Five of six rows proved byte-identical (wave 5)
+
+**Wave 6** *(blocked on Wave 5 — records what Wave 5 measured)*
+
+- [ ] 187-19-PLAN.md — G-4 closure: `187-VALIDATION.md` gains the six closure task rows, four new lived-experience rows (receipt honesty on a real `llm_agent → llm_emit` draft, the zero-detected arrival, the non-retrieval node face, the picker→card agreement), and **M3 is unblocked** — the row the BLOCKER was holding, since the operator would otherwise have been confirming a receipt that lies. Re-measures the zero-migration gate and the D-187-14 mount cap with raw output (wave 6)
 
 **Cross-cutting constraints:**
 
