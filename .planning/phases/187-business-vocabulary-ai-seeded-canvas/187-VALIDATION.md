@@ -432,6 +432,217 @@ called from this executor — all three write false records in this project.
 
 ---
 
+## Phase gates — gap-closure round, measured 2026-08-02
+
+> Base: **`ee5fff3b`**. Every figure below came from a command run at the closure commit, with the
+> raw output pasted. Nothing here is transcribed from a plan's own SUMMARY; where a plan's SUMMARY
+> states the same figure, that is recorded as an **agreement between two independent measurements**,
+> not as the source of the number.
+
+### (h) The base is source-identical to the phase close — so "before" is derived, not assumed
+
+The three fix plans' pre-fix state cannot be re-run without checking out the base on this shared
+working tree. It does not need to be: the closure base differs from the phase-close commit
+`9602bd13` **only in `.planning/` documents**, so every source measurement recorded in §(c) and §(e)
+above carries to the closure base by identity.
+
+```
+$ git diff --name-only 9602bd13 ee5fff3b
+.planning/ROADMAP.md
+.planning/STATE.md
+.planning/phases/187-business-vocabulary-ai-seeded-canvas/187-16-PLAN.md
+.planning/phases/187-business-vocabulary-ai-seeded-canvas/187-17-PLAN.md
+.planning/phases/187-business-vocabulary-ai-seeded-canvas/187-18-PLAN.md
+.planning/phases/187-business-vocabulary-ai-seeded-canvas/187-19-PLAN.md
+.planning/phases/187-business-vocabulary-ai-seeded-canvas/187-REVIEW.md
+.planning/phases/187-business-vocabulary-ai-seeded-canvas/187-VERIFICATION.md
+```
+
+**Zero source files.** The `980` / `443` / `33` figures in §(c) and §(e) are therefore the closure
+round's *before* values as a matter of derivation.
+
+### (i) The zero-migration gate
+
+```
+$ git diff --stat ee5fff3b HEAD -- supabase/migrations
+                                            ← (empty — 0 lines, exit 0)
+$ git status --porcelain supabase/migrations
+                                            ← (empty — 0 lines)
+```
+
+**Both empty.** Truth #11 (*"Zero migrations added by this phase"*) survives the closure round. This
+round shipped four frontend source files and no schema change of any kind.
+
+### (j) The D-187-14 mount cap, re-measured — this round spends none of the budget
+
+```
+$ git diff --numstat ee5fff3b HEAD -- frontend/src/pages/WorkflowBuilderPage.tsx
+                                            ← (empty — the file is UNTOUCHED by this round)
+```
+
+Pasted verbatim: the command produces **no output at all**. The phase shipped this file at the cap
+(46 ins / 5 del, §a2); the closure round adds **0 insertions and 0 deletions**, so the cap is
+neither renegotiated nor consumed. All four fixes landed in `components/workflows/`, not at the
+mount.
+
+### (k) The isolated named sets — count guarded, not just failures
+
+⚠ Run **isolated**, never as part of the full frontend suite (measured 42–49 failures, flaky at one
+commit). The Phase-177 lesson is applied: the **COUNT** is the gate, not only the failure number.
+
+| Set | 187-15 value (= the closure base, by §h) | **Measured now** | Δ | Failed |
+|---|---|---|---|---|
+| the 8-file vocabulary/canvas set | 980 | **998** | **+18** | **0** |
+| the 5-file consumer set (`WorkflowCanvas`, `PublishGauntlet`, `WorkflowBuilderPage.canvas`, `ProblemsTray`, `definitionOps`) | 443 | **447** | **+4** | **0** |
+
+```
+$ npx vitest run …/phaseVocabulary.test.ts …/canvasModel.test.ts …/canvasModel.purity.test.ts \
+      …/canvasModel.roundtrip.test.ts …/canvasModel.fixtures.test.ts …/PhaseSpineGraph.test.tsx \
+      …/PhaseSpine.test.tsx …/PhaseNodeCard.test.tsx
+ Test Files  8 passed (8)
+      Tests  998 passed (998)
+
+$ npx vitest run …/WorkflowCanvas.test.tsx …/PublishGauntlet.test.tsx \
+      src/pages/WorkflowBuilderPage.canvas.test.tsx …/ProblemsTray.test.tsx …/definitionOps.test.ts
+ Test Files  5 passed (5)
+      Tests  447 passed (447)
+```
+
+**"No shipped file's count may drop" is proved structurally, not inferred from a total.** Of the 13
+files across both sets, only three are touched by this round at all:
+
+```
+$ git diff --name-only ee5fff3b HEAD -- <the 13 files of both named sets>
+frontend/src/components/workflows/definitionOps.test.ts
+frontend/src/components/workflows/phaseVocabulary.test.ts
+frontend/src/pages/WorkflowBuilderPage.canvas.test.tsx
+```
+
+The other **ten are byte-identical to the base**, so their counts cannot have moved. And the two
+set deltas are exactly the two touched files' own growth (+18 in set A is `phaseVocabulary.test.ts`;
++4 in set B is `definitionOps.test.ts`), which leaves no room for a compensating drop elsewhere.
+`WorkflowBuilderPage.canvas.test.tsx` was modified but **added no case** — confirming 187-17's claim
+that no other row of that suite moved:
+
+```
+$ git show ee5fff3b:…/WorkflowBuilderPage.canvas.test.tsx | grep -cE '^[[:space:]]*(it|test)(\.each\(|\.skip)?\('
+110
+$ git show HEAD:…/WorkflowBuilderPage.canvas.test.tsx      | grep -cE '^[[:space:]]*(it|test)(\.each\(|\.skip)?\('
+110
+```
+
+### (l) The closure round's own five suites — before and after
+
+The plan's `<verify>` command, run now:
+
+```
+$ cd frontend && npx vitest run src/components/workflows/SeedReceipt.test.tsx \
+      src/components/workflows/definitionOps.test.ts \
+      src/components/workflows/phaseVocabulary.test.ts \
+      src/components/workflows/phaseVocabulary.corpus.test.ts \
+      src/components/workflows/StepTypePicker.test.tsx
+ Test Files  5 passed (5)
+      Tests  452 passed (452)
+```
+
+Then each file run **individually**, so the per-file "after" is a measurement and not a share of a
+total:
+
+| Suite | **After (run now)** | Declared case literals, base → HEAD | Δ | **Before, derived** | 187-16/17/18 SUMMARY | Agree? |
+|---|---|---|---|---|---|---|
+| `SeedReceipt.test.tsx` | **47 passed** | 33 → 47 | **+14** | 33 | 33 → 47 | ✅ |
+| `definitionOps.test.ts` | **227 passed** | 113 → 117 | **+4** | 223 | 223 → 227 | ✅ |
+| `phaseVocabulary.test.ts` | **90 passed** | 60 → 78 | **+18** | 72 | — (reported as a pair) | ✅ |
+| `phaseVocabulary.corpus.test.ts` | **45 passed** | 14 → 17 | **+3** | 42 | — (reported as a pair) | ✅ |
+| *the pair, as 187-17 reports it* | **135** | — | **+21** | 114 | 114 → 135 | ✅ |
+| `StepTypePicker.test.tsx` | **43 passed** | 29 → 36 | **+7** | 36 | 36 → 43 | ✅ |
+| **all five together** | **452 passed, 0 failed** | — | **+42** | 410 | — | — |
+
+**How the "before" column is a measurement.** The Δ column is measured now by counting declared test
+literals in the base blob and the HEAD blob (`git show <rev>:<path> | grep -cE …`) — a command run
+at this commit, over the real base content, not a transcription. Every one of those five deltas
+matches the run-count delta the corresponding SUMMARY reports, so "before" = "after − Δ" is derived
+rather than inherited. ⚠ The absolute literal counts do **not** equal run counts (`it.each`
+expands one literal into several cases), which is why only the **deltas** are used as the
+instrument; the absolute before-values are derived from the measured after-values.
+
+**Disagreements found: none.** Every figure the three SUMMARYs record was reproduced independently
+here. Had any differed, both would appear above with this re-run marked as the measurement.
+
+### (m) `tsc -b` — no NEW error, none in the touched files
+
+```
+$ cd frontend && npx tsc -b ; echo $?
+2
+$ grep -c 'error TS' <output>                                → 33
+$ grep -c 'src/components/workflows/' <output>               → 0
+$ grep -c 'src/pages/WorkflowBuilderPage' <output>           → 0
+```
+
+| | Before (= §e, and the base by §h) | **After (measured now)** |
+|---|---|---|
+| total `error TS` lines | 33 | **33** — zero delta |
+| errors in `src/components/workflows/` | 0 | **0** |
+| errors in `src/pages/WorkflowBuilderPage*` | 0 | **0** |
+
+⚠ **`tsc -b` has never exited 0 on this repo** (`D-ITEM-01`) — the criterion is *no NEW error, none
+in the touched files*, not a clean exit. ⚠ `tsc -b` ≠ `--noEmit` (the v3.3 lesson); the buildinfo
+path is the one run. A stronger statement than "0 in `components/workflows/`" also holds: the 33
+errors live in **19 files** (`useMessages.test.ts` 5, `ChatAreaMode.test.tsx` 4, `FilePreview.test.tsx` 3,
+`FilesSection.test.tsx` 3, `OrgProvider.test.tsx` 2, `SettingsPage.tsx` 2, `SkillFormDialog.tsx` 2,
+and 12 singles), and **not one of them is among the four source files this round modified.**
+
+### (n) `vite build`
+
+```
+$ cd frontend && npx vite build ; echo $?
+✓ built in 7.24s
+0
+```
+
+**Exit 0.**
+
+### (o) No false completion record
+
+```
+$ git status --porcelain .planning/REQUIREMENTS.md .planning/STATE.md .planning/ROADMAP.md
+                                            ← (empty — 0 lines)
+```
+
+Neither `requirements.mark-complete`, `state.advance-plan` nor `roadmap.update-plan-progress` was
+called from any executor in this round — all three write false records in this project.
+
+**Stated rather than left to be discovered:** `git diff --name-only ee5fff3b HEAD` *does* list
+`.planning/STATE.md` and `.planning/ROADMAP.md`. Those are the **orchestrator's** own tracking write
+(commit `ce68aacd`, `docs(phase-187): update tracking after gap-closure wave 1`), which is whose job
+it is. No executor wrote them, none is dirty now, and `REQUIREMENTS.md` was not touched at all —
+its VOCAB-01/02/03 rows still read Pending, which is correct until re-verification says otherwise.
+
+### What this round proved — and what it did NOT
+
+**Proved.** The four findings it was scoped to (CR-01, CR-02, WR-02, WR-03) are closed by code, each
+behind a falsification observed RED before its fix. No migration, no mount-cap spend, no new `tsc`
+error, a clean `vite build`, both named sets up by exactly the cases added, and no shipped test count
+anywhere in either set reduced.
+
+**Not proved.**
+
+- **Nothing on the manual board.** All **twelve** rows — M1–M8 and the four new M9–M12 — remain
+  **UNPERFORMED**. They are the operator's. M3 is now *unblocked*, which is not the same as done.
+- **The three ❌ SC#10 rows are untouched.** OpenRouter's non-deterministic name drop, OpenAI's
+  `gpt-5.6-sol` endpoint refusal and MiniMax's non-emission are provider-side; no frontend fix in
+  this round could move them and none tried.
+- **Seven findings remain open.** WR-01, WR-04, WR-05, WR-06, WR-07 and IN-01…IN-05 were out of
+  scope by the operator's own routing and are unchanged in `187-REVIEW.md`.
+- **The wider-glob flake is still there.** `PublishGauntlet.test.tsx` / `WorkflowCanvas.test.tsx`
+  axe cases fail non-deterministically under whole-glob parallel load and pass in isolation
+  (`D-ITEM-02`). Both files are inside the named sets above and green there. Not this round's, not
+  chased.
+- **The backend was not re-run and did not need to be** — this round committed **zero** backend
+  files. §(d)'s pre-existing-rot record stands unchanged.
+
+---
+
 ## Wave 0 Requirements
 
 - [x] `backend/tests/unit/test_187_armed_checkpoint_property.py` — SC#6 property, **observed RED first**
@@ -645,6 +856,14 @@ are this round's own.
       three deliberately-red SC#10 rows and their reasons unchanged
 - [x] `nyquist_compliant`'s stated meaning unchanged — it claims every requirement row has an
       instrument that was **RUN and recorded**, never that every instrument came back green
+- [x] **Every closure-round gate measured with raw output at the closure commit** —
+      §"Phase gates — gap-closure round" (h)–(o): zero migrations, the D-187-14 mount cap **unmoved**
+      (empty `--numstat`), both named sets **998 ≥ 980** and **447 ≥ 443** with 0 failed and no
+      shipped file's count dropped, the five closure suites **452 passed / 0 failed**, `tsc -b`
+      **33 → 33** with 0 in the touched files, `vite build` **exit 0**
+- [x] **No false completion record** — `git status --porcelain` over `REQUIREMENTS.md` / `STATE.md` /
+      `ROADMAP.md` empty; the one `STATE`/`ROADMAP` commit in the range is the orchestrator's own
+      (`ce68aacd`), named in §(o) rather than left for a reader to trip over
 
 **What this round does NOT claim.** It closed one BLOCKER and two operator-folded Warnings. It did
 **not** touch WR-01, WR-04, WR-05, WR-06, WR-07 or IN-01…IN-05, which remain open findings in
