@@ -542,19 +542,41 @@ export function seedReceiptHeading(stepCount: number): string {
 }
 
 /**
- * The grounding lead: how many steps read your documents, and what that cost them.
+ * The DETECTED lead: how many steps the generation itself grounded, and what that cost
+ * them. Its parameter is the count of steps whose cause is `detected` — NOTHING ELSE.
+ *
+ * ── WHY THE PARAMETER IS NARROWER THAN "GROUNDED" (187-16, review CR-01) ──
+ * This sentence ends "so I set them to must prove it". That is an AUTHORSHIP CLAIM, and
+ * it is true of exactly one of the three causes `groundingCause` can return:
+ *
+ *   detected     the generation switched on a KB-reading tool, and the lock followed
+ *                from that. The AI really did this. ✔ counted here
+ *   already-set  the deliverable's own `citation_policy` dial holds it. Nothing in this
+ *                generation applied it — and since `/generate` returns `model_dump`,
+ *                which emits the `"strict"` DEFAULT, this is the TYPICAL case. ✘
+ *   escalated    the author turned it on by hand. ✘
+ *
+ * It shipped taking the SEALED count (any non-null cause), so on the ordinary generated
+ * draft — both curated starter spines end `llm_agent → llm_emit` — the receipt told the
+ * user the AI had applied a gate the AI had not touched. A receipt about safety that
+ * misattributes safety is worse than no receipt: it teaches a wrong mental model of what
+ * the machine did. The carried causes get `seedReceiptCarriedLead` below, which claims
+ * nothing.
+ *
+ * The returned strings are UNCHANGED by that repair. They were always true of `detected`
+ * steps and only of those; the defect was entirely in what the caller counted.
  *
  * ZERO returns the EMPTY STRING, deliberately (D-187-10). With no auto-grounded steps
  * the receipt still appears — the orientation half and the nothing-committed half are
- * useful regardless — but there is no grounding paragraph and no step list, because a
- * grounded list that is empty or invented is exactly what Req 5 forbids. The caller
- * renders this paragraph only when it is non-empty.
+ * useful regardless — but there is no detected paragraph, because a grounded claim that
+ * is empty or invented is exactly what Req 5 forbids. The caller renders this paragraph
+ * only when it is non-empty.
  *
  * The binding phrase is COMPOSED from `GOVERNANCE_SEAL_LABEL`, never re-typed: Req 7's
  * vocabulary is a lock, and two copies of a locked word in two places can drift.
  */
-export function seedReceiptGroundingLead(groundedCount: number): string {
-  const count = wholeCount(groundedCount)
+export function seedReceiptGroundingLead(detectedCount: number): string {
+  const count = wholeCount(detectedCount)
   if (count === 0) return ""
   const words = GOVERNANCE_SEAL_LABEL.toLowerCase()
   return count === 1
@@ -563,11 +585,50 @@ export function seedReceiptGroundingLead(groundedCount: number): string {
 }
 
 /**
+ * The CARRIED lead: the sealed steps this generation did NOT seal — `already-set` plus
+ * `escalated`, counted together because what they have in common is the only thing the
+ * sentence says about them.
+ *
+ * Four properties, all load-bearing (187-16):
+ *
+ *  1. ZERO ⇒ the empty string, exactly as its sibling above does, so the component asks
+ *     the same question once per paragraph and keeps ONE arrival shape (D-187-10).
+ *  2. IT CLAIMS NO AUTHORSHIP. No first-person application verb appears — the sentence is
+ *     passive and names the step's own settings as what holds it. This generation did not
+ *     do it, and a receipt that implies otherwise is CR-01 wearing a different sentence.
+ *  3. IT IS SELF-CONTAINED. The detected sentence may be absent — on the typical
+ *     non-KB draft it IS absent — so this one may render first or alone. It therefore
+ *     leans on no antecedent ("that", "those", "more") that exists only when its sibling
+ *     is present.
+ *  4. IT PROMISES NO ONE-WAY LOCK. `SEED_RECEIPT_ONE_WAY_RULE` is the DETECTED lock
+ *     (D-185-07 — detection wins and the undo disappears). An `already-set` step is held
+ *     by the `citation_policy` dial and an `escalated` step by the author's own hand;
+ *     neither is the one-way lock, so "you can't turn that off" must never travel with
+ *     this sentence. That is why the rule is rendered with the DETECTED paragraph and
+ *     not with this one.
+ *
+ * The governance phrase is composed from `GOVERNANCE_SEAL_LABEL` for the same reason its
+ * sibling composes it: the vocabulary is Req 7's lock and must have one home.
+ */
+export function seedReceiptCarriedLead(carriedCount: number): string {
+  const count = wholeCount(carriedCount)
+  if (count === 0) return ""
+  const words = GOVERNANCE_SEAL_LABEL.toLowerCase()
+  return count === 1
+    ? `1 step was already set to ${words} by its own settings.`
+    : `${count} steps were already set to ${words} by their own settings.`
+}
+
+/**
  * The one-way rule, STATED rather than discovered. Detection wins over author intent
  * and the lock cannot be undone (D-185-07) — a user who learns that by pressing the
  * loose side and being refused has learned it the expensive way. The second clause is
  * the honest compensation: it cannot be turned off, but exactly where it applies is
  * visible, on this card, right now.
+ *
+ * IT TRAVELS WITH THE DETECTED SENTENCE AND ONLY WITH IT (187-16). This is the DETECTED
+ * lock; a carried step is undone by whatever set it. Rendering it over an `already-set`
+ * or `escalated` draft would be the same false claim in different words.
  */
 export const SEED_RECEIPT_ONE_WAY_RULE =
   "You can't turn that off — but you can see exactly where it applies."

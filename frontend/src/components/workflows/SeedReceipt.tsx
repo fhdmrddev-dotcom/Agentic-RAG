@@ -34,14 +34,30 @@
  * whose intersection cannot be read falls through to `seedReceiptStepReason`'s
  * unqualified sentence — never fabricate, the same floor `derivedFace` holds.
  *
- * ── ONE ARRIVAL BEHAVIOUR, ZERO GROUNDED STEPS INCLUDED (D-187-10) ──
- * With no auto-grounded steps the receipt STILL appears: the orientation half ("here is
- * what I built") and the nothing-committed half are useful regardless. Only the
- * grounding paragraph, the one-way rule and the step list are conditional, and the
- * whole of that conditional is `seedReceiptGroundingLead(n) !== ""` — the copy module
- * returns the empty string at zero precisely so this component asks the question once.
- * An empty or fabricated grounded list is what Req 5 forbids; no list at all is the
- * honest shape.
+ * ── ONE HONEST SENTENCE PER CAUSE (187-16, review CR-01) ──
+ * A card wears the ⛨ seal for ALL THREE causes — `canvasModel.isGrounded` is
+ * `groundingCauseOf(...) !== null` — so EVERY sealed step is still listed here. That is
+ * the sketch's rule: "never let the seal arrive unexplained. That is the whole of SC#3."
+ *
+ * What was wrong was not the list, it was the LEAD. `seedReceiptGroundingLead` ends "so
+ * I set them to must prove it" — an authorship claim true of `detected` steps and of
+ * nothing else — and it shipped taking the SEALED count. Since `/generate` emits the
+ * `citation_policy` default, the ordinary draft's `llm_emit` arrives `already-set`, so
+ * on the TYPICAL draft the receipt claimed the AI had applied a gate it never touched.
+ * The counts are now split at the point of use: the detected paragraph counts
+ * `cause === "detected"`, the carried sentence counts the rest and claims nothing.
+ *
+ * `SEED_RECEIPT_ONE_WAY_RULE` moves with the DETECTED paragraph, because it IS the
+ * detected lock (D-185-07). A carried step is undone by whatever set it; "you can't turn
+ * that off" over one of those is the same false claim in a different sentence.
+ *
+ * ── ONE ARRIVAL BEHAVIOUR, ZERO SEALED STEPS INCLUDED (D-187-10) ──
+ * With no sealed steps the receipt STILL appears: the orientation half ("here is what I
+ * built") and the nothing-committed half are useful regardless. Only the two grounding
+ * paragraphs and the step list are conditional, and each conditional is a copy formatter
+ * returning the empty string at zero — the same shape for both, so the component asks
+ * the question once per paragraph rather than branching on a rule of its own. An empty
+ * or fabricated grounded list is what Req 5 forbids; no list at all is the honest shape.
  *
  * ── NOTHING IS STAGED, BECAUSE NOTHING WAS STREAMED (T-187-13-03) ──
  * `generate_workflow_definition` (`workflow_authoring.py:217`) makes EXACTLY ONE
@@ -99,6 +115,7 @@ import {
   SEED_RECEIPT_DISMISS_LABEL,
   SEED_RECEIPT_NOTHING_COMMITTED,
   SEED_RECEIPT_ONE_WAY_RULE,
+  seedReceiptCarriedLead,
   seedReceiptGroundingLead,
   seedReceiptHeading,
   seedReceiptStepReason,
@@ -131,11 +148,14 @@ export interface SeedReceiptProps {
   onDismiss: () => void
 }
 
-/** One listed step: which node, what it is called, and why it is held. */
+/** One listed step: which node, what it is called, why it is held — and WHICH CAUSE
+ *  holds it, because the two sentences above the list count different causes and a row
+ *  that could not say which one it belonged to is a row nothing can check. */
 interface GroundedRow {
   slug: string
   face: string
   reason: string
+  cause: Exclude<GroundingCause, null>
 }
 
 /**
@@ -179,22 +199,32 @@ export function SeedReceipt({
         slug: phase.slug,
         face: nodeTitle(phase, nameContext),
         reason: seedReceiptStepReason(cause, intersectingKbTool(phase, kbTools)),
+        cause,
       })
     }
     return found
   }, [phases, kbTools, nameContext])
 
   const heading = seedReceiptHeading(phases.length)
-  // D-187-10 — THE WHOLE OF THE CONDITIONAL. The copy module returns "" at zero, so the
-  // grounding half is asked about exactly once and the receipt keeps one arrival shape.
-  const groundingLead = seedReceiptGroundingLead(rows.length)
+  // TWO COUNTS, BECAUSE THERE ARE TWO FACTS (CR-01). `rows.length` is what the canvas
+  // marks; `detectedCount` is what this generation actually did. Only the second may sit
+  // under a sentence that begins "so I set".
+  const detectedCount = rows.filter((row) => row.cause === "detected").length
+  const carriedCount = rows.length - detectedCount
+  // D-187-10 — one conditional shape per paragraph. Each formatter returns "" at zero, so
+  // each half is asked about exactly once and the receipt keeps one arrival behaviour.
+  const groundingLead = seedReceiptGroundingLead(detectedCount)
+  const carriedLead = seedReceiptCarriedLead(carriedCount)
 
   if (!open) return null
 
   return (
     <section
       data-testid="seed-receipt"
+      // The SEALED total — exactly the number of ⛨ marks the canvas draws for this draft.
       data-grounded-count={rows.length}
+      // …and the subset the generation itself grounded. Two numbers, two facts.
+      data-detected-count={detectedCount}
       aria-labelledby={headingId}
       className={cn(
         "w-full max-w-[720px] rounded-[14px] border border-border bg-card px-[18px] py-4 shadow-lg",
@@ -230,59 +260,73 @@ export function SeedReceipt({
       </div>
 
       {groundingLead ? (
-        <>
-          <p
-            data-testid="seed-receipt-grounding"
-            className="mt-2 text-[12.5px] leading-[1.5] text-muted-foreground"
-          >
-            <span data-testid="seed-receipt-lead">{groundingLead}</span>{" "}
-            <span data-testid="seed-receipt-one-way">{SEED_RECEIPT_ONE_WAY_RULE}</span>
-          </p>
+        <p
+          data-testid="seed-receipt-grounding"
+          className="mt-2 text-[12.5px] leading-[1.5] text-muted-foreground"
+        >
+          <span data-testid="seed-receipt-lead">{groundingLead}</span>{" "}
+          {/* The one-way rule is the DETECTED lock, so it lives inside this paragraph and
+              never travels to the carried one. */}
+          <span data-testid="seed-receipt-one-way">{SEED_RECEIPT_ONE_WAY_RULE}</span>
+        </p>
+      ) : null}
 
-          <ul
-            data-testid="seed-receipt-grounded-list"
-            className="mt-3 flex flex-col gap-[7px]"
-          >
-            {rows.map((row) => (
-              <li
-                key={row.slug}
-                data-testid={`seed-receipt-step-${row.slug}`}
-                data-slug={row.slug}
-                className="flex items-start gap-2 text-[12.5px] text-foreground"
+      {carriedLead ? (
+        <p
+          data-testid="seed-receipt-carried"
+          className="mt-2 text-[12.5px] leading-[1.5] text-muted-foreground"
+        >
+          {carriedLead}
+        </p>
+      ) : null}
+
+      {rows.length > 0 ? (
+        <ul
+          data-testid="seed-receipt-grounded-list"
+          className="mt-3 flex flex-col gap-[7px]"
+        >
+          {rows.map((row) => (
+            <li
+              key={row.slug}
+              data-testid={`seed-receipt-step-${row.slug}`}
+              data-slug={row.slug}
+              // WHICH SENTENCE THIS ROW BELONGS TO, read straight off the one derivation.
+              // Not decorative: it is what makes "the lead counts only these" checkable.
+              data-cause={row.cause}
+              className="flex items-start gap-2 text-[12.5px] text-foreground"
+            >
+              {/* The seal's ONE moment of attention (sketch 150-B) — it marks the one
+                  thing the user did not ask for, fires once on arrival and then rests
+                  forever. Same disc as the card's corner mark. Every row pulses on the
+                  same frame, because they all arrived on the same one. */}
+              <span
+                aria-hidden="true"
+                data-testid="seed-receipt-step-seal"
+                className={cn(
+                  "mt-[1px] grid h-[19px] w-[19px] shrink-0 place-items-center rounded-full",
+                  "text-[11px] leading-none",
+                  "border border-[hsl(220_30%_100%/0.34)] bg-[hsl(220_30%_100%/0.1)] text-foreground",
+                  "animate-in zoom-in-50 duration-300 motion-reduce:animate-none",
+                )}
               >
-                {/* The seal's ONE moment of attention (sketch 150-B) — it marks the one
-                    thing the user did not ask for, fires once on arrival and then rests
-                    forever. Same disc as the card's corner mark. Every row pulses on the
-                    same frame, because they all arrived on the same one. */}
+                ⛨
+              </span>
+              <span className="sr-only">{GOVERNANCE_SEAL_LABEL}</span>
+              <span className="min-w-0 flex-1">
+                <strong data-testid="seed-receipt-step-face" className="font-semibold">
+                  {row.face}
+                </strong>{" "}
+                —{" "}
                 <span
-                  aria-hidden="true"
-                  data-testid="seed-receipt-step-seal"
-                  className={cn(
-                    "mt-[1px] grid h-[19px] w-[19px] shrink-0 place-items-center rounded-full",
-                    "text-[11px] leading-none",
-                    "border border-[hsl(220_30%_100%/0.34)] bg-[hsl(220_30%_100%/0.1)] text-foreground",
-                    "animate-in zoom-in-50 duration-300 motion-reduce:animate-none",
-                  )}
+                  data-testid="seed-receipt-step-reason"
+                  className="text-muted-foreground"
                 >
-                  ⛨
+                  {row.reason}
                 </span>
-                <span className="sr-only">{GOVERNANCE_SEAL_LABEL}</span>
-                <span className="min-w-0 flex-1">
-                  <strong data-testid="seed-receipt-step-face" className="font-semibold">
-                    {row.face}
-                  </strong>{" "}
-                  —{" "}
-                  <span
-                    data-testid="seed-receipt-step-reason"
-                    className="text-muted-foreground"
-                  >
-                    {row.reason}
-                  </span>
-                </span>
-              </li>
-            ))}
-          </ul>
-        </>
+              </span>
+            </li>
+          ))}
+        </ul>
       ) : null}
 
       <p

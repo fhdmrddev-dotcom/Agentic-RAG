@@ -48,6 +48,7 @@ import {
   IDENTITY_BEARING_CONFIG_KEYS,
   seedReceiptHeading,
   seedReceiptGroundingLead,
+  seedReceiptCarriedLead,
   seedReceiptStepReason,
   SEED_RECEIPT_ONE_WAY_RULE,
   SEED_RECEIPT_NOTHING_COMMITTED,
@@ -811,6 +812,63 @@ describe("definitionOps — the seed-receipt copy is a lock (sketch 150-B)", () 
     )
   })
 
+  // ── 187-16 (review CR-01) — the carried causes get their OWN sentence ──────────
+  //
+  // `already-set` and `escalated` wear the same ⛨ seal on the canvas, so the receipt
+  // must still name them; but this generation applied neither. The sentence below is
+  // what lets both facts be true at once.
+
+  it("the carried lead names the count and the SHIPPED governance words", () => {
+    expect(seedReceiptCarriedLead(1)).toBe(
+      "1 step was already set to must prove it by its own settings.",
+    )
+    expect(seedReceiptCarriedLead(2)).toBe(
+      "2 steps were already set to must prove it by their own settings.",
+    )
+    for (const count of [1, 2, 7]) {
+      expect(seedReceiptCarriedLead(count)).toContain(GOVERNANCE_SEAL_LABEL.toLowerCase())
+    }
+  })
+
+  it("ZERO carried steps yields NO carried paragraph — the same shape as its sibling", () => {
+    expect(seedReceiptCarriedLead(0)).toBe("")
+    expect(seedReceiptCarriedLead(Number.NaN)).toBe("")
+    expect(seedReceiptCarriedLead(-1)).toBe("")
+    // TOTALITY, matching the shipped `wholeCount` treatment: a fractional count from
+    // author-supplied JSONB resolves rather than printing "2.7 steps".
+    expect(seedReceiptCarriedLead(2.7)).toBe(
+      "2 steps were already set to must prove it by their own settings.",
+    )
+  })
+
+  it("the carried sentence CLAIMS NO AUTHORSHIP — with a positive control", () => {
+    // Needles assembled from parts, the idiom this file already uses: a grep of this
+    // guard must not be able to satisfy the fence it protects.
+    const APPLICATION_CLAIM = ["so", "I", "set"].join(" ")
+    const FIRST_PERSON = [["I", "set"].join(" "), ["I", "turned"].join(" "), ["I", "applied"].join(" ")]
+    for (const count of [1, 2, 9]) {
+      const sentence = seedReceiptCarriedLead(count)
+      expect(sentence).not.toContain(APPLICATION_CLAIM)
+      for (const needle of FIRST_PERSON) expect(sentence).not.toContain(needle)
+    }
+    // POSITIVE CONTROL — the DETECTED lead really does make that claim, so the fence
+    // above cannot be passing by asserting the absence of a string nothing ever says.
+    expect(seedReceiptGroundingLead(2)).toContain(APPLICATION_CLAIM)
+    expect(seedReceiptGroundingLead(2)).toContain(FIRST_PERSON[0])
+  })
+
+  it("the carried sentence is SELF-CONTAINED — it may render first, or alone", () => {
+    // On the typical non-KB draft the detected sentence is absent entirely, so a lead-in
+    // antecedent would point at nothing. It must also promise no one-way lock: those
+    // steps are undone by whatever set them (D-185-07 is the DETECTED lock).
+    for (const count of [1, 3]) {
+      const sentence = seedReceiptCarriedLead(count)
+      expect(sentence).not.toMatch(/^(That|Those|The other|More|Another|Also)\b/)
+      expect(sentence).not.toContain(SEED_RECEIPT_ONE_WAY_RULE)
+      expect(sentence.toLowerCase()).not.toContain("turn that off")
+    }
+  })
+
   it("the per-step reason NAMES the actual intersecting tool (D-187-08)", () => {
     expect(seedReceiptStepReason("detected", "search_documents")).toBe(
       "it reads your documents (search_documents)",
@@ -933,6 +991,8 @@ describe("definitionOps — the Phase 187 copy carries no overclaim and no unshi
     seedReceiptHeading(5),
     seedReceiptGroundingLead(1),
     seedReceiptGroundingLead(2),
+    seedReceiptCarriedLead(1),
+    seedReceiptCarriedLead(2),
     SEED_RECEIPT_ONE_WAY_RULE,
     seedReceiptStepReason("detected", "search_documents"),
     seedReceiptStepReason("detected"),
