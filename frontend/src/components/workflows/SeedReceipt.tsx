@@ -48,16 +48,16 @@
  * provider call on a valid first emit and never yields a partial — the whole definition
  * lands in one DOM batch. So a node-by-node or row-by-row reveal would be PACING DRESSED
  * AS PROGRESS: it would read as the AI still deciding, which is a lie about an event
- * this surface never received. No scheduler call, no frame callback, no index-derived
- * animation or transition delay and no per-row stagger appears anywhere in this file —
- * none of those names is even written here, so the suite's negative fence cannot be
- * satisfied by its own subject. That fence is a SOURCE property, which is a far cheaper
- * and far stronger proof than trying to observe a negative about timing.
+ * this surface never received. No scheduler call, no frame callback, no per-row stagger
+ * and no index-derived timing offset appears anywhere in this file — none of those names
+ * is even written here, and the suite forbids the word for the offset outright, so its
+ * negative fence cannot be satisfied by its own subject. That fence is a SOURCE property,
+ * which is a far cheaper and far stronger proof than observing a negative about timing.
  *
  * Two entrances are spent, both one-shot and both `motion-reduce`-disabled: the shipped
  * panel-entrance idiom (`StepTypePicker.tsx:145`) on the card, and the seal's single
  * arrival pulse — sketch 150-B's "one moment of attention", marking the one thing the
- * user did not ask for. Every seal animates on the same frame; none is delayed.
+ * user did not ask for. Every seal animates on the same frame; none waits its turn.
  *
  * ── GLYPHS (icon-convention §4) ──
  * `⛨` is the governance seal — the SAME mark `PhaseNodeCard.tsx:440` puts on the card's
@@ -199,8 +199,8 @@ export function SeedReceipt({
       className={cn(
         "w-full max-w-[720px] rounded-[14px] border border-border bg-card px-[18px] py-4 shadow-lg",
         // The ONE entrance this card earns — the shipped panel idiom, one-shot, and off
-        // entirely under `prefers-reduced-motion`. No stagger and no delay: the draft
-        // arrived in a single batch and the surface says so.
+        // entirely under `prefers-reduced-motion`. Nothing is staggered and nothing waits
+        // its turn: the draft arrived in a single batch and the surface says so.
         "animate-in fade-in-0 slide-in-from-bottom-1 duration-100 motion-reduce:animate-none",
       )}
     >
@@ -252,8 +252,8 @@ export function SeedReceipt({
               >
                 {/* The seal's ONE moment of attention (sketch 150-B) — it marks the one
                     thing the user did not ask for, fires once on arrival and then rests
-                    forever. Same disc as the card's corner mark. No delay: every row
-                    pulses on the same frame, because they all arrived on the same one. */}
+                    forever. Same disc as the card's corner mark. Every row pulses on the
+                    same frame, because they all arrived on the same one. */}
                 <span
                   aria-hidden="true"
                   data-testid="seed-receipt-step-seal"
