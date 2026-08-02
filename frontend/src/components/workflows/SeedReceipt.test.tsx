@@ -31,6 +31,22 @@
  * (`String.fromCodePoint`, split identifiers), so a grep of this guard file can neither
  * satisfy nor break the greps it exists to protect — the D-ITEM-183-02 trap this phase
  * has hit repeatedly, and the reason plan 187-10 wrote its guards the same way.
+ *
+ * ── 187-16: TWO SHIPPED ASSERTIONS WERE RE-DERIVED, NOT RELAXED ──────────────────────
+ * Repairing the fixtures (CR-02 — see the block above them) switched on a branch this
+ * file had never crossed: the deliverable now carries the shipped default and is
+ * therefore `already-set`, so THREE steps wear a seal where two did before.
+ *
+ *  - `lists EXACTLY the steps that read the documents, and no others` was ONE assertion
+ *    over two different claims. It is now two cases: membership of the SEALED list (what
+ *    the canvas marks, what the receipt must explain), and membership of the DETECTED
+ *    subset (what the generation actually did, what the lead may count). Neither is
+ *    weaker than what it replaced; together they are strictly stronger, because the
+ *    single old assertion could not have told the two apart.
+ *  - `marks the grounded count on the surface itself` now reads THREE. That is the
+ *    honest number: it is exactly the count of ⛨ marks the canvas draws for this draft.
+ *    A companion assertion pins the new `data-detected-count` at two, so the two numbers
+ *    can never silently collapse back into one again.
  */
 import { describe, it, expect, vi } from "vitest"
 import { render, screen, within } from "@testing-library/react"
@@ -48,7 +64,12 @@ import {
   seedReceiptHeading,
   seedReceiptStepReason,
 } from "./definitionOps"
-import { nodeTitle, type NameContext, type PhaseSpecJSON } from "./phaseVocabulary"
+import {
+  groundingCauseOf,
+  nodeTitle,
+  type NameContext,
+  type PhaseSpecJSON,
+} from "./phaseVocabulary"
 
 /** The server's list, mirrored here as a FIXTURE only — the component never owns it. */
 const KB_TOOLS = [
@@ -60,12 +81,48 @@ const KB_TOOLS = [
 ]
 
 /**
- * A drafted definition with TWO steps that read the documents and three that do not.
+ * ── EVERY `citation_policy` BELOW IS A VALUE THE BACKEND CAN ACTUALLY PRODUCE (CR-02) ──
  *
- * The two grounded steps deliberately intersect on DIFFERENT tools, and the second one
+ * The source of the member set is `LlmEmitPhaseConfig.citation_policy` in
+ * `backend/app/models/harness.py` — read at live HEAD, 2026-08-02:
+ *
+ *     citation_policy: Literal["strict", "flag", "partial", "draft"] = "strict"
+ *
+ * The first draft of these fixtures gave the `llm_emit` step a value that is NOT a member
+ * of that Literal (spelled `POLICY_NEVER_REPRESENTABLE` below, assembled from parts so a
+ * grep of this guard file cannot satisfy the fence it exists to protect). No
+ * `model_validate()`-passing row can carry it, so no `/generate` response ever did — and
+ * `groundingCauseOf` therefore reported `null` for a step that in production is ALWAYS
+ * `already-set`. The suite was green over a state the product cannot reach, which is not
+ * coverage; it is a blind spot wearing coverage's clothes.
+ *
+ * A fixture that avoids the DEFAULT is a fixture avoiding the shipped shape:
+ * `POST /generate` returns `wd.model_dump(mode="json")`, which emits defaults, so every
+ * generated `llm_emit` phase reaches the client carrying `"strict"`. That is why the
+ * grounded fixture below uses the default and not a convenient non-default member.
+ */
+const REPRESENTABLE_CITATION_POLICIES: readonly string[] = [
+  "strict",
+  "flag",
+  "partial",
+  "draft",
+]
+
+/** The value the first draft used. Assembled from parts — see the block above. */
+const POLICY_NEVER_REPRESENTABLE = ["lo", "ose"].join("")
+
+/**
+ * A drafted definition with TWO steps that read the documents, ONE deliverable that is
+ * already held by its own citation policy, and two steps held to nothing.
+ *
+ * The two DETECTED steps deliberately intersect on DIFFERENT tools, and the second one
  * lists a non-KB tool FIRST. A component that hardcoded one tool id, or that named the
  * head of `available_tools` instead of the intersection, passes on the first row and
  * fails on the second — which is the whole reason the second row exists.
+ *
+ * `emit` carries the SHIPPED DEFAULT `"strict"`, so its cause is `already-set`. It wears
+ * the ⛨ seal on the canvas (`canvasModel.isGrounded` is `cause !== null`), which is why
+ * the receipt must name it — and why the lead must NOT count it.
  */
 const GROUNDED_PHASES: PhaseSpecJSON[] = [
   { slug: "gather", phase_index: 0, name: "Collect the renewal inputs", config: { phase_type: "programmatic" } },
@@ -88,15 +145,31 @@ const GROUNDED_PHASES: PhaseSpecJSON[] = [
     slug: "emit",
     phase_index: 4,
     name: "Produce the renewal pack",
-    config: { phase_type: "llm_emit", citation_policy: "loose" },
+    config: { phase_type: "llm_emit", citation_policy: "strict" },
   },
 ]
 
-/** The two steps that must be listed, and the three that must not. */
-const GROUNDED_SLUGS = ["contracts", "policy_check"]
-const UNGROUNDED_SLUGS = ["gather", "write", "emit"]
+/**
+ * The three steps that wear a seal, the two that do not, and — separately — the subset
+ * the AI itself GROUNDED.
+ *
+ * These are two different claims and CR-01 is what happens when one list serves both.
+ * SEALED is what the canvas marks and therefore what the receipt must explain; DETECTED
+ * is what the generation actually did and therefore what the "so I set them" sentence may
+ * count. `emit` belongs to the first and not the second.
+ */
+const SEALED_SLUGS = ["contracts", "policy_check", "emit"]
+const DETECTED_SLUGS = ["contracts", "policy_check"]
+const UNSEALED_SLUGS = ["gather", "write"]
 
-/** A draft where NOTHING reads the documents (D-187-10's zero case). */
+/**
+ * A draft where NOTHING is sealed at all (D-187-10's zero case).
+ *
+ * The `llm_emit` step CANNOT use the default here: `"strict"` is `already-set`, which
+ * would seal it and make this draft non-empty. `"draft"` is the member chosen instead —
+ * still a value the backend can produce, and the only honest way to reach the zero case
+ * without inventing an unrepresentable one.
+ */
 const BARE_PHASES: PhaseSpecJSON[] = [
   { slug: "gather", phase_index: 0, name: "Collect the renewal inputs", config: { phase_type: "programmatic" } },
   { slug: "write", phase_index: 1, name: "Draft the renewal summary", config: { phase_type: "llm_single" } },
@@ -104,7 +177,32 @@ const BARE_PHASES: PhaseSpecJSON[] = [
     slug: "emit",
     phase_index: 2,
     name: "Produce the renewal pack",
-    config: { phase_type: "llm_emit", citation_policy: "loose" },
+    config: { phase_type: "llm_emit", citation_policy: "draft" },
+  },
+]
+
+/** The SAME draft with the deliverable at its shipped default — zero detected, one
+ *  already-set. The typical generated shape once the KB tools are switched off. */
+const STRICT_EMIT_ONLY_PHASES: PhaseSpecJSON[] = [
+  BARE_PHASES[0],
+  BARE_PHASES[1],
+  {
+    slug: "emit",
+    phase_index: 2,
+    name: "Produce the renewal pack",
+    config: { phase_type: "llm_emit", citation_policy: "strict" },
+  },
+]
+
+/** An `llm_agent` the AUTHOR escalated by hand, reaching for no KB tool at all. */
+const ESCALATED_PHASES: PhaseSpecJSON[] = [
+  BARE_PHASES[0],
+  {
+    slug: "judgement",
+    phase_index: 1,
+    name: "Weigh the supplier options",
+    config: { phase_type: "llm_agent", available_tools: ["execute_code"] },
+    grounding_escalated: true,
   },
 ]
 
@@ -147,18 +245,64 @@ function listedSlugs(): string[] {
 // ── 1. A DRAFT THAT READS THE KB — exact membership, and a reason per step ───────────
 
 describe("SeedReceipt — the grounded steps and their reasons", () => {
-  it("lists EXACTLY the steps that read the documents, and no others", () => {
+  it("lists EXACTLY the steps that wear the seal, and no others", () => {
+    // The SEALED list — `groundingCauseOf(...) !== null`, the same predicate
+    // `canvasModel.isGrounded` uses. Every step the canvas marks is named here, which is
+    // the sketch's "never let the seal arrive unexplained" rule.
     renderReceipt()
-    expect(listedSlugs()).toEqual(GROUNDED_SLUGS)
+    expect(listedSlugs()).toEqual(SEALED_SLUGS)
   })
 
-  it("never names a step that does not read the documents", () => {
+  it("the DETECTED subset is exactly the two steps that read the documents", () => {
+    // The other half of the claim the old single assertion conflated. Read off the rows'
+    // own `data-cause`, so it cannot pass by counting the right number of wrong steps.
     renderReceipt()
     const list = screen.getByTestId("seed-receipt-grounded-list")
-    for (const slug of UNGROUNDED_SLUGS) {
+    const detected = [...list.querySelectorAll('[data-cause="detected"]')].map(
+      (row) => row.getAttribute("data-slug") ?? "",
+    )
+    expect(detected).toEqual(DETECTED_SLUGS)
+  })
+
+  it("each listed row carries the cause the ONE derivation returns for its phase", () => {
+    renderReceipt()
+    const list = screen.getByTestId("seed-receipt-grounded-list")
+    const causes = [...list.querySelectorAll("[data-slug]")].map((row) => [
+      row.getAttribute("data-slug") ?? "",
+      row.getAttribute("data-cause"),
+    ])
+    // Computed from the imported derivation, never hand-typed: a row that disagreed with
+    // `groundingCauseOf` would be a second classifier, which D-187-08 forbids.
+    expect(causes).toEqual(
+      SEALED_SLUGS.map((slug) => [
+        slug,
+        groundingCauseOf(phaseBySlug(GROUNDED_PHASES, slug), KB_TOOLS),
+      ]),
+    )
+  })
+
+  it("never names a step that is held to nothing", () => {
+    renderReceipt()
+    const list = screen.getByTestId("seed-receipt-grounded-list")
+    for (const slug of UNSEALED_SLUGS) {
       const phase = phaseBySlug(GROUNDED_PHASES, slug)
       expect(list.textContent ?? "").not.toContain(nodeTitle(phase))
     }
+  })
+
+  it("every fixture policy in this file is a value the backend can produce (CR-02)", () => {
+    // The guard that keeps this suite representable. A fixture the product cannot reach
+    // makes a green run mean nothing — see the block above the fixtures.
+    const policies = [...GROUNDED_PHASES, ...BARE_PHASES, ...STRICT_EMIT_ONLY_PHASES]
+      .map((phase) => phase.config.citation_policy)
+      .filter((value): value is string => typeof value === "string")
+    expect(policies.length).toBeGreaterThan(0)
+    for (const policy of policies) {
+      expect(REPRESENTABLE_CITATION_POLICIES).toContain(policy)
+    }
+    expect(REPRESENTABLE_CITATION_POLICIES).not.toContain(POLICY_NEVER_REPRESENTABLE)
+    // …and the SHIPPED DEFAULT is exercised, not merely permitted.
+    expect(policies).toContain("strict")
   })
 
   it("names the ACTUAL intersecting tool per step, not one hardcoded id", () => {
@@ -196,18 +340,113 @@ describe("SeedReceipt — the grounded steps and their reasons", () => {
     renderReceipt()
     const list = screen.getByTestId("seed-receipt-grounded-list")
     const seals = within(list).getAllByTestId("seed-receipt-step-seal")
-    expect(seals).toHaveLength(GROUNDED_SLUGS.length)
+    expect(seals).toHaveLength(SEALED_SLUGS.length)
     for (const seal of seals) expect(seal).toHaveAttribute("aria-hidden", "true")
     expect(within(list).getAllByText(GOVERNANCE_SEAL_LABEL)).toHaveLength(
-      GROUNDED_SLUGS.length,
+      SEALED_SLUGS.length,
     )
   })
 
-  it("marks the grounded count on the surface itself, from the same derivation", () => {
+  it("marks the SEALED count on the surface — the number of marks the canvas draws", () => {
     renderReceipt()
     expect(screen.getByTestId("seed-receipt")).toHaveAttribute(
       "data-grounded-count",
-      String(GROUNDED_SLUGS.length),
+      String(SEALED_SLUGS.length),
+    )
+  })
+
+  it("marks the DETECTED count separately — the number the AI itself grounded", () => {
+    // Two numbers, because there are two facts. Collapsing them is CR-01.
+    renderReceipt()
+    expect(screen.getByTestId("seed-receipt")).toHaveAttribute(
+      "data-detected-count",
+      String(DETECTED_SLUGS.length),
+    )
+    expect(SEALED_SLUGS.length).not.toBe(DETECTED_SLUGS.length)
+  })
+})
+
+// ── 1b. THE CARRIED CAUSES — listed, explained, and NOT claimed as the AI's doing ─────
+
+describe("SeedReceipt — an already-set deliverable", () => {
+  it("LISTS the already-set step with its own reason", () => {
+    renderReceipt()
+    const row = screen.getByTestId("seed-receipt-step-emit")
+    expect(row).toHaveAttribute("data-cause", "already-set")
+    expect(row.textContent ?? "").toContain(seedReceiptStepReason("already-set"))
+  })
+
+  it("does NOT count the already-set step under the detected lead", () => {
+    renderReceipt()
+    expect(screen.getByTestId("seed-receipt-lead").textContent).toBe(
+      seedReceiptGroundingLead(DETECTED_SLUGS.length),
+    )
+  })
+})
+
+describe("SeedReceipt — an escalated step", () => {
+  it("LISTS the hand-escalated step with its own reason", () => {
+    renderReceipt({ phases: ESCALATED_PHASES })
+    const row = screen.getByTestId("seed-receipt-step-judgement")
+    expect(row).toHaveAttribute("data-cause", "escalated")
+    expect(row.textContent ?? "").toContain(seedReceiptStepReason("escalated"))
+  })
+
+  it("renders NO detected lead and NO one-way rule for it — the author did that", () => {
+    renderReceipt({ phases: ESCALATED_PHASES })
+    expect(screen.queryByTestId("seed-receipt-lead")).toBeNull()
+    expect(screen.queryByTestId("seed-receipt-one-way")).toBeNull()
+    expect(screen.getByTestId("seed-receipt")).toHaveAttribute("data-detected-count", "0")
+    expect(screen.getByTestId("seed-receipt")).toHaveAttribute("data-grounded-count", "1")
+  })
+})
+
+describe("SeedReceipt — zero detected, one already-set (the typical non-KB draft)", () => {
+  it("still names the sealed step and its reason", () => {
+    renderReceipt({ phases: STRICT_EMIT_ONLY_PHASES })
+    expect(listedSlugs()).toEqual(["emit"])
+    expect(screen.getByTestId("seed-receipt-step-emit").textContent ?? "").toContain(
+      seedReceiptStepReason("already-set"),
+    )
+  })
+
+  it("renders NEITHER the detected lead NOR the one-way rule", () => {
+    // CR-01 in one case: the AI applied nothing here, and "you can't turn that off" is
+    // the DETECTED lock (D-185-07). Rendering either over this draft is a false claim.
+    renderReceipt({ phases: STRICT_EMIT_ONLY_PHASES })
+    expect(screen.queryByTestId("seed-receipt-lead")).toBeNull()
+    expect(screen.queryByTestId("seed-receipt-one-way")).toBeNull()
+    expect(screen.queryByTestId("seed-receipt-grounding")).toBeNull()
+  })
+})
+
+// ── 1c. THE AUTHORSHIP WORD-CLASS FENCE (CR-01 as a permanent regression class) ───────
+
+describe("SeedReceipt — it never claims an application it did not make", () => {
+  // Assembled from parts, the idiom this file already uses: a grep of this guard must not
+  // be able to satisfy the fence it protects.
+  const APPLICATION_CLAIM = ["so", "I", "set"].join(" ")
+
+  it("POSITIVE CONTROL — the claim IS present when the AI really did apply it", () => {
+    // Without this half the fence below could pass by asserting the absence of a string
+    // that never existed anywhere.
+    renderReceipt()
+    expect(screen.getByTestId("seed-receipt").textContent ?? "").toContain(
+      APPLICATION_CLAIM,
+    )
+  })
+
+  it("says nothing of the sort over a draft the AI grounded nothing in", () => {
+    renderReceipt({ phases: STRICT_EMIT_ONLY_PHASES })
+    expect(screen.getByTestId("seed-receipt").textContent ?? "").not.toContain(
+      APPLICATION_CLAIM,
+    )
+  })
+
+  it("nor over a draft whose only seal the AUTHOR put there", () => {
+    renderReceipt({ phases: ESCALATED_PHASES })
+    expect(screen.getByTestId("seed-receipt").textContent ?? "").not.toContain(
+      APPLICATION_CLAIM,
     )
   })
 })
@@ -297,7 +536,9 @@ describe("SeedReceipt — the copy is the copy module's", () => {
       seedReceiptHeading(GROUNDED_PHASES.length),
     )
     expect(screen.getByTestId("seed-receipt-lead").textContent).toBe(
-      seedReceiptGroundingLead(GROUNDED_SLUGS.length),
+      // The DETECTED count, not the sealed one — the sentence begins "so I set", and the
+      // AI set only the steps it detected. This is CR-01's falsifying assertion.
+      seedReceiptGroundingLead(DETECTED_SLUGS.length),
     )
     expect(screen.getByTestId("seed-receipt-one-way").textContent).toBe(
       SEED_RECEIPT_ONE_WAY_RULE,
@@ -315,11 +556,12 @@ describe("SeedReceipt — the copy is the copy module's", () => {
     expect(reasons).toEqual([
       seedReceiptStepReason("detected", "search_documents"),
       seedReceiptStepReason("detected", "read_document"),
+      seedReceiptStepReason("already-set"),
     ])
   })
 
-  it("the lead tracks the grounded count, not the step count", () => {
-    // One grounded step out of three: the singular form, and it must not report 3.
+  it("the lead tracks the DETECTED count, not the step count", () => {
+    // One detected step out of three: the singular form, and it must not report 3.
     const phases: PhaseSpecJSON[] = [
       BARE_PHASES[0],
       phaseBySlug(GROUNDED_PHASES, "contracts"),
@@ -344,7 +586,7 @@ describe("SeedReceipt — the step faces", () => {
       .getAllByTestId("seed-receipt-step-face")
       .map((node) => node.textContent)
     expect(faces).toEqual(
-      GROUNDED_SLUGS.map((slug) => nodeTitle(phaseBySlug(GROUNDED_PHASES, slug))),
+      SEALED_SLUGS.map((slug) => nodeTitle(phaseBySlug(GROUNDED_PHASES, slug))),
     )
   })
 
@@ -390,7 +632,7 @@ describe("SeedReceipt — the step faces", () => {
   it("never prints a slug on the surface — that lives behind the technical reveal", () => {
     renderReceipt()
     const text = screen.getByTestId("seed-receipt").textContent ?? ""
-    for (const slug of [...GROUNDED_SLUGS, ...UNGROUNDED_SLUGS]) {
+    for (const slug of [...SEALED_SLUGS, ...UNSEALED_SLUGS]) {
       expect(text).not.toContain(slug)
     }
   })
@@ -413,8 +655,21 @@ describe("SeedReceipt — malformed rows resolve rather than throw", () => {
     expect(screen.queryByTestId("seed-receipt-grounded-list")).toBeNull()
   })
 
-  it("renders with an EMPTY server tool list — an unread palette marks nothing", () => {
+  it("an EMPTY server tool list DETECTS nothing — and un-marks nothing either", () => {
+    // RE-DERIVED, not relaxed. The old form asserted no list at all, which was only true
+    // while the fixture's deliverable carried an unrepresentable policy. An unread palette
+    // must not INVENT a detected step — and equally it must not UN-MARK a step the
+    // author's own `citation_policy` dial holds (`phaseVocabulary.GroundingInputs.kbTools`
+    // says exactly this). So: zero detected, and the deliverable still explained.
     renderReceipt({ kbTools: [] })
+    expect(screen.getByTestId("seed-receipt")).toBeInTheDocument()
+    expect(screen.getByTestId("seed-receipt")).toHaveAttribute("data-detected-count", "0")
+    expect(screen.queryByTestId("seed-receipt-lead")).toBeNull()
+    expect(listedSlugs()).toEqual(["emit"])
+  })
+
+  it("an empty palette over a draft with no deliverable lists nothing at all", () => {
+    renderReceipt({ phases: BARE_PHASES, kbTools: [] })
     expect(screen.getByTestId("seed-receipt")).toBeInTheDocument()
     expect(screen.queryByTestId("seed-receipt-grounded-list")).toBeNull()
   })
