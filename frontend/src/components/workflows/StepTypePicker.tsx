@@ -5,13 +5,27 @@
  * THE `＋` MENU. Six step types, in plain language, at the point where the new step
  * will land.
  *
- * ── It speaks the D-183-06 plain-language vocabulary, with the 3D mark ──
- * Each row is `PHASE_TYPE_SENTENCES[type]` ("Search the knowledge base", "Wait for
- * you", …) beside the shared `renderPhaseMark(type)` element. **Never a text glyph** —
- * that single miss is most of why an earlier sketch batch read as *"very basic … does
- * not look very agentic"*, and the 3D mark is a locked rule of the sketch language, not
- * a preference. The technical `phase_type` identifier appears only behind the ⌥
- * Technical-names reveal.
+ * ── Each row is a PREVIEW OF THE CARD, not a description of it (187-18 / WR-03) ──
+ * The row title asks `nodeTitle` — THE one title resolution — over the very phase the
+ * caller will build with `minimalPhaseFor` once `onChoose` fires. It reads no
+ * vocabulary map of its own, and that is the whole point of the WR-03 fix: this file
+ * previously took the row title straight from the shipped sentence map, which is a
+ * SECOND answer to a question with exactly one home. The two answers disagreed. The
+ * author read **"Check with you"** in the menu, clicked it, and the card that landed
+ * said **"Wait for your approval"** — two sentences for one choice, one click apart,
+ * both sourced from the module whose premise is that titles resolve in one place.
+ *
+ * The drift survived a phase built to prevent it because it was SEMANTIC, not lexical:
+ * both strings were imported identifiers, so every `?raw` fence and copy-identity guard
+ * stayed green. `StepTypePicker.test.tsx` now measures the row against the resolver
+ * instead of against a string, and fences this file at zero sentence-map reads.
+ *
+ * Beside the title sits the shared `renderPhaseMark(type)` element. **Never a text
+ * glyph** — that single miss is most of why an earlier sketch batch read as *"very
+ * basic … does not look very agentic"*, and the 3D mark is a locked rule of the sketch
+ * language, not a preference. The supporting line stays `PHASE_TYPE_SUBTITLES[type]`
+ * (beaten by the refusal reason when a row is refused), and the technical `phase_type`
+ * identifier still appears only behind the ⌥ Technical-names reveal.
  *
  * ── The refusal: offered DISABLED, WITH its reason, never hidden (R10b) ──
  * Sketch 139 variant C's finding, folded into winner A as a build rule: an option that
@@ -53,15 +67,25 @@ import { useCallback, useEffect, useId, useRef } from "react"
 
 import {
   allowedTypesAt,
+  minimalPhaseFor,
   type PhaseTypeId,
 } from "@/components/workflows/definitionOps"
 import { DEFAULT_TINT, ICON_TINT, renderPhaseMark } from "@/components/workflows/nodePresentation"
 import {
-  PHASE_TYPE_SENTENCES,
   PHASE_TYPE_SUBTITLES,
+  nodeTitle,
   type PhaseSpecJSON,
 } from "@/components/workflows/phaseVocabulary"
 import { useTechnicalNamesOptional } from "@/providers/TechnicalNamesProvider"
+
+/**
+ * The slug the PREVIEW phase carries. Never rendered and never persisted: this object
+ * exists only to be handed to `nodeTitle`, and the real slug is derived by the caller
+ * with `slugForType` after `onChoose` (D-184-11, below). `nodeTitle` carries a
+ * never-print-a-slug floor, so this value cannot reach the row — asserted, not assumed,
+ * by "the preview is independent of the placeholder slug and index".
+ */
+const PREVIEW_SLUG = ""
 
 export interface StepTypePickerProps {
   /** The definition's phases as they stand. Read-only — the picker mutates nothing. */
@@ -153,7 +177,12 @@ export function StepTypePicker({
         const reason = choice.disabledReason
         const refused = typeof reason === "string" && reason.length > 0
         const reasonId = `${baseId}-why-${choice.type}`
-        const sentence = PHASE_TYPE_SENTENCES[choice.type] ?? choice.type
+        // WR-03 — ask the resolver the CARD asks, over the phase this click really
+        // creates. No name context is passed: nothing is bound yet, and an omitted
+        // context is the shipped safe direction (D-187-05 — absent ⇒ fall through,
+        // never fabricate). No `??` floor either: `nodeTitle` already echoes an
+        // unknown type honestly, and a second fallback here could disagree with it.
+        const sentence = nodeTitle(minimalPhaseFor(choice.type, PREVIEW_SLUG, index))
         const subtitle = PHASE_TYPE_SUBTITLES[choice.type] ?? ""
 
         return (
