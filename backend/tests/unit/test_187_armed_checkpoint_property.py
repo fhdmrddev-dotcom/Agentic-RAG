@@ -82,7 +82,7 @@ THE THREE ASSERTIONS
 * **P1 — body implies asked-first (universal, every row).** If the body ran, the armed
   prompt must have been awaited, and its order index must be strictly LESS than the
   body's. Both halves are asserted; the ordering is never inferred from call counts.
-* **P2 — reaching the body implies asked (targeted).** On every row whose
+* **P2 — reaching the body implies asked (targeted).** On the EIGHT rows whose
   ``reaches_body_without_arming`` is ``True``, the armed prompt must have been awaited
   **exactly once**. This is the assertion the HEAD bypass fails: the body runs while the
   armed-prompt count is ``0``. It is also the only assertion that can see the Pitfall-4
@@ -168,6 +168,50 @@ that breaks it. Why each is green on HEAD:
   (``harness_engine.py:1194-1198``) already ships, so the typed refusal fails the run and
   writes no receipt. P3 is green on HEAD **by design**: it is the assertion that would have
   caught Phase 185's BLOCKER, kept here so the hoist cannot silently re-open it.
+
+## Falsification observed after the fix
+
+Plan 187-11, 2026-08-02. **A property test that has never been seen to fail AFTER the fix
+is not a control either** — that is the Phase-185 lesson ("verify the PROPERTY not the
+PATCH; observe falsification RED first") stated as a procedure and applied to the far side
+of the fix. So the fix was temporarily removed and the property re-run.
+
+**What was removed.** The whole 49-line hoisted checkpoint block in
+``harness_engine._run_phase_with_gates`` — from ``if getattr(phase,
+"action_risk_armed", False):`` down to and including its ``return outcome``, i.e.
+everything between the pre-gate pass and ``attempt = 0``. Nothing else was touched: the
+``is_action_risk`` parameter, the Pitfall-4 short-circuit and the approval allow-list all
+stayed exactly as they ship. ``git status --porcelain backend/app`` was empty before and
+after; the block was restored and the file re-verified green (30 passed).
+
+**Result: 17 failed, 13 passed** (green again on restore). The RED set::
+
+    P1  test_p1_body_implies_the_armed_prompt_was_awaited_first[<id>]   × 8
+    P2  test_p2_reaching_the_body_implies_exactly_one_armed_prompt[<id>] × 8
+        ids (both): no_author_validators, pre_ask_user_proceed, post_only,
+                    pre_ask_user_plus_post_citations, two_pre_ask_user,
+                    pre_pass_then_pre_ask_user, pre_pass_fail_run_disposition,
+                    armed_refused_typed
+    P3  test_p3_a_typed_refusal_runs_nothing_and_writes_zero_approval_receipts
+
+**The assertions that fired are the RECORDED ones, verbatim** — ``assert armed_orders``
+("THE BODY RAN AND NOBODY WAS ASKED", reported as ``assert []``) for P1 and ``assert
+len(armed_orders) == 1`` for P2, with ``observed 0`` armed prompts, ``body_invoked=True``
+and ``outcome='completed'``. Identical to the HEAD RED signature above, on identical
+assertion text.
+
+**Why the falsified set is a strict SUPERSET of the HEAD RED set (8 ids), not the same 8.**
+The two states are not the same code. On HEAD the checkpoint did not exist BUT
+``effective_phase`` still appended the ``action_risk_approval`` spec, so the four rows with
+no author pre gate ahead of it (``no_author_validators``, ``post_only``,
+``pre_pass_fail_run_disposition``, ``armed_refused_typed``) were still asked — through the
+appended gate — and stayed green. Plan 187-06 deleted that synthesis as well, so with the
+checkpoint additionally removed there is NOTHING left that can ask, and every row declaring
+``reaches_body_without_arming`` goes red. ``pre_fail_run`` and ``pre_skip_to_phase`` stay
+GREEN in both states, correctly: their own gate routes control away from the body, so no
+checkpoint is owed (D-187-02). P3 joins the set for the same reason the four extra rows do
+— with nobody asked, ``armed_refused_typed``'s body RUNS, which is exactly the Phase-185
+BLOCKER shape and exactly what P3 exists to see.
 
 Imports INSIDE the body, per this suite's convention.
 """
@@ -523,6 +567,17 @@ def _drive(case: dict):
                 eff, {}, ctx,
                 run_id=uuid4(), pool=object(), redis=object(),
                 wall_clock=30, _audit_user_id=uuid4(),
+                # HARNESS FIX (plan 187-11), not a relaxation. This file predates the
+                # ``total_phases`` keyword plan 187-06 added, and ``run_workflow`` — the
+                # ONE production call site — always passes ``len(definition.phases)``. A
+                # drive that omits it takes the engine's ``phase.phase_index + 1``
+                # fallback, so the checkpoint composes "Step 2 of 2" while
+                # ``_approval_sentence(raw, 4)`` above composes "Step 2 of 4"; the two
+                # then fail to join on ``tool_call_id`` → prompt text and the recorder
+                # sees ZERO armed prompts even though one was awaited. Supplying it makes
+                # this drive match the production seam. It weakens nothing: the assertions
+                # are untouched, and the falsification below confirms they still bite.
+                total_phases=TOTAL_PHASES,
             )
         )
 
@@ -574,7 +629,8 @@ def test_p1_body_implies_the_armed_prompt_was_awaited_first(case):
 
     This is the property in its weakest, universal form: it says nothing about rows where
     an author's own gate legitimately routes control away from the body (there, it is
-    vacuously true and P2 does the work). Both halves are asserted separately —
+    vacuously true and P2 does the work — the 8 rows declaring
+    ``reaches_body_without_arming=True``). Both halves are asserted separately —
     PRESENCE (the armed prompt was awaited at all) and ORDERING (its recorded order index
     is strictly less than the body's). Ordering is compared on the recorder's single
     monotonic clock; it is never inferred from a call count, because "one prompt and one
