@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
 status: executing
-last_updated: "2026-08-04T00:00:00.000Z"
-last_activity: 2026-08-04 -- Phase 187 round-5 wave 14: plan 187-27 (GAP B) complete; a check that did not run can no longer unblock a publish, and opening a drafted definition with steps now issues one; 27/29 plans, count gate 18/18 green (2164 tests, 0 failing)
+last_updated: "2026-08-04T02:55:00.000Z"
+last_activity: 2026-08-04 -- Phase 187 round-5 wave 15: plan 187-28 (GAP C) complete; `workflows.py`'s `_ROUTE_ASSIGNED_CODES` comment now states what the code does (SERVER publish gate unchanged, CLIENT publish control gated and intended per BUG-260731-03) and both halves carry a behavioural fence; comment-only diff, zero behaviour change, zero mount-cap spend; 28/29 plans, backend unit 62 failed/1700 passed (baseline 62/1693 re-derived at base -- no new failure), canvas suite 124 -> 128
 progress:
   total_phases: 19
   completed_phases: 6
   total_plans: 101
-  completed_plans: 98
+  completed_plans: 99
   percent: 32
 ---
 
@@ -2199,6 +2199,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 
 | Phase | Plan | Duration | Notes |
 |-------|------|----------|-------|
+| Phase 187 P28 | 41min | 3 tasks | 4 files |
 | Phase 118 P02 | ~30 min | 2 tasks | 3 files |
 | Phase 118 P03 | 12min | 2 tasks | 5 files |
 | Phase 118 P05 | 10min | 2 tasks | 5 files |
