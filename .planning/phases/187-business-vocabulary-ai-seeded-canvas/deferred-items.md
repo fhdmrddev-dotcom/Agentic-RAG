@@ -163,3 +163,46 @@ behaviour — add `phase.config ?? { phase_type: "" }` to `groundingCauseOf` and
 `intersectingKbToolOf` in the same commit, so the two keep reading identically, and extend
 the WR-14 agreement table with a config-less phase.
 
+
+---
+
+## D-ITEM-187-25-01 — a SECOND parallel-execution flake, in `WorkflowBuilderPage.canvas.test.tsx` (not PublishGauntlet)
+
+**Found by:** plan 187-25, task 1 (2026-08-04), on the first of four `node scripts/vitest-count-gate.cjs` runs
+**Status:** deferred — pre-existing, not caused by this plan (which edits only a docblock and the pin map), and NOT pinned around
+
+The plan anticipated that a red gate would be `D-ITEM-187-20-01`, the known
+`PublishGauntlet.test.tsx` flake. **It was a different file.** Sample 1 reported
+`failed 1`:
+
+```
+FILE:     WorkflowBuilderPage.canvas.test.tsx
+FULLNAME: WorkflowBuilderPage 184-11 — with the flag OFF the panel receives NO rails key (D-14)
+          > POSITIVE CONTROL — with the flag ON the very same read finds the key
+MSG:      AssertionError: expected 0 to be greater than 0
+```
+
+Diagnosed rather than pinned around, per the task's own stop-and-report rule:
+
+| Evidence | Result |
+|---|---|
+| the same suite run ISOLATED | `npx vitest run src/pages/WorkflowBuilderPage.canvas.test.tsx` → **117 passed, exit 0** |
+| gate samples 2, 3 and 4 (whole target glob) | `failed 0` every time |
+| its per-file count, all four samples | **117** — identical; never a `[count-decrease]` |
+| `PublishGauntlet.test.tsx`, all four samples | **46**, 0 failing — `D-ITEM-187-20-01` did NOT bite this round |
+
+Same *class* as `D-ITEM-187-20-01` / `D-ITEM-02` — an assertion that passes alone and
+fails non-deterministically under whole-glob parallel load — but a **different file**, so
+it is logged separately rather than folded into that entry. The failing case is a
+`waitFor`-style positive control over a prop the panel receives, which is exactly the
+shape that loses a race under load.
+
+**No pin was moved for it.** A pin is lowered only alongside a deliberate, plan-authorised
+deletion — never to quiet a red gate — and lowering `WorkflowBuilderPage.canvas.test.tsx`
+from 22 (its actual is 117) would have been meaningless anyway: the flake is a
+`[failing-tests]` reason, not a count reason.
+
+**Re-open trigger:** Phase 188's `WorkflowCanvas.tsx` extraction, which reopens this suite
+— give the 184-11 positive control a deterministic settle (an explicit `findBy*`/`waitFor`
+on the rails key rather than a bare read), and re-sample the gate five times to confirm the
+class is gone rather than merely quiet.

@@ -6,9 +6,35 @@
  * A NET-NEW suite. It does NOT absorb, replace or re-implement any shipped file — Phase
  * 177's coverage-loss lesson (a "net-new" file that quietly REPLACED an existing suite,
  * so the total never moved and nobody noticed) is exactly why `scripts/vitest-count-gate.cjs`
- * pins per-file counts. This file postdates the 415 pin, reports to the gate as `new`,
- * and must NOT be added to `BASELINE`. It already sits inside the
- * `src/components/workflows` target glob, so `TARGETS` needs no edit either.
+ * pins per-file counts. It already sits inside the `src/components/workflows` target glob,
+ * so `TARGETS` needs no edit.
+ *
+ * ── THIS FILE IS PINNED (187-25). The instruction that used to live here said the
+ * opposite ── ─────────────────────────────────────────────────────────────────────────
+ * Until round 4 this docblock instructed the next reader to keep the file OUT of the
+ * gate's `BASELINE` map — it postdated the 415 pin and reported as `new`. (The exact
+ * former wording is not reproduced here on purpose: the acceptance grep for that stale
+ * instruction must not be satisfied by a quotation of it. It is in git history at
+ * `17c6e338` and earlier.) That instruction was RIGHT when it was written: the suite
+ * then held no load-bearing guard, and a pin on a file still growing case-by-case is
+ * friction with nothing behind it.
+ *
+ * It stopped being right. This suite now carries CR-04's leaf fences (the replaceable
+ * pure projection), WR-11's DOM no-empty-reason invariant, WR-14's one-home membership
+ * fence and WR-13's standing testid + sibling-state-attribute coverage sweep — guards
+ * that could each be deleted with the count gate green, because an unpinned file's
+ * disappearance hides inside a total sitting ~1700 above the floor. So `BASELINE` now
+ * carries `"SeedReceipt.test.tsx": 68`, READ FROM THE GATE'S OWN `actual` COLUMN.
+ *
+ * THE STANDING RULE, which replaces the old instruction: this pin moves ONLY alongside
+ * a deliberate, plan-authorised deletion, in the SAME commit, with the new number read
+ * from the script's own output — never hand-counted, and never lowered to quiet a red
+ * gate. Adding cases needs no pin edit; the gate prints `+N` and passes.
+ *
+ * (This paragraph is prose, and prose cannot move the testid sweep at the bottom: that
+ * guard strips comments from `testSource` before its substring check, so a docblock can
+ * neither satisfy nor break it. Verified by re-running the suite when this was written,
+ * not asserted from a plan.)
  *
  * WHY THE COMPONENT IS TESTED DIRECTLY. `SeedReceipt` is a LEAF: a flat, total prop
  * contract in, DOM out. Driving these criteria through `WorkflowBuilderPage` would make

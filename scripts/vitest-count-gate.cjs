@@ -21,17 +21,30 @@
  * .planning/phases/184-editable-canvas-live-structural-validation-round-trip/
  * 184-VALIDATION.md § "Wave 0 Count Pin"): 16 files / 424 tests / 0 failing.
  *
- * RE-PINNED ONCE, on purpose: Phase 185 plan 185-08 (SPEC Req 6) DELETED the
- * three-face grounding word-badge and the ~9 `it()` blocks that covered it, so
- * `phaseVocabulary.test.ts` went 42 → 33 and the pinned total 424 → 415. That
- * re-pin rode in the SAME COMMIT as the deletion, and its number was READ FROM
- * THIS SCRIPT'S OWN OUTPUT (the `actual` column) rather than hand-computed —
- * which is the only honest way to move a pin. A deletion that lands without its
- * pin edit leaves HEAD red; a pin edit that lands without the deletion leaves the
- * gate blind to the NEXT deleted test. See
- * .planning/phases/185-graded-governance-per-node-grounding-mode-action-risk-dial/
- * 185-RESEARCH.md § L-9. **A pin is lowered ONLY alongside a deliberate,
- * plan-authorized deletion — never to make a red gate go quiet.**
+ * THE PIN HAS MOVED TWICE. The two events are different in kind and the
+ * difference is the whole rule, so both are recorded rather than collapsed:
+ *
+ *   1. LOWERED — Phase 185 plan 185-08 (SPEC Req 6) DELETED the three-face
+ *      grounding word-badge and the ~9 `it()` blocks that covered it, so
+ *      `phaseVocabulary.test.ts` went 42 → 33 and the pinned total 424 → 415.
+ *      That re-pin rode in the SAME COMMIT as the deletion, and its number was
+ *      READ FROM THIS SCRIPT'S OWN OUTPUT (the `actual` column) rather than
+ *      hand-computed — which is the only honest way to move a pin. A deletion
+ *      that lands without its pin edit leaves HEAD red; a pin edit that lands
+ *      without the deletion leaves the gate blind to the NEXT deleted test. See
+ *      .planning/phases/185-graded-governance-per-node-grounding-mode-action-risk-dial/
+ *      185-RESEARCH.md § L-9.
+ *   2. EXTENDED — Phase 187 plan 187-25 ADDED two files that were already
+ *      running inside `TARGETS` but carried no pin: `definitionOps.test.ts` (232)
+ *      and `SeedReceipt.test.tsx` (68), pinned total 415 → 715. Nothing was
+ *      lowered and nothing was deleted; two suites that had become load-bearing
+ *      stopped being deletable with the gate green. See the map entry below.
+ *
+ * **A pin is LOWERED only alongside a deliberate, plan-authorized deletion —
+ * never to make a red gate go quiet.** Adding a pin needs no deletion; it needs
+ * only that the number came from the `actual` column of a run, not from a hand
+ * count of `it(` literals (`definitionOps.test.ts` declares ~118 literals and
+ * runs 232 cases, because of `it.each`).
  *
  * The gate FAILS (exit 1) when:
  *   [failing-tests]        numFailedTests > 0
@@ -68,8 +81,27 @@ const path = require("node:path")
 
 // ── The pin. Keyed by BARE filename (testResults[].name is an absolute path). ──
 const BASELINE = {
+  // 187-25: PINNED NOW, because these two stopped being ordinary suites. Between
+  // them they carry the whole Req-5 governance-honesty estate — CR-03's thirteen
+  // carried-paragraph cases, CR-04's three post-arrival fences plus their leaf
+  // fences, WR-09's cause fence and WR-12's word-class property, WR-11's no-actor
+  // property and WR-15's two-half exhaustiveness pin, WR-14's agreement
+  // biconditional, and WR-13's standing testid/state-attribute coverage sweep.
+  // Both already RAN inside `TARGETS` (`src/components/workflows`) and counted
+  // toward the total, but with no per-file pin the total sat far enough above the
+  // floor to absorb a large deletion — so every one of those guards was deletable
+  // with the gate green. That is verbatim the Phase-177 lesson this script exists
+  // for. Leaving them unpinned WAS right while they held no load-bearing guard;
+  // it stopped being right in round 4.
+  // BOTH NUMBERS WERE READ FROM THIS SCRIPT'S OWN `actual` COLUMN (two runs of
+  // `node scripts/vitest-count-gate.cjs`, 2026-08-04, agreeing at 232 / 68) —
+  // never hand-counted, never taken from a planning document. Each was then
+  // observed catching a deletion: one `it(` block removed per file reds the gate
+  // with `[count-decrease]` naming that file.
+  "definitionOps.test.ts": 232,
   "canvasModel.fixtures.test.ts": 100,
   "canvasModel.purity.test.ts": 69,
+  "SeedReceipt.test.tsx": 68,
   // 185-08: 42 → 33. Req 6 deleted the slot-1 grounding word-badge; the 9 `it()`
   // blocks over its three faces went with it. Measured, not computed.
   "phaseVocabulary.test.ts": 33,
@@ -88,7 +120,11 @@ const BASELINE = {
   "revertByteIdentical.test.tsx": 7,
 }
 
-const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // 415 (was 424 pre-185-08)
+// Still COMPUTED, never hand-written — the reduce is the single source, so the
+// trailing figure below is a note about the reduce's result and can never be the
+// thing the gate reads. 715 = 415 + 232 + 68 (187-25 extended; was 415 after
+// 185-08 lowered it, 424 at the original 184 Wave-0 pin).
+const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // 715
 
 // ── The Wave-0 blast radius (184-VALIDATION.md § "quick run command"). ──
 const TARGETS = [
@@ -312,7 +348,13 @@ function main() {
     process.exit(1)
   }
 
-  console.log(`${GRN}count gate OK${RST} — 16/16 pinned files present, no per-file decrease, 0 failing.`)
+  // DERIVED, not hard-coded: this line read "16/16" until 187-25 pinned two more
+  // files, at which point a literal would have printed a false count on a green
+  // gate — the same class of stale claim the pin itself exists to catch.
+  const pinnedCount = pinnedNames.length
+  console.log(
+    `${GRN}count gate OK${RST} — ${pinnedCount}/${pinnedCount} pinned files present, no per-file decrease, 0 failing.`,
+  )
   process.exit(0)
 }
 
