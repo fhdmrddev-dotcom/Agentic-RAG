@@ -819,6 +819,118 @@ describe("SeedReceipt — malformed rows resolve rather than throw", () => {
   })
 })
 
+// ── 6b. THE PROP CONTRACT: `phases` IS A SNAPSHOT, AND THIS LEAF PROJECTS IT ─────────
+//
+// Phase 187-22 Task 3 (CR-04). Added because `rerender(` appeared ZERO times in this file
+// — measured with `grep -c` at HEAD before this plan — which is precisely why no test in
+// it could ever have seen CR-04: every case rendered once and asked what was on screen.
+//
+// WHY THE CR-04 FALSIFICATION IS NOT HERE, AND MUST NOT BE MOVED HERE. The defect was
+// that `WorkflowBuilderPage` handed this card the LIVE store selector, so an edit the
+// author made in the inspector after the receipt arrived rewrote a sentence the AI is
+// credited with. That is a CALLER bug, and its end-to-end fence lives in
+// `WorkflowBuilderPage.canvas.test.tsx` — three real post-arrival edits driven through
+// the shipped panel and lane, red before the fix and green after.
+//
+// A component-level "the card must not change when `phases` changes" case CANNOT be
+// written honestly: this component is a PURE PROJECTION by construction (`:206-241` —
+// every row, count and sentence is recomputed from the prop on every render), so hand it
+// a mutated array and it will recompute, correctly, forever. The only way to make such a
+// case green would be to give the leaf a hidden cache of its first props — which would
+// break D-187-09's "a fresh generation gets a fresh receipt", hide the caller bug instead
+// of fixing it, and contradict the prop contract this block exists to pin.
+//
+// So what belongs here is the two properties the component genuinely owns, and the second
+// one is the fence that FORBIDS that wrong fix.
+
+describe("SeedReceipt — `phases` is a snapshot the caller keeps, and this leaf only projects it", () => {
+  /** One card over one snapshot. Written as an element factory so `rerender` hands the
+   *  component a SECOND generation the way the page would, rather than mutating one. */
+  function receiptFor(phases: readonly PhaseSpecJSON[], over: Partial<SeedReceiptProps> = {}) {
+    return (
+      <SeedReceipt
+        phases={phases}
+        kbTools={KB_TOOLS}
+        open
+        onDismiss={vi.fn()}
+        {...over}
+      />
+    )
+  }
+
+  const cardText = () => screen.getByTestId("seed-receipt").textContent ?? ""
+  const counts = () => {
+    const card = screen.getByTestId("seed-receipt")
+    return {
+      grounded: card.getAttribute("data-grounded-count"),
+      detected: card.getAttribute("data-detected-count"),
+      carried: card.getAttribute("data-carried-count"),
+    }
+  }
+
+  it("PURE PROJECTION — handed a new snapshot, every sentence and all three counts describe THAT one", () => {
+    const { rerender } = render(receiptFor(GROUNDED_PHASES))
+    // The first generation: 5 steps, 3 sealed, 2 of them this generation's own doing.
+    const first = cardText()
+    expect(counts()).toEqual({ grounded: "3", detected: "2", carried: "1" })
+
+    // A SECOND generation arrives — one escalated agent step, nothing detected.
+    rerender(receiptFor(ESCALATED_PHASES))
+
+    // POSITIVE CONTROL — the two snapshots are demonstrably different, so this case
+    // cannot pass by both projections happening to read the same.
+    expect(cardText()).not.toBe(first)
+
+    // Compared by IDENTITY against the copy home, never against hand-typed text.
+    expect(screen.getByTestId("seed-receipt-heading").textContent).toBe(
+      seedReceiptHeading(ESCALATED_PHASES.length),
+    )
+    expect(counts()).toEqual({ grounded: "1", detected: "0", carried: "1" })
+    // Zero detected, so the paragraph that makes an authorship claim is ABSENT — and the
+    // one-way rule travels with it, never with the carried sentence (D-185-07).
+    expect(screen.queryByTestId("seed-receipt-grounding")).toBeNull()
+    expect(screen.queryByTestId("seed-receipt-one-way")).toBeNull()
+    expect(screen.getByTestId("seed-receipt-carried").textContent).toBe(
+      seedReceiptCarriedLead(1),
+    )
+    // …and the list is the second snapshot's membership, with the second snapshot's cause.
+    expect(listedSlugs()).toEqual(["judgement"])
+    expect(screen.getByTestId("seed-receipt-step-reason").textContent).toBe(
+      seedReceiptStepReason("escalated"),
+    )
+    expect(screen.getByTestId("seed-receipt-step-face").textContent).toBe(
+      nodeTitle(phaseBySlug(ESCALATED_PHASES, "judgement")),
+    )
+  })
+
+  it("A NEW SNAPSHOT REPLACES THE OLD ONE — this leaf holds no cache of its first props", () => {
+    /**
+     * THE FENCE AGAINST THE TEMPTING WRONG FIX FOR CR-04. Freezing the first `phases`
+     * inside this component would make a page-level "the card did not move" case green
+     * while leaving the caller reading the live store — and it would break D-187-09: the
+     * author's SECOND draft would be narrated by their first draft's numbers.
+     *
+     * Asserted in BOTH directions, so a cache cannot hide in either: a second snapshot
+     * takes over, and going back to the first restores it exactly.
+     */
+    const { rerender } = render(receiptFor(GROUNDED_PHASES))
+    const asFirst = cardText()
+    const countsFirst = counts()
+
+    rerender(receiptFor(STRICT_EMIT_ONLY_PHASES))
+    // POSITIVE CONTROL — the projection genuinely moved, so "restored" below is a claim
+    // about coming back rather than about never having left.
+    expect(cardText()).not.toBe(asFirst)
+    expect(counts()).toEqual({ grounded: "1", detected: "0", carried: "1" })
+    expect(listedSlugs()).toEqual(["emit"])
+
+    rerender(receiptFor(GROUNDED_PHASES))
+    expect(cardText()).toBe(asFirst)
+    expect(counts()).toEqual(countsFirst)
+    expect(listedSlugs()).toEqual(SEALED_SLUGS)
+  })
+})
+
 // ── 7. THE SOURCE FENCE (the shipped `?raw` house idiom, S7) ─────────────────────────
 
 describe("SeedReceipt — source purity, glyph discipline and no staged arrival", () => {
@@ -833,6 +945,12 @@ describe("SeedReceipt — source purity, glyph discipline and no staged arrival"
     ["animation", "Delay"].join(""),
     ["transition", "Delay"].join(""),
   ]
+  /** 187-22 — the two hooks that could give this leaf a hidden cache of its first
+   *  `phases`. Assembled from parts for the same reason every needle above is: a grep of
+   *  this guard file must not be able to satisfy the grep it protects. `useMemo` is
+   *  deliberately NOT among them — the shipped derivation uses it, and a fence that fired
+   *  on the code it sits beside gets deleted rather than fixed. */
+  const CACHE_HOOKS = [["use", "State"].join(""), ["use", "Ref"].join("")]
 
   it("imports nothing from the API client and opens no request", () => {
     expect(seedReceiptSource).not.toMatch(/from\s+["']@\/lib\/api["']/)
@@ -896,6 +1014,19 @@ describe("SeedReceipt — source purity, glyph discipline and no staged arrival"
     expect(seedReceiptSource).toMatch(/GOVERNANCE_SEAL_LABEL/)
   })
 
+  it("holds NO cache of its first props — the CR-04 wrong fix, fenced at the source", () => {
+    // 187-22. The render-level half is section 6b's replaceability case; this is the
+    // structural half, and it is the cheaper of the two to keep honest: a cache can only
+    // be built out of one of these two hooks, and neither is written here.
+    for (const hook of CACHE_HOOKS) expect(seedReceiptSource).not.toContain(hook)
+    // POSITIVE CONTROL — the file is not simply hook-free. It DOES memoise its derivation,
+    // which is what makes the two absences above a statement about caching rather than
+    // about React.
+    expect(seedReceiptSource).toMatch(/useMemo</)
+    // …and the prop contract that names the caller's obligation is actually written down.
+    expect(seedReceiptSource).toMatch(/snapshot/i)
+  })
+
   it("renders every authored string as a text child (T-187-13-04)", () => {
     expect(seedReceiptSource).not.toMatch(/dangerouslySetInnerHTML/)
   })
@@ -955,5 +1086,12 @@ describe("SeedReceipt — source purity, glyph discipline and no staged arrival"
       /dangerouslySetInnerHTML/,
     )
     expect('className="animate-pulse"').toMatch(/animate-(pulse|ping|bounce|spin)/)
+    // 187-22 — the two cache hooks, each planted in the exact shape the wrong fix for
+    // CR-04 would take, so their absence above is falsifiable rather than merely true.
+    expect("const [seeded, setSeeded] = useState(phases)").toContain(CACHE_HOOKS[0])
+    expect("const firstPhases = useRef(phases)").toContain(CACHE_HOOKS[1])
+    // …and the control must NOT fire on the memo the component legitimately uses.
+    expect("const rows = useMemo<GroundedRow[]>(() => {").not.toContain(CACHE_HOOKS[0])
+    expect("const rows = useMemo<GroundedRow[]>(() => {").not.toContain(CACHE_HOOKS[1])
   })
 })

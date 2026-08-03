@@ -2636,6 +2636,51 @@ describe("WorkflowBuilderPage 187-22 — CR-04: nothing the author does afterwar
     expect(screen.queryByTestId("seed-receipt-carried")).toBeNull()
     expect(readReceipt()).toEqual(arrival)
   })
+
+  it("SOURCE FENCE — the card is handed the arrival snapshot, and the snapshot is taken beside setDrafted", () => {
+    /**
+     * 187-22 Task 3. The three cases above catch the defect through behaviour. This
+     * catches the REVERT: swapping the prop back to the live selector changes no DOM any
+     * render test notices until an edit happens, so a future refactor could undo the fix
+     * and only these three cases — which a hurried author might delete as "flaky canvas
+     * tests" — would object. A source pin costs one assertion and objects immediately.
+     *
+     * The needles are ASSEMBLED FROM PARTS, this file's shipped idiom, so a grep of the
+     * guard cannot satisfy the guard.
+     */
+    const LIVE_SELECTOR = ["phases={", "phases}"].join("")
+    const SNAPSHOT_PROP = ["phases={", "receiptPhases}"].join("")
+    const SETTER = ["setReceipt", "Phases(def.phases)"].join("")
+    const TRANSITION = ["setDrafted", "(def)"].join("")
+
+    // The `<SeedReceipt …/>` element, extracted rather than searched for file-wide: the
+    // live selector is CORRECT on the canvas and the spine, which are the live ledger of
+    // current governance. It is wrong on exactly one element, so the fence reads exactly
+    // that one.
+    const element = builderSource.match(/<SeedReceipt\b[\s\S]*?\/>/)?.[0] ?? ""
+    // A regex that matched nothing would make every assertion below vacuous.
+    expect(element).toContain("kbTools")
+
+    expect(element).not.toContain(LIVE_SELECTOR)
+    expect(element).toContain(SNAPSHOT_PROP)
+
+    // POSITIVE CONTROL — the pattern really would have fired on the shipped-before wiring.
+    const OLD_MOUNT = `<SeedReceipt\n        ${LIVE_SELECTOR}\n        kbTools={kbTools}\n      />`
+    expect(OLD_MOUNT).toContain(LIVE_SELECTOR)
+    expect(OLD_MOUNT).not.toContain(SNAPSHOT_PROP)
+
+    // …and the snapshot is taken in `onDraft`'s success branch, beside the SINGLE state
+    // transition — not in an effect that could observe an already-edited store.
+    const atTransition = builderSource.indexOf(TRANSITION)
+    expect(atTransition).toBeGreaterThan(-1)
+    // 500 chars is "the next few lines, comments included" — measured, not guessed: the two
+    // shipped comment blocks between the transition and the setter run to ~370 characters
+    // on their own. Wide enough to survive a re-worded comment, far too narrow to reach
+    // another function.
+    expect(builderSource.slice(atTransition, atTransition + 500)).toContain(SETTER)
+    // Exactly one write, so no second site can quietly re-snapshot a later state.
+    expect(builderSource.match(new RegExp(SETTER.replace(/[().]/g, "\\$&"), "g")) ?? []).toHaveLength(1)
+  })
 })
 
 describe("WorkflowBuilderPage 187-15 — source guards for the two mounts", () => {
