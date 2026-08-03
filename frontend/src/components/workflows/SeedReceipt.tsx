@@ -225,6 +225,9 @@ export function SeedReceipt({
       data-grounded-count={rows.length}
       // …and the subset the generation itself grounded. Two numbers, two facts.
       data-detected-count={detectedCount}
+      // …and the third fact: the seals this generation did NOT apply, exposed the same
+      // way its two siblings are, so the carried paragraph's number is checkable too.
+      data-carried-count={carriedCount}
       aria-labelledby={headingId}
       className={cn(
         "w-full max-w-[720px] rounded-[14px] border border-border bg-card px-[18px] py-4 shadow-lg",

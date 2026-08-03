@@ -20,7 +20,10 @@
  * TWO PROPERTIES ARE ASSERTED BY IDENTITY RATHER THAN BY LITERAL, and both are the point:
  *  - every sentence is compared character-for-character against its `definitionOps`
  *    export, never against a hand-typed copy, because a hand-typed copy drifts in exactly
- *    the same silence the copy module exists to break (T-187-13-05);
+ *    the same silence the copy module exists to break (T-187-13-05). That claim said
+ *    "every" while the CARRIED sentence had no rendered assertion at all — it was true of
+ *    four sentences out of five from 187-16 until 187-20; the carried paragraph joined the
+ *    section-4 enumeration in that plan, which is when the word became honest;
  *  - every step face is compared against `nodeTitle(phase, ctx)` — the same call the
  *    canvas makes — so a row and the node it describes can never name one step two ways.
  *
@@ -365,6 +368,21 @@ describe("SeedReceipt — the grounded steps and their reasons", () => {
     )
     expect(SEALED_SLUGS.length).not.toBe(DETECTED_SLUGS.length)
   })
+
+  it("marks the CARRIED count too — the seals this generation did NOT apply", () => {
+    // The third fact, exposed like its two siblings (187-20). It is the number the carried
+    // paragraph reports, so an attribute and a sentence that disagreed would be visible.
+    renderReceipt()
+    expect(screen.getByTestId("seed-receipt")).toHaveAttribute(
+      "data-carried-count",
+      String(SEALED_SLUGS.length - DETECTED_SLUGS.length),
+    )
+  })
+
+  it("the carried count reads 0 on a draft the AI grounded entirely by itself", () => {
+    renderReceipt({ phases: [phaseBySlug(GROUNDED_PHASES, "contracts")] })
+    expect(screen.getByTestId("seed-receipt")).toHaveAttribute("data-carried-count", "0")
+  })
 })
 
 // ── 1b. THE CARRIED CAUSES — listed, explained, and NOT claimed as the AI's doing ─────
@@ -659,6 +677,11 @@ describe("SeedReceipt — the copy is the copy module's", () => {
     )
     expect(screen.getByTestId("seed-receipt-one-way").textContent).toBe(
       SEED_RECEIPT_ONE_WAY_RULE,
+    )
+    expect(screen.getByTestId("seed-receipt-carried").textContent).toBe(
+      // The CARRIED count — sealed minus detected. Enumerated here from 187-20 onward, so
+      // the docblock's "every sentence" is a claim over five sentences and not four.
+      seedReceiptCarriedLead(SEALED_SLUGS.length - DETECTED_SLUGS.length),
     )
     expect(screen.getByTestId("seed-receipt-close").textContent).toBe(
       SEED_RECEIPT_NOTHING_COMMITTED,

@@ -819,12 +819,8 @@ describe("definitionOps — the seed-receipt copy is a lock (sketch 150-B)", () 
   // what lets both facts be true at once.
 
   it("the carried lead names the count and the SHIPPED governance words", () => {
-    expect(seedReceiptCarriedLead(1)).toBe(
-      "1 step was already set to must prove it by its own settings.",
-    )
-    expect(seedReceiptCarriedLead(2)).toBe(
-      "2 steps were already set to must prove it by their own settings.",
-    )
+    expect(seedReceiptCarriedLead(1)).toBe("1 step was already set to must prove it.")
+    expect(seedReceiptCarriedLead(2)).toBe("2 steps were already set to must prove it.")
     for (const count of [1, 2, 7]) {
       expect(seedReceiptCarriedLead(count)).toContain(GOVERNANCE_SEAL_LABEL.toLowerCase())
     }
@@ -836,9 +832,26 @@ describe("definitionOps — the seed-receipt copy is a lock (sketch 150-B)", () 
     expect(seedReceiptCarriedLead(-1)).toBe("")
     // TOTALITY, matching the shipped `wholeCount` treatment: a fractional count from
     // author-supplied JSONB resolves rather than printing "2.7 steps".
-    expect(seedReceiptCarriedLead(2.7)).toBe(
-      "2 steps were already set to must prove it by their own settings.",
-    )
+    expect(seedReceiptCarriedLead(2.7)).toBe("2 steps were already set to must prove it.")
+  })
+
+  it("the carried sentence ATTRIBUTES NO CAUSE — it counts two of them (187-20/WR-09)", () => {
+    // The count sums `already-set` and `escalated`. 187-16 shipped this sentence ending
+    // " by its own settings" — true of the first cause, FALSE of the second, and on an
+    // escalated-only draft it contradicted that step's own reason two lines below it on
+    // the same card. Needles assembled from parts, the idiom this file already uses.
+    const CAUSE_CLAIMS = [
+      ["by", "its", "own", "settings"].join(" "),
+      ["by", "their", "own", "settings"].join(" "),
+    ]
+    for (const count of [1, 2, 9]) {
+      const sentence = seedReceiptCarriedLead(count)
+      for (const claim of CAUSE_CLAIMS) expect(sentence).not.toContain(claim)
+      // Nor may it borrow either per-step reason: naming a cause is the ROW's job, and
+      // `seedReceiptStepReason` is the one function that is actually handed the cause.
+      expect(sentence).not.toContain(seedReceiptStepReason("escalated"))
+      expect(sentence).not.toContain(seedReceiptStepReason("already-set"))
+    }
   })
 
   it("the carried sentence CLAIMS NO AUTHORSHIP — with a positive control", () => {

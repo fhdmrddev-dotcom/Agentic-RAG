@@ -593,9 +593,24 @@ export function seedReceiptGroundingLead(detectedCount: number): string {
  *
  *  1. ZERO ⇒ the empty string, exactly as its sibling above does, so the component asks
  *     the same question once per paragraph and keeps ONE arrival shape (D-187-10).
- *  2. IT CLAIMS NO AUTHORSHIP. No first-person application verb appears — the sentence is
- *     passive and names the step's own settings as what holds it. This generation did not
- *     do it, and a receipt that implies otherwise is CR-01 wearing a different sentence.
+ *  2. IT CLAIMS NO AUTHORSHIP **AND ATTRIBUTES NO CAUSE** (187-20, review WR-09). No
+ *     first-person application verb appears — this generation did not do it, and a receipt
+ *     that implies otherwise is CR-01 wearing a different sentence. But the sentence must
+ *     not name the OTHER party either, and that is the half 187-16 got wrong: it shipped
+ *     ending " by its own settings", which is a claim about WHICH cause holds the step,
+ *     over a count that deliberately sums TWO causes this module keeps apart everywhere
+ *     else — `already-set`, where the deliverable's own `citation_policy` default really
+ *     does hold it, and `escalated`, where the AUTHOR turned it on by hand. On an
+ *     escalated-only draft the paragraph therefore contradicted that same step's own
+ *     reason, rendered two lines below it on the SAME CARD:
+ *     `seedReceiptStepReason("escalated")` reads "you turned this on by hand". A card that
+ *     argues with itself about who applied a governance lock is an integrity defect on the
+ *     governance surface, not a wording preference.
+ *     The repair is a DELETION, not a replacement: the clause is gone and nothing takes
+ *     its place. What both carried causes genuinely share is that the step ALREADY wore
+ *     the seal, and that is all the sentence now says. WHICH cause is stated per row by
+ *     `seedReceiptStepReason` — the one place that is handed the cause — which is exactly
+ *     why the paragraph above the rows must not state one.
  *  3. IT IS SELF-CONTAINED. The detected sentence may be absent — on the typical
  *     non-KB draft it IS absent — so this one may render first or alone. It therefore
  *     leans on no antecedent ("that", "those", "more") that exists only when its sibling
@@ -615,8 +630,8 @@ export function seedReceiptCarriedLead(carriedCount: number): string {
   if (count === 0) return ""
   const words = GOVERNANCE_SEAL_LABEL.toLowerCase()
   return count === 1
-    ? `1 step was already set to ${words} by its own settings.`
-    : `${count} steps were already set to ${words} by their own settings.`
+    ? `1 step was already set to ${words}.`
+    : `${count} steps were already set to ${words}.`
 }
 
 /**
