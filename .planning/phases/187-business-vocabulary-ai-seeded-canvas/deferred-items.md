@@ -63,3 +63,21 @@ reasons remain trustworthy and are the part D-184-08 actually pins.
 **Re-open trigger:** a test-infra phase that isolates the `axe` and `PublishGauntlet`
 suites (e.g. `poolOptions.threads.singleThread` or per-file environments), or the first
 plan whose own changes make the gate red in isolation.
+## D-ITEM-187-20-01 — PublishGauntlet.test.tsx parallel-run flake (found by plan 187-20)
+
+`node scripts/vitest-count-gate.cjs` exits 1 with a single `[failing-tests]` reason. Two cases
+in `frontend/src/components/workflows/PublishGauntlet.test.tsx` fail only under the full
+parallel blast-radius run:
+
+- `the 4 HTTP outcomes each render distinctly`
+- `named_failures key-detection: a MIXED list (lint dict + bare string) renders the lint row (lowercase code) AND the bare string as a block — the verdict is a block, never a pass`
+
+PROVED PRE-EXISTING, not assumed: the four files plan 187-20 edits were restored to
+`debced07~1` and the gate re-run — total 2075, failed 1, same two cases. The file passes
+GREEN in isolation and the failure count varies run to run (2, then 1). It imports nothing
+from `definitionOps` or `SeedReceipt`.
+
+Not fixed: outside plan 187-20 scope. Owner: whichever phase next touches PublishGauntlet,
+or a dedicated flake-hunt. The gate reports no `[count-decrease]`, no `[missing-file]` and
+no `[total-below-baseline]`, so it is not masking a coverage loss.
+
