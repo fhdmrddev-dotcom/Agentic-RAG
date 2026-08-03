@@ -28,10 +28,16 @@
  * `code` appears only behind the ⌥ Technical-names reveal, read through the shipped
  * fail-closed optional accessor, so a business surface stays business-plain by default.
  *
- * ── WHEN THE CHECK ITSELF DID NOT RUN (D-184-14) ──
+ * ── WHEN THE CHECK ITSELF DID NOT RUN (D-184-14 · 187-27) ──
  * The wording is split by CAUSE, because a reproducible shape rejection and a network
  * blip need different things from the reader and a user hitting the first must not be
- * told to retry forever. Held-stale findings stay VISIBLE rather than being cleared —
+ * told to retry forever. A THIRD cause, `unchecked`, means no request has been made at
+ * all yet — and it is deliberately routed down this same channel rather than a new prop,
+ * because all three of this component's clean affordances (the counts line, the resting
+ * attribution and the empty paragraph) already suppress themselves for a non-null cause.
+ * That is the whole reason 187-27 needed a VALUE here and not a rewrite: the component
+ * was never the liar; it simply had nothing to be handed. Held-stale findings stay
+ * VISIBLE rather than being cleared —
  * replacing them with silence would read as "everything is fine now", which is the
  * exact "registry blip rendered as a green light" failure sketch 139 names. Nothing in
  * this state renders a clean or passing affordance, and the 422 body never reaches
@@ -64,14 +70,15 @@ import {
 import {
   DEGRADED_SENTENCE,
   summaryLine,
+  type TrayCheckCause,
   type VerdictGroups,
 } from "@/components/workflows/verdictModel"
 import { useTechnicalNamesOptional } from "@/providers/TechnicalNamesProvider"
 import { cn } from "@/lib/utils"
-// Type-only: the live loop owns the cause union. This component declares no second
-// spelling of it, so a rename there is a typecheck error here rather than a silent
-// branch that stops matching.
-import type { DegradedValidationCause } from "@/hooks/useLiveValidation"
+// 187-27: the cause union this component reads is now `verdictModel`'s `TrayCheckCause`
+// (imported above with the sentences it keys), which is the loop's own union PLUS the
+// never-ran member the loop cannot emit. Still no second spelling declared here, so a
+// rename in either owner is a typecheck error rather than a branch that stops matching.
 
 /** The word for what is happening right now, when something IS happening. */
 const CHECKING_BEAT = "checking…"
@@ -90,8 +97,9 @@ export interface ProblemsTrayProps {
    *  falls through to `nodeTitle`'s own frozen empty default: the derived tier misses and the
    *  generic type sentence renders, never a fabricated or id-shaped name. */
   nameContext?: NameContext
-  /** `null` when the last check answered. Otherwise why it did not. */
-  degraded: DegradedValidationCause | null
+  /** `null` when the last check answered. Otherwise why it did not — including
+   *  `"unchecked"`, which means no request has been issued yet (187-27). */
+  degraded: TrayCheckCause | null
   /** A check is in flight: dim what is shown, do not clear it. */
   checking: boolean
   /** Owned by the caller. This component never opens itself. */

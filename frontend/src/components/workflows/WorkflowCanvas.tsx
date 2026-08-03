@@ -214,10 +214,12 @@ import { ProblemsTray } from "@/components/workflows/ProblemsTray"
 import { StepTypePicker } from "@/components/workflows/StepTypePicker"
 import type { VerdictGroups } from "@/components/workflows/verdictModel"
 import { useTechnicalNamesOptional } from "@/providers/TechnicalNamesProvider"
-// Type-only: the live loop owns the degraded-cause union and this file declares no
-// second spelling of it, so a rename there is a typecheck error here rather than a
-// branch that quietly stops matching. Erased at build — no runtime edge to the hook.
-import type { DegradedValidationCause } from "@/hooks/useLiveValidation"
+// Type-only: the check-state union has ONE owner and this file declares no second
+// spelling of it, so a rename there is a typecheck error here rather than a branch that
+// quietly stops matching. Erased at build — no runtime edge. 187-27 moved the owner from
+// the loop to `verdictModel`, which widens the loop's two emitted causes with the
+// never-ran member the loop cannot emit; this canvas passes the value through untouched.
+import type { TrayCheckCause } from "@/components/workflows/verdictModel"
 
 /**
  * MODULE SCOPE, never inside the component (Pattern 4). Declared in the render body
@@ -467,8 +469,9 @@ export interface CanvasSession {
   onHistoryStep?: () => void
   /** The server's findings, grouped by `verdictModel`. Nothing is classified here. */
   groups: VerdictGroups
-  /** Why the last check produced no verdict, or null when it answered. */
-  degraded: DegradedValidationCause | null
+  /** Why the last check produced no verdict, or null when it answered. Includes
+   *  `"unchecked"` — no request has been issued yet (187-27). */
+  degraded: TrayCheckCause | null
   /** A check is in flight: the tray dims its rows, it never clears them. */
   checking: boolean
   /** The tray's disclosure state — owned by the CALLER, which is what makes

@@ -53,7 +53,9 @@
 import type { Verdict } from "@/lib/api"
 // Type-only, and therefore erased: the live loop owns the cause union, and keying the
 // sentences off it is what stops a second spelling of the same two words appearing here.
-import type { DegradedValidationCause } from "@/hooks/useLiveValidation"
+// `ValidationState` rides the same erased import (187-27) so the outstanding-check
+// predicate below is keyed on the loop's OWN state names rather than on a copy of them.
+import type { DegradedValidationCause, ValidationState } from "@/hooks/useLiveValidation"
 
 /**
  * The mark a node carries. Two values, because the canvas paints two: a red ✕ and a
@@ -77,14 +79,31 @@ const SOFT_SEVERITY = "incomplete"
 export const NOTHING_OUTSTANDING = "Nothing to fix — the static checks pass"
 
 /**
- * The two sentences a surface says when the check did not run at all (D-184-14).
+ * WHAT A SURFACE MAY SAY WHEN THE CHECK DID NOT RUN (D-184-14 · 187-27).
+ *
+ * The union means exactly one thing: **the check did not produce an answer.** The loop
+ * can reach that state two ways, and a THIRD way reaches it without the loop being
+ * involved at all — nobody has asked yet. All three are members of the same class, and
+ * the widening below says so in the type rather than leaving the third to be discovered
+ * as an absence.
  *
  * SAME BEHAVIOUR, DIFFERENT WORDS, ON PURPOSE. A shape rejection is reproducible: an
  * author who hits one and is told "try again" will try forever. An unreachable server
- * usually is worth retrying. Neither sentence renders the rejected body — that is
- * logged at the transport boundary and carried no further — and neither of them may
- * ever be swapped for silence or for the clean line above, because "we could not
- * check" rendering as "fine" is the single worst thing this surface can do.
+ * usually is worth retrying. And "nobody has asked yet" is neither a fault nor a
+ * failure — it is a moment that ends on its own, so its sentence is the shortest of the
+ * three and reads as a state rather than an alarm. None of the three renders the
+ * rejected body — that is logged at the transport boundary and carried no further — and
+ * none of them may EVER be swapped for silence or for the clean line above, because "we
+ * could not check" rendering as "fine" is the single worst thing this surface can do.
+ *
+ * ── WHY `unchecked` IS A MEMBER AND NOT A FORK (187-27, GAP B) ──
+ * The obvious-looking tidy-up is to "fix the naming" by splitting never-ran off into its
+ * own boolean, on the grounds that nothing degraded. Do not: every surface that reads
+ * this union reads it to answer ONE question — *may I speak as though a check answered?*
+ * — and the answer for never-ran is the same NO. A second channel would mean every
+ * consumer growing a second branch, and the first consumer to forget one is the
+ * fail-open this widening closed. `DegradedValidationCause` stays exactly what the LOOP
+ * can emit; `TrayCheckCause` is what a SURFACE can be in, and it is deliberately wider.
  *
  * They live in this module, and not beside the component that says them, for a
  * mechanical reason worth writing down: a component file may not export shared
@@ -92,9 +111,34 @@ export const NOTHING_OUTSTANDING = "Nothing to fix — the static checks pass"
  * every word a surface says ABOUT a check now sits in one pure module, next to the
  * resting-state line it has to be chosen against.
  */
-export const DEGRADED_SENTENCE: Record<DegradedValidationCause, string> = {
+export type TrayCheckCause = DegradedValidationCause | "unchecked"
+
+export const DEGRADED_SENTENCE: Record<TrayCheckCause, string> = {
   unreadable: "We couldn't check this — the workflow's shape isn't something we can read yet.",
   unreachable: "We couldn't reach the check.",
+  // Short on purpose: it sits in a strip whose only other occupant is the checking beat,
+  // and a long sentence there reads as an alarm about something that is merely not
+  // finished happening. It claims no pass and attributes nothing to anyone.
+  unchecked: "Not checked yet.",
+}
+
+/**
+ * IS THE CHECK STILL OUTSTANDING? — the one predicate behind the `unchecked` cause.
+ *
+ * `idle` is "nobody has asked" and `checking` is "the FIRST request is in flight with no
+ * previous answer to hold" (the loop's own docblock). Neither carries an `ok` field, by
+ * construction, so neither may be read as a verdict — which makes them one state as far
+ * as any surface is concerned, and exactly the state `unchecked` words.
+ *
+ * It lives HERE, and is exported, so its two callers on the Builder page share one rule
+ * instead of two inline comparisons that can drift apart — and so the page gains no
+ * declaration of its own (D-187-14). It is keyed on `ValidationState["kind"]`, so a
+ * renamed state in the loop is a typecheck error here rather than a branch that quietly
+ * stops matching. It classifies nothing: it reads the loop's own discriminant and
+ * answers a boolean.
+ */
+export function isCheckOutstanding(kind: ValidationState["kind"]): boolean {
+  return kind === "idle" || kind === "checking"
 }
 
 /**

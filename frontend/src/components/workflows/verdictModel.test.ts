@@ -21,6 +21,10 @@ import { describe, it, expect } from "vitest"
 
 import verdictModelSource from "./verdictModel?raw"
 import { groupVerdicts, summaryLine, NOTHING_OUTSTANDING } from "./verdictModel"
+// Phase 187-27 (GAP B) lands as a SEPARATE import statement so this file's whole diff is
+// added lines only. Both names are read rather than re-typed: the record IS the union's
+// membership list, and the sentence is the one the surface actually says.
+import { DEGRADED_SENTENCE, type TrayCheckCause } from "./verdictModel"
 import type { Verdict } from "@/lib/api"
 
 /** A verdict exactly as the wire delivers one. Every field is the server's. */
@@ -288,5 +292,103 @@ describe("verdictModel — the D-182-06 fences (source guard)", () => {
     expect(verdictModelSource).not.toMatch(/severity\s*===\s*["'](?!incomplete)/)
     // Control: the soft comparison IS there, exactly once as an operand.
     expect(verdictModelSource).toMatch(/verdict\.severity === SOFT_SEVERITY/)
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════════════
+// Phase 187-27 (GAP B · VOCAB-02) — NEVER-RAN IS A CHECK STATE, AND IT HAS WORDS
+//
+// APPENDED; nothing above this line was edited except one added import statement.
+//
+// D-184-14's rule as SHIPPED covered `degraded` and did not cover never-ran. Opening an
+// existing draft into the canvas issued ZERO `POST /workflows/validate` calls, and the
+// tray said *"Nothing to fix — the static checks pass · checked by the server"* about a
+// check nobody had made — for a definition the server marks `ok:false` the moment it is
+// asked. That is the phase's own forbidden shape: *a check that did NOT RUN must never
+// unblock a publish*.
+//
+// "Nobody has asked yet" is a MEMBER of the class the loop's union already names — *the
+// check did not run* — not a competitor to it. So it rides that channel and earns the
+// same treatment, and its sentence lives here beside the other two, because this module
+// is the one home for every word a surface says ABOUT a check.
+//
+// EVERY COMPARISON IS AGAINST THE EXPORT (the 187-24 rule). A hand-typed copy keeps
+// passing after the sentence is reworded, which is exactly the silent drift a one-home
+// copy module exists to break.
+// ══════════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Anything that would let "nobody has asked" read as "we asked, and you are fine".
+ *
+ * A WORD CLASS, not a letter class: `\b` is applied wherever a word boundary is what is
+ * actually meant, so `passenger` is not a pass claim and `broken` is not an "ok". The
+ * negative controls below prove that, and the positive control — welded onto the SHIPPED
+ * string rather than a convenient literal — proves the fence can fire at all.
+ */
+const PASS_CLAIM = /\bpass(es|ed)?\b|\bclean\b|\bfine\b|\bok\b|nothing to fix|checked by/i
+
+describe("verdictModel — 187-27: the third check state and the words it may not say", () => {
+  /** The union's members, READ from the total record rather than re-typed. Because
+   *  `DEGRADED_SENTENCE` is declared `Record<TrayCheckCause, string>`, the compiler is
+   *  the authority on this list: a member with no sentence is a typecheck error, so the
+   *  iteration below can never be a stale hand-written trio. */
+  const ALL_CAUSES = Object.keys(DEGRADED_SENTENCE) as TrayCheckCause[]
+
+  it("DEGRADED_SENTENCE is TOTAL over the widened union, iterated rather than hand-looked-up", () => {
+    // COMPILE-TIME HALF — a member added to `TrayCheckCause` without a sentence stops
+    // this object being total, so this case cannot silently go out of date.
+    const EXHAUSTIVE: Record<TrayCheckCause, true> = {
+      unreadable: true,
+      unreachable: true,
+      unchecked: true,
+    }
+    expect([...ALL_CAUSES].sort()).toEqual(Object.keys(EXHAUSTIVE).sort())
+
+    // RUNTIME HALF — every member the record declares answers a real sentence.
+    for (const cause of ALL_CAUSES) {
+      expect(typeof DEGRADED_SENTENCE[cause]).toBe("string")
+      expect(DEGRADED_SENTENCE[cause].trim().length).toBeGreaterThan(0)
+    }
+
+    // …and no two members share a sentence: two different reasons a check produced no
+    // answer must not read as the same reason.
+    expect(new Set(ALL_CAUSES.map((c) => DEGRADED_SENTENCE[c])).size).toBe(ALL_CAUSES.length)
+  })
+
+  it("the third sentence is DISTINCT from both shipped ones AND from the clean line", () => {
+    // By identity against the exports — never against a re-typed copy of any of them.
+    expect(DEGRADED_SENTENCE.unchecked).not.toBe(DEGRADED_SENTENCE.unreadable)
+    expect(DEGRADED_SENTENCE.unchecked).not.toBe(DEGRADED_SENTENCE.unreachable)
+    expect(DEGRADED_SENTENCE.unchecked).not.toBe(NOTHING_OUTSTANDING)
+    expect(DEGRADED_SENTENCE.unchecked.trim()).not.toBe("")
+  })
+
+  it("it claims no pass and attributes nothing to the server — and neither does any sibling", () => {
+    expect(DEGRADED_SENTENCE.unchecked).not.toMatch(PASS_CLAIM)
+    expect(DEGRADED_SENTENCE.unchecked).not.toMatch(/\bserver\b/i)
+    // The property is stated over the WHOLE union, so a fourth cause cannot arrive with
+    // a pass claim in it and pass this file.
+    for (const cause of ALL_CAUSES) {
+      expect(DEGRADED_SENTENCE[cause]).not.toMatch(PASS_CLAIM)
+      expect(DEGRADED_SENTENCE[cause]).not.toMatch(/\bserver\b/i)
+    }
+  })
+
+  it("the CONTROLS — the class speaks about WORDS, and it provably fires", () => {
+    // NEGATIVE controls: letters inside a longer word are not that word. Without these,
+    // a `\b`-less pattern would look identical and quietly forbid ordinary English.
+    expect("a passenger boarded").not.toMatch(PASS_CLAIM)
+    expect("the pipe is broken").not.toMatch(PASS_CLAIM)
+    expect("define the step").not.toMatch(PASS_CLAIM)
+    expect("a cleanser").not.toMatch(PASS_CLAIM)
+    expect("observer").not.toMatch(/\bserver\b/i)
+
+    // POSITIVE controls, WELDED ONTO THE SHIPPED STRING — the fence is proved able to
+    // fire on the very sentence it guards, not merely on a literal chosen to match.
+    expect(`${DEGRADED_SENTENCE.unchecked} Everything passed.`).toMatch(PASS_CLAIM)
+    expect(`${DEGRADED_SENTENCE.unchecked} · checked by the server`).toMatch(PASS_CLAIM)
+    expect(`${DEGRADED_SENTENCE.unchecked} the server said so`).toMatch(/\bserver\b/i)
+    // …and the clean line, which DOES claim the static pass, is caught by the same class.
+    expect(NOTHING_OUTSTANDING).toMatch(PASS_CLAIM)
   })
 })

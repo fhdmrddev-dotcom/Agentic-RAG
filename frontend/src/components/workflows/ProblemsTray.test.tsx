@@ -29,6 +29,10 @@ import type { PhaseSpecJSON } from "./phaseVocabulary"
 // below compares the tray against the canvas projection itself, not against a literal.
 import { nodeTitle } from "./phaseVocabulary"
 import { toCanvas } from "./canvasModel"
+// Phase 187-27, its own line so this file's diff stays added-lines-only: the clean line,
+// IMPORTED so the 187-27 positive control asserts character-identity against the page's
+// own constant rather than against a second copy of it.
+import { NOTHING_OUTSTANDING } from "./verdictModel"
 import type { Verdict } from "@/lib/api"
 
 const PHASES: PhaseSpecJSON[] = [
@@ -432,5 +436,94 @@ describe("ProblemsTray — 187-08: a row and the card name one step the same way
     renderTray({ open: true, phases: [BOUND], nameContext: NAME_CTX }, BOUND_FINDING)
     const row = screen.getByTestId("problems-tray-row-check-0")
     expect(row.textContent).not.toContain("AI agent step · check")
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════════════
+// Phase 187-27 (GAP B · VOCAB-02) — THE ALL-CLEAR MAY NOT RENDER BEFORE AN ANSWER
+//
+// APPENDED; nothing above this line was edited.
+//
+// The measured defect: a canvas opened on an existing draft issued ZERO
+// `POST /workflows/validate` calls, and this tray said *"Nothing to fix — the static
+// checks pass"* next to *"checked by the server"* — a sentence about a check nobody had
+// made. THE COMPONENT WAS NEVER THE LIAR. All three of its all-clear affordances already
+// branch on the cause being non-null; the page simply had no value to hand it, because
+// "nobody has asked yet" was not yet a member of the cause union.
+//
+// So the fence below is a fence on the COMPOSED behaviour of the component under the new
+// value, and it is written with its positive control INSIDE the same case: three
+// absences are satisfied by a component that renders nothing at all, and a fence that
+// cannot tell those two apart is the vacuous shape 187-24 named.
+// ══════════════════════════════════════════════════════════════════════════════════
+
+describe("ProblemsTray — 187-27: a check that never RAN says so, and claims nothing", () => {
+  it("counts, beat and empty paragraph are ABSENT for `unchecked` — and the CONTROL proves all three DO render for `null`", () => {
+    // THE NEVER-RAN STATE, exactly as a freshly-opened draft sits in it: no verdicts,
+    // nothing in flight, and no request has been issued yet.
+    const never = renderTray({ open: true, degraded: "unchecked", checking: false }, [])
+
+    expect(screen.queryByTestId("problems-tray-counts")).toBeNull()
+    expect(screen.queryByTestId("problems-tray-beat")).toBeNull()
+    expect(screen.queryByTestId("problems-tray-empty")).toBeNull()
+    // What it says INSTEAD — compared to the export, so a rewording moves both together.
+    expect(screen.getByTestId("problems-tray-degraded").textContent).toBe(
+      DEGRADED_SENTENCE.unchecked,
+    )
+    expect(screen.getByTestId("problems-tray").getAttribute("data-degraded")).toBe("unchecked")
+    // Nothing anywhere in the rendered tray reads as clean, passing or server-attributed.
+    expect(never.container.textContent ?? "").not.toMatch(CLEAN_AFFORDANCE)
+    never.unmount()
+
+    // THE POSITIVE CONTROL, in the same case on purpose. Identical inputs, cause `null`:
+    // all three render, and the tray says the very sentences the never-ran state must
+    // not. This is also the DEFECT reproduced — it is what the page handed the tray for
+    // every opened draft before this plan.
+    const control = renderTray({ open: true, degraded: null, checking: false }, [])
+    expect(screen.getByTestId("problems-tray-counts").textContent).toBe(NOTHING_OUTSTANDING)
+    expect(screen.getByTestId("problems-tray-beat").textContent).toBe("checked by the server")
+    expect(screen.getByTestId("problems-tray-empty")).toBeInTheDocument()
+    expect(control.container.textContent ?? "").toMatch(CLEAN_AFFORDANCE)
+  })
+
+  it("a check now IN FLIGHT beats, and STILL never shows the resting attribution", () => {
+    const { container } = renderTray({ open: true, degraded: "unchecked", checking: true }, [])
+    expect(screen.getByTestId("problems-tray-beat").textContent).toBe("checking…")
+    // The resting attribution is the one word-for-word claim that a server did the
+    // checking. It may not appear while the answer is still outstanding.
+    expect(container.textContent ?? "").not.toContain("checked by the server")
+    expect(screen.queryByTestId("problems-tray-counts")).toBeNull()
+    expect(screen.queryByTestId("problems-tray-empty")).toBeNull()
+  })
+
+  it("the two SHIPPED causes behave EXACTLY as before — the asymmetry net", () => {
+    // Without this, "additive" would be a claim rather than a measurement: a change that
+    // altered the unreadable/unreachable rendering would still pass the two cases above.
+    for (const cause of ["unreadable", "unreachable"] as const) {
+      const { container, unmount } = renderTray({ open: true, degraded: cause, checking: false }, [])
+      expect(screen.getByTestId("problems-tray-degraded").textContent).toBe(
+        DEGRADED_SENTENCE[cause],
+      )
+      expect(screen.getByTestId("problems-tray").getAttribute("data-degraded")).toBe(cause)
+      expect(screen.queryByTestId("problems-tray-counts")).toBeNull()
+      expect(screen.queryByTestId("problems-tray-beat")).toBeNull()
+      expect(screen.queryByTestId("problems-tray-empty")).toBeNull()
+      expect(container.textContent ?? "").not.toMatch(CLEAN_AFFORDANCE)
+      unmount()
+    }
+  })
+
+  it("held-stale findings still render under `unchecked`, exactly as under the other causes", () => {
+    // Reachable on a SECOND open of a draft whose store still carries the last answer:
+    // the findings are still true and hiding them would be a quieter way of replacing
+    // them with silence. The clean COUNTS line comes back because it is no longer clean.
+    renderTray({ open: true, degraded: "unchecked", checking: false }, [
+      verdict({ phase: "draft", severity: "error", message: "a real finding from before" }),
+    ])
+    expect(screen.getByTestId("problems-tray-degraded").textContent).toBe(
+      DEGRADED_SENTENCE.unchecked,
+    )
+    expect(screen.getByTestId("problems-tray-row-draft-0")).toBeInTheDocument()
+    expect(screen.getByTestId("problems-tray-counts").textContent).toBe("1 problem")
   })
 })
