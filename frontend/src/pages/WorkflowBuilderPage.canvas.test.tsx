@@ -2428,6 +2428,216 @@ describe("WorkflowBuilderPage 187-15 — the seed receipt arrives with the draft
   })
 })
 
+// ══════════════════════════════════════════════════════════════════════════════════
+// Phase 187-22 Task 1 (VOCAB-02 / Req 5) — CR-04: THE RECEIPT DESCRIBES ITS OWN
+// GENERATION, AND NOTHING THAT HAPPENED AFTERWARDS
+//
+// APPENDED, a sibling of the 187-15 block above. Every sentence on the card is
+// PAST-TENSE and FIRST-PERSON — "Here's what I built", "so I set them to must prove
+// it", "N steps were already set". The shipped wiring handed the card the LIVE store
+// selector, and `PhaseFormPanel` sits on the same screen writing the very field the
+// card's grounding classification reads. So the author could switch a knowledge-base
+// tool on ten seconds after the receipt arrived and watch it claim their own act as
+// the AI's — CR-01's failure shape for the third time, on the one surface (SC#3) whose
+// entire purpose is that safety is attributed to whoever actually applied it.
+//
+// THE FALSIFICATION LIVES HERE, AT THE PAGE, and not in `SeedReceipt.test.tsx`. The
+// component is a PURE PROJECTION: every count and sentence is recomputed from the
+// `phases` prop on every render. Hand it a mutated array directly and it recomputes,
+// correctly, forever — so a component-level "the card must not change" case could only
+// ever be made green by giving the leaf a hidden cache of its first props, which breaks
+// a second generation's receipt and hides the caller bug instead of fixing it. The
+// defect is in WHERE THE CARD READS FROM, which is the page's, so the fence is the
+// page's. `SeedReceipt.test.tsx` carries the two properties the component genuinely
+// owns (it is a pure projection, and a NEW snapshot replaces the old one).
+//
+// EACH CASE COMPARES AGAINST A CAPTURED ARRIVAL BASELINE, never a hand-typed sentence —
+// a hand-typed expectation drifts in exactly the same silence the copy module exists to
+// break. And each case asserts ITS EDIT LANDED before it asserts the card did not move:
+// without that positive control the case passes trivially on the day the edit path stops
+// working, which is a fence that measures nothing (WR-12).
+// ══════════════════════════════════════════════════════════════════════════════════
+
+describe("WorkflowBuilderPage 187-22 — CR-04: nothing the author does afterwards may change the receipt", () => {
+  const ON = { features: { visual_workflow_canvas: true }, loading: false }
+
+  /** The one KB-reading tool in this block's server palette — the tool the author
+   *  switches ON in case 1, and the reason the agent step is UNGROUNDED at arrival. */
+  const KB_TOOL = "search_documents"
+  /** A tool that reads no documents, so naming it grounds nothing. */
+  const PLAIN_TOOL = "execute_code"
+
+  /**
+   * A generated definition with ZERO sealed steps, so all three counts start at 0 and
+   * each mutation below moves exactly one of them.
+   *
+   *  - `gather` is `programmatic` — no dial, nothing to prove.
+   *  - `judge` is `llm_agent` reaching ONLY for a non-KB tool, so `groundingCauseOf` is
+   *    `null`: not detected (no intersection) and not escalated (no stored bit). It is
+   *    the step case 1 grounds and the step case 3 escalates.
+   *  - `brief` is `llm_emit` carrying `citation_policy: "draft"` — a member of the
+   *    backend Literal `["strict","flag","partial","draft"]` (`harness.py`), chosen
+   *    because the SHIPPED DEFAULT `"strict"` would make it `already-set` and the draft
+   *    would not start at zero.
+   */
+  const cr04Phases = [
+    { slug: "gather", phase_index: 0, config: { phase_type: "programmatic" } },
+    {
+      slug: "judge",
+      phase_index: 1,
+      config: { phase_type: "llm_agent", available_tools: [PLAIN_TOOL] },
+    },
+    { slug: "brief", phase_index: 2, config: { phase_type: "llm_emit", citation_policy: "draft" } },
+  ]
+  const cr04Def = { ...definition, phases: structuredClone(cr04Phases) } as BuilderDefinition
+
+  beforeEach(() => {
+    // The SERVER's palette: both tools are offerable, only one of them reads documents.
+    mockBundle.mockResolvedValue({
+      tools: [KB_TOOL, PLAIN_TOOL],
+      folders: [],
+      skills: [],
+      degraded: [],
+      kb_tools: [KB_TOOL],
+    })
+    mockGenerate.mockResolvedValue({ ok: true, definition: structuredClone(cr04Def) })
+  })
+
+  /** Everything the card says, and every number it exposes — read as ONE value so a
+   *  case cannot accidentally assert on three of the four things that can move. */
+  type Arrival = {
+    text: string
+    grounded: string | null
+    detected: string | null
+    carried: string | null
+  }
+  function readReceipt(): Arrival {
+    const card = screen.getByTestId("seed-receipt")
+    return {
+      text: card.textContent ?? "",
+      grounded: card.getAttribute("data-grounded-count"),
+      detected: card.getAttribute("data-detected-count"),
+      carried: card.getAttribute("data-carried-count"),
+    }
+  }
+
+  /** The node ROOTS only. `[data-testid^='canvas-node-']` alone also matches a card's
+   *  `canvas-node-seal` / `-verdict` / `-technical-line` children, so the `[data-slug]`
+   *  qualifier is what makes "one more node" a statement about steps. */
+  const nodeSlugs = () =>
+    Array.from(document.querySelectorAll("[data-testid^='canvas-node-'][data-slug]")).map(
+      (n) => n.getAttribute("data-slug") ?? "",
+    )
+
+  /** The KB chip in the open inspector, RESOLVED rather than assumed. */
+  function kbChip(): HTMLElement {
+    const found = screen
+      .getAllByTestId("tool-option")
+      .find((el) => el.getAttribute("data-tool") === KB_TOOL)
+    if (!found) throw new Error(`the panel offers no "${KB_TOOL}" chip`)
+    return found
+  }
+
+  /**
+   * Draft through the ONE shipped forward path, capture the arrival baseline the moment
+   * the card lands, then switch to the canvas so the shipped edit affordances are
+   * reachable. Switching views is not an edit — the baseline is taken before it anyway.
+   */
+  async function draftAndOpenCanvas(): Promise<Arrival> {
+    render(
+      <EffectiveFeaturesProvider value={{ ...ON, refetch: vi.fn() }}>
+        <div style={{ width: 1200, height: 800 }}>
+          <WorkflowBuilderPage />
+        </div>
+      </EffectiveFeaturesProvider>,
+    )
+    await screen.findByTestId("describe-hint")
+    fireEvent.change(screen.getByLabelText("business requirement"), {
+      target: { value: "summarise the supplier renewals every week" },
+    })
+    fireEvent.click(screen.getByRole("button", { name: "Draft the workflow" }))
+
+    await screen.findByTestId("seed-receipt")
+    const arrival = readReceipt()
+    // The draft really did start at zero — otherwise a mutation could move a count that
+    // was already non-zero and the comparison would be weaker than it looks.
+    expect(arrival.grounded).toBe("0")
+    expect(arrival.detected).toBe("0")
+    expect(arrival.carried).toBe("0")
+
+    fireEvent.click(screen.getByTestId("builder-view-canvas"))
+    await waitFor(() => expect(screen.getByTestId("canvas-node-judge")).toBeInTheDocument(), LAZY)
+    return arrival
+  }
+
+  /** Select a step the way this suite always does: click its card, wait for its panel. */
+  async function selectStep(slug: string) {
+    fireEvent.click(screen.getByTestId(`canvas-node-${slug}`))
+    await waitFor(
+      () => expect(screen.getByLabelText(`Refine step: ${slug}`)).toBeInTheDocument(),
+      LAZY,
+    )
+  }
+
+  it("CR-04 path 1 — switching a KB tool ON afterwards does not make the card claim it", async () => {
+    const arrival = await draftAndOpenCanvas()
+    await selectStep("judge")
+
+    expect(kbChip()).toHaveAttribute("aria-pressed", "false")
+    fireEvent.click(kbChip())
+
+    // POSITIVE CONTROL — the edit LANDED, in the panel and on the canvas both. A case
+    // that skipped this would go green the day the whitelist rail stopped committing.
+    await waitFor(() => expect(kbChip()).toHaveAttribute("aria-pressed", "true"))
+    await waitFor(() =>
+      expect(
+        within(screen.getByTestId("canvas-node-judge")).getByTestId("canvas-node-seal"),
+      ).toBeInTheDocument(),
+    )
+
+    // …and the receipt is a statement about the generation, so it did not move.
+    expect(readReceipt()).toEqual(arrival)
+  })
+
+  it("CR-04 path 2 — a step the AUTHOR adds is not counted by the card's heading", async () => {
+    const arrival = await draftAndOpenCanvas()
+    const before = nodeSlugs()
+    expect(before).toHaveLength(3)
+
+    fireEvent.click(screen.getByTestId("canvas-insert-2"))
+    fireEvent.click(screen.getByTestId("step-type-choice-llm_single"))
+
+    // POSITIVE CONTROL — the graph really gained a step.
+    await waitFor(() => expect(nodeSlugs()).toHaveLength(4))
+
+    expect(readReceipt()).toEqual(arrival)
+  })
+
+  it("CR-04 path 3 — flipping the grounding dial ON afterwards does not join the carried count", async () => {
+    const arrival = await draftAndOpenCanvas()
+    await selectStep("judge")
+
+    const strict = screen.getByTestId("governance-dial-strict")
+    expect(strict).toHaveAttribute("aria-pressed", "false")
+    fireEvent.click(strict)
+
+    // POSITIVE CONTROL — the author's escalation landed, and the canvas seal followed.
+    await waitFor(() =>
+      expect(screen.getByTestId("governance-dial-strict")).toHaveAttribute("aria-pressed", "true"),
+    )
+    await waitFor(() =>
+      expect(
+        within(screen.getByTestId("canvas-node-judge")).getByTestId("canvas-node-seal"),
+      ).toBeInTheDocument(),
+    )
+
+    // The carried paragraph stays ABSENT and its count stays at its arrival value: the
+    // author turned this on, and the card must not say "was already set to".
+    expect(screen.queryByTestId("seed-receipt-carried")).toBeNull()
+    expect(readReceipt()).toEqual(arrival)
+  })
+})
+
 describe("WorkflowBuilderPage 187-15 — source guards for the two mounts", () => {
   it("still names NO browser-storage API — D-187-09's useState is structural", () => {
     // The shipped guard, restated where the receipt's dismissal decision lives: a
