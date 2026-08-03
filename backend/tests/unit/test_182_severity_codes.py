@@ -311,11 +311,19 @@ def test_known_codes_compose_from_the_owning_modules_with_no_orphan():
     )
 
     # D-187-11, stated as its own falsifiable claim rather than left implicit in the
-    # disjointness above: `unbound_retrieval` is CANVAS-ONLY. It must appear in neither
-    # owning module's published set, because `grounding.grounding_verdicts` is shared with
-    # the publish gate (182-06 made publish enforcing through it) — a code that leaked into
-    # `GROUNDING_VERDICT_CODES` would silently start blocking publishes too, which Phase 187
-    # is explicitly not scoped to do.
+    # disjointness above: `unbound_retrieval` must stay OUT of the SERVER publish gate. It
+    # must therefore appear in neither owning module's published set, because
+    # `grounding.grounding_verdicts` is shared with that gate (182-06 made publish enforcing
+    # through it) — a code that leaked into `GROUNDING_VERDICT_CODES` would silently start
+    # blocking publishes on the SERVER side.
+    #
+    # ⚠ 187-28: this comment used to describe the code as confined to the canvas, and that
+    # was measured FALSE from the author's seat on 2026-08-04 — the verdict reaches the
+    # Builder's `blockedReason` and greys the Publish CONTROL, deliberately (BUG-260731-03).
+    # The claim below is now scoped to the SERVER gate, which is the part that really is
+    # untouched. The corrected long-form reasoning lives above `_ROUTE_ASSIGNED_CODES` in
+    # `app/api/workflows.py`, and both halves are measured in
+    # `tests/unit/test_187_route_assigned_reach.py` and the Builder's canvas suite.
     assert "unbound_retrieval" in set(workflows._ROUTE_ASSIGNED_CODES)
     assert "unbound_retrieval" not in set(reachability.LINT_CODES)
     assert "unbound_retrieval" not in set(grounding.GROUNDING_VERDICT_CODES), (

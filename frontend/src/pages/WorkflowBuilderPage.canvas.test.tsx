@@ -2951,3 +2951,160 @@ describe("WorkflowBuilderPage 187-27 — GAP B: opening a draft ASKS, and the wi
     )
   })
 })
+
+// ══════════════════════════════════════════════════════════════════════════════════
+// Phase 187-28 (GAP C · VOCAB-02) — A ROUTE-ASSIGNED VERDICT GATES THE PUBLISH CONTROL
+//
+// APPENDED; everything above this line is untouched.
+//
+// THE CLAIM THIS BLOCK EXISTS TO PIN. `backend/app/api/workflows.py`'s comment above
+// `_ROUTE_ASSIGNED_CODES` used to say those three codes were confined to the canvas and
+// therefore left publishing untouched from the author's seat. Measured live on 2026-08-04:
+// a draft whose SOLE verdict is `unbound_retrieval` renders `publish-trigger.disabled ===
+// true` with the server's message verbatim beside it. The operator's decision was that the
+// BEHAVIOUR is right — blocking an unbound retrieval workflow before a golden run is spent
+// is what `BUG-260731-03` asked for — and the COMMENT was wrong. 187-28 corrected the
+// comment; this block is the half of the evidence that keeps it corrected.
+//
+// WHY THIS IS NOT COVERED BY WHAT ALREADY SHIPS. Two nearby cases look like it and are not:
+//   * 184-11's "the reason is the FIRST verdict's message VERBATIM" sends a MIXED list, so
+//     the `.find(v => v.severity !== "incomplete")` arm matches and the fallback is never
+//     exercised.
+//   * 187-27's "…an ok:false answer names the VERDICT verbatim" sends `unbound_retrieval`
+//     at severity `"error"` — again the `.find` arm.
+// The route classifies `unbound_retrieval` as `incomplete` (D-182-03 / D-187-11), so the
+// SHIPPING shape is an `incomplete`-ONLY envelope, which reaches the button only through
+// `?? validation.verdicts[0]`. That half-expression is the entire mechanism of GAP C and
+// nothing was measuring it. Observed RED by deleting it (probe P-27).
+//
+// THE CONTROLS ARE THE POINT. A single green case here would not distinguish "an
+// incomplete-only ok:false blocks" from "a non-empty tray blocks" or from "the page blocks
+// whenever the loop has answered at all". The two controls below rule both out.
+// ══════════════════════════════════════════════════════════════════════════════════
+
+describe("WorkflowBuilderPage 187-28 — a route-assigned verdict GATES the Publish control", () => {
+  /** The real gauntlet through the shipped `renderPublish` seam — the composed surface the
+   *  184-11 R12 and 187-27 blocks both measure, so the trigger and its reason are real. */
+  function renderPublishable(features: { features: EffectiveFeatures; loading: boolean }) {
+    return render(
+      <EffectiveFeaturesProvider value={{ ...features, refetch: vi.fn() }}>
+        <div style={{ width: 1200, height: 800 }}>
+          <WorkflowBuilderPage
+            initial={{ definition, draftId: "draft-1" }}
+            renderPublish={(d, id, blockedReason) => (
+              <PublishGauntlet
+                definitionId={id ?? "draft-1"}
+                definition={d as never}
+                blockedReason={blockedReason}
+              />
+            )}
+          />
+        </div>
+      </EffectiveFeaturesProvider>,
+    )
+  }
+
+  /** The route's OWN wording for the D-187-11 verdict, kept in the shape
+   *  `backend/app/api/workflows.py` mints it (`phase '<slug>' reads your documents, but
+   *  this workflow is not bound to a knowledge base — it would search everything`). The
+   *  string matters only in that the client must reproduce it BYTE FOR BYTE: the page never
+   *  rewrites, maps or re-words a server verdict (D-182-06 — the client never classifies). */
+  const UNBOUND_MESSAGE =
+    "phase 'research' reads your documents, but this workflow is not bound to a knowledge " +
+    "base — it would search everything"
+
+  it("an ok:false whose SOLE verdict is an INCOMPLETE route-assigned code disables Publish", async () => {
+    // The exact envelope the live Builder receives for an unbound retrieval draft: one
+    // verdict, severity `incomplete`, nothing else. This is the shape the old comment said
+    // could not reach publishing.
+    mockValidate.mockResolvedValue({
+      ok: false,
+      verdicts: [
+        {
+          code: "unbound_retrieval",
+          phase: "research",
+          message: UNBOUND_MESSAGE,
+          severity: "incomplete",
+        },
+      ],
+    })
+    renderPublishable(FLAG_ON)
+
+    const reason = await screen.findByTestId("publish-blocked-reason", undefined, {
+      timeout: 3000,
+    })
+    await waitFor(() => expect(reason.textContent).toBe(UNBOUND_MESSAGE), { timeout: 3000 })
+
+    // VERBATIM — not rewritten, not mapped, not softened because the severity is grey.
+    expect(reason.textContent).toBe(UNBOUND_MESSAGE)
+    const trigger = screen.getByTestId("publish-trigger")
+    expect(trigger).toBeDisabled()
+    // R12: greying alone is not enough — the reason must be REACHABLE from the control.
+    expect(trigger.getAttribute("aria-describedby")).toBe(reason.getAttribute("id"))
+    // …and it is the SERVER's sentence, never the never-ran one: the check DID run here.
+    expect(reason.textContent).not.toBe(DEGRADED_SENTENCE["not-run"])
+  })
+
+  it("CONTROL A — a MIXED list still leads with the error, so incompletes are not merely 'first'", async () => {
+    // Ranked ordering is the shipped behaviour (184-11 R12) and it is asserted HERE too, so
+    // the case above cannot be "fixed" later by dropping incompletes from consideration: any
+    // such change reds the case above, and this one proves the ordering it would claim to
+    // protect is already intact without it.
+    mockValidate.mockResolvedValue({
+      ok: false,
+      verdicts: [
+        {
+          code: "unbound_retrieval",
+          phase: "research",
+          message: UNBOUND_MESSAGE,
+          severity: "incomplete",
+        },
+        {
+          code: "orphan_phase",
+          phase: "draft",
+          message: "Nothing leads to this step.",
+          severity: "error",
+        },
+      ],
+    })
+    renderPublishable(FLAG_ON)
+
+    await waitFor(
+      () =>
+        expect(screen.getByTestId("publish-blocked-reason").textContent).toBe(
+          "Nothing leads to this step.",
+        ),
+      { timeout: 3000 },
+    )
+    // The error wins even though the server listed the incomplete one FIRST.
+    expect(screen.getByTestId("publish-blocked-reason").textContent).not.toBe(UNBOUND_MESSAGE)
+    expect(screen.getByTestId("publish-trigger")).toBeDisabled()
+  })
+
+  it("CONTROL B — ok:true with ZERO verdicts leaves Publish ENABLED on the very same mount", async () => {
+    // Rules out the vacuous reading of the first case. Same definition, same composition,
+    // same settled loop — only the envelope differs. So the block above is provably about
+    // `ok:false`, and not about "the loop answered" or "the tray is non-empty".
+    mockValidate.mockResolvedValue({ ok: true, verdicts: [] })
+    renderPublishable(FLAG_ON)
+
+    await waitFor(() => expect(screen.getByTestId("publish-trigger")).not.toBeDisabled(), {
+      timeout: 3000,
+    })
+    expect(screen.queryByTestId("publish-blocked-reason")).toBeNull()
+  })
+
+  it("the SERVER gate is a different surface — the client shows a reason, it does not judge", async () => {
+    // The other half of the corrected comment, from the client's side. The page renders the
+    // server's string and nothing else: no severity is re-derived, no code is interpreted,
+    // and the message is not assembled locally (D-182-06 — the client never classifies).
+    // A page that built this sentence itself would keep working with the server silent,
+    // which is exactly the drift `blockedReason` must never acquire.
+    expect(builderSource).not.toMatch(/unbound_retrieval/)
+    expect(builderSource).not.toMatch(/not bound to a knowledge base/)
+    // POSITIVE CONTROL — the matcher really would catch a locally-authored copy.
+    expect("      if (code === \"unbound_retrieval\") return LOCAL_COPY").toMatch(
+      /unbound_retrieval/,
+    )
+  })
+})
