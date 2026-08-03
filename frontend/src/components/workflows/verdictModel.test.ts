@@ -340,7 +340,7 @@ describe("verdictModel — 187-27: the third check state and the words it may no
     const EXHAUSTIVE: Record<TrayCheckCause, true> = {
       unreadable: true,
       unreachable: true,
-      unchecked: true,
+      "not-run": true,
     }
     expect([...ALL_CAUSES].sort()).toEqual(Object.keys(EXHAUSTIVE).sort())
 
@@ -357,15 +357,15 @@ describe("verdictModel — 187-27: the third check state and the words it may no
 
   it("the third sentence is DISTINCT from both shipped ones AND from the clean line", () => {
     // By identity against the exports — never against a re-typed copy of any of them.
-    expect(DEGRADED_SENTENCE.unchecked).not.toBe(DEGRADED_SENTENCE.unreadable)
-    expect(DEGRADED_SENTENCE.unchecked).not.toBe(DEGRADED_SENTENCE.unreachable)
-    expect(DEGRADED_SENTENCE.unchecked).not.toBe(NOTHING_OUTSTANDING)
-    expect(DEGRADED_SENTENCE.unchecked.trim()).not.toBe("")
+    expect(DEGRADED_SENTENCE["not-run"]).not.toBe(DEGRADED_SENTENCE.unreadable)
+    expect(DEGRADED_SENTENCE["not-run"]).not.toBe(DEGRADED_SENTENCE.unreachable)
+    expect(DEGRADED_SENTENCE["not-run"]).not.toBe(NOTHING_OUTSTANDING)
+    expect(DEGRADED_SENTENCE["not-run"].trim()).not.toBe("")
   })
 
   it("it claims no pass and attributes nothing to the server — and neither does any sibling", () => {
-    expect(DEGRADED_SENTENCE.unchecked).not.toMatch(PASS_CLAIM)
-    expect(DEGRADED_SENTENCE.unchecked).not.toMatch(/\bserver\b/i)
+    expect(DEGRADED_SENTENCE["not-run"]).not.toMatch(PASS_CLAIM)
+    expect(DEGRADED_SENTENCE["not-run"]).not.toMatch(/\bserver\b/i)
     // The property is stated over the WHOLE union, so a fourth cause cannot arrive with
     // a pass claim in it and pass this file.
     for (const cause of ALL_CAUSES) {
@@ -385,9 +385,9 @@ describe("verdictModel — 187-27: the third check state and the words it may no
 
     // POSITIVE controls, WELDED ONTO THE SHIPPED STRING — the fence is proved able to
     // fire on the very sentence it guards, not merely on a literal chosen to match.
-    expect(`${DEGRADED_SENTENCE.unchecked} Everything passed.`).toMatch(PASS_CLAIM)
-    expect(`${DEGRADED_SENTENCE.unchecked} · checked by the server`).toMatch(PASS_CLAIM)
-    expect(`${DEGRADED_SENTENCE.unchecked} the server said so`).toMatch(/\bserver\b/i)
+    expect(`${DEGRADED_SENTENCE["not-run"]} Everything passed.`).toMatch(PASS_CLAIM)
+    expect(`${DEGRADED_SENTENCE["not-run"]} · checked by the server`).toMatch(PASS_CLAIM)
+    expect(`${DEGRADED_SENTENCE["not-run"]} the server said so`).toMatch(/\bserver\b/i)
     // …and the clean line, which DOES claim the static pass, is caught by the same class.
     expect(NOTHING_OUTSTANDING).toMatch(PASS_CLAIM)
   })

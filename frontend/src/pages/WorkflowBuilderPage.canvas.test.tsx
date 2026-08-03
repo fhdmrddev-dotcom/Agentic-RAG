@@ -140,6 +140,9 @@ import { nodeTitle, PHASE_TYPE_SENTENCES } from "@/components/workflows/phaseVoc
 // Phase 185-08: the ONE home of the locked-row sentence. IMPORTED, never re-typed, so
 // the assertions below are character-identity rather than a second copy of the copy.
 import { GOVERNANCE_GATE_ROW_LABEL } from "@/components/workflows/definitionOps"
+// Phase 187-27 (GAP B), on its own line so this file's diff stays additive: the sentence
+// a surface says when no check has run. Compared by IDENTITY below, never re-typed.
+import { DEGRADED_SENTENCE } from "@/components/workflows/verdictModel"
 
 mockReactFlow()
 
@@ -584,8 +587,22 @@ describe("WorkflowBuilderPage 184-11 — no positional key can reach a draft pay
   })
 })
 
-describe("WorkflowBuilderPage 184-11 — nothing validates before the first edit (D-184-15)", () => {
-  it("mounting a draft calls validateWorkflow ZERO times and renders no verdict mark", async () => {
+describe("WorkflowBuilderPage 184-11 — what starts the loop (D-184-15, narrowed by 187-27)", () => {
+  /**
+   * REWRITTEN IN PLACE by 187-27 (GAP B), not deleted — and named here because a rewrite
+   * of a shipped guard has to be visible rather than discovered.
+   *
+   * As shipped this case asserted ZERO validate calls on a drafted definition WITH steps,
+   * which is precisely the fail-open GAP B measured: the canvas then rendered *"the static
+   * checks pass · checked by the server"* and left Publish ENABLED over a check nobody had
+   * made. The case was asserting the DEFECT. D-184-15's own stated reason is about a draft
+   * with NO steps — and that reason is preserved exactly, asserted still at ZERO, in the
+   * 187-27 block at the end of this file.
+   *
+   * The rest of the case is untouched: a check that has been ISSUED still claims no
+   * verdict, so no mark may render before an answer lands.
+   */
+  it("mounting a draft ISSUES the check (187-27) and still claims no verdict until it answers", async () => {
     renderBuilder(FLAG_ON)
     await screen.findByTestId("builder-view-toggle")
     fireEvent.click(screen.getByTestId("builder-view-canvas"))
@@ -594,7 +611,7 @@ describe("WorkflowBuilderPage 184-11 — nothing validates before the first edit
     // Long enough to clear the loop's own 500 ms debounce — an assertion taken before it
     // would be green on a loop that simply had not fired YET.
     await new Promise((resolve) => setTimeout(resolve, 700))
-    expect(mockValidate).toHaveBeenCalledTimes(0)
+    expect(mockValidate.mock.calls.length).toBeGreaterThanOrEqual(1)
     expect(screen.queryAllByTestId("phase-node-verdict")).toHaveLength(0)
   })
 
@@ -1072,6 +1089,12 @@ describe("WorkflowBuilderPage 184-12 — growing the flow, and the two refusals"
 
   it("R10 — the refusal consults the server ZERO times", async () => {
     await openCanvasOn(withFallback)
+    // 187-27 rewrote the INSTRUMENT, not the property. The open now issues one check of
+    // its own, so "the refusal asked nothing" can no longer be carried by an absolute
+    // count over the whole mount — it is a DIFFERENTIAL across the gesture. The open's
+    // own check is settled first, so the count cannot move for a reason that has nothing
+    // to do with the gesture being measured.
+    await waitFor(() => expect(mockValidate).toHaveBeenCalledTimes(1), { timeout: 3000 })
     const validateCallsBefore = mockValidate.mock.calls.length
 
     fireEvent.click(screen.getByTestId("canvas-remove-escalate"))
@@ -1080,7 +1103,6 @@ describe("WorkflowBuilderPage 184-12 — growing the flow, and the two refusals"
     await new Promise((resolve) => setTimeout(resolve, 700))
 
     expect(mockValidate.mock.calls.length).toBe(validateCallsBefore)
-    expect(mockValidate).toHaveBeenCalledTimes(0)
     expect(mockUpdate).toHaveBeenCalledTimes(0)
   })
 
@@ -1586,20 +1608,31 @@ describe("WorkflowBuilderPage 185-08 — the client-synthesized locked gate row"
   })
 
   it("D-185-19 — the row is synthesized LOCALLY; /workflows/validate is never asked for it", async () => {
+    // 187-27 rewrote the INSTRUMENT, not the property. The open now issues a check of its
+    // own, so an absolute "zero calls" can no longer carry "nothing waits on the server
+    // for this row". The property is now measured DIRECTLY and more strongly: the check
+    // is held UNANSWERED for the whole case, so nothing the server said can possibly be
+    // the row's source — the row is on screen with the transport having replied nothing.
+    mockValidate.mockReturnValue(new Promise<never>(() => {}))
+
     await openResearch(["search_documents"], "detected")
     expect((await screen.findAllByTestId("gate-row"))[0].textContent).toContain(
       GOVERNANCE_GATE_ROW_LABEL,
     )
 
-    // Well past the live loop's 500 ms debounce, so "zero" is not "not yet".
+    // Well past the live loop's 500 ms debounce: the request has been issued and has
+    // answered nothing, and the row is there regardless.
     await new Promise((resolve) => setTimeout(resolve, 700))
-    expect(mockValidate).toHaveBeenCalledTimes(0)
+    expect(screen.getAllByTestId("gate-row")).toHaveLength(1)
 
-    // POSITIVE CONTROL — the very same spy DOES fire once the page has a reason to ask.
-    // Without this the assertion above would be green on a spy wired to nothing.
+    // POSITIVE CONTROL — the very same spy DOES fire AGAIN once the page has a new reason
+    // to ask. Without this the reading above would be green on a spy wired to nothing.
+    const askedBefore = mockValidate.mock.calls.length
     const field = await screen.findByLabelText(/instructions/i)
     fireEvent.change(field, { target: { value: "search the vendor corpus" } })
-    await waitFor(() => expect(mockValidate).toHaveBeenCalled(), { timeout: 3000 })
+    await waitFor(() => expect(mockValidate.mock.calls.length).toBeGreaterThan(askedBefore), {
+      timeout: 3000,
+    })
   })
 
   it("the dial writes through the store, and every other phase stays toBe-identical", async () => {
@@ -1862,6 +1895,13 @@ describe("WorkflowBuilderPage 186-16 — an outstanding write blocks publish (WR
 
     // The reading BEFORE the write, captured rather than assumed: this row is about the
     // saving branch, not about what the fixture's validation happens to say.
+    //
+    // 187-27 STRENGTHENED this capture rather than weakening the equality below. The open
+    // now issues its own check, so a baseline taken on the first frame would catch the
+    // TRANSIENT never-ran sentence and the equality at the end would then be comparing two
+    // different moments. Waiting for that check to answer makes `before` a SETTLED reading,
+    // which is what "returns to whatever it was before the write" was always meant to say.
+    await waitFor(() => expect(latest()).toBeNull(), { timeout: 3000 })
     const before = latest()
 
     await editOnce("search the vendor corpus")
@@ -2712,5 +2752,202 @@ describe("WorkflowBuilderPage 187-15 — source guards for the two mounts", () =
     // The door writes into the describe box and nothing else — the seam is `setDescribe`,
     // never `initialDescribe` (an UPSTREAM prop that is not settable from inside the page).
     expect(builderSource).toMatch(/onChoose=\{setDescribe\}/)
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════════════
+// Phase 187-27 (GAP B · VOCAB-02) — THE CHECK RUNS ON OPEN, AND UNTIL IT ANSWERS
+// PUBLISH SAYS SO
+//
+// APPENDED; everything above this line is untouched except one added import statement
+// and the in-place rewrite of the two shipped cases that PINNED the defect (each named
+// in the plan's summary, none deleted).
+//
+// THE MEASURED DEFECT. Opening an existing draft into the canvas issued ZERO
+// `POST /workflows/validate` calls — the operator's own session recorded
+// `validateCallsMade: 0` — and yet the tray read *"Nothing to fix — the static checks
+// pass · checked by the server"* and Publish stayed ENABLED, for a definition the server
+// marks `ok:false` the moment it is asked. That is verbatim the shape the page's own
+// `blockedReason` docblock forbids: *a check that did NOT RUN must never unblock a
+// publish (D-184-14, fail-closed)*. The rule as shipped covered `degraded` and did not
+// cover NEVER-RAN.
+//
+// BOTH HALVES SHIP TOGETHER, because either alone is wrong. Fail-closed alone would
+// leave every opened draft permanently unpublishable until the author made a pointless
+// edit — a fail-closed state a person cannot escape is a new defect, not a fix.
+// Validate-on-open alone leaves the debounce-plus-request window lying, and leaves the
+// lie standing outright while the first request is in flight.
+//
+// D-184-15 IS NARROWED, DELIBERATELY AND IN THE OPEN, NOT OVERRULED. Its stated reason
+// is that *a brand-new zero-step draft is never greeted with a not-ok envelope and a
+// full problems tray* — a statement about an EMPTY draft. `phases.length > 0` preserves
+// it exactly, and the zero-step case below proves it rather than claiming it. D-181-01 is
+// preserved by `canvasEnabled &&`, and that half-line gets its own falsification.
+// ══════════════════════════════════════════════════════════════════════════════════
+
+describe("WorkflowBuilderPage 187-27 — GAP B: opening a draft ASKS, and the window fails closed", () => {
+  /** A promise this file settles by hand, so "while the answer is outstanding" is a state
+   *  the case CONTROLS rather than a race it hopes to win. */
+  function deferred<T>() {
+    let settle!: (value: T) => void
+    const promise = new Promise<T>((resolve) => {
+      settle = resolve
+    })
+    return { promise, settle }
+  }
+
+  /** The real gauntlet through the shipped `renderPublish` seam — the same composition
+   *  the 184-11 R12 block uses, so the trigger and its reason are the composed surface. */
+  function renderPublishable(
+    features: { features: EffectiveFeatures; loading: boolean },
+    def: BuilderDefinition = definition,
+  ) {
+    return render(
+      <EffectiveFeaturesProvider value={{ ...features, refetch: vi.fn() }}>
+        <div style={{ width: 1200, height: 800 }}>
+          <WorkflowBuilderPage
+            initial={{ definition: def, draftId: "draft-1" }}
+            renderPublish={(d, id, blockedReason) => (
+              <PublishGauntlet
+                definitionId={id ?? "draft-1"}
+                definition={d as never}
+                blockedReason={blockedReason}
+              />
+            )}
+          />
+        </div>
+      </EffectiveFeaturesProvider>,
+    )
+  }
+
+  const zeroStepDraft: BuilderDefinition = { ...definition, phases: [] }
+
+  it("VALIDATE-ON-OPEN — mounting a drafted definition WITH steps asks the server, on no edit at all", async () => {
+    renderPublishable(FLAG_ON)
+    await screen.findByTestId("builder-view-toggle")
+
+    // The measurement that returned 0 in the operator's session. `waitFor` clears the
+    // loop's own 500 ms debounce, so a green here is an issued request and not a guess.
+    await waitFor(() => expect(mockValidate.mock.calls.length).toBeGreaterThanOrEqual(1), {
+      timeout: 3000,
+    })
+    // …and nothing was EDITED to cause it: no field was changed and no write was made.
+    expect(mockUpdate).toHaveBeenCalledTimes(0)
+    expect(mockCreate).toHaveBeenCalledTimes(0)
+    expect(mockGenerate).toHaveBeenCalledTimes(0)
+  })
+
+  it("THE FAIL-CLOSED WINDOW — while the answer is outstanding, Publish is DISABLED and names why", async () => {
+    const answer = deferred<{ ok: boolean; verdicts: never[] }>()
+    mockValidate.mockReturnValue(answer.promise)
+
+    renderPublishable(FLAG_ON)
+    const trigger = await screen.findByTestId("publish-trigger")
+
+    // Before the debounce even elapses — nobody has asked yet, so nothing may be claimed.
+    expect(trigger).toBeDisabled()
+    const reason = screen.getByTestId("publish-blocked-reason")
+    expect(reason.textContent).toBe(DEGRADED_SENTENCE["not-run"])
+    // R12: greying alone is not enough — the reason must be REACHABLE from the control.
+    expect(trigger.getAttribute("aria-describedby")).toBe(reason.getAttribute("id"))
+
+    // …and it is STILL the reason once the request is genuinely in flight, which is the
+    // half validate-on-open alone would have left lying.
+    await waitFor(() => expect(mockValidate).toHaveBeenCalled(), { timeout: 3000 })
+    expect(screen.getByTestId("publish-blocked-reason").textContent).toBe(
+      DEGRADED_SENTENCE["not-run"],
+    )
+    expect(screen.getByTestId("publish-trigger")).toBeDisabled()
+  })
+
+  it("…and an ok:true answer RELEASES it — the window closes on its own, with no author edit", async () => {
+    // The half that makes fail-closed liveable: an author who opens a healthy draft is
+    // never asked to make a pointless edit to escape a refusal.
+    mockValidate.mockResolvedValue({ ok: true, verdicts: [] })
+    renderPublishable(FLAG_ON)
+
+    await waitFor(() => expect(screen.getByTestId("publish-trigger")).not.toBeDisabled(), {
+      timeout: 3000,
+    })
+    expect(screen.queryByTestId("publish-blocked-reason")).toBeNull()
+  })
+
+  it("…and an ok:false answer names the VERDICT verbatim, never the unchecked sentence", async () => {
+    // `unbound_retrieval` is the finding that made this window routinely non-empty — a
+    // freshly-opened draft commonly carries it, which is why the lie was not rare.
+    const message = "This step reads your documents, but no knowledge base is bound."
+    mockValidate.mockResolvedValue({
+      ok: false,
+      verdicts: [
+        { code: "unbound_retrieval", phase: "research", message, severity: "error" },
+      ],
+    })
+    renderPublishable(FLAG_ON)
+
+    await waitFor(
+      () => expect(screen.getByTestId("publish-blocked-reason").textContent).toBe(message),
+      { timeout: 3000 },
+    )
+    expect(screen.getByTestId("publish-trigger")).toBeDisabled()
+    expect(screen.getByTestId("publish-blocked-reason").textContent).not.toBe(
+      DEGRADED_SENTENCE["not-run"],
+    )
+  })
+
+  it("D-181-01 — with the flag OFF the VERY SAME open issues ZERO validate requests", async () => {
+    // THE PIN THAT GUARDS THE HALF-LINE. Without `canvasEnabled &&` in the enabled
+    // expression a flag-off Builder would issue a request it does not issue today, and
+    // "byte-identical to today" would be false. Observed RED by deleting that guard.
+    renderPublishable(FLAG_OFF)
+    await waitFor(() => expect(screen.getByTestId("builder-grid")).toBeInTheDocument())
+
+    // Well past the 500 ms debounce, so "zero" is not "not yet".
+    await new Promise((resolve) => setTimeout(resolve, 900))
+    expect(mockValidate).toHaveBeenCalledTimes(0)
+
+    // …and the flag-off publish trigger is the control that shipped: enabled, unexplained.
+    expect(screen.getByTestId("publish-trigger")).not.toBeDisabled()
+    expect(screen.queryByTestId("publish-blocked-reason")).toBeNull()
+  })
+
+  it("D-184-15 SURVIVES — a ZERO-STEP draft still asks nothing, and still gets its invitation", async () => {
+    // The narrowing is PROVED here rather than claimed: the empty canvas keeps its
+    // invitation, which is not a claimed verdict and therefore not client-side validation.
+    renderPublishable(FLAG_ON, zeroStepDraft)
+    const trigger = await screen.findByTestId("publish-trigger")
+
+    await new Promise((resolve) => setTimeout(resolve, 900))
+    expect(mockValidate).toHaveBeenCalledTimes(0)
+    expect(trigger).toBeDisabled()
+    expect(screen.getByTestId("publish-blocked-reason").textContent).toBe(EMPTY_DRAFT_INVITATION)
+    expect(screen.getByTestId("publish-blocked-reason").textContent).not.toBe(
+      DEGRADED_SENTENCE["not-run"],
+    )
+  })
+
+  it("THE TRAY AGREES WITH THE TRIGGER — one never-ran state, never two stories", async () => {
+    const answer = deferred<{ ok: boolean; verdicts: never[] }>()
+    mockValidate.mockReturnValue(answer.promise)
+
+    renderPublishable(FLAG_ON)
+    await screen.findByTestId("builder-view-toggle")
+    fireEvent.click(screen.getByTestId("builder-view-canvas"))
+    await waitFor(() => expect(screen.getByTestId("problems-tray")).toBeInTheDocument(), LAZY)
+
+    // The canvas session carries the SAME cause the publish trigger is reading, so the
+    // bottom of the screen and the top of it cannot tell a person two different things.
+    expect(screen.getByTestId("problems-tray").getAttribute("data-degraded")).toBe("not-run")
+    expect(screen.getByTestId("problems-tray-degraded").textContent).toBe(
+      DEGRADED_SENTENCE["not-run"],
+    )
+    // The two affordances the operator actually saw on this screen are both gone.
+    expect(screen.queryByTestId("problems-tray-counts")).toBeNull()
+    expect(screen.getByTestId("problems-tray").textContent ?? "").not.toContain(
+      "checked by the server",
+    )
+    expect(screen.getByTestId("publish-trigger")).toBeDisabled()
+    expect(screen.getByTestId("publish-blocked-reason").textContent).toBe(
+      DEGRADED_SENTENCE["not-run"],
+    )
   })
 })

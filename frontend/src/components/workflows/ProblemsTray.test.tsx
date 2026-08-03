@@ -458,19 +458,19 @@ describe("ProblemsTray — 187-08: a row and the card name one step the same way
 // ══════════════════════════════════════════════════════════════════════════════════
 
 describe("ProblemsTray — 187-27: a check that never RAN says so, and claims nothing", () => {
-  it("counts, beat and empty paragraph are ABSENT for `unchecked` — and the CONTROL proves all three DO render for `null`", () => {
+  it("counts, beat and empty paragraph are ABSENT for `not-run` — and the CONTROL proves all three DO render for `null`", () => {
     // THE NEVER-RAN STATE, exactly as a freshly-opened draft sits in it: no verdicts,
     // nothing in flight, and no request has been issued yet.
-    const never = renderTray({ open: true, degraded: "unchecked", checking: false }, [])
+    const never = renderTray({ open: true, degraded: "not-run", checking: false }, [])
 
     expect(screen.queryByTestId("problems-tray-counts")).toBeNull()
     expect(screen.queryByTestId("problems-tray-beat")).toBeNull()
     expect(screen.queryByTestId("problems-tray-empty")).toBeNull()
     // What it says INSTEAD — compared to the export, so a rewording moves both together.
     expect(screen.getByTestId("problems-tray-degraded").textContent).toBe(
-      DEGRADED_SENTENCE.unchecked,
+      DEGRADED_SENTENCE["not-run"],
     )
-    expect(screen.getByTestId("problems-tray").getAttribute("data-degraded")).toBe("unchecked")
+    expect(screen.getByTestId("problems-tray").getAttribute("data-degraded")).toBe("not-run")
     // Nothing anywhere in the rendered tray reads as clean, passing or server-attributed.
     expect(never.container.textContent ?? "").not.toMatch(CLEAN_AFFORDANCE)
     never.unmount()
@@ -487,7 +487,7 @@ describe("ProblemsTray — 187-27: a check that never RAN says so, and claims no
   })
 
   it("a check now IN FLIGHT beats, and STILL never shows the resting attribution", () => {
-    const { container } = renderTray({ open: true, degraded: "unchecked", checking: true }, [])
+    const { container } = renderTray({ open: true, degraded: "not-run", checking: true }, [])
     expect(screen.getByTestId("problems-tray-beat").textContent).toBe("checking…")
     // The resting attribution is the one word-for-word claim that a server did the
     // checking. It may not appear while the answer is still outstanding.
@@ -513,15 +513,15 @@ describe("ProblemsTray — 187-27: a check that never RAN says so, and claims no
     }
   })
 
-  it("held-stale findings still render under `unchecked`, exactly as under the other causes", () => {
+  it("held-stale findings still render under `not-run`, exactly as under the other causes", () => {
     // Reachable on a SECOND open of a draft whose store still carries the last answer:
     // the findings are still true and hiding them would be a quieter way of replacing
     // them with silence. The clean COUNTS line comes back because it is no longer clean.
-    renderTray({ open: true, degraded: "unchecked", checking: false }, [
+    renderTray({ open: true, degraded: "not-run", checking: false }, [
       verdict({ phase: "draft", severity: "error", message: "a real finding from before" }),
     ])
     expect(screen.getByTestId("problems-tray-degraded").textContent).toBe(
-      DEGRADED_SENTENCE.unchecked,
+      DEGRADED_SENTENCE["not-run"],
     )
     expect(screen.getByTestId("problems-tray-row-draft-0")).toBeInTheDocument()
     expect(screen.getByTestId("problems-tray-counts").textContent).toBe("1 problem")

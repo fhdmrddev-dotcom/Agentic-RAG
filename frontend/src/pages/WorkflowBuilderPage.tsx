@@ -187,6 +187,7 @@ import {
 } from "@/hooks/useDraftPersistence"
 import { useGroundingBundle } from "@/hooks/useGroundingBundle"
 import { DEGRADED_SENTENCE, groupVerdicts } from "@/components/workflows/verdictModel"
+import { isCheckOutstanding } from "@/components/workflows/verdictModel" // 187-27 (GAP B)
 import { clearNudges, readNudges, writeNudge } from "@/components/workflows/canvasNudge"
 import {
   canRemovePhase,
@@ -783,6 +784,7 @@ export function WorkflowBuilderPage({
    * has in common — a new `phases` reference — and excludes DOCUMENT transitions, which
    * always replace `meta` (a fresh object) and usually `builderPhase` too. Generating or
    * opening a workflow is not something the author edited, so it must not start the loop.
+   * 187-27 NARROWS that last sentence, deliberately and in the open: D-184-15's reason is about a draft with NO steps ("never greeted with a not-ok envelope"), and applied to one that already HAS steps it produced a fail-open — a canvas claiming "the static checks pass · checked by the server" over a check nobody made, with Publish enabled. So the loop's `enabled` is now `hasEdited || (canvasEnabled && phases.length > 0)`: `phases.length > 0` keeps D-184-15's stated reason exactly (the empty canvas still shows its INVITATION), and `canvasEnabled &&` keeps D-181-01 (a flag-off Builder issues precisely the requests it issues today, pinned at zero). `hasEdited` itself is unchanged and still owns the post-edit loop.
    *
    * Deliberately NOT reused: the store's `dirty`, which `markSaved()` clears — a save
    * would then switch validation back off.
@@ -804,7 +806,8 @@ export function WorkflowBuilderPage({
    * contract `useLiveValidation`'s docblock states, and the difference between a
    * debounced request per edit and one per keystroke of React re-render.
    */
-  const validation = useLiveValidation(definition as WorkflowDefinitionJSON | null, hasEdited)
+  // 187-27 (GAP B): also on OPEN, for a flag-on draft that already has steps — see the `hasEdited` docblock.
+  const validation = useLiveValidation(definition as WorkflowDefinitionJSON | null, hasEdited || (canvasEnabled && phases.length > 0))
 
   /**
    * Mirror the loop's answer into the store's UNTRACKED half, so the marks (canvas) and
@@ -1123,6 +1126,8 @@ export function WorkflowBuilderPage({
     if (persistState.kind === "saving") return SAVING_PUBLISH_WAIT
     if (!canvasEnabled || builderPhase !== "drafted") return null
     if (phases.length === 0) return EMPTY_DRAFT_INVITATION
+    // 187-27 (GAP B): NEVER-RAN is fail-closed too — D-184-14's rule for a check that did not run.
+    if (isCheckOutstanding(validation.kind)) return DEGRADED_SENTENCE["not-run"]
     if (validation.kind === "degraded") return DEGRADED_SENTENCE[validation.cause]
     if (validation.kind !== "verdicts" || validation.ok) return null
     const first =
@@ -1368,7 +1373,8 @@ export function WorkflowBuilderPage({
       // The store's cause is the persisted mirror; the tray's vocabulary is the loop's.
       // One translation, in the one place that has both (`"422"` is the unreadable shape,
       // `"network"` is the one worth retrying).
-      degraded: storeDegraded === null ? null : storeDegraded.kind === "422" ? "unreadable" : "unreachable",
+      // 187-27 (GAP B): never-ran OUTRANKS the mirror — a stale cause must not word a check nobody has made.
+      degraded: isCheckOutstanding(validation.kind) ? "not-run" : storeDegraded === null ? null : storeDegraded.kind === "422" ? "unreadable" : "unreachable",
       checking,
       trayOpen,
       onToggleTray: toggleTray,
@@ -1381,6 +1387,7 @@ export function WorkflowBuilderPage({
     persistence,
     onTidyUp,
     verdictGroups,
+    validation,
     storeDegraded,
     checking,
     trayOpen,

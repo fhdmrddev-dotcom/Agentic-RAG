@@ -96,7 +96,7 @@ export const NOTHING_OUTSTANDING = "Nothing to fix — the static checks pass"
  * none of them may EVER be swapped for silence or for the clean line above, because "we
  * could not check" rendering as "fine" is the single worst thing this surface can do.
  *
- * ── WHY `unchecked` IS A MEMBER AND NOT A FORK (187-27, GAP B) ──
+ * ── WHY `not-run` IS A MEMBER AND NOT A FORK (187-27, GAP B) ──
  * The obvious-looking tidy-up is to "fix the naming" by splitting never-ran off into its
  * own boolean, on the grounds that nothing degraded. Do not: every surface that reads
  * this union reads it to answer ONE question — *may I speak as though a check answered?*
@@ -105,13 +105,23 @@ export const NOTHING_OUTSTANDING = "Nothing to fix — the static checks pass"
  * fail-open this widening closed. `DegradedValidationCause` stays exactly what the LOOP
  * can emit; `TrayCheckCause` is what a SURFACE can be in, and it is deliberately wider.
  *
+ * ── AND WHY IT IS SPELLED `not-run` RATHER THAN THE OBVIOUS WORD ──
+ * DO NOT "TIDY" THIS SPELLING. The obvious single word for this member is on the graded
+ * governance never-say list (`references/graded-governance.md` §VOCABULARY, binding —
+ * *"Judgement is not a gap"*), and `governanceVocabulary.test.ts` sweeps every string
+ * literal in this tree for it with the TypeScript parser. That sweep is deliberately
+ * blunt: it does not care whether a literal is copy or a discriminant, because the way
+ * banned copy actually arrives is somebody copying a nearby machine token into a
+ * sentence. Renaming the member was the cheap side of that trade; adding an exemption to
+ * a shipped governance fence to fit a spelling would have been the expensive one.
+ *
  * They live in this module, and not beside the component that says them, for a
  * mechanical reason worth writing down: a component file may not export shared
  * constants (`react-refresh/only-export-components`). It is also the right home —
  * every word a surface says ABOUT a check now sits in one pure module, next to the
  * resting-state line it has to be chosen against.
  */
-export type TrayCheckCause = DegradedValidationCause | "unchecked"
+export type TrayCheckCause = DegradedValidationCause | "not-run"
 
 export const DEGRADED_SENTENCE: Record<TrayCheckCause, string> = {
   unreadable: "We couldn't check this — the workflow's shape isn't something we can read yet.",
@@ -119,16 +129,16 @@ export const DEGRADED_SENTENCE: Record<TrayCheckCause, string> = {
   // Short on purpose: it sits in a strip whose only other occupant is the checking beat,
   // and a long sentence there reads as an alarm about something that is merely not
   // finished happening. It claims no pass and attributes nothing to anyone.
-  unchecked: "Not checked yet.",
+  "not-run": "Not checked yet.",
 }
 
 /**
- * IS THE CHECK STILL OUTSTANDING? — the one predicate behind the `unchecked` cause.
+ * IS THE CHECK STILL OUTSTANDING? — the one predicate behind the `not-run` cause.
  *
  * `idle` is "nobody has asked" and `checking` is "the FIRST request is in flight with no
  * previous answer to hold" (the loop's own docblock). Neither carries an `ok` field, by
  * construction, so neither may be read as a verdict — which makes them one state as far
- * as any surface is concerned, and exactly the state `unchecked` words.
+ * as any surface is concerned, and exactly the state `not-run` words.
  *
  * It lives HERE, and is exported, so its two callers on the Builder page share one rule
  * instead of two inline comparisons that can drift apart — and so the page gains no

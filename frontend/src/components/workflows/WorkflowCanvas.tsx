@@ -470,7 +470,7 @@ export interface CanvasSession {
   /** The server's findings, grouped by `verdictModel`. Nothing is classified here. */
   groups: VerdictGroups
   /** Why the last check produced no verdict, or null when it answered. Includes
-   *  `"unchecked"` — no request has been issued yet (187-27). */
+   *  `"not-run"` — no request has been issued yet (187-27). */
   degraded: TrayCheckCause | null
   /** A check is in flight: the tray dims its rows, it never clears them. */
   checking: boolean

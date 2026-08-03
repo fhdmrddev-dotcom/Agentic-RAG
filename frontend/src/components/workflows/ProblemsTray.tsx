@@ -31,7 +31,7 @@
  * ── WHEN THE CHECK ITSELF DID NOT RUN (D-184-14 · 187-27) ──
  * The wording is split by CAUSE, because a reproducible shape rejection and a network
  * blip need different things from the reader and a user hitting the first must not be
- * told to retry forever. A THIRD cause, `unchecked`, means no request has been made at
+ * told to retry forever. A THIRD cause, `not-run`, means no request has been made at
  * all yet — and it is deliberately routed down this same channel rather than a new prop,
  * because all three of this component's clean affordances (the counts line, the resting
  * attribution and the empty paragraph) already suppress themselves for a non-null cause.
@@ -98,7 +98,7 @@ export interface ProblemsTrayProps {
    *  generic type sentence renders, never a fabricated or id-shaped name. */
   nameContext?: NameContext
   /** `null` when the last check answered. Otherwise why it did not — including
-   *  `"unchecked"`, which means no request has been issued yet (187-27). */
+   *  `"not-run"`, which means no request has been issued yet (187-27). */
   degraded: TrayCheckCause | null
   /** A check is in flight: dim what is shown, do not clear it. */
   checking: boolean
