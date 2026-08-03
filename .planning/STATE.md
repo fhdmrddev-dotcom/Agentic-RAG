@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
 status: executing
-last_updated: "2026-08-04T02:55:00.000Z"
-last_activity: 2026-08-04 -- Phase 187 round-5 wave 15: plan 187-28 (GAP C) complete; `workflows.py`'s `_ROUTE_ASSIGNED_CODES` comment now states what the code does (SERVER publish gate unchanged, CLIENT publish control gated and intended per BUG-260731-03) and both halves carry a behavioural fence; comment-only diff, zero behaviour change, zero mount-cap spend; 28/29 plans, backend unit 62 failed/1700 passed (baseline 62/1693 re-derived at base -- no new failure), canvas suite 124 -> 128
+last_updated: "2026-08-04T03:20:00.000Z"
+last_activity: 2026-08-04 -- Phase 187 round-5 wave 16: plan 187-29 complete; the three suites carrying round 5’s honesty estate are PINNED in vitest-count-gate.cjs (DescribeKbPicker 30 / ProblemsTray 30 / verdictModel 29, every number read from the gate’s own actual column over two agreeing pre-pin samples, each pin observed producing a [count-decrease] on a genuinely deleted it( block) -- pinned total 715 -> 804, derived success line 18/18 -> 21/21, exit 0. 187-VALIDATION.md gained the round-5 section as a pure insertion (795 ins / 2 del, hunk @@ -1603,0 +1608,652 @@) and the manual board grew 14 -> 17 with manual_rows_performed: 0. 29/29 plans shipped -- the PHASE IS NOT COMPLETE: verification has not run and all 17 manual rows are UNPERFORMED. No SDK completion verb called; VOCAB-02/VOCAB-03 remain unmarked
 progress:
   total_phases: 19
   completed_phases: 6
   total_plans: 101
-  completed_plans: 99
+  completed_plans: 100
   percent: 32
 ---
 
