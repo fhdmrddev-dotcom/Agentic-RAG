@@ -835,23 +835,144 @@ describe("definitionOps — the seed-receipt copy is a lock (sketch 150-B)", () 
     expect(seedReceiptCarriedLead(2.7)).toBe("2 steps were already set to must prove it.")
   })
 
+  // ── 187-24 / WR-12 — the two things the carried sentence must never carry ─────────
+  // Hoisted to the describe body so the fence below and the domain sweep beneath it read
+  // ONE copy. A second regex is a second answer to one question, which is the same
+  // mistake at the guard layer that WR-14 closed at the source layer.
+
+  /** The exact clause 187-16 shipped and 187-20 deleted, in both its numbers. Assembled
+   *  from parts, the idiom this file already uses. These are REGRESSION PINS, not the
+   *  fence: measured over `frontend/src` at HEAD, neither matches anything the product
+   *  can emit (two hits, both prose — see the block inside the fence). */
+  const CARRIED_CAUSE_CLAIMS = [
+    ["by", "its", "own", "settings"].join(" "),
+    ["by", "their", "own", "settings"].join(" "),
+  ]
+
+  /**
+   * THE PROPERTY: a sentence that attributes no cause uses no causal connective.
+   * `by` is a member deliberately — the deleted clause was a bare `by …`, and in a
+   * one-clause sentence of this shape every `by X` IS an attribution.
+   *
+   * Unlike the `?raw` fences elsewhere in this file, this reads a RUNTIME VALUE rather
+   * than source text, so the assemble-from-parts idiom does not apply: a grep of this
+   * guard cannot satisfy a guard that never looks at a file.
+   */
+  const CAUSAL_CONNECTIVE =
+    /\b(because|since|due to|owing to|thanks to|on account of|as a result|therefore|thus|hence|consequently|by)\b/i
+
+  /** The sentence this module WOULD emit if the 187-20 deletion were ever undone — the
+   *  shipped lead with a cause clause welded back on. Every positive control below is
+   *  built with it, so no control is a hand-typed string that drifts from the formatter. */
+  const undoTheDeletion = (count: number, clause: string) =>
+    `${seedReceiptCarriedLead(count).replace(/\.$/, "")} ${clause}.`
+
   it("the carried sentence ATTRIBUTES NO CAUSE — it counts two of them (187-20/WR-09)", () => {
     // The count sums `already-set` and `escalated`. 187-16 shipped this sentence ending
     // " by its own settings" — true of the first cause, FALSE of the second, and on an
     // escalated-only draft it contradicted that step's own reason two lines below it on
     // the same card. Needles assembled from parts, the idiom this file already uses.
-    const CAUSE_CLAIMS = [
-      ["by", "its", "own", "settings"].join(" "),
-      ["by", "their", "own", "settings"].join(" "),
+    //
+    // ── 187-24 / review WR-12: THIS FENCE WAS A DENY-LIST OF A DELETED CLAUSE ────────
+    // Measured over `frontend/src` at HEAD before this repair, the two needles below
+    // matched exactly two lines, BOTH of them prose:
+    //
+    //   definitionOps.ts:600       (a docblock explaining the deletion)
+    //   definitionOps.test.ts:840  (the comment three lines above)
+    //
+    // Nothing in the product produces either string. A fence asserting the absence of a
+    // string the module cannot emit reports a property it does not measure — and worse,
+    // the NEXT cause attribution, worded differently ("because of its citation policy",
+    // "set by the deliverable's own rules"), passes it unchanged. That is the recorded
+    // Phase-185 lesson (a deny-list cannot be made fail-closed by extension) and the
+    // recorded 187 lesson (verify the PROPERTY, not the PATCH), landing on this file's
+    // own new guard. The repair is NOT more needles. It is (a) a positive control over
+    // the needles this fence already has, and (b) a WORD-CLASS assertion that makes the
+    // absence a property of the sentence rather than a memory of one wording.
+    // ── POSITIVE CONTROL, over THIS fence's OWN needles ──────────────────────────────
+    // Both halves must be shown capable of firing before either absence below means
+    // anything. Each control is built from the SHIPPED sentence plus a cause clause, so
+    // it is the sentence this module would emit if the deletion were ever undone. It
+    // lives INSIDE this `it` on purpose: a control in a sibling case can be deleted and
+    // leave the absences standing alone, which is how this fence shipped in the first
+    // place.
+    expect(undoTheDeletion(1, CARRIED_CAUSE_CLAIMS[0])).toContain(CARRIED_CAUSE_CLAIMS[0])
+    expect(undoTheDeletion(2, CARRIED_CAUSE_CLAIMS[1])).toContain(CARRIED_CAUSE_CLAIMS[1])
+    // …and the word-class assertion fires on every attribution shape the deny-list
+    // above cannot see, which is precisely the gap WR-12 reports.
+    const OTHER_ATTRIBUTIONS = [
+      "because of its citation policy",
+      "since the deliverable requires it",
+      "due to the policy on the emit step",
+      "thanks to the author's own dial",
     ]
+    for (const clause of OTHER_ATTRIBUTIONS) {
+      expect(undoTheDeletion(1, clause)).toMatch(CAUSAL_CONNECTIVE)
+      // …and the historical needles do NOT see it. This is the WR-12 gap, asserted:
+      // the deny-list is blind to every attribution but the one that was deleted.
+      for (const claim of CARRIED_CAUSE_CLAIMS) {
+        expect(undoTheDeletion(1, clause)).not.toContain(claim)
+      }
+    }
+
+    // ── NEGATIVE CONTROLS — whole words, never letters ───────────────────────────────
+    // A property fence that fired on an innocent substring would be a fence about
+    // spelling. `\b` on both sides is what makes it a statement about the connective.
+    for (const innocent of ["a bystander wrote it", "sincerely yours", "thusly phrased", "a byte of it"]) {
+      expect(innocent).not.toMatch(CAUSAL_CONNECTIVE)
+    }
+
     for (const count of [1, 2, 9]) {
       const sentence = seedReceiptCarriedLead(count)
-      for (const claim of CAUSE_CLAIMS) expect(sentence).not.toContain(claim)
+      // (a) the two historical wordings, kept as cheap regression pins for the exact
+      //     clause that shipped — no longer the fence, just its footnote.
+      for (const claim of CARRIED_CAUSE_CLAIMS) expect(sentence).not.toContain(claim)
+      // (b) THE FENCE: no causal connective at all, however it is worded.
+      expect(sentence, `carried lead at ${count} attributes a cause`).not.toMatch(
+        CAUSAL_CONNECTIVE,
+      )
       // Nor may it borrow either per-step reason: naming a cause is the ROW's job, and
       // `seedReceiptStepReason` is the one function that is actually handed the cause.
+      // (187-23 changed the `escalated` sentence; these compare by IDENTITY against the
+      // exports, so they track the change rather than pinning a stale literal.)
       expect(sentence).not.toContain(seedReceiptStepReason("escalated"))
       expect(sentence).not.toContain(seedReceiptStepReason("already-set"))
     }
+  })
+
+  it("…and it attributes none over EVERY representable count, not three samples", () => {
+    // The fence above samples 1, 2 and 9. `seedReceiptCarriedLead` has FOUR branches —
+    // zero, singular, plural, and the `wholeCount` totality path that admits NaN, a
+    // negative and a fraction from author-supplied JSONB. A clause welded onto ONE of
+    // them slips past a three-sample check, so the property is swept over the whole
+    // domain the formatter can be handed.
+    const counts: number[] = [
+      ...Array.from({ length: 31 }, (_, i) => i),
+      -1,
+      -7.5,
+      0.4,
+      2.7,
+      99.9,
+      Number.NaN,
+      Number.POSITIVE_INFINITY,
+      Number.MAX_SAFE_INTEGER,
+    ]
+    let nonEmptySeen = 0
+    for (const count of counts) {
+      const sentence = seedReceiptCarriedLead(count)
+      if (sentence !== "") nonEmptySeen += 1
+      expect(sentence, `carried lead at ${count} attributes a cause`).not.toMatch(
+        CAUSAL_CONNECTIVE,
+      )
+    }
+    // NON-VACUITY. A domain that produced only empty strings would make the sweep above
+    // a statement about nothing — every count below one returns "" by design (D-187-10).
+    expect(nonEmptySeen).toBeGreaterThanOrEqual(30)
+    // POSITIVE CONTROL, in this case too: a fence whose control lives only in a sibling
+    // can be left standing alone when that sibling is deleted.
+    expect(undoTheDeletion(9, "because the deliverable already required it")).toMatch(
+      CAUSAL_CONNECTIVE,
+    )
   })
 
   it("the carried sentence CLAIMS NO AUTHORSHIP — with a positive control", () => {
