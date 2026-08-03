@@ -4,12 +4,12 @@ milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
 status: executing
 last_updated: "2026-08-04T00:00:00.000Z"
-last_activity: 2026-08-04 -- Phase 187 round-5 wave 13: plan 187-26 (GAP A) complete; the loose door can bind a KB before the AI drafts; 26/29 plans, count gate 18/18 green (2149 tests, 0 failing)
+last_activity: 2026-08-04 -- Phase 187 round-5 wave 14: plan 187-27 (GAP B) complete; a check that did not run can no longer unblock a publish, and opening a drafted definition with steps now issues one; 27/29 plans, count gate 18/18 green (2164 tests, 0 failing)
 progress:
   total_phases: 19
   completed_phases: 6
   total_plans: 101
-  completed_plans: 97
+  completed_plans: 98
   percent: 32
 ---
 
