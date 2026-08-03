@@ -1031,6 +1031,59 @@ describe("SeedReceipt — source purity, glyph discipline and no staged arrival"
    *  under `.test`, which is what `toMatch` calls. */
   const declarationRx = () => /^\s*(export\s+)?function\s+\w+/gm
 
+  // ── 187-24 / review WR-13 — the coverage sweep's three blind spots ───────────────
+  // The sweep at the bottom of this block measured a MENTION, not coverage. Reproduced
+  // at HEAD before this repair, against the sweep exactly as it stood:
+  //
+  //   a brand-new `data-testid="…"` nothing queries   → FAILED  (the one direction it had)
+  //   `data-testid={"…"}`                              → passed  (invisible)
+  //   `data-testid={'…'}`                              → passed  (invisible)
+  //   an id whose only query is inside a comment       → passed  (a mention satisfies it)
+  //   a new sibling `data-*` state attribute           → passed  (whole class unswept)
+  //
+  // The three helpers below close them. Each is a FUNCTION returning a fresh regex: a
+  // `/g` regex carries `lastIndex` across calls, and a stateful guard is a guard that
+  // reports different answers to the same question.
+
+  /**
+   * Every spelling JSX admits for a STATIC `data-testid` value — the bare attribute and
+   * the brace-wrapped string in either quote.
+   *
+   * The character class EXCLUDES `$`, `{` and `}` deliberately. WR-13's proposed regex
+   * admitted backticks, and measured against this component it extracts
+   * `seed-receipt-step-${row.slug}` — the TEMPLATE row testid — as though it were a
+   * static id, then demands a query for that literal string. A review's suggestion is a
+   * claim, not an artifact: this one was tried, observed to fail on correct code, and
+   * narrowed. The template form keeps its own explicit acknowledgement in the sweep.
+   */
+  const staticTestIdRx = () => /data-testid=(?:"([^"'{}$]+)"|\{\s*["']([^"'{}$]+)["']\s*\})/g
+
+  /** The `data-*` STATE attributes — the sibling class `data-carried-count` belongs to,
+   *  and the exact class of surface hook the sweep exists to protect. Brace-valued,
+   *  because a state attribute is always an expression. */
+  const stateAttrRx = () => /\sdata-([a-z][a-z-]*)=\{/g
+
+  /**
+   * The suite's own source with COMMENTS REMOVED, so a commented-out or discarded query
+   * can no longer satisfy the sweep. Block comments go entirely; a line is cut at the
+   * first `//` that begins the line or follows whitespace, which leaves regex literals
+   * (whose `//` follows a backslash) and `://` intact.
+   *
+   * Over-stripping is the SAFE direction here and under-stripping is not: removing a
+   * live query site turns the sweep red and is seen immediately, while leaving a
+   * commented one in place is the silent pass this repair exists to end.
+   */
+  function withoutComments(src: string): string {
+    return src
+      .replace(/\/\*[\s\S]*?\*\//g, " ")
+      .split("\n")
+      .map((line) => {
+        const m = /(^|\s)\/\//.exec(line)
+        return m ? line.slice(0, m.index) : line
+      })
+      .join("\n")
+  }
+
   it("imports nothing from the API client and opens no request", () => {
     expect(seedReceiptSource).not.toMatch(/from\s+["']@\/lib\/api["']/)
     expect(seedReceiptSource).not.toMatch(/fetch\(/)
@@ -1153,31 +1206,74 @@ describe("SeedReceipt — source purity, glyph discipline and no staged arrival"
     expect(seedReceiptSource).not.toMatch(/\shidden=|display:\s*none/)
   })
 
-  it("every STATIC testid the component renders is queried by this suite (187-20)", () => {
+  it("every STATIC testid the component renders is QUERIED by this suite (187-20/WR-13)", () => {
     // WHY THIS IS A TEST AND NOT A REVIEW HABIT. `seed-receipt-carried` shipped in 187-16
-    // with ZERO queries against it — measured with a shell grep at HEAD before this plan,
+    // with ZERO queries against it — measured with a shell grep at HEAD before 187-20,
     // which returned exactly one hit in all of `frontend/src/`: the component's own
     // attribute. A paragraph nothing queries can be deleted, can print the wrong number,
     // or can drift from its formatter with the whole suite green. A one-off grep finds
-    // that once; this finds it every run, including for the NEXT testid somebody adds.
+    // that once; this finds it every run, including for the NEXT hook somebody adds.
     //
-    // The needle is ASSEMBLED at runtime from each extracted id, so this guard's own
+    // IT MEASURES COVERAGE, NOT A MENTION (187-24 / WR-13). Until this plan it read the
+    // suite's raw source, so a query inside a comment, inside `it.skip` or inside a
+    // `describe.skip` satisfied it — and it saw only ONE of the three static spellings,
+    // and none of the sibling `data-*` class that `data-carried-count` (shipped in the
+    // very same plan as the guard) belongs to. It now strips comments first and reads
+    // every static spelling; the sibling class gets the case immediately below, so a
+    // red says WHICH half moved and deleting either half moves the suite's count.
+    //
+    // The needle is ASSEMBLED at runtime from each extracted name, so this guard's own
     // source contains no literal `ByTestId("seed-receipt-…")` call and therefore cannot
     // satisfy itself — the same self-satisfaction trap the fences above avoid.
-    const ids = [...seedReceiptSource.matchAll(/data-testid="([^"]+)"/g)].map((m) => m[1])
+    const queried = withoutComments(testSource)
+
+    const ids = [...seedReceiptSource.matchAll(staticTestIdRx())].map((m) => m[1] ?? m[2])
     const unique = [...new Set(ids)]
     // A regex that matched nothing would make every assertion below vacuous.
     expect(unique.length).toBeGreaterThan(0)
     // …and it must reach the id whose absence WAS the blocker, named explicitly so this
     // guard cannot pass by sweeping a set that quietly stopped containing it.
     expect(unique).toContain("seed-receipt-carried")
+    // …and it must NOT have swallowed the dynamic row testid as though it were static.
+    for (const id of unique) expect(id).not.toContain("${")
     for (const id of unique) {
-      expect(testSource).toContain(`ByTestId("${id}")`)
+      expect(queried, `data-testid="${id}" is rendered but never queried`).toContain(
+        `ByTestId("${id}")`,
+      )
     }
+
     // The row testid is a TEMPLATE literal (`seed-receipt-step-${row.slug}`), so a static
     // extraction correctly does not see it. It is not unguarded: section 1 queries every
     // fixture slug by name — `seed-receipt-step-emit`, `-contracts`, `-judgement`.
     expect(seedReceiptSource).toMatch(/data-testid=\{`seed-receipt-step-\$\{/)
+  })
+
+  it("every `data-*` STATE attribute it renders is QUERIED by this suite too (WR-13)", () => {
+    // THE SIBLING CLASS, and the reason this is a separate case rather than a second
+    // paragraph of the one above: `data-carried-count` shipped in the SAME plan as that
+    // sweep, is exactly the class of surface hook the sweep exists to protect, and was
+    // invisible to a `data-testid`-only extraction. So were `data-grounded-count`,
+    // `data-detected-count`, `data-slug` and `data-cause`. All five are queried today;
+    // none was protected tomorrow.
+    //
+    // Its own case, its own non-vacuity: a guard folded into its sibling can be deleted
+    // without the suite's count moving, which is the Phase-177 coverage-loss shape.
+    const queried = withoutComments(testSource)
+    const attrs = [
+      ...new Set(
+        [...seedReceiptSource.matchAll(stateAttrRx())].map((m) => `data-${m[1]}`),
+      ),
+      // `data-testid` is excluded so the two halves cannot double-count: the case above
+      // owns it, and it is the only `data-*` here that is an IDENTIFIER rather than a
+      // piece of state.
+    ].filter((a) => a !== "data-testid")
+    expect(attrs.length).toBeGreaterThan(0)
+    // Named explicitly, so this cannot pass by sweeping a set that quietly stopped
+    // containing the attribute it was written for.
+    expect(attrs).toContain("data-carried-count")
+    for (const attr of attrs) {
+      expect(queried, `${attr} is rendered but never queried`).toContain(`"${attr}"`)
+    }
   })
 
   it("those fences are real — each pattern matches its planted literal", () => {
@@ -1239,5 +1335,60 @@ describe("SeedReceipt — source purity, glyph discipline and no staged arrival"
     // expressions rather than declarations and are not predicates.
     expect("  const detectedCount = rows.filter((row) => row.cause === 'detected').length")
       .not.toMatch(/^\s*(export\s+)?function\s+\w+/m)
+
+    // ── 187-24 / WR-13 — the sweep's own planted literals ────────────────────────────
+    // It was the ONLY fence in this block with no entry here. Every id and attribute
+    // below is ASSEMBLED from parts, because a planted literal spelled out in full would
+    // appear in `testSource` and satisfy the very guard it is planted to falsify.
+    const PLANTED_ID = ["planted", "unqueried"].join("-")
+    const PLANTED_ATTR = ["data", "row", "count"].join("-")
+    const byTestId = (id: string) => `ByTestId("${id}")`
+
+    // (a) the widened extraction sees ALL THREE static spellings — the two brace forms
+    //     are the ones the old sweep passed over.
+    for (const jsx of [
+      `<p data-testid="${PLANTED_ID}">`,
+      `<p data-testid={"${PLANTED_ID}"}>`,
+      `<p data-testid={'${PLANTED_ID}'}>`,
+    ]) {
+      expect([...jsx.matchAll(staticTestIdRx())].map((m) => m[1] ?? m[2])).toEqual([
+        PLANTED_ID,
+      ])
+    }
+    // …and the suite genuinely does not query it, so the sweep WOULD fail on it. This is
+    // the half that proves the extraction above is a falsification and not a formality.
+    expect(withoutComments(testSource)).not.toContain(byTestId(PLANTED_ID))
+    // NON-FIRING CONTROL — the dynamic row testid is not a static id, and the narrowed
+    // character class is what keeps the sweep off correct code.
+    expect([
+      ...`<li data-testid={\`seed-receipt-step-\${row.slug}\`}>`.matchAll(staticTestIdRx()),
+    ]).toHaveLength(0)
+
+    // (b) comment stripping really removes a commented-out query — the probe the old
+    //     sweep passed.
+    const GHOST = ["ghost", PLANTED_ID].join("-")
+    const LINE_COMMENTED = ["const a = 1", `  // screen.get${byTestId(GHOST)}`, "const b = 2"].join(
+      "\n",
+    )
+    expect(LINE_COMMENTED).toContain(byTestId(GHOST))
+    expect(withoutComments(LINE_COMMENTED)).not.toContain(byTestId(GHOST))
+    const BLOCK_COMMENTED = `/* screen.get${byTestId(GHOST)} */`
+    expect(withoutComments(BLOCK_COMMENTED)).not.toContain(byTestId(GHOST))
+    // …and the stripper must NOT eat a LIVE query that merely has a comment beside it.
+    // A fence that removed real coverage would turn red on correct code.
+    const LIVE = `screen.get${byTestId(GHOST)} // an explanation`
+    expect(withoutComments(LIVE)).toContain(byTestId(GHOST))
+    // …nor a regex literal, whose `//` follows a backslash rather than whitespace.
+    expect(withoutComments("expect(s).toMatch(/\\shidden=/)")).toContain("toMatch")
+
+    // (c) the state-attribute half fires on a NEW sibling attribute nothing queries —
+    //     the class `data-carried-count` belongs to, and the class the old sweep could
+    //     not see at all.
+    expect(
+      [...`<section ${PLANTED_ATTR}={rows.length}>`.matchAll(stateAttrRx())].map(
+        (m) => `data-${m[1]}`,
+      ),
+    ).toEqual([PLANTED_ATTR])
+    expect(withoutComments(testSource)).not.toContain(`"${PLANTED_ATTR}"`)
   })
 })
