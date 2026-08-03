@@ -590,6 +590,70 @@ describe("SeedReceipt — the carried paragraph", () => {
   })
 })
 
+// ── 1e. NO SEAL MAY ARRIVE UNEXPLAINED (187-23, review WR-15) ────────────────────────
+//
+// `seedReceiptStepReason`'s `default:` arm returned `""` for any future `GroundingCause`
+// member, and `GroundedRow.cause` is `Exclude<GroundingCause, null>` — so a 4th member is
+// admitted to a row, and the row renders its reason UNCONDITIONALLY after an em-dash
+// (`SeedReceipt.tsx:342-353`). The result a person would SEE is "Weigh the supplier
+// options — " with nothing after the dash, on the one surface whose entire job is that a
+// seal never arrives unexplained (Req 5).
+//
+// 187-23 closed the type hole with a `never` guard. This block fences the CONSEQUENCE in
+// the DOM, because a type guard is invisible to a reader and the reader is who the rule
+// protects.
+
+describe("SeedReceipt — every sealed row states a reason", () => {
+  /** Every shipped fixture that produces at least one sealed row. */
+  const SEALED_FIXTURES = [
+    ["the mixed grounded draft", GROUNDED_PHASES],
+    ["the already-set-only draft", STRICT_EMIT_ONLY_PHASES],
+    ["the escalated-only draft", ESCALATED_PHASES],
+  ] as const
+
+  it("no rendered reason is empty or blank, across every sealed fixture", () => {
+    for (const [label, phases] of SEALED_FIXTURES) {
+      const { unmount } = renderReceipt({ phases })
+      const reasons = screen.getAllByTestId("seed-receipt-step-reason")
+      // VACUITY GUARD — a fixture that rendered no rows would make the loop below a
+      // statement about nothing.
+      expect(reasons.length, label).toBeGreaterThan(0)
+      for (const reason of reasons) {
+        expect((reason.textContent ?? "").trim(), label).not.toBe("")
+      }
+      unmount()
+    }
+  })
+
+  it("no row's text ends at the em-dash — the consequence, in what a reader sees", () => {
+    for (const [label, phases] of SEALED_FIXTURES) {
+      const { unmount } = renderReceipt({ phases })
+      const list = screen.getByTestId("seed-receipt-grounded-list")
+      const rows = [...list.querySelectorAll("[data-slug]")]
+      expect(rows.length, label).toBeGreaterThan(0)
+      for (const row of rows) {
+        const text = (row.textContent ?? "").trim()
+        expect(text, `${label} / ${row.getAttribute("data-slug")}`).not.toMatch(/—\s*$/)
+      }
+      unmount()
+    }
+  })
+
+  it("POSITIVE CONTROL — the formatter really can return the empty string, and that row WOULD dangle", () => {
+    // Without this half both cases above could be passing over an invariant nothing is
+    // capable of breaking. The formatter's empty answer is real…
+    expect(seedReceiptStepReason(null)).toBe("")
+    // …and a row assembled the way the component assembles one — face, em-dash, reason —
+    // does end at the dash when the reason is empty, which is exactly the pattern the case
+    // above asserts against. So the invariant is known to be falsifiable.
+    const face = nodeTitle(phaseBySlug(ESCALATED_PHASES, "judgement"))
+    const wouldRender = `${face} — ${seedReceiptStepReason(null)}`.trim()
+    expect(wouldRender).toMatch(/—\s*$/)
+    // …and the same row with a real reason does NOT, so the pattern discriminates.
+    expect(`${face} — ${seedReceiptStepReason("escalated")}`.trim()).not.toMatch(/—\s*$/)
+  })
+})
+
 // ── 2. ZERO GROUNDED STEPS — the receipt still arrives (D-187-10) ─────────────────────
 
 describe("SeedReceipt — the zero-grounded draft", () => {

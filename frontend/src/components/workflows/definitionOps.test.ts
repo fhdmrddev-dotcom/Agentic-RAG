@@ -893,10 +893,71 @@ describe("definitionOps — the seed-receipt copy is a lock (sketch 150-B)", () 
 
   it("the reason formatter CLASSIFIES nothing — it renders the cause it is handed", () => {
     expect(seedReceiptStepReason("already-set")).toBe("it already has to cite its sources")
-    expect(seedReceiptStepReason("escalated")).toBe("you turned this on by hand")
+    // 187-23 / WR-11 — this literal moved. It is still asserted CHARACTER FOR CHARACTER,
+    // because that is what makes changing the sentence visible: this one assertion is the
+    // sentence's only pin, and it is what turned red when the wording changed.
+    expect(seedReceiptStepReason("escalated")).toBe("it was set to must prove it by hand")
     // No cause ⇒ no sentence. A step with nothing to explain is never listed.
     expect(seedReceiptStepReason(null)).toBe("")
     expect(seedReceiptStepReason(null, "search_documents")).toBe("")
+  })
+
+  // ── 187-23 / WR-11 — the row is handed a CAUSE, never an ACTOR ────────────────────
+  //
+  // WHAT THE BIT CARRIES: `grounding_escalated` is a boolean (`harness.py:234`, read via
+  // `phaseVocabulary.ts:329`/`:353`). It records that the lock is AUTHORED rather than
+  // derived. WHAT IT DOES NOT CARRY: who authored it — and a model emission can set it
+  // (it lives in the emit tool's whole-model schema, it validates, and `POST /generate`
+  // returns it verbatim), so a second person here can be false of the reader.
+
+  it("the escalated reason NAMES NO ACTOR — a property, with a positive control (WR-11)", () => {
+    // WHOLE WORDS. `\b` on both sides so an innocent substring can never fire this: the
+    // fence must be a statement about the pronoun, not about the letters.
+    const SECOND_PERSON = /\b(you|your|yours|yourself)\b/i
+
+    expect(seedReceiptStepReason("escalated")).not.toMatch(SECOND_PERSON)
+    // …and the tool-qualified call site cannot smuggle one in either.
+    expect(seedReceiptStepReason("escalated", "search_documents")).not.toMatch(SECOND_PERSON)
+
+    // POSITIVE CONTROL (a), over a sentence this module GENUINELY STILL PRODUCES — so the
+    // absence above is a measurement and not a tautology about a pattern nothing matches.
+    expect(seedReceiptStepReason("detected")).toMatch(SECOND_PERSON)
+    // POSITIVE CONTROL (b), the RETIRED sentence itself, assembled from parts so this
+    // guard's own source is not what a grep for the historical literal finds.
+    const RETIRED = ["you", "turned", "this", "on", "by", "hand"].join(" ")
+    expect(RETIRED).toMatch(SECOND_PERSON)
+    expect(seedReceiptStepReason("escalated")).not.toBe(RETIRED)
+    // NEGATIVE CONTROL — the pattern does not fire on innocent substrings, which is the
+    // whole reason it is anchored on word boundaries.
+    for (const innocent of ["a youthful register", "the young engineer", "beyond doubt"]) {
+      expect(innocent).not.toMatch(SECOND_PERSON)
+    }
+
+    // The actor left; the FACT did not. The sentence still states that the lock was set
+    // by hand rather than derived, in the module's one governance vocabulary — otherwise
+    // "names no actor" could be satisfied by deleting the meaning.
+    expect(seedReceiptStepReason("escalated")).toContain(GOVERNANCE_SEAL_LABEL.toLowerCase())
+    expect(seedReceiptStepReason("escalated")).toContain("by hand")
+    expect(seedReceiptStepReason("escalated").startsWith("it ")).toBe(true)
+  })
+
+  // ── 187-23 / WR-15 — a FOURTH cause may never render as a dangling em-dash ────────
+  //
+  // Two halves, because neither alone is enough: the runtime half cannot see a typecheck
+  // guard, and the source half cannot prove the function still resolves.
+
+  it("an UNMODELLED cause returns the empty string rather than throwing (runtime half)", () => {
+    // Cast through `unknown` — the point is precisely a value the type system forbids.
+    const future = "reviewed" as unknown as Parameters<typeof seedReceiptStepReason>[0]
+    expect(() => seedReceiptStepReason(future)).not.toThrow()
+    expect(seedReceiptStepReason(future)).toBe("")
+    // `null` keeps its OWN arm and its own meaning: nothing to explain, so no line.
+    expect(seedReceiptStepReason(null)).toBe("")
+    // POSITIVE CONTROL — the three modelled members really do resolve to sentences, so
+    // the empty strings above are the guard's answer and not the function's default mood.
+    for (const cause of ["detected", "already-set", "escalated"] as const) {
+      expect(seedReceiptStepReason(cause).length).toBeGreaterThan(0)
+    }
   })
 
   it("never fabricates a tool name when none was handed to it", () => {
@@ -1145,6 +1206,50 @@ describe("definitionOps — source purity (the ?raw grep, the shipped house idio
     expect(definitionOpsSource).not.toMatch(/fetch\(/)
     expect(definitionOpsSource).not.toMatch(/workflows\/validate/)
     expect(definitionOpsSource).not.toMatch(/XMLHttpRequest|EventSource|navigator\.sendBeacon/)
+  })
+
+  // ── 187-23 / WR-15, the SOURCE half of the exhaustiveness pin ─────────────────────
+  //
+  // The runtime half above proves the formatter answers an unmodelled cause with the
+  // empty string. It CANNOT see the typecheck guard — and the typecheck guard is the
+  // whole fix, because the empty string is exactly the failure: `SeedReceipt` renders the
+  // reason unconditionally after an em-dash, so an unhandled member ships a seal with no
+  // reason. Only the source can say a 4th `GroundingCause` is a compile error.
+
+  it("guards `seedReceiptStepReason` with a `never` binding, not a bare default (WR-15)", () => {
+    /** A `const _never: never = cause` binding, however it is spaced. */
+    const NEVER_BINDING = /const\s+_never\s*:\s*never\s*=\s*cause\b/
+
+    // Extract the ONE function, so a `never` guard elsewhere in the file (there is one —
+    // `requiredConfigFor`, whose idiom this copies) cannot satisfy this assertion.
+    const extracted = definitionOpsSource.match(
+      /export function seedReceiptStepReason[\s\S]*?\n}/,
+    )
+    expect(extracted).not.toBeNull()
+    const body = extracted![0]
+    // VACUITY GUARDS — we really did extract this function, and only this function.
+    expect(body).toContain('case "escalated"')
+    expect(body).not.toContain("export function seedReceiptCarriedLead")
+    expect(body).not.toContain("function requiredConfigFor")
+
+    expect(body).toMatch(NEVER_BINDING)
+    // …and `null` is its own arm, so `default:` is no longer doing two jobs.
+    expect(body).toMatch(/case null:/)
+
+    // POSITIVE CONTROL — a planted literal in the exact shape this function shipped in
+    // before 187-23. The pattern must FAIL on it, or the assertion above proves nothing.
+    const bareDefault = [
+      "export function seedReceiptStepReason(cause: GroundingCause): string {",
+      "  switch (cause) {",
+      '    case "escalated":',
+      '      return "it was set by hand"',
+      "    default:",
+      '      return ""',
+      "  }",
+      "}",
+    ].join("\n")
+    expect(bareDefault).toContain('case "escalated"') // it IS the same shape…
+    expect(bareDefault).not.toMatch(NEVER_BINDING) // …and the pattern would have caught it.
   })
 })
 
