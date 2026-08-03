@@ -31,6 +31,7 @@
  */
 import { useState } from "react"
 import { WorkflowBuilderPage, type BuilderInitial } from "@/pages/WorkflowBuilderPage"
+import { DescribeKbPicker } from "@/components/workflows/DescribeKbPicker"
 import { WorkflowSoul } from "@/components/workflows/WorkflowSoul"
 import { type DefShape } from "@/components/workflows/soulData"
 
@@ -108,6 +109,18 @@ export function WorkflowDoorSwitch({
   // the govern-door Builder AND asks it to auto-run the draft. Sticky until the user
   // returns to the chooser (goBoth) so a Builder remount can't re-fire the generate.
   const [handoffDraft, setHandoffDraft] = useState(false)
+  /**
+   * Phase 187-26 (GAP A): the knowledge base the author chose BEFORE the AI drafts.
+   *
+   * `""` means "not chosen", which is the state D-187-11 is about — and it is now a state
+   * the author ELECTED rather than one the door imposed by having no control at all. It
+   * lives beside `describe` and is deliberately NOT cleared by `goBoth`: the hand-off is a
+   * one-shot and must not re-fire, but a considered pick is not undone by looking around.
+   *
+   * It reaches the generator through the govern door's Builder, NOT through
+   * `onDescribeDraft` — that is a parent OBSERVER hook, not a channel into the Builder.
+   */
+  const [kbFolderId, setKbFolderId] = useState("")
   const canDraft = describe.trim().length > 0
 
   // Return to the "both" chooser AND clear the one-shot draft hand-off (so re-entering
@@ -177,6 +190,10 @@ export function WorkflowDoorSwitch({
             renderPublish={renderPublish}
             initialDescribe={describe}
             autoDraft={handoffDraft}
+            // Phase 187-26 (GAP A): the door's KB choice, carried into the EXISTING
+            // generate call so a fast-path workflow can be born BOUND. `""` (nobody
+            // picked) leaves the Builder's own initializer at exactly today's value.
+            initialProjectFolderId={kbFolderId}
             registerCanLeave={registerCanLeave}
             // SPREAD-CONDITIONAL, the D-14 idiom this file's sibling `rails` prop uses:
             // without `inline` the two slots must be genuinely ABSENT from the element, not
@@ -232,6 +249,12 @@ export function WorkflowDoorSwitch({
               rows={5}
               className="w-full resize-none rounded-lg border border-border bg-card px-4 py-4 text-[15px] leading-relaxed text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             />
+            {/* Phase 187-26 (GAP A): somewhere to say what this work is ABOUT, before the
+                AI drafts. OPTIONAL by construction — it renders nothing when there are no
+                folders to offer, it touches no enablement rule, and ignoring it gives
+                today's behaviour exactly. Its own file, so this shell gains a mount and
+                not a surface (the D-187-14 shape). */}
+            <DescribeKbPicker value={kbFolderId} onChange={setKbFolderId} />
             <div className="flex flex-col items-center gap-3">
               <button
                 type="button"

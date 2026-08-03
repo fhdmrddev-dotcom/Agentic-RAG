@@ -444,3 +444,60 @@ describe("Builder describe screen, canvas flag ON — the template door (Req 6)"
     expect(screen.queryByTestId("seed-receipt")).toBeNull()
   })
 })
+
+// ══════════════════════════════════════════════════════════════════════════════════
+// Phase 187-26 Task 2 (VOCAB-02 / VOCAB-03 · GAP A) — THE OMITTED PROP.
+//
+// APPENDED, and NOT ONE ASSERTION ABOVE THIS LINE MOVES: `FLAG_OFF_DESCRIBE_MARKUP` is
+// untouched, which is the point. This plan adds ONE additive-optional prop to the page and
+// changes nothing in its render body, so every mount that supplies nothing — the tests
+// above, the flag-off app, the door shell's own fresh-build path — must be byte-identical.
+//
+// A prop is only additive-optional if an ABSENT one is observably today's behaviour. That
+// is asserted here rather than asserted by the docblock that claims it.
+// ══════════════════════════════════════════════════════════════════════════════════
+
+/** The two folders the picker would offer, in the live `Folder` shape. */
+const PAGE_FOLDERS = [
+  {
+    id: "f-policies",
+    user_id: "u-1",
+    name: "Policies",
+    parent_id: null,
+    is_org_shared: false,
+    created_at: "2026-08-04T00:00:00Z",
+    updated_at: "2026-08-04T00:00:00Z",
+  },
+]
+
+describe("Builder describe screen — an OMITTED initialProjectFolderId is today's page", () => {
+  it("the describe screen's own picker starts UNCHOSEN when the prop is not supplied", async () => {
+    // `renderDescribeScreen` mounts `<WorkflowBuilderPage />` with no props at all — the
+    // exact shape every shipped call site used before this plan.
+    mockListFolders.mockResolvedValue(PAGE_FOLDERS)
+    await renderDescribeScreen(OFF_VARIANTS[0].value)
+
+    const picker = (await screen.findByTestId("project-folder-picker")) as HTMLSelectElement
+    expect(picker.value).toBe("")
+    // …and the opt-out row is what is selected, not a fabricated default binding.
+    expect(picker.selectedOptions[0].value).toBe("")
+  })
+
+  it("the wave-1 CTA byte pin still holds with folders on offer — the picker is a SIBLING", async () => {
+    // The Builder's own describe-screen picker sits ABOVE the pinned CTA column, so the
+    // literal captured in wave 1 is unaffected by folders existing. Asserted rather than
+    // assumed, because "it did not move" is exactly the claim a re-capture would hide.
+    mockListFolders.mockResolvedValue(PAGE_FOLDERS)
+    await renderDescribeScreen(OFF_VARIANTS[0].value)
+
+    await screen.findByTestId("project-folder-picker")
+    expect(describeRegion()).toBe(FLAG_OFF_DESCRIBE_MARKUP)
+    expect(ctaRegion().querySelector('[data-testid="project-folder-picker"]')).toBeNull()
+  })
+
+  it("an OPERATOR-LIKE map with the prop absent still produces the IDENTICAL CTA markup", async () => {
+    mockListFolders.mockResolvedValue(PAGE_FOLDERS)
+    await renderDescribeScreen(OFF_VARIANTS[2].value)
+    expect(describeRegion()).toBe(FLAG_OFF_DESCRIBE_MARKUP)
+  })
+})

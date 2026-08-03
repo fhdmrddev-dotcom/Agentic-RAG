@@ -517,6 +517,9 @@ export interface WorkflowBuilderPageProps {
    *  the EXISTING generate→draft flow ONCE on mount using the seeded `initialDescribe`,
    *  so the fast path actually drafts instead of dead-ending on an empty screen. */
   autoDraft?: boolean
+  /** Phase 187-26 (GAP A): the loose door's KB choice, made BEFORE the AI drafts.
+   *  ABSENT ⇒ the describe screen is byte-identical to today (D-181-01). */
+  initialProjectFolderId?: string
   /**
    * Phase 184-11 (D-184-16 debt 1) — the unsaved-work leave guard's registration seam.
    *
@@ -554,6 +557,7 @@ export function WorkflowBuilderPage({
   initial,
   initialDescribe,
   autoDraft,
+  initialProjectFolderId,
   registerCanLeave,
   headerLead,
   headerTrail,
@@ -582,8 +586,9 @@ export function WorkflowBuilderPage({
   // Chosen at the describe step (ONE calm dropdown), passed to generate, and shown
   // by name in the draft header afterwards. When opening an existing definition,
   // seed it from that definition's own binding so the header shows the bound KB.
+  // Phase 187-26 (GAP A): the loose door may now have bound one before generate ran.
   const [projectFolderId, setProjectFolderId] = useState<string>(
-    typeof initial?.definition.project_folder_id === "string" ? initial.definition.project_folder_id : "",
+    typeof initial?.definition.project_folder_id === "string" ? initial.definition.project_folder_id : (initialProjectFolderId ?? ""),
   )
   // Phase 103-ux: id→name maps so the form panel renders folder + skill NAMES (never
   // UUIDs). Fetched once on mount; failures degrade to showing the raw id.
