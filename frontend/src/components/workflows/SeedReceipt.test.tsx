@@ -60,6 +60,7 @@ import {
   SEED_RECEIPT_DISMISS_LABEL,
   SEED_RECEIPT_NOTHING_COMMITTED,
   SEED_RECEIPT_ONE_WAY_RULE,
+  seedReceiptCarriedLead,
   seedReceiptGroundingLead,
   seedReceiptHeading,
   seedReceiptStepReason,
@@ -448,6 +449,122 @@ describe("SeedReceipt — it never claims an application it did not make", () =>
     expect(screen.getByTestId("seed-receipt").textContent ?? "").not.toContain(
       APPLICATION_CLAIM,
     )
+  })
+})
+
+// ── 1d. THE CARRIED PARAGRAPH ITSELF (187-20, review CR-03 + WR-09) ──────────────────
+//
+// WHY THIS BLOCK EXISTS. 187-16 repaired CR-01 by SPLITTING the counts and adding a
+// second paragraph — and shipped that paragraph with no rendered assertion of any kind.
+// Measured at HEAD before this plan: `grep -rn "seed-receipt-carried" frontend/src/`
+// returned exactly ONE hit, the component's own attribute. The paragraph could have been
+// deleted, could have printed the sealed total instead of the carried one, or could have
+// drifted from its formatter, and all 452 tests stayed green. A fix that ships its own
+// new sentence unguarded reintroduces the bug class it was written to close.
+//
+// So this block gives the carried paragraph exactly the rigor its sibling already has —
+// presence, COUNT, character-identity against the export, and both zero cases — plus the
+// WR-09 cause fence the sentence itself needed.
+
+describe("SeedReceipt — the carried paragraph", () => {
+  // Assembled from parts, the idiom this file already uses: a grep of this guard file
+  // must not be able to satisfy the fence it exists to protect.
+  const CAUSE_CLAIMS = [
+    ["by", "its", "own", "settings"].join(" "),
+    ["by", "their", "own", "settings"].join(" "),
+  ]
+
+  it("renders it, character for character, over the CARRIED count", () => {
+    // The count is DERIVED from the shipped fixture constants — sealed minus detected —
+    // so a hand-typed `1` can never hide a component that reported the wrong number.
+    renderReceipt()
+    expect(screen.getByTestId("seed-receipt-carried").textContent).toBe(
+      seedReceiptCarriedLead(SEALED_SLUGS.length - DETECTED_SLUGS.length),
+    )
+  })
+
+  it("renders ALONE on the typical non-KB draft — no detected paragraph above it", () => {
+    // The case that proves the sentence must be self-contained: its sibling is absent
+    // entirely here, so any antecedent word would point at nothing on screen.
+    renderReceipt({ phases: STRICT_EMIT_ONLY_PHASES })
+    expect(screen.queryByTestId("seed-receipt-grounding")).toBeNull()
+    expect(screen.getByTestId("seed-receipt-carried").textContent).toBe(
+      seedReceiptCarriedLead(1),
+    )
+  })
+
+  it("renders on the draft whose only seal the AUTHOR escalated by hand", () => {
+    renderReceipt({ phases: ESCALATED_PHASES })
+    expect(screen.getByTestId("seed-receipt-carried").textContent).toBe(
+      seedReceiptCarriedLead(1),
+    )
+  })
+
+  it("is ABSENT — no node at all — when every seal is one the AI detected", () => {
+    // A single detected step: sealed 1, detected 1, carried 0. Built from the shipped
+    // fixture rather than a new one, so it cannot drift away from what the others assert.
+    renderReceipt({ phases: [phaseBySlug(GROUNDED_PHASES, "contracts")] })
+    expect(screen.getByTestId("seed-receipt")).toHaveAttribute("data-detected-count", "1")
+    expect(screen.queryByTestId("seed-receipt-carried")).toBeNull()
+    // …because the formatter returns the empty string, which is the ONE conditional shape
+    // both paragraphs share (D-187-10). Not an empty paragraph — no paragraph.
+    expect(seedReceiptCarriedLead(0)).toBe("")
+  })
+
+  it("is ABSENT on a draft where nothing is sealed at all", () => {
+    renderReceipt({ phases: BARE_PHASES })
+    expect(screen.queryByTestId("seed-receipt-carried")).toBeNull()
+    expect(seedReceiptCarriedLead(0)).toBe("")
+  })
+
+  // ── WR-09: ONE PARAGRAPH, TWO CAUSES, NO CONTRADICTION ────────────────────────────
+  //
+  // The carried count sums `already-set` AND `escalated`. A paragraph that attributes the
+  // seal to the step's own settings is therefore false of half of what it counts — and on
+  // an escalated-only draft it contradicts that step's own reason two lines below it on
+  // the SAME CARD ("you turned this on by hand"). The repair is that the paragraph names
+  // no cause and the ROW names the real one: one card, two statements, no contradiction.
+
+  it("attributes the seal to NO CAUSE on the mixed draft", () => {
+    renderReceipt()
+    const carried = screen.getByTestId("seed-receipt-carried").textContent ?? ""
+    for (const claim of CAUSE_CLAIMS) expect(carried).not.toContain(claim)
+  })
+
+  it("nor on the already-set-only draft", () => {
+    renderReceipt({ phases: STRICT_EMIT_ONLY_PHASES })
+    const carried = screen.getByTestId("seed-receipt-carried").textContent ?? ""
+    for (const claim of CAUSE_CLAIMS) expect(carried).not.toContain(claim)
+  })
+
+  it("nor on the escalated-only draft, whose row says the opposite", () => {
+    renderReceipt({ phases: ESCALATED_PHASES })
+    const carried = screen.getByTestId("seed-receipt-carried").textContent ?? ""
+    for (const claim of CAUSE_CLAIMS) expect(carried).not.toContain(claim)
+  })
+
+  it("POSITIVE CONTROL — the ROW still names the cause the paragraph withholds", () => {
+    // Without this half the fence above could pass over a card that had stopped saying
+    // anything about cause at all. The cause is not deleted from the surface; it moved to
+    // the one place that knows it per step.
+    renderReceipt({ phases: ESCALATED_PHASES })
+    expect(screen.getByTestId("seed-receipt-step-judgement").textContent ?? "").toContain(
+      seedReceiptStepReason("escalated"),
+    )
+  })
+
+  it("the one-way lock never travels with it (D-185-07)", () => {
+    // `SEED_RECEIPT_ONE_WAY_RULE` is the DETECTED lock. A carried step is undone by
+    // whatever set it, so "you can't turn that off" over one of these is a false claim.
+    for (const phases of [STRICT_EMIT_ONLY_PHASES, ESCALATED_PHASES]) {
+      const { unmount } = renderReceipt({ phases })
+      expect(screen.getByTestId("seed-receipt-carried")).toBeInTheDocument()
+      expect(screen.queryByTestId("seed-receipt-one-way")).toBeNull()
+      expect(
+        screen.getByTestId("seed-receipt-carried").textContent ?? "",
+      ).not.toContain(SEED_RECEIPT_ONE_WAY_RULE)
+      unmount()
+    }
   })
 })
 
