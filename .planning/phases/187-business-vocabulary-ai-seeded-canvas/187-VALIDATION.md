@@ -15,7 +15,11 @@ gap_closure_round_3: 2026-08-03
 gap_closure_3_plans: [187-20, 187-21]
 gap_closure_3_base: f632f9b6
 gap_closure_3_gates_measured: 2026-08-03
-manual_rows: 13
+gap_closure_round_4: 2026-08-04
+gap_closure_4_plans: [187-22, 187-23, 187-24, 187-25]
+gap_closure_4_base: 7a1b427e
+gap_closure_4_gates_measured: 2026-08-04
+manual_rows: 14
 manual_rows_performed: 0
 ---
 
@@ -1200,6 +1204,403 @@ exit 0, and the five-suite total up +14 with nothing dropped.
 
 ---
 
+## The gap-closure round 4 — 2026-08-04
+
+`187-VERIFICATION.md`'s round-3 re-verification re-scored the phase at **`gaps_found`, 10/11
+must-haves**, with truth **#5 (VOCAB-02 / SPEC Req 5)** failing for a *third* time and for a third
+distinct reason. Rounds 2 and 3 had both fixed the class by editing **what the copy SAYS**. CR-04 is
+the same failure one layer down: a **data-flow** defect. Every sentence on the seed receipt is
+past-tense and first-person (*"Here's what I built"*, *"so I set them to must prove it"*), but its
+data source was a **live store selector** — so a post-arrival edit in the sibling inspector, on the
+same screen, made the card claim the author's own act as the AI's.
+
+| Plan | Findings it closes | Severity as recorded | Wave |
+|---|---|---|---|
+| **187-22** | **CR-04** — the receipt renders a live selector rather than a snapshot of the generation, across **three** input paths (KB-tool edit, added step, grounding dial) | 🛑 Blocker | 9 |
+| **187-23** | **WR-11** (the escalated row says *"you turned this on by hand"* — an actor claim its input, a bare boolean, cannot support) + **WR-15** (a 4th `GroundingCause` renders a seal with a dangling em-dash and no reason) | ⚠️ Warning ×2 | 10 |
+| **187-24** | **WR-12** (the WR-09 fence is a deny-list of two literal clauses, blind to any other wording) + **WR-13** (the testid sweep measures mentions, not coverage) + **WR-14** (a second KB-tool membership derivation, one line from the first) | ⚠️ Warning ×3 | 11 |
+| **187-25** | **WR-16** (the suites carrying this entire estate are unpinned in the count gate — every guard above is deletable with the gate green) + this record | ⚠️ Warning | 12 |
+
+**Scope discipline, stated rather than implied.** Round 4 is scoped to **CR-04 and WR-11…WR-16
+only**.
+
+- **IN-11, IN-12, IN-13 and IN-14 were SHOWN to the operator and left OUT of this round by
+  decision.** They are named here so no reader can infer any of them was absorbed.
+- **WR-08 remains routed to Phase 188**, unchanged from round 3's §(ac). It was not closed, not
+  partially closed and not absorbed by this round either.
+- **WR-01, WR-04, WR-05, WR-06, WR-07 and IN-01…IN-05 remain carried forward**, unchanged in
+  `187-REVIEW.md`, none silently absorbed and none silently dropped.
+
+**Base commit for every gate in this section: `7a1b427e`** (`docs(187): record round-4 gap-closure
+planning (25 plans, 12 waves)`) — the tip immediately before `fbf07b49`, round 4's first commit:
+
+```
+$ git rev-parse --short fbf07b49~1
+7a1b427e
+```
+
+This base is **different from all three** earlier bases: `35261e96` (the phase base,
+§"Phase gates — measured"), `ee5fff3b` (round 2) and `f632f9b6` (round 3). All four are stated so
+that no figure anywhere in this file is ambiguous about which range it measures.
+
+### (ae) Per-task verification rows — 187-22, 187-23, 187-24
+
+> Every command below is the plan's own `<verify>` command. Results are **transcribed** from the
+> three SUMMARYs, each measured at the commit named in its row — this task does not re-derive figures
+> those plans already measured. The **gates** in §(ah) *are* re-measured at the round-4 tip.
+
+| Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | Measured at | Status |
+|---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
+| **187-22-T1** | **22** | **9** | VOCAB-02 (Req 5) | T-187-R4-01/02 | **CR-04 observed RED before any fix** — three post-arrival edits each move the card. Exactly the 3 new cases failed; **all 113 pre-existing cases still passed**. Every failure is a text/count mismatch against the captured arrival baseline, never a selector or timeout error. Path 1's observed text contains *"so I set"* — the authorship claim, printed over the author's own edit | falsification (page-level) | `cd frontend && npx vitest run src/pages/WorkflowBuilderPage.canvas.test.tsx` | `fbf07b49` | ✅ green (after T2) — **RED first, by design**: 3 failed / 113 passed (116) |
+| **187-22-T2** | **22** | **9** | VOCAB-02 (Req 5) | T-187-R4-02/03/04 | **CR-04 closed in the CALLER** — `receiptPhases`, an arrival snapshot captured beside the single `setDrafted` transition, replaces the live selector at the `<SeedReceipt>` mount. One mechanism closes all three input paths at once. The immutability precondition (T-187-R4-04) was **verified at live source** across all seven store ops before the fix was written — every one spreads or maps, none mutates — so the alias needs no defensive copy | unit + render | `cd frontend && npx vitest run src/pages/WorkflowBuilderPage.canvas.test.tsx src/components/workflows/SeedReceipt.test.tsx src/components/workflows/definitionOps.test.ts` | `ef4e59e7` | ✅ green — 404 passed, 0 failed |
+| **187-22-T3** | **22** | **9** | VOCAB-02 (Req 5) | T-187-R4-02/05 | **Standing fences** — the leaf is a *replaceable* pure projection (4 `rerender(`-based cases, up from **0**) plus a `builderSource` pin proving the mount is handed the snapshot and the snapshot is taken beside `setDrafted`. Needles assembled from parts so a grep of the guard cannot satisfy the guard | source fence + rerender fences | `cd frontend && npx vitest run src/components/workflows/SeedReceipt.test.tsx src/pages/WorkflowBuilderPage.canvas.test.tsx` | `4b0fe96e` | ✅ green — 180 passed (117 + 63), 0 failed |
+| **187-23-T1** | **23** | **10** | VOCAB-02 (Req 5) | T-187-R4-06/08/09 | **WR-11 closed** — `it was set to must prove it by hand`, composed from `GOVERNANCE_SEAL_LABEL` rather than hand-typed, names **no actor**. **WR-15 closed** — `case null:` became its own arm and `default:` binds the residual to `never`, so a 4th `GroundingCause` is a **typecheck error at the formatter** rather than a seal with a dangling em-dash. The Phase-185 lesson applied literally: a deny-list cannot be made fail-closed by extension | unit (expected RED) | `cd frontend && npx vitest run src/components/workflows/definitionOps.test.ts src/components/workflows/SeedReceipt.test.tsx` | `f59af16a` | ✅ green (after T2) — **exactly ONE case RED first**, the character-identity pin; signature in §(af) |
+| **187-23-T2** | **23** | **10** | VOCAB-02 (Req 5) | T-187-R4-06/08 | The no-second-person **PROPERTY** (`/\b(you\|your\|yours\|yourself)\b/i`) with **two positive controls** — one a sentence the module genuinely still produces — and **three negative controls** (`youthful`, `young`, `beyond`) proving word-boundary anchoring; the WR-15 pin in **two halves** (runtime totality + `?raw` source, because the runtime half cannot see a compile-time guard); and the DOM no-empty-reason invariant over all three sealed fixtures plus the consequence (no row ends at the em-dash) | property + source fence + DOM invariant | same | `7b1356c3` | ✅ green — 297 passed (231 + 66), 0 failed |
+| **187-24-T1** | **24** | **11** | VOCAB-01/02 | T-187-R4-10/13 | **WR-14 closed** — the `available_tools ∩ kbTools` membership test is **extracted to one body** (`firstKbTool`) read by BOTH `groundingCause` and the new `intersectingKbToolOf`, so agreement is by construction rather than by coincidence. Pinned by an **agreement biconditional** over a 12-phase table (a step is `detected` **iff** it carries a dial **and** the resolver names a tool) carrying a **case-differing** tool id so the property has an input that can fail | unit + agreement property + source fence | `cd frontend && npx vitest run src/components/workflows/phaseVocabulary.test.ts src/components/workflows/SeedReceipt.test.tsx` | `c4972bde` | ✅ green — `phaseVocabulary` 90→**96**, `SeedReceipt` 66→**68** |
+| **187-24-T2** | **24** | **11** | VOCAB-02 (Req 5) | T-187-R4-11 | **WR-12 closed** — the fence is now a **word-class PROPERTY** over causal connectives with four negative controls; the two historical wordings stay **beneath** it as regression pins, no longer as the fence. It carries a **positive control over its own needles inside the same `it`** (built by welding the deleted clause back on, never hand-typed), because a control in a sibling case can be deleted and leave the absences standing alone — which is how the fence shipped in the first place. Net-new: the property over the whole representable count domain (0–30, negative, fractional, `NaN`, `Infinity`, `MAX_SAFE_INTEGER`) | property + positive control | `cd frontend && npx vitest run src/components/workflows/definitionOps.test.ts` | `576a0e31` | ✅ green — 231→**232** |
+| **187-24-T3** | **24** | **11** | VOCAB-02 (Req 5) | T-187-R4-12 | **WR-13 closed** — the sweep measures COVERAGE, not mentions: extraction widened to all three static spellings, comments stripped from `testSource` before the substring check, and the sibling `data-*` state-attribute class swept in its **own `it`** (a guard folded into its sibling can be deleted without the count moving — the Phase-177 shape). `it("those fences are real")` gained the planted literals it never had, including a **NON-FIRING control** over the dynamic row testid | coverage sweep + planted-literal controls | `cd frontend && npx vitest run src/components/workflows/SeedReceipt.test.tsx` | `17c6e338` | ✅ green — 67→**68** |
+| **187-25-T1** | **25** | **12** | VOCAB-02 | T-187-R4-14/15/16 | **WR-16 closed** — `definitionOps.test.ts` (232) and `SeedReceipt.test.tsx` (68) are pinned in `BASELINE`, both numbers **read from the gate's own `actual` column** over two agreeing runs, each observed catching a deletion. The gate's hard-coded `16/16` success line is now derived. The stale docblock instruction is repaired in the same commit | pin + deletion probes ×2 | `node scripts/vitest-count-gate.cjs` | `4541a936` | ✅ green — exit 0, both at delta **0**, `18/18` |
+
+*Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
+
+### (af) PROBE — every falsification round 4 performed
+
+**Why this section exists.** Round 3's own lesson was that *green over an unrepresentable fixture is
+not coverage* — and round 3's CR-01 fix then shipped **its own new sentence with zero assertions**
+(that is CR-03, verbatim). Round 4 inherited the same temptation twice over: WR-12 and WR-13 are both
+findings that a **guard shipped without the control its own file mandates**. A guard that has never
+been seen to fail is indistinguishable from a guard that cannot fail. **A probe observed RED is the
+only evidence a guard bites.**
+
+⚠ **The measured probe count for 187-24 is EIGHT, not the nine both its own SUMMARY and this
+plan's task action state.** The decomposition *"two agreement/source, one WR-12 wording, five WR-13
+sweep probes, and the sibling-attribute probe"* counts the sibling-attribute probe twice — it **is**
+probe 5 of the five sweep probes (`data-row-tally`), not a ninth. The measured set is recorded, not
+the planned one, exactly as round 3's §(q) did when its own probe count was misstated. Round-4 total:
+**14 probes**, plus two expected task-level REDs.
+
+| # | Plan | Mutation applied | Observed RED (verbatim) | Revert evidence |
+|---|---|---|---|---|
+| **RED-1** | 187-22 T1 | *(none — the SHIPPED code, before any fix)* | `× CR-04 path 1 — switching a KB tool ON afterwards does not make the card claim it` · `× path 2 — a step the AUTHOR adds is not counted by the card's heading` · `× path 3 — flipping the grounding dial ON afterwards does not join the carried count`. Path 1 received: `"…3 steps✕1 step reads your documents, so I set it to must prove it…"` — **the authorship claim, printed over the author's own edit**. `Tests 3 failed \| 113 passed (116)` | n/a — this is the defect, fixed at `ef4e59e7` |
+| **P-1** | 187-22 T3 | cache the first `phases` inside the leaf: `const [frozen] = useState(phases)` / `phases = frozen` — **the tempting WRONG fix** the review's own proposed test would have forced | `× PURE PROJECTION — handed a new snapshot, every sentence and all three counts describe THAT one` · `× A NEW SNAPSHOT REPLACES THE OLD ONE — this leaf holds no cache of its first props` · `× holds NO cache of its first props — the CR-04 wrong fix, fenced at the source`. `Tests 3 failed \| 60 passed (63)` | `git checkout -- SeedReceipt.tsx` → `git diff --stat` **no diff**; `grep -nE "useState\|useRef"` → **no cache hooks** |
+| **P-2** | 187-22 T3 | revert the mount prop to the live selector: `phases={receiptPhases}` → `phases={phases}`, at the `<SeedReceipt>` mount only | the new `builderSource` **SOURCE FENCE** *and* all three Task-1 cases: `Tests 4 failed \| 113 passed (117)` | `git checkout -- WorkflowBuilderPage.tsx` → **no diff**; `grep -n "phases={receiptPhases}"` → `1644:` |
+| **RED-2** | 187-23 T1 | *(none — the shipped `escalated` sentence, before the fix)* | `× the reason formatter CLASSIFIES nothing — it renders the cause it is handed`. `AssertionError: expected 'it was set to must prove it by hand' to be 'you turned this on by hand'`. `Tests 1 failed \| 290 passed (291)` — **exactly one case**, the character-identity pin, which is the proof the sentence had exactly one home | n/a — this is the copy change, at `f59af16a` |
+| **P-3** | 187-23 T2 | revert the sentence to the second-person wording | **BOTH** required cases: `× the reason formatter CLASSIFIES nothing` · `× the escalated reason NAMES NO ACTOR — a property, with a positive control (WR-11)`. `AssertionError: expected 'you turned this on by hand' not to match /\b(you\|your\|yours\|yourself)\b/i`. `Tests 2 failed \| 295 passed (297)` — the **property** would have caught *any* second-person rewording, not only this one | `git checkout --` → **no diff**; `grep -n 'it was set to ${words} by hand'` → `710:` |
+| **P-4** | 187-23 T2 | replace the `never` guard with a bare `default: return ""` | `× guards seedReceiptStepReason with a never binding, not a bare default (WR-15)`. `Tests 1 failed \| 296 passed (297)` — **exactly the source half failed and the runtime half stayed green**, which is the empirical proof that the runtime half alone cannot see a compile-time guard | `git checkout --` → **no diff**; `grep -n "_never"` → `717,718,886,887` |
+| **P-5** | 187-23 T2 | make `seedReceiptStepReason` return `""` for `escalated` | `× no rendered reason is empty or blank, across every sealed fixture` · `× no row's text ends at the em-dash — the consequence, in what a reader sees` · `× POSITIVE CONTROL — the formatter really can return the empty string`. `AssertionError: expected '⛨Must prove itWeigh the supplier opti…' not to match /—\s*$/`. `Tests 3 failed \| 63 passed (66)` — the failure message **is the defect in the words a reader would see** | `git checkout --` → **no diff**; `git status --porcelain -- frontend/` shows only the two Task-2 test files |
+| **P-6** | 187-24 T1 | plant the drift: give `intersectingKbToolOf` its own **case-folding** loop instead of calling `firstKbTool`, leaving `groundingCause` alone | `× AGREES WITH THE CLASSIFIER, over a table — the property, not two copies of it`. `AssertionError: phase l names Search_Documents but is not detected: expected null to be 'detected'`. `Tests 1 failed \| 95 passed (96)` — the table carries a **case-differing** id precisely so the biconditional has a falsifiable input | `python plant_a.py unplant` → `git diff \| grep -c "folded"` **0**; suite **96 passed** |
+| **P-7** | 187-24 T1 | re-declare a local `localIntersectingKbTool` in `SeedReceipt.tsx`, in the exact shape that was deleted | `× declares NO membership predicate of its own — one rule, one home (187-24/WR-14)`. `AssertionError: expected […(2)] to have a length of 1 but got 2`. `Tests 1 failed \| 66 passed (67)` — the assertion that bit is the **PROPERTY**, not the deny-list of membership calls beneath it | `grep -c "localIntersectingKbTool"` → **0**; `git diff --stat` → `15 insertions(+), 22 deletions(-)` — **the task's own delta, checked against what it SHOULD be rather than against zero** |
+| **P-8** | 187-24 T2 | a **differently-worded** cause clause: `… must prove it because of its citation policy.` | `× the carried sentence ATTRIBUTES NO CAUSE — it counts two of them (187-20/WR-09)` · `× …and it attributes none over EVERY representable count`. `expected '1 step was already set to must prove …' not to match /\b(because\|since\|due to\|owing to\|tha…/i`. `Tests 4 failed \| 228 passed (232)`. **The historical-needle loop ran FIRST in the same iteration and PASSED** — the empirical proof of WR-12: the deny-list is blind to this wording and only the property sees it | `python plant_b.py unplant` → `git diff --stat -- definitionOps.ts` **empty**; suite **232 passed** |
+| **P-9** | 187-24 T3 | a brand-new `data-testid="seed-receipt-brandnew"` nothing queries | `AssertionError: data-testid="seed-receipt-brandnew" is rendered but never queried` — **old sweep also failed** (its one working direction) | `git diff --stat -- SeedReceipt.tsx` **empty**; suite **68 passed** |
+| **P-10** | 187-24 T3 | `data-testid={"seed-receipt-brace"}` — the brace-wrapped double-quote spelling | `AssertionError: data-testid="seed-receipt-brace" is rendered but never queried` — **old sweep PASSED: invisible** | as above |
+| **P-11** | 187-24 T3 | `data-testid={'seed-receipt-sneaky'}` — the brace-wrapped single-quote spelling | `AssertionError: data-testid="seed-receipt-sneaky" is rendered but never queried` — **old sweep PASSED: invisible** | as above |
+| **P-12** | 187-24 T3 | a new id whose only query is the **commented-out** `// screen.getByTestId("seed-receipt-ghost")` | `AssertionError: data-testid="seed-receipt-ghost" is rendered but never queried` — **old sweep PASSED: a mention satisfied it** | as above |
+| **P-13** | 187-24 T3 | a new **sibling state attribute** `data-row-tally={rows.length}` nothing queries | `AssertionError: data-row-tally is rendered but never queried: expected ' \r\nimport { describe, it, expect, v…' to contain '"data-row-tally"'` — **old sweep PASSED: the whole class was unswept.** The expected string beginning with comment-stripped source is visible proof both repairs are live in the same assertion | as above |
+| **P-14** | 187-25 T1 | delete one `it(` block from **`SeedReceipt.test.tsx`** (`renders every authored string as a text child`) | `SeedReceipt.test.tsx  68  67  -1` · `RESULT: COUNT GATE VIOLATED (1 reason(s))` · `FAIL [count-decrease] SeedReceipt.test.tsx — pinned 68, ran 67 (-1). A test was deleted or skipped away.` — with **`failed 0`**, so the count decrease is the *only* signal, which is the entire point: a failures-only differential cannot see a deleted test | restored byte-for-byte from a sidecar copy (**not** `git checkout --`, which would have wiped the uncommitted task edits — the 187-24 lesson); `grep -c` for the block → **1**; `git diff -U0` non-comment changed lines → **0** |
+| **P-15** | 187-25 T1 | delete one `it(` block from **`definitionOps.test.ts`** (`is pure — the same drag resolves identically every time`) | `definitionOps.test.ts  232  231  -1` · `FAIL [count-decrease] definitionOps.test.ts — pinned 232, ran 231 (-1). A test was deleted or skipped away.` — again with `failed 0` | sidecar restore; `grep -c` → **1**; `git diff --stat -- definitionOps.test.ts` → **empty** (the file is byte-identical to HEAD; this plan only probed it) |
+
+**Two probes are worth naming for what they refuted, not merely for going red.**
+
+- **P-1 is the probe that matters most in round 4.** It is the *tempting wrong fix* — caching inside
+  the leaf — which the review's own proposed component-level test would have **forced**. `SeedReceipt`
+  recomputes every row, count and sentence from its `phases` prop on every render, so the review's
+  proposed test would still have failed after the review's own proposed fix and could only be made
+  green by adding a cache. **A review's suggested fix and its suggested test contradicted each other**;
+  the verified `planner_note` was confirmed against live source before Task 1, and P-1 now makes the
+  wrong fix red three cases instead of green.
+- **P-8 proves WR-12 as an executable claim rather than an argument.** The old deny-list loop and the
+  new property ran in the *same iteration*; the deny-list passed and the property failed. That is the
+  finding, measured.
+
+### (ag) COVERAGE — what the three widened guards now measure
+
+Round 4 widened three guards from *mentions* to *properties*. Each widening is recorded with the
+measurement that justified it, because two of the three were adopted only after a proposed artifact
+was **rejected**.
+
+| Guard | Was | Is | The measurement that decided it |
+|---|---|---|---|
+| the WR-09 cause fence | two literal clauses (`" by its own settings"`, `" by their own settings"`) | a **word class** — `because \| since \| due to \| owing to \| thanks to \| on account of \| as a result \| therefore \| thus \| hence \| consequently \| by`, `\b`-anchored, with 4 negative controls (`bystander`, `sincerely`, `thusly`, `a byte of it`) | re-derived at HEAD: `grep -rn "by its own settings\|by their own settings" src/` → **2 hits, BOTH PROSE** (a test comment and a docblock). Every needle in the shipped fence matched **nothing the product can emit** |
+| the testid sweep | one static spelling, comments included, `data-testid` only | all **three** static spellings; `withoutComments()` applied to `testSource` first; the sibling `data-*` state-attribute class swept in its **own `it`** | all 5 probes (P-9…P-13) run against **both** sweeps: the old one caught **1 of 5**; the new one catches **5 of 5** |
+| the KB-tool membership rule | two derivations one line apart, agreeing by coincidence | **one body** (`firstKbTool`) read by both consumers | `grep -nE "kbTools\.(includes\|indexOf)\|includes\(tool\)" SeedReceipt.tsx` → **nothing**; `grep -c "export function intersectingKbToolOf" phaseVocabulary.ts` → **1**; `grep -n "intersectingKbToolOf" SeedReceipt.tsx` → imported (`:138`) and called (`:218`), **never redeclared** |
+
+⚠ **A review's suggested regex is a CLAIM, not an artifact — and this round measured two of them
+false.** WR-13's proposed extraction regex admits backticks and, against this component, extracts
+`seed-receipt-step-${row.slug}` — the **template** row testid — as though it were a static id, then
+demands a query for that literal string: **a guard red on correct code.** It was narrowed to exclude
+`$`, `{` and `}`, and the sweep now asserts *explicitly* that no extracted id contains `${`.
+Separately, **two needles were tried and REJECTED for firing on correct code** and the reasons written
+into the guard rather than deleted quietly: `/function\s+\w+\s*\([^)]*kbTools/` fired on the
+component's own destructured props, and `"for (const "` fired on its own row derivation.
+
+### (ah) GATES — re-measured at the round-4 tip, not carried forward
+
+Every figure below came from a command run **at this commit**, with raw output pasted.
+
+**(ah-1) The five-suite named set — count-guarded**
+
+⚠ Run **isolated**, never as part of the full frontend suite. The Phase-177 lesson applies: the
+**COUNT** is the gate, not only the failure number.
+
+```
+$ cd frontend && npx vitest run src/components/workflows/SeedReceipt.test.tsx \
+      src/components/workflows/StepTypePicker.test.tsx \
+      src/components/workflows/phaseVocabulary.test.ts \
+      src/components/workflows/phaseVocabulary.corpus.test.ts \
+      src/components/workflows/definitionOps.test.ts
+ Test Files  5 passed (5)
+      Tests  484 passed (484)
+EXIT=0
+```
+
+**Files 5 · passed 484 · failed 0. Against round 3's `466` for this identical command (§(t)), the
+total ROSE by exactly +18** — strictly greater, so no suite was replaced rather than extended.
+
+**The 466 is re-derived here, not inherited.** Declared case literals counted in the round-4 base
+blob and the HEAD blob:
+
+```bash
+for f in SeedReceipt.test.tsx StepTypePicker.test.tsx phaseVocabulary.test.ts \
+         phaseVocabulary.corpus.test.ts definitionOps.test.ts; do
+  git show 7a1b427e:frontend/src/components/workflows/$f | grep -cE '^[ \t]*(it|test)(\.each\(|\.skip)?\('
+  git show HEAD:frontend/src/components/workflows/$f      | grep -cE '^[ \t]*(it|test)(\.each\(|\.skip)?\('
+done
+```
+
+| Suite | literals `7a1b427e` → `HEAD` | Δ | Which plans moved it |
+|---|---|---|---|
+| `SeedReceipt.test.tsx` | 60 → 68 | **+8** | 187-22 (+3), 187-23 (+3), 187-24 (+2) |
+| `definitionOps.test.ts` | 118 → 122 | **+4** | 187-23 (+3), 187-24 (+1) |
+| `phaseVocabulary.test.ts` | 78 → 84 | **+6** | 187-24 (+6) |
+| `StepTypePicker.test.tsx` | 36 → 36 | **0** | — untouched by this round |
+| `phaseVocabulary.corpus.test.ts` | 17 → 17 | **0** | — untouched by this round |
+| **total Δ** | — | **+18** | |
+
+`484 − 18 = 466`, which is round 3's recorded figure for the identical command — so "before" is
+**derived from a measurement taken now**, and it independently reproduces round 3's number. ⚠ Absolute
+literal counts do not equal run counts (`it.each` expands one literal into several cases), which is
+why only the **deltas** are used as the instrument. Two of the five files are byte-identical to the
+base, so their counts cannot have moved and there is no room for a compensating drop.
+
+Also re-measured: `WorkflowBuilderPage.canvas.test.tsx`, which 187-22 moved **113 → 117**, reports
+**117** in every count-gate sample below.
+
+**(ah-2) The count gate — and the two new pins**
+
+```
+$ node scripts/vitest-count-gate.cjs
+  file                                     pinned  actual   delta
+  -------------------------------------------------------------
+  definitionOps.test.ts                       232     232       0    ← NEW PIN (187-25)
+  canvasModel.fixtures.test.ts                100     100       0
+  canvasModel.purity.test.ts                   69     143     +74
+  SeedReceipt.test.tsx                         68      68       0    ← NEW PIN (187-25)
+  phaseVocabulary.test.ts                      33      96     +63
+  WorkflowCanvas.test.tsx                      31      35      +4
+  canvasModel.test.ts                          26      49     +23
+  PublishGauntlet.test.tsx                     24      46     +22
+  WorkflowBuilderPage.canvas.test.tsx          22     117     +95
+  PhaseFormPanel.test.tsx                      19      19       0
+  WorkflowBuilderPage.test.tsx                 15      15       0
+  PhaseSpineGraph.test.tsx                     14      20      +6
+  soulData.test.ts                             14      14       0
+  WorkflowDoorSwitch.test.tsx                  13      13       0
+  PhaseSpine.test.tsx                          11      11       0
+  deriveTier.test.ts                            9       9       0
+  WorkflowSoul.test.tsx                         8       8       0
+  revertByteIdentical.test.tsx                  7       7       0
+  … 20 unpinned files reported `new` …
+  -------------------------------------------------------------
+  total                                       715    2111   +1396
+  total 2111  ·  failed 0  ·  pinned total 715
+count gate OK — 18/18 pinned files present, no per-file decrease, 0 failing.
+GATE_EXIT=0
+```
+
+**Exit 0. Every previously-pinned file reports delta ≥ 0 — not one decreased.** Pinned total
+**415 → 715** (+232 +68). The success line's count is now **derived from the map** rather than the
+hard-coded `16/16` it printed before, so it cannot announce a false figure on a green gate.
+
+**Both pin numbers were read from this table's own `actual` column**, over two runs that agreed at
+232 / 68, and neither was hand-counted — `definitionOps.test.ts` declares **122** `it(` literals and
+runs **232** cases because of `it.each`, so a hand count would have pinned a fiction by ~110. The
+deletion probes that prove the pins bite are **P-14** and **P-15** in §(af).
+
+⚠ **A red gate was sampled, diagnosed, and NOT pinned around.** Sample 1 of four reported
+`failed 1`. The plan anticipated the known `PublishGauntlet.test.tsx` flake (`D-ITEM-187-20-01`).
+**It was a different file:**
+
+```
+FILE:     WorkflowBuilderPage.canvas.test.tsx
+FULLNAME: WorkflowBuilderPage 184-11 — with the flag OFF the panel receives NO rails key (D-14)
+          > POSITIVE CONTROL — with the flag ON the very same read finds the key
+MSG:      AssertionError: expected 0 to be greater than 0
+```
+
+| Sample | Command | `failed` | `WorkflowBuilderPage.canvas` | `PublishGauntlet` |
+|---|---|---|---|---|
+| 1 (pre-pin) | `node scripts/vitest-count-gate.cjs` | **1** | 117 | 46 |
+| 2 (pre-pin) | same | 0 | 117 | 46 |
+| 3 (post-pin) | same | 0 | 117 | 46 |
+| 4 (final, shipped tree) | same | 0 | 117 | 46 |
+| isolation | `npx vitest run src/pages/WorkflowBuilderPage.canvas.test.tsx` | 0 | **117 passed, exit 0** | — |
+
+Green alone, green in three of four whole-glob samples, and its **per-file count is 117 in every
+sample** — never a `[count-decrease]`. Same *class* as `D-ITEM-187-20-01` / `D-ITEM-02`, different
+*file*, so it is logged separately as **`D-ITEM-187-25-01`** rather than folded in. **No pin was
+lowered for it.** A pin is lowered only alongside a deliberate, plan-authorised deletion — never to
+quiet a red gate — and lowering it would have been meaningless anyway, since the flake is a
+`[failing-tests]` reason and not a count reason. `D-ITEM-187-20-01`'s own file did **not** flake this
+round: `PublishGauntlet.test.tsx` reported 46 passing in all four samples.
+
+**(ah-3) The zero-migration gate**
+
+```
+$ git diff --stat 35261e96 HEAD -- supabase/migrations     ← (empty — 0 lines)
+$ git diff --stat 7a1b427e HEAD -- supabase/migrations     ← (empty — 0 lines)
+$ git status --porcelain supabase/migrations               ← (empty — 0 lines)
+```
+
+**All three empty.** Measured from the **phase** base *and* the **round-4** base, so truth #11
+(*"Zero migrations added by this phase, including the closure rounds"*) survives round 4 on its own
+evidence rather than on round 3's.
+
+**(ah-4) The backend-untouched gate**
+
+```
+$ git diff --name-only 7a1b427e HEAD -- backend/           ← (empty)
+```
+
+**Zero backend files.** §(d)'s pre-existing-rot record stands unchanged and the backend suite was
+neither re-run nor needed.
+
+**(ah-5) The D-187-14 mount cap — this round SPENDS the budget, for the first time since the phase**
+
+```
+$ git diff --numstat 7a1b427e HEAD -- frontend/src/pages/WorkflowBuilderPage.tsx
+8	1	frontend/src/pages/WorkflowBuilderPage.tsx
+```
+
+**8 insertions / 1 deletion, against the ≤ 15 insertion budget this round set. Under, not at.**
+Rounds 2 and 3 each spent **0** (§(j), §(y)); round 4 is the first closure round to touch the mount
+at all, because CR-04 is a **caller** defect and the caller is this file. The whole delta on a
+1851-line hot file is: a `receiptPhases` state declaration + a 3-line comment; one
+`setReceiptPhases(def.phases)` inside `onDraft`'s success branch + a 2-line comment; and **one
+identifier** in the JSX (`phases={phases}` → `phases={receiptPhases}`). **The render body gains no
+new line** — the only render-body change is a 1-insertion/1-deletion identifier swap at the same
+position. The reasoning lives in the component's prop contract, not in the page. G-1 is honoured by
+construction.
+
+**(ah-6) `tsc --noEmit` against the `D-ITEM-01` baseline**
+
+```
+$ cd frontend && npx tsc --noEmit -p tsconfig.app.json ; echo $?
+2
+$ grep -c 'error TS'                            → 33
+$ grep -c 'src/components/workflows/'           → 0
+$ grep -c 'src/pages/WorkflowBuilderPage'       → 0
+```
+
+| | Before (`D-ITEM-01`, and re-measured by 187-22/23/24 at each task) | **After (measured now)** |
+|---|---|---|
+| total `error TS` lines | 33 | **33** — zero delta |
+| errors in `src/components/workflows/` | 0 | **0** |
+| errors in `src/pages/WorkflowBuilderPage*` | 0 | **0** |
+
+187-23 and 187-24 additionally measured their outputs **byte-identical** to their own pre-task
+baselines at every task, so across the whole round not one error moved, changed shape or changed file.
+
+⚠ **`D-ITEM-187-23-02` re-confirmed by measurement at the round-4 tip: the bare form is VACUOUS.**
+
+```
+$ cd frontend && npx tsc --noEmit ; echo $?
+0        ← ZERO output, ZERO error lines
+```
+
+The root `frontend/tsconfig.json` is a **solution file** with `files: []`, so the bare command
+type-checks **zero files**. It cannot reproduce the 33-error baseline and — the part that matters —
+**it cannot detect a new error either.** Any criterion spelled `npx tsc --noEmit` must be read as
+`-p tsconfig.app.json`. ⚠ Separately, `tsc -b` ≠ `tsc --noEmit` (the v3.3 lesson) — two distinct
+traps in the same area.
+
+**(ah-7) No false completion record**
+
+```
+$ git status --porcelain .planning/REQUIREMENTS.md .planning/ROADMAP.md   ← (empty — 0 lines)
+$ grep -rn "gsd-sdk\|sdk query" .planning/phases/187-.../187-2[2345]-*.md ← (no hits, exit 1)
+```
+
+Neither `requirements.mark-complete`, `state.advance-plan` nor `roadmap.update-plan-progress` was
+called by **any** executor in round 4 — all three write false records in this project. Every textual
+occurrence of those three verb names across the round's four plans and four summaries is
+**prohibition prose**, never an invocation; the second grep confirms there is no SDK call site of any
+kind in those eight documents. `REQUIREMENTS.md` was not touched at all — its VOCAB-01/02/03 rows
+still read Pending, which is correct until re-verification says otherwise. ⚠ Stated rather than left
+to be discovered: `.planning/STATE.md` **does** appear in the round's file list (§(ai)); those are the
+**orchestrator's** own tracking commits (`5e0db585`, `83524870`, `925373b9`), which is whose job it is.
+
+**(ah-8) The full file list for the round — measured, not asserted**
+
+```
+$ git diff --name-only 7a1b427e HEAD
+.planning/STATE.md
+.planning/phases/187-business-vocabulary-ai-seeded-canvas/187-22-SUMMARY.md
+.planning/phases/187-business-vocabulary-ai-seeded-canvas/187-23-SUMMARY.md
+.planning/phases/187-business-vocabulary-ai-seeded-canvas/187-24-SUMMARY.md
+.planning/phases/187-business-vocabulary-ai-seeded-canvas/deferred-items.md
+frontend/src/components/workflows/SeedReceipt.test.tsx
+frontend/src/components/workflows/SeedReceipt.tsx
+frontend/src/components/workflows/definitionOps.test.ts
+frontend/src/components/workflows/definitionOps.ts
+frontend/src/components/workflows/phaseVocabulary.test.ts
+frontend/src/components/workflows/phaseVocabulary.ts
+frontend/src/pages/WorkflowBuilderPage.canvas.test.tsx
+frontend/src/pages/WorkflowBuilderPage.tsx
+scripts/vitest-count-gate.cjs
+```
+
+**Eight source files, one script, five planning documents, nothing else.** (Measured *before* 187-25's
+own doc commits, which add this file and `187-25-SUMMARY.md`.) `StepTypePicker.tsx` /
+`.test.tsx` do **not** appear — the WR-08 fence of §(ac) holds through round 4 as well.
+
+### (ai) Deferred items opened by this round
+
+| Id | Opened by | What | Re-open trigger |
+|---|---|---|---|
+| `D-ITEM-187-23-01` | 187-23 | `GROUNDING_WHY_ESCALATED` (`definitionOps.ts:475`) carries the same second-person claim — *"Because you turned this on by hand."* — on the grounding dial's why-line in `PhaseFormPanel`. The case is genuinely weaker (the line renders beside the dial the author is operating), and the plan's action said *"change nothing else in this file"* | the next plan touching `PhaseFormPanel`'s grounding why-line |
+| `D-ITEM-187-24-01` | 187-24 | `groundingCauseOf` reads `phase.config` unguarded, against its own module's totality contract; `intersectingKbToolOf` deliberately **mirrors** it rather than diverging | the next plan that may change a shipped `phaseVocabulary` export's behaviour |
+| `D-ITEM-187-25-01` | 187-25 | a **second** parallel-execution flake, in `WorkflowBuilderPage.canvas.test.tsx` (the 184-11 rails positive control) — not `PublishGauntlet`. Green in isolation at 117; no pin moved for it | Phase 188's `WorkflowCanvas.tsx` extraction |
+
+### What round 4 proved — and what it did NOT
+
+**Proved.** CR-04 is closed **in the caller**, by a snapshot — the one fix shape that closes all three
+input paths at once, where the two prior rounds had each edited what the copy *says*. WR-11 through
+WR-16 are closed by code. Fourteen probes were observed RED and every one was cleanly reverted, so no
+guard added in this round is one that has never been seen to fail. Two guards that shipped in round 3
+without the controls their own files mandate now have them, and each was observed failing on a defect
+it previously passed. The two suites carrying the whole Req-5 governance-honesty estate are pinned,
+from numbers the gate printed, each observed catching a deletion. Zero migrations, zero backend files,
+zero `tsc` delta, the five-suite total up +18 with nothing dropped, and the mount cap spent at 8 of 15.
+
+**Not proved.**
+
+- **Nothing on the manual board.** All **fourteen** rows (M1–M14) remain **UNPERFORMED**. They are
+  the operator's. M14 is net-new and unperformed like the rest; repairing a note is not performing it.
+- **IN-11…IN-14 were shown and left out by decision**, and **WR-08 is still Phase 188's**. Neither
+  was absorbed here.
+- **WR-01, WR-04, WR-05, WR-06, WR-07 and IN-01…IN-05 remain open**, unchanged in `187-REVIEW.md`.
+- **The three ❌ SC#10 rows are untouched.** OpenRouter's non-deterministic name drop, OpenAI's
+  `gpt-5.6-sol` endpoint refusal and MiniMax's non-emission are provider-side; no frontend change in
+  this round could move them and none tried.
+- **The parallel-run flake class is still there, and it GREW a file** (`D-ITEM-187-25-01`). Three of
+  four gate samples landed at 0 failing; that is a sample, not a fix.
+- **`groundingCauseOf`'s unguarded `config` read is still there** (`D-ITEM-187-24-01`), deliberately
+  mirrored rather than diverged from, and **`GROUNDING_WHY_ESCALATED` still says "you"** on the panel
+  surface (`D-ITEM-187-23-01`). Both are logged, neither is swept in.
+- **The backend was not re-run and did not need to be** — this round committed **zero** backend files.
+
+---
+
 ## Wave 0 Requirements
 
 - [x] `backend/tests/unit/test_187_armed_checkpoint_property.py` — SC#6 property, **observed RED first**
@@ -1228,18 +1629,20 @@ exit 0, and the five-suite total up +14 with nothing dropped.
 |---|----------|-------------|------------|-------------------|
 | M1 | Every node face says what *that* step does | Req 1 / SC#5 | "Reads distinctly to a business user" is a judgement | Generate a real 5-step workflow; read every face aloud |
 | M2 | The plain title survives the ⌥ reveal; layout does not jump | Req 4 | Height/jump is perceptual | Toggle ⌥ Technical-names ON/OFF ×3 on **both** views |
-| M3 | The receipt arrives once, seal pulses once, implies nothing still-deciding | Req 5 | Temporal + perceptual | **UNBLOCKED 2026-08-02, further REPAIRED 2026-08-03 — still UNPERFORMED and UNTICKED.** *History kept, not overwritten:* `187-VERIFICATION.md` originally held this row with its blocking reason recorded verbatim — *"NOTE: fix the CR-01 gap before running this, or the operator will be confirming a receipt that lies."* **CR-01 was closed by plan 187-16** (commits `77668751` RED, `5c613bf4` GREEN); the receipt no longer states a governance action the AI did not take, so the hold no longer applies. Round 2's re-verification then attached a **second** warning to this row, telling the operator to also read the carried sentence against the per-step reasons because an escalated draft showed an internally-contradictory card (CR-03 / WR-09). **That second warning is STALE as of plan 187-20** (`debced07` RED → `51a60299` GREEN → `7593fe8b` guard): the carried sentence now attributes **no cause at all** — it reads *"1 step was already set to must prove it."* — so there is no contradiction left to look for and no reason to go hunting for one. **What the operator should now see:** the receipt arrives as ONE batch; the carried paragraph states the count and the seal and says nothing about *what* applied it; each row beneath names its own cause. **Unblocking a row is not performing it, and neither is repairing it.** To perform: watch arrival on a throttled connection on a REAL generated draft — the receipt enters ONCE as one batch, the seal pulses once, and nothing on the card reads as still-deciding. ⚠ `187-VERIFICATION.md`'s own `human_verification` entry for M3 still carries the stale CR-03/WR-09 wording; that file belongs to the verifier and is amended at re-verification, not by this plan — named here so the two are not silently in conflict. |
+| M3 | The receipt arrives once, seal pulses once, implies nothing still-deciding | Req 5 | Temporal + perceptual | **UNBLOCKED 2026-08-02, further REPAIRED 2026-08-03 — still UNPERFORMED and UNTICKED.** *History kept, not overwritten:* `187-VERIFICATION.md` originally held this row with its blocking reason recorded verbatim — *"NOTE: fix the CR-01 gap before running this, or the operator will be confirming a receipt that lies."* **CR-01 was closed by plan 187-16** (commits `77668751` RED, `5c613bf4` GREEN); the receipt no longer states a governance action the AI did not take, so the hold no longer applies. Round 2's re-verification then attached a **second** warning to this row, telling the operator to also read the carried sentence against the per-step reasons because an escalated draft showed an internally-contradictory card (CR-03 / WR-09). **That second warning is STALE as of plan 187-20** (`debced07` RED → `51a60299` GREEN → `7593fe8b` guard): the carried sentence now attributes **no cause at all** — it reads *"1 step was already set to must prove it."* — so there is no contradiction left to look for and no reason to go hunting for one. **What the operator should now see:** the receipt arrives as ONE batch; the carried paragraph states the count and the seal and says nothing about *what* applied it; each row beneath names its own cause. **Unblocking a row is not performing it, and neither is repairing it.** To perform: watch arrival on a throttled connection on a REAL generated draft — the receipt enters ONCE as one batch, the seal pulses once, and nothing on the card reads as still-deciding. ⚠ `187-VERIFICATION.md`'s own `human_verification` entry for M3 still carries the stale CR-03/WR-09 wording; that file belongs to the verifier and is amended at re-verification, not by this plan — named here so the two are not silently in conflict. **AMENDED 2026-08-04 by plan 187-22 (CR-04) — still UNPERFORMED and UNTICKED.** This row's last clause — *"nothing on the card reads as still-deciding"* — got a second, sharper meaning that did not exist when it was written. Before 187-22 the card was wired to a **live** store selector, so it kept re-computing forever: it was not merely *reading* as still-deciding, it genuinely **was** still tracking, and an edit made ten seconds after arrival would silently rewrite its sentences. After 187-22 the card renders an **arrival snapshot** and stops. **What the operator should now see:** once the receipt has arrived, it is finished — a frozen account of the generation, not a live readout. The dedicated head-on read of that property is the new **M14**; this row keeps its original scope (the *arrival*: once, one batch, one pulse) and simply no longer has a moving target underneath it. |
 | M4 | The face tracks a skill bind/unbind without a save and without flicker | Req 1 | The async-map settle is only visible live (Pitfall 1) | Bind a skill to a step, then unbind, watching the face |
 | M5 | The seeded describe text reads like something a person typed | Req 6 | Copy quality | Pick each of the 3 templates |
 | M6 | **SC#6 live** — armed checkpoint cannot be preempted | Req 7 / SC#6 | Needs a live Redis rendezvous + a real browser answer | Run an armed phase carrying a `timing="pre"` `ask_user` validator. Answer the author's gate **Proceed**; confirm the armed checkpoint appears in the chat `PendingAskCard`. **Refuse** it. Confirm the step did NOT run and `harness_audit` has **zero** `validator_ask_user_approved` rows for it. |
 | M7 | **SC#10 live row** — the env path reaches `resolve_authoring_model` | SC#10 | Requires a backend restart | Restart backend with `HARNESS_AUTHORING_MODEL` set; generate; confirm the model actually used |
 | M8 | Flag-OFF Builder first screen is byte-identical to today | D-181-01 | No shipped test covers it | Turn `visual_workflow_canvas` OFF; open the Builder's first screen; confirm no template line |
-| **M9** | **The receipt's two paragraphs read as ONE honest account** on a typical generated draft | Req 5 / VOCAB-02 (CR-01) | The automated half can prove *which steps each sentence counts*. It cannot say whether two sentences, read one after the other by a person, add up to one coherent account or to a contradiction. That judgement is the whole point of the surface. | Generate a REAL draft whose spine is `llm_agent → llm_emit` (the shape **both** curated starters produce — `StarterTemplatePicker.tsx:50-53`). Then confirm, reading the card as a person: (1) the *"…read your documents, so I set them to must prove it"* sentence counts **only** the steps that actually read documents — cross-check its number against the steps you can see retrieving; (2) the deliverable step is **still named** and **still explains its own seal**; (3) **no** sentence claims the AI applied a gate that the step's own `citation_policy` default applied; (4) the *"You can't turn that off"* line sits with the detected paragraph and nowhere else; **(5) — NEW after plan 187-20, and the fact that changed:** the *second* paragraph (the one counting steps that were **already** sealed) now attributes **no cause at all** — it reads *"N steps were already set to must prove it."* — so you are confirming that the paragraph and the rows **AGREE**, not checking the card for a contradiction. The paragraph says only that those steps already wore the seal; each row beneath names its own cause (*"it already has to cite its sources"* for a policy default, *"you turned this on by hand"* for one the author escalated). If that paragraph ever names a cause again, WR-09 has returned. Cross-check the receipt's counts against the ⛨ seals the canvas actually draws. |
+| **M9** | **The receipt's two paragraphs read as ONE honest account** on a typical generated draft | Req 5 / VOCAB-02 (CR-01) | The automated half can prove *which steps each sentence counts*. It cannot say whether two sentences, read one after the other by a person, add up to one coherent account or to a contradiction. That judgement is the whole point of the surface. | Generate a REAL draft whose spine is `llm_agent → llm_emit` (the shape **both** curated starters produce — `StarterTemplatePicker.tsx:50-53`). Then confirm, reading the card as a person: (1) the *"…read your documents, so I set them to must prove it"* sentence counts **only** the steps that actually read documents — cross-check its number against the steps you can see retrieving; (2) the deliverable step is **still named** and **still explains its own seal**; (3) **no** sentence claims the AI applied a gate that the step's own `citation_policy` default applied; (4) the *"You can't turn that off"* line sits with the detected paragraph and nowhere else; **(5) — NEW after plan 187-20, and the fact that changed:** the *second* paragraph (the one counting steps that were **already** sealed) now attributes **no cause at all** — it reads *"N steps were already set to must prove it."* — so you are confirming that the paragraph and the rows **AGREE**, not checking the card for a contradiction. The paragraph says only that those steps already wore the seal; each row beneath names its own cause (*"it already has to cite its sources"* for a policy default, ~~*"you turned this on by hand"*~~ **→ see the 187-23 repair below** for one the author escalated). If that paragraph ever names a cause again, WR-09 has returned. Cross-check the receipt's counts against the ⛨ seals the canvas actually draws. **AMENDED 2026-08-04 — still UNPERFORMED and UNTICKED. Two repairs, both because the round changed what the operator will actually see:** **(a) plan 187-23 (WR-11) changed the escalated row's sentence.** The struck wording above told you to expect *"you turned this on by hand"* — **a string the product no longer emits**, so this check would have failed for the wrong reason. The escalated row now reads ***"it was set to must prove it by hand"***. The reason is not cosmetic and is worth knowing while you read the card: the formatter is handed a `GroundingCause`, never an actor — `grounding_escalated` is a bare boolean recording *authored rather than derived*, and it does not record **who**. A sentence must not claim more than its input knows. Confirm the row names the **act** and not a **person**. **(b) plan 187-22 (CR-04) means checks (1)–(5) are now read against a FROZEN card.** Read them as a description of the generation that produced the draft, not of the draft's current state — and do not edit anything mid-read expecting the counts to follow. Whether the freeze itself reads as honest is **M14**, not this row. Nothing else in this row changed; all five original checks stand. |
 | **M10** | **The zero-detected draft still arrives as one thing**, not a card with a hole in it | Req 5 / D-187-10 | The suite can assert one paragraph is absent. It cannot assert that what remains still *looks* whole — a component with a paragraph removed can be individually correct and compositionally broken, and only a person can see the difference. | Describe a workflow with **no retrieval at all** (nothing that reads documents). Confirm the receipt **still arrives**, with its heading and its closing line intact; the *"You can't turn that off"* sentence is **absent**; and whatever remains reads as ONE deliberate arrival rather than a truncated card. Watch the entrance, not just the final frame. |
 | **M11** | **The card states no capability the step lacks — and still states the one it has** | Req 1 / VOCAB-01 (WR-02) | The negative half alone can pass by over-tightening. The **positive** half is what proves the gate did not, and the pair is only convincing when a person sees both cards at once — two green unit tests on separate halves never show the contrast. | Bind a folder on a step type that **cannot** search (e.g. a *Write it up* / `llm_single` step, or a human-input step): confirm the card **no longer** says *"Search {folder}"* and reads its plain type sentence instead, with no folder name and no raw id anywhere on it. Then bind the **same** folder on an **agent** step: confirm it **does** say *"Search {folder}"*. Read the two cards side by side on the same canvas. |
 | **M12** | **The ＋ row promises the sentence the card that lands actually says** | Req 1 / VOCAB-01 (WR-03) | The drift was **semantic, not lexical** — both strings were imported identifiers, so every `?raw` source fence stayed green through the whole defect. A person reading two sentences one click apart is the only instrument that catches this class. | Open `＋` on the lane and **read every row aloud**. Click the **human-input** row. Confirm the card that lands says the **same sentence the row promised** (*"Wait for your approval"*), not a second wording. Repeat once with a different row (e.g. the deliverable step) as a control that nothing else moved. |
 
-| **M13** | **The escalated-only draft's card agrees with itself** — its paragraph and its own rows say the same thing about who applied the seal | Req 5 / VOCAB-02 (WR-09) | Whether one card's paragraph and its own rows, **two lines apart**, read as agreeing or as contradicting is a judgement only a person makes. The suite can prove which words are present and which are absent; it cannot prove that they add up. This is the exact case WR-09 broke, and no other shipped row tests it head-on — M9 reads the typical mixed draft, M10 reads the zero-detected one, and neither isolates the cause whose sentence was false. | Reach a draft whose **only** sealed step is one **you escalated by hand**, and where **no** step reads documents: generate (or open) a draft with no retrieval at all, then turn the grounding dial to *must prove it* on **one** step yourself. Read the card top to bottom and confirm, as a person: (1) the paragraph states the **count** and the **seal** — *"1 step was already set to must prove it."* — and says **nothing** about what applied it; (2) the row below it names **your own act**: *"you turned this on by hand"*; (3) the two do **not** contradict each other — this is the whole row; (4) the *"You can't turn that off"* line is **ABSENT**, because that is the **detected** lock (D-185-07) and nothing here was detected; (5) the card still closes with *"Everything else is yours to change. Nothing is saved or published yet."* — the arrival reads whole, not truncated. |
+| **M13** | **The escalated-only draft's card agrees with itself** — its paragraph and its own rows say the same thing about who applied the seal | Req 5 / VOCAB-02 (WR-09) | Whether one card's paragraph and its own rows, **two lines apart**, read as agreeing or as contradicting is a judgement only a person makes. The suite can prove which words are present and which are absent; it cannot prove that they add up. This is the exact case WR-09 broke, and no other shipped row tests it head-on — M9 reads the typical mixed draft, M10 reads the zero-detected one, and neither isolates the cause whose sentence was false. | Reach a draft whose **only** sealed step is one **you escalated by hand**, and where **no** step reads documents: generate (or open) a draft with no retrieval at all, then turn the grounding dial to *must prove it* on **one** step yourself. Read the card top to bottom and confirm, as a person: (1) the paragraph states the **count** and the **seal** — *"1 step was already set to must prove it."* — and says **nothing** about what applied it; (2) the row below it names the **act**: **AMENDED 2026-08-04 by plan 187-23 (WR-11)** — this check used to read *"names **your own act**: 'you turned this on by hand'"*. **That is a string the product no longer emits**, and left unrepaired this row would have failed for the wrong reason. The escalated row now reads ***"it was set to must prove it by hand"***. **The change is the point of the check, not a detail of it:** the formatter is handed a `GroundingCause` and is **never** handed an actor — `grounding_escalated` is a bare boolean recording *authored rather than derived*, not *who* — so a sentence naming **you** claimed more than its input knew. Confirm the row names the **act** (*by hand*) and **no person**, and that it still tells you the step is held to *must prove it*. If a second-person pronoun ever returns to this row, WR-11 has returned; (3) the two do **not** contradict each other — this is the whole row; (4) the *"You can't turn that off"* line is **ABSENT**, because that is the **detected** lock (D-185-07) and nothing here was detected; (5) the card still closes with *"Everything else is yours to change. Nothing is saved or published yet."* — the arrival reads whole, not truncated. **Why this row was EXTENDED rather than duplicated:** 187-23's sentence change lands on exactly the draft M13 already isolates — the escalated-only card — and M13 is the only shipped row that reads that card head-on. A second row would have put two operators on the same card reading two halves of one sentence. So the new wording was folded into check (2) and **no row was added for 187-23**. The one row round 4 does add (M14) is for a **different** property on a **different** class of draft. |
+
+| **M14** | **The receipt is a RECEIPT, not a readout** — with the card still open, an edit that would have changed one of its sentences moves the CANVAS and leaves the CARD exactly where it was | Req 5 / VOCAB-02 (CR-04) | The automated half proves the card is handed a snapshot and never re-reads the store — that is arithmetic, and §(af) P-1/P-2 prove it bites. **What it cannot answer is the only question that matters here:** a card that *deliberately stops tracking* looks, to a person who does not know it is a snapshot, **exactly like a stale bug**. Whether it reads as honest history or as a component that forgot to update is a judgement only a person makes, and getting it wrong is worse than the defect — an operator who learns to distrust the card stops reading the one surface whose job is attributing safety. Sketch **150-B**'s *"here is what I built"* framing is the acceptance bar: every sentence on this card is **past-tense and first-person**, so a card that kept updating would be narrating the author's own edits in the AI's voice. That framing — not "is it current?" — is what you are judging against. | Generate a REAL draft and leave the receipt **OPEN**. Then make one real edit in the inspector beside it — any of the three paths CR-04 travelled: (a) switch a **KB tool ON** for a step that had none; (b) **add a step** to the spine; (c) flip the **grounding dial** to *must prove it* on a step. Now confirm, as a person: (1) the **CANVAS updates** — the new step appears, the ⛨ seal is drawn, the tool is bound. The canvas is the **ledger** of current governance and it must stay live; (2) the **CARD does not move at all** — its heading count, its *"…read your documents, so I set them to must prove it"* sentence, its carried count and its listed rows are all **identical** to the moment it arrived. In particular it must **NOT** start claiming *"so I set…"* over the seal **you** just applied; (3) read the two side by side and answer the actual question: does the frozen card read as *"here is what I built"* — an honest account of a moment that has passed — or does it read as **broken**? If it reads as broken, say so: the fix would be a framing or affordance change, not a re-tensing of the copy, and the finding belongs in the next round. (4) Dismiss and re-generate; confirm the fresh card describes the **new** generation, not the old snapshot — a receipt that freezes forever is the opposite failure and would be just as wrong. |
 
 **Roster rule:** blocked rows are recorded **⛔ with the reason and blocking id — never omitted.**
 Measured: all 8 provider keys are configured locally ⇒ **zero ⛔ rows expected**.
@@ -1305,6 +1708,55 @@ nothing and dropped nothing.** Precisely:
   routed it to **Phase 188** — and the fence is measured empty in §(ac). An operator running M12
   still needs that warning, and should still specifically try the deliverable / `llm_emit` row on a
   template-bearing draft, not just the human-input control.
+- **M1, M2, M4, M6, M7, M10, M11** are untouched by this round and remain exactly as they were.
+
+**Status after gap-closure round 4 (2026-08-04): FOURTEEN rows, all UNPERFORMED and UNTICKED.**
+(The paragraphs above are dated 2026-08-02 and 2026-08-03 and are *those* rounds' records, left as
+written; the board's **current** total is fourteen. `manual_rows: 14` / `manual_rows_performed: 0` in
+this file's frontmatter is the present-tense figure.)
+
+**All fourteen rows remain the operator's and remain unperformed at the close of this round.**
+Round 4 **amended three notes and added one row. It ticked nothing, softened nothing, re-scoped
+nothing and dropped nothing.** The count of manual rows only grows. Precisely:
+
+- **M3's note was AMENDED, not performed.** Its closing clause (*"nothing on the card reads as
+  still-deciding"*) acquired a sharper second meaning after 187-22: the card was previously wired to
+  a live selector, so it was not merely *reading* as still-deciding — it genuinely **was** still
+  tracking. The note now says what the operator should **see** and keeps the row's whole history
+  (blocked on CR-01 → unblocked by 187-16 → repaired by 187-20 → amended by 187-22), because a row
+  whose history is deleted cannot be audited. M3's own scope (the *arrival*) is unchanged. Still
+  **UNPERFORMED**.
+- **M9's check (5) carried a STALE STRING and was repaired.** It told the operator to expect the
+  escalated row to read *"you turned this on by hand"* — **a sentence 187-23 removed**. Left alone,
+  M9 would have failed for the wrong reason and taught an operator to distrust a correct surface. The
+  old wording is **struck through, not deleted** (a silently vanishing expectation reads as one that
+  was never true), the shipped sentence is named, and a second note records that checks (1)–(5) are
+  now read against a frozen card. All five original checks survive. Still **UNPERFORMED**.
+- **M13's check (2) carried the SAME stale string and was repaired the same way — and M13 was
+  EXTENDED rather than duplicated.** The plan permitted a second row for 187-23's sentence change
+  *only if* no shipped row covered it head-on. M13 **is** that row: it is the only one that isolates
+  the escalated-only card, which is precisely where the changed sentence renders. A second row would
+  have put two operators on one card reading two halves of one sentence. **The choice is stated
+  because it is a choice:** extended, not duplicated. Still **UNPERFORMED**.
+- **M14 is net-new, and is the round's ONE added row** — the CR-04 property head-on, on a class of
+  draft no other row reads: the card left **open** while the author edits beside it. It exists
+  because a component that deliberately stops tracking is visually indistinguishable from one that
+  forgot to, and only a person can tell those apart. **UNPERFORMED**, like every other row.
+- **No row was ticked.** Amending a note is not performing it; neither is closing the defect the note
+  describes.
+- **M5** (the three starter templates' seeded describe copy, VOCAB-03) is **unchanged and still
+  owed** — no plan in this round touched `StarterTemplatePicker` (§(ah-8): the file does not appear
+  in the round's diff at all).
+- **M8** (the flag-OFF Builder first screen, D-181-01) is **unchanged and still owed**, and this is
+  the first closure round where that needs re-checking rather than asserting: round 4 **did** touch
+  `WorkflowBuilderPage.tsx` (8 ins / 1 del, §(ah-5)), where rounds 2 and 3 touched it not at all. The
+  delta is a `useState` declaration, one setter inside `onDraft`'s success branch, and one identifier
+  swap **inside the canvas-flag-gated receipt mount** — nothing on the flag-OFF path, and the
+  flag-OFF byte-identity guards (`revertByteIdentical.test.tsx`, `WorkflowBuilderPage.header.test.tsx`)
+  ran **34 passed** through 187-22. Cheaper to run, not less owed.
+- **M12's round-2 note about WR-08 STANDS.** WR-08 was **not** closed by this round either — the
+  operator's routing to **Phase 188** is unchanged, and §(ah-8) shows `StepTypePicker.tsx` /
+  `.test.tsx` absent from the round's file list entirely.
 - **M1, M2, M4, M6, M7, M10, M11** are untouched by this round and remain exactly as they were.
 
 ---
@@ -1461,3 +1913,50 @@ are this round's own.
 `187-REVIEW.md`. It did **not** perform any manual row: all **twelve** (M1–M12) remain the
 operator's and remain unperformed. And it did not re-run the SC#10 live roster — those three ❌ rows
 are unchanged, provider-side findings that no frontend fix could move.
+
+### Gap-closure round 4 sign-off — 2026-08-04
+
+Added, not substituted. Everything above stands as written; the lines below are round 4's own.
+
+- [x] **Per-task rows for every task in 187-22, 187-23 and 187-24** — nine rows (`187-22-T1/T2/T3`,
+      `187-23-T1/T2`, `187-24-T1/T2/T3`, plus `187-25-T1`), each with the plan's own `<verify>`
+      command, its measured result, and the commit it was measured at — §(ae)
+- [x] **Every figure in the round-4 section carries the command that produced it.** A figure without
+      a command does not appear
+- [x] **Every falsification the round performed is transcribed with its observed RED and its revert
+      evidence** — §(af), **14 probes plus 2 expected task-level REDs**, none summarised as "passed".
+      ⚠ The measured 187-24 probe count is **EIGHT**, not the nine its own SUMMARY and this plan's
+      task action state — the sibling-attribute probe **is** probe 5 of the five sweep probes. The
+      measured set is recorded, not the planned one (the same correction round 3's §(q) made)
+- [x] **All five gates RE-MEASURED at the round-4 tip with raw output, never carried forward** —
+      the five-suite set **484 ≥ 466 (+18)** with 0 failed; the count gate **exit 0**, both new pins
+      at delta 0, `18/18`, every previously-pinned file delta ≥ 0; zero migrations from **both** the
+      phase base and the round-4 base; **zero** backend files; the D-187-14 mount cap **8 / 15**;
+      `tsc --noEmit -p tsconfig.app.json` **33 → 33** with 0 in the touched files — §(ah)
+- [x] **The `D-187-14` cap is spent, and stated as spent.** Rounds 2 and 3 spent 0; round 4 spends
+      **8 insertions of 15**, because CR-04 is a caller defect and the caller is that file. The
+      render body gains **no new line** — one identifier swap
+- [x] **A red gate was diagnosed, not pinned around.** Sample 1 of 4 reported `failed 1`, in
+      `WorkflowBuilderPage.canvas.test.tsx` — **not** the anticipated `PublishGauntlet` flake. Green
+      in isolation (117), count identical in all four samples, logged as `D-ITEM-187-25-01`, and
+      **no pin was lowered for it**
+- [x] **Both new pin numbers were read from the gate's own `actual` column**, over two agreeing runs,
+      and **each was observed catching a deletion** (P-14, P-15) — a pin never seen biting is a
+      gesture
+- [x] **G-4 honoured for round 4** — the user-visible changes (a receipt that no longer re-narrates
+      the author's own edits; a row that no longer names an actor) have lived-experience rows
+      authored **here in VALIDATION.md and never inside a PLAN task**: M14 net-new, M13 extended
+- [x] **The manual board only grew and never softened** — 13 → **14** rows, three notes amended, two
+      of them repairing a **stale string the product no longer emits**, struck through rather than
+      deleted. **No row ticked, re-scoped or dropped; `manual_rows_performed: 0`**
+- [x] **No false completion record** — `git status --porcelain` over `REQUIREMENTS.md` / `ROADMAP.md`
+      empty; zero SDK call sites in the round's eight plan/summary documents; the `STATE.md` commits
+      in range are the orchestrator's own (`5e0db585`, `83524870`, `925373b9`), named in §(ah-7)
+- [x] `nyquist_compliant`'s stated meaning unchanged — it claims every requirement row has an
+      instrument that was **RUN and recorded**, never that every instrument came back green
+
+**What round 4 does NOT claim.** It closed one BLOCKER (CR-04) and six Warnings (WR-11…WR-16). It
+did **not** touch WR-01, WR-04…WR-07 or IN-01…IN-05; **IN-11…IN-14 were shown to the operator and
+left out by decision**; **WR-08 remains Phase 188's**. It performed **no** manual row — all fourteen
+remain the operator's. It did not re-run the SC#10 live roster. And it did not fix the parallel-run
+flake class, which **grew a file** this round (`D-ITEM-187-25-01`).
