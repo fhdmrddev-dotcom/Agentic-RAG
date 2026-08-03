@@ -438,7 +438,7 @@ class GroundingBundleResponse(BaseModel):
 #
 #   ``reachability.LINT_CODES``           — the 5 structural codes ``lint_workflow`` emits
 #   ``grounding.GROUNDING_VERDICT_CODES`` — the 3 fidelity codes ``grounding_verdicts`` emits
-#   ``_ROUTE_ASSIGNED_CODES``             — the 2 codes THIS route mints itself
+#   ``_ROUTE_ASSIGNED_CODES``             — the 3 codes THIS route mints itself
 #
 # ``tests/unit/test_182_severity_codes.py`` SCANS the two owning modules' emit sites and
 # fails if a published set drifts from what its functions can really emit. That guard is
@@ -466,11 +466,51 @@ class GroundingBundleResponse(BaseModel):
 #                              ``grounding.grounding_cause(phase) == "detected"`` while
 #                              ``body.project_folder_id is None`` (Phase 187 / D-187-11)
 #
-# WHY THE ROUTE AND NOT ``grounding.grounding_verdicts`` (D-187-11): that collector is SHARED
-# with publish — plan 182-06 made the publish gate enforcing through it — so a rule added
-# there silently becomes a hard PUBLISH BLOCKER as well as a canvas verdict. Phase 187 is not
-# scoped to change what publishes; it is scoped to tell the author sooner. The route is the
-# only seam where a verdict can be canvas-only, which is exactly what these three codes are.
+# WHY THE ROUTE AND NOT ``grounding.grounding_verdicts`` (D-187-11)
+# ─────────────────────────────────────────────────────────────────
+# (1) WHAT IS TRUE, AND WHY THE ROUTE IS STILL THE RIGHT HOME. That collector is SHARED with
+#     publish — plan 182-06 made the publish gate ENFORCING through it — so any rule added
+#     there becomes a hard SERVER publish blocker, evaluated inside the gauntlet, on a code
+#     path no client can influence. These three codes are deliberately NOT there, and the
+#     consequence really does hold: the server's publish gate runs exactly the stages it ran
+#     before D-187-11, and none of them can emit a route-assigned code.
+#
+# (2) WHAT WAS FALSE HERE UNTIL PLAN 187-28, AND IS NOW CORRECTED. This block used to claim
+#     that a route-assigned verdict was confined to the canvas and therefore left publishing
+#     untouched from the AUTHOR'S SEAT. Measured live on 2026-08-04, that is wrong. The
+#     Builder's ``blockedReason`` memo (``frontend/src/pages/WorkflowBuilderPage.tsx``)
+#     returns the FIRST verdict's message for ANY not-ok envelope — it prefers an ``error``
+#     finding but falls back to ``verdicts[0]``, so an ``incomplete``-ONLY response is not
+#     exempt — and that string is handed straight to the Publish control's ``disabled`` +
+#     ``aria-describedby``. A draft whose SOLE verdict is ``unbound_retrieval`` therefore
+#     renders a DISABLED ``publish-trigger`` with this route's own message beside it.
+#     ⇒ A route-assigned code DOES gate the Publish BUTTON.
+#
+# (3) THAT IS INTENDED, NOT A LEAK (operator decision, 2026-08-04). Blocking an unbound
+#     retrieval workflow BEFORE a golden run is spent is precisely what
+#     ``.planning/reported-bugs/BUG-260731-03-*`` asked for. The distinction that survives —
+#     and the one the next reader must not collapse again — is:
+#       * the SERVER publish GATE  — unchanged by these codes, because they are not in the
+#                                    shared collector;
+#       * the CLIENT publish CONTROL — gated by them, because ``/validate``'s envelope is
+#                                    exactly what greys that button.
+#     "The route is the seam that keeps a verdict out of the server gate" is the true claim.
+#     "The route is the seam that keeps a verdict away from the author's Publish button" is
+#     the false one, and it is not reproduced verbatim anywhere in this module ON PURPOSE:
+#     ``tests/unit/test_187_route_assigned_reach.py`` pins its absence by scanning this
+#     file's source, and quoting the old sentence in order to explain it would satisfy that
+#     pin and disarm it. The original wording is preserved in history at commit ``a68132db``.
+#
+# (4) WHERE THIS IS MEASURED, so the paragraph points at evidence instead of asserting a
+#     property on its own authority (the WR-14 lesson, same shape plan 187-24 used):
+#       * the TRUE half  — ``backend/tests/unit/test_187_route_assigned_reach.py``: no member
+#         of ``_ROUTE_ASSIGNED_CODES`` reaches ``grounding.GROUNDING_VERDICT_CODES`` or is
+#         emitted by ``grounding.grounding_verdicts`` for any constructible input.
+#       * the GATED half — ``frontend/src/pages/WorkflowBuilderPage.canvas.test.tsx``
+#         ("187-28 — a route-assigned verdict GATES the Publish control"): an ``ok:false``
+#         whose sole verdict is an ``incomplete`` route-assigned code yields a non-null
+#         ``publish-blocked-reason`` equal to the server's message verbatim, and a disabled
+#         ``publish-trigger``.
 _ROUTE_ASSIGNED_CODES: frozenset[str] = frozenset(
     {
         "business_requirement",
