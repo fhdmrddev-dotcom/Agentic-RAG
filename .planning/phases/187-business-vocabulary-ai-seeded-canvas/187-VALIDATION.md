@@ -15,7 +15,7 @@ gap_closure_round_3: 2026-08-03
 gap_closure_3_plans: [187-20, 187-21]
 gap_closure_3_base: f632f9b6
 gap_closure_3_gates_measured: 2026-08-03
-manual_rows: 12
+manual_rows: 13
 manual_rows_performed: 0
 ---
 
@@ -1130,6 +1130,46 @@ operator's decision to roll into **Phase 188**, and the diff proves the round re
 rather than merely claiming to. `StepTypePicker.test.tsx`'s literal count is unchanged at 36 (§(t)),
 so nothing moved there by accident either.
 
+### (ad) D-187-10 and D-187-08 — the two decisions this round could have quietly broken
+
+Both are recorded with measured evidence rather than asserted, because a fix that adds a paragraph
+and a fix that adds a derivation are exactly how each of these decisions dies.
+
+**D-187-10 — the zero-carried arrival is WHOLE, not an empty paragraph.** The carried formatter
+returns the **empty string** at zero, which is the one conditional shape both paragraphs share, so
+the component renders **no node at all** rather than an empty `<p>`:
+
+```
+$ grep -n 'queryByTestId("seed-receipt-carried")' frontend/src/components/workflows/SeedReceipt.test.tsx
+530:    expect(screen.queryByTestId("seed-receipt-carried")).toBeNull()
+538:    expect(screen.queryByTestId("seed-receipt-carried")).toBeNull()
+```
+
+`SeedReceipt.test.tsx:525-541` — two cases, *"is ABSENT — no node at all — when every seal is one
+the AI detected"* and *"is ABSENT on a draft where nothing is sealed at all"* — each pairing the
+`toBeNull()` with `expect(seedReceiptCarriedLead(0)).toBe("")`, so the absence is proved at the
+formatter **and** in the DOM. The receipt itself still arrives: section 2 of the same file
+(`:593`, *"ZERO GROUNDED STEPS — the receipt still arrives (D-187-10)"*) asserts
+`seed-receipt` is in the document with its **heading** and its **closing line** intact. The
+manual counterpart is **M10**, unchanged and still owed; the new **M13** covers the mirror case.
+
+**D-187-08 — no second grounding derivation was added.** `groundingCauseOf` remains the ONE home:
+
+```
+$ grep -rn 'export function groundingCauseOf' frontend/src/
+frontend/src/components/workflows/phaseVocabulary.ts:343:export function groundingCauseOf(
+
+$ grep -c 'groundingCauseOf' frontend/src/components/workflows/SeedReceipt.tsx        → 5   (calls, no definition)
+$ grep -cE 'search_documents|list_documents|read_document' frontend/src/components/workflows/SeedReceipt.tsx  → 0
+$ grep -c 'D-187-08' frontend/src/components/workflows/SeedReceipt.tsx                → 4
+```
+
+**Exactly one definition site in the whole of `frontend/src`, and it is not in the receipt.** The
+component still only renders what it is handed — zero KB tool ids appear in it — and
+`seedReceiptStepReason` classifies nothing: it `switch`es on the cause it is given
+(`definitionOps.ts:660-676`). Round 3 changed the *carried lead's wording* and added *assertions*;
+it added no decision-making anywhere.
+
 ### What round 3 proved — and what it did NOT
 
 **Proved.** CR-03 and WR-09 are closed by code. The carried paragraph now has the same rigor its
@@ -1188,16 +1228,18 @@ exit 0, and the five-suite total up +14 with nothing dropped.
 |---|----------|-------------|------------|-------------------|
 | M1 | Every node face says what *that* step does | Req 1 / SC#5 | "Reads distinctly to a business user" is a judgement | Generate a real 5-step workflow; read every face aloud |
 | M2 | The plain title survives the ⌥ reveal; layout does not jump | Req 4 | Height/jump is perceptual | Toggle ⌥ Technical-names ON/OFF ×3 on **both** views |
-| M3 | The receipt arrives once, seal pulses once, implies nothing still-deciding | Req 5 | Temporal + perceptual | **UNBLOCKED 2026-08-02 — still UNPERFORMED and UNTICKED.** `187-VERIFICATION.md` held this row with its blocking reason recorded verbatim: *"NOTE: fix the CR-01 gap before running this, or the operator will be confirming a receipt that lies."* **CR-01 was closed by plan 187-16** (commits `77668751` RED, `5c613bf4` GREEN); the receipt no longer states a governance action the AI did not take, so the hold no longer applies. **Unblocking a row is not performing it.** To perform: watch arrival on a throttled connection on a REAL generated draft — the receipt enters ONCE as one batch, the seal pulses once, and nothing on the card reads as still-deciding. |
+| M3 | The receipt arrives once, seal pulses once, implies nothing still-deciding | Req 5 | Temporal + perceptual | **UNBLOCKED 2026-08-02, further REPAIRED 2026-08-03 — still UNPERFORMED and UNTICKED.** *History kept, not overwritten:* `187-VERIFICATION.md` originally held this row with its blocking reason recorded verbatim — *"NOTE: fix the CR-01 gap before running this, or the operator will be confirming a receipt that lies."* **CR-01 was closed by plan 187-16** (commits `77668751` RED, `5c613bf4` GREEN); the receipt no longer states a governance action the AI did not take, so the hold no longer applies. Round 2's re-verification then attached a **second** warning to this row, telling the operator to also read the carried sentence against the per-step reasons because an escalated draft showed an internally-contradictory card (CR-03 / WR-09). **That second warning is STALE as of plan 187-20** (`debced07` RED → `51a60299` GREEN → `7593fe8b` guard): the carried sentence now attributes **no cause at all** — it reads *"1 step was already set to must prove it."* — so there is no contradiction left to look for and no reason to go hunting for one. **What the operator should now see:** the receipt arrives as ONE batch; the carried paragraph states the count and the seal and says nothing about *what* applied it; each row beneath names its own cause. **Unblocking a row is not performing it, and neither is repairing it.** To perform: watch arrival on a throttled connection on a REAL generated draft — the receipt enters ONCE as one batch, the seal pulses once, and nothing on the card reads as still-deciding. ⚠ `187-VERIFICATION.md`'s own `human_verification` entry for M3 still carries the stale CR-03/WR-09 wording; that file belongs to the verifier and is amended at re-verification, not by this plan — named here so the two are not silently in conflict. |
 | M4 | The face tracks a skill bind/unbind without a save and without flicker | Req 1 | The async-map settle is only visible live (Pitfall 1) | Bind a skill to a step, then unbind, watching the face |
 | M5 | The seeded describe text reads like something a person typed | Req 6 | Copy quality | Pick each of the 3 templates |
 | M6 | **SC#6 live** — armed checkpoint cannot be preempted | Req 7 / SC#6 | Needs a live Redis rendezvous + a real browser answer | Run an armed phase carrying a `timing="pre"` `ask_user` validator. Answer the author's gate **Proceed**; confirm the armed checkpoint appears in the chat `PendingAskCard`. **Refuse** it. Confirm the step did NOT run and `harness_audit` has **zero** `validator_ask_user_approved` rows for it. |
 | M7 | **SC#10 live row** — the env path reaches `resolve_authoring_model` | SC#10 | Requires a backend restart | Restart backend with `HARNESS_AUTHORING_MODEL` set; generate; confirm the model actually used |
 | M8 | Flag-OFF Builder first screen is byte-identical to today | D-181-01 | No shipped test covers it | Turn `visual_workflow_canvas` OFF; open the Builder's first screen; confirm no template line |
-| **M9** | **The receipt's two paragraphs read as ONE honest account** on a typical generated draft | Req 5 / VOCAB-02 (CR-01) | The automated half can prove *which steps each sentence counts*. It cannot say whether two sentences, read one after the other by a person, add up to one coherent account or to a contradiction. That judgement is the whole point of the surface. | Generate a REAL draft whose spine is `llm_agent → llm_emit` (the shape **both** curated starters produce — `StarterTemplatePicker.tsx:50-53`). Then confirm, reading the card as a person: (1) the *"…read your documents, so I set them to must prove it"* sentence counts **only** the steps that actually read documents — cross-check its number against the steps you can see retrieving; (2) the deliverable step is **still named** and **still explains its own seal**; (3) **no** sentence claims the AI applied a gate that the step's own `citation_policy` default applied; (4) the *"You can't turn that off"* line sits with the detected paragraph and nowhere else. Cross-check the receipt's counts against the ⛨ seals the canvas actually draws. |
+| **M9** | **The receipt's two paragraphs read as ONE honest account** on a typical generated draft | Req 5 / VOCAB-02 (CR-01) | The automated half can prove *which steps each sentence counts*. It cannot say whether two sentences, read one after the other by a person, add up to one coherent account or to a contradiction. That judgement is the whole point of the surface. | Generate a REAL draft whose spine is `llm_agent → llm_emit` (the shape **both** curated starters produce — `StarterTemplatePicker.tsx:50-53`). Then confirm, reading the card as a person: (1) the *"…read your documents, so I set them to must prove it"* sentence counts **only** the steps that actually read documents — cross-check its number against the steps you can see retrieving; (2) the deliverable step is **still named** and **still explains its own seal**; (3) **no** sentence claims the AI applied a gate that the step's own `citation_policy` default applied; (4) the *"You can't turn that off"* line sits with the detected paragraph and nowhere else; **(5) — NEW after plan 187-20, and the fact that changed:** the *second* paragraph (the one counting steps that were **already** sealed) now attributes **no cause at all** — it reads *"N steps were already set to must prove it."* — so you are confirming that the paragraph and the rows **AGREE**, not checking the card for a contradiction. The paragraph says only that those steps already wore the seal; each row beneath names its own cause (*"it already has to cite its sources"* for a policy default, *"you turned this on by hand"* for one the author escalated). If that paragraph ever names a cause again, WR-09 has returned. Cross-check the receipt's counts against the ⛨ seals the canvas actually draws. |
 | **M10** | **The zero-detected draft still arrives as one thing**, not a card with a hole in it | Req 5 / D-187-10 | The suite can assert one paragraph is absent. It cannot assert that what remains still *looks* whole — a component with a paragraph removed can be individually correct and compositionally broken, and only a person can see the difference. | Describe a workflow with **no retrieval at all** (nothing that reads documents). Confirm the receipt **still arrives**, with its heading and its closing line intact; the *"You can't turn that off"* sentence is **absent**; and whatever remains reads as ONE deliberate arrival rather than a truncated card. Watch the entrance, not just the final frame. |
 | **M11** | **The card states no capability the step lacks — and still states the one it has** | Req 1 / VOCAB-01 (WR-02) | The negative half alone can pass by over-tightening. The **positive** half is what proves the gate did not, and the pair is only convincing when a person sees both cards at once — two green unit tests on separate halves never show the contrast. | Bind a folder on a step type that **cannot** search (e.g. a *Write it up* / `llm_single` step, or a human-input step): confirm the card **no longer** says *"Search {folder}"* and reads its plain type sentence instead, with no folder name and no raw id anywhere on it. Then bind the **same** folder on an **agent** step: confirm it **does** say *"Search {folder}"*. Read the two cards side by side on the same canvas. |
 | **M12** | **The ＋ row promises the sentence the card that lands actually says** | Req 1 / VOCAB-01 (WR-03) | The drift was **semantic, not lexical** — both strings were imported identifiers, so every `?raw` source fence stayed green through the whole defect. A person reading two sentences one click apart is the only instrument that catches this class. | Open `＋` on the lane and **read every row aloud**. Click the **human-input** row. Confirm the card that lands says the **same sentence the row promised** (*"Wait for your approval"*), not a second wording. Repeat once with a different row (e.g. the deliverable step) as a control that nothing else moved. |
+
+| **M13** | **The escalated-only draft's card agrees with itself** — its paragraph and its own rows say the same thing about who applied the seal | Req 5 / VOCAB-02 (WR-09) | Whether one card's paragraph and its own rows, **two lines apart**, read as agreeing or as contradicting is a judgement only a person makes. The suite can prove which words are present and which are absent; it cannot prove that they add up. This is the exact case WR-09 broke, and no other shipped row tests it head-on — M9 reads the typical mixed draft, M10 reads the zero-detected one, and neither isolates the cause whose sentence was false. | Reach a draft whose **only** sealed step is one **you escalated by hand**, and where **no** step reads documents: generate (or open) a draft with no retrieval at all, then turn the grounding dial to *must prove it* on **one** step yourself. Read the card top to bottom and confirm, as a person: (1) the paragraph states the **count** and the **seal** — *"1 step was already set to must prove it."* — and says **nothing** about what applied it; (2) the row below it names **your own act**: *"you turned this on by hand"*; (3) the two do **not** contradict each other — this is the whole row; (4) the *"You can't turn that off"* line is **ABSENT**, because that is the **detected** lock (D-185-07) and nothing here was detected; (5) the card still closes with *"Everything else is yours to change. Nothing is saved or published yet."* — the arrival reads whole, not truncated. |
 
 **Roster rule:** blocked rows are recorded **⛔ with the reason and blocking id — never omitted.**
 Measured: all 8 provider keys are configured locally ⇒ **zero ⛔ rows expected**.
@@ -1232,6 +1274,38 @@ Nothing was ticked, softened, re-scoped or dropped by this round. In particular:
 **M9–M12 are the operator's, like M1–M8.** None of the four can be discharged by a render test:
 three are judgements about whether prose or composition reads honestly to a person, and the fourth
 (M11) is a contrast that only exists when two cards are on screen together.
+
+**Status after gap-closure round 3 (2026-08-03): THIRTEEN rows, all UNPERFORMED and UNTICKED.**
+(The two paragraphs above are dated 2026-08-02 and are *that* round's record, left as written; the
+board's **current** total is thirteen. `manual_rows: 13` / `manual_rows_performed: 0` in this file's
+frontmatter is the present-tense figure.)
+
+Round 3 **amended two notes and added one row. It ticked nothing, softened nothing, re-scoped
+nothing and dropped nothing.** Precisely:
+
+- **M3's note was REPAIRED, not performed.** Round 2's warning — read the carried sentence against
+  the per-step reasons, because an escalated draft shows an internally-contradictory card — stopped
+  being true when plan 187-20 landed, and a stale warning is worse than no warning: it trains an
+  operator to distrust a surface that is now correct. The note now says what the operator should
+  **see**, and it **keeps** the row's history (blocked on CR-01 → unblocked by 187-16 → repaired by
+  187-20), because a row whose history is deleted cannot be audited. M3 is still **UNPERFORMED**.
+- **M9's note GAINED a fifth check** — the carried paragraph now attributes no cause, so the
+  operator confirms the paragraph and the rows **agree** instead of hunting for a contradiction. All
+  four of its original checks survive verbatim; nothing was replaced. M9 is still **UNPERFORMED**.
+- **M13 is net-new** — the escalated-only draft, head-on. It is the case WR-09 actually broke and
+  the one no shipped row tested directly. **UNPERFORMED**, like every other row.
+- **M5** (the three starter templates' seeded describe copy, VOCAB-03) is **unchanged and still
+  owed** — no plan in this round touched `StarterTemplatePicker` (§(aa): the round's whole file list
+  is four files under `components/workflows/` plus two planning documents).
+- **M8** (the flag-OFF Builder first screen, D-181-01) is **unchanged and still owed** — re-measured
+  for this round, `git diff --numstat f632f9b6 HEAD -- frontend/src/pages/WorkflowBuilderPage.tsx`
+  is **empty** (§(y)), so the screen this row inspects is byte-identical to the one the phase
+  shipped. Cheaper to run, not less owed.
+- **M12's round-2 note about WR-08 STANDS.** WR-08 was **not** closed by this round — the operator
+  routed it to **Phase 188** — and the fence is measured empty in §(ac). An operator running M12
+  still needs that warning, and should still specifically try the deliverable / `llm_emit` row on a
+  template-bearing draft, not just the human-input control.
+- **M1, M2, M4, M6, M7, M10, M11** are untouched by this round and remain exactly as they were.
 
 ---
 
