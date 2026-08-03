@@ -56,6 +56,10 @@ import { render, screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 
 import seedReceiptSource from "./SeedReceipt?raw"
+// THIS FILE'S OWN SOURCE, for the testid-coverage sweep at the bottom (187-20). `?raw`
+// hands back the file as a STRING and evaluates no module, so the self-reference cannot
+// introduce an import cycle — it is the same proven idiom as the line above it.
+import testSource from "./SeedReceipt.test?raw"
 import { SeedReceipt, type SeedReceiptProps } from "./SeedReceipt"
 import {
   GOVERNANCE_SEAL_LABEL,
@@ -902,6 +906,33 @@ describe("SeedReceipt — source purity, glyph discipline and no staged arrival"
     // which this file uses correctly twice. A fence that fires on its own good practice
     // gets deleted rather than fixed.
     expect(seedReceiptSource).not.toMatch(/\shidden=|display:\s*none/)
+  })
+
+  it("every STATIC testid the component renders is queried by this suite (187-20)", () => {
+    // WHY THIS IS A TEST AND NOT A REVIEW HABIT. `seed-receipt-carried` shipped in 187-16
+    // with ZERO queries against it — measured with a shell grep at HEAD before this plan,
+    // which returned exactly one hit in all of `frontend/src/`: the component's own
+    // attribute. A paragraph nothing queries can be deleted, can print the wrong number,
+    // or can drift from its formatter with the whole suite green. A one-off grep finds
+    // that once; this finds it every run, including for the NEXT testid somebody adds.
+    //
+    // The needle is ASSEMBLED at runtime from each extracted id, so this guard's own
+    // source contains no literal `ByTestId("seed-receipt-…")` call and therefore cannot
+    // satisfy itself — the same self-satisfaction trap the fences above avoid.
+    const ids = [...seedReceiptSource.matchAll(/data-testid="([^"]+)"/g)].map((m) => m[1])
+    const unique = [...new Set(ids)]
+    // A regex that matched nothing would make every assertion below vacuous.
+    expect(unique.length).toBeGreaterThan(0)
+    // …and it must reach the id whose absence WAS the blocker, named explicitly so this
+    // guard cannot pass by sweeping a set that quietly stopped containing it.
+    expect(unique).toContain("seed-receipt-carried")
+    for (const id of unique) {
+      expect(testSource).toContain(`ByTestId("${id}")`)
+    }
+    // The row testid is a TEMPLATE literal (`seed-receipt-step-${row.slug}`), so a static
+    // extraction correctly does not see it. It is not unguarded: section 1 queries every
+    // fixture slug by name — `seed-receipt-step-emit`, `-contracts`, `-judgement`.
+    expect(seedReceiptSource).toMatch(/data-testid=\{`seed-receipt-step-\$\{/)
   })
 
   it("those fences are real — each pattern matches its planted literal", () => {
