@@ -1,282 +1,318 @@
 ---
 phase: 187-business-vocabulary-ai-seeded-canvas
-reviewed: 2026-08-03T00:00:00Z
+reviewed: 2026-08-04T00:00:00Z
 depth: standard
-round: 3 (gap closure)
+round: 5 (gap closure)
+diff_base: 15339441
 prior_round:
-  reviewed: 2026-08-02T08:43:10Z
-  round: 2 (gap closure)
-  diff_base: ee5fff3b
-  findings: 1 critical / 3 warning / 5 info (plus 10 carried forward)
-  scope: 10 files
+  reviewed: 2026-08-03T00:00:00Z
+  round: 3 (gap closure)
+  diff_base: f632f9b6
+  findings: 1 critical / 6 warning / 4 info (plus 15 carried forward)
+  scope: 4 files
   prior_round:
-    reviewed: 2026-08-02T03:17:14Z
-    round: 1
-    commit: 20ae79b6
-    findings: 2 critical / 7 warning / 5 info
-    scope: 38 files (the full phase)
-diff_base: f632f9b6
-files_reviewed: 4
+    reviewed: 2026-08-02T08:43:10Z
+    round: 2 (gap closure)
+    diff_base: ee5fff3b
+    findings: 1 critical / 3 warning / 5 info (plus 10 carried forward)
+    scope: 10 files
+    prior_round:
+      reviewed: 2026-08-02T03:17:14Z
+      round: 1
+      commit: 20ae79b6
+      findings: 2 critical / 7 warning / 5 info
+      scope: 38 files (the full phase)
+files_reviewed: 16
 files_reviewed_list:
-  - frontend/src/components/workflows/SeedReceipt.tsx
-  - frontend/src/components/workflows/SeedReceipt.test.tsx
-  - frontend/src/components/workflows/definitionOps.ts
-  - frontend/src/components/workflows/definitionOps.test.ts
+  - backend/app/api/workflows.py
+  - backend/tests/unit/test_182_severity_codes.py
+  - backend/tests/unit/test_187_route_assigned_reach.py
+  - frontend/src/components/workflows/DescribeKbPicker.test.tsx
+  - frontend/src/components/workflows/DescribeKbPicker.tsx
+  - frontend/src/components/workflows/ProblemsTray.test.tsx
+  - frontend/src/components/workflows/ProblemsTray.tsx
+  - frontend/src/components/workflows/WorkflowCanvas.tsx
+  - frontend/src/components/workflows/WorkflowDoorSwitch.test.tsx
+  - frontend/src/components/workflows/WorkflowDoorSwitch.tsx
+  - frontend/src/components/workflows/verdictModel.test.ts
+  - frontend/src/components/workflows/verdictModel.ts
+  - frontend/src/pages/WorkflowBuilderPage.canvas.test.tsx
+  - frontend/src/pages/WorkflowBuilderPage.describe.test.tsx
+  - frontend/src/pages/WorkflowBuilderPage.tsx
+  - scripts/vitest-count-gate.cjs
 findings:
   critical: 1
   warning: 6
-  info: 4
-  total: 11
+  info: 6
+  total: 13
 carried_forward:
   critical: 0
-  warning: 6
-  info: 9
-  total: 15
+  warning: 11
+  info: 13
+  total: 24
 status: issues_found
 ---
 
-# Phase 187: Code Review Report — Round 3 (gap closure)
+# Phase 187: Code Review Report — Round 5 (gap closure)
 
-**Reviewed:** 2026-08-03
+**Reviewed:** 2026-08-04
 **Depth:** standard
-**Round:** 3 (gap closure — plans 187-20 / 187-21, diff base `f632f9b6`)
-**Files Reviewed:** 4 (2 production source, 2 test)
+**Round:** 5 (gap closure — plans 187-26 / 187-27 / 187-28 / 187-29, diff base `15339441`)
+**Files Reviewed:** 16 (7 production source, 8 test, 1 tooling script)
 **Status:** issues_found
 
 ## Summary
 
-**Round 3's two round-2 targets are genuinely closed, and — unlike round 2 — round 3 did
-not ship its own new production code unguarded.** The production diff over
-`f632f9b6..HEAD` is exactly two changes, both covered:
+Round 5's three gaps are three different qualities of work, and the difference is worth
+stating before the findings.
+
+**GAP B (187-27) is the strongest thing in this round.** It is a real fail-open, closed at
+the right seam, with the narrowing of D-184-15 written down in the open rather than smuggled
+in, and with the D-181-01 half-line (`canvasEnabled &&`) given its own falsification test
+(`WorkflowBuilderPage.canvas.test.tsx`, "D-181-01 — with the flag OFF the VERY SAME open
+issues ZERO validate requests"). I traced the state machine: `beginBeat`
+(`useLiveValidation.ts:155-160`) can only return `{kind:"checking"}` from `idle`/`checking`,
+so `isCheckOutstanding` is true exactly until the first answer and never re-arms — which is
+what makes the new fence liveable rather than a permanent refusal. The predicate is keyed on
+`ValidationState["kind"]` so a renamed loop state is a typecheck error. I could not construct
+a live path where a `verdicts` answer is claimed for a check nobody made **within one mount**
+(WR-R5-06 records the one shape that would, and why it is not currently reachable).
+
+**GAP C (187-28) is comment-only in production and its two behavioural fences are real.**
+`backend/tests/unit/test_187_route_assigned_reach.py` measures the true half over the
+quantified SET rather than over one hand-picked code, and its Property-2 positive control
+(`set(GROUNDING_VERDICT_CODES) <= codes`, stated as a subset *on purpose* so it cannot
+shadow the disjointness assertion) is the correct shape. Measured: `16 passed` for
+`test_187_route_assigned_reach.py` + `test_182_severity_codes.py`. The corrected claim in
+`workflows.py:478-487` is accurate — I verified `blockedReason`
+(`WorkflowBuilderPage.tsx:1132-1135`) really does fall back to `verdicts[0]`, so an
+`incomplete`-only envelope really does grey the Publish control.
+
+**GAP A (187-26) is where this round's defect is.** The picker itself is a clean leaf, but it
+is the one piece of round 5 that adds a new *input path to a request*, and it ships two
+properties nothing measures: it never reconciles the `value` it is handed against the folders
+it actually fetched, and its state lives in a parent that deliberately outlives it. Together
+those produce a `project_folder_id` on the wire that the author cannot see and did not
+confirm on that mount — and, because the server's `unbound_retrieval` rule tests only
+`is None` (`workflows.py:755`), a stale id **silently satisfies the very gate GAP A exists to
+help the author satisfy**. That is CR-R5-01.
+
+**And 187-29, the round's own honesty instrument, does not hold what it claims to hold.**
+Measured with the script itself at HEAD — not read from a plan:
 
 ```
-$ git diff --stat f632f9b6..HEAD -- frontend/src/components/workflows/
- SeedReceipt.test.tsx  | 173 ++++++++++++++++++++-
- SeedReceipt.tsx       |   3 +
- definitionOps.test.ts |  31 ++--
- definitionOps.ts      |  25 ++-
+WorkflowBuilderPage.canvas.test.tsx     22     128    +106
+WorkflowDoorSwitch.test.tsx             13      21      +8
+DescribeKbPicker.test.tsx               30      30       0
+ProblemsTray.test.tsx                   30      30       0
+verdictModel.test.ts                    29      29       0
+total                                  804    2168   +1364      failed 0
 ```
 
-Of the 3 inserted lines in `SeedReceipt.tsx`, one is `data-carried-count={carriedCount}`
-(`:230`) and two are its comment; of the 25 in `definitionOps.ts`, two are the sentence
-edit (`:633-634`) and 23 are docblock. Both are asserted. Measured, not inherited:
+The three new pins are exact and correct. But the born-bound round trip — GAP A's only
+end-to-end fence — lives in `WorkflowDoorSwitch.test.tsx`, whose pin is 13 against an actual
+of 21, so all eight of round 5's cases there are deletable with the gate green. The whole
+GAP-B and GAP-C behavioural estate lives in `WorkflowBuilderPage.canvas.test.tsx` at 22
+against 128. And `WorkflowBuilderPage.describe.test.tsx` — which round 5 extended with the
+additive-prop pins — **did not appear in the run at all**: it is absent from `TARGETS`
+(`vitest-count-gate.cjs:168-179`), so its three new cases are outside the gate's blast radius
+entirely. That is WR-16 from round 3, reintroduced, in the same commit that cites WR-16's
+lesson.
 
-- `npx vitest run` over both suites: **2 files / 288 tests / 0 failing**
-  (`definitionOps.test.ts` 228, `SeedReceipt.test.tsx` 60).
-- `grep -c "seed-receipt-carried"` → **1** in `SeedReceipt.tsx`, **14** in
-  `SeedReceipt.test.tsx` (round 2 measured 1 and 0).
-- The deleted clause is gone from every rendered string: `grep -rn "by its own
-  settings\|by their own settings" frontend/src` returns **2 hits, both prose**
-  (`definitionOps.ts:600`, `definitionOps.test.ts:840`).
-- The new testid sweep **does bite**: replaying its logic over a mutated source with one
-  new unqueried `data-testid="seed-receipt-brandnew"` reports it missing.
-
-What still blocks is **not** in the diff. It is the property the diff was written to
-protect, reached by a path neither round has looked at: **the receipt narrates the arrival
-of a generated draft but renders live store state, so after arrival the user's own edit
-re-produces CR-01's exact sentence over the user's own act.** That is CR-01 for the third
-time, and no test in either suite ever re-renders the component with changed props.
-
-Beyond that, both of round 3's *guards* shipped without the controls their own files
-mandate for every other fence: the WR-09 fence is a deny-list of the deleted clause with
-no positive control, and the testid sweep has no planted-literal entry in the
-"those fences are real" block. Four measured probes show it is satisfiable by a comment
-and blind to two other testid spellings.
-
-Direct answers to the round-3 questions, each verified against code rather than docblock:
+Direct answers to the four `must_know` items, each checked against source:
 
 | # | Question | Verdict |
 |---|---|---|
-| 1 | Is "every sentence compared character-for-character" true? | **True now.** Section 4 (`:672-693`) enumerates all five: heading, lead, one-way, carried, close; the per-step reasons follow at `:695-705`; `GOVERNANCE_SEAL_LABEL` at `:353` and `SEED_RECEIPT_DISMISS_LABEL` at `:645`. Nothing rendered is un-compared. |
-| 2 | Can the testid guard satisfy itself? | **No.** Its needle is `` `ByTestId("${id}")` ``; its own source spells the illustrative form with an ellipsis (`:920`) and its explicit id check as a bare string (`:928`). It fails correctly on a new unqueried id (probed). But it *is* satisfiable by a commented-out query and blind to `data-testid={"…"}` / `{'…'}` — **WR-13**. |
-| 3 | Is the carried sentence true of both populations, and can it contradict the row? | **No contradiction of agent** — the clause is deleted. But the residual word *"already"* is a temporal claim, and the only path this surface has to a hand-`escalated` step is an edit made *after* the receipt arrived — **CR-04**. And the actor claim did not disappear, it moved into the row — **WR-11**. |
-| 4 | Does every formatter return `""` at zero? | **The two conditional ones do**, and are pinned at `definitionOps.test.ts:801-807` / `:829-836` and re-asserted in the DOM at `SeedReceipt.test.tsx:533`, `:539`. `seedReceiptStepReason(null)` → `""` (`:898`). `seedReceiptHeading(0)` is deliberately non-empty and the heading is unconditional — consistent with D-187-10, which scopes the rule to the two paragraphs. |
-| 5 | Did round 3 add a second grounding derivation? | **No.** Round 3 added no derivation at all. A pre-existing second copy of the *intersection predicate* remains — **WR-14**. |
+| 1 | Should `not-run` be renamed? | **No, and I am not filing it.** `governanceVocabulary.test.ts` runs at 30 cases in the gate sample and sweeps this tree; the DO-NOT-TIDY note at `verdictModel.ts:108-116` is accurate. I have no counter-opinion, not even at Info. |
+| 2 | Did round 5 worsen `WorkflowCanvas.tsx`'s cycle or extraction seam? | **No — it improved both.** The 9-insertion delta swaps a `import type` edge from `@/hooks/useLiveValidation` (a hook with a runtime `@/lib/api` dependency) to `@/components/workflows/verdictModel` (a pure module the file *already* type-imports at `:216`). No new module is named, no value import is added, and the `FlowEdge` module-scope value import is untouched. The only residue is a duplicate `import type` statement (IN-R5-01). |
+| 3 | Did `WorkflowBuilderPage.tsx` honour the ≤15-insertion cap? | **Yes, exactly.** `git diff --numstat` measures **15 ins / 3 del**. The density that cap bought is real and I have priced it as Info, not Warning (IN-R5-02). |
+| 4 | Is `D-ITEM-187-29-01` real? | **CONFIRMED, and understated.** See WR-R5-03 — the flag-off delta is not only a visible control; it is a network request the door never made and a request field the door could never previously supply. |
+
+Measured, not inherited, for this round: `npx tsc --noEmit -p tsconfig.app.json` → **33
+errors, identical to the D-ITEM-01 baseline, zero of them in `src/components/workflows/` or
+`WorkflowBuilderPage.tsx`**. `npx eslint` over the six changed production files → 2 errors,
+both the pre-existing `react-refresh/only-export-components` at `WorkflowCanvas.tsx:364` and
+`WorkflowBuilderPage.tsx:238`, neither introduced here.
 
 ---
 
-## Round 2 disposition
+## Prior-round disposition (measured at HEAD, not re-litigated)
 
-### CR-03 — **CLOSED**
+Round 5's diff touches none of `SeedReceipt.tsx`, `definitionOps.ts`, `phaseVocabulary.ts` or
+their suites, so it could not have moved most of the standing list. **Round 4 (plans
+187-22 … 187-25) is outside this round's diff base and its own review is not in this file;
+its dispositions are not re-litigated here.** Two exceptions, both of which I can point at
+code for:
 
-Round 2: the carried paragraph shipped with zero assertions anywhere in the repo.
+- **Round-3 CR-04 — CLOSED.** `WorkflowBuilderPage.tsx:615` declares
+  `const [receiptPhases, setReceiptPhases] = useState<readonly PhaseSpecJSON[]>([])`, it is
+  written beside the single state transition at `:1228` (`setReceiptPhases(def.phases)`), and
+  `:1656` renders `<SeedReceipt phases={receiptPhases} …>` rather than the live store
+  selector. That is CR-04's proposed snapshot, shipped. Carried criticals → 0.
+- **Round-3 WR-16 — CLOSED.** `vitest-count-gate.cjs:110` and `:113` now pin
+  `definitionOps.test.ts` at 232 and `SeedReceipt.test.tsx` at 68, and both reported delta
+  `0` in my own run. Carried warnings 12 → 11.
 
-Evidence of closure, all re-derived at HEAD:
-
-- `seedReceiptCarriedLead` is imported (`SeedReceipt.test.tsx:70`) — round 2 measured the
-  import block at eight names without it.
-- A dedicated block, `describe("SeedReceipt — the carried paragraph")` (`:491-591`),
-  asserts presence, character-identity against the export, the count *derived* from
-  `SEALED_SLUGS.length - DETECTED_SLUGS.length` rather than hand-typed, the render-alone
-  case, the escalated-only case, and **both** zero cases.
-- The docblock's "every sentence" claim was made honest at `:20-28` rather than left
-  standing — the section-4 identity case now enumerates the carried sentence (`:685-689`).
-- `data-carried-count` was added and pinned at both 1 (`:376-384`) and 0 (`:386-389`),
-  which is round 2's own suggested hardening.
-- A standing guard was added so the *next* omission fails automatically (`:911-936`).
-
-I could not construct a mutation of the carried paragraph that survives this block:
-deleting it fails `:503`; printing `rows.length` fails `:503` and `:513`; drifting the
-text fails `:503`, `:513`, `:520` and `:685`.
-
-### WR-09 — **CLOSED for the paragraph; the claim relocated, see WR-11**
-
-The clause is deleted, not reworded (`definitionOps.ts:633-634`), and fenced in both
-suites with needles assembled from parts (`definitionOps.test.ts:843-846`,
-`SeedReceipt.test.tsx:494-497`). On the escalated-only draft the paragraph now says only
-"1 step was already set to must prove it." and the row says "you turned this on by hand" —
-those two no longer disagree about *who*.
-
-Two residuals: the fence is a deny-list with no positive control (**WR-12**), and the
-actor claim now lives entirely in a row that is handed a cause, not an actor (**WR-11**).
-
-### Still open from earlier rounds — untouched by this diff
-
-`f632f9b6..HEAD` touches four frontend files and no backend file, so none of the following
-could have moved. **Not re-litigated here, and still open:**
-
-- Round 2: **WR-08** (`StepTypePicker` `llm_emit` preview vs template asset), **WR-10**
-  (hand-transcribed `REPRESENTABLE_CITATION_POLICIES` with no cross-language pin — still
-  the entire mechanism holding CR-02 closed, still four hand-typed strings at
-  `SeedReceipt.test.tsx:112-117`), **IN-06**, **IN-07**, **IN-08**, **IN-09** (the CR-02
-  representability guard at `:301-314` still sweeps only `GROUNDED_PHASES` /
-  `BARE_PHASES` / `STRICT_EMIT_ONLY_PHASES` — `ESCALATED_PHASES` at `:206-215` and every
-  inline fixture are still outside it), **IN-10** (row order is the caller's array order,
-  and `key={row.slug}` / `data-testid={\`seed-receipt-step-${row.slug}\`}` still assume
-  slug uniqueness that `removePhase`'s own docblock, `definitionOps.ts:179-182`, says the
-  JSONB does not guarantee).
-- Round 1 carried-forward: WR-01, WR-04, WR-05, WR-06, WR-07, IN-01 … IN-05.
+Everything else from rounds 1–3 (WR-08, WR-10 … WR-15, IN-01 … IN-14) is carried forward
+mechanically as an **upper bound**: unverified this round, possibly already closed by round 4.
 
 ---
 
-## Round 3 findings
+## Round 5 findings
 
-New defects. Ids continue the round-1/round-2 sequence so they cannot collide.
+Ids are prefixed `R5` so they cannot collide with round 4's unknown sequence.
 
 ### Critical Issues
 
-#### CR-04: The receipt narrates the arrival but renders LIVE store state — a post-arrival edit makes it claim the user's own act as the AI's, which is CR-01's exact sentence for the third time
+#### CR-R5-01: `DescribeKbPicker` never reconciles its `value` against the folders it fetched, and the door's `kbFolderId` outlives it — so a stale, invisible `project_folder_id` reaches `generateWorkflow` and suppresses `unbound_retrieval`
 
-**File:** `frontend/src/components/workflows/SeedReceipt.tsx:193-217`, `:208`, `:216`
-(mount context: `frontend/src/pages/WorkflowBuilderPage.tsx:573`, `:605`, `:1211`,
-`:1636-1642`, `:1245-1251`)
+**File:** `frontend/src/components/workflows/DescribeKbPicker.tsx:91-164` (specifically `:140`),
+`frontend/src/components/workflows/WorkflowDoorSwitch.tsx:112-131`, `:257`,
+`frontend/src/pages/WorkflowBuilderPage.tsx:591-592`, `:1213`
+(server amplifier: `backend/app/api/workflows.py:755`)
 
 **Issue:**
-Every number and every sentence on this card is recomputed from the `phases` prop on every
-render:
 
-```tsx
-const rows = useMemo<GroundedRow[]>(() => { … }, [phases, kbTools, nameContext])
-const heading        = seedReceiptHeading(phases.length)
-const detectedCount  = rows.filter((row) => row.cause === "detected").length
-const groundingLead  = seedReceiptGroundingLead(detectedCount)
+Three facts, each verified in source, compose into a defect none of them has alone.
+
+1. **The picker holds no copy of the choice and never validates the one it is given.**
+   `value` is rendered straight onto the `<select>` (`:149`) and the only writes are the
+   user's own `onChange` (`:150`). There is no effect, no reconcile, no `onChange("")` when
+   the fetched `options` do not contain `value`.
+
+2. **When there is nothing to offer, the picker renders nothing at all — including no way to
+   clear a choice that is still live:**
+
+   ```tsx
+   // DescribeKbPicker.tsx:139-140
+   // Nothing to offer ⇒ nothing at all. No empty select, no placeholder, no copy.
+   if (options.length === 0) return stateMarker
+   ```
+
+   `options` is `[]` in *both* zero-row states, and `"unavailable"` is one of them
+   (`:118-124`). A failed fetch therefore hides the control while the parent's choice stands.
+
+3. **The parent's choice is deliberately made to outlive the picker.**
+   `WorkflowDoorSwitch.tsx:117-118` states it as the design: *"it is deliberately NOT cleared
+   by `goBoth` … a considered pick is not undone by looking around."* `goBoth`
+   (`:128-131`) clears `handoffDraft` and not `kbFolderId`.
+
+**Failure scenario A — a transient fetch failure (no exotic fixture required):**
+
+1. Describe door. `listFolders()` succeeds; the author picks *Contracts*. `kbFolderId =
+   "f-contracts"`.
+2. The author clicks `‹ both doors` to look around, then re-enters the describe door. The
+   door shell stays mounted, so `kbFolderId` survives; the **picker remounts and refetches**
+   (`useEffect(…, [])`, `:99-129`).
+3. That refetch fails — a blip, an expired token, a 5xx. `setState("unavailable")`,
+   `options = []`, and `DescribeKbPicker` returns the hidden `<span>` marker only.
+4. The author types a requirement and clicks *Draft the workflow*. `kbFolderId` is still
+   `"f-contracts"`, so `initialProjectFolderId` seeds `projectFolderId`
+   (`WorkflowBuilderPage.tsx:591-592`) and `onDraft` sends
+   `project_folder_id: "f-contracts"` (`:1213`).
+
+The workflow is born bound to a knowledge base **that never appeared on the screen the author
+was looking at**, with no control present to see it or unset it.
+
+**Failure scenario B — the folder is gone, and this is the one that matters:**
+
+Same steps, but the refetch *succeeds* and simply no longer contains `f-contracts` (deleted,
+moved out of the author's org scope by RLS, or renamed away). `options.length > 0`, so the
+picker renders — with `value="f-contracts"` matching no `<option>`. React sets
+`selectedIndex = -1`; the select displays **blank**, which an author reads as *"nothing
+picked"*. It is not nothing: `generateWorkflow` still receives the dead id.
+
+And the server does not catch it. `GenerateRequest.project_folder_id` is `UUID | None`
+(`workflows.py:1381`) — a syntactically valid UUID passes Pydantic with no ownership or
+existence check on this route. Then:
+
+```python
+# backend/app/api/workflows.py:755
+if body.project_folder_id is None:
+    findings.extend({... "code": "unbound_retrieval" ...})
 ```
 
-The copy those inputs feed is past-tense and first-person: *"Here's what I built — N
-steps"*, *"N steps read your documents, **so I set them** to must prove it"*, *"N steps
-were **already** set to must prove it"*. Those are claims about one instant — the moment
-`/generate` returned. The inputs are not from that instant. Traced:
+`unbound_retrieval` tests **only** `is None`. A non-null id pointing at nothing suppresses
+the finding entirely, so `ok:true`, `blockedReason` is `null`, and Publish is enabled on a
+workflow whose retrieval steps are scoped to a folder that does not exist. The `is None`-only
+test is pre-existing D-187-11 behaviour and I am not attributing it to round 5 — but round 5
+is the first surface that can produce a stale, invisible, non-null id, so the composition is
+newly reachable.
 
-- `WorkflowBuilderPage.tsx:573` — `const phases = useStore(store, (s) => s.phases)`. The
-  **live** selector, not a snapshot of the generated definition.
-- `:1636-1642` — `<SeedReceipt phases={phases} kbTools={kbTools} … open={showReceipt} />`.
-- `:605` / `:1211` — `showReceipt` is set `true` in `onDraft` and set `false` **only** by
-  the dismiss button. Nothing closes it on an edit.
-- `:1245-1251` — `onPhaseChange` → `store.getState().patchConfig(slug, patch)`, wired to
-  `PhaseFormPanel` at `:1819-1825`, which is rendered as a **sibling of the same graph
-  column** — receipt and inspector are on screen together.
-- `PhaseFormPanel.tsx:874` / `:926` —
-  `onChange({ available_tools: v.split(",").map(…) })`. The tool list is free-text editable
-  in the drafted view.
+**Why nothing catches it.** `DescribeKbPicker.test.tsx` has 30 cases and none of them supplies
+a `value` that is absent from the fetched list; its `reflects the value PROP` case (`:132`)
+uses an id that *is* offered. `WorkflowDoorSwitch.test.tsx`'s new "the choice SURVIVES a look
+around the chooser" case (the closest one) re-resolves the **same two folders** on the second
+mount, so it exercises the surviving-value path only in the case where it is safe.
 
-**Failure scenario (every step verified in source; nothing here needs a rare fixture):**
-
-1. Describe → generate. The typical draft ends `llm_agent → llm_emit` with no KB tool
-   switched on, so `detectedCount === 0` and no detected paragraph renders — this is the
-   case round 2's `STRICT_EMIT_ONLY_PHASES` was written for.
-2. The receipt stays open. The author selects the agent step and types
-   `search_documents` into its tools field.
-3. `patchConfig` → `store.phases` → the receipt re-renders. `groundingCauseOf` now returns
-   `detected`, `detectedCount` becomes 1, and the card prints:
-
-   > 1 step reads your documents, **so I set it** to must prove it. You can't turn that
-   > off — but you can see exactly where it applies.
-
-   The AI set nothing. **The user did, ten seconds ago.** This is round 1's CR-01 verbatim
-   — "the receipt claimed the AI had applied a gate it never touched" — regenerated by a
-   different mechanism, on the surface whose entire purpose (SC#3) is that safety is
-   attributed to whoever actually applied it.
-
-The same input path also falsifies the other two sentences: pressing `＋` on a lane
-increments `phases.length`, so *"Here's what I built — 6 steps"* counts a step the author
-built; and flipping the grounding dial (`onGovernanceChange` → `setPhaseGovernance`)
-increments `carriedCount`, so *"1 step was **already** set to must prove it"* describes a
-lock created after the sentence's own reference point. The residual word "already" in the
-WR-09 repair is exactly this: the paragraph no longer says *who*, but it still says
-*when*, and on the only path this surface has to a hand-escalated step, "when" is wrong.
-
-**Why no test sees it.** Both suites render once per case and never re-render with mutated
-props — `renderReceipt` (`SeedReceipt.test.tsx:223-234`) calls `render` and returns; the
-one loop that renders twice (`:581-589`) unmounts between iterations. The CR-01 fence
-(`:448-475`) asserts the assembled needle `"so I set"` is absent over three **static**
-fixture sets; none of them is a fixture *after an edit*. `WorkflowBuilderPage.canvas.test.tsx`
-(`:2360-2427`) drives the receipt through the page but only ever asserts on the
-just-generated draft and on dismissal. So the entire coverage estate measures the arrival
-frame and nothing after it — which is precisely the frame in which the copy happens to be
-true.
-
-**Fix:** make the receipt describe the event it names, by snapshotting at the moment it is
-opened rather than tracking the store. The receipt is already a pure leaf, so this is a
-caller change plus a prop-doc change:
+**Fix:** the component that owns the offer must own the reconcile — the value it renders and
+the value it lets stand must be the same value.
 
 ```tsx
-// WorkflowBuilderPage.tsx
-const [receiptPhases, setReceiptPhases] = useState<readonly PhaseSpecJSON[] | null>(null)
-
-// …in onDraft, beside the single state transition:
-store.getState().setDrafted(def)
-// 187-R3/CR-04 — the receipt is a statement about THIS generation. It must be rendered
-// from the definition that arrived, never from the live store: after arrival the author's
-// own edits are indistinguishable from the AI's, and "so I set them" would claim them.
-setReceiptPhases(def.phases)
-setShowReceipt(true)
-
-<SeedReceipt
-  phases={receiptPhases ?? []}
-  …
-/>
+// DescribeKbPicker.tsx — inside the resolve branch, after `setOptions(rows)`
+setOptions(rows)
+setState(rows.length > 0 ? "ready" : "none")
+// 187-R5/CR-R5-01 — A CHOICE THIS PICKER CANNOT SHOW IS A CHOICE IT MAY NOT LET STAND.
+// The parent's value outlives this component by design (WorkflowDoorSwitch's `goBoth`
+// keeps it), so a remount that no longer offers the chosen folder — deleted, out of RLS
+// scope, or unfetchable — must retract it rather than ship an id nobody can see. It goes
+// to "" and not to a fabricated row: "we could not confirm your pick" resolves to NOT
+// BOUND, which is the state `unbound_retrieval` can still speak about.
+if (value !== "" && !rows.some((r) => r.id === value)) onChange("")
 ```
 
 ```tsx
-// SeedReceipt.tsx — the prop contract must say so, because the copy depends on it
-/** The phases **as the generation emitted them** — an immutable snapshot, NOT a live
- *  store selector. Every sentence on this card is past-tense and first-person
- *  ("so I set them"), so a phases array that tracks later edits makes the card claim the
- *  author's own act as the AI's (CR-04). */
-phases: readonly PhaseSpecJSON[]
+// …and the same retraction on the unavailable branch, which today hides the control
+// while leaving the binding live:
+} catch {
+  if (cancelled) return
+  setOptions([])
+  setState("unavailable")
+  if (value !== "") onChange("")   // no control on screen ⇒ no binding may stand
+}
 ```
 
-If the live reading is deliberate instead, the copy must be re-tensed to describe current
-state with no actor (`"1 step reads your documents and must prove it"`), and
-`SEED_RECEIPT_ONE_WAY_RULE`'s placement re-examined — but a snapshot is the smaller change
-and keeps sketch 150-B's "here is what I built" framing.
+Add `value` and `onChange` to the effect's dependency list (or read them from a ref) so the
+lint rule and the behaviour agree.
 
-**Falsifying test to add (it should be RED before the fix):**
+**Falsifying tests to add (both should be RED before the fix):**
 
 ```tsx
-it("does not claim the AUTHOR's later edit as its own (CR-04)", () => {
-  const APPLICATION_CLAIM = ["so", "I", "set"].join(" ")
-  const { rerender } = render(
-    <SeedReceipt phases={STRICT_EMIT_ONLY_PHASES} kbTools={KB_TOOLS} open onDismiss={vi.fn()} />,
+it("retracts a value the refreshed list no longer offers (CR-R5-01)", async () => {
+  const onChange = vi.fn()
+  api.listFolders.mockResolvedValue([folder("f-policies", "Policies")])
+  render(<DescribeKbPicker value="f-contracts" onChange={onChange} />)
+  await screen.findByTestId("project-folder-picker")
+  expect(onChange).toHaveBeenCalledWith("")
+})
+
+it("retracts a value when the list could not be fetched at all (CR-R5-01)", async () => {
+  const onChange = vi.fn()
+  api.listFolders.mockRejectedValue(new Error("blip"))
+  render(<DescribeKbPicker value="f-contracts" onChange={onChange} />)
+  await waitFor(() =>
+    expect(screen.getByTestId("describe-kb-state").getAttribute("data-state")).toBe("unavailable"),
   )
-  expect(screen.getByTestId("seed-receipt").textContent ?? "").not.toContain(APPLICATION_CLAIM)
+  expect(onChange).toHaveBeenCalledWith("")
+})
+```
 
-  // The author switches a KB tool on, in the inspector, with the receipt still open.
-  const edited = patchPhaseConfig(STRICT_EMIT_ONLY_PHASES, "gather", {
-    phase_type: "llm_agent", available_tools: ["search_documents"],
-  })
-  rerender(<SeedReceipt phases={edited} kbTools={KB_TOOLS} open onDismiss={vi.fn()} />)
-  expect(screen.getByTestId("seed-receipt").textContent ?? "").not.toContain(APPLICATION_CLAIM)
+and the end-to-end one, in `WorkflowDoorSwitch.test.tsx`, which is the assertion that
+actually protects the wire:
+
+```tsx
+it("a pick the door can no longer show does NOT reach generateWorkflow", async () => {
+  const select = await openDescribeDoorWithFolders()
+  fireEvent.change(select, { target: { value: KB_CONTRACTS.id } })
+  fireEvent.click(screen.getByTestId("both-doors"))
+  mockListFolders.mockRejectedValue(new Error("blip"))     // the folder is gone / unreachable
+  fireEvent.click(screen.getByTestId("door-card-describe"))
+  await waitFor(() => expect(mockListFolders).toHaveBeenCalledTimes(2))
+  fireEvent.change(screen.getByTestId("describe-box"), { target: { value: "anything" } })
+  fireEvent.click(screen.getByTestId("describe-draft"))
+  await waitFor(() => expect(mockGenerateWorkflow).toHaveBeenCalled())
+  const request = mockGenerateWorkflow.mock.calls[0][0] as Record<string, unknown>
+  expect(Object.prototype.hasOwnProperty.call(request, "project_folder_id")).toBe(false)
 })
 ```
 
@@ -284,397 +320,461 @@ it("does not claim the AUTHOR's later edit as its own (CR-04)", () => {
 
 ### Warnings
 
-#### WR-11: The WR-09 repair did not delete the actor claim, it concentrated it in the row — and `seedReceiptStepReason` is handed a CAUSE, never an ACTOR
+#### WR-R5-01: The round-5 pins do not pin round 5's load-bearing fences — the born-bound round trip and the whole GAP-B/GAP-C behavioural estate are still deletable with the gate green, and one suite is outside the gate entirely
 
-**File:** `frontend/src/components/workflows/definitionOps.ts:661-673`, `:596-613`
+**File:** `scripts/vitest-count-gate.cjs:143-145`, `:148`, `:153`, `:168-179`
 
 **Issue:**
-The 187-20 docblock states the repair's logic explicitly (`:611-613`): *"WHICH cause is
-stated per row by `seedReceiptStepReason` — the one place that is handed the cause — which
-is exactly why the paragraph above the rows must not state one."* But the row's sentence
-for that cause is not a statement about a cause, it is a statement about a **person**:
 
-```ts
-case "escalated":
-  return "you turned this on by hand"
+Plan 187-29's commit message is *"pin round 5's three suites — the guards stop being
+deletable."* Measured with the script itself at HEAD (`node scripts/vitest-count-gate.cjs`,
+green, `failed 0`, total 2168):
+
+| suite | pin | actual | slack | what lives in the slack |
+|---|---|---|---|---|
+| `DescribeKbPicker.test.tsx` | 30 | 30 | **0** | the leaf's own fences — correctly pinned |
+| `ProblemsTray.test.tsx` | 30 | 30 | **0** | GAP B's absence fences — correctly pinned |
+| `verdictModel.test.ts` | 29 | 29 | **0** | GAP B's sentence fences — correctly pinned |
+| `WorkflowDoorSwitch.test.tsx` | 13 | 21 | **+8** | **all 8 of GAP A's cases, including the only born-bound round trip** |
+| `WorkflowBuilderPage.canvas.test.tsx` | 22 | 128 | **+106** | **every GAP-B page fence *and* the entire 187-28 "GATED half"** |
+| `WorkflowBuilderPage.describe.test.tsx` | — | **did not run** | — | the 3 additive-prop / byte-identity cases |
+
+The last row is the sharpest: that file is not in `TARGETS` (`:168-179`, which names only
+`WorkflowBuilderPage.test.tsx`, `.canvas.test.tsx` and `.header.test.tsx`), and it did not
+appear even in the script's own `new` extras list. Its cases are outside the gate's blast
+radius, not merely unpinned.
+
+The 106-case slack on the canvas suite is the one with a downstream consequence:
+`backend/app/api/workflows.py:509-513` and
+`backend/tests/unit/test_187_route_assigned_reach.py:19-20` both point at that suite by name
+as the measurement for the corrected GAP-C claim, and
+`test_the_corrected_comment_names_both_halves_and_points_at_its_evidence` asserts the
+*pointer* survives. Nothing asserts the *target* does. A comment can keep citing a describe
+block that has been deleted.
+
+This is the recorded round-3 WR-16 shape ("the guards were deletable with the gate green")
+reproduced in the commit that cites WR-16's own lesson. The deferred ledger's standing rule —
+*a pin is LOWERED only alongside a deliberate deletion; ADDING a pin needs no deletion* —
+means there is no obstacle to fixing this: raising `WorkflowDoorSwitch.test.tsx` 13 → 21 and
+`WorkflowBuilderPage.canvas.test.tsx` 22 → 128 is an extension, exactly like the three that
+were added.
+
+**Fix:** in the same commit, and with every number read from the script's own `actual` column:
+
+```js
+  // 187-R5/WR-R5-01: these two ALSO became load-bearing in round 5 — GAP A's only
+  // end-to-end round trip and GAP C's cited "GATED half" both live in their slack.
+  // Raised as an EXTENSION (no deletion rode with it), per this file's own rule.
+  "WorkflowBuilderPage.canvas.test.tsx": 128,   // was 22
+  "WorkflowDoorSwitch.test.tsx": 21,            // was 13
 ```
 
-`escalated` is `phase.grounding_escalated === true` (`phaseVocabulary.ts:329`, `:353`). The
-function receives the bit; it does not receive, and cannot infer, who set it. So the
-paragraph's cause claim was removed and the row's actor claim — the stronger of the two —
-was left standing under a docblock that presents the row as the *safe* home for it.
+and add the missing suite to the blast radius:
 
-Reachability, stated honestly as two separate things:
-
-- **Confirmed:** under CR-04's path the author really did set it, so the row is true and
-  only the paragraph's "already" is wrong.
-- **Reachable by construction, not observed (hypothesis):** `grounding_escalated` is an
-  ordinary `PhaseSpec` field (`backend/app/models/harness.py:234`) and the emit tool's
-  schema is the **whole** model —
-  `WF_SCHEMA = _strip_discriminator(copy.deepcopy(WorkflowDefinition.model_json_schema()))`
-  (`backend/app/services/workflow_authoring.py:140`) — so a model emission carrying
-  `grounding_escalated: true` validates and reaches the receipt. On that draft the card
-  tells a user who has clicked nothing that they turned a governance lock on by hand. I
-  did not drive a generation that produces it, so I record it as reachable-by-schema
-  rather than as observed.
-
-**Fix:** say what is known. The bit records that the lock is authored rather than derived;
-it does not record the author.
-
-```ts
-case "escalated":
-  // The bit says the lock is AUTHORED, not who authored it — `/generate` can emit it
-  // (WorkflowDefinition's full schema is the emit tool), so "you" may be false. State
-  // the fact the cause actually carries.
-  return "it was set to must prove it by hand"
+```js
+const TARGETS = [
+  …,
+  // 187-R5: it carries the additive-optional-prop byte-identity pins for 187-26. A file
+  // outside TARGETS is not merely unpinned — it never runs under the gate at all.
+  "src/pages/WorkflowBuilderPage.describe.test.tsx",
+]
 ```
 
-and, if the second person is wanted, gate it on provenance the client actually holds
-(the same shape `name_seeded_by_ai` already uses for names).
+Note `phaseVocabulary.test.ts` (33 pinned / 96 actual), `canvasModel.test.ts` (26/49) and
+`PublishGauntlet.test.tsx` (24/46) carry comparable slack; those predate this round and are
+not attributed to it, but the same one-line extension applies.
 
 ---
 
-#### WR-12: The new WR-09 fence in `definitionOps.test.ts` is a deny-list of the exact deleted clause, with no positive control — and its own sibling two lines below documents why that is not acceptable
+#### WR-R5-02: The 187-29 pin comment attributes GAP A's born-bound round trip to a suite that asserts `generateWorkflow` was called ZERO times
 
-**File:** `frontend/src/components/workflows/definitionOps.test.ts:838-855`
+**File:** `scripts/vitest-count-gate.cjs:121-125`
 
 **Issue:**
 
-```ts
-const CAUSE_CLAIMS = [
-  ["by", "its",   "own", "settings"].join(" "),
-  ["by", "their", "own", "settings"].join(" "),
-]
-for (const count of [1, 2, 9]) {
-  const sentence = seedReceiptCarriedLead(count)
-  for (const claim of CAUSE_CLAIMS) expect(sentence).not.toContain(claim)
-  expect(sentence).not.toContain(seedReceiptStepReason("escalated"))
-  expect(sentence).not.toContain(seedReceiptStepReason("already-set"))
-}
+```js
+//   · DescribeKbPicker.test.tsx  — GAP A: the loose "Describe & run" door's
+//     knowledge-base picker, and the BORN-BOUND round trip (the folder chosen
+//     before the AI drafts reaches `generateWorkflow`'s `project_folder_id` on
+//     the request the client actually sends). Delete these and a workflow can
+//     silently go back to being born unbound with every other gate green.
 ```
 
-Measured at HEAD: `grep -rn "by its own settings\|by their own settings" frontend/src`
-returns **two hits, both inside comments** (`definitionOps.ts:600`,
-`definitionOps.test.ts:840`). Neither is a rendered string. So every needle in this fence
-now matches nothing anywhere in the product — the test asserts the absence of strings that
-no longer exist.
+That suite does the opposite. `generateWorkflow` is a member of `FORBIDDEN_SYMBOLS`
+(`DescribeKbPicker.test.tsx:54-62`) and `expectNothingElseCalled()` asserts
+`toHaveBeenCalledTimes(0)` for it. The suite never renders `WorkflowDoorSwitch`, never
+renders `WorkflowBuilderPage`, and contains no reference to `project_folder_id` at all
+(`grep` returns two hits, both the mock declaration and the forbidden-symbol list). It tests
+the leaf in isolation — correctly, and well.
 
-The file itself states that this is the failure mode a fence must avoid. Nineteen lines
-below, `it("the carried sentence CLAIMS NO AUTHORSHIP — with a positive control")`
-(`:857-871`) ends:
+The round trip it claims to hold is `WorkflowDoorSwitch.test.tsx`'s *"a folder chosen on the
+door reaches generateWorkflow's project_folder_id"* — the suite left at pin 13 (WR-R5-01).
+So the comment does not merely mis-cite: it names the wrong file **in the direction that
+makes the gap invisible**, asserting protection for the one fence that is unprotected.
 
-```ts
-// POSITIVE CONTROL — the DETECTED lead really does make that claim, so the fence
-// above cannot be passing by asserting the absence of a string nothing ever says.
-expect(seedReceiptGroundingLead(2)).toContain(APPLICATION_CLAIM)
+This matters more than an ordinary stale comment because the file's whole subject is that
+claims about coverage must be measured. Its own header (`:52-56`) forbids hand-counted
+numbers for exactly this reason; the same discipline was not applied to the prose beside them.
+
+**Fix:** state what each suite actually holds, and move the round-trip claim to the file that
+holds it (alongside WR-R5-01's pin raise):
+
+```js
+//   · DescribeKbPicker.test.tsx  — GAP A's LEAF: the picker offers what the server
+//     returned and manufactures nothing, holds "there are none" apart from "we could
+//     not ask", and reaches exactly one api symbol. It deliberately asserts
+//     `generateWorkflow` at ZERO calls — the round trip is NOT here.
+//   · WorkflowDoorSwitch.test.tsx — GAP A's ROUND TRIP: the folder chosen before the AI
+//     drafts reaches `generateWorkflow`'s `project_folder_id` on the request the client
+//     actually sends, and nothing chosen sends no key at all.
 ```
 
-The new fence has no equivalent. And because it is a **deny-list of one historical
-wording**, the next cause attribution written differently — "because of its citation
-policy", "set by the deliverable's own rules" — passes it unchanged. This is the recorded
-Phase-185 lesson (*a deny-list cannot be made fail-closed by extension*) and the recorded
-187 lesson (*verify the PROPERTY not the PATCH*) applied to round 3's own new guard.
+---
 
-The DOM-level sibling (`SeedReceipt.test.tsx:550-576`) does carry a positive control, but
-it controls a *different* string (`seedReceiptStepReason("escalated")` appearing in the
-row), which proves the row still speaks — not that the paragraph's needles are meaningful.
+#### WR-R5-03: `D-ITEM-187-29-01` confirmed — and understated. The flag-off describe door gains a control, a network request it never made, and a request field it could never previously supply, so `visual_workflow_canvas` no longer reverts GAP A
 
-**Fix:** give the fence a positive control over its own needles, and make the property
-checkable rather than the wording:
+**File:** `frontend/src/components/workflows/WorkflowDoorSwitch.tsx:34`, `:123`, `:196`, `:257`,
+`frontend/src/pages/WorkflowsPage.tsx:403-411`,
+`frontend/src/components/workflows/DescribeKbPicker.tsx:99-129`
+
+**Issue:**
+
+Confirmed against source rather than accepted as logged. `WorkflowsPage.tsx:403` renders
+`<WorkflowDoorSwitch …>` unconditionally; only `inline` and `headerLead` are spread behind
+`canvasEnabled` (`:411`). The shell reads no flag (its own docblock, `:82`, says so), and the
+mount at `:257` is unguarded. So a `visual_workflow_canvas` **off** user meets the picker.
+
+The ledger entry records this as "a new control on a screen a flag-off user reaches". Two
+things it does not record, both measurable, both stronger:
+
+1. **A network request the door never issued.** `DescribeKbPicker` calls `listFolders()` on
+   mount (`:99-129`). The describe door previously issued none — the shell's own red lines
+   say *"The shell adds NO API call"* (`:26`). Round 5's sibling plan 187-27 treated exactly
+   this property as load-bearing, gating its loop on `canvasEnabled &&` *specifically* so a
+   flag-off Builder "issues precisely the requests it issues today, pinned at zero", and gave
+   that half-line a falsification test. The same round did the opposite one file over.
+
+2. **A request field the door could never previously supply.** `kbFolderId` → `initialProjectFolderId`
+   → `projectFolderId` (`WorkflowBuilderPage.tsx:591-592`) → `generateWorkflow`'s
+   `project_folder_id` (`:1213`). None of that hop reads `canvasEnabled`. The door's fast path
+   (`autoDraft`) skips the Builder's describe screen entirely, so before round 5 a door-path
+   generate could *never* carry a binding; now it can, with the flag off. The flag-off change
+   is on the wire, not only on the screen.
+
+The ledger's reasoning that "the door is a different, upstream surface, and its flag-blindness
+predates round 5" is fair about the *shell*. It does not carry to the *control*: the
+flag-blindness is inherited, the new behaviour behind it is not. The practical consequence is
+the one its own re-open trigger names — *"any plan that must be able to revert the v3.6
+surfaces from the flag alone"* — and it is now true: turning the flag off no longer reverts
+GAP A.
+
+**Fix:** either gate the mount, or write the decision down as a decision. Gating is one line
+and keeps the shell flag-blind by passing the answer down, exactly as `inline` already does:
+
+```tsx
+// WorkflowsPage.tsx — the host already evaluates the one shared gate rule
+<WorkflowDoorSwitch
+  …
+  {...(canvasEnabled ? { inline: true, headerLead: breadcrumbGroup, offerKbPicker: true } : {})}
+/>
+```
+
+```tsx
+// WorkflowDoorSwitch.tsx — ABSENT ⇒ byte-identical to the shipped door (the D-14 idiom
+// this file already uses for `inline`, so no second copy of the gate is created here).
+{offerKbPicker ? <DescribeKbPicker value={kbFolderId} onChange={setKbFolderId} /> : null}
+```
+
+and pin it, in the shape 187-27 used for its own half-line:
+
+```tsx
+it("D-181-01 — with the flag OFF the describe door renders no picker and fetches no folders", async () => {
+  render(<WorkflowDoorSwitch />)                 // no offerKbPicker key at all
+  fireEvent.click(screen.getByTestId("door-card-describe"))
+  await new Promise((r) => setTimeout(r, 50))
+  expect(screen.queryByTestId("project-folder-picker")).toBeNull()
+  expect(mockListFolders).toHaveBeenCalledTimes(0)
+})
+```
+
+If the answer is instead "the door is deliberately outside D-181-01", that is a legitimate
+answer — but it needs to be a recorded decision (`D-187-xx`) rather than a deferred item,
+because a rollback plan will read the flag as complete.
+
+---
+
+#### WR-R5-04: GAP B's fence reaches the tray strip and the Publish control but not the node marks — during `not-run` every node on the canvas renders identically to "checked and clean", and nothing tests it
+
+**File:** `frontend/src/pages/WorkflowBuilderPage.tsx:867-871`, `:1377`,
+`frontend/src/components/workflows/verdictModel.ts:226-234`
+
+**Issue:**
+
+The stated property of 187-27 is that *the canvas never claims an all-clear it has no server
+evidence for*. Two of the three surfaces now honour it. The third does not.
 
 ```ts
-it("the carried sentence ATTRIBUTES NO CAUSE — it counts two of them (187-20/WR-09)", () => {
-  const CAUSE_CLAIMS = [ /* … */ ]
-  // POSITIVE CONTROL — the needles are strings the module CAN produce, so the absences
-  // below are measurements and not tautologies.
-  const WITH_CLAIM = `1 step was already set to must prove it ${CAUSE_CLAIMS[0]}.`
-  for (const claim of CAUSE_CLAIMS) expect(WITH_CLAIM + CAUSE_CLAIMS[1]).toContain(claim)
+// WorkflowBuilderPage.tsx:867-871
+const verdicts = useStore(store, (s) => s.verdicts)
+const verdictGroups = useMemo(() => groupVerdicts(verdicts), [verdicts])
+const marks = useMemo(() => (slug: string) => verdictGroups.markFor(slug), [verdictGroups])
+```
 
-  for (const count of [1, 2, 9]) {
-    const sentence = seedReceiptCarriedLead(count)
-    for (const claim of CAUSE_CLAIMS) expect(sentence).not.toContain(claim)
-    // THE PROPERTY, not the wording: no causal connective may appear at all.
-    expect(sentence).not.toMatch(/\b(because|by its|by their|since|due to)\b/i)
-  }
+`marks` is derived only from the store's `verdicts`, which is empty until the first answer —
+and the mirror effect (`:818-839`) deliberately does not touch `setVerdicts` on the `idle` or
+`checking` branches. `markFor` returns `undefined` for every slug, and `undefined` is
+documented as *"the server said nothing about it"* (`verdictModel.ts:227`) — but on the
+canvas it renders exactly as *"the server checked this and found nothing"*. The two are
+pixel-identical. `degraded` (`:1377`) is threaded to the tray only; nothing on the node path
+receives the check state at all.
+
+So during the never-ran window — which now exists on **every** open of a flag-on drafted
+canvas, for the debounce plus a round trip — the graph itself reads clean while the strip
+below it says *"Not checked yet."* The strip is at least always rendered (the summary button
+is outside `open ?`, `ProblemsTray.tsx:184-218`), so a person who looks down can find the
+truth. That is a mitigation, not the property.
+
+Not one of round 5's tests asserts anything about node marks under `not-run`: the eight new
+canvas-page cases assert on `publish-trigger`, `publish-blocked-reason`, `problems-tray*` and
+`mockValidate` call counts, and never on a `PhaseNodeCard` mark.
+
+**Fix:** hand the check state down the same seam `degraded` already travels, and let the card
+render the "not yet known" affordance the sketch already has a slot for (the dashed grey ○ is
+taken; a dimmed/indeterminate card state or an explicitly absent corner is the design call).
+At minimum, pin what is true today so a future reader is not misled by the docblock:
+
+```tsx
+it("the canvas does not paint a CLEAN graph over a check that never ran (WR-R5-04)", async () => {
+  const answer = deferred<{ ok: boolean; verdicts: never[] }>()
+  mockValidate.mockReturnValue(answer.promise)
+  renderPublishable(FLAG_ON)
+  fireEvent.click(await screen.findByTestId("builder-view-canvas"))
+  await screen.findByTestId("problems-tray")
+  // The state the graph is IN must be reachable from the graph, not only from the strip.
+  expect(screen.getByTestId("workflow-canvas").getAttribute("data-check-state")).toBe("not-run")
 })
 ```
 
 ---
 
-#### WR-13: The testid-coverage guard is lexical and patch-shaped — satisfiable by a comment, blind to two other testid spellings and to the whole `data-*` class that `data-carried-count` belongs to, and it is the only fence in the file with no planted-literal control
+#### WR-R5-05: `isCheckOutstanding` — the entire GAP-B predicate — has zero direct tests in the suite that was pinned for GAP B
 
-**File:** `frontend/src/components/workflows/SeedReceipt.test.tsx:911-936`, `:938-958`
+**File:** `frontend/src/components/workflows/verdictModel.ts:150-152`,
+`frontend/src/components/workflows/verdictModel.test.ts:297-394`,
+`scripts/vitest-count-gate.cjs:130-134`
 
 **Issue:**
-The guard is a good idea and it does bite in the direction it was written for. I replayed
-its exact logic (`/data-testid="([^"]+)"/g` → `testSource.includes(\`ByTestId("${id}")\`)`)
-over mutated sources. Measured results:
 
-| probe | result |
-|---|---|
-| HEAD as-is | 12 ids extracted, 0 missing — and all 12 have real query sites (verified line by line) |
-| a new `data-testid="seed-receipt-brandnew"` | **missing → guard fails.** Correct. |
-| `data-testid={"seed-receipt-brace"}` | 12 ids, 0 missing — **invisible** |
-| `data-testid={'seed-receipt-sneaky'}` | 12 ids, 0 missing — **invisible** |
-| a new id whose only "query" is `// screen.getByTestId("seed-receipt-ghost")` in a comment | 0 missing — **passes on a commented-out query** |
+`grep -rn "isCheckOutstanding" frontend/src` returns exactly four hits: one declaration
+(`verdictModel.ts:150`) and three call sites (`WorkflowBuilderPage.tsx:190`, `:1130`,
+`:1377`). **Zero in any test file.**
 
-Three consequences:
+The new `verdictModel.test.ts` block (29 cases, newly pinned) is thorough about the
+*sentences* — totality over the widened record, distinctness, the word-class fence with both
+positive and negative controls — and asserts nothing at all about the *predicate* those
+sentences are chosen by. The pin comment describes the file as holding "GAP B's other half";
+the half it holds is the vocabulary half.
 
-1. **It measures a mention, not coverage.** A query inside a comment, inside `it.skip`, or
-   inside a `describe.skip` satisfies it. The guard's own docblock claims more than that:
-   *"A paragraph nothing queries can be deleted, can print the wrong number, or can drift
-   from its formatter with the whole suite green. … this finds it every run."* It finds
-   the *string*, every run.
-2. **It is shaped like the patch, not the property.** The blocker it closes was an
-   unqueried surface hook. `data-carried-count` — added in the same plan — is the same
-   class of hook and is not swept, because the sweep matches only `data-testid`. So do
-   `data-grounded-count`, `data-detected-count`, `data-slug` and `data-cause`. All five are
-   queried today; none is protected tomorrow.
-3. **It is the only fence in section 7 with no entry in `it("those fences are real")`**
-   (`:938-958`), which plants a literal for every other pattern in the block — including
-   the deliberate non-firing control `expect('<span aria-hidden="true">').not.toMatch(…)`.
-   Nothing proves the extraction regex or the needle construction would fail on an
-   unqueried id; the two sanity assertions (`unique.length > 0`, `toContain(
-   "seed-receipt-carried")`) only prove it is non-vacuous, not that it is falsifiable.
+The predicate is the whole fence. It is what decides that `idle` and `checking` are one state
+and that `verdicts`/`degraded` are not, and a one-character edit (`kind === "idle" ||
+kind === "degraded"`, say) would silently invert GAP B while every case in the pinned suite
+stays green. The only coverage is transitive, through
+`WorkflowBuilderPage.canvas.test.tsx` — which is the suite sitting on 106 cases of unpinned
+slack (WR-R5-01). The two findings compound: the predicate is untested where it is pinned and
+pinned nowhere it is tested.
 
-**Fix:** widen the extraction to every spelling and to the sibling attribute class, and
-add the missing control:
+**Fix:** four cheap direct cases, in the module's own suite, keyed on the loop's union so they
+cannot go stale:
 
 ```ts
-// every spelling JSX admits, not only the double-quoted attribute form
-const RX = /data-testid=(?:"([^"]+)"|\{\s*["'`]([^"'`]+)["'`]\s*\})/g
-const ids = [...seedReceiptSource.matchAll(RX)].map((m) => m[1] ?? m[2])
+it("isCheckOutstanding is TRUE exactly for the two states with no `ok` field", () => {
+  const OUTSTANDING: ValidationState["kind"][] = ["idle", "checking"]
+  const ANSWERED: ValidationState["kind"][] = ["verdicts", "degraded"]
+  for (const kind of OUTSTANDING) expect(isCheckOutstanding(kind)).toBe(true)
+  for (const kind of ANSWERED) expect(isCheckOutstanding(kind)).toBe(false)
+  // EXHAUSTIVE — a fifth loop state must be classified here, not defaulted to "answered".
+  const EVERY: Record<ValidationState["kind"], true> = {
+    idle: true, checking: true, verdicts: true, degraded: true,
+  }
+  expect([...OUTSTANDING, ...ANSWERED].sort()).toEqual(Object.keys(EVERY).sort())
+})
 
-// …and the STATE attributes are hooks too — `data-carried-count` shipped in the same
-// plan as this guard and would not have been caught by it.
-const attrs = [...seedReceiptSource.matchAll(/\sdata-([a-z-]+)=\{/g)]
-  .map((m) => `data-${m[1]}`)
-  .filter((a) => a !== "data-testid")
-for (const attr of attrs) expect(testSource).toContain(`"${attr}"`)
-
-// …in `it("those fences are real")`:
-expect('<p data-testid="planted-unqueried">').toMatch(RX)
-expect(testSource).not.toContain('ByTestId("planted-unqueried")')
+it("a DEGRADED check is answered, not outstanding — the two causes keep their own words", () => {
+  // Guards the ordering `blockedReason` depends on: never-ran must not swallow the
+  // degraded sentence, which is a different fact with a different sentence.
+  expect(isCheckOutstanding("degraded")).toBe(false)
+})
 ```
-
-Stripping block/line comments from `testSource` before the substring check closes the
-comment hole in one line.
 
 ---
 
-#### WR-14: `SeedReceipt.tsx`'s docblock claims "there is no second derivation to drift" while the file re-implements the `available_tools ∩ kbTools` predicate `groundingCause` owns
+#### WR-R5-06: `isCheckOutstanding` fences only the FIRST answer per mount — `validation` is never reset when `definition` goes null, so a second definition in one mount would inherit the previous one's `ok:true`
 
-**File:** `frontend/src/components/workflows/SeedReceipt.tsx:20-29`, `:170-180`
-
-**Issue:**
-The docblock states the D-187-08 property as absolute:
-
-> This file writes no KB tool name and classifies nothing, so a sixth KB tool added
-> server-side is picked up here for free and **there is no second derivation to drift**.
-
-`intersectingKbTool` (`:170-180`) is a second derivation of the intersection:
-
-```ts
-for (const tool of raw) {
-  if (typeof tool === "string" && kbTools.includes(tool)) return tool
-}
-```
-
-`groundingCause`'s `detected` branch computes the same membership
-(`phaseVocabulary.ts:316`: `inputs.availableTools.some((tool) => inputs.kbTools.includes(tool))`
-over the string-filtered list built at `:351`). I checked both at HEAD and they **agree**
-today — same predicate, same first match — so this is a drift risk, not a live defect. But
-the rule the two implement is server-owned (D-185-09), and the day it stops being exact
-string membership (case folding, a prefix family, an alias map) the cause and the tool
-named inside the reason are updated in two places or they disagree, and the reason will
-name a tool the classifier did not count. The docblock currently tells the next reader that
-cannot happen.
-
-Second, smaller: `intersectingKbTool` guards `phase.config?.available_tools` while
-`groundingCauseOf` reads `phase.config.available_tools` unguarded (`phaseVocabulary.ts:347`)
-and is called **one line earlier** (`SeedReceipt.tsx:196`). On the malformed row the `?.`
-exists for, the throw has already happened. That is round-2 WR-04's finding reaching this
-file; the optional chain here is defensive theatre.
-
-**Fix:** move the tool resolution next to the classifier that owns the rule, and export it —
-the receipt then imports both and holds neither:
-
-```ts
-// phaseVocabulary.ts, directly under groundingCause
-/** The FIRST KB tool this step reaches for, by the same membership rule
- *  `groundingCause`'s detected branch uses. One rule, one place (D-187-08). */
-export function intersectingKbToolOf(
-  phase: PhaseSpecJSON,
-  kbTools: readonly string[],
-): string | null { … }
-```
-
-and either drop the `?.` in `SeedReceipt.tsx` or narrow the docblock sentence to what the
-code holds.
-
----
-
-#### WR-15: `seedReceiptStepReason`'s `default:` arm silently returns `""` for any future cause, and the row renders it as a dangling em-dash — the same file uses a `never` guard elsewhere for exactly this
-
-**File:** `frontend/src/components/workflows/definitionOps.ts:661-673`,
-`frontend/src/components/workflows/SeedReceipt.tsx:318-329`
+**File:** `frontend/src/pages/WorkflowBuilderPage.tsx:763-766`, `:810`, `:1130`,
+`frontend/src/hooks/useLiveValidation.ts:206-212`
 
 **Issue:**
-`GroundingCause` is `"detected" | "already-set" | "escalated" | null`
-(`phaseVocabulary.ts:268`). The formatter's `default:` arm is documented as the `null` case
-only, but it swallows every future member as well. `GroundedRow.cause` is
-`Exclude<GroundingCause, null>` (`SeedReceipt.tsx:158`), so a fourth cause is admitted to a
-row, and the row renders its reason **unconditionally**:
+
+Stated honestly as two separate things, because they have different weights.
+
+**The mechanism, confirmed.** `useLiveValidation` returns early when `def === null` and
+deliberately does not wipe its state (`:207-210`: *"discarding the server's last word without
+a new one would be the client asserting something on its own"*). `beginBeat`
+(`:155-160`) can only produce `{kind:"checking"}` from `idle`/`checking`, so once an answer
+lands the state is `verdicts`/`degraded` **for the life of the mount**. Therefore
+`isCheckOutstanding` is true only before the first answer. Any *subsequent* document swap
+inside one mount would be checked against the previous document's verdict for a full debounce
+window (500 ms) plus a round trip, with `blockedReason` returning `null` if that verdict was
+`ok:true` — the exact fail-open shape GAP B closed, relocated from "on open" to "on replace".
+
+**The reachability, measured and negative.** `builderPhase` returns to `composing` only via
+`store.getState().setComposing()`, whose sole call site is `onDraft`
+(`WorkflowBuilderPage.tsx:1201`), which is reachable only from the describe screen —
+i.e. from `builderPhase` `empty`/`error`, never from `drafted`. And every door transition
+remounts the Builder (`WorkflowDoorSwitch` returns a different tree per door), resetting
+`validation` to `idle`. **I could not construct a live path to it at HEAD.**
+
+I am recording it as a Warning rather than dropping it because the fence's soundness rests
+entirely on a property of a *different* module's UI graph, and nothing states that dependency
+where either module can see it. A "start over" / "regenerate" affordance on the drafted view
+— a plausible Phase-188 addition — reintroduces the blocker with no test going red.
+
+**Fix:** make the fence depend on the definition it is fencing, rather than on the absence of
+a navigation path:
 
 ```tsx
-<strong data-testid="seed-receipt-step-face">{row.face}</strong>{" "}
-—{" "}
-<span data-testid="seed-receipt-step-reason">{row.reason}</span>
-```
-
-Result: `**Weigh the supplier options** — ` with nothing after the em-dash, on the surface
-whose one job is that a seal never arrives unexplained. Nothing typechecks against it and
-nothing tests it — `:695-705` asserts the three known reasons in order.
-
-The module already establishes the right idiom 180 lines down, and names it:
-`requiredConfigFor`'s `default:` arm is *"the `deriveTier.ts:119-127` runtime-safe
-exhaustiveness guard: a 7th union member must be handled here"* (`:836-841`).
-
-**Fix:** apply the file's own idiom, so a new cause is a typecheck error rather than an
-empty sentence:
-
-```ts
-export function seedReceiptStepReason(cause: GroundingCause, tool?: string | null): string {
-  const named = typeof tool === "string" && tool.trim() !== "" ? tool.trim() : null
-  switch (cause) {
-    case "detected":    return named ? `it reads your documents (${named})` : "it reads your documents"
-    case "already-set": return "it already has to cite its sources"
-    case "escalated":   return "you turned this on by hand"
-    case null:          return ""
-    default: {
-      // A 4th GroundingCause must get its own sentence here — a seal with no reason is
-      // the one thing this card may never render (Req 5).
-      const _never: never = cause
-      void _never
-      return ""
-    }
+// WorkflowBuilderPage.tsx — the answer must belong to the definition on screen
+const answeredFor = useRef<BuilderDefinition | null>(null)
+useEffect(() => {
+  if (validation.kind === "verdicts" || validation.kind === "degraded") {
+    answeredFor.current = definition
   }
+}, [validation, definition])
+
+// …and in blockedReason, beside the existing outstanding check:
+// 187-R5/WR-R5-06 — a verdict about a PREVIOUS definition is not a verdict about this one.
+if (isCheckOutstanding(validation.kind) || answeredFor.current !== definition) {
+  return DEGRADED_SENTENCE["not-run"]
 }
 ```
 
-and, cheaply, assert the invariant in the DOM: every `seed-receipt-step-reason` node has
-non-empty `textContent`.
-
----
-
-#### WR-16: Neither reviewed suite is pinned by `vitest-count-gate.cjs`, so the 13 tests that close CR-03 can be deleted with the gate green — the exact regression class the gate exists for
-
-**File:** `scripts/vitest-count-gate.cjs:70-88` (evidence), affecting
-`frontend/src/components/workflows/SeedReceipt.test.tsx` and
-`frontend/src/components/workflows/definitionOps.test.ts`
-
-**Issue:**
-The gate's `BASELINE` map lists 16 files (`:70-88`); `grep -n "definitionOps\|SeedReceipt"
-scripts/vitest-count-gate.cjs` returns **nothing**. Both suites fall inside the
-`src/components/workflows` target glob, so they run and count toward `numTotalTests`, but
-neither has a per-file pin — and `BASELINE_TOTAL` is 415 while these two alone contribute
-288 (`definitionOps.test.ts` 228, `SeedReceipt.test.tsx` 60, measured from the JSON
-reporter), so the total is far enough above the floor to absorb a large deletion.
-
-`SeedReceipt.test.tsx`'s own docblock records the "postdates the pin, reports as `new`"
-status as a deliberate choice (`:6-11`). It was correct when the file had no load-bearing
-guard in it. It is no longer: the file now holds the entire CR-03 repair *and* the standing
-testid sweep, and the `definitionOps.test.ts` block holds the WR-09 fence. Deleting
-`describe("SeedReceipt — the carried paragraph")` returns the repo to the exact state
-round 2 blocked on, with `vitest-count-gate.cjs` green — which is verbatim the Phase-177
-lesson the script's own header cites as its reason for existing.
-
-**Fix:** pin both files now, with counts read from the script's own `actual` column (never
-hand-computed), in the same commit as this round:
-
-```js
-const BASELINE = {
-  "canvasModel.fixtures.test.ts": 100,
-  // 187-R3: the two suites carrying the whole Req-5 governance-honesty estate. Pinned
-  // once they became load-bearing (the CR-03 repair + the testid sweep live here).
-  "definitionOps.test.ts": 228,
-  "SeedReceipt.test.tsx": 60,
-  …
-}
-```
+Alternatively, document the dependency where it can be checked: a comment on
+`isCheckOutstanding` stating *"sound only because `builderPhase` never returns to `composing`
+within one mount — see `setComposing`'s single call site"*, plus a test asserting that call
+site count is 1.
 
 ---
 
 ### Info
 
-#### IN-11: `CAUSE_CLAIMS` is declared twice, verbatim, in two suites
+#### IN-R5-01: Duplicate `import type` statements from the same module, in two files
 
-**File:** `frontend/src/components/workflows/SeedReceipt.test.tsx:494-497`,
-`frontend/src/components/workflows/definitionOps.test.ts:843-846`
-**Issue:** The same two assembled needles are hand-built in both files. The whole reason
-the copy lives in `definitionOps` is that two copies of a locked string in two files can
-drift; the *fence over* that string now has the property the string does not.
-**Fix:** export the assembled array once from a shared test helper (or from
-`definitionOps.test.ts`) and import it, keeping the assemble-from-parts idiom in one place.
+**File:** `frontend/src/components/workflows/WorkflowCanvas.tsx:216`, `:222`;
+`frontend/src/pages/WorkflowBuilderPage.tsx:189-190`
+**Issue:** Both files now import from `@/components/workflows/verdictModel` twice — once for
+the pre-existing name and once for the round-5 name, separated by an explanatory comment
+block. `eslint` does not flag it (no `no-duplicate-imports` rule configured; I ran it). The
+split is understandable under the insertion cap and the added-lines-only discipline, but two
+import statements from one module is the shape that makes the *next* reader add a third.
+**Fix:** merge on the next touch of either file —
+`import { DEGRADED_SENTENCE, groupVerdicts, isCheckOutstanding } from "…/verdictModel"` — and
+keep the comment above the merged statement.
 
-#### IN-12: `definitionOps.test.ts:881` hardcodes a fragment of `SEED_RECEIPT_ONE_WAY_RULE` instead of deriving it
+#### IN-R5-02: The ≤15-insertion cap produced a ~700-character single-line comment and a four-way nested ternary on one line
 
-**File:** `frontend/src/components/workflows/definitionOps.test.ts:880-881`
-**Issue:**
-```ts
-expect(sentence).not.toContain(SEED_RECEIPT_ONE_WAY_RULE)
-expect(sentence.toLowerCase()).not.toContain("turn that off")
-```
-The first line derives; the second re-types a fragment of the same constant. If the rule's
-wording changes, the second assertion silently stops describing it. (Pre-existing, 187-16.)
-**Fix:** derive both — e.g. assert against the constant's first clause via `split("—")[0]`.
+**File:** `frontend/src/pages/WorkflowBuilderPage.tsx:787`, `:810`, `:1377`
+**Issue:** `:787` is one comment line carrying an entire paragraph of D-184-15 narrowing
+rationale; `:1377` is
+`degraded: isCheckOutstanding(validation.kind) ? "not-run" : storeDegraded === null ? null : storeDegraded.kind === "422" ? "unreadable" : "unreachable",`
+— four branches, ~150 characters, no line breaks. Both are consequences of the round cap
+(measured 15 ins / 3 del), which is a good trade for this round; they are not a good permanent
+shape on a file this size.
+**Fix:** re-wrap on the next non-capped touch. The ternary chain in particular wants to be a
+small named helper beside `toolbarSaveState` (`trayCauseFor(validation, storeDegraded)`),
+which would also give WR-R5-05's tests something to target directly.
 
-#### IN-13: The "never prints a slug" guard passes on `contracts` by a capitalisation coincidence
+#### IN-R5-03: `test_the_needles_can_actually_match` takes a `caplog` fixture it never uses
 
-**File:** `frontend/src/components/workflows/SeedReceipt.test.tsx:776-782`, `:140`
-**Issue:** The guard asserts the card's `textContent` does not contain each fixture slug.
-Slug `contracts` is rendered as part of the name `"Search Supplier Contracts"` (`:140`);
-`toContain` is case-sensitive, so the guard passes only because the fixture capitalises the
-word. Renaming the fixture to sentence case would fail a test about slugs on a card that
-prints no slug — a false positive waiting on an unrelated edit.
-**Fix:** pick slugs that are not substrings of any fixture name in any casing (the
-`policy_check` fixture already does this deliberately, `:144-146`), or compare
-case-sensitively against a slug set that shares no token with the names.
+**File:** `backend/tests/unit/test_187_route_assigned_reach.py:273`
+**Issue:** `def test_the_needles_can_actually_match(caplog):` — the body performs only string
+containment checks. `caplog` is presumably copied from
+`test_every_route_assigned_code_is_classified_without_the_fail_loud_branch` (`:202`), where it
+is load-bearing. Harmless, but an unused fixture in a file whose subject is that a guard must
+be watched failing reads as a leftover.
+**Fix:** drop the parameter.
 
-#### IN-14: `data-grounded-count` means "sealed", and the suite that reads it calls it SEALED
+#### IN-R5-04: "Not checked yet." and "checking…" render side by side
 
-**File:** `frontend/src/components/workflows/SeedReceipt.tsx:222-230`,
-`frontend/src/components/workflows/SeedReceipt.test.tsx:169`, `:358-364`
-**Issue:** Three sibling attributes now expose three facts, but only two of the three names
-match the vocabulary the rest of the phase uses: `data-grounded-count` carries
-`rows.length` (the SEALED total), and its test is titled *"marks the SEALED count"* over
-`SEALED_SLUGS`. Round 2's CR-01 was, at root, one word standing for two facts.
-**Fix:** rename to `data-sealed-count` (with `data-detected-count` / `data-carried-count`
-unchanged) so the surface, the suite and the sketch vocabulary use one word per fact.
+**File:** `frontend/src/components/workflows/ProblemsTray.tsx:203-217`,
+`frontend/src/components/workflows/ProblemsTray.test.tsx` ("a check now IN FLIGHT beats…")
+**Issue:** With `degraded === "not-run"` and `checking === true`, the strip renders the
+degraded sentence *and* the checking beat. Read literally, "Not checked yet." next to
+"checking…" is redundant rather than dishonest — nothing false is claimed, and the pinned test
+deliberately asserts this composition. `verdictModel.ts:129-131` shows the pairing was
+considered. Recorded only so the next copy pass knows the pairing is intentional.
+**Fix:** none required. If it is ever reworded, prefer suppressing the sentence while
+`checking` (the beat already carries the state) over shortening either string.
+
+#### IN-R5-05: The quiet note lives inside the `<label>` but `aria-label` suppresses it from the accessible name, so it is not programmatically associated with the select
+
+**File:** `frontend/src/components/workflows/DescribeKbPicker.tsx:143`, `:148`, `:160-162`
+**Issue:** The `<label>` wraps the select and contains both `DESCRIBE_KB_LABEL` and
+`DESCRIBE_KB_NOTE`. `aria-label={DESCRIBE_KB_LABEL}` on the select overrides the implicit
+name, which is the right call (the note in the name would be noisy) — but it also means the
+note reaches no assistive technology as a description of the control.
+**Fix:** `aria-describedby` pointing at the note's id (the component already calls `useId`
+nowhere, so one `useId()` is needed), keeping `aria-label` as the name.
+
+#### IN-R5-06: The picker's `catch` conflates a transport failure with a malformed payload
+
+**File:** `frontend/src/components/workflows/DescribeKbPicker.tsx:118-124`
+**Issue:** The `try` covers both `await listFolders()` and the `for (const f of folders)`
+normalisation loop, so a non-iterable response (a shape change, a proxy returning an
+envelope) lands in the same `"unavailable"` state as a network failure. That state is worded
+"we could not ask", which is not what happened. Total and non-throwing, which is the important
+half; the state name is the imprecise half.
+**Fix:** narrow the `try` to the `await`, and normalise outside it with an
+`Array.isArray(folders)` guard that falls to `"unavailable"` explicitly, so the two causes
+stay distinguishable if a third state is ever wanted.
 
 ---
 
 ## Notes on scope
 
-- **Verified sound, recorded so it is not re-litigated.** Round 3 did **not** repeat CR-02:
-  `ESCALATED_PHASES` is a representable fixture — `grounding_escalated: bool = False` is a
-  real `PhaseSpec` field (`backend/app/models/harness.py:234`) and reachable both from the
-  generator's schema and from `setPhaseGovernance`. The `?raw` self-import resolves
-  correctly (all 12 needles are found; a wrong resolution would fail all 12). No hook is
-  called conditionally — `useId`/`useMemo` both precede `if (!open) return null`. XSS is
-  clean: every server- or model-authored string is a text child or an attribute value, and
-  `dangerouslySetInnerHTML` appears nowhere (fenced at `:899-901`).
-- **Performance is out of v1 scope.** Not reported: `detectedCount`/`carriedCount` are
-  recomputed outside the `useMemo`, and `nameContext` is an object dependency that busts
-  the memo on any page re-render that rebuilds it. Neither is a correctness issue.
-- **Backend and cross-provider concerns are out of scope for this round** per the review
-  brief; `harness.py` and `workflow_authoring.py` are cited only as evidence for
-  reachability claims, not reviewed.
-- **`tsc`/lint were not re-run** for this round — the diff adds no new type surface beyond
-  one JSX attribute and one import, and both suites transform and run clean.
+- **Verified sound, recorded so it is not re-litigated.** (1) The GAP-B state machine cannot
+  re-enter `checking` after an answer — `beginBeat` (`useLiveValidation.ts:155-160`) preserves
+  `verdicts`/`degraded`, so the new fence is not a permanent refusal, and the *"an ok:true
+  answer RELEASES it"* case is a real property and not a fixture. (2) `summaryLine` has
+  exactly one consumer repo-wide (`ProblemsTray.tsx:142`), so GAP B has no second fail-open
+  surface for the all-clear *sentence* (the node marks are WR-R5-04, a different affordance).
+  (3) `WorkflowCanvas.tsx`'s round-5 delta does not touch the `FlowEdge` module-scope value
+  import and moves a type edge onto a *purer* module — the Phase-188 extraction seam is
+  slightly better, not worse. (4) The `_ROUTE_ASSIGNED_CODES` inventory really is 3
+  (`workflows.py:514-520`), and `test_the_inventory_comment_states_the_real_set_size` compares
+  the digit against `len()` rather than pinning a literal, which is the right shape. (5) The
+  door's "three sites never co-render" claim (`DescribeKbPicker.tsx:21-27`) holds: describe
+  door, Builder describe screen and drafted header are mutually exclusive branches. (6) XSS:
+  every new string in `DescribeKbPicker` is a text child or an attribute value; no
+  `dangerouslySetInnerHTML` anywhere in the round-5 diff, and the picker's suite fences it.
+- **Measured, so it is not inherited.** Backend: `16 passed` over the two backend suites.
+  Frontend: count gate green, `total 2168 · failed 0`, all 21 pins present, no per-file
+  decrease. `tsc --noEmit -p tsconfig.app.json` → 33 errors, byte-matching the D-ITEM-01
+  baseline, none in the touched tree. `eslint` over the six changed production files → 2
+  pre-existing `react-refresh` errors, no new ones.
+- **Not attributed to round 5, and not re-measured:** the `PublishGauntlet.test.tsx` and
+  `WorkflowBuilderPage.canvas.test.tsx` parallel-load flakes (`D-ITEM-187-20-01`,
+  `D-ITEM-187-25-01`). My gate sample was `failed 0`, consistent with 187-29's five samples.
+  The ledger's standing recommendation — fix it rather than prove non-attribution a fifth
+  time — is sound and I second it.
+- **Out of v1 scope, so not reported as findings:** `DescribeKbPicker` refetches on every
+  describe-door entry (no cache); adding `validation` to the `canvasSession` memo's deps
+  recomputes it on every beat. Neither is a correctness issue.
+- **Not re-litigated:** round 4 (plans 187-22 … 187-25) is outside this diff base, and its
+  review is not in this file. The carried-forward tally is a mechanical upper bound with the
+  two exceptions named above.
 
 ---
 
-_Reviewed: 2026-08-03_
+_Reviewed: 2026-08-04_
 _Reviewer: Claude (gsd-code-reviewer)_
-_Depth: standard · Round 3 (gap closure) · diff base `f632f9b6`_
+_Depth: standard · Round 5 (gap closure) · diff base `15339441`_
