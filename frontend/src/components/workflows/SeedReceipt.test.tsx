@@ -1015,6 +1015,21 @@ describe("SeedReceipt — source purity, glyph discipline and no staged arrival"
    *  deliberately NOT among them — the shipped derivation uses it, and a fence that fired
    *  on the code it sits beside gets deleted rather than fixed. */
   const CACHE_HOOKS = [["use", "State"].join(""), ["use", "Ref"].join("")]
+  /** 187-24 / WR-14 — the two code shapes a membership predicate takes. Assembled from
+   *  parts for the same reason every needle above is. Note these are CODE shapes, never
+   *  words: `available_tools` is deliberately NOT a needle, because the docblock names
+   *  the rule in prose and a fence that fired on its own file's explanation would get
+   *  deleted rather than fixed. */
+  const MEMBERSHIP_CALLS = [
+    [".", "includes", "("].join(""),
+    [".", "some", "("].join(""),
+    [".", "indexOf", "("].join(""),
+  ]
+  /** A module-scope function declaration. The component is the ONLY one this file may
+   *  declare — a predicate has to live SOMEWHERE, and this is the property that says
+   *  there is nowhere for it to live. Built fresh per use: a `/g` regex is stateful
+   *  under `.test`, which is what `toMatch` calls. */
+  const declarationRx = () => /^\s*(export\s+)?function\s+\w+/gm
 
   it("imports nothing from the API client and opens no request", () => {
     expect(seedReceiptSource).not.toMatch(/from\s+["']@\/lib\/api["']/)
@@ -1091,6 +1106,41 @@ describe("SeedReceipt — source purity, glyph discipline and no staged arrival"
     expect(seedReceiptSource).toMatch(/snapshot/i)
   })
 
+  it("declares NO membership predicate of its own — one rule, one home (187-24/WR-14)", () => {
+    // 187-24. Until this plan the file declared `intersectingKbTool`, a second copy of
+    // the `available_tools ∩ kbTools` loop, ONE LINE after the `groundingCauseOf` call it
+    // had to agree with — while the docblock told the next reader that "there is no
+    // second derivation to drift". They agreed, and would have gone on agreeing right up
+    // until the server-owned rule stopped being exact string equality, at which point a
+    // row would name a tool the classifier did not count.
+    //
+    // THE PROPERTY, not the wording. Rather than deny-listing the loop that was deleted —
+    // the Phase-185 lesson says a deny-list cannot be made fail-closed by extension —
+    // this asserts that the file declares NO function but the component, so a predicate
+    // has nowhere to live regardless of how it is spelled.
+    const declared = seedReceiptSource.match(declarationRx()) ?? []
+    expect(declared).toHaveLength(1)
+    expect(declared[0]).toContain("SeedReceipt")
+    // …and no module-PRIVATE declaration exists either, which is the exact shape a
+    // helper predicate takes: the deleted one was a bare `function intersectingKbTool(`
+    // at column 0. (A `kbTools`-in-the-signature needle was tried first and REJECTED —
+    // the component's own destructured props contain `kbTools`, so it fired on the
+    // correct code it sits beside. A fence that does that gets deleted, not fixed.)
+    expect(seedReceiptSource).not.toMatch(/^function\s+\w+/m)
+    // The three membership CALLS a predicate can be written with — the deleted copy used
+    // the first, `groundingCause`'s branch used the second — kept as cheap regression
+    // pins beneath the property above. (A `for (const ` needle was tried and REJECTED
+    // for the same reason as the one above: the component's own row derivation is a
+    // `for (const phase of phases)` loop, so the needle fired on correct code.)
+    for (const call of MEMBERSHIP_CALLS) expect(seedReceiptSource).not.toContain(call)
+    // POSITIVE CONTROL — it does not merely lack a predicate, it IMPORTS the one home
+    // and calls it, which is what makes the absences above a statement about drift.
+    expect(seedReceiptSource).toMatch(
+      /import\s*\{[^}]*intersectingKbToolOf[^}]*\}\s*from\s+["']@\/components\/workflows\/phaseVocabulary["']/,
+    )
+    expect(seedReceiptSource).toMatch(/intersectingKbToolOf\(phase,\s*kbTools\)/)
+  })
+
   it("renders every authored string as a text child (T-187-13-04)", () => {
     expect(seedReceiptSource).not.toMatch(/dangerouslySetInnerHTML/)
   })
@@ -1157,5 +1207,37 @@ describe("SeedReceipt — source purity, glyph discipline and no staged arrival"
     // …and the control must NOT fire on the memo the component legitimately uses.
     expect("const rows = useMemo<GroundedRow[]>(() => {").not.toContain(CACHE_HOOKS[0])
     expect("const rows = useMemo<GroundedRow[]>(() => {").not.toContain(CACHE_HOOKS[1])
+    // 187-24 / WR-14 — the DELETED predicate, planted in the exact shape it had at
+    // HEAD before this plan, so each half of the fence above is falsifiable.
+    const DELETED_PREDICATE = [
+      "function intersectingKbTool(",
+      "  phase: PhaseSpecJSON,",
+      "  kbTools: readonly string[],",
+      "): string | null {",
+      "  const raw = phase.config?.available_tools",
+      "  if (!Array.isArray(raw)) return null",
+      "  for (const tool of raw) {",
+      "    if (typeof tool === 'string' && kbTools.includes(tool)) return tool",
+      "  }",
+      "  return null",
+      "}",
+    ].join("\n")
+    expect(DELETED_PREDICATE).toContain(MEMBERSHIP_CALLS[0])
+    expect(DELETED_PREDICATE).toMatch(/^function\s+\w+/m)
+    // …and the other two spellings, planted in the shapes they would actually take.
+    expect("availableTools.some((tool) => kbTools.includes(tool))").toContain(
+      MEMBERSHIP_CALLS[1],
+    )
+    expect("if (kbTools.indexOf(tool) !== -1) return tool").toContain(MEMBERSHIP_CALLS[2])
+    // …and the module-private needle must NOT fire on the exported component.
+    expect("export function SeedReceipt({").not.toMatch(/^function\s+\w+/m)
+    // …and the declaration sweep really does see a SECOND declaration when one exists,
+    // which is the half that makes "no predicate can live here" a property.
+    const twoDeclarations = `${DELETED_PREDICATE}\n\nexport function SeedReceipt({`
+    expect(twoDeclarations.match(declarationRx()) ?? []).toHaveLength(2)
+    // …and the control must NOT fire on the component's own arrow callbacks, which are
+    // expressions rather than declarations and are not predicates.
+    expect("  const detectedCount = rows.filter((row) => row.cause === 'detected').length")
+      .not.toMatch(/^\s*(export\s+)?function\s+\w+/m)
   })
 })

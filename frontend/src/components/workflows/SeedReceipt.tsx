@@ -28,6 +28,19 @@
  * "never INVENT a reason string client-side". The safety-DEFINING input is still the
  * server's; the client only intersects and renders.
  *
+ * WHY THAT SENTENCE IS TRUE BY CONSTRUCTION AND NOT BY HOPE (187-24 / review WR-14).
+ * It was ASPIRATION until 187-24. This file declared its own `intersectingKbTool` — a
+ * second copy of the `available_tools ∩ kbTools` loop — one line after the
+ * `groundingCauseOf` call it had to agree with. The two agreed, and would have gone on
+ * agreeing right up until the rule stopped being exact string equality, at which point
+ * the row would have named a tool the classifier did not count: a reason contradicting
+ * its own cause, on the governance surface. The predicate MOVED (it was not merely
+ * checked): `intersectingKbToolOf` now sits beside `groundingCauseOf` in
+ * `phaseVocabulary.ts` and both it and `groundingCause`'s detected branch read one
+ * `firstKbTool` body. THIS COMPONENT NOW DECLARES NO PREDICATE OF ITS OWN — a source
+ * fence in `SeedReceipt.test.tsx` fails the moment one reappears, with a planted
+ * literal proving it can fire.
+ *
  * The named tool in a `detected` row is taken from the REAL intersection
  * (`config.available_tools ∩ kbTools`), never a hardcoded tool id — no KB tool name is
  * written anywhere in this file, so a source grep for one returns zero. A step
@@ -122,6 +135,7 @@ import {
 } from "@/components/workflows/definitionOps"
 import {
   groundingCauseOf,
+  intersectingKbToolOf,
   nodeTitle,
   type GroundingCause,
   type NameContext,
@@ -182,27 +196,6 @@ interface GroundedRow {
   cause: Exclude<GroundingCause, null>
 }
 
-/**
- * The KB tool this step actually reaches for, read off the LOOSE definition-JSONB shape.
- *
- * `available_tools` is author-supplied and hand-editable, so every read is guarded — a
- * projection must not crash on a malformed row (CANVAS-01 totality). The step's own
- * ordering decides which tool is named when several intersect: it is the list the author
- * sees in the panel, so the receipt names what they would name. A miss returns `null`
- * and the reason falls through to its unqualified form rather than guessing.
- */
-function intersectingKbTool(
-  phase: PhaseSpecJSON,
-  kbTools: readonly string[],
-): string | null {
-  const raw = phase.config?.available_tools
-  if (!Array.isArray(raw)) return null
-  for (const tool of raw) {
-    if (typeof tool === "string" && kbTools.includes(tool)) return tool
-  }
-  return null
-}
-
 export function SeedReceipt({
   phases,
   kbTools,
@@ -222,7 +215,7 @@ export function SeedReceipt({
       found.push({
         slug: phase.slug,
         face: nodeTitle(phase, nameContext),
-        reason: seedReceiptStepReason(cause, intersectingKbTool(phase, kbTools)),
+        reason: seedReceiptStepReason(cause, intersectingKbToolOf(phase, kbTools)),
         cause,
       })
     }

@@ -305,6 +305,31 @@ export interface GroundingInputs {
 }
 
 /**
+ * THE `available_tools ∩ kbTools` MEMBERSHIP RULE, IN ONE BODY (D-187-08 / WR-14).
+ *
+ * `groundingCause`'s detected branch and `intersectingKbToolOf` below both read THIS
+ * function, so the tool named inside a `detected` reason can never disagree with the
+ * classifier that decided the cause — and the day the rule stops being exact string
+ * equality (case folding, a prefix family, an alias map) there is exactly ONE place to
+ * change it. Until 187-24 the receipt re-implemented this loop beside its call to
+ * `groundingCauseOf`; the two agreed by coincidence rather than by construction.
+ *
+ * FIRST match, in the step's OWN order: `available_tools` is the list the author sees in
+ * the panel, so a surface that names one names the one they would name. The `typeof`
+ * filter is the loose-JSONB guard `groundingCauseOf` already applies — a hand-edited row
+ * may carry any JSON value and a projection must not crash on one (CANVAS-01 totality).
+ */
+function firstKbTool(
+  availableTools: readonly unknown[],
+  kbTools: readonly string[],
+): string | null {
+  for (const tool of availableTools) {
+    if (typeof tool === "string" && kbTools.includes(tool)) return tool
+  }
+  return null
+}
+
+/**
  * Resolve WHY a step must prove itself, or `null` when it is held to nothing.
  * TOTAL — every input shape returns, and none of them throws.
  */
@@ -312,8 +337,10 @@ export function groundingCause(inputs: GroundingInputs): GroundingCause {
   const hasDial = GROUNDING_DIAL_TYPES.includes(inputs.phaseType)
 
   // (1) DETECTED — the step reads your documents. Structural, never stored, and it
-  //     wins over both branches below, which is what makes the lock one-way.
-  if (hasDial && inputs.availableTools.some((tool) => inputs.kbTools.includes(tool))) {
+  //     wins over both branches below, which is what makes the lock one-way. The
+  //     membership test is `firstKbTool` above and is NOT re-written here: this branch
+  //     and the tool-naming resolver must read one predicate (WR-14).
+  if (hasDial && firstKbTool(inputs.availableTools, inputs.kbTools) !== null) {
     return "detected"
   }
 
@@ -353,6 +380,33 @@ export function groundingCauseOf(
     groundingEscalated: phase.grounding_escalated === true,
     citationPolicy: typeof citationPolicy === "string" ? citationPolicy : undefined,
   })
+}
+
+/**
+ * The FIRST KB tool this step reaches for, by the SAME membership rule
+ * `groundingCause`'s detected branch uses — `firstKbTool` above, read by both and
+ * re-written by neither. One rule, one place (D-187-08 / 187-24 review WR-14).
+ *
+ * It lives here, beside `groundingCauseOf`, because the rule is SERVER-OWNED
+ * (D-185-09) and a surface that names a tool must name the one the classifier counted.
+ * `SeedReceipt.tsx` held a second copy of this loop until 187-24 — one line after its
+ * `groundingCauseOf` call — and the two agreed only for as long as the rule stayed
+ * exact string equality. A miss returns `null` and the caller falls through to its
+ * unqualified sentence rather than guessing; the naming surface never fabricates.
+ *
+ * THE READ IS `groundingCauseOf`'S READ, DELIBERATELY. `available_tools` is guarded by
+ * `Array.isArray` exactly as its sibling guards it, and `phase.config` is read exactly
+ * as its sibling reads it — unguarded. A divergent defensive guard on one of two
+ * functions that are always called one line apart is theatre that cannot fire (the
+ * earlier call throws first) and is the very drift this move exists to close. The
+ * `config` residual belongs to `groundingCauseOf` and is logged, not silently widened.
+ */
+export function intersectingKbToolOf(
+  phase: PhaseSpecJSON,
+  kbTools: readonly string[],
+): string | null {
+  const rawTools = phase.config.available_tools
+  return firstKbTool(Array.isArray(rawTools) ? rawTools : [], kbTools)
 }
 
 /**

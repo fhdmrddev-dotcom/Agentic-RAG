@@ -35,6 +35,8 @@ import {
   waitsForYou,
   derivedFace,
   derivedFaceOf,
+  groundingCauseOf,
+  intersectingKbToolOf,
   PHASE_TYPE_SENTENCES,
   PHASE_TYPE_SUBTITLES,
   PHASE_TYPE_LABELS,
@@ -657,6 +659,203 @@ describe("phaseVocabulary.waitsForYou — slot 2 (D-183-07)", () => {
     for (const t of ["programmatic", "llm_single", "llm_agent", "llm_batch_agents", "llm_emit", "nope"]) {
       expect(waitsForYou(phase({ config: { phase_type: t } }))).toBe(false)
     }
+  })
+})
+
+// ── 187-24 / review WR-14 — the membership rule has ONE home ─────────────────────
+//
+// `SeedReceipt.tsx` declared its own `available_tools ∩ kbTools` loop one line after
+// its `groundingCauseOf` call. The two AGREED, and the file's docblock told the next
+// reader that "there is no second derivation to drift" — which was aspiration, not a
+// property of the code. The predicate MOVED here; these cases pin the rule AND, more
+// importantly, the AGREEMENT, so a future divergence is a red rather than a review
+// finding. One assertion of agreement is worth more than two parallel copies of the
+// same expectations.
+
+/** The server's list, mirrored as a FIXTURE only — no client module owns it. */
+const KB_TOOL_FIXTURE: readonly string[] = [
+  "search_documents",
+  "query_documents",
+  "read_document",
+]
+
+/** Marks a config with NO `available_tools` KEY AT ALL — distinct from one holding
+ *  `undefined`, and one of the shapes the loose JSONB column genuinely admits. */
+const NO_TOOLS_KEY = Symbol("available_tools absent")
+
+/**
+ * A tool-carrying phase, built WITHOUT the shared `phase()` helper above.
+ *
+ * That helper types its `config` parameter as `PhaseConfigJSON & Record<string, unknown>`,
+ * so every literal must spell `phase_type` and every VALUE must be well-typed — which is
+ * exactly what these cases must be able to violate. The definition column is JSONB and
+ * hand-editable: `available_tools` reaches the client as any JSON value, or not at all,
+ * and a fixture that could not express those shapes would be testing the type system
+ * rather than the resolver.
+ */
+function toolPhase(
+  slug: string,
+  tools: unknown,
+  over: {
+    phase_type?: string
+    citation_policy?: string
+    grounding_escalated?: boolean
+  } = {},
+): PhaseSpecJSON {
+  const config: Record<string, unknown> = { phase_type: over.phase_type ?? "llm_agent" }
+  if (tools !== NO_TOOLS_KEY) config.available_tools = tools
+  if (over.citation_policy !== undefined) config.citation_policy = over.citation_policy
+  return {
+    slug,
+    phase_index: 0,
+    config: config as PhaseSpecJSON["config"],
+    grounding_escalated: over.grounding_escalated,
+  }
+}
+
+describe("phaseVocabulary.intersectingKbToolOf — the tool the step reaches for (WR-14)", () => {
+  it("names the FIRST intersecting tool in the STEP's own order, not the list's", () => {
+    // Both are KB tools, so a resolver that scanned `kbTools` and returned ITS first
+    // member would say "search_documents" for both. The author sees THIS order in the
+    // panel, so the surface names what they would name.
+    expect(
+      intersectingKbToolOf(
+        toolPhase("a", ["read_document", "search_documents"]),
+        KB_TOOL_FIXTURE,
+      ),
+    ).toBe("read_document")
+    // …and reversing the STEP's list reverses the answer while `kbTools` stays fixed,
+    // which is what isolates WHICH of the two lists decides.
+    expect(
+      intersectingKbToolOf(
+        toolPhase("b", ["search_documents", "read_document"]),
+        KB_TOOL_FIXTURE,
+      ),
+    ).toBe("search_documents")
+  })
+
+  it("skips a NON-KB tool listed FIRST — it names the intersection, never the head", () => {
+    // The case that catches a resolver returning `available_tools[0]`.
+    expect(
+      intersectingKbToolOf(toolPhase("c", ["execute_code", "query_documents"]), KB_TOOL_FIXTURE),
+    ).toBe("query_documents")
+  })
+
+  it("a MISS returns null — the caller falls through, it never guesses", () => {
+    expect(intersectingKbToolOf(toolPhase("d", ["execute_code"]), KB_TOOL_FIXTURE)).toBeNull()
+    // An unread palette marks NOTHING — the same direction `groundingCause` takes, for
+    // the same reason: an empty server list must not invent a grounded step.
+    expect(intersectingKbToolOf(toolPhase("e", ["search_documents"]), [])).toBeNull()
+  })
+
+  it("TOTALITY over the loose definition JSONB — no malformed shape throws", () => {
+    // Every shape below is admitted by the JSONB column and reachable by hand-editing.
+    const malformed: unknown[] = [
+      NO_TOOLS_KEY,
+      undefined,
+      null,
+      "search_documents",
+      42,
+      {},
+      { search_documents: true },
+      [null, undefined, 7, {}, ["search_documents"]],
+    ]
+    for (const tools of malformed) {
+      const p = toolPhase("m", tools)
+      expect(() => intersectingKbToolOf(p, KB_TOOL_FIXTURE)).not.toThrow()
+      expect(intersectingKbToolOf(p, KB_TOOL_FIXTURE)).toBeNull()
+    }
+    // …and a well-formed member SURVIVING among malformed ones is still found, so the
+    // nulls above are about those shapes and not about the guard swallowing everything.
+    expect(
+      intersectingKbToolOf(toolPhase("n", [null, 7, {}, "read_document"]), KB_TOOL_FIXTURE),
+    ).toBe("read_document")
+  })
+
+  it("AGREES WITH THE CLASSIFIER, over a table — the property, not two copies of it", () => {
+    // THE assertion this whole move exists to make. `groundingCause`'s detected branch
+    // and this resolver read one `firstKbTool` body, so the biconditional below holds by
+    // construction rather than by coincidence — and a second copy re-introduced in
+    // either place turns this red.
+    //
+    // Stated exactly: a step is `detected` IF AND ONLY IF it carries a dial AND the
+    // resolver names a tool. The DIAL GATE is the classifier's alone (D-185-15) — the
+    // membership rule knows nothing about phase types — so the two halves are not the
+    // same statement, and the type gate is asserted rather than assumed.
+    const table: PhaseSpecJSON[] = [
+      toolPhase("a", ["search_documents"]),
+      toolPhase("b", ["execute_code", "read_document"]),
+      toolPhase("c", ["execute_code"]),
+      toolPhase("d", []),
+      toolPhase("e", NO_TOOLS_KEY),
+      toolPhase("f", "search_documents"),
+      toolPhase("g", [null, "query_documents"]),
+      toolPhase("h", ["read_document"], { phase_type: "llm_batch_agents" }),
+      // NO DIAL, but it lists a KB tool: the classifier must still refuse `detected`.
+      toolPhase("i", ["search_documents"], { phase_type: "llm_single" }),
+      toolPhase("j", ["search_documents"], {
+        phase_type: "llm_emit",
+        citation_policy: "strict",
+      }),
+      // A dial, no tools, but the author escalated by hand — `escalated`, not `detected`.
+      toolPhase("k", [], { grounding_escalated: true }),
+      // A CASE-DIFFERING tool id. Under the shipped exact-equality rule it is a MISS on
+      // BOTH sides, so it changes no expectation — it is in the table because it is the
+      // input that makes the biconditional FALSIFIABLE. A resolver that started folding
+      // case (or matching a prefix family, or reading an alias map) while the classifier
+      // did not would name this tool on a dial step the classifier declined to count,
+      // and the second half below turns red. Observed red in 187-24's Task-1
+      // falsification: "phase l names Search_Documents but is not detected".
+      toolPhase("l", ["Search_Documents"]),
+    ]
+
+    let detectedSeen = 0
+    let namedWithoutDialSeen = 0
+    for (const p of table) {
+      const cause = groundingCauseOf(p, KB_TOOL_FIXTURE)
+      const named = intersectingKbToolOf(p, KB_TOOL_FIXTURE)
+      const hasDial = GROUNDING_DIAL_TYPES.includes(p.config.phase_type)
+      // FORWARD: every `detected` step names a tool, so a reason can never fall back to
+      // its unqualified form on a step the classifier counted BECAUSE of a tool.
+      if (cause === "detected") {
+        detectedSeen += 1
+        expect(named, `phase ${p.slug} is detected but names no tool`).not.toBeNull()
+      }
+      // REVERSE: a dial step that names a tool is ALWAYS detected — so the resolver can
+      // never name a tool the classifier declined to count.
+      if (hasDial && named !== null) {
+        expect(cause, `phase ${p.slug} names ${named} but is not detected`).toBe("detected")
+      }
+      // …while a NON-dial step may name a tool and still not be detected: that gate
+      // belongs to the classifier alone, and `seedReceiptStepReason` reads the tool only
+      // on its `detected` arm, so no surface can print it.
+      if (!hasDial && named !== null) {
+        namedWithoutDialSeen += 1
+        expect(cause).not.toBe("detected")
+      }
+    }
+    // NON-VACUITY. A table that produced no `detected` step, or no dial-less tool
+    // holder, would make the branches above assert nothing at all.
+    expect(detectedSeen).toBeGreaterThanOrEqual(4)
+    expect(namedWithoutDialSeen).toBeGreaterThanOrEqual(2)
+  })
+
+  it("reads ONE membership body — the loop is not written twice in this module", () => {
+    // The structural half. The rule is `firstKbTool`; a second inline `kbTools.includes`
+    // loop anywhere in this file is the drift the move above closed.
+    const decls = phaseVocabularySource.match(/function firstKbTool/g) ?? []
+    expect(decls).toHaveLength(1)
+    // `groundingCause`'s detected branch CALLS it rather than re-writing `.some(...)`.
+    expect(phaseVocabularySource).toMatch(/hasDial && firstKbTool\(/)
+    expect(phaseVocabularySource).not.toMatch(/availableTools\.some\(/)
+    // …and exactly two call sites read it: the classifier and the phase-shaped resolver.
+    const calls = phaseVocabularySource.match(/firstKbTool\(/g) ?? []
+    expect(calls.length).toBeGreaterThanOrEqual(2)
+    // POSITIVE CONTROL — the pattern that must be absent above really does match the
+    // shape it forbids, so its absence is a measurement and not a tautology.
+    expect("inputs.availableTools.some((tool) => inputs.kbTools.includes(tool))").toMatch(
+      /availableTools\.some\(/,
+    )
   })
 })
 
