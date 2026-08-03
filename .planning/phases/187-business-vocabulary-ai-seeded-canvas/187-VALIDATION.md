@@ -11,6 +11,10 @@ gap_closure_round: 2026-08-02
 gap_closure_plans: [187-16, 187-17, 187-18, 187-19]
 gap_closure_base: ee5fff3b
 gap_closure_gates_measured: 2026-08-02
+gap_closure_round_3: 2026-08-03
+gap_closure_3_plans: [187-20, 187-21]
+gap_closure_3_base: f632f9b6
+gap_closure_3_gates_measured: 2026-08-03
 manual_rows: 12
 manual_rows_performed: 0
 ---
@@ -640,6 +644,519 @@ anywhere in either set reduced.
   chased.
 - **The backend was not re-run and did not need to be** — this round committed **zero** backend
   files. §(d)'s pre-existing-rot record stands unchanged.
+
+---
+
+## The gap-closure round 3 — 2026-08-03
+
+`187-VERIFICATION.md`'s **re-verification** (commit `fb3b3f42`) re-scored the phase at
+**`gaps_found`, 10/11 must-haves**. Round 2's blocker (CR-01 + CR-02) was confirmed closed, but
+truth **#5 (VOCAB-02 Req 5)** failed again for a *narrower and different* reason: the sentence
+round 2's own fix introduced — `seedReceiptCarriedLead` — shipped with **zero test assertions**
+anywhere in the repo (**CR-03**, a Blocker) and **misattributed the `escalated` cause** to *"by its
+own settings"*, contradicting `seedReceiptStepReason("escalated")` two lines below it on the same
+card (**WR-09**, a Warning that is the substantive half of the failed truth).
+
+| Plan | Finding it closes | Severity as recorded | Wave |
+|---|---|---|---|
+| **187-20** | **CR-03** (the carried paragraph is unguarded — it could be deleted, show the wrong count, or drift from its formatter with all 452 tests green) + **WR-09** (the carried sentence is false of one of the two causes it counts) | 🛑 Blocker (CR-03) + ⚠️ Warning (WR-09) — together the *only* reason truth #5 still failed | 7 |
+| **187-21** | this record — round 3's own rows, the probes, the re-measured gates, the M3/M9 repairs and the new M13 | — | 8 |
+
+**Scope discipline, stated rather than implied.** Round 3 is scoped to **CR-03 and WR-09 only**.
+
+- **WR-08 was NOT closed by this round.** It was one of round 2's four scoped items — the `＋`
+  picker's preview still cannot see a template asset, because `StepTypePickerProps`
+  (`StepTypePicker.tsx:90-101`) carries **no `nameContext` field at all**. The operator's decision
+  was to **roll WR-08 into Phase 188**, not to absorb it here. It is named so no reader can infer
+  it was quietly swept in, and the fence is **measured** below (§(ac)), not promised. M12's
+  round-2 warning about it therefore still stands and is still owed.
+- **WR-01, WR-04, WR-05, WR-06, WR-07 and IN-01…IN-05 remain carried forward**, unchanged in
+  `187-REVIEW.md`, none silently absorbed and none silently dropped.
+
+**Base commit for every gate in this section: `f632f9b6`** (`docs(187): plan gap-closure round 3 —
+CR-03 blocker + WR-09`) — the tip immediately before `debced07`, round 3's first commit:
+
+```
+$ git log --oneline -5
+43b8c6dd docs(187-20): complete the CR-03 + WR-09 gap-closure plan
+7593fe8b test(187-20): a standing testid-coverage guard, proved by four falsification probes
+51a60299 fix(187-20): the carried sentence attributes no cause — WR-09 by deletion
+debced07 test(187-20): observe the carried paragraph RED — CR-03 coverage gap + WR-09 cause fence
+f632f9b6 docs(187): plan gap-closure round 3 — CR-03 blocker + WR-09
+```
+
+This base is **different from both** `35261e96` (the phase base, §"Phase gates — measured") **and**
+`ee5fff3b` (round 2's base, §"Phase gates — gap-closure round"). All three are stated so that no
+figure anywhere in this file is ambiguous about which range it measures.
+
+### (p) Per-task verification rows — 187-20
+
+| Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
+|---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
+| **187-20-T1** | **20** | **7** | VOCAB-02 (Req 5) | T-187-20-01/02 | The WR-09 cause fence is **observed RED against the shipped sentence** before any source edit — 3 failed / 54 passed (57), signature transcribed verbatim in §(q) preamble | falsification | `cd frontend && npx vitest run src/components/workflows/SeedReceipt.test.tsx` | ✅ | ✅ green (after T2) — **RED first at `debced07`, by design** |
+| **187-20-T2** | **20** | **7** | VOCAB-02 (Req 5) | T-187-20-01/03/04 | **WR-09 closed by DELETION** — the `" by its own settings"` clause is gone, so the one sentence counting `already-set` **and** `escalated` claims only what both causes genuinely share; the cause is stated per row by the one function actually handed it. **CR-03 closed** — presence, COUNT (derived from `SEALED_SLUGS.length - DETECTED_SLUGS.length`, never a hand-typed `1`), character-identity against `seedReceiptCarriedLead`, and both zero cases | unit + render + copy lock | `cd frontend && npx vitest run src/components/workflows/SeedReceipt.test.tsx src/components/workflows/definitionOps.test.ts` | ✅ | ✅ green — 288 passed (60 + 228), 0 failed |
+| **187-20-T3** | **20** | **7** | VOCAB-02 (Req 5) | T-187-20-05 | A **standing** testid-coverage guard: the suite reads its own source via `./SeedReceipt.test?raw` and asserts every static `data-testid` the component renders is queried by this suite, with the needle **assembled per-id at runtime** so the guard's own source cannot satisfy it; non-vacuity asserted; `seed-receipt-carried` named explicitly. Proved by five falsification probes, §(q) | falsification ×5 + source-fence guard | `cd frontend && npx vitest run src/components/workflows/SeedReceipt.test.tsx` | ✅ | ✅ green — 60 passed, 0 failed |
+
+*Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
+
+### (q) PROBE — the five falsification probes, and why they are what makes round 3 different
+
+⚠ **The probe count on file is FIVE, not the three this plan's `key_links` says nor the four its
+task action says.** 187-20 added **PROBE C2** during execution (its deviation `D-20-C`) because
+PROBE C could not answer the question the plan was asking. The measured set is recorded, not the
+planned one: **A · B · C · C2 · D**. No probe is compressed away to match a plan's wording.
+
+**Why this section exists at all.** Round 2's own recorded lesson was *"green over an
+unrepresentable fixture is not coverage"* — and round 2's fix then shipped protected by **no
+fixture at all** (that is CR-03, verbatim). A guard that has never been seen to fail is
+indistinguishable from a guard that cannot fail. **A probe observed RED is the only evidence a
+guard bites.** Every probe below was reverted with `git diff --quiet -- frontend/` **exit 0**, so
+none of them is in the shipped tree.
+
+**The Task-1 RED, transcribed** (the WR-09 cause fence, run against the *shipped* sentence at
+`debced07`):
+
+```
+ FAIL  src/components/workflows/SeedReceipt.test.tsx > SeedReceipt — the carried paragraph > attributes the seal to NO CAUSE on the mixed draft
+AssertionError: expected '1 step was already set to must prove …' not to contain 'by its own settings'
+
+Expected: "by its own settings"
+Received: "1 step was already set to must prove it by its own settings."
+
+ FAIL  ... > nor on the already-set-only draft
+ FAIL  ... > nor on the escalated-only draft, whose row says the opposite
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 54 passed (57)
+EXIT=1
+```
+
+#### PROBE A — delete the carried paragraph from `SeedReceipt.tsx`
+
+```
+     × renders it, character for character, over the CARRIED count
+     × renders ALONE on the typical non-KB draft — no detected paragraph above it
+     × renders on the draft whose only seal the AUTHOR escalated by hand
+     × attributes the seal to NO CAUSE on the mixed draft
+     × nor on the already-set-only draft
+     × nor on the escalated-only draft, whose row says the opposite
+     × the one-way lock never travels with it (D-185-07)
+     × renders each sentence identically to its definitionOps export
+TestingLibraryElementError: Unable to find an element by: [data-testid="seed-receipt-carried"]   (×8)
+ Test Files  1 failed (1)
+EXIT=1
+```
+
+Reverted: `git checkout -- frontend/src/components/workflows/SeedReceipt.tsx` →
+`git diff --quiet -- frontend/` **exit 0**.
+
+#### PROBE B — corrupt the count (`carriedCount = rows.length`)
+
+This is the substitution CR-03 named explicitly — the pre-round suite could not see it at all.
+
+```
+     × marks the CARRIED count too — the seals this generation did NOT apply
+     × the carried count reads 0 on a draft the AI grounded entirely by itself
+     × renders it, character for character, over the CARRIED count
+     × is ABSENT — no node at all — when every seal is one the AI detected
+     × renders each sentence identically to its definitionOps export
+
+AssertionError: expected '3 steps were already set to must prov…' to be '1 step was already set to must prove …' // Object.is equality
+Expected: "1 step was already set to must prove it."
+Received: "3 steps were already set to must prove it."
+AssertionError: expected <p …(2)></p> to be null
+
+ Test Files  1 failed (1)
+      Tests  5 failed | 54 passed (59)
+EXIT=1
+```
+
+Reverted: `git diff --quiet -- frontend/` **exit 0**; `SeedReceipt.tsx:213` back to
+`const carriedCount = rows.length - detectedCount`.
+
+#### PROBE C — drift the formatter text (`already set` → `already configured` in `definitionOps.ts`, no test touched)
+
+```
+     × the carried lead names the count and the SHIPPED governance words
+     × ZERO carried steps yields NO carried paragraph — the same shape as its sibling
+ FAIL  src/components/workflows/definitionOps.test.ts > definitionOps — the seed-receipt copy is a lock (sketch 150-B) > the carried lead names the count and the SHIPPED governance words
+ FAIL  src/components/workflows/definitionOps.test.ts > ... > ZERO carried steps yields NO carried paragraph — the same shape as its sibling
+ Test Files  1 failed | 4 passed (5)
+      Tests  2 failed | 463 passed (465)
+EXIT=1
+```
+
+`SeedReceipt.test.tsx` **stayed GREEN** — and 187-20's plan had prescribed, as an acceptance
+criterion, that a green component suite here means *"the identity assertion is not doing its job
+and must be repaired"*. **That prescription was REFUTED with evidence, not quietly skipped**
+(187-20 deviation `D-20-A`, recorded on both sides here because it changes what a reader should
+expect the shipped tests to do):
+
+- The component assertion is `textContent === seedReceiptCarriedLead(n)`. PROBE C mutates the
+  formatter — i.e. **both sides of that equation at once**. No assertion of the form
+  `rendered === export` can detect a change that moves `rendered` and `export` together. That is
+  arithmetic, not a weak assertion.
+- The guard that *does* see PROBE C is the **exact-string unit lock** in `definitionOps.test.ts` —
+  which fired, on both of its cases.
+- Applying the prescribed repair would have required `SeedReceipt.test.tsx` to hold a **hand-typed
+  literal of the copy**, which (a) contradicts that file's own docblock — *"never against a
+  hand-typed copy, because a hand-typed copy drifts in exactly the same silence the copy module
+  exists to break (T-187-13-05)"* — and (b) puts the copy lock in **two homes**, against this
+  project's one-home-per-concern rule and the reason `definitionOps.ts` exists.
+- **PROBE C2 was added instead**, and it is the probe that actually answers the question.
+
+Reverted: `git diff --quiet -- frontend/` **exit 0**.
+
+#### PROBE C2 — drift the COMPONENT away from the export (the probe the plan did not have)
+
+`{carriedLead}` → `{carriedLead.replace("already set", "already configured")}` in `SeedReceipt.tsx`.
+
+```
+     × renders it, character for character, over the CARRIED count
+     × renders ALONE on the typical non-KB draft — no detected paragraph above it
+     × renders on the draft whose only seal the AUTHOR escalated by hand
+     × renders each sentence identically to its definitionOps export
+Expected: "1 step was already set to must prove it."
+Received: "1 step was already configured to must prove it."   (×4)
+ Test Files  1 failed (1)
+      Tests  4 failed | 55 passed (59)
+EXIT=1
+```
+
+**The identity assertion is doing its job** — it is the guard for component↔formatter
+*disagreement*, which is exactly what C2 induces and exactly what C cannot. The pair is the
+generalisable lesson: *a probe that mutates the SUBJECT and a probe that mutates the LINK ask
+different questions; an identity assertion can only ever see the second.* Reverted:
+`git diff --quiet -- frontend/` **exit 0**.
+
+#### PROBE D — remove every carried query from the test file (does the guard guard itself?)
+
+```
+     × every STATIC testid the component renders is queried by this suite (187-20)
+AssertionError: expected '/**\n * Phase 187-13 Task 2 — Req 5\'…' to contain 'ByTestId("seed-receipt-carried")'
+ Test Files  1 failed (1)
+      Tests  1 failed | 49 passed (50)
+EXIT=1
+```
+
+**Exactly one failure, and it is the guard.** The removed cases vanish rather than fail, so nothing
+else masks the signal. Reverted: `git diff --quiet -- frontend/` **exit 0**.
+
+### (r) Which of the new assertions were GREEN on arrival — stated plainly, not implied
+
+Round 3 was **not** a whole-block red-to-green cycle, and saying so would overstate it. Of the ten
+cases 187-20 Task 1 added to the carried-paragraph block:
+
+- **RED on arrival — 3.** The three cause-honesty fence cases. These are the WR-09 falsifier, and
+  their signature is transcribed at the head of §(q).
+- **GREEN on arrival — 7.** Presence/identity, alone-on-the-non-KB-draft, the escalated draft, both
+  zero cases, the positive control and the one-way-lock case. They guard behaviour that was
+  **already correct**; the paragraph simply had nothing asserting it — which is precisely what
+  CR-03 was.
+
+**What proves the always-green seven bite is the probes, not a red.** PROBE A deletes the
+paragraph (8 red), PROBE B corrupts the count (5 red) and PROBE C2 drifts the component off the
+export (4 red). Without §(q) this block would be seven assertions that have never been observed to
+fail — the same shape as the defect it closes.
+
+### (s) COVERAGE — the testid sweep, BEFORE and AFTER, both re-derived at this commit
+
+The sweep is a per-id join: every **static** `data-testid` literal in `SeedReceipt.tsx` against the
+number of `ByTestId("<that id>")` queries in `SeedReceipt.test.tsx`.
+
+```bash
+ids=$(grep -oE 'data-testid="[^"{]+"' src/components/workflows/SeedReceipt.tsx \
+      | sed 's/data-testid="//; s/"$//' | sort -u)
+for id in $ids; do grep -c "ByTestId(\"$id\")" src/components/workflows/SeedReceipt.test.tsx; done
+```
+
+**BEFORE — run against the base blobs** (`git show f632f9b6:<path>`), so this is a measurement made
+now over the real base content, not a transcription of 187-20's table:
+
+```
+BASE f632f9b6 — static data-testid in SeedReceipt.tsx -> ByTestId("id") in SeedReceipt.test.tsx
+------------------------------------------------------------------------------
+  ok      15  seed-receipt
+MISSING    0  seed-receipt-carried
+  ok       2  seed-receipt-close
+  ok       3  seed-receipt-dismiss
+  ok       9  seed-receipt-grounded-list
+  ok       2  seed-receipt-grounding
+  ok       4  seed-receipt-heading
+  ok       6  seed-receipt-lead
+  ok       4  seed-receipt-one-way
+  ok       3  seed-receipt-step-face
+  ok       1  seed-receipt-step-reason
+  ok       1  seed-receipt-step-seal
+------------------------------------------------------------------------------
+static ids: 12   uncovered: 1
+SWEEP_EXIT=1
+```
+
+**It reproduces 187-20's BEFORE table cell for cell** — an agreement between two independent
+measurements, not a copied number. CR-03 itself reproduces the same way:
+
+```
+$ git show f632f9b6:frontend/src/components/workflows/SeedReceipt.tsx | grep -n "seed-receipt-carried"
+276:          data-testid="seed-receipt-carried"
+$ git show f632f9b6:frontend/src/components/workflows/SeedReceipt.test.tsx | grep -n "seed-receipt-carried"
+(no hits — the CR-03 gap, reproduced)
+$ git grep -n "seed-receipt-carried" f632f9b6 -- 'frontend/src'
+f632f9b6:frontend/src/components/workflows/SeedReceipt.tsx:276:          data-testid="seed-receipt-carried"
+```
+
+**Exactly one hit in the whole of `frontend/src`, and it is the component's own attribute.**
+
+**AFTER — the same sweep, run now at the round-3 tip:**
+
+```
+static data-testid in SeedReceipt.tsx -> ByTestId("id") count in SeedReceipt.test.tsx
+------------------------------------------------------------------------------
+  ok      18  seed-receipt
+  ok      11  seed-receipt-carried
+  ok       2  seed-receipt-close
+  ok       3  seed-receipt-dismiss
+  ok       9  seed-receipt-grounded-list
+  ok       3  seed-receipt-grounding
+  ok       4  seed-receipt-heading
+  ok       6  seed-receipt-lead
+  ok       5  seed-receipt-one-way
+  ok       3  seed-receipt-step-face
+  ok       1  seed-receipt-step-reason
+  ok       1  seed-receipt-step-seal
+------------------------------------------------------------------------------
+static ids: 12   uncovered: 0
+SWEEP_EXIT=0
+```
+
+`seed-receipt-carried` moved **0 → 11 queries**; `static ids` is unchanged at **12** and
+`uncovered` is **0**. The dynamic `data-testid={`seed-receipt-step-${row.slug}`}` is a template
+literal, correctly excluded from a *static* extraction; its rows are covered by the per-slug queries
+in section 1 (`-emit`, `-contracts`, `-policy_check`, `-judgement`, `-archive`).
+
+**One disagreement with 187-20's SUMMARY, recorded on both sides — the re-run is the measurement.**
+That SUMMARY prints `grep -c "seed-receipt-carried" …/SeedReceipt.test.tsx` → **12** under its
+*Final gates* heading. Measured now it is **14**, and the cause is a commit-attribution slip rather
+than a wrong number:
+
+```
+$ for r in 51a60299 7593fe8b HEAD; do git show $r:frontend/src/components/workflows/SeedReceipt.test.tsx | grep -c "seed-receipt-carried"; done
+12
+14
+14
+```
+
+**12 is the value at `51a60299` (Task 2), not at the Task-3 tip where the block is presented** — the
+guard added at `7593fe8b` contributes the two extra lines. Nothing about the closure changes; the
+figure is corrected here so a later reader re-running the command does not think the tree moved.
+
+### (t) GATES — the five named suites, count-guarded
+
+⚠ Run **isolated**, never as part of the full frontend suite (measured 42–49 failures, flaky at one
+commit). The Phase-177 lesson applies: the **COUNT** is the gate, not only the failure number.
+
+```
+$ cd frontend && npx vitest run src/components/workflows/SeedReceipt.test.tsx \
+      src/components/workflows/StepTypePicker.test.tsx \
+      src/components/workflows/phaseVocabulary.test.ts \
+      src/components/workflows/phaseVocabulary.corpus.test.ts \
+      src/components/workflows/definitionOps.test.ts
+ Test Files  5 passed (5)
+      Tests  466 passed (466)
+EXIT=0
+```
+
+**Files 5 · passed 466 · failed 0.** Against round 2's `452` for this same five-file set (§(l)),
+**the total ROSE by exactly +14** — strictly greater, so no suite was replaced rather than extended.
+
+**The 452 baseline is re-derived here, not inherited.** Declared case literals counted in the base
+blob and the HEAD blob (`git show <rev>:<path> | grep -cE '^[ \t]*(it|test)(\.each\(|\.skip)?\('`):
+
+| Suite | literals `f632f9b6` → `HEAD` | Δ | **Run count now** |
+|---|---|---|---|
+| `SeedReceipt.test.tsx` | 47 → 60 | **+13** | **60 passed** (`npx vitest run …/SeedReceipt.test.tsx`) |
+| `definitionOps.test.ts` | 117 → 118 | **+1** | **228 passed** (`npx vitest run …/definitionOps.test.ts`) |
+| `phaseVocabulary.test.ts` | 78 → 78 | **0** | — untouched by this round |
+| `phaseVocabulary.corpus.test.ts` | 17 → 17 | **0** | — untouched by this round |
+| `StepTypePicker.test.tsx` | 36 → 36 | **0** | — untouched by this round (and see §(ac)) |
+| **total Δ** | — | **+14** | **466** |
+
+`466 − 14 = 452`, which is round 2's recorded figure for the identical command — so "before" is
+**derived from a measurement taken now**, not transcribed. ⚠ Absolute literal counts do not equal
+run counts (`it.each` expands one literal into several cases), which is why only the **deltas** are
+used as the instrument. Three of the five files are byte-identical to the base, so their counts
+cannot have moved and there is no room for a compensating drop.
+
+### (u) The count gate — and an honest correction to 187-20's own reading of it
+
+```
+$ node scripts/vitest-count-gate.cjs
+  SeedReceipt.test.tsx                          —      60     new
+  definitionOps.test.ts                         —     228     new
+  total                                       415    2089   +1674
+  total 2089  ·  failed 0  ·  pinned total 415
+count gate OK — 16/16 pinned files present, no per-file decrease, 0 failing.
+GATE_EXIT=0
+```
+
+**Exit 0 at the round-3 tip.** 187-20's SUMMARY records the same gate, on the same tree, exiting
+**1** with a single `[failing-tests]` reason (two `PublishGauntlet.test.tsx` cases). Both are
+recorded, and the divergence is itself the evidence:
+
+- **The failure is PRE-EXISTING and non-deterministic — proved, not assumed.** 187-20 copied its
+  four edited files aside, restored them to `debced07~1` (the pre-plan state) with `git checkout`,
+  re-ran the gate — **total 2075, failed 1, the same two `PublishGauntlet.test.tsx` cases** — then
+  restored from the copies (no `git stash`, no `git clean`; both are forbidden here). The file
+  passes **green in isolation**, the failure count varies run to run (2 → 1 → **0** counting this
+  re-run), and it imports nothing from `definitionOps` or `SeedReceipt`. Logged as
+  `D-ITEM-187-20-01` in `deferred-items.md`, alongside the older `D-ITEM-02`.
+- **This round did not cause it and this round did not fix it.** A third sample landing at 0 is a
+  property of the flake, not a repair. The gate is **not** presented as clean by this round; it is
+  presented as *pre-existing-flaky, sampled three times, currently 0*.
+- In no sample did the gate report `[count-decrease]`, `[missing-file]` or `[total-below-baseline]`
+  — the reasons that would indicate real coverage loss.
+
+**The pin file was not edited by this round:**
+
+```
+$ git status --porcelain scripts/vitest-count-gate.cjs      ← (empty)
+$ git diff --name-only f632f9b6 HEAD -- scripts/            ← (empty)
+```
+
+### (v) `tsc -b` — no NEW error, none in the touched files
+
+```
+$ cd frontend && npx tsc -b ; echo $?
+2
+$ grep -c 'error TS' <output>                        → 33
+$ grep -c 'src/components/workflows/' <output>       → 0
+$ grep -c 'src/pages/WorkflowBuilderPage' <output>   → 0
+```
+
+| | Before (187-20's re-measured pre-change baseline at `f632f9b6`) | **After (measured now)** |
+|---|---|---|
+| total `error TS` lines | 33 | **33** — zero delta |
+| errors in `src/components/workflows/` | 0 | **0** |
+| errors in `src/pages/WorkflowBuilderPage*` | 0 | **0** |
+
+⚠ **`tsc -b` has never exited 0 on this repo** (`D-ITEM-01`) — the criterion is *no NEW error, none
+in the touched files*, not a clean exit. ⚠ **`tsc -b` ≠ `tsc --noEmit`** (the v3.3 lesson); the
+buildinfo path is the one run.
+
+### (w) `vite build`
+
+```
+$ cd frontend && npx vite build ; echo $?
+✓ built in 4.69s
+0
+```
+
+**Exit 0.**
+
+### (x) The zero-migration gate — re-measured for this round
+
+```
+$ git diff --stat 35261e96 HEAD -- supabase/migrations     ← (empty — 0 lines)
+$ git diff --stat f632f9b6 HEAD -- supabase/migrations     ← (empty — 0 lines)
+$ git status --porcelain supabase/migrations               ← (empty — 0 lines)
+```
+
+**All three empty.** Measured from the **phase** base *and* the **round-3** base, so truth #11
+(*"Zero migrations added by this phase, including the closure rounds"*) survives round 3 on its own
+evidence rather than on round 2's.
+
+### (y) The D-187-14 mount cap — re-measured for this round, unmoved
+
+```
+$ git diff --numstat f632f9b6 HEAD -- frontend/src/pages/WorkflowBuilderPage.tsx
+                                            ← (empty — the file is UNTOUCHED by this round)
+```
+
+Pasted verbatim: the command produces **no output at all**. The phase shipped this file at its cap
+(46 ins / 5 del, §(a2)); round 2 spent **0** of it (§(j)); round 3 spends **0** of it as well. The
+cap is neither renegotiated nor consumed. Both of this round's source-bearing commits landed inside
+`components/workflows/`, not at the mount.
+
+### (z) The backend fence
+
+```
+$ git diff --name-only f632f9b6 HEAD -- backend/           ← (empty)
+```
+
+**Zero backend files.** §(d)'s pre-existing-rot record stands unchanged and the backend suite was
+neither re-run nor needed.
+
+### (aa) The full file list for the round — measured, not asserted
+
+```
+$ git diff --name-only f632f9b6 HEAD
+.planning/phases/187-business-vocabulary-ai-seeded-canvas/187-20-SUMMARY.md
+.planning/phases/187-business-vocabulary-ai-seeded-canvas/deferred-items.md
+frontend/src/components/workflows/SeedReceipt.test.tsx
+frontend/src/components/workflows/SeedReceipt.tsx
+frontend/src/components/workflows/definitionOps.test.ts
+frontend/src/components/workflows/definitionOps.ts
+```
+
+**Four source files, both planning documents, nothing else.** (This list is measured *before*
+187-21's own doc commits, which add this file and `187-21-SUMMARY.md`.)
+
+### (ab) No false completion record
+
+```
+$ git status --porcelain .planning/REQUIREMENTS.md .planning/ROADMAP.md   ← (empty — 0 lines)
+```
+
+Neither `requirements.mark-complete`, `state.advance-plan` nor `roadmap.update-plan-progress` was
+called from any executor in this round — all three write false records in this project.
+
+⚠ **Stated rather than left to be discovered:** `git status --porcelain .planning/STATE.md` is
+**not** empty during this round — `git diff --stat -- .planning/STATE.md` reports
+`1 file changed, 5 insertions(+), 5 deletions(-)`. That is the **orchestrator's** own tracking
+write, which is whose job it is; no executor in this round read, wrote or committed `STATE.md`, and
+`REQUIREMENTS.md` was not touched at all — its VOCAB-01/02/03 rows still read Pending, which is
+correct until re-verification says otherwise.
+
+### (ac) The WR-08 out-of-scope fence — measured, not promised
+
+```
+$ git diff --stat f632f9b6 HEAD -- frontend/src/components/workflows/StepTypePicker.tsx \
+                                    frontend/src/components/workflows/StepTypePicker.test.tsx
+                                            ← (empty — 0 lines)
+```
+
+**Both files untouched.** WR-08 is not closed, not partially closed and not absorbed — it is the
+operator's decision to roll into **Phase 188**, and the diff proves the round respected that fence
+rather than merely claiming to. `StepTypePicker.test.tsx`'s literal count is unchanged at 36 (§(t)),
+so nothing moved there by accident either.
+
+### What round 3 proved — and what it did NOT
+
+**Proved.** CR-03 and WR-09 are closed by code. The carried paragraph now has the same rigor its
+sibling already had — presence, a count derived from fixture constants rather than a hand-typed
+literal, character-identity against its `definitionOps` export, and both zero cases — plus a
+**standing** coverage guard that fails if any future static testid goes unqueried. Five probes were
+observed RED and cleanly reverted, so no guard in this block is one that has never been seen to
+fail. Zero migrations, zero mount-cap spend, zero backend files, zero `tsc` delta, `vite build`
+exit 0, and the five-suite total up +14 with nothing dropped.
+
+**Not proved.**
+
+- **Nothing on the manual board.** All **thirteen** rows (M1–M13) remain **UNPERFORMED**. They are
+  the operator's. M3 is now *unblocked and repaired*, which is not the same as done.
+- **WR-08 is still open** and is Phase 188's, by the operator's routing (§(ac)). M12's warning about
+  it still stands and is still owed.
+- **Seven findings remain open** — WR-01, WR-04, WR-05, WR-06, WR-07 and IN-01…IN-05, unchanged in
+  `187-REVIEW.md`.
+- **The three ❌ SC#10 rows are untouched.** OpenRouter's non-deterministic name drop, OpenAI's
+  `gpt-5.6-sol` endpoint refusal and MiniMax's non-emission are provider-side; no frontend change in
+  this round could move them and none tried.
+- **The `PublishGauntlet.test.tsx` parallel-run flake is still there** (`D-ITEM-187-20-01`,
+  `D-ITEM-02`). This round's gate sample happened to land at 0 failing; that is a sample, not a fix.
+- **`SeedReceipt.test.tsx` is still blind to a formatter-internal word swap that moves the component
+  and the export together** (PROBE C). That is deliberate — the copy lock lives in exactly one home,
+  `definitionOps.test.ts`, which *did* go red on PROBE C. Recorded so a future reader does not
+  rediscover it as a defect.
 
 ---
 
