@@ -131,3 +131,35 @@ $ npx tsc --noEmit -p tsconfig.app.json → exit 2, 33 error lines  (the real ba
 means what the plans intend. (Plan 187-22 already used this form.) The recorded project
 lesson `tsc -b` ≠ `--noEmit` still holds; this is a second, separate trap in the same area.
 
+---
+
+## D-ITEM-187-24-01 — `groundingCauseOf` reads `phase.config` UNGUARDED, against its own module's totality contract
+
+**Found by:** plan 187-24, task 1 (2026-08-03)
+**Status:** deferred — widening it would change a shipped export's behaviour, which
+threat-register entry `T-187-R4-13` accepted its risk on the explicit basis that 187-24's
+change to `phaseVocabulary.ts` is purely additive
+
+```
+frontend/src/components/workflows/phaseVocabulary.ts
+  groundingCauseOf:  const rawTools = phase.config.available_tools      ← unguarded
+  nodeTitle:         const type = phase.config?.phase_type ?? ""        ← guarded
+  derivedFaceOf:     const config = phase.config ?? { phase_type: "" }  ← guarded
+```
+
+The module's header states *"every exported resolver is TOTAL … the definition JSONB is
+author-supplied and a projection must not crash on it"*. Two of the three phase-shaped
+resolvers honour that on `config` itself; `groundingCauseOf` does not, and 187-24's new
+`intersectingKbToolOf` deliberately MIRRORS it rather than diverging (a defensive guard on
+one of two functions called one line apart is unreachable theatre — round-2 WR-04's finding,
+re-confirmed here).
+
+`PhaseSpecJSON.config` is typed REQUIRED, so this is only reachable from a hand-edited or
+legacy JSONB row that TypeScript never saw. Not a live defect; a totality gap with a stated
+contract behind it.
+
+**Re-open trigger:** the next plan that may change a shipped `phaseVocabulary` export's
+behaviour — add `phase.config ?? { phase_type: "" }` to `groundingCauseOf` and
+`intersectingKbToolOf` in the same commit, so the two keep reading identically, and extend
+the WR-14 agreement table with a config-less phase.
+
