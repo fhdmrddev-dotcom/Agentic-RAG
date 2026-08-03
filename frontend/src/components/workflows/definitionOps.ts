@@ -600,12 +600,16 @@ export function seedReceiptGroundingLead(detectedCount: number): string {
  *     ending " by its own settings", which is a claim about WHICH cause holds the step,
  *     over a count that deliberately sums TWO causes this module keeps apart everywhere
  *     else — `already-set`, where the deliverable's own `citation_policy` default really
- *     does hold it, and `escalated`, where the AUTHOR turned it on by hand. On an
- *     escalated-only draft the paragraph therefore contradicted that same step's own
- *     reason, rendered two lines below it on the SAME CARD:
- *     `seedReceiptStepReason("escalated")` reads "you turned this on by hand". A card that
- *     argues with itself about who applied a governance lock is an integrity defect on the
- *     governance surface, not a wording preference.
+ *     does hold it, and `escalated`, where the lock was SET BY HAND rather than derived.
+ *     On an escalated-only draft the paragraph therefore contradicted that same step's
+ *     own reason, rendered two lines below it on the SAME CARD, where
+ *     `seedReceiptStepReason("escalated")` says the lock was set by hand. A card that
+ *     argues with itself about how a governance lock got there is an integrity defect on
+ *     the governance surface, not a wording preference.
+ *     (187-23 / WR-11: until that round the row sentence NAMED A PERSON, and this block
+ *     quoted it verbatim. It names none now, and the quote is gone with it — a docblock
+ *     that quotes a string its own file no longer contains is precisely the stale-claim
+ *     class this phase has hit over and over.)
  *     The repair is a DELETION, not a replacement: the clause is gone and nothing takes
  *     its place. What both carried causes genuinely share is that the step ALREADY wore
  *     the seal, and that is all the sentence now says. WHICH cause is stated per row by
@@ -656,7 +660,41 @@ export const SEED_RECEIPT_ONE_WAY_RULE =
  * never fabricate, the same floor `derivedFace` holds.
  *
  * A `null` cause yields the empty string — a step with nothing to explain is never
- * listed, so there is no line for it to render.
+ * listed, so there is no line for it to render. `null` is now its OWN arm; the
+ * `default:` below is no longer the null case, and the last block here says why.
+ *
+ * IT NAMES NO ACTOR (187-23, review WR-11). This arm shipped reading "you turned this
+ * on by hand" — a statement about a PERSON. Its input is `phase.grounding_escalated`, a
+ * BOOLEAN (`backend/app/models/harness.py:234`; read here via `phaseVocabulary.ts:329`
+ * and `:353`). The bit records that the lock is AUTHORED RATHER THAN DERIVED. It does
+ * not record who authored it, and this function is handed a cause, never an actor.
+ *
+ * That gap is reachable rather than theoretical, and it was MEASURED rather than
+ * assumed: `grounding_escalated` is an ordinary `PhaseSpec` field, the emit tool's
+ * schema is the WHOLE `WorkflowDefinition`
+ * (`backend/app/services/workflow_authoring.py:140`), and `generate_workflow_definition`
+ * returns `wd.model_dump(mode="json")` with only `name_seeded_by_ai` and `slug`
+ * re-stamped (`:341-377`) — nothing on that success path resets this bit. So a model
+ * emission carrying `grounding_escalated: true` validates and reaches this card, where
+ * the retired sentence would have told a user who clicked nothing that they turned a
+ * governance lock on by hand.
+ *
+ * IF THE SECOND PERSON IS EVER WANTED HERE it must be gated on provenance the client
+ * actually holds — the `name_seeded_by_ai` shape (`harness.py:263`), stamped SERVER-SIDE
+ * after validation and never read off the emission. No such bit exists for governance,
+ * so the honest sentence is the one below: what happened, not who did it.
+ *
+ * The binding phrase is COMPOSED from `GOVERNANCE_SEAL_LABEL`, exactly as the two leads
+ * above compose it. Req 7's vocabulary is a lock with ONE home, and a third hand-typed
+ * copy of it is the drift this module exists to prevent.
+ *
+ * THE `default:` ARM IS AN EXHAUSTIVENESS GUARD (187-23, review WR-15) — the
+ * `requiredConfigFor` idiom ~170 lines down, itself the `deriveTier.ts:119-127`
+ * runtime-safe guard. A FOURTH `GroundingCause` member is now a TYPECHECK ERROR here
+ * rather than an empty sentence on the card. It has to be: `SeedReceipt` renders the
+ * reason UNCONDITIONALLY after an em-dash (`SeedReceipt.tsx:342-353`), so an unhandled
+ * member would print a face, a dash and nothing — a seal arriving unexplained, the one
+ * thing Req 5 forbids this surface to do.
  */
 export function seedReceiptStepReason(cause: GroundingCause, tool?: string | null): string {
   const named = typeof tool === "string" && tool.trim() !== "" ? tool.trim() : null
@@ -665,10 +703,21 @@ export function seedReceiptStepReason(cause: GroundingCause, tool?: string | nul
       return named ? `it reads your documents (${named})` : "it reads your documents"
     case "already-set":
       return "it already has to cite its sources"
-    case "escalated":
-      return "you turned this on by hand"
-    default:
+    case "escalated": {
+      // Composed, never re-typed — the same lock `seedReceiptGroundingLead` and
+      // `seedReceiptCarriedLead` obey.
+      const words = GOVERNANCE_SEAL_LABEL.toLowerCase()
+      return `it was set to ${words} by hand`
+    }
+    case null:
       return ""
+    default: {
+      // A 4th `GroundingCause` must be given its own sentence HERE. At runtime an
+      // unmodelled member still yields the empty string rather than throwing.
+      const _never: never = cause
+      void _never
+      return ""
+    }
   }
 }
 

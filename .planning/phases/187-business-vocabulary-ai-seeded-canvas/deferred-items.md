@@ -81,3 +81,53 @@ Not fixed: outside plan 187-20 scope. Owner: whichever phase next touches Publis
 or a dedicated flake-hunt. The gate reports no `[count-decrease]`, no `[missing-file]` and
 no `[total-below-baseline]`, so it is not masking a coverage loss.
 
+---
+
+## D-ITEM-187-23-01 — `GROUNDING_WHY_ESCALATED` carries the SAME second-person claim WR-11 just removed from the receipt row
+
+**Found by:** plan 187-23, task 1 (2026-08-03)
+**Status:** deferred — the plan's action says "Change nothing else in this file"
+
+```
+frontend/src/components/workflows/definitionOps.ts:475
+export const GROUNDING_WHY_ESCALATED = "Because you turned this on by hand."
+```
+
+This is the *panel's* why-line for the grounding dial, not the receipt row. Plan 187-23
+retired the identical claim from `seedReceiptStepReason("escalated")` because the input
+(`grounding_escalated`, a boolean) records **that** the lock is authored and never **who**
+authored it — and because a model emission can carry that bit (measured: it is in
+`WF_SCHEMA`, `model_validate`s, and is returned verbatim by `POST /generate`). The same
+argument applies verbatim to this constant: on a model-emitted escalation the panel tells a
+user who clicked nothing that they turned the lock on by hand.
+
+It is **not** identical in context — the panel line renders beside the dial the author is
+operating, so on the ordinary path the reader has just done the act — which is why it is a
+weaker case than the receipt row and was scoped out rather than swept in.
+
+**Re-open trigger:** the next plan that touches the grounding dial's copy or
+`PhaseFormPanel`'s governance section, or any plan that adds a governance-provenance bit of
+the `name_seeded_by_ai` shape (which would make the second person legitimate again, gated).
+
+---
+
+## D-ITEM-187-23-02 — bare `npx tsc --noEmit` in `frontend/` is a VACUOUS check
+
+**Found by:** plan 187-23, task 1 (2026-08-03)
+**Status:** informational — affects how every 187 plan's typecheck criterion must be read
+
+`frontend/tsconfig.json` is a SOLUTION file: `{"files": [], "references": [...]}`. So
+`npx tsc --noEmit` from `frontend/` checks **zero files** and exits 0 with no output — it
+cannot reproduce D-ITEM-01's 33 errors and cannot detect a new one either.
+
+Measured at HEAD, 2026-08-03:
+
+```
+$ npx tsc --noEmit                      → exit 0, 0 error lines   (vacuous)
+$ npx tsc --noEmit -p tsconfig.app.json → exit 2, 33 error lines  (the real baseline)
+```
+
+**How to read the criterion:** `npx tsc --noEmit -p tsconfig.app.json` is the command that
+means what the plans intend. (Plan 187-22 already used this form.) The recorded project
+lesson `tsc -b` ≠ `--noEmit` still holds; this is a second, separate trap in the same area.
+
