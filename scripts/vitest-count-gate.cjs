@@ -39,6 +39,15 @@
  *      and `SeedReceipt.test.tsx` (68), pinned total 415 → 715. Nothing was
  *      lowered and nothing was deleted; two suites that had become load-bearing
  *      stopped being deletable with the gate green. See the map entry below.
+ *   3. EXTENDED AGAIN — Phase 187 plan 187-29 added the three suites carrying
+ *      gap-closure round 5's honesty estate: `DescribeKbPicker.test.tsx` (30),
+ *      `ProblemsTray.test.tsx` (30) and `verdictModel.test.ts` (29), pinned
+ *      total 715 → 804. **This is an EXTENSION, not a lowering, and the
+ *      difference is the whole rule:** an extension has NO deletion behind it
+ *      and needs none — only a LOWERING requires a deliberate, plan-authorised
+ *      deletion to ride in the same commit. Nothing was removed, no existing
+ *      pin moved by a single test, and all three numbers came from the `actual`
+ *      column of two agreeing runs. See the map entry below.
  *
  * **A pin is LOWERED only alongside a deliberate, plan-authorized deletion —
  * never to make a red gate go quiet.** Adding a pin needs no deletion; it needs
@@ -106,6 +115,34 @@ const BASELINE = {
   // blocks over its three faces went with it. Measured, not computed.
   "phaseVocabulary.test.ts": 33,
   "WorkflowCanvas.test.tsx": 31,
+  // 187-29: gap-closure round 5's three suites, pinned for exactly the reason
+  // 187-25 pinned its two — each now carries a guard that a failures-only
+  // differential cannot see the deletion of:
+  //   · DescribeKbPicker.test.tsx  — GAP A: the loose "Describe & run" door's
+  //     knowledge-base picker, and the BORN-BOUND round trip (the folder chosen
+  //     before the AI drafts reaches `generateWorkflow`'s `project_folder_id` on
+  //     the request the client actually sends). Delete these and a workflow can
+  //     silently go back to being born unbound with every other gate green.
+  //   · ProblemsTray.test.tsx      — GAP B: the fence that the all-clear line
+  //     and the "checked by the server" attribution CANNOT render before a check
+  //     has answered. These are ABSENCE assertions with a positive control; an
+  //     absence assertion is the easiest kind of case to delete unnoticed.
+  //   · verdictModel.test.ts       — GAP B's other half: DEGRADED_SENTENCE's
+  //     totality over the widened `TrayCheckCause` union, plus the word-class
+  //     property that the never-ran sentence claims no pass and attributes
+  //     nothing to a server. (⚠ its third member is spelled `not-run` on
+  //     purpose — see that module's DO NOT "TIDY" THIS SPELLING docblock.)
+  // ALL THREE NUMBERS WERE READ FROM THIS SCRIPT'S OWN `actual` COLUMN (two runs
+  // of `node scripts/vitest-count-gate.cjs`, 2026-08-04, agreeing at 30 / 30 / 29)
+  // — never hand-counted, never taken from a planning document. A hand count of
+  // `it(` literals is not merely sloppy here, it is unsound: `definitionOps.test.ts`
+  // declares ~122 literals and runs 232 cases because of `it.each`, and a pin BELOW
+  // the real count can never fire. Each was then observed catching a deletion: one
+  // `it(` block removed per file reds the gate with `[count-decrease]` naming that
+  // file, at `failed 0` — the count decrease being the ONLY signal is the point.
+  "DescribeKbPicker.test.tsx": 30,
+  "ProblemsTray.test.tsx": 30,
+  "verdictModel.test.ts": 29,
   "canvasModel.test.ts": 26,
   "PublishGauntlet.test.tsx": 24,
   "WorkflowBuilderPage.canvas.test.tsx": 22,
@@ -122,9 +159,10 @@ const BASELINE = {
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
 // trailing figure below is a note about the reduce's result and can never be the
-// thing the gate reads. 715 = 415 + 232 + 68 (187-25 extended; was 415 after
-// 185-08 lowered it, 424 at the original 184 Wave-0 pin).
-const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // 715
+// thing the gate reads. 804 = 715 + 30 + 30 + 29 (187-29 extended; 715 = 415 +
+// 232 + 68 after 187-25 extended; was 415 after 185-08 lowered it, 424 at the
+// original 184 Wave-0 pin).
+const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // 804
 
 // ── The Wave-0 blast radius (184-VALIDATION.md § "quick run command"). ──
 const TARGETS = [
