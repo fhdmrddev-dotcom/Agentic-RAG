@@ -81,6 +81,39 @@ Not fixed: outside plan 187-20 scope. Owner: whichever phase next touches Publis
 or a dedicated flake-hunt. The gate reports no `[count-decrease]`, no `[missing-file]` and
 no `[total-below-baseline]`, so it is not masking a coverage loss.
 
+### RECURRENCE, plan 187-28 (2026-08-04) — same two cases, and PROVED not attributable
+
+Plan 187-27 recorded that this flake "did not recur" on its gate sample. It recurs at
+187-28 on both samples, with **exactly the same two case names** as above:
+
+| sample | `failed` | which file |
+|---|---|---|
+| `node scripts/vitest-count-gate.cjs`, run 1 | 1 | (reason `[failing-tests]`) |
+| `node scripts/vitest-count-gate.cjs`, run 2 | 2 | (reason `[failing-tests]`) |
+| the TARGETS glob re-run with `--reporter=json` | 2 | **both in `PublishGauntlet.test.tsx`** |
+| `npx vitest run src/components/workflows/PublishGauntlet.test.tsx` (ISOLATED) | **0** | 46/46 green |
+
+The variance (1, then 2) is the same non-determinism the original entry records.
+
+**Attribution measured rather than assumed** — the method the 187-20 entry established,
+pointed at this plan: `WorkflowBuilderPage.canvas.test.tsx` was rolled back to `67b8025d`
+(this plan's Task-1 commit, i.e. WITHOUT 187-28's four added cases), the TARGETS glob was
+re-run, and the result was **`failed 2`, the identical two cases, total 2164** — which is
+187-27's recorded total exactly. Restored afterwards, proved by `sha256sum -c`. So the four
+cases 187-28 adds neither cause nor worsen it; the flake is a property of the parallel run
+at this plan's parent commit.
+
+**No pin was moved.** `WorkflowBuilderPage.canvas.test.tsx` reports **128** against a pin of
+22 (`+106`), `PublishGauntlet.test.tsx` reports **46** against 46, pinned total 715, and
+grand total rose 2164 → 2168. The gate's only reason is `[failing-tests]`; there is no
+`[count-decrease]`, no `[missing-file]` and no `[total-below-baseline]`, so it is still not
+masking a coverage loss.
+
+**Re-open trigger unchanged** (whichever phase next touches `PublishGauntlet.tsx`, or a
+dedicated flake-hunt). Two independent plans have now each spent a measurement proving
+non-attribution, which is itself the argument for fixing it rather than re-proving it a
+third time.
+
 ---
 
 ## D-ITEM-187-23-01 — `GROUNDING_WHY_ESCALATED` carries the SAME second-person claim WR-11 just removed from the receipt row
