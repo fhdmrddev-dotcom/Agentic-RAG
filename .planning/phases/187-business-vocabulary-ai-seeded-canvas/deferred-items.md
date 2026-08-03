@@ -114,6 +114,36 @@ dedicated flake-hunt). Two independent plans have now each spent a measurement p
 non-attribution, which is itself the argument for fixing it rather than re-proving it a
 third time.
 
+### THIRD AND FOURTH MEASUREMENT, plan 187-29 (2026-08-04) — GREEN in isolation, and green in five whole-glob samples
+
+Two further independent measurements, recorded because together they change what the honest
+recommendation is:
+
+| measurement | who | result |
+|---|---|---|
+| `npx vitest run src/components/workflows/PublishGauntlet.test.tsx` ISOLATED at HEAD, after 187-28 | the orchestrator (not this plan) | **46/46 passed, 25.6 s** |
+| `node scripts/vitest-count-gate.cjs` — 5 samples at HEAD (2 pre-pin, 1 post-pin, and the P-29 / P-30 probe samples) | plan 187-29 | `PublishGauntlet.test.tsx` **46**, `failed 0`, **every time** |
+
+So the ledger now reads: 187-20 saw it (2 → 1 → 0 across three samples), 187-27 saw it not at all,
+187-28 saw it on both its samples and **measured** non-attribution by rolling the canvas suite back,
+the orchestrator measured it green isolated, and 187-29 saw it green in five consecutive whole-glob
+samples. That is the signature of a **load-dependent race**, not of a broken assertion — and it is
+now four separate parties' worth of evidence.
+
+**STANDING RECOMMENDATION, on that evidence: fix it rather than prove it a fourth time.** Every plan
+that meets a red gate here spends a measurement re-establishing something five measurements already
+say. **No pin has ever been moved for it and none may be** — the gate's only reason is
+`[failing-tests]`; there is no `[count-decrease]`, `[missing-file]` or `[total-below-baseline]`, so
+lowering a pin would not even silence it, and would blind the gate to a real deletion.
+
+### RECURRENCE of `D-ITEM-187-25-01`, plan 187-29 (2026-08-04)
+
+Recorded here for adjacency; the entry itself is below. The **other** parallel flake
+(`WorkflowBuilderPage.canvas.test.tsx`, the 184-11 rails positive control) recurred **once** in this
+round — on the P-28 probe sample — with the identical FULLNAME and
+`AssertionError: expected 0 to be greater than 0`. Its per-file count was **128** in that sample, as
+in every other sample of the round. A `[failing-tests]` reason, never a count reason. No pin moved.
+
 ---
 
 ## D-ITEM-187-23-01 — `GROUNDING_WHY_ESCALATED` carries the SAME second-person claim WR-11 just removed from the receipt row
@@ -239,3 +269,49 @@ from 22 (its actual is 117) would have been meaningless anyway: the flake is a
 — give the 184-11 positive control a deterministic settle (an explicit `findBy*`/`waitFor`
 on the rails key rather than a bare read), and re-sample the gate five times to confirm the
 class is gone rather than merely quiet.
+
+**RECURRENCE, plan 187-29 (2026-08-04).** It bit once in five whole-glob samples at this commit — the
+P-28 probe sample — with the **identical** FULLNAME and message recorded above. Per-file count
+**128** in that sample and in every other; the other four samples reported `failed 0`. Diagnosed by
+extracting the FULLNAME from the gate's own JSON report rather than by assuming it was the
+`PublishGauntlet` flake the plan anticipated — the same discipline 187-25 applied when it discovered
+this file in the first place. **No pin was moved.**
+
+---
+
+## D-ITEM-187-29-01 — `WorkflowDoorSwitch` reads NO feature flag, so 187-26's KB picker renders on the loose door with `visual_workflow_canvas` OFF
+
+**Found by:** plan 187-29, task 2 (2026-08-04), while running the stale-manual-row sweep for M8
+**Status:** deferred — out of scope (this plan writes a pin map and planning records, no product code),
+and it is a **decision that has not been made** rather than a defect with a known fix
+
+```
+frontend/src/components/workflows/WorkflowDoorSwitch.tsx:82
+  * exactly as it ships. This shell does NOT read the canvas flag at all — the host page
+
+frontend/src/components/workflows/WorkflowDoorSwitch.tsx:257
+            <DescribeKbPicker value={kbFolderId} onChange={setKbFolderId} />
+```
+
+The mount is unconditional, and the shell it lives in evaluates no gate of its own — by design, per
+its own docblock (the host page owns the one shared gate rule and passes the answer down as `inline`,
+so there is no second copy of the gate here to drift from it). Consequence: **a flag-OFF user meets a
+knowledge-base picker on the loose "Describe & run" door** whenever `listFolders()` returns anything.
+
+**Why this is NOT recorded as a D-181-01 violation.** That decision's subject is the **Builder** page's
+first screen, and 187-26 leaves it byte-identical when the new prop is absent (`initialProjectFolderId`
+ABSENT ⇒ today's behaviour; the flag-off byte-identity guards are green in every gate sample). The
+**door** is a different, upstream surface, and its flag-blindness is a property of the Phase-124 shell
+that **predates round 5** — 187-26 added a control to an already-ungated screen rather than ungating
+anything.
+
+**Why it is logged rather than passed over.** It is still a new control on a screen a flag-off user
+reaches, and nothing in the phase measures that. The honest statement is that nobody has decided
+whether the two-door shell belongs inside D-181-01's fence — and an undecided question that nobody
+writes down becomes an assumption.
+
+**Re-open trigger:** the next plan that touches `WorkflowDoorSwitch`, **or** any plan that must be able
+to revert the v3.6 surfaces from the flag alone (a rollback, a staged enablement, or a customer with
+the flag off). Decide then whether the door joins D-181-01's fence or is deliberately outside it, and
+**write the decision down either way** — including the case where the answer is "outside, on purpose",
+which is a legitimate answer and is currently indistinguishable from nobody having asked.
