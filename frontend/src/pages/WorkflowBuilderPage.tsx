@@ -603,6 +603,10 @@ export function WorkflowBuilderPage({
   // and a reload re-shows it, correctly: the grounding is still true and nothing was persisted. No
   // draft id exists yet (`setDraftId(null)`), and a storage key would fail this file's own guard.
   const [showReceipt, setShowReceipt] = useState(false)
+  // 187-22 (CR-04) — the phases AS THE GENERATION EMITTED THEM. The card is a statement about
+  // ONE generation and its copy is past-tense, so it must never read the live selector: see
+  // `SeedReceipt`'s `phases` contract for why that made the card claim the author's own edits.
+  const [receiptPhases, setReceiptPhases] = useState<readonly PhaseSpecJSON[]>([])
   // 187-15 (Req 1 / D-187-05) — the ONE name context: values this page already holds, memoised
   // so the memoised `toCanvas` does not re-project every render. `assets` is DEFINITION-level
   // (a workflow's, never a phase's), which is why 187-04 gates the template tier on
@@ -1209,6 +1213,9 @@ export function WorkflowBuilderPage({
         // 187-15 — beside the SINGLE transition, so the receipt lands in the SAME DOM batch
         // as the graph. `autoDraft` funnels through here too, deliberately (D-187-14).
         setShowReceipt(true)
+        // 187-22 — REPLACED per generation, never frozen for the session, so a second draft
+        // gets a second receipt rather than the first one's numbers (D-187-09).
+        setReceiptPhases(def.phases)
       } else {
         // ok:false is an HONEST failure — never a renderable broken draft.
         store.getState().setErrorState(result.error, result.detail)
@@ -1634,7 +1641,7 @@ export function WorkflowBuilderPage({
           the run-time gate still binds. DISMISSED IT RENDERS NO NODE, which is why the graph is
           pinned to the 1fr row by `*:last-child` rather than by auto-placement. */}
       <SeedReceipt
-        phases={phases}
+        phases={receiptPhases}
         kbTools={kbTools}
         nameContext={nameContext}
         open={showReceipt}

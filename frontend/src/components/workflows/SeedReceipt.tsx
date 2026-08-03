@@ -130,7 +130,31 @@ import {
 import { cn } from "@/lib/utils"
 
 export interface SeedReceiptProps {
-  /** The drafted definition's phases, in order. */
+  /**
+   * The drafted definition's phases, in order, AS THE GENERATION EMITTED THEM — an
+   * immutable SNAPSHOT of one `POST /generate` result, NEVER a live store selector.
+   *
+   * ── WHY THE WORD "SNAPSHOT" IS LOAD-BEARING (187-22, review CR-04) ──
+   * Every sentence this card renders is PAST-TENSE and FIRST-PERSON: "Here's what I
+   * built", "so I set them to must prove it", "N steps were already set". Those are
+   * claims about ONE past event. Hand this prop an array that tracks later edits and
+   * the card starts narrating the AUTHOR's acts in the AI's voice — the inspector
+   * sits on the same screen and writes the exact field the classification above reads,
+   * so switching a document-reading tool on, adding a step, or flipping the grounding
+   * dial would each rewrite a sentence the AI is credited with. On the one surface
+   * whose whole purpose is that safety is attributed to whoever applied it, that is an
+   * integrity defect — CR-01's shape for the third time.
+   *
+   * THIS COMPONENT CANNOT ENFORCE IT, and deliberately does not try. It is a PURE
+   * PROJECTION by design (see the leaf note below): every count and sentence is
+   * recomputed from this prop on every render, which is exactly what makes a SECOND
+   * generation replace the first one's receipt (D-187-09). Caching the first `phases`
+   * here would buy the appearance of the fix and break that. So the contract is the
+   * CALLER's to keep, and it is kept in `WorkflowBuilderPage.tsx` — `receiptPhases`,
+   * captured beside the single `setDrafted` transition and replaced on every draft.
+   * Its fences live in `WorkflowBuilderPage.canvas.test.tsx` (three real post-arrival
+   * edits) and in `SeedReceipt.test.tsx` (this leaf holds no cache).
+   */
   phases: readonly PhaseSpecJSON[]
   /** The SERVER's KB-reading tool list (D-185-09 / D-187-08), passed in by the caller
    *  off `useGroundingBundle`. EMPTY marks nothing — an unread palette must not invent a
