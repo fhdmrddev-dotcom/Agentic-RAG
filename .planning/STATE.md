@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
 status: executing
-last_updated: "2026-08-03T18:57:55.549Z"
-last_activity: 2026-08-03 -- Phase 187 plan 22 (CR-04 seed-receipt snapshot) complete
+last_updated: "2026-08-03T19:36:00.000Z"
+last_activity: 2026-08-03 -- Phase 187 plan 23 (WR-11 no-actor row + WR-15 never guard) complete
 progress:
   total_phases: 19
   completed_phases: 6
@@ -424,6 +424,48 @@ without copying, so `def.phases` IS the store's initial array; every `definition
 (4) **`SeedReceipt` is now source-fenced against `useState`/`useRef`** (needles assembled from parts,
 `useMemo` explicitly excluded so the fence does not fire on the shipped derivation). The tempting wrong
 fix for CR-04 can no longer land silently.
+
+**Plan 187-23 COMPLETE (Wave 10 / gap-closure round 4, 2026-08-03, `f59af16a` → `7b1356c3`).**
+VOCAB-02 / Req 5 — **WR-11 + WR-15: the escalated row now says what its bit knows, and a 4th grounding
+cause is a typecheck error.** 187-20 deleted the carried paragraph's cause claim and recorded, in its
+own docblock, that naming the cause is the ROW's job. But the row's `escalated` sentence was not a
+statement about a cause — it was a statement about a PERSON ("you turned this on by hand") over a
+BOOLEAN that records only that the lock is authored rather than derived. Now:
+`it was set to must prove it by hand` — actor-free, same `it …` register as its two siblings, and the
+governance words **composed from `GOVERNANCE_SEAL_LABEL`** rather than typed a third time.
+**The reachability hypothesis is RESOLVED, by executing the model rather than reading it:**
+`grounding_escalated` IS in the emit tool's advertised schema (`{'default': False, 'type': 'boolean'}`),
+an emission carrying it `model_validate`s, `model_dump` carries it, and `generate_workflow_definition`
+re-stamps only `name_seeded_by_ai` + `slug` (`workflow_authoring.py:341-377`) — so the PATH is observed
+end-to-end; only a provider *choosing* to emit it stays reachable-by-schema. The review was one notch
+too weak on the first half. Beside it, WR-15: `case null:` is now its own arm and `default:` is the
+file's own `requiredConfigFor` / `deriveTier.ts:119-127` **`never` guard**, because `SeedReceipt`
+renders the reason UNCONDITIONALLY after an em-dash — an unhandled member shipped a seal with a
+dangling dash and no reason, on the one surface Req 5 forbids that. Counts re-measured at HEAD, never
+inherited: `definitionOps.test.ts` **228 → 231**, `SeedReceipt.test.tsx` **63 → 66** (the plan's
+inherited `60` was already stale). Task-1 RED was **exactly one** case — the single character-identity
+pin — proving the sentence has one home. **Three falsifications observed and cleanly reverted:**
+second-person wording reds the identity pin AND the property fence; a bare `default: return ""` reds
+the source half ONLY (empirical proof the runtime half cannot see a typecheck guard, which is why the
+pin has two halves); an empty escalated reason reds the DOM invariant with the defect printed in the
+reader's own words (`⛨Must prove itWeigh the supplier opti… —`). Zero backend files, zero migrations,
+zero SDK completion verbs.
+**Carry forward, three things:**
+(1) **`npx tsc --noEmit` from `frontend/` is a VACUOUS check** — the root `tsconfig.json` is a solution
+file with `files: []`, so it type-checks ZERO files and exits 0 with no output. It can neither
+reproduce D-ITEM-01's 33 errors nor detect a new one. Use `npx tsc --noEmit -p tsconfig.app.json`
+(33 → 33, byte-identical output here). Logged as **D-ITEM-187-23-02**; a second, separate trap from the
+recorded `tsc -b` ≠ `--noEmit` lesson.
+(2) **`GROUNDING_WHY_ESCALATED` (`definitionOps.ts:475`) still carries the retired second-person claim**
+on the PANEL surface ("Because you turned this on by hand."). Same bit, same argument, weaker case (it
+renders beside the dial the author is operating). Scoped out per the plan's "change nothing else in
+this file" — logged as **D-ITEM-187-23-01** with a re-open trigger: the next plan touching the
+grounding dial's copy or `PhaseFormPanel`'s governance section.
+(3) **Prefer type-system exhaustiveness over enumeration** — the Phase 185 lesson ("a deny-list cannot
+be made fail-closed by extension") applied verbatim. And the review's suggested DOM test was NOT copied:
+one assertion over one fixture would have passed before AND after the fix; what shipped is the property
+over all three sealed fixtures plus the consequence plus a positive control, and probe 3 saw all three
+bite.
 
 (`3713a716`), GOVERN-01/02/03 all `Complete`, `nyquist_compliant` true, SECURED 49/49 (`a00b1cc5`).
 Security found one real fail-open BLOCKER — T-185-04-01, a **typed** refusal on an armed checkpoint ran
