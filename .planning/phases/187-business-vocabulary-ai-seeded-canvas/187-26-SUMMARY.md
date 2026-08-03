@@ -296,3 +296,10 @@ stale doc claim, `187-28`) are untouched by this plan and remain open.
 **M15** ("bind before the AI drafts") is authored in `187-29`, and the operator's seeded-rows caveat
 is binding on it — the existing `workflow_definitions` rows are test data of unknown vintage, so M15
 must also be performed against a **freshly generated** draft.
+
+## Self-Check: PASSED
+
+All 5 claimed files exist on disk; all 3 claimed commits (`f5a28e7e`, `74aff9f9`, `1b2e81d5`) resolve
+in `git log`. `.planning/REQUIREMENTS.md` is clean and `VOCAB-02` / `VOCAB-03` carry no completion
+mark. In the ROADMAP's round-5 waves only `187-26` is ticked — `187-27`, `187-28` and `187-29` all
+remain `- [ ]`.
