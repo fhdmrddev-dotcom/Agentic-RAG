@@ -467,6 +467,43 @@ one assertion over one fixture would have passed before AND after the fix; what 
 over all three sealed fixtures plus the consequence plus a positive control, and probe 3 saw all three
 bite.
 
+**Plan 187-24 COMPLETE (Wave 11 / gap-closure round 4, 2026-08-03, `c4972bde` → `576a0e31` →
+`17c6e338`).** VOCAB-02 + VOCAB-01 — **WR-14 + WR-12 + WR-13: one predicate with one home, and round
+3's own two guards turned from gestures into measurements.** (1) `SeedReceipt.tsx` re-implemented the
+`available_tools ∩ kbTools` loop ONE LINE after its `groundingCauseOf` call while its docblock claimed
+"there is no second derivation to drift". The membership TEST itself is now extracted — `firstKbTool`
+in `phaseVocabulary.ts`, read by `groundingCause`'s detected branch AND by the new
+`intersectingKbToolOf` — so agreement is by construction, not coincidence, and the receipt declares no
+predicate at all. Pinned by a **biconditional over a 12-phase table** (`detected` iff dial AND resolver
+names a tool; the dial gate is the classifier's alone, so both halves are asserted) plus a source
+fence. (2) The WR-09 fence was a deny-list of the DELETED clause: re-derived at HEAD, both needles
+match **2 lines in all of `frontend/src`, BOTH prose**. It now carries a positive control over its own
+needles *inside the same `it`* and asserts a **word-class property** over causal connectives; the two
+historical wordings survive beneath it as regression pins, never as the fence. (3) The testid sweep
+measured a MENTION: comments strip first now, all three static JSX spellings are extracted, and the
+sibling `data-*` state class (`data-carried-count` and its four siblings) gets its own case with its
+own non-vacuity. Counts re-measured at HEAD: `phaseVocabulary.test.ts` **90 → 96**, `SeedReceipt.test.tsx`
+**66 → 68**, `definitionOps.test.ts` **231 → 232**; named five-suite set **475 → 484**. tsc
+byte-identical at 33 after every task. **Nine falsifications observed and cleanly reverted**, including
+all five WR-13 probes — the OLD sweep failed only the first, the NEW one fails all five.
+**Carry forward, four things:**
+(1) **A review's suggested ARTIFACT is a claim, not a patch — third round running.** WR-13's proposed
+extraction regex admits backticks and swallows the TEMPLATE row testid `seed-receipt-step-${row.slug}`
+as a static id, demanding a query for that literal string: a guard red on correct code. Narrowed, and
+the `${`-exclusion is now asserted rather than implied.
+(2) **Two needles were tried and REJECTED for firing on the correct code they sit beside** — a
+`kbTools`-in-signature match (the component's own destructured props contain `kbTools`) and a
+`for (const ` match (the component's own row derivation). Both rejections are written INTO the guard, so
+the next author does not re-add them.
+(3) **`git checkout --` is not a revert for an UNCOMMITTED task** — it restores to HEAD and silently
+wipes the task's own edits along with the plant. Use a targeted plant/unplant that reverses exactly what
+it applied, and check `git diff --stat` against what it *should* show rather than against zero.
+(4) **`groundingCauseOf` reads `phase.config` UNGUARDED**, against its own module's totality contract
+(`nodeTitle` and `derivedFaceOf` both guard it). `intersectingKbToolOf` deliberately MIRRORS it rather
+than diverging — a defensive guard on one of two functions called one line apart cannot fire. Logged as
+**D-ITEM-187-24-01**; re-open trigger = the next plan free to change a shipped `phaseVocabulary` export's
+behaviour, which must fix both in one commit.
+
 (`3713a716`), GOVERN-01/02/03 all `Complete`, `nyquist_compliant` true, SECURED 49/49 (`a00b1cc5`).
 Security found one real fail-open BLOCKER — T-185-04-01, a **typed** refusal on an armed checkpoint ran
 the step and filed a false approval receipt — fixed by quick task `260731-3y4` (`417728bd`) and
