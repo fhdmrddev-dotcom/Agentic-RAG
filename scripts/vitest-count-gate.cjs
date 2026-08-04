@@ -140,17 +140,32 @@ const BASELINE = {
   // the real count can never fire. Each was then observed catching a deletion: one
   // `it(` block removed per file reds the gate with `[count-decrease]` naming that
   // file, at `failed 0` — the count decrease being the ONLY signal is the point.
-  "DescribeKbPicker.test.tsx": 30,
+  // POST-ROUND-5 CORRECTION (verification truth 14 FAILED). Round 5 pinned the three
+  // suites above and believed "every guard round 5 added is pinned". It was not true.
+  // A pinned TOTAL rising proves nothing about the NEW cases, because slack inside an
+  // already-listed file absorbs them — measured: `WorkflowDoorSwitch.test.tsx` 13 pinned
+  // / 21 actual (GAP A's ONLY end-to-end wire fence sat in the slack, deletable with the
+  // gate green) and `WorkflowBuilderPage.canvas.test.tsx` 22 / 128 (the whole GAP-B and
+  // GAP-C estate). Each is now pinned AT its actual, read from this script's own printed
+  // `actual` column on the run that added `describe.test.tsx` to TARGETS above — never a
+  // hand count of `it(` literals, which is unsound under `it.each`.
+  // `DescribeKbPicker.test.tsx` 30 → 37: the 7 cases fencing CR-R5-01, the blocker round 5
+  // shipped — a held folder id the server no longer offers is surrendered rather than sent
+  // invisibly, because `POST /workflows/generate` mints `unbound_retrieval` on
+  // `project_folder_id is None` and a dangling id would suppress the very verdict the
+  // picker exists to help the author satisfy.
+  "DescribeKbPicker.test.tsx": 37,
   "ProblemsTray.test.tsx": 30,
   "verdictModel.test.ts": 29,
   "canvasModel.test.ts": 26,
   "PublishGauntlet.test.tsx": 24,
-  "WorkflowBuilderPage.canvas.test.tsx": 22,
+  "WorkflowBuilderPage.canvas.test.tsx": 128,
+  "WorkflowBuilderPage.describe.test.tsx": 19,
   "PhaseFormPanel.test.tsx": 19,
   "WorkflowBuilderPage.test.tsx": 15,
   "PhaseSpineGraph.test.tsx": 14,
   "soulData.test.ts": 14,
-  "WorkflowDoorSwitch.test.tsx": 13,
+  "WorkflowDoorSwitch.test.tsx": 21,
   "PhaseSpine.test.tsx": 11,
   "deriveTier.test.ts": 9,
   "WorkflowSoul.test.tsx": 8,
@@ -159,10 +174,12 @@ const BASELINE = {
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
 // trailing figure below is a note about the reduce's result and can never be the
-// thing the gate reads. 804 = 715 + 30 + 30 + 29 (187-29 extended; 715 = 415 +
-// 232 + 68 after 187-25 extended; was 415 after 185-08 lowered it, 424 at the
-// original 184 Wave-0 pin).
-const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // 804
+// thing the gate reads. 944 = 804 + 7 (DescribeKbPicker 30→37) + 106 (canvas
+// 22→128) + 8 (DoorSwitch 13→21) + 19 (describe.test.tsx, newly RUN and pinned)
+// — the post-round-5 truth-14 correction. Was 804 = 715 + 30 + 30 + 29 (187-29
+// extended; 715 = 415 + 232 + 68 after 187-25 extended; was 415 after 185-08
+// lowered it, 424 at the original 184 Wave-0 pin).
+const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // 944
 
 // ── The Wave-0 blast radius (184-VALIDATION.md § "quick run command"). ──
 const TARGETS = [
@@ -176,6 +193,13 @@ const TARGETS = [
   // deleted without the gate noticing. It is deliberately NOT added to BASELINE: it
   // postdates the 424 pin, so it reports as `new` and its own count is free to grow.
   "src/pages/WorkflowBuilderPage.header.test.tsx",
+  // Added post-round-5 (CR-R5-01 / verification truth 14). TARGETS and BASELINE are TWO
+  // knobs: TARGETS decides what RUNS, BASELINE decides what is PINNED, and a page-level
+  // suite lands outside BOTH by default because the directory entry above only covers
+  // `src/components/workflows`. Round 5 pinned three suites and still left GAP A's only
+  // end-to-end wire fence unguarded — this file was never even EXECUTED by the gate. That
+  // is round-3's WR-16 recurring, so the fix is the entry, not another comment about it.
+  "src/pages/WorkflowBuilderPage.describe.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
