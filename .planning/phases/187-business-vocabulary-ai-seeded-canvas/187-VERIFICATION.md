@@ -1,9 +1,64 @@
 ---
 phase: 187-business-vocabulary-ai-seeded-canvas
 verified: 2026-08-04T04:10:00Z
-status: gaps_found
-score: 11/14 must-haves verified
+status: passed
+score: 13/14 must-haves verified (1 UNCERTAIN — SC#5's lived-experience half, human_verification)
 overrides_applied: 0
+closure:
+  closed: 2026-08-04T19:05:00Z
+  closed_by: "operator decision — direct fast-fix, NOT a gap-closure round 6"
+  why_not_a_round: >-
+    The operator asked why a 15-plan phase had become 29 across five rounds. The answer,
+    measured: BOTH open gaps lived in code round 5 itself authored that same day
+    (`DescribeKbPicker.tsx` created 2026-08-04 `f5a28e7e`; the pin block edited 2026-08-04
+    `51c44f37`). A round 6 would have been 100% cleanup of round 5 — the loop was feeding
+    itself. Every ROADMAP success criterion was already verified. So the two items were
+    fixed directly under G-3 (small, single-concern, no schema or API surface) and the
+    phase was closed. See the G-7 proposal in deferred-items.md.
+  gap_1_closed:
+    truth: "D-187-11 / the folded BUG-260731-03 verdict half — the picker helps the author satisfy the gate rather than defeating it"
+    fix: "12069204 + f2a43fc9"
+    evidence: >-
+      `DescribeKbPicker` now surrenders a held `value` the settled fetch does not offer,
+      handing `""` back to the parent. Fails toward UNBOUND — the state D-187-11 reads as
+      legitimate and the server says out loud — never toward a silent binding. `loading` is
+      excluded (not-asked-yet is not not-offered); `unavailable` is included, because when
+      nothing renders the author cannot see or change what would be sent. 7 component cases
+      + 2 END-TO-END WIRE cases on the door asserting the `project_folder_id` KEY is absent
+      from the request the client actually sends — exactly the fence this report's `missing`
+      item 3 asked for. All observed RED with the single `onChange("")` severed, measured in
+      one tool call (the 187-27 apply-and-measure rule), restore sha256-verified.
+    not_fixed_deliberately: >-
+      The server's `if body.project_folder_id is None:` still tests nullity rather than
+      resolvability, so a dead id from ANY other client would still suppress the finding.
+      This report listed that as OPTIONAL and "a separate decision"; it is pre-existing,
+      not round 5's, and it is a backend behaviour change that does not belong in a fast
+      fix. Logged as D-ITEM-187-CLOSE-01.
+  gap_2_closed:
+    truth: "Every guard round 5 added lives in a suite whose per-file count is PINNED"
+    fix: "e854a505 + f2a43fc9"
+    evidence: >-
+      TARGETS and BASELINE are two knobs — what RUNS and what is PINNED — and a page-level
+      suite lands outside both by default. `WorkflowBuilderPage.describe.test.tsx` added to
+      TARGETS (it was never executed by the gate) and pinned at 19; `WorkflowDoorSwitch.test.tsx`
+      13 → 23; `WorkflowBuilderPage.canvas.test.tsx` 22 → 128; `DescribeKbPicker.test.tsx`
+      30 → 37. Every number read from the gate's own printed `actual` column. Both new pins
+      OBSERVED producing a `[count-decrease]` on a genuinely deleted `it(` block. The
+      WR-R5-02 mis-attribution in the pin comment is corrected in the same commit.
+      Baseline total 804 → 946.
+  gates_at_closure:
+    count_gate: "exit 0 — 2196 tests, failed 0, 22/22 pinned files, no per-file decrease"
+    typecheck: "33 errors via `npx tsc --noEmit -p tsconfig.app.json`, unchanged from baseline, ZERO in the touched tree. NOTE: plain `npx tsc --noEmit` reports 0 because tsconfig.json is a solution file (`files: []`) and checks nothing — do not quote it (D-ITEM-187-23-02)."
+    build: "npx vite build exit 0"
+    backend: "test_187_route_assigned_reach.py + test_182_severity_codes.py 16/16 green"
+    publish_gauntlet_flake: "RESOLVED — 5d9ba921 raised this suite's per-test budget to 20s. Load-sensitive, never a logic race; nothing weakened, no case skipped (D-ITEM-187-20-01)."
+  manual_debt_carried_forward: >-
+    CLOSING THE PHASE IS A DECISION, NOT A CLAIM THAT EVERY ROW RAN. `187-UAT.md` stands at
+    6 passed / 1 blocked (M11, non-performable through the Builder) / 7 pending, and this
+    report's `human_verification` list has 12 items. They remain owed and will keep
+    surfacing in /gsd:progress and /gsd:audit-uat. M15b — the browser falsification of
+    CR-R5-01 against a really-deleted folder — is the one to run first; jsdom cannot
+    reproduce an RLS scope change or a real 5xx on the second fetch.
 re_verification:
   previous_status: gaps_found
   previous_score: 10/11

@@ -315,3 +315,61 @@ to revert the v3.6 surfaces from the flag alone (a rollback, a staged enablement
 the flag off). Decide then whether the door joins D-181-01's fence or is deliberately outside it, and
 **write the decision down either way** — including the case where the answer is "outside, on purpose",
 which is a legitimate answer and is currently indistinguishable from nobody having asked.
+
+---
+
+## D-ITEM-187-CLOSE-01 — the server's unbound rule tests NULLITY, not RESOLVABILITY
+
+**Logged:** 2026-08-04, at phase close, alongside the CR-R5-01 fix.
+**Status:** open, pre-existing, deliberately out of scope for a fast fix.
+
+`backend/app/api/workflows.py:755` mints `unbound_retrieval` on `if body.project_folder_id is None:`.
+So **any** non-null id suppresses the finding — live, deleted, out-of-RLS-scope, or fabricated. Nothing
+downstream covers for it: `GenerateRequest.project_folder_id` is `UUID | None` with no ownership or
+existence check, and nothing in `harness/grounding.py` validates that the id resolves against
+`fetch_visible_folders` — `render_grounding_prompt` will state "BOUND to project folder id=<dead id>".
+
+The CR-R5-01 fix closes the only client path that could produce a stale invisible id **on the describe
+door**. It does not, and cannot, stop a dead id arriving from anywhere else — a different client, a
+direct API call, or a future surface.
+
+**Why deferred rather than fixed:** `187-VERIFICATION.md` listed this as OPTIONAL and explicitly "a
+separate decision". It is a backend behaviour change with a real question behind it (does a dead id
+mean *unbound*, or does it mean *invalid request*? — those want different responses), and answering it
+inside a fast fix would be exactly the overreach that grew this phase from 15 plans to 29.
+
+**Re-open trigger:** the next phase touching the grounding rules or `POST /workflows/generate`'s
+request validation — or the first report of a workflow publishing with retrieval steps scoped to a
+folder that does not exist.
+
+---
+
+## D-ITEM-187-CLOSE-02 (PROCESS) — propose a G-7 guardrail: cap gap-closure ROUNDS
+
+**Logged:** 2026-08-04, at phase close, from the operator's own question.
+
+CLAUDE.md's G-1 caps repeated phase INSERTS on the same hot file. Nothing caps repeated gap-closure
+ROUNDS on the same phase, and Phase 187 shows what that costs: **15 plans on 2026-08-02 → 29 on
+2026-08-04**, five rounds. The measured tell at round 5 was that **both** remaining gaps lived in code
+round 5 had authored that same day (`DescribeKbPicker.tsx` created `f5a28e7e`; the pin block edited
+`51c44f37`) — a round 6 would have been 100% cleanup of round 5, while every ROADMAP success criterion
+was already verified.
+
+Three mechanisms drive it, all structural rather than anyone's mistake:
+
+1. **The gate manufactures findings.** Every `execute-phase` ends with a standard-depth code review of
+   code written that morning; such a review essentially always returns something, a must_have then
+   scores failed, and `gaps_found` routes straight back into `plan-phase --gaps`. Nothing in the loop
+   asks *"is the phase goal met?"* as the terminating question.
+2. **Each round adds must_haves, which are new failure surface.** Plan 187-29 existed ONLY to pin round
+   5's guards; its own headline must_have then failed. A bookkeeping plan manufactured a gap.
+3. **Closure rounds smuggle in features.** "The loose door has no KB picker" is a MISSING CAPABILITY,
+   not a defect in shipped code. 187-26 built new UI inside a closure round — which is both how 15
+   became 29 and why the blocker existed at all: new surface, no prior review cycles.
+
+**Proposed rule (needs operator ratification before it goes into CLAUDE.md):** after **round 2** on a
+phase, every further finding is triaged as **fast-fix / defer-to-next-phase / accept** and never as a
+new round — UNLESS a ROADMAP success criterion is actually unmet. And a closure round may not introduce
+a new user-facing capability; that is a phase, not a gap.
+
+**Re-open trigger:** the next phase to reach gap-closure round 3.
