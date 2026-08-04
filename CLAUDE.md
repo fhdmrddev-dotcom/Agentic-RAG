@@ -156,6 +156,18 @@ Three structural mechanisms drive the runaway — none is anyone's mistake, whic
 2. **Each round adds must_haves, which are themselves new failure surface.** Phase 187's plan `187-29` existed ONLY to pin round 5's guards; its own headline must_have then failed. A pure-bookkeeping plan manufactured a gap.
 3. **Closure rounds smuggle in features.** "The loose door has no KB picker" is a MISSING CAPABILITY, not a defect in shipped code. Building it inside a closure round is both how 15 became 29 and why that round shipped a blocker — new surface, zero prior review cycles.
 
+**The mechanical check (run it — do not eyeball the round count):**
+
+```bash
+node scripts/check-gap-closure-rounds.cjs <phase>
+```
+
+Exit `0` = G-7 clear · `1` = G-7 fires · `2` = harness error. It derives the round count from the repository itself — `gap_closure_round:` frontmatter where present, falling back to the number of distinct commits that ADDED gap-closure plan files (that fallback is load-bearing: Phase 186's twelve gap plans carry no round field at all, and it still reads 3 correctly) — and prints the derivation so the number is auditable rather than asserted. It also fails `[new-capability-in-closure]` when a gap-closure plan's `files_modified` contains a non-test source file that did not exist when that plan was written; run against Phase 187 it names `DescribeKbPicker.tsx` unprompted, which is precisely the file that shipped CR-R5-01.
+
+Both failures have a WORDED escape hatch, never a boolean — `--unmet-criterion "SC#N: <what is not true>"` and `--capability-approved "<why this belongs here>"`. An override prints `G-7 passed WITH OVERRIDES` rather than `clear`, so a waved-through finding can never read as an absent one, and it must still be recorded under `STATE.md → Guardrail overrides` per the protocol below.
+
+**Run it at three points:** when `verify-work`/`execute-phase` returns `gaps_found`; before emitting any `--gaps` routing; and at the top of `/gsd:plan-phase {X} --gaps`.
+
 **Before emitting ANY `/gsd:plan-phase {X} --gaps` routing, the orchestrator MUST:**
 
 - **Report success-criteria status first.** If every ROADMAP success criterion is verified, say so plainly and present *stopping* as a real option — never route to the next round as though it were the only door.
