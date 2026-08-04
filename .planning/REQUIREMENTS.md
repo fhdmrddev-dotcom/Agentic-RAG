@@ -39,9 +39,9 @@
 
 ### VOCAB — approachability for business users
 
-- [ ] **VOCAB-01**: A business user sees plain-language node names/verbs ("Find documents", "Ask the AI", "Get approval", "Produce a report") with a Technical-names reveal — extends the v3.3 LANG-01 plain-language layer + SEED-085 terminology split.
-- [ ] **VOCAB-02**: A user can describe a workflow in natural language and get a seeded, editable canvas draft (wires the existing NL generator, SEED-051, onto the canvas) — and the AI seed structurally cannot emit an unsafe node (the response schema IS the `extra="forbid"` union).
-- [ ] **VOCAB-03**: A user can start from a template / starter flow on the canvas (reuses the shipped Starter Workflow Library).
+- [x] **VOCAB-01**: A business user sees plain-language node names/verbs ("Find documents", "Ask the AI", "Get approval", "Produce a report") with a Technical-names reveal — extends the v3.3 LANG-01 plain-language layer + SEED-085 terminology split.
+- [x] **VOCAB-02**: A user can describe a workflow in natural language and get a seeded, editable canvas draft (wires the existing NL generator, SEED-051, onto the canvas) — and the AI seed structurally cannot emit an unsafe node (the response schema IS the `extra="forbid"` union).
+- [x] **VOCAB-03**: A user can start from a template / starter flow on the canvas (reuses the shipped Starter Workflow Library).
 
 ### RUNVIZ — non-technical live run observability
 
@@ -112,9 +112,9 @@ Which phases cover which requirements. Filled at roadmap creation 2026-07-24, re
 | GOVERN-03 | Phase 185 | Complete |
 | CONCUR-01 | Phase 186 | Complete |
 | CONCUR-02 | Phase 186 | Complete |
-| VOCAB-01 | Phase 187 | Pending |
-| VOCAB-02 | Phase 187 | Pending |
-| VOCAB-03 | Phase 187 | Pending |
+| VOCAB-01 | Phase 187 | Complete |
+| VOCAB-02 | Phase 187 | Complete |
+| VOCAB-03 | Phase 187 | Complete |
 | RUNVIZ-01 | Phase 188 | Pending |
 | RUNVIZ-02 | Phase 188 | Pending |
 | RUNVIZ-03 | Phase 188 | Pending |
