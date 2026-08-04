@@ -128,6 +128,33 @@ export function DescribeKbPicker({ value, onChange, className }: DescribeKbPicke
     }
   }, [])
 
+  // ── CR-R5-01 — WHAT IS SENT IS ALWAYS SOMETHING THE AUTHOR CAN SEE ──
+  //
+  // The parent owns `value` and deliberately keeps it across unmount (a considered pick is
+  // not undone by looking around — `WorkflowDoorSwitch`). Compose that with the two
+  // render-nothing states below and a THIRD case — a held id the server no longer offers
+  // (deleted, or scoped away by RLS) — and the door could put a `project_folder_id` on the
+  // wire that no control on screen shows. `<select>` renders such an id as a BLANK row
+  // (`selectedIndex === -1`), so even the visible case is unreadable.
+  //
+  // That is not merely untidy: `POST /workflows/generate` tests `project_folder_id is None`
+  // to mint `unbound_retrieval`, so a non-null id pointing at nothing SUPPRESSES the very
+  // verdict this control exists to help the author satisfy, and quietly unblocks Publish.
+  // The control built so the author would be ASKED would be answering on their behalf.
+  //
+  // So: once the request has SETTLED, an unofferable choice is surrendered back to the
+  // parent. It fails toward UNBOUND — the state D-187-11 already reads as legitimate and
+  // which the server says out loud — never toward a silent binding. `loading` is excluded
+  // because "not asked yet" is not "not offered", and `unavailable` is INCLUDED for the
+  // reason that matters here: when nothing renders, the author cannot see or change what
+  // would be sent, whatever the reason for the emptiness.
+  useEffect(() => {
+    if (state === "loading") return
+    if (value === "") return
+    if (options.some((f) => f.id === value)) return
+    onChange("")
+  }, [state, options, value, onChange])
+
   // The state probe. `hidden` + `aria-hidden` — no surface, nothing in the accessibility
   // tree, and (being `display:none`) not a flex item, so an unoffered picker adds no gap
   // to the column it sits in. It exists so "there are none" and "we could not ask" are

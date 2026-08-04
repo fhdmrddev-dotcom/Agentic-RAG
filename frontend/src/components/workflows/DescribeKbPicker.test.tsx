@@ -441,6 +441,74 @@ describe("DescribeKbPicker — source purity: one api symbol, zero routes", () =
   })
 })
 
+// ── 7b. CR-R5-01: what is SENT is always something the author can SEE ─────────
+
+describe("DescribeKbPicker — an unofferable choice is surrendered, never sent invisibly", () => {
+  const DANGLING = "f-deleted-or-scoped-away"
+
+  it("MECHANISM — a dangling id matches NO option, so <select> would render a blank row", async () => {
+    // This is the defect's shape, asserted directly rather than described in a comment:
+    // an id with no matching <option> gives selectedIndex -1. Everything below exists so
+    // that state can never be reached with the id still live in the parent.
+    renderPicker({ value: CONTRACTS.id })
+    const select = (await screen.findByTestId("project-folder-picker")) as HTMLSelectElement
+    const offered = Array.from(select.querySelectorAll("option")).map((o) => o.value)
+    expect(offered).not.toContain(DANGLING)
+  })
+
+  it("a held id the server does NOT offer is handed back as '' once the request settles", async () => {
+    const { onChange } = renderPicker({ value: DANGLING })
+    await screen.findByTestId("project-folder-picker")
+    await waitFor(() => expect(onChange).toHaveBeenCalledWith(""))
+  })
+
+  it("ANTI-CASE — a held id the server DOES offer is left completely alone", async () => {
+    const { onChange } = renderPicker({ value: POLICIES.id })
+    const select = (await screen.findByTestId("project-folder-picker")) as HTMLSelectElement
+    expect(select.value).toBe(POLICIES.id)
+    await waitFor(() => expect(stateOf()).toBe("ready"))
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it("'we could not ask' surrenders it too — nothing renders, so nothing may be sent", async () => {
+    api.listFolders.mockRejectedValue(new Error("network"))
+    const { onChange } = renderPicker({ value: DANGLING })
+    await waitFor(() => expect(stateOf()).toBe("unavailable"))
+    expect(picker()).toBeNull()
+    await waitFor(() => expect(onChange).toHaveBeenCalledWith(""))
+  })
+
+  it("'there are none' surrenders it too", async () => {
+    api.listFolders.mockResolvedValue([])
+    const { onChange } = renderPicker({ value: DANGLING })
+    await waitFor(() => expect(stateOf()).toBe("none"))
+    expect(picker()).toBeNull()
+    await waitFor(() => expect(onChange).toHaveBeenCalledWith(""))
+  })
+
+  it("NOT-ASKED-YET IS NOT NOT-OFFERED — nothing is surrendered while the request is in flight", async () => {
+    api.listFolders.mockReturnValue(new Promise(() => {}))
+    const { onChange } = renderPicker({ value: DANGLING })
+    await waitFor(() => expect(stateOf()).toBe("loading"))
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it("an empty value is never churned back to the parent in ANY settled state", async () => {
+    for (const [label, arrange] of [
+      ["ready", () => api.listFolders.mockResolvedValue(TWO_FOLDERS)],
+      ["none", () => api.listFolders.mockResolvedValue([])],
+      ["unavailable", () => api.listFolders.mockRejectedValue(new Error("network"))],
+    ] as const) {
+      vi.clearAllMocks()
+      arrange()
+      const { onChange, unmount } = renderPicker({ value: "" })
+      await waitFor(() => expect(stateOf()).toBe(label))
+      expect(onChange).not.toHaveBeenCalled()
+      unmount()
+    }
+  })
+})
+
 // ── 8. The whole-suite network tripwire (must run LAST) ───────────────────────
 
 describe("DescribeKbPicker — zero real network calls across the entire suite", () => {
