@@ -144,6 +144,25 @@ These rules exist because the v2.6 075.x cascade (8 phases on the same streaming
 | **G-4 Lived-experience UAT gate** | Phase touches user-visible UI | Operator-defined "I'd recognize failure here" scenarios at scope-time (not post-hoc). Chrome MCP drives all 3 at phase verification — wire format + screenshot are insufficient. |
 | **G-5 Refactor between feature waves** | ≥ 3 prior phases on the same hot file (see ledger below) | Insert a dedicated refactor phase BEFORE the next feature phase on that file. Audit during discuss-phase. |
 | **G-6 Failure criteria upfront** | Writing SPEC.md or scoping a phase | Include `## How we'd know this failed` section with concrete observable conditions. If failure modes can't be enumerated, scope is not ready to plan. |
+| **G-7 Gap-closure round cap** | Verification returns `gaps_found` on a phase that has already run **2** gap-closure rounds | Do NOT route to `/gsd:plan-phase --gaps`. Triage every remaining finding as **fast-fix / defer-to-next-phase / accept** — unless a ROADMAP **success criterion** is actually unmet, which is the only thing that justifies a further round. A closure round may NEVER introduce a new user-facing capability: that is a phase, not a gap. |
+
+**G-7 in detail (ratified 2026-08-04 — operator, at Phase 187 close).**
+
+Phase 187 went from **15 plans on 2026-08-02 to 29 on 2026-08-04** across five gap-closure rounds. The tell at round 5: **both** remaining gaps lived in code round 5 had authored that same day (`DescribeKbPicker.tsx` created `f5a28e7e`; the count-gate pin block edited `51c44f37`) — a round 6 would have been 100% cleanup of round 5, while every ROADMAP success criterion was already verified. G-1 caps repeated phase INSERTS on a hot file; nothing capped repeated ROUNDS on a phase. This is that cap.
+
+Three structural mechanisms drive the runaway — none is anyone's mistake, which is why a rule is needed rather than more care:
+
+1. **The gate manufactures findings.** Every `execute-phase` ends with a standard-depth code review of code written that morning; such a review essentially always returns something → a must_have scores failed → `gaps_found` → straight back into `plan-phase --gaps`. Nothing in the loop asks *"is the phase GOAL met?"* as the terminating question — must_have bookkeeping outvotes it.
+2. **Each round adds must_haves, which are themselves new failure surface.** Phase 187's plan `187-29` existed ONLY to pin round 5's guards; its own headline must_have then failed. A pure-bookkeeping plan manufactured a gap.
+3. **Closure rounds smuggle in features.** "The loose door has no KB picker" is a MISSING CAPABILITY, not a defect in shipped code. Building it inside a closure round is both how 15 became 29 and why that round shipped a blocker — new surface, zero prior review cycles.
+
+**Before emitting ANY `/gsd:plan-phase {X} --gaps` routing, the orchestrator MUST:**
+
+- **Report success-criteria status first.** If every ROADMAP success criterion is verified, say so plainly and present *stopping* as a real option — never route to the next round as though it were the only door.
+- **Date the offending code** (`git log --diff-filter=A -- <file>`). Gaps in the current round's own output are a signal to STOP, not to iterate.
+- **Size each fix.** ≤ 1 file / ≤ 10 lines with no schema or API surface is `/gsd:fast` under G-3 — never a round.
+
+**Closing a phase with owed manual UAT rows is legitimate**, and is often the right call — but state it as a DECISION, never as a claim that everything ran. Record the owed rows in the ROADMAP progress row and `STATE.md`, and name which row to run first.
 
 **Orchestrator protocol when a guardrail fires:**
 

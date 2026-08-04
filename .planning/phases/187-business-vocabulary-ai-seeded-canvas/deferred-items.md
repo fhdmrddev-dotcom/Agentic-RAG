@@ -344,7 +344,11 @@ folder that does not exist.
 
 ---
 
-## D-ITEM-187-CLOSE-02 (PROCESS) — propose a G-7 guardrail: cap gap-closure ROUNDS
+## D-ITEM-187-CLOSE-02 (PROCESS) — RESOLVED: G-7 ratified into CLAUDE.md
+
+**Status: CLOSED 2026-08-04** — the operator ratified this. `G-7 Gap-closure round cap` is now a row in
+CLAUDE.md’s Workflow-guardrails table, with the three mechanisms and the pre-routing checklist
+spelled out beneath it. Nothing below is owed any more; it is kept as the derivation.
 
 **Logged:** 2026-08-04, at phase close, from the operator's own question.
 
@@ -367,7 +371,7 @@ Three mechanisms drive it, all structural rather than anyone's mistake:
    not a defect in shipped code. 187-26 built new UI inside a closure round — which is both how 15
    became 29 and why the blocker existed at all: new surface, no prior review cycles.
 
-**Proposed rule (needs operator ratification before it goes into CLAUDE.md):** after **round 2** on a
+**The rule, AS RATIFIED (now binding in CLAUDE.md, not a proposal):** after **round 2** on a
 phase, every further finding is triaged as **fast-fix / defer-to-next-phase / accept** and never as a
 new round — UNLESS a ROADMAP success criterion is actually unmet. And a closure round may not introduce
 a new user-facing capability; that is a phase, not a gap.
