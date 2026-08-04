@@ -50,6 +50,25 @@ import { PublishGauntlet } from "./PublishGauntlet"
 import type { PublishOutcome } from "@/lib/api"
 import { publishWorkflow } from "@/lib/api"
 
+/**
+ * D-ITEM-187-20-01 — this suite's per-test budget, raised from the 5 s default.
+ *
+ * WHAT WAS ACTUALLY MEASURED, not guessed: 46/46 green in 25.6 s when this file runs
+ * ALONE, and 1-2 red when it runs inside the count gate's whole blast radius. The first
+ * failure is always `Test timed out in 5000ms`; the second is a cascade from it (a
+ * half-mounted modal leaves the next case unable to find the trigger). Rolling the source
+ * back to a pre-change commit reproduced the identical pair, so it tracks LOAD, not any
+ * one phase's edit — four separate investigations have now each spent a measurement
+ * proving non-attribution, which is the argument for fixing it instead of proving it a
+ * fifth time.
+ *
+ * Every case here drives `userEvent` against a real modal with real timers; that is
+ * legitimately slow and gets slower as the parallel pool fills. A budget is not an
+ * assertion — NOTHING below is weakened, no case is skipped, and the gate's `failed 0`
+ * requirement is untouched. A genuine hang still fails, 20 s later.
+ */
+vi.setConfig({ testTimeout: 20000 })
+
 vi.mock("@/lib/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/api")>()
   return { ...actual, publishWorkflow: vi.fn() }
