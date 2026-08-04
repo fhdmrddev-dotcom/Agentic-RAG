@@ -119,10 +119,14 @@ const BASELINE = {
   // 187-25 pinned its two — each now carries a guard that a failures-only
   // differential cannot see the deletion of:
   //   · DescribeKbPicker.test.tsx  — GAP A: the loose "Describe & run" door's
-  //     knowledge-base picker, and the BORN-BOUND round trip (the folder chosen
-  //     before the AI drafts reaches `generateWorkflow`'s `project_folder_id` on
-  //     the request the client actually sends). Delete these and a workflow can
-  //     silently go back to being born unbound with every other gate green.
+  //     knowledge-base picker itself — what it offers, what it refuses to invent,
+  //     and (post-round-5) that it surrenders a choice it cannot show.
+  //     ATTRIBUTION CORRECTED (WR-R5-02): this comment used to credit this file
+  //     with the BORN-BOUND ROUND TRIP as well. It does not have it — this suite
+  //     lists `generateWorkflow` in its FORBIDDEN_SYMBOLS and asserts it at zero
+  //     calls. The round trip, and the two wire fences beneath it, live in
+  //     `WorkflowDoorSwitch.test.tsx`. The mis-credit pointed away from the one
+  //     unprotected fence, which is how it stayed unpinned.
   //   · ProblemsTray.test.tsx      — GAP B: the fence that the all-clear line
   //     and the "checked by the server" attribution CANNOT render before a check
   //     has answered. These are ABSENCE assertions with a positive control; an
@@ -165,7 +169,11 @@ const BASELINE = {
   "WorkflowBuilderPage.test.tsx": 15,
   "PhaseSpineGraph.test.tsx": 14,
   "soulData.test.ts": 14,
-  "WorkflowDoorSwitch.test.tsx": 21,
+  // 21 → 23: the two end-to-end WIRE fences for CR-R5-01 (a pick whose folder is gone,
+  // and a pick that survived a failed re-fetch, each asserting the `project_folder_id`
+  // KEY is absent from the request the client actually sends). Both observed RED with
+  // the picker's single `onChange("")` severed.
+  "WorkflowDoorSwitch.test.tsx": 23,
   "PhaseSpine.test.tsx": 11,
   "deriveTier.test.ts": 9,
   "WorkflowSoul.test.tsx": 8,
@@ -174,12 +182,12 @@ const BASELINE = {
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
 // trailing figure below is a note about the reduce's result and can never be the
-// thing the gate reads. 944 = 804 + 7 (DescribeKbPicker 30→37) + 106 (canvas
-// 22→128) + 8 (DoorSwitch 13→21) + 19 (describe.test.tsx, newly RUN and pinned)
+// thing the gate reads. 946 = 804 + 7 (DescribeKbPicker 30→37) + 106 (canvas
+// 22→128) + 10 (DoorSwitch 13→23) + 19 (describe.test.tsx, newly RUN and pinned)
 // — the post-round-5 truth-14 correction. Was 804 = 715 + 30 + 30 + 29 (187-29
 // extended; 715 = 415 + 232 + 68 after 187-25 extended; was 415 after 185-08
 // lowered it, 424 at the original 184 Wave-0 pin).
-const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // 944
+const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // 946
 
 // ── The Wave-0 blast radius (184-VALIDATION.md § "quick run command"). ──
 const TARGETS = [

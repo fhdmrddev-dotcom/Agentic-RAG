@@ -348,6 +348,56 @@ describe("WorkflowDoorSwitch — THE ROUND TRIP: a loose-door workflow can be bo
     expect(mockGenerateWorkflow).not.toHaveBeenCalled()
   })
 
+  // ── CR-R5-01 — the fence that protects THE WIRE, not just the component ──
+  //
+  // The case above pins that a pick survives curiosity. Its shadow is the defect: a pick
+  // that survives into a world where the folder is no longer offered would be SENT while
+  // no control on screen could show it, and `POST /workflows/generate` mints
+  // `unbound_retrieval` on `project_folder_id is None` — so a dead id suppresses the
+  // verdict and unblocks Publish. These two assert on the REQUEST, which is the only
+  // thing the server sees, and they are the reason the picker retracts.
+
+  it("a pick whose folder is GONE on re-entry never reaches the wire", async () => {
+    const select = await openDescribeDoorWithFolders()
+    fireEvent.change(select, { target: { value: KB_POLICIES.id } })
+
+    // Out and back in — and this time the server no longer offers that folder
+    // (deleted, or scoped away by RLS between the two visits).
+    fireEvent.click(screen.getByTestId("both-doors"))
+    mockListFolders.mockResolvedValue([KB_CONTRACTS])
+    fireEvent.click(screen.getByTestId("door-card-describe"))
+
+    const again = (await screen.findByTestId("project-folder-picker")) as HTMLSelectElement
+    await waitFor(() => expect(again.value).toBe(""))
+
+    fireEvent.change(screen.getByTestId("describe-box"), { target: { value: "Vendor risk" } })
+    fireEvent.click(screen.getByTestId("describe-draft"))
+
+    await waitFor(() => expect(mockGenerateWorkflow).toHaveBeenCalled())
+    const request = mockGenerateWorkflow.mock.calls[0][0] as Record<string, unknown>
+    expect(Object.prototype.hasOwnProperty.call(request, "project_folder_id")).toBe(false)
+  })
+
+  it("a pick survived into a FAILED re-fetch never reaches the wire either", async () => {
+    const select = await openDescribeDoorWithFolders()
+    fireEvent.change(select, { target: { value: KB_POLICIES.id } })
+
+    // The harder half: the list could not be fetched at all, so NO picker renders and
+    // the author has nothing on screen that could show or clear the binding.
+    fireEvent.click(screen.getByTestId("both-doors"))
+    mockListFolders.mockRejectedValue(new Error("network"))
+    fireEvent.click(screen.getByTestId("door-card-describe"))
+
+    await waitFor(() => expect(screen.queryByTestId("project-folder-picker")).toBeNull())
+
+    fireEvent.change(screen.getByTestId("describe-box"), { target: { value: "Vendor risk" } })
+    fireEvent.click(screen.getByTestId("describe-draft"))
+
+    await waitFor(() => expect(mockGenerateWorkflow).toHaveBeenCalled())
+    const request = mockGenerateWorkflow.mock.calls[0][0] as Record<string, unknown>
+    expect(Object.prototype.hasOwnProperty.call(request, "project_folder_id")).toBe(false)
+  })
+
   it("SOURCE: the door mounts the picker component and wires the id to the govern mount", () => {
     const src = workflowDoorSwitchSource
     expect(src).toMatch(/<DescribeKbPicker/)
