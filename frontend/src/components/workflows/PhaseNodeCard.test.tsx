@@ -62,6 +62,10 @@ import { GOVERNANCE_SEAL_LABEL, GROUNDING_DIAL_STRICT_LABEL } from "./definition
 // copies has two places to drift from.
 import type { CanvasReading } from "@/lib/phaseState"
 import { RUN_READING_WORD, runReadingLabel } from "./runVocabulary"
+// 188.1-04: the verdict-slot's key type, imported for the WR-04 site-4 falsification's
+// cast. Its own import statement rather than a widening of the 184-08 line above — the
+// `canvasModel.purity.test.ts:18-21` rule, so this plan's whole diff reads as ADDED lines.
+import type { VerdictMarkKind } from "./nodePresentation"
 
 /** The minimal slot set — everything else on the contract is optional by design. */
 function renderCard(overrides: Partial<React.ComponentProps<typeof PhaseNodeCard>> = {}) {
@@ -1979,5 +1983,81 @@ describe("188-06 — the ring and the icon well are CONCENTRIC, not colliding", 
     // …and it does NOT take the corner governance claims. Top-right is spoken for.
     const seal = table.find((z) => z.name === "governance seal")!
     expect(ring.box.x1).toBeLessThan(seal.box.x0)
+  })
+})
+
+// ── 188.1-04 · WR-04 sites 4 and 5 — the card's two lookups are total ───────────
+
+/**
+ * WR-04 SITES 4 and 5 (`PhaseNodeCard.tsx` — the `VERDICT_MARK[verdict]` mark and the
+ * `RING_STROKE[reading]` SVG stroke).
+ *
+ * ⚠ BOTH OBSERVED RED FIRST, against the shipped tree, before either guard was written —
+ * the `lib/phaseState.ts` register. Both tables are plain object literals, so they
+ * INHERIT `constructor`, `toString`, `__proto__` and friends. `TABLE["constructor"]` is
+ * the `Object` FUNCTION: never nullish, so a `?? fallback` provably does not fire, and
+ * the function is what reaches the render. Site 5's sink is an SVG `stroke` ATTRIBUTE —
+ * a paint context — which is why the assertion below reads the attribute rather than the
+ * expression that produced it.
+ *
+ * Both slots are TYPED, and both values are DERIVED one function away from a
+ * server-supplied string, so the type is a statement about the current callers rather
+ * than about the lookup. Totality is a property of the lookup.
+ */
+describe("PhaseNodeCard 188.1-04 — WR-04 sites 4 and 5: the lookups are total", () => {
+  it("site 4 — a prototype-key verdict renders the DECLARED unknown mark, not an inherited member", () => {
+    // The cast is the falsification: the wire value is `verdict.severity`, a string the
+    // slot's union describes but does not enforce at runtime.
+    const { container } = renderCard({
+      verdict: "constructor" as unknown as VerdictMarkKind,
+    })
+    const mark = container.querySelector('[data-testid="canvas-node-verdict"]')
+    expect(mark).not.toBeNull()
+    // POSITIVE CONTROL: the declared unknown mark carries real, non-empty strings, so the
+    // two assertions below cannot pass by comparing empty against empty.
+    expect(VERDICT_MARK.unknown.glyph.length).toBeGreaterThan(0)
+    expect(VERDICT_MARK.unknown.label.length).toBeGreaterThan(0)
+
+    expect(mark?.textContent).toContain(VERDICT_MARK.unknown.glyph)
+    expect(mark?.textContent).toContain(VERDICT_MARK.unknown.label)
+    // …and nothing anywhere on the card stringified a function into the DOM.
+    expect(container.innerHTML).not.toContain("native code")
+  })
+
+  it("site 5 — a prototype-key reading paints a COLOUR TOKEN stroke, never a stringified function", () => {
+    const { container } = renderCard({
+      status: "constructor" as unknown as CanvasReading,
+    })
+    const arc = container.querySelector(`[data-testid="${ARC_TEST_ID}"]`)
+    // POSITIVE CONTROL: an ordinary reading really does emit a stroke on this element,
+    // so an absent attribute below is evidence rather than a broken selector.
+    const { container: ok, unmount } = render(
+      <PhaseNodeCard
+        slug="probe"
+        phaseType="llm_single"
+        icon={null}
+        title="probe"
+        tint={ICON_TINT.llm_single}
+        status="unknown"
+      />,
+    )
+    const okStroke = ok
+      .querySelector(`[data-testid="${ARC_TEST_ID}"]`)
+      ?.getAttribute("stroke")
+    unmount()
+    expect(okStroke).toMatch(/^hsl\(/)
+
+    expect(arc).not.toBeNull()
+    const stroke = arc?.getAttribute("stroke")
+    // ⚠ THE ATTRIBUTE'S TYPE IS PART OF THE PROPERTY. React refuses a function-valued DOM
+    // prop and OMITS the attribute entirely (*"Invalid value for prop `stroke` on
+    // <circle>"*), so the unguarded consequence is an arc with NO stroke at all — a ring
+    // that paints nothing rather than one that paints something wrong.
+    expect(typeof stroke).toBe("string")
+    expect(stroke ?? "").toMatch(/^hsl\(/)
+    expect(stroke ?? "").not.toContain("function")
+    // The unowned reading is indistinguishable from the declared unknown one — the ring
+    // says "we can't tell", which is the only honest thing it can say.
+    expect(stroke).toBe(okStroke)
   })
 })

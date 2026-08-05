@@ -48,6 +48,23 @@ vi.mock("@/lib/api", () => {
   }
 })
 
+// 188.1-04 (WR-07): the auth seam the REAL `@/lib/api` reaches through `getAuthHeaders`.
+// Mocked so the ONE test below that runs the real `getWorkflowRun` (via `importActual`,
+// which un-mocks that module only — its dependencies still resolve through this registry)
+// never touches a Supabase client. Every other test in this file keeps the api mock above
+// and never reaches this.
+vi.mock("@/lib/supabase", () => ({
+  supabase: {
+    auth: {
+      getSession: vi.fn().mockResolvedValue({
+        data: { session: { user: { id: "user-1" }, access_token: "token" } },
+      }),
+    },
+    channel: vi.fn(),
+    removeChannel: vi.fn(),
+  },
+}))
+
 // ── The live slice + the deliverable list. The page is the ONLY component on this
 //    surface that touches the stream, so exactly these two hooks are mocked. ──
 const usePhases = vi.fn()
@@ -1616,5 +1633,52 @@ describe("WorkflowRunPage — the governance seal's input reaches the canvas (F7
     expect(codeOf(pageSource)).not.toMatch(new RegExp(KB))
     // POSITIVE CONTROL — that needle really does match a hardcoded list.
     expect('const KB_TOOLS = ["search_documents"]').toMatch(new RegExp(KB))
+  })
+})
+
+// ── 188.1-04 · WR-07 — the run-id path segment is encoded ──────────────────────
+
+/**
+ * WR-07 (`lib/api.ts`, `getWorkflowRun`) — the run id is interpolated straight into the
+ * URL PATH, where `/`, `?` and `#` are structural rather than textual: a `runId` of
+ * `"a/b"` addresses a different route, and one of `"x?y=z"` moves the remainder into the
+ * query string. The route's server-side ownership gate is the security control; this is
+ * the defensive URL construction that pairs with it (`api.ts`'s `listRelationships`
+ * register), so a non-UUID value cannot reshape the request the client sends.
+ *
+ * ⚠ OBSERVED RED FIRST, against the shipped tree, before the encode was written.
+ *
+ * IT ASSERTS THE URL THE MOCK RECEIVED, not the source: a `?raw` grep for
+ * `encodeURIComponent` would test the patch. This is also why the test lives HERE rather
+ * than beside `api.ts` — `frontend/src/lib/` sits outside BOTH count-gate knobs (`TARGETS`
+ * decides what RUNS, `BASELINE` what is PINNED), so a suite written there would never be
+ * executed by the gate, and a falsification that does not run has falsified nothing.
+ * This file is inside both.
+ */
+describe("api.getWorkflowRun 188.1-04 — WR-07: the run-id path segment is encoded", () => {
+  it("a runId carrying a slash cannot reshape the request path", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({}),
+    })
+    vi.stubGlobal("fetch", fetchMock)
+    vi.stubEnv("VITE_API_BASE_URL", "http://localhost:8000")
+    try {
+      // `importActual` bypasses this file's `@/lib/api` factory mock for this ONE call,
+      // so the function under test is the shipped one rather than the suite's spy.
+      const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api")
+      await actual.getWorkflowRun("a/b")
+
+      const url = String(fetchMock.mock.calls[0][0])
+      // POSITIVE CONTROL — the mock really did receive THIS route's URL, so the two
+      // assertions below are about a real request rather than an empty string.
+      expect(url).toContain("/workflow-runs/")
+      expect(url).toContain("a%2Fb")
+      expect(url).not.toContain("workflow-runs/a/b")
+    } finally {
+      vi.unstubAllGlobals()
+      vi.unstubAllEnvs()
+    }
   })
 })

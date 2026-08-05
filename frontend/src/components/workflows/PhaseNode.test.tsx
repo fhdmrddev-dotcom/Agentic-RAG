@@ -631,3 +631,91 @@ describe("PhaseNode 188-07 — the run sentence is derived ONCE", () => {
     view.unmount()
   })
 })
+
+// ── 10 · WR-04 site 1 — the tint lookup is TOTAL (188.1-04) ────────────────────
+
+/**
+ * Render the real projection with `data.phaseType` OVERRIDDEN, in exactly the shape
+ * `renderNodes` merges `technical` and `run` — `data` is what the adapter reads, so
+ * writing the discriminator there is writing the adapter's real input.
+ */
+async function renderWithPhaseType(phaseType: string) {
+  const projection = toCanvas(renewalDraft, { nameContext })
+  const nodes: Node[] = projection.nodes.map((node) => ({
+    ...node,
+    data: { ...node.data, phaseType },
+  }))
+  const view = render(
+    <div style={{ width: 1200, height: 800 }}>
+      <ReactFlow nodes={nodes} edges={projection.edges} nodeTypes={nodeTypes} fitView={false} />
+    </div>,
+  )
+  await waitFor(() => {
+    expect(view.container.querySelectorAll("[data-testid^='canvas-node-']").length).toBeGreaterThan(
+      0,
+    )
+  })
+  return view
+}
+
+/** The one element the resolved tint reaches — the icon well's `radial-gradient`. */
+function wellStyleOf(container: HTMLElement): string {
+  return container.querySelector('[style*="radial-gradient"]')?.getAttribute("style") ?? ""
+}
+
+describe("PhaseNode 188.1-04 — WR-04 site 1: the phase-type face is total", () => {
+  /**
+   * WR-04 SITE 1 (`PhaseNode.tsx`, the `ICON_TINT[data.phaseType]` lookup) — the ONE of
+   * the five WR-04 sites with a real SINK: the resolved value is interpolated into a CSS
+   * string by `PhaseNodeCard`, `radial-gradient(circle, ${tint}, transparent 68%)`.
+   *
+   * ⚠ OBSERVED RED FIRST, against the shipped tree, before any guard was written — the
+   * `lib/phaseState.ts` register. `ICON_TINT` is a plain object literal, so it INHERITS
+   * `constructor`, `toString`, `__proto__` and friends; `ICON_TINT["constructor"]` is
+   * therefore the `Object` FUNCTION — never nullish, so `?? DEFAULT_TINT` does not fire
+   * and a function reaches the style string.
+   *
+   * ⚠ IT IS ONE TEST BECAUSE `data.phaseType` FEEDS THREE LOOKUPS, NOT ONE, and the
+   * property is about the VALUE not about any single table. The adapter hands the same
+   * author-supplied discriminator to `ICON_TINT` (the tint) and to
+   * `nodePresentation.renderPhaseMark`, which indexes `phaseGlyph`'s `PHASE_GLYPH_MARKS`
+   * and then `soulData.PHASE_GLYPHS`. Measured against the shipped tree on 2026-08-06,
+   * the FIRST consequence of `"constructor"` is not a bad colour — it is
+   * `createElement(Object, …)` and a hard render crash, *"Objects are not valid as a
+   * React child"*. Guarding only the tint would leave this test red, which is exactly
+   * how a falsification proves the property is wider than the patch it was written for.
+   *
+   * This asserts the CONSEQUENCE (what the DOM paints) rather than the expression: a
+   * test that greps this file's source for `hasOwnProperty` would test the patch.
+   */
+  it("a prototype-key phase type renders the ORDINARY unknown face, never an inherited member", async () => {
+    const proto = await renderWithPhaseType("constructor")
+    const protoStyle = wellStyleOf(proto.container)
+    const protoCard = proto.container.querySelector(`[data-testid="canvas-node-${AGENT_SLUG}"]`)
+    const protoText = protoCard?.textContent ?? ""
+    // The sink, stated as the sink: NO rendered style attribute anywhere in the tree
+    // carries a stringified function.
+    for (const el of Array.from(proto.container.querySelectorAll("[style]"))) {
+      expect(el.getAttribute("style") ?? "").not.toContain("function")
+    }
+    proto.unmount()
+
+    // An ORDINARY unrecognised type — a real table MISS, which is what the prototype key
+    // must be indistinguishable from.
+    const ordinary = await renderWithPhaseType("llm_time_travel")
+    const ordinaryStyle = wellStyleOf(ordinary.container)
+    const ordinaryText =
+      ordinary.container.querySelector(`[data-testid="canvas-node-${AGENT_SLUG}"]`)?.textContent ??
+      ""
+    ordinary.unmount()
+
+    // POSITIVE CONTROLS: the ordinary miss really does paint a well and really does fall
+    // back to the declared "•" mark, so the equalities below compare two real faces
+    // rather than two empty strings.
+    expect(ordinaryStyle).toContain("radial-gradient")
+    expect(ordinaryText).toContain("•")
+
+    expect(protoStyle).toBe(ordinaryStyle)
+    expect(protoText).toBe(ordinaryText)
+  })
+})

@@ -62,6 +62,11 @@ vi.mock("@/lib/api", async () => {
 
 import { replayFixture } from "./replayHarness"
 import { PhaseTimeline } from "../PhaseTimeline"
+// 188.1-04: the ROW the timeline renders, imported directly for the WR-04 site-2/3
+// falsifications. Its own import statement rather than a widening of the line above —
+// the `canvasModel.purity.test.ts:18-21` rule, so this plan's diff reads as ADDED lines.
+import { PhaseCard } from "../PhaseCard"
+import type { Phase } from "@/types"
 
 const THREAD = "thread-tl"
 
@@ -173,5 +178,101 @@ describe("Phase 094 — PhaseTimeline a11y + render states (INV-2)  [owner: Plan
     })
     await renderTimeline(fxRunDone)
     expect(screen.getByRole("list")).not.toHaveAttribute("aria-busy")
+  })
+})
+
+// ── 188.1-04 · WR-04 sites 2 and 3 — the panel row's two lookups are total ──────
+
+/**
+ * WR-04 SITES 2 and 3 (`panel/PhaseCard.tsx` — `PHASE_TYPE_LABEL[phaseType]` behind
+ * `phaseTypeMeta`, and the FALLBACK-FREE `STATUS_META[phase.status]`).
+ *
+ * ⚠ BOTH OBSERVED RED FIRST, against the shipped tree, before either guard was written —
+ * the `lib/phaseState.ts` register. Both tables are plain object literals, so they
+ * INHERIT `constructor`, `toString`, `__proto__` and friends. `TABLE["constructor"]` is
+ * the `Object` FUNCTION: never nullish, so site 2's `?? UNKNOWN_PHASE_META` provably does
+ * not fire — and site 3 has no fallback at all, so an unowned key is read straight
+ * through. The consequence is a row whose label, glyph and status text all read
+ * `undefined` while the card still claims to have rendered a phase.
+ *
+ * ⚠ WHY THIS DRIVES `PhaseCard` DIRECTLY RATHER THAN A `PhaseTimeline` FIXTURE — measured,
+ * not assumed. The fixture path reaches the store through the REAL normalizer, and that
+ * normalizer already maps every wire status through `lib/phaseState.phaseStatusFromDb`,
+ * which is a SHIPPED own-property guard. A `status: "toString"` handed to `replayFixture`
+ * is therefore resolved to `"unknown"` BEFORE it can reach site 3 — a fixture-driven
+ * falsification would have been green against the unguarded tree, i.e. never observed RED
+ * and never known to test anything. `PhaseCard` is exported and is the real component the
+ * timeline renders at `PhaseTimeline.tsx:217`; rendering it is the only route that
+ * actually reaches the site. The reference render in each case is an ORDINARY unrecognised
+ * value, so the assertion is an equality against real output rather than against a
+ * hand-typed literal copied out of a module-private table.
+ */
+function basePhase(over: Partial<Phase> = {}): Phase {
+  return {
+    slug: "draft-the-summary",
+    phaseIndex: 0,
+    phaseType: "llm_single",
+    status: "pending",
+    subAgents: [],
+    pendingAsk: null,
+    ...over,
+  }
+}
+
+/** The accordion header — where the type label, the type glyph and the status atom live. */
+function headerTextOf(container: HTMLElement): string {
+  return container.querySelector("button")?.textContent ?? ""
+}
+
+describe("panel/PhaseCard 188.1-04 — WR-04 sites 2 and 3: the lookups are total", () => {
+  it("site 2 — a prototype-key phaseType renders the ORDINARY unknown row, never an inherited member", () => {
+    // `running` so the type LABEL renders: the panel shows it on the active step only.
+    const proto = render(
+      <PhaseCard phase={basePhase({ phaseType: "constructor", status: "running" })} position={0} />,
+    )
+    const protoText = headerTextOf(proto.container)
+    for (const el of Array.from(proto.container.querySelectorAll("*"))) {
+      expect(el.textContent ?? "").not.toContain("native code")
+    }
+    proto.unmount()
+
+    const ordinary = render(
+      <PhaseCard
+        phase={basePhase({ phaseType: "llm_time_travel", status: "running" })}
+        position={0}
+      />,
+    )
+    const ordinaryText = headerTextOf(ordinary.container)
+    ordinary.unmount()
+
+    // POSITIVE CONTROL: the ordinary miss really does render the declared unknown meta —
+    // the generic "Step" label and the "•" glyph — so the equality below compares two
+    // real rows rather than two empty strings.
+    expect(ordinaryText).toContain("Step")
+    expect(ordinaryText).toContain("•")
+    expect(protoText).toBe(ordinaryText)
+  })
+
+  it("site 3 — a prototype-key status renders the DECLARED unknown atom, never an inherited member", () => {
+    const proto = render(
+      <PhaseCard
+        phase={basePhase({ status: "toString" as unknown as Phase["status"] })}
+        position={0}
+      />,
+    )
+    const protoText = headerTextOf(proto.container)
+    proto.unmount()
+
+    // The reference is the union's OWN honest member — `STATUS_META.unknown`, added in
+    // Phase 188 Plan 02 so an unrecognised wire status reads as unknown rather than as
+    // Complete. Site 3's guard must land an unowned key on exactly that row.
+    const declared = render(<PhaseCard phase={basePhase({ status: "unknown" })} position={0} />)
+    const declaredText = headerTextOf(declared.container)
+    declared.unmount()
+
+    // POSITIVE CONTROL: the declared unknown atom carries real words and a real glyph.
+    expect(declaredText).toContain("Unknown")
+    expect(declaredText).toContain("?")
+    expect(protoText).toBe(declaredText)
   })
 })
