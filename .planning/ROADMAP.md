@@ -530,8 +530,8 @@ Plans:
 
 **Wave 10** *(blocked on 188-10; the two plans share no files and run in parallel)*
 
-- [ ] 188-11-PLAN.md — the SC#10 board: `scripts/sc10_188_run_board.py` derives the 8-provider roster by executing `MODEL_CAPABILITIES`, probes API keys FIRST (a keyless row silently looks like a pass), reads the EFFECTIVE provider back from `runs`, and `188-UAT.md` is authored with every row present and none pre-marked (wave 10)
-- [ ] 188-12-PLAN.md — final pins + phase gates: every suite this phase authored moves from `TARGETS` into `BASELINE` at its measured count, one pin is watched producing `[count-decrease]`, and nine gates are recorded — including the WHOLE-PHASE `WorkflowCanvas.tsx` numstat, zero migrations, and backend non-attribution proved by DIFFING the failure set (wave 10)
+- [x] 188-11-PLAN.md — the SC#10 board: `scripts/sc10_188_run_board.py` derives the 8-provider roster by executing `MODEL_CAPABILITIES`, probes API keys FIRST (a keyless row silently looks like a pass), reads the EFFECTIVE provider back from `runs`, and `188-UAT.md` is authored with every row present and none pre-marked (wave 10)
+- [x] 188-12-PLAN.md — final pins + phase gates: every suite this phase authored moves from `TARGETS` into `BASELINE` at its measured count, one pin is watched producing `[count-decrease]`, and nine gates are recorded — including the WHOLE-PHASE `WorkflowCanvas.tsx` numstat, zero migrations, and backend non-attribution proved by DIFFING the failure set (wave 10)
 
 
 **Wave 11** *(blocked on 188-11 + 188-12 — the operator gate)*
