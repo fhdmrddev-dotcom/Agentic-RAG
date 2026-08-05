@@ -1136,6 +1136,240 @@ describe("WorkflowCanvas 186-07 — F12: a cosmetic nudge writes nothing WITH au
   })
 })
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// Plan 188.1-02 — THE PRE-MOVE AFFORDANCE SHAPE CAPTURE (SC#2).
+//
+// Inserted ABOVE the accumulated belt on purpose, so that block keeps the property its
+// own comment claims: declared last, therefore run last, therefore its total covers
+// every path this file drives — including this one. Nothing above was edited, renamed
+// or re-described; this is a pure insertion.
+//
+// WHY A CAPTURE AND NOT AN EXPECTATION. Phase 188.1 lifts `PlaneEditingLayer`,
+// `EDIT_AFFORDANCE`, `REVEAL_ON_HOVER`, `insertPointX` and `verticalOffsetFor` out of
+// `WorkflowCanvas.tsx` into two modules of their own, and SC#2 promises the canvas
+// renders identically before and after. The cheap wrong way to check that is to
+// hand-type the attributes the affordances OUGHT to carry — which proves only what the
+// author believed the geometry was, and would ratify a move that changed it whenever
+// the change happened to match the belief. So this block CAPTURES the rendered
+// attributes from the tree AS IT SHIPS and pins the literal it observed. A baseline
+// taken after the move proves nothing, which is why this plan runs before it.
+//
+// `style` IS THE LOAD-BEARING ATTRIBUTE, and the reason one capture fences almost the
+// whole moved surface. Every number the moved helpers produce reaches the DOM through
+// it: the six `EDIT_AFFORDANCE` members as widths, heights and translate terms;
+// `insertPointX`'s three branches (before-first, between, after-last) as the `＋` x;
+// `verticalOffsetFor`'s nudge branch as the y — which is why the render below carries a
+// NON-ZERO nudge, since with every offset at 0 that helper contributes the same number
+// everywhere and the capture could not fail on it; and `PICKER_WIDTH` / `PICKER_DROP`
+// as the open menu's own transform, which is why the render OPENS the picker rather
+// than merely declaring those two constants exist.
+//
+// The driver rule from the top of this file still applies: `fireEvent` only.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * The captured shape of one affordance element.
+ *
+ * ORDER-INDEPENDENT BY CONSTRUCTION. The result is sorted by `data-testid` before it is
+ * returned, so jsdom's DOM traversal order cannot leak into the baseline. Research
+ * assumption A6 held that jsdom's ordering is stable in practice but did not prove it;
+ * sorting retires the assumption outright rather than betting on it, and costs a line.
+ *
+ * `aria-*` are captured alongside `class` and `style` because the `＋` is a menu button:
+ * a move that kept the geometry and dropped `aria-expanded` would still be a change to
+ * what ships. A missing attribute captures as `null`, which is a value the deep-equal
+ * compares — an attribute that disappears is a diff, not a silent pass.
+ */
+function AFFORDANCE_SHAPE(container: HTMLElement) {
+  const els = Array.from(
+    container.querySelectorAll(
+      '[data-testid^="canvas-insert-"], [data-testid^="canvas-remove-"], [data-testid="canvas-insert-picker"]',
+    ),
+  )
+  return els
+    .map((el) => ({
+      testid: el.getAttribute("data-testid"),
+      class: el.getAttribute("class"),
+      style: el.getAttribute("style"),
+      ariaLabel: el.getAttribute("aria-label"),
+      ariaExpanded: el.getAttribute("aria-expanded"),
+      ariaHaspopup: el.getAttribute("aria-haspopup"),
+    }))
+    .sort((a, b) => (a.testid! < b.testid! ? -1 : a.testid! > b.testid! ? 1 : 0))
+}
+
+/**
+ * ⚠ THIS LITERAL IS A CAPTURE, NOT AN EXPECTATION. Every character below was READ OUT of
+ * the rendered DOM of the tree as it stands at this commit — the tree Phase 188 closed at
+ * `7e1bff34` — by running `AFFORDANCE_SHAPE` above and pasting what it printed. Not one
+ * number here was typed from the source, computed by hand, or reasoned about. That is the
+ * whole point: an expectation records what its author believed the geometry to be, and a
+ * move that changed the geometry to match that belief would pass it.
+ *
+ * OBSERVED TWICE on the unchanged tree before it was committed, and the two runs agreed —
+ * so it is a baseline rather than one sample of something that might vary. It was also
+ * observed to go RED against a deliberate one-pixel change to `EDIT_AFFORDANCE.INSERT_SIZE`
+ * (26 → 27) and to `PICKER_WIDTH` (300 → 320), which is what makes it a fence around
+ * GEOMETRY and not merely around presence.
+ *
+ * A DIFF AGAINST THIS ARRAY AFTER PLAN 188.1-03 IS A BEHAVIOUR CHANGE — SC#2 broken — AND
+ * NOT A TEST TO UPDATE. The extraction is supposed to move code, not move pixels. If this
+ * goes red during the move, the move is wrong; re-capturing it to make it green would
+ * delete the only evidence anybody has that the canvas still renders what it rendered.
+ *
+ * WHAT THE NUMBERS BELOW REACH BACK TO, so a reader can see the fence is not decorative:
+ *   · `width` / `height` 26 → `EDIT_AFFORDANCE.INSERT_SIZE`, 24 → `REMOVE_SIZE`
+ *   · the `＋` x −43 / 277 / 597 / 917 / 1237 / 1557 → `insertPointX`'s three branches over
+ *     a 320 pitch (`GAP` = 60, so a half-gap of 30 either side of the run)
+ *   · the `＋` y 15 → `INSERT_Y` (28) − `INSERT_SIZE`/2, and 39 → the same plus the 24px
+ *     mean slant either side of the one nudged card — `verticalOffsetFor`'s nudge branch
+ *   · the ✕ y 92 → `NODE_MIN_HEIGHT` − `REMOVE_SIZE`/2, and 140 → that plus the full 48px
+ *     nudge, because a ✕ belongs to exactly one card and takes its WHOLE offset
+ *   · the picker's `translate(460px, 74px)` → `insertPointX(lanes, 2)` (610) −
+ *     `PICKER_WIDTH`/2 (150), and `INSERT_Y` + `PICKER_DROP` + the 24px slant. `PICKER_WIDTH`
+ *     reaches the DOM only through that halved centring term — the literal 300 appears
+ *     nowhere in the attribute — which is why it is proven fenced by the RED observation
+ *     rather than by reading the string.
+ */
+const AFFORDANCE_SHAPE_BASELINE: ReturnType<typeof AFFORDANCE_SHAPE> = [
+  {
+    testid: "canvas-insert-0",
+    class:
+      "absolute grid place-items-center rounded-full border border-dashed border-border bg-card text-[15px] leading-none text-muted-foreground transition-opacity hover:border-solid hover:border-primary hover:text-primary motion-reduce:transition-none pointer-events-auto opacity-100 lg:opacity-0 lg:group-hover/canvas:opacity-100 lg:focus-visible:opacity-100 [@media(hover:none)]:opacity-100",
+    style: "left: 0px; top: 0px; width: 26px; height: 26px; transform: translate(-43px, 15px);",
+    ariaLabel: "Add a step before step 1",
+    ariaExpanded: "false",
+    ariaHaspopup: "menu",
+  },
+  {
+    testid: "canvas-insert-1",
+    class:
+      "absolute grid place-items-center rounded-full border border-dashed border-border bg-card text-[15px] leading-none text-muted-foreground transition-opacity hover:border-solid hover:border-primary hover:text-primary motion-reduce:transition-none pointer-events-auto opacity-100 lg:opacity-0 lg:group-hover/canvas:opacity-100 lg:focus-visible:opacity-100 [@media(hover:none)]:opacity-100",
+    style: "left: 0px; top: 0px; width: 26px; height: 26px; transform: translate(277px, 39px);",
+    ariaLabel: "Add a step before step 2",
+    ariaExpanded: "false",
+    ariaHaspopup: "menu",
+  },
+  {
+    testid: "canvas-insert-2",
+    class:
+      "absolute grid place-items-center rounded-full border border-dashed border-border bg-card text-[15px] leading-none text-muted-foreground transition-opacity hover:border-solid hover:border-primary hover:text-primary motion-reduce:transition-none pointer-events-auto opacity-100 lg:opacity-0 lg:group-hover/canvas:opacity-100 lg:focus-visible:opacity-100 [@media(hover:none)]:opacity-100",
+    style: "left: 0px; top: 0px; width: 26px; height: 26px; transform: translate(597px, 39px);",
+    ariaLabel: "Add a step before step 3",
+    ariaExpanded: "true",
+    ariaHaspopup: "menu",
+  },
+  {
+    testid: "canvas-insert-3",
+    class:
+      "absolute grid place-items-center rounded-full border border-dashed border-border bg-card text-[15px] leading-none text-muted-foreground transition-opacity hover:border-solid hover:border-primary hover:text-primary motion-reduce:transition-none pointer-events-auto opacity-100 lg:opacity-0 lg:group-hover/canvas:opacity-100 lg:focus-visible:opacity-100 [@media(hover:none)]:opacity-100",
+    style: "left: 0px; top: 0px; width: 26px; height: 26px; transform: translate(917px, 15px);",
+    ariaLabel: "Add a step before step 4",
+    ariaExpanded: "false",
+    ariaHaspopup: "menu",
+  },
+  {
+    testid: "canvas-insert-4",
+    class:
+      "absolute grid place-items-center rounded-full border border-dashed border-border bg-card text-[15px] leading-none text-muted-foreground transition-opacity hover:border-solid hover:border-primary hover:text-primary motion-reduce:transition-none pointer-events-auto opacity-100 lg:opacity-0 lg:group-hover/canvas:opacity-100 lg:focus-visible:opacity-100 [@media(hover:none)]:opacity-100",
+    style: "left: 0px; top: 0px; width: 26px; height: 26px; transform: translate(1237px, 15px);",
+    ariaLabel: "Add a step before step 5",
+    ariaExpanded: "false",
+    ariaHaspopup: "menu",
+  },
+  {
+    testid: "canvas-insert-5",
+    class:
+      "absolute grid place-items-center rounded-full border border-dashed border-border bg-card text-[15px] leading-none text-muted-foreground transition-opacity hover:border-solid hover:border-primary hover:text-primary motion-reduce:transition-none pointer-events-auto opacity-100 lg:opacity-0 lg:group-hover/canvas:opacity-100 lg:focus-visible:opacity-100 [@media(hover:none)]:opacity-100",
+    style: "left: 0px; top: 0px; width: 26px; height: 26px; transform: translate(1557px, 15px);",
+    ariaLabel: "Add a step at the end",
+    ariaExpanded: "false",
+    ariaHaspopup: "menu",
+  },
+  {
+    testid: "canvas-insert-picker",
+    class: "pointer-events-auto absolute",
+    style:
+      "left: 0px; top: 0px; transform-origin: top left; transform: translate(460px, 74px) scale(1);",
+    ariaLabel: null,
+    ariaExpanded: null,
+    ariaHaspopup: null,
+  },
+  {
+    testid: "canvas-remove-confirm",
+    class:
+      "absolute grid place-items-center rounded-[7px] border border-border bg-card text-[11px] leading-none text-muted-foreground transition-opacity hover:border-[hsl(0_72%_51%/0.6)] hover:text-[hsl(0_85%_74%)] motion-reduce:transition-none pointer-events-auto opacity-100 lg:opacity-0 lg:group-hover/canvas:opacity-100 lg:focus-visible:opacity-100 [@media(hover:none)]:opacity-100",
+    style: "left: 0px; top: 0px; width: 24px; height: 24px; transform: translate(1078px, 92px);",
+    ariaLabel: "Remove step 4",
+    ariaExpanded: null,
+    ariaHaspopup: null,
+  },
+  {
+    testid: "canvas-remove-deep_dive",
+    class:
+      "absolute grid place-items-center rounded-[7px] border border-border bg-card text-[11px] leading-none text-muted-foreground transition-opacity hover:border-[hsl(0_72%_51%/0.6)] hover:text-[hsl(0_85%_74%)] motion-reduce:transition-none pointer-events-auto opacity-100 lg:opacity-0 lg:group-hover/canvas:opacity-100 lg:focus-visible:opacity-100 [@media(hover:none)]:opacity-100",
+    style: "left: 0px; top: 0px; width: 24px; height: 24px; transform: translate(758px, 92px);",
+    ariaLabel: "Remove step 3",
+    ariaExpanded: null,
+    ariaHaspopup: null,
+  },
+  {
+    testid: "canvas-remove-fanout",
+    class:
+      "absolute grid place-items-center rounded-[7px] border border-border bg-card text-[11px] leading-none text-muted-foreground transition-opacity hover:border-[hsl(0_72%_51%/0.6)] hover:text-[hsl(0_85%_74%)] motion-reduce:transition-none pointer-events-auto opacity-100 lg:opacity-0 lg:group-hover/canvas:opacity-100 lg:focus-visible:opacity-100 [@media(hover:none)]:opacity-100",
+    style: "left: 0px; top: 0px; width: 24px; height: 24px; transform: translate(438px, 140px);",
+    ariaLabel: "Remove step 2",
+    ariaExpanded: null,
+    ariaHaspopup: null,
+  },
+  {
+    testid: "canvas-remove-split",
+    class:
+      "absolute grid place-items-center rounded-[7px] border border-border bg-card text-[11px] leading-none text-muted-foreground transition-opacity hover:border-[hsl(0_72%_51%/0.6)] hover:text-[hsl(0_85%_74%)] motion-reduce:transition-none pointer-events-auto opacity-100 lg:opacity-0 lg:group-hover/canvas:opacity-100 lg:focus-visible:opacity-100 [@media(hover:none)]:opacity-100",
+    style: "left: 0px; top: 0px; width: 24px; height: 24px; transform: translate(118px, 92px);",
+    ariaLabel: "Remove step 1",
+    ariaExpanded: null,
+    ariaHaspopup: null,
+  },
+  {
+    testid: "canvas-remove-summarize",
+    class:
+      "absolute grid place-items-center rounded-[7px] border border-border bg-card text-[11px] leading-none text-muted-foreground transition-opacity hover:border-[hsl(0_72%_51%/0.6)] hover:text-[hsl(0_85%_74%)] motion-reduce:transition-none pointer-events-auto opacity-100 lg:opacity-0 lg:group-hover/canvas:opacity-100 lg:focus-visible:opacity-100 [@media(hover:none)]:opacity-100",
+    style: "left: 0px; top: 0px; width: 24px; height: 24px; transform: translate(1398px, 92px);",
+    ariaLabel: "Remove step 5",
+    ariaExpanded: null,
+    ariaHaspopup: null,
+  },
+]
+
+describe("WorkflowCanvas 188.1-02 — the editing affordances' pre-move rendered shape", () => {
+  it("reproduces the shape CAPTURED from the shipped tree, attribute for attribute", () => {
+    const { container } = renderCanvas(evalCoverage, {
+      editable: true,
+      // A non-zero cosmetic offset on exactly ONE card, so `verticalOffsetFor` returns
+      // three different numbers across this render (48 for that card's ✕, 24 for the two
+      // ＋ that straddle it and for the picker, 0 everywhere else) instead of one.
+      nudges: { fanout: 48 },
+    })
+
+    // The picker OPEN, driven the way this suite's driver rule requires — a real event on
+    // a real `＋`, never a prop poke. Boundary 2 is a MIDDLE boundary, so the mean branch
+    // of the slant term is the one exercised.
+    fireEvent.click(screen.getByTestId("canvas-insert-2"))
+
+    const captured = AFFORDANCE_SHAPE(container)
+
+    // NON-VACUITY CONTROL, first: a deep-equal against an empty array passes forever, and
+    // a capture that lost the picker would still deep-equal a baseline captured without it.
+    expect(captured.length).toBeGreaterThan(0)
+    expect(captured.filter((e) => /^canvas-insert-\d+$/.test(e.testid ?? "")).length).toBeGreaterThan(0)
+    expect(captured.filter((e) => (e.testid ?? "").startsWith("canvas-remove-")).length).toBeGreaterThan(0)
+    expect(captured.filter((e) => e.testid === "canvas-insert-picker")).toHaveLength(1)
+
+    expect(captured).toEqual(AFFORDANCE_SHAPE_BASELINE)
+  })
+})
+
 // ── The accumulated belt, declared LAST so it runs LAST (the `canvasNudge.test.ts:391-394`
 //    shape). Every assertion site above checks the spy at its own moment; this one checks
 //    the total across every path this file drives, including the ones that never mention
