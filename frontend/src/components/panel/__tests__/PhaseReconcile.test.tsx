@@ -377,3 +377,195 @@ describe("Phase 188 — reconcilePhases TERMINAL branch fallback (Req 3 / D-188-
     expect(result.current.data[1].slug).toBe("publish")
   })
 })
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 188 Plan 04 — BUG-260609-04, at its root (RUNVIZ-01 / RUNVIZ-02 / D-188-22).
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// ⚠ THIS BLOCK DRIVES THE **LIVE** BRANCH — the mirror image of RED 2 above, which
+// had to drive the TERMINAL one. Live is selected by `wf.mode === "harness" &&
+// !wf.lock_is_stale`, and it is the branch that builds the positional
+// `Array.from({length: total_phases})` skeleton whose non-current rows carry the
+// placeholder slug `phase-${i}` and the flat `phaseType: "unknown"`.
+//
+// THE BUG (BUG-260609-04, reported 2026-06-10, `folded_into: "188"`): that skeleton
+// was written on the premise that only `current_phase_slug` is knowable mid-run.
+// RESEARCH Open Question 4 measured the premise FALSE: `create_workflow_run`
+// (`backend/app/db/workflows.py:206-214`) inserts EVERY `workflow_phases` row at run
+// creation in one transaction — it is the only `INSERT INTO workflow_phases` in
+// `backend/app` — and `GET /threads/{id}/workflow` returns `slug + phase_index +
+// status + phase_type` for all of them, live and terminal alike. So the real names
+// are already on the wire and the skeleton is discarding them.
+//
+// THE SECOND, PREVIOUSLY UNRECORDED HALF: the same line loses `phaseType` too. The
+// report only ever named the slug; `phaseType: "unknown"` is the same defect on the
+// same row, and one overlay closes both.
+//
+// OBSERVED RED on unmodified production source, 2026-08-05, `npx vitest run
+// src/components/panel/__tests__/PhaseReconcile.test.tsx` at 12 tests | 3 failed
+// — the other 9 green, INCLUDING the floor guard and the fallback control below
+// (the full raw vitest output is pasted verbatim into `188-04-SUMMARY.md`). The
+// three received values, verbatim:
+//
+//   AssertionError: the first step's real name, not a positional placeholder:
+//   expected 'phase-0' to be 'collect-inputs' // Object.is equality
+//   Expected: "collect-inputs"     Received: "phase-0"
+//
+//   AssertionError: a later step's real name is already on the wire:
+//   expected 'phase-2' to be 'check-the-numbers' // Object.is equality
+//   Expected: "check-the-numbers"  Received: "phase-2"
+//
+//   AssertionError: expected [ 'unknown', 'unknown', …(2) ] to strictly equal
+//   [ 'programmatic', 'llm_agent', …(2) ]
+//
+// i.e. THE RECEIVED SLUGS WERE THE POSITIONAL PLACEHOLDERS `phase-0` / `phase-2`
+// while the server had already sent `collect-inputs` / `check-the-numbers`, and
+// EVERY phaseType read `"unknown"` while the server had sent a real type for each.
+//
+// ── AND THE FENCE THE FIX MUST NOT BREAK ─────────────────────────────────────
+//
+// The floor guard in this same block is GREEN BEFORE THE FIX and must stay green
+// after. It is not a falsification; it is the mechanical fence around T-188-04-01.
+// The fixture's DB rows are deliberately BEHIND the positional derivation (index 0
+// is still `pending` in `workflow_phases` even though `current_phase_index` is 1),
+// which is the real mid-run shape: a row only flips at `complete_phase`. Overlaying
+// STATUS as well as identity would therefore drag `PhaseTimeline`'s shipped
+// forward-only counter (`PhaseTimeline.tsx:115-127`) BACKWARD — a regression dressed
+// as a fix, and strictly worse than the cosmetic bug being closed. The overlay is
+// IDENTITY ONLY: `slug` and `phaseType`, never `status`.
+//
+// That same assertion doubles as the mechanical proof that the LIVE branch really
+// was the one exercised: the terminal branch maps a DB `pending` straight through to
+// `pending`, so a `done` at index 0 can only have come from the positional
+// derivation.
+
+const THREAD_LIVE = "thread-188-live"
+
+/** The four real `workflow_phases` rows a LIVE run already has from t=0. */
+const LIVE_ROWS = [
+  { slug: "collect-inputs", phase_index: 0, status: "pending", phase_type: "programmatic" },
+  { slug: "draft-the-letter", phase_index: 1, status: "pending", phase_type: "llm_agent" },
+  { slug: "check-the-numbers", phase_index: 2, status: "pending", phase_type: "llm_single" },
+  { slug: "produce-the-report", phase_index: 3, status: "pending", phase_type: "llm_emit" },
+]
+
+describe("Phase 188 — reconcilePhases LIVE branch identity overlay (BUG-260609-04 / D-188-22)", () => {
+  beforeEach(() => {
+    resetPhases()
+    // LIVE: a harness run whose lock is FRESH → the positional-skeleton branch.
+    // Every DB row still reads `pending` (they flip only at `complete_phase`), which
+    // is exactly the mid-run state that makes a status overlay dangerous.
+    mockGetThreadWorkflow.mockResolvedValue({
+      mode: "harness",
+      lock_is_stale: false,
+      definition_name: "Quarterly board letter",
+      run_status: "running",
+      total_phases: 4,
+      current_phase_index: 1,
+      current_phase_slug: "draft-the-letter",
+      phases: LIVE_ROWS,
+    })
+  })
+
+  it("a non-current EARLIER step carries its real name, not the positional placeholder", async () => {
+    mountRealProvider()
+    const { result } = renderHook(() => RealStreams.usePhases(THREAD_LIVE))
+    await waitFor(() => expect(result.current.data).toHaveLength(4))
+
+    // THE BUG, at index 0: `phase-0` is a synthetic positional name the operator
+    // cannot match to any step they authored. The server sent `collect-inputs`.
+    expect(
+      result.current.data[0].slug,
+      "the first step's real name, not a positional placeholder",
+    ).toBe("collect-inputs")
+    expect(result.current.data[0].slug).not.toBe("phase-0")
+  })
+
+  it("a non-current LATER step carries its real name too", async () => {
+    mountRealProvider()
+    const { result } = renderHook(() => RealStreams.usePhases(THREAD_LIVE))
+    await waitFor(() => expect(result.current.data).toHaveLength(4))
+
+    // Ahead of the current index, not just behind it — the skeleton clobbered both.
+    expect(
+      result.current.data[2].slug,
+      "a later step's real name is already on the wire",
+    ).toBe("check-the-numbers")
+    expect(result.current.data[2].slug).not.toBe("phase-2")
+    // And the CURRENT row keeps the name it already had (it was the one position the
+    // skeleton got right, via `current_phase_slug`) — the overlay must not regress it.
+    expect(result.current.data[1].slug).toBe("draft-the-letter")
+    expect(result.current.data[3].slug).toBe("produce-the-report")
+  })
+
+  it("every step carries its real phase type — the second, previously unrecorded half of the same bug", async () => {
+    mountRealProvider()
+    const { result } = renderHook(() => RealStreams.usePhases(THREAD_LIVE))
+    await waitFor(() => expect(result.current.data).toHaveLength(4))
+
+    // The report only ever named the slug. `phaseType: "unknown"` is the same defect
+    // on the same row, and it is what drives the step's icon and its type sentence.
+    expect(result.current.data.map((p) => p.phaseType)).toStrictEqual([
+      "programmatic",
+      "llm_agent",
+      "llm_single",
+      "llm_emit",
+    ])
+  })
+
+  it("THE FLOOR GUARD — status stays POSITIONAL: a DB row lagging behind the counter never drags it backward", async () => {
+    mountRealProvider()
+    const { result } = renderHook(() => RealStreams.usePhases(THREAD_LIVE))
+    await waitFor(() => expect(result.current.data).toHaveLength(4))
+
+    // Green BEFORE the fix and green after — this is the fence, not a falsification.
+    // Index 0's DB row still says `pending` (it flips only at `complete_phase`), yet
+    // the positional derivation says `done` because `current_phase_index` is 1. The
+    // DERIVATION must win: overlaying status would move the shipped forward-only
+    // counter at `PhaseTimeline.tsx:115-127` backward.
+    expect(
+      result.current.data[0].status,
+      "the positional floor outranks a lagging DB row — status is NOT overlaid",
+    ).toBe("done")
+    expect(result.current.data[1].status).toBe("running")
+    expect(result.current.data[2].status).toBe("pending")
+    expect(result.current.data[3].status).toBe("pending")
+    // The `done` above is ALSO the proof that the LIVE branch was exercised: the
+    // terminal branch maps a DB `pending` straight through to `pending`.
+  })
+
+  it("POSITIVE CONTROL — with no `phases` on the wire the placeholder fallback is byte-for-byte unchanged", async () => {
+    // Defence in depth. RESEARCH OQ4 measured that this case cannot occur against the
+    // shipped backend (every row exists from run creation), so the fallback is not
+    // load-bearing — but a fallback nobody exercised is a fallback nobody has read.
+    mockGetThreadWorkflow.mockResolvedValue({
+      mode: "harness",
+      lock_is_stale: false,
+      definition_name: "Quarterly board letter",
+      run_status: "running",
+      total_phases: 4,
+      current_phase_index: 1,
+      current_phase_slug: "draft-the-letter",
+      phases: null,
+    })
+    mountRealProvider()
+    const { result } = renderHook(() => RealStreams.usePhases(THREAD_LIVE))
+    await waitFor(() => expect(result.current.data).toHaveLength(4))
+
+    expect(result.current.data.map((p) => p.slug)).toStrictEqual([
+      "phase-0",
+      "draft-the-letter",
+      "phase-2",
+      "phase-3",
+    ])
+    expect(result.current.data.map((p) => p.phaseType)).toStrictEqual([
+      "unknown",
+      "unknown",
+      "unknown",
+      "unknown",
+    ])
+    // `total_phases` remains the array length — kept as defence in depth, never
+    // presented as load-bearing (RESEARCH OQ4 consequence 2).
+    expect(result.current.data).toHaveLength(4)
+  })
+})
