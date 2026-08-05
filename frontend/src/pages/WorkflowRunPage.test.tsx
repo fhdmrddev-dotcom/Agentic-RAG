@@ -23,7 +23,13 @@ const getWorkflowRun = vi.fn()
 // Plan 10: the shipped bearer-authed raw-bytes helper. Mocked so a download is a
 // RECORDED CALL rather than a jsdom navigation — the argument this suite cares about is
 // the thread id, and it must be the RUN's.
-const downloadWorkspaceFile = vi.fn(() => Promise.resolve())
+// ⚠ Typed with its REAL signature, not `unknown[]`: this suite asserts on
+// `mock.calls[0][0]` (the thread id), and an untyped spy makes that index a compile
+// error under `noUnusedLocals`/strict tuple indexing — the check that matters most here
+// would be the one the compiler refuses to let us write.
+const downloadWorkspaceFile = vi.fn(
+  (_threadId: string, _fileId: string, _filename: string): Promise<void> => Promise.resolve(),
+)
 
 vi.mock("@/lib/api", () => {
   class ApiError extends Error {
@@ -38,7 +44,7 @@ vi.mock("@/lib/api", () => {
     ApiError,
     getWorkflowRun: (...a: unknown[]) => getWorkflowRun(...(a as [string])),
     downloadWorkspaceFile: (...a: unknown[]) =>
-      downloadWorkspaceFile(...(a as [])),
+      downloadWorkspaceFile(...(a as [string, string, string])),
   }
 })
 
@@ -46,9 +52,16 @@ vi.mock("@/lib/api", () => {
 //    surface that touches the stream, so exactly these two hooks are mocked. ──
 const usePhases = vi.fn()
 const useWorkspaceFiles = vi.fn()
+// A DECOY, and the whole point of it: the globally-viewed thread is what the panel's own
+// file list resolves, and it is the wrong answer here. Exporting it from the mock means
+// that IF the page ever reached for it, it would resolve — to a deliberately different
+// value than the run's thread, so the mistake shows up as a failing assertion rather than
+// as a list that quietly belongs to somebody else's thread.
+const useViewingThread = vi.fn()
 vi.mock("@/providers/StreamsProvider", () => ({
   usePhases: (...a: unknown[]) => usePhases(...(a as [string | null])),
   useWorkspaceFiles: (...a: unknown[]) => useWorkspaceFiles(...(a as [string | null])),
+  useViewingThread: () => useViewingThread(),
 }))
 
 // ── The canvas leaf-stub: it renders what the page HANDED it and nothing else, so a
@@ -208,11 +221,38 @@ function labels(): Record<string, string> {
   return out
 }
 
+// ── Plan 10 fixtures: the two thread ids are DELIBERATELY DIFFERENT VALUES ────────
+//
+// In production both are bare uuids and a swap typechecks, so the only way a wrong-thread
+// read is DETECTABLE is if the two fixtures disagree. `RUN_THREAD_ID` is the thread the
+// run itself anchors — the correct source for its deliverables. `VIEWED_THREAD_ID` is
+// whatever thread chat happens to be looking at, which on this surface is nobody's
+// business and is what the panel's own list would have used.
+const RUN_THREAD_ID = "thread-of-the-run"
+const VIEWED_THREAD_ID = "thread-being-viewed"
+
+/** The flagship deliverable: the artefact the template-fill engine actually emits, and
+ *  precisely the kind a reviewer cannot read in place. 18841 B → `18.4 KB`. */
+const DELIVERABLE: WorkspaceFile = {
+  id: "file-docx-1",
+  path: "output/renewal-letter.docx",
+  size_bytes: 18841,
+  mime_type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  version: 1,
+}
+const DELIVERABLE_NAME = "renewal-letter.docx"
+const DELIVERABLE_SIZE = "18.4 KB"
+const DOWNLOAD_LABEL = `Download ${DELIVERABLE_NAME} (${DELIVERABLE_SIZE})`
+
+const COPY_EMPTY_LIVE = "No files yet — this run hasn't written anything."
+const COPY_EMPTY_TERMINAL = "This run produced no files."
+
 beforeEach(() => {
   vi.clearAllMocks()
   window.localStorage.clear()
   setLiveSlice([])
   setFiles([])
+  useViewingThread.mockReturnValue(VIEWED_THREAD_ID)
   downloadWorkspaceFile.mockResolvedValue(undefined)
   getWorkflowRun.mockResolvedValue(mkRun())
 })
@@ -686,11 +726,151 @@ describe("WorkflowRunPage — loading and error states", () => {
     expect(screen.getByText("The second workflow")).toBeTruthy()
   })
 
-  it("renders the deliverable region as a frame only — Plan 10 fills it", async () => {
+  // Plan 08 authored this as "a frame only — Plan 10 fills it". Plan 10 filled it; the
+  // assertion it makes is the region's IDENTITY, which is unchanged and still worth
+  // holding, so the case is renamed rather than deleted.
+  it("renders the deliverable region under its own heading", async () => {
     renderPage()
     await screen.findByTestId("canvas-stub")
     const region = screen.getByTestId("run-deliverables")
     expect(region.textContent).toContain("What this run produced")
+  })
+})
+
+// ── 7b. The deliverable: listed and downloadable, never previewed (SPEC Req 7) ────
+//
+// This is the `🕐 Tomorrow` half of the phase: a day later, can the user find the run and
+// GET THE FILE IT MADE? Everything below measures that answer, and measures that the
+// answer is sourced from the run's OWN thread.
+
+describe("WorkflowRunPage — the deliverable is listed and downloadable", () => {
+  beforeEach(() => {
+    getWorkflowRun.mockResolvedValue(mkRun({ thread_id: RUN_THREAD_ID }))
+    setFiles([DELIVERABLE])
+  })
+
+  it("lists the file the run produced, with its name and its size", async () => {
+    renderPage()
+    const row = await screen.findByRole("button", { name: DOWNLOAD_LABEL })
+    expect(row.textContent).toContain(DELIVERABLE_NAME)
+    expect(row.textContent).toContain(DELIVERABLE_SIZE)
+    // The full path is available without being the visible label.
+    expect(row.getAttribute("title")).toBe(DELIVERABLE.path)
+  })
+
+  it("reads the list from the RUN's thread and never from the viewed thread", async () => {
+    renderPage()
+    await screen.findByRole("button", { name: DOWNLOAD_LABEL })
+    const args = useWorkspaceFiles.mock.calls.map((c) => c[0])
+    expect(args).toContain(RUN_THREAD_ID)
+    expect(args).not.toContain(VIEWED_THREAD_ID)
+  })
+
+  it("downloads with the RUN's thread id, the file id and the bare filename", async () => {
+    renderPage()
+    fireEvent.click(await screen.findByRole("button", { name: DOWNLOAD_LABEL }))
+    expect(downloadWorkspaceFile).toHaveBeenCalledWith(
+      RUN_THREAD_ID,
+      DELIVERABLE.id,
+      DELIVERABLE_NAME,
+    )
+    // Stated separately and on purpose: the two fixtures differ so THIS is a measurement.
+    expect(downloadWorkspaceFile.mock.calls[0][0]).not.toBe(VIEWED_THREAD_ID)
+  })
+
+  it("offers NO preview for the .docx row — no pane, no frame, only the download", async () => {
+    renderPage()
+    await screen.findByRole("button", { name: DOWNLOAD_LABEL })
+    const region = screen.getByTestId("run-deliverables")
+    expect(region.querySelector("iframe")).toBeNull()
+    expect(region.querySelector("embed")).toBeNull()
+    expect(region.querySelector("object")).toBeNull()
+    expect(region.querySelector("[data-testid*='preview']")).toBeNull()
+    // Exactly one control in the region, and it is the download.
+    const buttons = region.querySelectorAll("button")
+    expect(buttons).toHaveLength(1)
+    expect(buttons[0].getAttribute("aria-label")).toBe(DOWNLOAD_LABEL)
+    // POSITIVE CONTROL — the probes really do find the shapes they forbid.
+    const probe = document.createElement("div")
+    probe.innerHTML = `<iframe></iframe><div data-testid="file-preview"></div>`
+    expect(probe.querySelector("iframe")).not.toBeNull()
+    expect(probe.querySelector("[data-testid*='preview']")).not.toBeNull()
+  })
+
+  it("renders the rows as a list, one row per file", async () => {
+    setFiles([
+      DELIVERABLE,
+      { id: "file-2", path: "notes.md", size_bytes: 512, mime_type: "text/markdown" },
+    ])
+    renderPage()
+    await screen.findByRole("button", { name: DOWNLOAD_LABEL })
+    const region = screen.getByTestId("run-deliverables")
+    const list = region.querySelector('[role="list"]')
+    expect(list).not.toBeNull()
+    expect(list?.querySelectorAll("li")).toHaveLength(2)
+    expect(screen.getByRole("button", { name: "Download notes.md (512 B)" })).toBeTruthy()
+  })
+
+  it("surfaces a failed download where the user clicked, instead of swallowing it", async () => {
+    downloadWorkspaceFile.mockRejectedValueOnce(new Error("File not found."))
+    renderPage()
+    fireEvent.click(await screen.findByRole("button", { name: DOWNLOAD_LABEL }))
+    expect((await screen.findByTestId("run-download-error")).textContent).toContain(
+      "File not found.",
+    )
+  })
+
+  it("a row the listing gave with no id is shown as a fact, never as a dead control", async () => {
+    setFiles([{ path: "orphan.docx", size_bytes: 100, mime_type: "" }])
+    renderPage()
+    await screen.findByTestId("canvas-stub")
+    const region = screen.getByTestId("run-deliverables")
+    expect(region.textContent).toContain("orphan.docx")
+    // No control — the raw route would be built with an empty id segment and 404.
+    expect(region.querySelectorAll("button")).toHaveLength(0)
+  })
+})
+
+describe("WorkflowRunPage — the two empty states say different true things", () => {
+  it("a LIVE run with no files says nothing has been written YET", async () => {
+    getWorkflowRun.mockResolvedValue(mkRun({ status: "active", thread_id: RUN_THREAD_ID }))
+    setFiles([])
+    renderPage()
+    await screen.findByTestId("canvas-stub")
+    expect(screen.getByTestId("run-deliverables").textContent).toContain(COPY_EMPTY_LIVE)
+    expect(screen.queryByText(COPY_EMPTY_TERMINAL)).toBeNull()
+  })
+
+  it("a TERMINAL run with no files says it produced none — the tense is the fact", async () => {
+    getWorkflowRun.mockResolvedValue(mkRun({ status: "completed", thread_id: RUN_THREAD_ID }))
+    setFiles([])
+    renderPage()
+    await screen.findByTestId("canvas-stub")
+    expect(screen.getByTestId("run-deliverables").textContent).toContain(COPY_EMPTY_TERMINAL)
+    expect(screen.queryByText(COPY_EMPTY_LIVE)).toBeNull()
+  })
+
+  it("claims NEITHER while the first read is still in flight", async () => {
+    getWorkflowRun.mockResolvedValue(mkRun({ status: "completed", thread_id: RUN_THREAD_ID }))
+    setFiles([], true)
+    renderPage()
+    await screen.findByTestId("canvas-stub")
+    const region = screen.getByTestId("run-deliverables")
+    expect(region.textContent).not.toContain(COPY_EMPTY_TERMINAL)
+    expect(region.textContent).not.toContain(COPY_EMPTY_LIVE)
+    // The heading is still there — the region exists, it just makes no claim yet.
+    expect(region.textContent).toContain("What this run produced")
+  })
+})
+
+describe("WorkflowRunPage — the seam, run side (D-188-13)", () => {
+  it("hands the thread seam the RUN's thread id, not the viewed one", async () => {
+    getWorkflowRun.mockResolvedValue(mkRun({ thread_id: RUN_THREAD_ID }))
+    const { onOpenThread } = renderPage()
+    await screen.findByTestId("canvas-stub")
+    fireEvent.click(screen.getByText("Open the chat thread"))
+    expect(onOpenThread).toHaveBeenCalledWith(RUN_THREAD_ID)
+    expect(onOpenThread).not.toHaveBeenCalledWith(VIEWED_THREAD_ID)
   })
 })
 
@@ -786,5 +966,49 @@ describe("WorkflowRunPage — source fence", () => {
     expect(pageSource).toMatch(/useTechnicalNamesOptional\(/)
     // POSITIVE CONTROL.
     expect("<TechnicalNamesToggle />").toMatch(new RegExp(TOGGLE))
+  })
+
+  // ── Plan 10 additions ──────────────────────────────────────────────────────
+
+  it("sources the deliverable list from the RUN's thread, at exactly one call site", () => {
+    const code = codeOf(pageSource)
+    expect(code.match(/useWorkspaceFiles\(/g) ?? []).toHaveLength(1)
+    expect(code).toMatch(/useWorkspaceFiles\(run\?\.thread_id/)
+    expect(code.match(/downloadWorkspaceFile\(/g) ?? []).toHaveLength(1)
+    expect(code).toMatch(/const runThreadId = run\?\.thread_id/)
+    expect(code).toMatch(/downloadWorkspaceFile\(runThreadId/)
+  })
+
+  it("neither mounts the panel's file list nor names it — it reads the viewed thread", () => {
+    // The panel list resolves its thread from the globally-viewed-thread selector rather
+    // than from a prop, so mounting it here would WRITE chat state as a side effect of
+    // opening a run. Only its icon mapping and byte formatter are mirrored, and both are
+    // pure. The selector itself must not appear either — that is the mechanism.
+    const PANEL_LIST = ["Files", "Section"].join("")
+    const VIEWED = ["useViewing", "Thread"].join("")
+    expect(pageSource).not.toMatch(new RegExp(PANEL_LIST))
+    expect(pageSource).not.toMatch(new RegExp(VIEWED))
+    // ...and the mirrored pieces really are here.
+    expect(codeOf(pageSource)).toMatch(/function formatBytes/)
+    expect(codeOf(pageSource)).toMatch(/function iconFor/)
+    // POSITIVE CONTROLS — both assembled needles match the shapes they forbid.
+    expect("import { FilesSection } from './FilesSection'").toMatch(new RegExp(PANEL_LIST))
+    expect("const threadId = useViewingThread()").toMatch(new RegExp(VIEWED))
+  })
+
+  it("promises no preview: the previewer is neither imported nor named", () => {
+    // DOCX/PPTX/XLSX/PDF are download-only by decision and the template engine emits
+    // .docx, so the flagship deliverable is exactly the artefact that cannot be shown in
+    // place. Req 7 asks that it be listed and downloadable — not that it be rendered.
+    const PREVIEWER = ["File", "Preview"].join("")
+    expect(pageSource).not.toMatch(new RegExp(PREVIEWER))
+    // POSITIVE CONTROL.
+    expect("<FilePreview threadId={t} file={f} onBack={b} />").toMatch(new RegExp(PREVIEWER))
+  })
+
+  it("carries both empty-state strings, each written exactly once", () => {
+    const code = codeOf(pageSource)
+    expect(code.match(/No files yet — this run hasn't written anything\./g) ?? []).toHaveLength(1)
+    expect(code.match(/This run produced no files\./g) ?? []).toHaveLength(1)
   })
 })

@@ -162,14 +162,23 @@ interface RenderOpts {
   state?: PanelState
   onToggle?: () => void
   onExpand?: () => void
+  /** Phase 188 Plan 10 — OPTIONAL by design. Left undefined here so every case above
+   *  renders exactly the panel it rendered before the run receipt existed. */
+  onOpenRun?: (runId: string) => void
 }
-function renderPanel({ state = "open", onToggle = vi.fn(), onExpand = vi.fn() }: RenderOpts = {}) {
+function renderPanel({
+  state = "open",
+  onToggle = vi.fn(),
+  onExpand = vi.fn(),
+  onOpenRun,
+}: RenderOpts = {}) {
   return render(
     <WorkspacePanel
       selectedThread={thread}
       state={state}
       onToggle={onToggle}
       onExpand={onExpand}
+      onOpenRun={onOpenRun}
     />,
   )
 }
@@ -524,3 +533,138 @@ describe("WorkspacePanel (PANEL-01) — controlled composition", () => {
     expect(await axe(container)).toHaveNoViolations()
   })
 })
+
+// ── Phase 188 Plan 10 (RUNVIZ-03 / D-188-13) — the run receipt: the THREAD side of
+//    the bidirectional seam.
+//
+// WHY THIS IS LOAD-BEARING RATHER THAN DECORATIVE. `GET /runs` and the cross-workflow
+// runs home are deferred by the SPEC and the app has no router, so there are no links
+// and no list of runs. Chat history IS the index, because a launch mints one thread per
+// run. Delete this line and a launched run becomes unreachable the moment the user
+// navigates away from it — "a finished run re-opens" would then be true of the endpoint
+// and false of the product.
+//
+// The id is resolved from the THREAD ANCHOR and never from the panel's workflow lock:
+// that lock field is overwritten with a producer run id at kickoff and again on a
+// Continue re-subscribe, and it is cleared outright once a run goes terminal, which is
+// the very case this line serves. Both ids are bare uuids, so a swap typechecks and then
+// resolves nothing.
+describe("WorkspacePanel — the run receipt (D-188-13, the thread → run direction)", () => {
+  const HARNESS_LOCK = {
+    runId: "producer-run-DO-NOT-USE",
+    mode: "harness" as const,
+    capPaused: false,
+    continuesRemaining: 3,
+  }
+  /** The anchor id, DELIBERATELY DIFFERENT from the lock's id above — in production both
+   *  are bare uuids, so the wrong one has to be detectable to be measured. */
+  const ANCHOR_RUN_ID = "workflow-run-anchor-1"
+
+  function setAnchor(activeWorkflowRunId: string | null) {
+    getThreadWorkflow.mockResolvedValue({
+      thread_id: "thread-1",
+      mode: "harness",
+      locked: true,
+      active_workflow_run_id: activeWorkflowRunId,
+      run_status: "completed",
+      definition_slug: null,
+      definition_name: null,
+      current_phase_slug: null,
+      current_phase_index: null,
+      total_phases: 2,
+      lock_is_stale: false,
+      cap_paused: false,
+      continues_used: 0,
+      continues_remaining: 3,
+    } as ThreadWorkflowState)
+  }
+
+  it("renders the receipt when a run id resolves for the thread", async () => {
+    setAnchor(ANCHOR_RUN_ID)
+    setHooks({ lock: HARNESS_LOCK })
+    renderPanel({ state: "open", onOpenRun: vi.fn() })
+    expect(await screen.findByText("Open the run")).toBeInTheDocument()
+  })
+
+  it("opens the run with the THREAD ANCHOR id, never the lock's producer id", async () => {
+    setAnchor(ANCHOR_RUN_ID)
+    setHooks({ lock: HARNESS_LOCK })
+    const onOpenRun = vi.fn()
+    const user = userEvent.setup()
+    renderPanel({ state: "open", onOpenRun })
+    await user.click(await screen.findByText("Open the run"))
+    expect(onOpenRun).toHaveBeenCalledWith(ANCHOR_RUN_ID)
+    expect(onOpenRun).not.toHaveBeenCalledWith(HARNESS_LOCK.runId)
+  })
+
+  it("renders NOTHING when no callback is supplied — every existing caller is unchanged", async () => {
+    setAnchor(ANCHOR_RUN_ID)
+    setHooks({ lock: HARNESS_LOCK })
+    renderPanel({ state: "open" })
+    // The harness gate is open (the timeline is mounted), so the absence below is a
+    // measurement of the callback and not of the gate.
+    expect(screen.getByTestId("phase-timeline")).toBeInTheDocument()
+    await waitFor(() => expect(getThreadWorkflow).toHaveBeenCalled())
+    expect(screen.queryByText("Open the run")).not.toBeInTheDocument()
+  })
+
+  it("renders NOTHING on a Deep / no-run thread, even with the callback supplied", async () => {
+    setAnchor(ANCHOR_RUN_ID)
+    setHooks({ todos: mockTodos, phases: [], lock: null })
+    renderPanel({ state: "open", onOpenRun: vi.fn() })
+    // POSITIVE CONTROL for the gate: no timeline either, which is what "Deep" means here.
+    expect(screen.queryByTestId("phase-timeline")).not.toBeInTheDocument()
+    await waitFor(() => expect(screen.getByTestId("todos-section")).toBeInTheDocument())
+    expect(screen.queryByText("Open the run")).not.toBeInTheDocument()
+  })
+
+  it("renders NOTHING when the thread has no anchor to open", async () => {
+    setAnchor(null)
+    setHooks({ lock: HARNESS_LOCK })
+    renderPanel({ state: "open", onOpenRun: vi.fn() })
+    await waitFor(() => expect(getThreadWorkflow).toHaveBeenCalled())
+    expect(screen.queryByText("Open the run")).not.toBeInTheDocument()
+  })
+
+  it("renders NOTHING when the anchor read fails — it never throws into the panel", async () => {
+    getThreadWorkflow.mockRejectedValue(new Error("network"))
+    setHooks({ lock: HARNESS_LOCK })
+    renderPanel({ state: "open", onOpenRun: vi.fn() })
+    await waitFor(() => expect(getThreadWorkflow).toHaveBeenCalled())
+    expect(screen.getByTestId("phase-timeline")).toBeInTheDocument()
+    expect(screen.queryByText("Open the run")).not.toBeInTheDocument()
+  })
+
+  it("does not read PhaseTimeline or PhaseCard internals for the receipt (the G-5 red line)", () => {
+    // The receipt is an ADDITIVE SIBLING. The panel's own docblock forbids this section
+    // reading either component's internals or adding a prop to either; the source below
+    // is the mechanical half of that promise.
+    //
+    // ⚠ ANCHORED ON STRIPPED-COMMENT CODE, and MEASURED: this file's own docblocks state
+    // the red line in prose and therefore SPELL the very component names the fence
+    // forbids. Indexing the raw source would make a code rule satisfiable — and in this
+    // case unsatisfiable — by a paragraph. The stripper is tested first, below, because a
+    // fence anchored on a broken stripper is a fence that silently passes.
+    const code = codeOf(workspacePanelSource)
+    expect(code).toMatch(/function RunSeam\(/)
+    // The card is never even imported for this; only the prose explaining the rule names it.
+    expect(workspacePanelSource).toMatch(/PhaseCard/)
+    expect(code).not.toMatch(/PhaseCard/)
+    // No prop was added to either neighbour.
+    expect(code).not.toMatch(/<PhaseTimeline[^>]*onOpenRun/)
+    expect(code).not.toMatch(/<PhaseCard/)
+    // The id source is the thread anchor field.
+    expect(code).toMatch(/active_workflow_run_id/)
+  })
+
+  it("the comment stripper works — and this file really does carry the names in prose", () => {
+    const sample = codeOf("/** PhaseCard in prose */\n// PhaseCard in a line\nconst x = 1\n")
+    expect(sample).not.toMatch(/PhaseCard/)
+    expect(sample).toMatch(/const x = 1/)
+  })
+})
+
+/** The panel source with its comments removed — see the G-5 fence above for why. */
+function codeOf(src: string): string {
+  return src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "")
+}

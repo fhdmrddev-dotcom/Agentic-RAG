@@ -326,6 +326,26 @@ const TARGETS = [
   // it postdates the 1037 pin, so it reports as `new` and its own count is free to grow;
   // 188-11 pins it from this script's printed `actual` column.
   "src/components/layout/ChatLayout.launch.test.tsx",
+  // Added in 188-10 — and this one is an ADOPTION, not a new file, which is the case the
+  // panel-directory comment above explicitly reserved: "a later phase that wants
+  // WorkspacePanel inside the gate should adopt it deliberately, with its own measured
+  // number." That is what this is. MEASURED FIRST, before the decision: the shipped suite
+  // ran `1 passed (1) / 31 passed (31)` under plain vitest on 2026-08-05, i.e. zero
+  // pre-existing failures — so adopting it imports no rot into a gate that requires 0
+  // failing forever. Had it been red, the seam guard would have gone into a fresh
+  // `WorkspacePanelRunSeam.test.tsx` instead and THAT file would be the entry here.
+  //
+  // What would be unguarded without it: the THREAD side of D-188-13's bidirectional seam
+  // — the only route back to a finished run while `GET /runs` and the cross-workflow runs
+  // home are deferred and the app has no router. Its four load-bearing cases are ABSENCE
+  // assertions (renders nothing with no callback, nothing on a Deep thread, nothing with
+  // no anchor, nothing when the anchor read fails), plus the wrong-id guard where the
+  // panel's workflow lock holds a PRODUCER run id and both ids are bare uuids.
+  //
+  // Left OUT of BASELINE on purpose: it postdates the 1037 pin, so it reports as `new`
+  // and its own count is free to grow; 188-11 pins it from this script's printed `actual`
+  // column (expected 39 — 31 shipped + 8 added here), across two agreeing runs.
+  "src/components/panel/__tests__/WorkspacePanel.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
