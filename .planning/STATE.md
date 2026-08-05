@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio — 🚧 ACTIVE
 status: executing
-last_updated: "2026-08-06T00:10:00.000Z"
-last_activity: 2026-08-06 -- Phase 188.1 Plan 03 executed (THE EXTRACTION — WorkflowCanvas 1593 → 1292 L)
+last_updated: "2026-08-06T01:35:00.000Z"
+last_activity: 2026-08-06 -- Phase 188.1 Plan 04 executed (WR-04/WR-07 hardening — 6 falsifications RED first, 7 lookups closed)
 progress:
   total_phases: 20
   completed_phases: 8
   total_plans: 119
-  completed_plans: 116
+  completed_plans: 117
   percent: 40
 ---
 
@@ -44,7 +44,37 @@ Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 op
 
 ## Current Position
 
-Phase: 188.1 (WorkflowCanvas extraction refactor — INSERTED 2026-08-05) — **EXECUTING, plan 3 of 5 done**
+Phase: 188.1 (WorkflowCanvas extraction refactor — INSERTED 2026-08-05) — **EXECUTING, plan 4 of 5 done**
+
+**⚑ 188.1-04 LANDED 2026-08-06 — THE BOUNDED HARDENING PASS (SC#6)** (`358a4c34` / `b018b20b` /
+`d17151bd` / `23046860`). Wave 4: the five WR-04 prototype-key lookups + WR-07's
+`encodeURIComponent`, each with a falsification **observed RED against the shipped code first** —
+6 failed / **225 passed**, where 225 is the EXACT pre-change total, so no shipped assertion moved
+to make room. All guards in the tree's only spelling, `Object.prototype.hasOwnProperty.call`;
+`Object.hasOwn` still **0** occurrences in `frontend/src`. Site 1 uses the TERNARY shape that keeps
+`PhaseNodeCard.test.tsx:373`'s `ICON_TINT[` positive control green; site 3 (which had **no fallback
+at all**) now lands on the table's OWN declared `unknown` row — no new visual state invented.
+**⚑ THE HEADLINE IS WHAT THE RED FOUND.** `data.phaseType` feeds **three** lookups, not one: the
+measured first consequence of a `"constructor"` key was not a wrong colour but
+`createElement(Object, …)` and a HARD RENDER CRASH — *"Objects are not valid as a React child"* —
+out of `lib/phaseGlyph.tsx:78`, two modules away, with `nodePresentation.renderPhaseMark`'s
+`PHASE_GLYPHS` read the same defect one line further on. Both were closed as **BLOCKERS** (sites 1
+and 2 are physically unobservable while the render crashes), not as a sweep. **Four** false-totality
+docblocks corrected in the `⚠` register, incl. `phaseGlyph`'s *"total over any key"* and
+`nodePresentation`'s *"TOTALITY contract: both resolvers are total … rather than throwing"* — a file
+promising the exact thing it did. Battery: `count gate OK` **2476/2476 zero slack, failed 0** (four
+pins raised from twice-measured actuals, nothing lowered, `TARGETS` untouched); `tsc -p
+tsconfig.app.json` **33** at every stage; `eslint src/components/workflows/` **5**; `vite build`
+exit 0; `git diff --stat backend/ supabase/migrations/ frontend/package*.json` **0 files**;
+`check-deploy-drift.sh` exit 0. **⚠ Carry forward:** (1) sites 2/3's falsifications drive
+`panel/PhaseCard` DIRECTLY, because the fixture path is normalised by the already-guarded
+`phaseStatusFromDb` and a fixture-driven site-3 test would have been GREEN against the unguarded
+tree — never RED, therefore proving nothing; (2) **D-188.1-DEF-01 CLOSED** (the ~1-in-6
+`WorkflowRunPage.test.tsx:504` gate flake — one `waitFor`, inside this plan's blast radius);
+(3) **D-188.1-DEF-02 LOGGED, not fixed** — `lib/providerLogo.tsx:107` is byte-for-byte the
+`phaseGlyph` defect, false comment included, deferred per 188.1-CONTEXT to the next phase touching
+that file; (4) the plan's *"exactly one `[INEFFECTIVE_DYNAMIC_IMPORT]`"* is the same stale inherited
+figure 188.1-03 already corrected — it is **2**.
 
 **⚑ 188.1-03 LANDED 2026-08-06 — THE EXTRACTION** (`14917821` / `718ccd48` / `e92224c2`). Wave 3,
 the reason the phase exists. `PlaneEditingLayer` + `EDIT_AFFORDANCE` (with `REVEAL_ON_HOVER`,
@@ -2605,9 +2635,15 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 186 P06 | 55min | 3 tasks | 2 files |
 | Phase 186 P07 | 65min | 3 tasks | 12 files |
 | Phase 188.1 P01 | 25min | 2 tasks | 3 files |
+| Phase 188.1 P04 | 70min | 3 tasks | 11 files |
 
 ## Decisions
 
+- [Phase 188.1]: 188.1-04: **`lib/phaseGlyph.tsx` and `nodePresentation.renderPhaseMark` were closed as BLOCKERS, not as a sweep.** `data.phaseType` feeds three lookups; the FIRST consequence of a prototype key is `createElement(Object, …)` → *"Objects are not valid as a React child"*, so WR-04 sites 1 and 2 are physically unobservable while the render crashes. `lib/providerLogo.tsx:107` is the identical defect on no path this plan drives and was LOGGED (D-188.1-DEF-02), not fixed — 188.1-CONTEXT defers beyond-the-five sites to the next phase touching the file. The dividing line is *blocks a falsification* vs *shares a pattern*.
+- [Phase 188.1]: 188.1-04: **WR-04 sites 2/3's falsifications drive `panel/PhaseCard` DIRECTLY rather than a `PhaseTimeline` fixture, as the plan prescribed.** The fixture path is normalised by `lib/phaseState.phaseStatusFromDb`, an ALREADY-SHIPPED own-property guard, so a `status: "toString"` is resolved to `"unknown"` before it can reach site 3 — the prescribed test would have been GREEN against the unguarded tree, never observed RED, and therefore known to test nothing. General rule: before writing a falsification into a suite that drives a fixture through a real normalizer, check whether an existing guard sanitizes the input first.
+- [Phase 188.1]: 188.1-04: sites 4/5 share ONE module-private `own()` in `PhaseNodeCard.tsx` (the plan's own Form B), which makes the plan's `hasOwnProperty.call ≥ 5 across three files` criterion arithmetically unreachable — measured **4** across the three named files, **6** across all five guarded files. The helper was kept over inlining because `phaseState.ts` argues for exactly one place a fallback can be got wrong. `runVocabulary.ts`'s `own()` was NOT exported/generalised (it is `CanvasReading`-typed and its file carries its own `?raw` fences).
+- [Phase 188.1]: 188.1-04: a `⚠` docblock correction must **PARAPHRASE** the false claim when an acceptance grep asks the tree whether that literal still exists — quoting it satisfies the house rule and fails the grep. Third occurrence of this shape in the phase (188.1-02, 188.1-03, 188.1-04).
+- [Phase 188.1]: 188.1-04: **React OMITS a function-valued DOM attribute** rather than stringifying it, so the unguarded consequence of a poisoned lookup at an attribute sink is ABSENCE, not corruption (site 5's arc painted no `stroke` at all). Assert the attribute's TYPE, not only its value.
 - [Phase 186]: 186-01 (D-186-07 AMENDED IN THE OPEN): the concurrency token is compared in **TEXT space** via one module-level `CONCURRENCY_TOKEN_SQL` = `to_char(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`, **not** `AND updated_at = $N`. asyncpg refuses a `str` bind to `timestamptz` with AND without a `::timestamptz` cast (probed live — `DataError` both ways), so the literal D-186-07 shape is a runtime 500, not a precision bug. Rejected alternatives are recorded at the constant: `updated_at::text` renders in the SESSION TimeZone (`+00` vs `+05:30` for the same row), and Python `isoformat()` / Pydantic's datetime serializer both DROP the fractional part at 0 µs (variable-width token). **Zero migrations — slot 115 stays free.**
 - [Phase 186]: 186-01: the token rides an **`If-Match` header**, not a wrapper body model (`WorkflowDefinition` is `extra='forbid'` and the token is transport metadata, D-14), and it is **OPTIONAL for one release** — an absent header runs today's byte-identical unguarded UPDATE so a tab open across the deploy does not break on its next save. Dated concession, stated in the route docstring.
 - [Phase 186]: 186-01 (D-186-09): stale = **409 + `detail.code`**, not 412 — the shipped client already branches on 409 and throws the body away, so adding a code is additive at one call site; 412 would split one concept across two statuses and drag the operator-verified published-row sentence with it. The stale 409 carries the **current token** so "overwrite with what's on screen" is one PATCH.
