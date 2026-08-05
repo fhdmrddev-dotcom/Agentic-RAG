@@ -48,6 +48,7 @@ Design decisions baked in here:
 from __future__ import annotations
 
 import copy
+import re
 from typing import Any, Callable, Iterable
 
 from starlette.responses import JSONResponse
@@ -65,14 +66,22 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 # prefix joined; it is corrected here rather than left, because a comment that still names a
 # shape the code no longer has is the same defect as a false docblock.
 #
-# ⚠ THE TWO HALVES ARE ASYMMETRIC — know which one a given member is load-bearing for.
-# ``_is_canvas_path`` (below) does EXACT membership on the REQUEST path, so a member
-# containing a ``{...}`` placeholder can never match there; for a parameterised route the
-# request-side authority is ``Depends(require_canvas())`` on the route itself, whose 404 body
-# is byte-identical to this middleware's. ``canvas_filtered_openapi`` pops these strings from
-# FastAPI's ``paths`` dict, whose keys ARE templates — that is the half a parameterised member
-# exists for. Both halves still read this ONE constant, so the single edit remains the
-# contract; only its effect differs per member shape.
+# ⚠ THE TWO HALVES CONSUME THIS CONSTANT DIFFERENTLY — know which shape a member is.
+# ``canvas_filtered_openapi`` pops these strings from FastAPI's ``paths`` dict, whose keys ARE
+# templates, so a parameterised member is used VERBATIM there. ``_is_canvas_path`` (below)
+# matches the concrete REQUEST path, so a templated member is compiled to a segment-bounded
+# regex first (``_GATED_PATH_PATTERNS``). Both halves read this ONE constant, so the single
+# edit remains the contract.
+#
+# ⚠ CR-04 (Phase 188 review) — this note previously said a templated member "can never match"
+# on the request side and that ``Depends(require_canvas())`` was therefore the request-side
+# authority for it. That was FALSE as a security claim, and the falseness was measured:
+# ``require_canvas`` is a DEPENDENCY, and Starlette answers a wrong-method probe (405) and a
+# trailing-slash probe (307) during ROUTING — before ``solve_dependencies`` runs. So with the
+# canvas off, ``POST /workflow-runs/<uuid>`` returned **405 {"detail":"Method Not Allowed"}**
+# while ``POST /workflow-runs/x/y`` returned 404: the 405 admits a handler is declared at that
+# exact path, which is the disclosure this middleware exists to close. The dependency remains
+# defense-in-depth (D-182-05); it is not, and never was, able to own these two channels.
 CANVAS_GATED_PATHS: frozenset[str] = frozenset(
     {
         "/workflows/validate",
@@ -81,6 +90,30 @@ CANVAS_GATED_PATHS: frozenset[str] = frozenset(
         # (see the asymmetry note above); its request-path 404 comes from require_canvas.
         "/workflow-runs/{workflow_run_id}",
     }
+)
+
+
+def _compile_gated_pattern(template: str) -> re.Pattern[str]:
+    """Compile ONE FastAPI path template to a segment-bounded, fully-anchored regex.
+
+    ``{param}`` becomes ``[^/]+`` — bounded to a single segment on purpose, so
+    ``/workflow-runs/{workflow_run_id}`` matches ``/workflow-runs/<uuid>`` and does NOT match
+    the deliberately-unbuilt two-segment baseline ``/workflow-runs/x/y`` that the byte-identity
+    tests compare against. Every literal run is ``re.escape``-d, so a path containing a regex
+    metacharacter (``.``, ``+``, ``-`` inside a future member) can never widen the match.
+    """
+    parts = re.split(r"(\{[^/}]+\})", template)
+    body = "".join(
+        "[^/]+" if p.startswith("{") and p.endswith("}") else re.escape(p) for p in parts
+    )
+    return re.compile("^" + body + "$")
+
+
+# Compiled ONCE at import, and ONLY for the templated members — the literal ones are already
+# answered by the frozenset lookup, so the overwhelmingly common request (a path that is not
+# gated at all) still costs one set lookup plus one regex match against a single pattern.
+_GATED_PATH_PATTERNS: tuple[re.Pattern[str], ...] = tuple(
+    _compile_gated_pattern(p) for p in sorted(CANVAS_GATED_PATHS) if "{" in p
 )
 
 # The schema half's path — FastAPI's default ``openapi_url`` (main.py:593 passes no override).
@@ -149,10 +182,18 @@ def _is_canvas_path(path: str) -> bool:
     issues a 307 for ``/workflows/validate/`` ONLY because the slash-stripped path DOES
     match a mounted route — so without normalization the redirect itself (and the 422 that
     follows it) would advertise the route's existence.
+
+    CR-04: the same two escapes (307, and 405 on a wrong-method probe) were open for the
+    TEMPLATED member, because this function used to end at the frozenset lookup and a concrete
+    request path can never equal ``/workflow-runs/{workflow_run_id}``. The templated members
+    are matched through ``_GATED_PATH_PATTERNS`` for exactly that reason. The gate stays
+    PATH-ONLY — never method-aware — for the reason stated at the call site.
     """
     if len(path) > 1 and path.endswith("/"):
         path = path[:-1]
-    return path in CANVAS_GATED_PATHS
+    if path in CANVAS_GATED_PATHS:
+        return True
+    return any(pattern.match(path) for pattern in _GATED_PATH_PATTERNS)
 
 
 class CanvasGateMiddleware:

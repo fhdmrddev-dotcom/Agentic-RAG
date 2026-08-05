@@ -249,6 +249,32 @@ def test_run_read_404s_when_off(client, monkeypatch):
     assert unbuilt.status_code == 404, unbuilt.text
     assert anon.json() == unbuilt.json() == {"detail": "Not Found"}
 
+    # ── CR-04: the two channels that answer BEFORE any dependency runs ──────────────
+    #
+    # ``Depends(require_canvas())`` cannot close either of these, and the docblock above
+    # (and this module's Phase-182 header) says so in full: Starlette answers a wrong-method
+    # probe with 405 and a trailing-slash probe with a 307 redirect during ROUTING, ahead of
+    # ``solve_dependencies``. Both answers ADMIT a handler is declared at this path, which is
+    # precisely the disclosure ``CanvasGateMiddleware`` exists to close — and it was closed
+    # for the two literal ``/workflows`` members and silently NOT for the templated one,
+    # because ``_is_canvas_path`` did exact set membership on the REQUEST path.
+    #
+    # Each probe is asserted EQUAL to the genuinely-unbuilt path's answer, not merely
+    # "== 404": byte-identity with a path that was never built is the actual contract, and a
+    # bare status check would pass on a 404 carrying a different body.
+    unbuilt_post = client.post("/workflow-runs/__nope__/__nope__")
+    wrong_method = client.post(_RUN_READ_PATH)
+    assert wrong_method.status_code == unbuilt_post.status_code == 404, wrong_method.text
+    assert wrong_method.status_code != 405, "405 admits a handler is declared at this path"
+    assert wrong_method.json() == unbuilt_post.json() == {"detail": "Not Found"}
+
+    # ``follow_redirects=False`` is load-bearing: the client follows a 307 by default and the
+    # followed request would 404 at the gate, hiding the redirect that did the leaking.
+    slashed = client.get(_RUN_READ_PATH + "/", follow_redirects=False)
+    assert slashed.status_code == 404, slashed.text
+    assert slashed.status_code != 307, "a 307 admits the slash-stripped path matches a route"
+    assert slashed.json() == {"detail": "Not Found"}
+
     # POSITIVE CONTROL — the 404s above are the GATE, not an absent route. The path template is
     # genuinely mounted with the probed METHOD, so "404" cannot mean "never built" here.
     mounted = {
