@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio — 🚧 ACTIVE
 status: executing
-last_updated: "2026-08-05T14:41:59.608Z"
-last_activity: 2026-08-05 -- Phase 188 UAT board COMPLETE (16 PASS / 0 FAIL / 1 blocked); security review owed
+last_updated: "2026-08-05T21:40:00.000Z"
+last_activity: 2026-08-05 -- Phase 188 SECURED (46/46 threats closed, 0 open); phase CLOSED -- next is 189, G-5 check owed first
 progress:
   total_phases: 19
   completed_phases: 8
@@ -44,11 +44,55 @@ Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 op
 
 ## Current Position
 
-Phase: 188 (non-technical-run-observability) — **UAT COMPLETE · security review OWED**
+Phase: 188 (non-technical-run-observability) — **CODE + UAT + SECURED — CLOSED**
 
-**▶ NEXT ACTION: `/gsd:secure-phase 188`.** All 13 plans executed; the UAT board is settled at
-**16 PASS · 0 FAIL · 1 ⛔ · 0 pending**; no `188-SECURITY.md` exists and `security_enforcement`
-defaults on, so the phase is NOT yet verified. Precedent: 185 and 186 both closed SECURED.
+**▶ NEXT ACTION: `/gsd:discuss-phase 189` — but read the G-5 note below first.** All 13 plans
+executed; the UAT board is settled at **16 PASS · 0 FAIL · 1 ⛔ · 0 pending**; `188-SECURITY.md`
+now exists at **46/46 threats CLOSED, 0 open** (`97b2bd29`, 2026-08-05). Precedent held: 185, 186
+and now 188 all closed SECURED.
+
+**SECURED 2026-08-05 — 46/46, `block_on: high`, nothing blocking.** `register_authored_at_plan_time:
+true` (all 13 plans carried a `<threat_model>`), so this was mitigation *verification*, not a
+retroactive STRIDE scan. Every CLOSED verdict cites shipped source at `file:line`; five recorded
+measurements were **re-derived rather than inherited** — `WorkflowCanvas.tsx` **13/2** against the
+≤15/≤4 cap · zero dependency-file churn · count gate **2462 pinned == 2462 actual, 45/45** ·
+backend gate suites **20 passed** · `check-deploy-drift.sh` exit 0. All ten fence suites verified
+inside **both** `TARGETS` and `BASELINE`.
+
+Three findings recorded as warnings, none blocking:
+
+- **RD-1 — an accepted rationale that was wrong when it was written.** `T-188-08-05` and
+  `T-188-09-04` were both `accept`ed on the claim that *no client-side flag check exists*, calling
+  one a D-14 / D-181-02 red-line violation. `bce384ef` (CR-05) then shipped exactly that in four
+  places in `ChatLayout.tsx`. Read at source, **D-181-02 is about refusal polarity** (404 never
+  403) and **D-14 is about run-state derivation** — neither forbids a client feature gate, and
+  `WorkflowBuilderPage` gated on the identical expression before this phase. The gate is
+  fail-closed defence-in-depth over an intact server boundary, so the risk stands; the wording in
+  `188-SECURITY.md` is corrected to describe shipped code. **Lesson: a red line cited from memory
+  can forbid the wrong thing — and here the misreading is what let the ungated view ship.**
+- **F7 is the sharpest lesson of the phase.** `T-188-06-01`'s invariance fence on the ⛨ governance
+  seal held the entire time — and the seal still **never rendered on the run surface**, because
+  `WorkflowRunPage` passed no `kbTools` and the intersection ran against an empty set. **An
+  invariance fence on a shared component proves nothing about whether that component's
+  security-relevant output is REACHABLE on a newly-built surface.**
+- **Two of the 10 deferred REVIEW warnings are security findings under a non-security label.**
+  **WR-04** — `ICON_TINT[data.phaseType] ?? DEFAULT_TINT` returns a *function* for a prototype key
+  (`??` never fires), interpolated into CSS at `PhaseNodeCard.tsx:738`; deferred on reachability,
+  which is verbatim the argument `phaseState.ts:73-74` rejects, in a phase that built `own()` for
+  this exact case. **WR-07** — unencoded `runId` in the exported `getWorkflowRun` at `api.ts:3751`.
+  Plus **UF-1** `last_workflow_run_id` on the un-gated `GET /threads/{id}/workflow` (CR-03), never
+  registered in any threat model.
+
+**Owed to the next phase touching those files** (not blockers): apply `own()` to the five WR-04
+sites · `encodeURIComponent(runId)` in `getWorkflowRun` · register `last_workflow_run_id`.
+
+**⚠ G-5 fires on Phase 189 if it touches `WorkflowCanvas.tsx`.** The CLAUDE.md hot-file ledger
+records the `PlaneEditingLayer` + `EDIT_AFFORDANCE` extraction as **due in Phase 188** and it
+**stays OWED** — 188 honoured its cap by measurement (13/2) rather than by extracting. 189 places a
+*governed external-action node* on the canvas, so the ledger must be scanned against 189's
+`files_modified` at discuss-phase, and a refactor recommendation is the first option if it hits.
+Live constraint the 185-10 seam discovered: `WorkflowCanvas` imports `FlowEdge`'s VALUE at module
+scope for the `edgeTypes` map, so the extracted module **must not import back** (ESM cycle).
 
 **UAT rows 12 · 14 · 16 DRIVEN 2026-08-05 at `/gsd:verify-work 188` — all three PASS.** They
 were already *counted* as PASS in the board's header but **none carried a driven record of its
