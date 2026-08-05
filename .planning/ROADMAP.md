@@ -510,7 +510,7 @@ Plans:
 
 **Wave 6** *(blocked on 188-06)*
 
-- [ ] 188-07-PLAN.md — the `PhaseNode` adapter and the **capped** `WorkflowCanvas` pass-through: a prop mirroring the shipped `marks?:` plus one `ariaLabel` append, inside a pinned **≤ 15 insertions / ≤ 4 deletions** `git diff --numstat`. Req 2's no-harness-vocabulary fence and Req 5's string separation land here (wave 6)
+- [x] 188-07-PLAN.md — the `PhaseNode` adapter and the **capped** `WorkflowCanvas` pass-through: a prop mirroring the shipped `marks?:` plus one `ariaLabel` append, inside a pinned **≤ 15 insertions / ≤ 4 deletions** `git diff --numstat`. Req 2's no-harness-vocabulary fence and Req 5's string separation land here (wave 6)
 
 
 **Wave 7** *(blocked on 188-03 + 188-05 + 188-07)*
