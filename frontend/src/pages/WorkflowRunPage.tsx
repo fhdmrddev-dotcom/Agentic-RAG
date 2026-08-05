@@ -84,6 +84,7 @@ import {
   useWorkspaceFiles,
 } from "@/providers/StreamsProvider"
 import { useTechnicalNamesOptional } from "@/providers/TechnicalNamesProvider"
+import { useGroundingBundle } from "@/hooks/useGroundingBundle"
 import type { Phase, WorkspaceFile } from "@/types"
 
 interface Props {
@@ -436,6 +437,37 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
    * slice inside the phase fetcher, and the SPEC puts panel changes out of scope.
    */
   const { data: asks, reconcile: reconcileAsks } = useAskUserPrompt(run?.thread_id ?? null)
+
+  /**
+   * ⚠ F7 (UAT 2026-08-05) — SC#1'S GOVERNANCE HALF NEVER REACHED THIS SURFACE.
+   *
+   * The criterion is that each node shows live state **and its grounded-cited vs open
+   * governance state**. The first shipped; the second could not, because `toCanvas`
+   * resolves `grounded` through `isGrounded(phase, kbTools)` and defaults an omitted
+   * `kbTools` to the frozen empty `NO_KB_TOOLS` (`canvasModel.ts:360`). This page rendered
+   * the canvas with no `kbTools` at all, so `available_tools ∩ kb_tools` was taken against
+   * the empty set and the **`detected`** cause could never resolve.
+   *
+   * That is the quiet shape of the bug: `already-set` (an explicit `citation_policy`) and
+   * `escalated` (the author's own flag) still resolved, so governance LOOKED right on the
+   * workflows that declare it explicitly — while every step that is grounded merely by
+   * reading the knowledge base, which is most of them, painted as ungoverned.
+   *
+   * Falsified live on `doc_qa_scoped_098uat`, the same workflow on both surfaces: the
+   * Builder canvas gave node `draft` `data-grounded="true"`; this one gave no attribute.
+   *
+   * The rule below is the Builder's, VERBATIM (`WorkflowBuilderPage.tsx:904-907`) and for
+   * its stated reason: the kb-tool list is served OUTSIDE every registry read, so it
+   * arrives intact on a degraded bundle too, and carrying it only on `ready` would let an
+   * unrelated folder-registry blip silently un-mark a locked step. Absent, it is empty —
+   * which marks nothing, the safe direction, because the run-time gate is server-side and
+   * unconditional either way. R11: the list is the SERVER's; this page authors none of it.
+   */
+  const bundle = useGroundingBundle(true)
+  const kbTools = useMemo<readonly string[]>(
+    () => (bundle.kind === "ready" || bundle.kind === "unavailable" ? bundle.kbTools : []),
+    [bundle],
+  )
 
   /**
    * ⚠ CR-02 — SOMETHING HAS TO OPEN THE RUN'S STREAM, and after the retarget nothing did.
@@ -914,6 +946,7 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
           onClearSelection={noop}
           editable={false}
           runState={runState}
+          kbTools={kbTools}
         />
       </section>
 

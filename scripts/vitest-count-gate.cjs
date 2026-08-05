@@ -325,7 +325,16 @@ const BASELINE = {
   //      3 s advanced with the figure still reading its mount value. The second case is the
   //      over-fix guard: a terminal run's figure is a measurement between two recorded
   //      timestamps and must stay frozen.
-  "WorkflowRunPage.test.tsx": 85,
+  // 87 = 85 + the two F7 cases (UAT 2026-08-05). SC#1 requires each node to show live state
+  //      AND its grounded-cited vs open governance state; the second half never reached this
+  //      surface. `toCanvas` resolves `grounded` via `isGrounded(phase, kbTools)` and defaults
+  //      an omitted `kbTools` to the frozen empty NO_KB_TOOLS, and the page passed none — so
+  //      `available_tools ∩ kb_tools` ran against the empty set and the DETECTED cause, the
+  //      dominant one, could never resolve. Quiet because `already-set` and `escalated` still
+  //      did. Falsified live on ONE workflow across BOTH surfaces: the Builder canvas gave the
+  //      node `data-grounded="true"`, the run surface no attribute. Both cases observed RED.
+  //      The second is an R11 fence: the page must READ the server list, never author one.
+  "WorkflowRunPage.test.tsx": 87,
   // 188 code-review fix pass (CR-03): 39 → 41. An EXTENSION, not a lowering — nothing was
   // deleted. The two added cases are the receipt's own reason for existing: `finish_run`
   // NULLs `threads.active_workflow_run_id` in the same transaction as the terminal status,

@@ -66,6 +66,12 @@ const setViewingThread = vi.fn()
 // F5: the DURABLE pending-ask slice. Shipped at `StreamsProvider.tsx:3263` long before this
 // phase — the run surface simply never consumed it, which is the whole defect.
 const useAskUserPrompt = vi.fn()
+// F7: the grounding bundle — the ONLY source of the server's kb-tool list (R11: no
+// client-assembled whitelist). Mocked at the hook so this suite needs no fetch.
+const useGroundingBundle = vi.fn()
+vi.mock("@/hooks/useGroundingBundle", () => ({
+  useGroundingBundle: (...a: unknown[]) => useGroundingBundle(...(a as [boolean])),
+}))
 vi.mock("@/providers/StreamsProvider", () => ({
   usePhases: (...a: unknown[]) => usePhases(...(a as [string | null])),
   useWorkspaceFiles: (...a: unknown[]) => useWorkspaceFiles(...(a as [string | null])),
@@ -82,16 +88,21 @@ vi.mock("@/components/workflows/WorkflowCanvas", () => ({
     runState,
     editable,
     selectedSlug,
+    kbTools,
   }: {
     phases: PhaseSpecJSON[]
     runState?: (slug: string) => { reading: string; label: string } | undefined
     editable?: boolean
     selectedSlug: string | null
+    kbTools?: readonly string[]
   }) => (
     <div
       data-testid="canvas-stub"
       data-editable={String(editable)}
       data-selected={String(selectedSlug)}
+      // F7: the governance input. Rendered as a joined string so a test can assert on the
+      // VALUE the page handed down, not merely that some prop was present.
+      data-kbtools={(kbTools ?? []).join(",")}
     >
       {phases.map((p) => (
         <div key={p.slug} data-testid={`node-${p.slug}`}>
@@ -286,6 +297,14 @@ beforeEach(() => {
   setLiveSlice([])
   setFiles([])
   setAsks([])
+  useGroundingBundle.mockReturnValue({
+    kind: "ready",
+    degraded: [],
+    kbTools: ["analyze_document", "get_related_documents", "query_documents", "read_document", "search_documents"],
+    tools: [],
+    folders: [],
+    skills: [],
+  })
   useViewingThread.mockReturnValue(VIEWED_THREAD_ID)
   downloadWorkspaceFile.mockResolvedValue(undefined)
   getWorkflowRun.mockResolvedValue(mkRun())
@@ -1554,5 +1573,48 @@ describe("WorkflowRunPage — the live elapsed figure actually advances (F6)", (
       await vi.advanceTimersByTimeAsync(30000)
     })
     expect(screen.getByTestId("run-elapsed").textContent ?? "").toBe(first)
+  })
+})
+
+// ── F7 (UAT 2026-08-05) — THE GOVERNANCE SEAL NEVER RENDERED ON THE RUN SURFACE ──
+//
+// SC#1 requires each node to show "live state ... AND its grounded-cited vs open
+// governance state". The run surface showed the first and never the second.
+//
+// Mechanism, measured: `toCanvas` resolves `grounded` via `isGrounded(phase, kbTools)`,
+// and `canvasModel.ts:360` defaults an omitted `kbTools` to the frozen empty
+// `NO_KB_TOOLS`. `WorkflowRunPage` rendered `<WorkflowCanvas>` with NO `kbTools` prop, so
+// the intersection `available_tools ∩ kb_tools` was against the empty set and the
+// **`detected`** cause — the dominant one, and the only one most fixtures have — could
+// never resolve. `already-set` and `escalated` still would, which is why the miss is
+// quiet: governance appears to work on the workflows that declare it explicitly.
+//
+// Falsified live on `doc_qa_scoped_098uat`, the SAME workflow on both surfaces:
+//   Builder canvas   node "Work out how to do it" → data-grounded="true"
+//   Run surface      the same node                → no attribute at all
+//
+// `useGroundingBundle`'s own docblock names this exact consumer: the kb-tool list is used
+// "for one thing: the local available_tools ∩ kb_tools intersection that moves the dial,
+// the strike-through and THE CANVAS SEAL". The run surface simply never asked for it.
+
+describe("WorkflowRunPage — the governance seal's input reaches the canvas (F7, SC#1)", () => {
+  it("hands the canvas the server's kb-tool list, so a detected-grounded step can be marked", async () => {
+    renderPage()
+    const stub = await screen.findByTestId("canvas-stub")
+    // The VALUE, not merely the presence of a prop: an empty list is exactly the broken
+    // state, because `available_tools ∩ [] = ∅` for every step ever authored.
+    expect(stub.getAttribute("data-kbtools")).toContain("search_documents")
+  })
+
+  it("asks for the bundle — the page is a READER of the server list, never an author of one", async () => {
+    renderPage()
+    await screen.findByTestId("canvas-stub")
+    expect(useGroundingBundle).toHaveBeenCalled()
+    // R11: a client-assembled whitelist would let knowledge-base content whitelist itself.
+    // The literal must not appear in the page's own source.
+    const KB = ["search", "_documents"].join("")
+    expect(codeOf(pageSource)).not.toMatch(new RegExp(KB))
+    // POSITIVE CONTROL — that needle really does match a hardcoded list.
+    expect('const KB_TOOLS = ["search_documents"]').toMatch(new RegExp(KB))
   })
 })
