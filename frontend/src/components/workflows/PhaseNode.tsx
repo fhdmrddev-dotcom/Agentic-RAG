@@ -90,6 +90,7 @@ import {
   type BadgeSlot,
   type BadgeSlots,
 } from "@/components/workflows/PhaseNodeCard"
+import type { NodeRunState } from "@/components/workflows/runVocabulary"
 import { cn } from "@/lib/utils"
 
 // ── Shared atoms ────────────────────────────────────────────────────────────────
@@ -156,6 +157,21 @@ function PhaseNodeImpl({ data, selected }: NodeProps<PhaseCanvasNode>) {
   // guaranteed at the shell's `marks` prop, which is typed to this exact union.
   const verdict = data.verdict as VerdictMarkKind | undefined
 
+  // RUNVIZ-01 (188-07): the step's live run state, threaded down on `data` by the shell
+  // exactly as the ⌥ reveal and the verdict mark are (D-183-08 / D-184-06). The PAGE owns
+  // every part of it — it joins the run's rows to the definition's slugs, it calls
+  // `phaseState.canvasReading` once to pick the reading, and it calls
+  // `runVocabulary.runReadingLabel` once to word it — so this adapter derives nothing,
+  // collapses nothing and maps no status. That is what stops `PhaseNode` growing a second
+  // source of truth for a value only the run stream owns, and it is why a provider-less
+  // node still renders in a unit test.
+  //
+  // The cast is the same price `verdict` pays one line above: `PhaseNodeData` carries an
+  // `[k: string]: unknown` index signature because @xyflow/react requires one on every
+  // node-data shape. The value's own type is guaranteed at the shell's `runState` prop,
+  // which is typed to this exact interface.
+  const run = data.run as NodeRunState | undefined
+
   // BADGE SLOT 1 IS DELIBERATELY EMPTY, AND IT IS SPOKEN FOR (Phase 185, SPEC Req 6).
   //
   // Until 185-08 slot 1 carried the three-face grounding word-badge. That badge is
@@ -165,10 +181,14 @@ function PhaseNodeImpl({ data, selected }: NodeProps<PhaseCanvasNode>) {
   // component, as `data.grounded` and `data.armed`; what is gone is the chip that spoke
   // them, and what replaced it costs neither a slot nor a colour.
   //
-  // DO NOT FILL THE FREED SLOT with a governance mark. The freed slot belongs to
-  // Phase 188 (run state) and Phase 189 (external actions), and `BadgeSlots` is a max-2
-  // tuple union, so a third badge is a typecheck error rather than a review comment —
-  // which is exactly the budget `PhaseNodeCard`'s own docblock says it enforces.
+  // DO NOT FILL THE FREED SLOT with a governance mark. `BadgeSlots` is a max-2 tuple
+  // union, so a third badge is a typecheck error rather than a review comment — which is
+  // exactly the budget `PhaseNodeCard`'s own docblock says it enforces.
+  //
+  // THE FIRST OF THE TWO CLAIMANTS HAS NOW LANDED AND DECLINED IT. Phase 188 paints run
+  // state on this card (see `run` above) and spends ZERO badge slots: its channel is the
+  // ring's geometry plus a sentence in the body, which is exactly why sketch 153-A won.
+  // Slot 1 is therefore still empty and now belongs to Phase 189 alone.
   //
   // Slot 2 is unchanged: `Waits for you`, on `llm_human_input` only (D-183-07).
   const waitsForYou: BadgeSlot = {
@@ -179,11 +199,19 @@ function PhaseNodeImpl({ data, selected }: NodeProps<PhaseCanvasNode>) {
   }
   const badges: BadgeSlots = data.waitsForYou ? [waitsForYou] : []
 
-  // `status`, `technicalLine` and `stepNumber` are still deliberately NOT passed: Wave 0
-  // landed the seam and Phase 188 lands those. `verdict` WAS in that list until 184-10
-  // and `grounded` until 185-09 — the line is corrected each time rather than left,
-  // because a comment that still names a slot the component now fills is the same defect
-  // as a false docblock.
+  // `technicalLine` and `stepNumber` are still deliberately NOT passed. `status` WAS in
+  // that list until 188-07 — this plan fills it, below, together with `emitFailure` —
+  // just as `verdict` was until 184-10 and `grounded` until 185-09. The line is corrected
+  // each time rather than left, because a comment that still names a slot the component
+  // now fills is the same defect as a false docblock.
+  //
+  // `technicalLine` is not merely unspent by 188, it is DECLINED by it (UI-SPEC § Card
+  // Body Budget rule 2): the card body is ONE budget, the run line is the thing 188
+  // spends it on, and declining the 10px mono line is what dissolved the three-way
+  // competition D-188-17 warned about. Declining a slot is a decision, recorded here
+  // rather than discovered later. Both it and `stepNumber` stay free for Phase 189 —
+  // `stepNumber` additionally guarded by D-183-07, which keeps the step ordinal off the
+  // face regardless of who wants it.
   //
   // 187-09 IS THE FIRST CHANGE TO THIS LINE THAT DOES NOT REMOVE A NAME FROM IT, and the
   // distinction is the whole point. Req 4 / D-187-16 moves the ⌥ reveal out of the TITLE
@@ -218,6 +246,8 @@ function PhaseNodeImpl({ data, selected }: NodeProps<PhaseCanvasNode>) {
       subtitle={technical ? data.technicalTitle : data.subtitle}
       tint={tint}
       badges={badges}
+      status={run?.reading}
+      emitFailure={run?.emitFailure}
       verdict={verdict}
       grounded={data.grounded}
       selected={selected}

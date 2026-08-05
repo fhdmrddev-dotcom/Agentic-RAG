@@ -191,6 +191,36 @@ export function runReadingLabel(reading: CanvasReading, emitFailure?: EmitFailur
   return clause === null ? word : `${word} ${clause}`
 }
 
+// ── The shell↔page contract ─────────────────────────────────────────────────────
+
+/**
+ * ONE node's run state, as it crosses `WorkflowCanvas` on its way to the card.
+ *
+ * `label` is `runReadingLabel(reading, emitFailure)`, ALREADY COMPUTED BY THE PAGE, and
+ * it is carried as a FIELD rather than recomputed downstream for one structural reason.
+ * The canvas has to join the sentence to the node's accessible name — the shipped
+ * `aria-label` is an explicit property on the node object, so the card's inner text is
+ * NOT part of it, and without that join a screen-reader user tabbing the spine would
+ * hear no run state whatsoever. Carrying the words lets the canvas do that join while
+ * importing nothing from this module but a type: it stays a pass-through that derives
+ * nothing, words nothing and looks nothing up. `WorkflowCanvas.tsx` is a G-5 hot file
+ * whose diff for this phase is capped as a plan acceptance criterion, and that cap is
+ * only honest if the vocabulary genuinely never enters the file.
+ *
+ * Because `label` is precomputed once, the visible run line and the accessible-name
+ * suffix are the SAME string from the SAME call. They cannot drift apart the way two
+ * call sites kept in step by hand eventually do.
+ */
+export interface NodeRunState {
+  /** Which of the seven readings the step is in — derived ONCE, by `phaseState.canvasReading`. */
+  reading: CanvasReading
+  /** `runReadingLabel(reading, emitFailure)`. The whole sentence, worded by the page. */
+  label: string
+  /** The step's terminal emit failure, when its run row carries one. Selects which of the
+   *  three fixed clauses follows the failure word; ignored at every other reading. */
+  emitFailure?: EmitFailure | null
+}
+
 // ── The card border ─────────────────────────────────────────────────────────────
 
 /**
