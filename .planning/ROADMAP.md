@@ -485,7 +485,7 @@ Plans:
 
 **Wave 1** *(Wave 0 in effect — the pre-edit baselines must be measured against an unmodified tree)*
 
-- [ ] 188-01-PLAN.md — Wave 0 harness: extend the count gate's `TARGETS` so the panel reconcile suites RUN, pin the two running-but-unpinned node suites, and record the six pre-edit baselines (frontend gate, `tsc -p tsconfig.app.json` = 33, the backend 211-failure baseline, the canvas/gate 12-pass, and the pre-existing `test_thread_workflow_endpoint.py` 1-of-7 RED) before any production edit (wave 1)
+- [x] 188-01-PLAN.md — Wave 0 harness: extend the count gate's `TARGETS` so the panel reconcile suites RUN, pin the two running-but-unpinned node suites, and record the six pre-edit baselines (frontend gate, `tsc -p tsconfig.app.json` = 33, the backend 211-failure baseline, the canvas/gate 12-pass, and the pre-existing `test_thread_workflow_endpoint.py` 1-of-7 RED) before any production edit (wave 1)
 
 **Wave 2** *(blocked on 188-01 so the baselines are recorded first; these two share no files and run in parallel)*
 
