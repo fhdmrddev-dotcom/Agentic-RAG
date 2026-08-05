@@ -275,6 +275,32 @@ const TARGETS = [
   // Left OUT of BASELINE on purpose — it postdates the 1037 pin, so it reports as
   // `new` and its own count is free to grow; 188-11 pins it from the printed `actual`.
   "src/lib/phaseState.test.ts",
+  // Added in 188-08, in the SAME COMMIT that creates the file — the fourth occurrence of
+  // the SAME two-knob trap, so this comment records the rule rather than the incident:
+  //
+  //   TARGETS decides what RUNS. BASELINE decides what is PINNED. They are two knobs and
+  //   a file can land outside BOTH by default, which is what happened to
+  //   `WorkflowBuilderPage.describe.test.tsx` (round 5), to the two panel suites (188-01)
+  //   and to `phaseState.test.ts` (188-05). `src/pages/` is covered ONLY by named files:
+  //   the directory holds nine suites the green gate has never executed, so a page-level
+  //   suite is invisible to the gate until its own entry exists.
+  //
+  // And the timing is not cosmetic: an entry pointing at a path that does not exist yet
+  // makes the gate ERROR (exit 2), not fail — so it can only be added in the commit that
+  // creates the file, never before, never after.
+  //
+  // What would be unguarded without it: this suite carries the ONLY mechanical fences for
+  // the `phase_index` join (D-188-01 — a slug-keyed join silently misses every
+  // not-yet-started node mid-run), for the run band's totality (an unrecognised
+  // `workflow_runs.status` must never read as success), and for the `claimed_at == null`
+  // no-number rule. All three are ABSENCE assertions, which are the easiest kind to
+  // delete unnoticed.
+  //
+  // FILE-LEVEL, deliberately NOT the bare directory `src/pages` — see the same reasoning
+  // recorded for `src/components/panel/__tests__` and `src/lib` above. Left OUT of
+  // BASELINE on purpose: it postdates the 1037 pin, so it reports as `new` and its own
+  // count is free to grow; 188-11 pins it from this script's printed `actual` column.
+  "src/pages/WorkflowRunPage.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
