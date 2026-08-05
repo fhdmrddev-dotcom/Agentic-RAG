@@ -1,7 +1,9 @@
 ---
 phase: 188
 slug: non-technical-run-observability
-status: draft
+status: approved
+reviewed_at: 2026-08-05
+reviewed_by: gsd-ui-checker — 6/6 dimensions, 11/11 phase-specific hard invariants, 2 non-blocking FLAGs (both applied below)
 shadcn_initialized: true
 preset: "components.json — style: default · baseColor: slate · cssVariables: true · iconLibrary: lucide (pre-dates the preset-string format; no `shadcn init` is run by this phase)"
 created: 2026-08-05
@@ -56,6 +58,12 @@ Declared values (multiples of 4):
 
 **Exceptions — every one is a GEOMETRIC DERIVATION from shipped 137-B coordinates, not a spacing
 choice. None may be "rounded to the grid":**
+
+> **Checker FLAG applied (Dimension 5, 2026-08-05).** Every value in the table below is a **pinned
+> geometric constant**, never a spacing token. They are not loose padding awaiting tidy-up: each is
+> either frozen shipped 137-B geometry (`PhaseNodeCard.tsx` / `CANVAS_LAYOUT`) or inherent circle
+> math. A future executor who "rounds these to the 4px grid" breaks the card. Treat the derivation
+> column as the source of truth and re-derive rather than re-choose.
 
 | Value | Where | Derivation |
 |-------|-------|-----------|
@@ -451,6 +459,18 @@ overflow-hidden">`), immediately **before** the trailing `<KnowledgeHealthPage /
 6's "no message list and no composer" is satisfied **structurally**, and its test asserts a property
 of the layout rather than a discipline. **The cost that comes with it:** no `WorkspacePanel`, so the
 run surface renders its own deliverable list.
+
+### Primary visual anchor (Checker FLAG applied — Dimension 2, 2026-08-05)
+
+**The canvas region is the focal point of this surface, and within it the running node's status ring
+is the single primary visual anchor** — it is the only element on the page carrying `--primary`
+motion, and it is what the eye should find first at every moment of a live run. Secondary is the
+**one-line run band** (the run-level verdict). Tertiary is the **deliverable list**, which earns
+attention only once the run is terminal. The **header** is orientation, never a focal point — it
+spends no accent except the "Open the chat thread" seam link.
+
+This ordering is what the region stack below encodes; it is stated here so no future addition
+competes with the ring for the accent budget (see the closed 5-item reserved-for list under Color).
 
 ### Regions (full-bleed, top to bottom)
 
