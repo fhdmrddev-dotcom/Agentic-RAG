@@ -1275,6 +1275,20 @@ export interface ThreadWorkflowState {
    *  terminal/absent. PURE additive read (no new query, no write — the 092-05 F2
    *  invariant holds). */
   latest_producer_run_id?: string | null
+  /** Phase 188 CR-03 — the `workflow_runs` row this thread MOST RECENTLY held: the live
+   *  `active_workflow_run_id` when set, ELSE the thread's latest `workflow_runs` row. It is
+   *  the SAME value the server already resolves to source `phases` below, surfaced rather
+   *  than recomputed.
+   *
+   *  ⚠ Read THIS, not `active_workflow_run_id`, whenever the target is "the run this thread
+   *  ran" rather than "the run this thread is running now". `finish_run` NULLs the live
+   *  anchor in the same transaction as the terminal status (Phase 092 SC#2), so the anchor is
+   *  absent for exactly the FINISHED runs a re-open affordance serves.
+   *
+   *  ⚠ It is a `workflow_runs.id`, NEVER a producer `runs.run_id` — see
+   *  `latest_producer_run_id` directly above, which is the OTHER table. Both are bare uuids,
+   *  so a swap typechecks and then resolves nothing. */
+  last_workflow_run_id?: string | null
   /** Phase 098-UAT run-honesty fix (B) — the run's durable per-phase status array
    *  (ordered by phase_index) from workflow_phases, so the reconcile floor can
    *  rebuild an HONEST timeline for a TERMINAL run instead of returning [] (which

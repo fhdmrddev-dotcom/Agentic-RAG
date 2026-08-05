@@ -157,13 +157,27 @@ function RunSoul({ threadId }: { threadId: string | null }) {
  * becomes unreachable the moment the user navigates away from it, and "a finished run
  * re-opens" would be true of the endpoint and false of the product.
  *
- * THE ID IS RESOLVED FROM THE THREAD ANCHOR, and deliberately NOT from the panel's
- * workflow lock. The lock's id field is documented as the anchor but is overwritten with a
- * PRODUCER run id at kickoff and again on a Continue re-subscribe (StreamsProvider), and
- * the lock is cleared outright once a run goes terminal — which is exactly the case this
- * line exists to serve. Both ids are bare uuids, so a swap typechecks and then resolves
- * nothing. The thread frame's anchor survives termination (it is what makes the lock read
- * "stale" rather than absent) and is the only honest source.
+ * THE ID IS RESOLVED FROM THE THREAD FRAME, and deliberately NOT from the panel's workflow
+ * lock. The lock's id field is documented as the anchor but is overwritten with a PRODUCER
+ * run id at kickoff and again on a Continue re-subscribe (StreamsProvider), and the lock is
+ * cleared outright once a run goes terminal — which is exactly the case this line exists to
+ * serve. Both ids are bare uuids, so a swap typechecks and then resolves nothing.
+ *
+ * ⚠ CORRECTED (CR-03). This block previously asserted that *"the thread frame's anchor
+ * survives termination ... and is the only honest source"*, and read `active_workflow_run_id`
+ * alone on the strength of it. The claim was FALSE and the falseness is in the DB:
+ * `finish_run` runs `UPDATE threads SET active_workflow_run_id = NULL WHERE
+ * active_workflow_run_id = $1` in the SAME transaction as the terminal status — described in
+ * its own docblock as "the SINGLE authoritative clear site", and correctly stated by
+ * `reconcilePhases`' comment ("a COMPLETED workflow run CLEARS the thread anchor"). So this
+ * receipt rendered ONLY while a run was live, i.e. never for the finished run it was built
+ * for, and with `GET /runs` deferred and no router that run then had zero entry points.
+ *
+ * That clear is Phase 092's SC#2 (no dangling lock survives a terminal run) and is NOT
+ * undone. Instead the frame now also carries `last_workflow_run_id` — the anchor-then-latest
+ * resolution the SAME endpoint already performed to source its phase spine, surfaced rather
+ * than recomputed (no migration, no new query). The live anchor is still preferred, so a
+ * mid-run receipt is byte-unchanged; the fallback is reached only once the anchor is gone.
  *
  * ADDITIVE SIBLING, and the same G-5 red line the run-soul section observes: it does not
  * read PhaseCard / PhaseTimeline internals and adds a prop to neither. It also renders
@@ -200,7 +214,10 @@ function RunSeam({
     void (async () => {
       try {
         const frame = await getThreadWorkflow(threadId, ctrl.signal)
-        if (!cancelled) setRunId(frame.active_workflow_run_id ?? null)
+        // Live anchor first (unchanged mid-run), then the anchor that survives termination.
+        if (!cancelled) {
+          setRunId(frame.active_workflow_run_id ?? frame.last_workflow_run_id ?? null)
+        }
       } catch {
         // A frame read that fails degrades to no line — an unreachable receipt is better
         // than one that opens a surface it cannot resolve, and this must never throw

@@ -560,12 +560,18 @@ describe("WorkspacePanel — the run receipt (D-188-13, the thread → run direc
    *  are bare uuids, so the wrong one has to be detectable to be measured. */
   const ANCHOR_RUN_ID = "workflow-run-anchor-1"
 
-  function setAnchor(activeWorkflowRunId: string | null) {
+  /** The anchor-survives-termination id (CR-03). `finish_run` NULLs the LIVE anchor in the
+   *  same transaction as the terminal status, so a finished run has only this one. Also
+   *  deliberately different from both ids above. */
+  const LAST_RUN_ID = "workflow-run-last-1"
+
+  function setAnchor(activeWorkflowRunId: string | null, lastWorkflowRunId?: string | null) {
     getThreadWorkflow.mockResolvedValue({
       thread_id: "thread-1",
       mode: "harness",
       locked: true,
       active_workflow_run_id: activeWorkflowRunId,
+      last_workflow_run_id: lastWorkflowRunId ?? null,
       run_status: "completed",
       definition_slug: null,
       definition_name: null,
@@ -618,12 +624,54 @@ describe("WorkspacePanel — the run receipt (D-188-13, the thread → run direc
     expect(screen.queryByText("Open the run")).not.toBeInTheDocument()
   })
 
-  it("renders NOTHING when the thread has no anchor to open", async () => {
-    setAnchor(null)
+  it("renders NOTHING when the thread has NEITHER id to open", async () => {
+    setAnchor(null, null)
     setHooks({ lock: HARNESS_LOCK })
     renderPanel({ state: "open", onOpenRun: vi.fn() })
     await waitFor(() => expect(getThreadWorkflow).toHaveBeenCalled())
     expect(screen.queryByText("Open the run")).not.toBeInTheDocument()
+  })
+
+  // ── CR-03 (Phase 188 review) — the case this receipt EXISTS for ────────────────
+  //
+  // The receipt's own docblock used to justify reading only the live anchor with "the
+  // thread frame's anchor survives termination ... and is the only honest source." That
+  // is FALSE, and the falseness is in the DB: `finish_run` runs
+  //   UPDATE threads SET active_workflow_run_id = NULL WHERE active_workflow_run_id = $1
+  // in the SAME transaction as the terminal status (it is Phase 092's SC#2 — no dangling
+  // lock survives a terminal run, and other surfaces depend on it, so it is NOT undone).
+  //
+  // Consequence before the fix: the receipt rendered ONLY while the run was live, and was
+  // absent for exactly the case it was built for. With `GET /runs` deferred, no router, no
+  // nav item claiming the run home and `activeRunId` held in volatile React state, a
+  // finished run then had ZERO entry points once the user navigated away — "a finished run
+  // re-opens" true of the endpoint and false of the product.
+  //
+  // The fix reuses the resolution `GET /threads/{id}/workflow` ALREADY performs for the
+  // phase spine (`phases_source_run_id` = anchor, else the thread's latest `workflow_runs`
+  // row) and simply puts it on the wire. Zero migrations, zero new queries, and no change
+  // to `finish_run`.
+  it("renders the receipt for a TERMINAL run whose live anchor has been cleared", async () => {
+    setAnchor(null, LAST_RUN_ID)
+    setHooks({ lock: HARNESS_LOCK })
+    const onOpenRun = vi.fn()
+    const user = userEvent.setup()
+    renderPanel({ state: "open", onOpenRun })
+    await user.click(await screen.findByText("Open the run"))
+    expect(onOpenRun).toHaveBeenCalledWith(LAST_RUN_ID)
+  })
+
+  it("prefers the LIVE anchor over the last-run fallback while a run is under way", async () => {
+    // The two ids differ on purpose: mid-run they are the same row in production, so a
+    // fallback that silently won would be invisible without a discriminating fixture.
+    setAnchor(ANCHOR_RUN_ID, LAST_RUN_ID)
+    setHooks({ lock: HARNESS_LOCK })
+    const onOpenRun = vi.fn()
+    const user = userEvent.setup()
+    renderPanel({ state: "open", onOpenRun })
+    await user.click(await screen.findByText("Open the run"))
+    expect(onOpenRun).toHaveBeenCalledWith(ANCHOR_RUN_ID)
+    expect(onOpenRun).not.toHaveBeenCalledWith(LAST_RUN_ID)
   })
 
   it("renders NOTHING when the anchor read fails — it never throws into the panel", async () => {

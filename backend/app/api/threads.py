@@ -1258,5 +1258,16 @@ async def get_thread_workflow(
             if isinstance(latest_producer_run_id, str)
             else latest_producer_run_id
         ),
+        # Phase 188 CR-03 — the ALREADY-RESOLVED anchor-then-latest id, surfaced. This is
+        # literally the value that sourced `phases` above; nothing new is queried and nothing
+        # is written. It exists because `finish_run` NULLs the live anchor in the same
+        # transaction as the terminal status, so a consumer that reads only
+        # `active_workflow_run_id` can never reach a FINISHED run — and `finish_run`'s clear
+        # is Phase 092's SC#2 and is deliberately NOT undone.
+        last_workflow_run_id=(
+            UUID(phases_source_run_id)
+            if isinstance(phases_source_run_id, str)
+            else phases_source_run_id
+        ),
         phases=phases_list,
     )

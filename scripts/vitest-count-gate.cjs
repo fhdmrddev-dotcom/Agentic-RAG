@@ -286,7 +286,15 @@ const BASELINE = {
   //     the run not on chat, the thread still anchors the run, the two-bare-uuid id trap, and
   //     the positional-fallback hazard.
   "WorkflowRunPage.test.tsx": 60,
-  "WorkspacePanel.test.tsx": 39,
+  // 188 code-review fix pass (CR-03): 39 → 41. An EXTENSION, not a lowering — nothing was
+  // deleted. The two added cases are the receipt's own reason for existing: `finish_run`
+  // NULLs `threads.active_workflow_run_id` in the same transaction as the terminal status,
+  // so the receipt rendered only while a run was LIVE and was absent for exactly the
+  // finished run it was built for. One case pins that a cleared anchor still opens the run
+  // (observed RED first), the other that the LIVE anchor still wins while a run is under
+  // way — the guard against the fix drifting into "always the latest row". Both numbers
+  // read from this script's own `actual` column.
+  "WorkspacePanel.test.tsx": 41,
   "phaseState.test.ts": 34,
   "ChatLayout.launch.test.tsx": 12,
   // ── 188-12: the fifteen files that RAN inside TARGETS with NO pin at all. ──
