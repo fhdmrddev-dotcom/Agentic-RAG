@@ -505,7 +505,7 @@ Plans:
 
 **Wave 5** *(blocked on 188-05 — needs `CanvasReading`)*
 
-- [ ] 188-06-PLAN.md — the canvas business-word table (`runVocabulary.ts`) and the status ring: seven readings as seven distinct arc geometries, gaps placed with `stroke-dashoffset` and every number computed from `offset = (D + G/2) − p`, zero net-new glyphs, the run line as one budget with `technicalLine` DECLINED, and the ⛨ seal guard widened from four run states to seven (wave 5)
+- [x] 188-06-PLAN.md — the canvas business-word table (`runVocabulary.ts`) and the status ring: seven readings as seven distinct arc geometries, gaps placed with `stroke-dashoffset` and every number computed from `offset = (D + G/2) − p`, zero net-new glyphs, the run line as one budget with `technicalLine` DECLINED, and the ⛨ seal guard widened from four run states to seven (wave 5)
 
 
 **Wave 6** *(blocked on 188-06)*
