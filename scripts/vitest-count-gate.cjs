@@ -303,7 +303,9 @@ const BASELINE = {
   // run read "● Running" forever with a clock still counting under it. Three of the five
   // added cases were observed RED; the other two guard the poll's teardown and its
   // never-tear-down-a-good-surface rule.
-  "WorkflowRunPage.test.tsx": 69,
+  // 72 = 69 + the three F1 cases (UAT 2026-08-05): the phase slice and the stream now ride
+  //      the run poll, and a final slice+file read lands on the terminal edge.
+  "WorkflowRunPage.test.tsx": 72,
   // 188 code-review fix pass (CR-03): 39 → 41. An EXTENSION, not a lowering — nothing was
   // deleted. The two added cases are the receipt's own reason for existing: `finish_run`
   // NULLs `threads.active_workflow_run_id` in the same transaction as the terminal status,

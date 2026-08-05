@@ -563,11 +563,50 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
   // 5s is a deliberate order of magnitude apart from the 1s clock above: the clock is a
   // local render, the poll is a network read, and pinning them to the same beat would make
   // a per-second request out of a per-second repaint.
+  // F1 (UAT 2026-08-05) — THE PHASE SLICE RIDES THIS SAME BEAT, and before it did the
+  // canvas froze at its mount-time paint while a person watched it.
+  //
+  // Measured live: a 3-phase run whose DB rows read `completed / active / pending` painted
+  // `Running / Not started / Not started` for 100 s on a VISIBLE tab. The reconcile
+  // machinery was never broken — dispatching a wake event snapped the readings straight to
+  // the truth. Nothing was DRIVING it. Two channels were meant to and neither could:
+  //
+  //   1. The STREAM. `reconcileStream` ran once, at mount — where the thread's
+  //      `latest_producer_run_id` is legitimately `null` on an `llm_human_input` phase,
+  //      because the producer run ends while the `workflow_run` stays active. One attempt
+  //      against a value that is not there yet is the same as no attempt, so it is retried
+  //      on the beat rather than assumed.
+  //   2. The WAKE handler above, which fires on `visibilitychange` / `online` — neither of
+  //      which happens to someone sitting and watching. "Watch a run" is this phase's goal
+  //      and the watching case is precisely the one with no wake event in it.
+  //
+  // This is also the shape the project already mandates: Realtime is a hint, not a source of
+  // truth — always reconcile via fetch (D-v2.5-03). The slice is now correct whether or not
+  // an SSE connection ever arms, which is why the fix is a poll and not a second stream.
   useEffect(() => {
     if (!runId || loadPhase !== "ready" || isTerminal) return
-    const id = window.setInterval(refreshRun, RUN_POLL_MS)
+    const threadId = run?.thread_id ?? null
+    const tick = () => {
+      refreshRun()
+      if (!threadId) return
+      void reconcile()
+      void reconcileStream(threadId)
+    }
+    const id = window.setInterval(tick, RUN_POLL_MS)
     return () => window.clearInterval(id)
-  }, [runId, loadPhase, isTerminal, refreshRun])
+  }, [runId, loadPhase, isTerminal, refreshRun, run?.thread_id, reconcile, reconcileStream])
+
+  // The terminal EDGE. The poll above tears itself down on the read that observes the
+  // verdict, so that same tick is the last one — and the deliverable row is written as the
+  // run finishes. Without a read here the final per-node state and the file both land after
+  // the last poll and are never fetched. Gated on `isTerminal` so it fires once, on the
+  // transition, not on every render of a finished run.
+  useEffect(() => {
+    if (!runId || loadPhase !== "ready" || !isTerminal) return
+    if (!run?.thread_id) return
+    void reconcile()
+    void reconcileFiles()
+  }, [runId, loadPhase, isTerminal, run?.thread_id, reconcile, reconcileFiles])
 
   /**
    * The elapsed slot: a number and the field it derives from, or NOTHING AT ALL.

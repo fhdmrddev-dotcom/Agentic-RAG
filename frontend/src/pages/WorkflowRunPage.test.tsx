@@ -1064,6 +1064,63 @@ describe("WorkflowRunPage — the run row is re-read while it is live (CR-01)", 
     expect(screen.getByTestId("run-elapsed")).toHaveTextContent("Ran for")
   })
 
+  // ── F1 (UAT 2026-08-05) — THE CANVAS FROZE WHILE A PERSON WATCHED IT. ──
+  //
+  // Driven live: a 3-phase run whose DB rows read `completed / active / pending` painted
+  // `Running / Not started / Not started` for 100 s on a VISIBLE tab and never moved. The
+  // reconcile machinery was fine — a wake event snapped it straight to the truth. Nothing
+  // was DRIVING it. The run row polled every 5 s (CR-01); the phase slice polled never, and
+  // the stream was re-attempted only on mount, where `latest_producer_run_id` is still null
+  // on an `llm_human_input` phase (the producer run ends while the workflow run continues).
+  //
+  // "Watch a run" is the phase goal, and the watching case is exactly the one with no wake
+  // event in it. So the slice rides the SAME beat as the run.
+  it("polls the PHASE SLICE on the same beat, so a watched canvas advances without a wake", async () => {
+    vi.useFakeTimers()
+    getWorkflowRun.mockResolvedValue(mkRun({ status: "active" }))
+    renderPage()
+    await settle()
+    const afterMount = reconcile.mock.calls.length
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000)
+    })
+    expect(reconcile.mock.calls.length).toBeGreaterThan(afterMount)
+  })
+
+  it("re-attempts the STREAM on the poll — a subscription that could not arm at mount gets another chance", async () => {
+    vi.useFakeTimers()
+    getWorkflowRun.mockResolvedValue(mkRun({ status: "active" }))
+    renderPage()
+    await settle()
+    const afterMount = reconcileStream.mock.calls.length
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000)
+    })
+    // At mount the thread's `latest_producer_run_id` can legitimately be null; one attempt
+    // is not enough, and a canvas frozen for the rest of the run is the cost of assuming it.
+    expect(reconcileStream.mock.calls.length).toBeGreaterThan(afterMount)
+  })
+
+  it("takes a FINAL slice + file read at the terminal edge — the poll tears down on that same tick", async () => {
+    vi.useFakeTimers()
+    getWorkflowRun.mockResolvedValue(mkRun({ status: "active" }))
+    renderPage()
+    await settle()
+
+    getWorkflowRun.mockResolvedValue(mkRun({ status: "completed" }))
+    const beforeTerminal = { slice: reconcile.mock.calls.length, files: reconcileFiles.mock.calls.length }
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000)
+    })
+    await settle()
+    // The deliverable row appears AS the run finishes, and the poll stops on the read that
+    // observes it — without an edge read the last state and the file never land.
+    expect(reconcile.mock.calls.length).toBeGreaterThan(beforeTerminal.slice)
+    expect(reconcileFiles.mock.calls.length).toBeGreaterThan(beforeTerminal.files)
+  })
+
   it("stops polling once the run is terminal — a finished run is not re-read forever", async () => {
     vi.useFakeTimers()
     getWorkflowRun.mockResolvedValue(mkRun({ status: "completed" }))
