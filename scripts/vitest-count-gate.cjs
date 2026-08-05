@@ -208,6 +208,25 @@ const TARGETS = [
   // end-to-end wire fence unguarded — this file was never even EXECUTED by the gate. That
   // is round-3's WR-16 recurring, so the fix is the entry, not another comment about it.
   "src/pages/WorkflowBuilderPage.describe.test.tsx",
+  // Added in 188-01 (Wave 0), for the same two-knob reason spelled out directly above and
+  // for one more: `src/components/panel/__tests__/` lands outside BOTH knobs by default —
+  // the directory entries above cover only `src/components/workflows` and three named
+  // `src/pages/` files. Phase 188's Req-3 falsification test (the REACHABLE fail-open where
+  // `finalizeAllPhasesForThread` sweeps `pending` → `done`) and its Req-1 developer-view
+  // parity assertion are written INTO these two suites. Without these entries the gate would
+  // never have EXECUTED either one, and a falsification test that does not run has falsified
+  // nothing — verbatim the round-5 "verification truth 14" failure Phase 187 shipped and had
+  // to fix afterwards.
+  // FILE-LEVEL, deliberately NOT the bare directory `src/components/panel/__tests__`. The
+  // directory holds 12 suites; measured under plain vitest on 2026-08-05 it is
+  // `12 passed (12) / 144 passed (144)` — i.e. 0 failing, so the directory form WOULD have
+  // been admissible. It is still not taken: the gate requires 0 failing forever, and adopting
+  // ten suites nobody in this phase reads makes this phase the owner of their future rot. A
+  // later phase that wants CsvTablePreview / FilePreview / FilesSection / PendingAskCard /
+  // Seam / TodosSection / VersionDiff / WorkspacePanel{,.derived} inside the gate should adopt
+  // them deliberately, with its own measured number.
+  "src/components/panel/__tests__/PhaseReconcile.test.tsx",
+  "src/components/panel/__tests__/PhaseTimeline.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
