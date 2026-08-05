@@ -88,7 +88,18 @@ import { useOperatorProbe } from "@/hooks/useOperatorProbe"
 import { useEffectiveFeatures } from "@/hooks/useEffectiveFeatures"
 import { visibleNavItems } from "@/lib/nav-items"
 
-export type ActiveView = "chat" | "documents" | "skills" | "settings" | "library-health" | "workflows" | "classification-rules" | "governance" | "skill-studio" | "control-room" | "org-admin"
+// Phase 188 Plan 09 (RUNVIZ-03 / D-188-10): the TWELFTH member below is the run's own
+// home (SPEC Req 6). ⚠ Its literal is deliberately NOT spelled again in this comment —
+// the acceptance fence counts occurrences in this file, and prose that repeats the
+// member would make a code measurement satisfiable by a comment (the 187-24 lesson,
+// met again by 188-03 / 188-07 / 188-08). NO ROUTER: the three-homes contract holds and this
+// is wired exactly like the other eleven (a `useState<ActiveView>` switch + a matching
+// render branch in ChatLayout + a launch that navigates to it). ⚠ The member alone is
+// NOT reachability: ChatLayout's trailing `<KnowledgeHealthPage />` is a POSITIONAL
+// FALLBACK, not a `default:` that throws, so a union member with no branch silently
+// renders Knowledge Health (the Phase-118 built-but-unreachable lesson). The matching
+// branch ships in the same commit as this member.
+export type ActiveView = "chat" | "documents" | "skills" | "settings" | "library-health" | "workflows" | "classification-rules" | "governance" | "skill-studio" | "control-room" | "org-admin" | "workflow-run"
 
 function App() {
   const { user, loading, signIn, signUp, signOut } = useAuth()

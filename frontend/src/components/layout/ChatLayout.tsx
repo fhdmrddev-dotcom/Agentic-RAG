@@ -21,6 +21,9 @@ import { ControlRoomPage } from "@/components/admin/ControlRoomPage"
 // Shield-mirror. useOrgOptional supplies canManage (the mobile-drawer shield gate) +
 // activeOrgId (the D-166-08 thread-list refetch key).
 import { OrgAdminShell } from "@/components/org/OrgAdminShell"
+// Phase 188 Plan 09 (RUNVIZ-03): the run's own room mounts here as a full-surface
+// branch (the SkillStudioPage precedent — entered WITH an id, returned via callbacks).
+import { WorkflowRunPage } from "@/pages/WorkflowRunPage"
 import { useOrgOptional } from "@/providers/OrgProvider"
 import { useThreads } from "@/hooks/useThreads"
 import { useFolders } from "@/hooks/useFolders"
@@ -212,6 +215,17 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
     onSetPrefillMessage(`Use the ${skillName} skill`)
     onNavigate("chat")
   }, [onSetPrefillMessage, onNavigate])
+
+  // ── Phase 188 Plan 09 (RUNVIZ-03 / D-188-11): the run surface's per-view id, held
+  //    LOCALLY in exactly the style of the other per-view state above (`panelState`,
+  //    `drawerOpen`) — ChatLayout already owns `doRun`, `onNavigate` and the panel, so
+  //    it is the right owner. `studioSkillId` is the App-held precedent for the same
+  //    shape; this one stays local because only doRun and the branch below read it.
+  //    ⚠ This is a `workflow_runs.id`, NEVER a producer `runs.run_id`.
+  //    The setter arrives with the launch retarget (the next commit): this commit
+  //    lands the HOME (union member + branch), so the id is still always null here
+  //    and the surface renders its calm no-id guard. ──
+  const [activeRunId] = useState<string | null>(null)
 
   // ── Phase 103-06 (REQ-7 / D-103-CONF-1): doRun — the Run-from-page launch.
   //    Workflows are a MODE of a thread, never page-resident: Run creates a NEW
@@ -641,6 +655,41 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
             // closes the reachability triad (App union [Plan 02] + this mount + the NavPanel
             // entry — all owned in-phase; the Phase-118 built-but-unreachable lesson).
             <OrgAdminShell onBack={() => onNavigate("chat")} />
+          ) : activeView === "workflow-run" ? (
+            // Phase 188 Plan 09 (RUNVIZ-03 / SPEC Req 6 / D-188-10): the run's own room
+            // mounts here as the FOURTH home — additive branch placed IMMEDIATELY BEFORE
+            // the trailing KnowledgeHealthPage (the governance/skill-studio/control-room
+            // precedent). ⚠ That trailing element is a POSITIONAL FALLBACK, not a
+            // `default:` that throws: an ActiveView member with no branch of its own
+            // silently renders Knowledge Health, so the branch MUST precede it (the
+            // Phase-118 built-but-unreachable lesson). The reachability triad — the
+            // App.tsx union member + this mount + doRun's navigation — is owned in-phase.
+            //
+            // Entered WITH a `workflow_runs.id` (never a producer `runs.run_id`), set by
+            // doRun below. `onBack` returns to the Workflows library; `onOpenThread` is
+            // D-188-13's bidirectional seam back into the run's chat thread, resolved off
+            // the already-loaded app-wide `threads` list (Phase 156's Wave-1 bootstrap)
+            // because `selectThread` takes a Thread, not an id.
+            //
+            // NO nav-rail item claims this view: while activeView === "workflow-run" no
+            // rail item carries aria-current (188-UI-SPEC § Copywriting Contract). This
+            // home is reached by launching or by the thread's run receipt, never from the
+            // rail — so `nav-items.ts` is deliberately untouched.
+            //
+            // The message list, the composer and <WorkspacePanel> all live inside the
+            // `activeView === "chat" ?` branch above, so a view on THIS side renders none
+            // of them. That is what makes SPEC Req 6's "no message list and no composer" a
+            // structural property of the layout rather than a discipline — and the reason
+            // the run surface renders its own deliverable list (Plan 10).
+            <WorkflowRunPage
+              runId={activeRunId}
+              onBack={() => onNavigate("workflows")}
+              onOpenThread={(tid) => {
+                const t = threads.find((x) => x.id === tid)
+                if (t) selectThread(t)
+                onNavigate("chat")
+              }}
+            />
           ) : (
             <KnowledgeHealthPage />
           )}
