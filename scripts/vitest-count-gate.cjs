@@ -150,7 +150,13 @@ const BASELINE = {
   // 188-12: 31 → 46. GREW IN THIS PHASE — 188-06 added the seven-readings and ring-spec
   // cases, 188-07 the derives-nothing property and the type-only-import fence that is the
   // mechanical half of the G-5 diff cap. It began this phase pinned at 31 while running 35.
-  "WorkflowCanvas.test.tsx": 46,
+  // 188.1-01: 46 → 48. EXTENDED, never lowered, and read from this script's own printed
+  // `actual` column across two agreeing runs rather than by counting `it(` literals. The two
+  // cases are the move-invariant subtree-fence control (which keeps the file's twelve `?raw`
+  // negatives from narrowing when 188.1-03 cuts 311 lines out of `WorkflowCanvas.tsx`) and
+  // the editable SC#4 walk (the two shipped no-focusable-control assertions render READ-ONLY,
+  // so neither ever mounted `PlaneEditingLayer` — the layer this phase moves).
+  "WorkflowCanvas.test.tsx": 48,
   // 187-29: gap-closure round 5's three suites, pinned for exactly the reason
   // 187-25 pinned its two — each now carries a guard that a failures-only
   // differential cannot see the deletion of:
@@ -379,7 +385,10 @@ const BASELINE = {
   // The now-false TARGETS comment below is corrected in this same commit.
   "WorkflowBuilderPage.header.test.tsx": 27,
   "FlowEdge.test.tsx": 22,
-  "WorkflowCanvas.composition.test.tsx": 19,
+  // 188.1-01: 19 → 20. EXTENDED — the same move-invariant subtree-fence control, carried
+  // here as well because this suite re-scopes its own five negatives and a control living in
+  // another file protects another file. Twice-measured from the `actual` column.
+  "WorkflowCanvas.composition.test.tsx": 20,
   "CanvasToolbar.test.tsx": 14,
   "BuilderSaveRegion.test.tsx": 11,
 }
@@ -396,7 +405,13 @@ const BASELINE = {
 // — the post-round-5 truth-14 correction. Was 804 = 715 + 30 + 30 + 29 (187-29
 // extended; 715 = 415 + 232 + 68 after 187-25 extended; was 415 after 185-08
 // lowered it, 424 at the original 184 Wave-0 pin).
-const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // 2421
+// ⚠ CORRECTED BY 188.1-01: the trailing figure said `2421` while the reduce computed 2462 —
+// stale since 188-12 re-pinned every file, and harmless only because the gate reads the
+// reduce and never the comment. It is now 2465 (2462 + the two 188.1-01 extensions above),
+// re-derived from this script's own printed `total` across two agreeing runs. A number in a
+// comment that nothing checks goes stale by default; recording the correction rather than
+// silently rewriting it is the house `⚠` rule.
+const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // 2465
 
 // ── The Wave-0 blast radius (184-VALIDATION.md § "quick run command"). ──
 const TARGETS = [

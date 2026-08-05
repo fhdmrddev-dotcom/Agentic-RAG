@@ -99,6 +99,12 @@ function renderCanvas(
      *  passing `undefined` here leaves every pre-188 assertion rendering exactly as it
      *  did. Only the RUNVIZ-01 block at the foot of this file supplies one. */
     runState?: (slug: string) => NodeRunState | undefined
+    /** 188.1-01: the editing switch. OMITTED on every shipped call above, and omitting it
+     *  mounts NO `PlaneEditingLayer` at all — so passing `undefined` here leaves every
+     *  pre-188.1 assertion rendering exactly as it did. Only the SC#4 editable walk in the
+     *  tab-stop block supplies one, and it exists because that block's two shipped
+     *  assertions render read-only and therefore never reached the layer. */
+    editable?: boolean
   } = {},
 ) {
   const ui = (
@@ -110,6 +116,7 @@ function renderCanvas(
         onClearSelection={opts.onClearSelection ?? vi.fn()}
         kbTools={opts.kbTools}
         runState={opts.runState}
+        editable={opts.editable}
       />
     </div>
   )
@@ -319,6 +326,39 @@ describe("WorkflowCanvas — one tab stop per node (Pattern 3 Option A)", () => 
     expect(container.querySelectorAll('.react-flow__node[tabindex="0"]')).toHaveLength(
       docQaHumanGrounded.length,
     )
+    for (const node of nodes) {
+      expect(node.querySelectorAll("button, a, [tabindex]")).toHaveLength(0)
+    }
+  })
+
+  it("no focusable control exists inside a node WHEN THE EDITING LAYER IS MOUNTED (188.1-01)", () => {
+    // ⚠ A MEASURED CORRECTION, not a new invariant. SC#4's two shipped assertions above
+    // both render READ-ONLY (`renderCanvas(evalCoverage)` / `renderCanvas(docQaHumanGrounded,
+    // { kbTools })`), and `PlaneEditingLayer` — the only thing on this surface that renders
+    // `<button>`s near a card at all — mounts ONLY under `editable`. So before this commit
+    // the walk never saw the `＋` or the `✕`, and the invariant "the affordances live on the
+    // LANE, never inside a card" was enforced against a render that had no affordances in
+    // it. That is vacuity with respect to exactly the code 188.1-03 moves out.
+    const { container } = renderCanvas(evalCoverage, { editable: true })
+
+    // NON-VACUITY CONTROL FIRST (the `FlowEdge.test.tsx:294-301` house shape), so an empty
+    // result below is evidence rather than a broken matcher: the affordances really ARE in
+    // this DOM. Proven by inversion — `toHaveLength(0)` here fails.
+    expect(
+      container.querySelectorAll('[data-testid^="canvas-insert-"]').length,
+    ).toBeGreaterThan(0)
+    expect(
+      container.querySelectorAll('[data-testid^="canvas-remove-"]').length,
+    ).toBeGreaterThan(0)
+
+    // The invariant under test is WHERE they live, not whether they exist — so the tab-stop
+    // count is asserted too. One stop per node, with the layer mounted.
+    expect(container.querySelectorAll('.react-flow__node[tabindex="0"]')).toHaveLength(
+      evalCoverage.length,
+    )
+
+    const nodes = Array.from(container.querySelectorAll(".react-flow__node"))
+    expect(nodes.length).toBeGreaterThan(0)
     for (const node of nodes) {
       expect(node.querySelectorAll("button, a, [tabindex]")).toHaveLength(0)
     }
