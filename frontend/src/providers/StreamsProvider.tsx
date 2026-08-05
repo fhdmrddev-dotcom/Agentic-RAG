@@ -111,6 +111,11 @@ import {
   deriveWorkspacePanel,
   type DerivedPanelItem,
 } from "@/lib/workspacePanel"
+// Phase 188 Plan 05 (SPEC Req 8 / D-188-02): the ONE phase-state derivation. The
+// `DB_PHASE_STATUS` map used to be declared in this file; it now lives in `lib/` with
+// the total function that owns its fallback, so the developer panel and the business
+// canvas cannot drift. This file consumes the derivation and re-derives nothing.
+import { phaseStatusFromDb } from "@/lib/phaseState"
 // BUG-260626-01 (+ sibling): collapse same-runId temp/persisted twins at the
 // bucket-read seam so useDerivedPanel's flat-map doesn't double-count a run.
 import { dedupMessagesByRunId } from "@/lib/dedupMessages"
@@ -3308,15 +3313,9 @@ export function useTasks(threadId: string | null): {
  * a no-op (returns []) when the thread is Deep / has no run, so the skeleton
  * only appears for an actual harness run.
  */
-// Phase 098-UAT run-honesty fix (B): map a DB-native workflow_phases.status to the
-// Phase status union the PhaseCard renders verbatim (active→running, completed→done).
-const DB_PHASE_STATUS: Record<string, Phase["status"]> = {
-  pending: "pending",
-  active: "running",
-  completed: "done",
-  failed: "failed",
-  skipped: "skipped",
-}
+// Phase 188 Plan 05 (SPEC Req 8 / D-188-02): the Phase-098-UAT `DB_PHASE_STATUS` map
+// MOVED to `@/lib/phaseState` — verbatim, with its provenance comment — and this file
+// now imports `phaseStatusFromDb` instead. The map is unchanged; only its address is.
 
 async function reconcilePhases(threadId: string, signal?: AbortSignal): Promise<Phase[]> {
   const wf = await getThreadWorkflow(threadId, signal)
@@ -3402,7 +3401,12 @@ async function reconcilePhases(threadId: string, signal?: AbortSignal): Promise<
       // green. Third occurrence of the same lesson: fail CLOSED on a state we cannot
       // name. Falsified first (`panel/__tests__/PhaseReconcile.test.tsx`, RED observed
       // on unmodified source), with a positive control that `completed` still maps.
-      status: DB_PHASE_STATUS[r.status] ?? "unknown",
+      //
+      // Phase 188 Plan 05: the map lookup AND its fallback moved bodily into the total
+      // `phaseStatusFromDb` (`lib/phaseState.ts`). That is the point of the extraction
+      // — a fallback at each call site is a fallback that can be got wrong at each
+      // call site; there is now exactly one.
+      status: phaseStatusFromDb(r.status),
       subAgents: [],
       pendingAsk: null,
   }))

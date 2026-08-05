@@ -29,6 +29,10 @@ import { useEffect, useRef, useState } from "react"
 import { usePhases, useTasks } from "@/providers/StreamsProvider"
 import { getThreadWorkflow, type ThreadWorkflowState } from "@/lib/api"
 import type { Phase } from "@/types"
+// Phase 188 Plan 05 (SPEC Req 8 / D-188-02): the terminal-run set MOVED to the shared
+// derivation module so the canvas run view reads the same one. `timed_out` is carried
+// forward unchanged (D-188-21) — the measurement is recorded in that module's docblock.
+import { TERMINAL_RUN_STATUSES } from "@/lib/phaseState"
 import { PhaseCard } from "./PhaseCard"
 
 /** The run-level reconcile frame this timeline needs (subset of ThreadWorkflowState). */
@@ -37,7 +41,6 @@ type RunFrame = Pick<
   "mode" | "definition_name" | "run_status" | "current_phase_index" | "total_phases"
 >
 
-const TERMINAL_RUN_STATUSES = new Set(["completed", "failed", "cancelled", "timed_out"])
 
 /** Find the active (running/retrying) phase index, else the last done, else 0. */
 function activePhaseIndex(phases: Phase[]): number {
