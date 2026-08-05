@@ -264,7 +264,14 @@ const BASELINE = {
   "PhaseNodeCard.test.tsx": 105,
   "PhaseNode.test.tsx": 25,
   "PhaseTimeline.test.tsx": 8,
-  "PhaseReconcile.test.tsx": 12,
+  // 188 code-review fix pass (CR-06): 12 → 17. An EXTENSION, not a lowering. The five
+  // added cases falsify the fail-open that survived ONE FUNCTION AWAY from the one 188-02
+  // closed: the live branch's `i < current ? "done"` painted a `skipped` row Complete (or
+  // Running, when the cursor is still parked on it — `advance_current_phase` is not called
+  // on the skip branch), and did the same to a `failed` row and to an unnameable one. Four
+  // of the five were observed RED; the fifth is the positive control that a genuinely
+  // completed row below the cursor is unaffected.
+  "PhaseReconcile.test.tsx": 17,
   // ── 188-12: the four suites Phase 188 CREATED (or deliberately adopted), pinned now. ──
   // Each was put into TARGETS by the plan that created it — in the same commit, because an
   // entry pointing at a not-yet-existing path makes the gate ERROR (exit 2) rather than fail —

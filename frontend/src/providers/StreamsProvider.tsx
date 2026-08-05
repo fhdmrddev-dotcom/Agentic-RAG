@@ -3343,18 +3343,42 @@ async function reconcilePhases(threadId: string, signal?: AbortSignal): Promise<
   //
   // THE JOIN KEY IS `phase_index`, NEVER the slug: the very value this branch can emit as
   // a placeholder cannot also be the key that repairs it. Same reasoning as the
-  // BUG-260609-01 by-INDEX sweep above. `byIndex.get(i)` is deliberately read twice
-  // rather than hoisted into a block body, so the status line below stays BYTE-identical
-  // in the diff — the cheap lookup buys a mechanically checkable no-op.
+  // BUG-260609-01 by-INDEX sweep above. (188-04 read `byIndex.get(i)` twice rather than
+  // hoisting it, specifically so the status line stayed byte-identical in that diff. CR-06
+  // changes the status line, so that reason has expired and the lookup is hoisted.)
   //
-  // STATUS IS DELIBERATELY NOT OVERLAID — the overlay carries IDENTITY ONLY (`slug`,
-  // `phaseType`). The positional derivation is a FORWARD-ONLY floor and is in some cases
-  // MORE advanced than the DB rows, because a row flips only at `complete_phase`.
-  // Overlaying it would let a lagging row drag `PhaseTimeline`'s shipped counter
-  // (`PhaseTimeline.tsx:115-127`) BACKWARD — a regression dressed as a fix, and strictly
-  // worse than the cosmetic defect being closed (T-188-04-01). That is fenced
-  // mechanically by the floor guard in `panel/__tests__/PhaseReconcile.test.tsx`, whose
-  // fixture holds every DB row at `pending` while the counter has already advanced.
+  // STATUS IS NOT OVERLAID WHOLESALE — the identity overlay carries `slug` and
+  // `phaseType`, and the positional derivation remains a FORWARD-ONLY floor. Overlaying
+  // status wholesale is the regression 188-04 refused: the derivation is in some cases
+  // MORE advanced than the rows, and a lagging row would drag `PhaseTimeline`'s shipped
+  // counter (`PhaseTimeline.tsx:115-127`) backward — strictly worse than the cosmetic
+  // defect being closed (T-188-04-01). The floor guard in
+  // `panel/__tests__/PhaseReconcile.test.tsx` fences that, with a fixture holding every DB
+  // row at `pending` while the counter has already advanced.
+  //
+  // ⚠ CR-06 (Phase 188 review) — BUT THE FLOOR MAY ONLY ADVANCE AN *UNRESOLVED* ROW.
+  // Plan 02 narrowed `finalizeAllPhasesForThread` because "on any skip-bearing workflow
+  // this sweep painted a step that NEVER RAN as Complete, while a reconcile rebuilt from
+  // those same rows restored 'Not started': the live view and the reload disagreed —
+  // precisely what Req 4 forbids." The identical fail-open survived one function away, in
+  // this branch's own `i < current ? "done"`.
+  //
+  // Measured, not argued: `harness_engine.py`'s skip branch calls `skip_phase(pool,
+  // phase_id)` (the row becomes `skipped`) and then `i = target_i; continue`, so every row
+  // between it and the target keeps `pending` and nothing revisits them. And
+  // `advance_current_phase` is called at ONE site, AFTER `complete_phase`/`fail_phase`,
+  // and NOT on the skip branch — so the cursor can be parked ON the skipped row (which
+  // painted it `running`: a jumped-over step reported as executing right now) or already
+  // past it (which painted it `done`). Both were wrong; a reload restored `Skipped` for
+  // both.
+  //
+  // THE RULE, stated once: a DB row the engine has already RESOLVED — `done`, `failed`,
+  // `skipped`, or a status this client cannot name — is a terminal truth the positional
+  // counter must not overwrite. Only an UNRESOLVED row (`pending` / `active`, i.e. the lag
+  // the floor exists for) takes the positional value. That keeps the floor forward-only
+  // (the guard fixture is all-`pending`, so it is untouched) while making the live view
+  // agree with the reload it will be replaced by. `unknown` is included for Req 3's
+  // reason one level up: a status we cannot name may never be upgraded to success.
   if (wf.mode === "harness" && !wf.lock_is_stale) {
     const total = wf.total_phases ?? 0
     if (total <= 0) return []
@@ -3362,16 +3386,25 @@ async function reconcilePhases(threadId: string, signal?: AbortSignal): Promise<
     const byIndex = new Map<number, WorkflowPhaseState>(
       (wf.phases ?? []).map((r) => [r.phase_index, r]),
     )
-    return Array.from({ length: total }, (_, i): Phase => ({
-      slug:
-        byIndex.get(i)?.slug ??
-        (i === current ? (wf.current_phase_slug ?? `phase-${i}`) : `phase-${i}`),
-      phaseIndex: i,
-      phaseType: byIndex.get(i)?.phase_type ?? "unknown",
-      status: i < current ? "done" : i === current ? "running" : "pending",
-      subAgents: [],
-      pendingAsk: null,
-    }))
+    return Array.from({ length: total }, (_, i): Phase => {
+      const row = byIndex.get(i)
+      const positional: Phase["status"] =
+        i < current ? "done" : i === current ? "running" : "pending"
+      const db = row ? phaseStatusFromDb(row.status) : undefined
+      // `pending` / `running` are the UNRESOLVED readings — those, and only those, defer
+      // to the floor. Everything else is a resolution the engine already wrote down.
+      const resolved = db != null && db !== "pending" && db !== "running"
+      return {
+        slug:
+          row?.slug ??
+          (i === current ? (wf.current_phase_slug ?? `phase-${i}`) : `phase-${i}`),
+        phaseIndex: i,
+        phaseType: row?.phase_type ?? "unknown",
+        status: resolved ? db : positional,
+        subAgents: [],
+        pendingAsk: null,
+      }
+    })
   }
   // Phase 098-UAT run-honesty fix (B): NOT a live/active harness run. A COMPLETED
   // workflow run CLEARS the thread anchor (mode flips back to "deep"); a terminal

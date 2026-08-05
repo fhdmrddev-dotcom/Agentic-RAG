@@ -523,6 +523,13 @@ describe("Phase 188 — reconcilePhases LIVE branch identity overlay (BUG-260609
     // the positional derivation says `done` because `current_phase_index` is 1. The
     // DERIVATION must win: overlaying status would move the shipped forward-only
     // counter at `PhaseTimeline.tsx:115-127` backward.
+    //
+    // ⚠ SCOPE, CORRECTED BY CR-06. This case pins the floor for an UNRESOLVED row — the
+    // rationale above ("the row flips only at `complete_phase`") is a statement about a
+    // `pending` row, and it does not generalise to a row the engine has already resolved.
+    // The fix reads that distinction, so this assertion is unchanged and still green;
+    // what changed is only that a `skipped` / `failed` / unnameable row no longer falls
+    // under it. See the CR-06 block at the bottom of this file.
     expect(
       result.current.data[0].status,
       "the positional floor outranks a lagging DB row — status is NOT overlaid",
@@ -567,5 +574,141 @@ describe("Phase 188 — reconcilePhases LIVE branch identity overlay (BUG-260609
     // `total_phases` remains the array length — kept as defence in depth, never
     // presented as load-bearing (RESEARCH OQ4 consequence 2).
     expect(result.current.data).toHaveLength(4)
+  })
+})
+
+// ── CR-06 (Phase 188 review) — the fail-open that survived ONE FUNCTION AWAY ───────────
+//
+// Plan 02 narrowed `finalizeAllPhasesForThread` for a carefully-argued reason:
+//
+//   "`skip_to_phase` marks ONLY the current phase … every phase between it and the jump
+//    target keeps `status='pending'` … nothing ever revisits them. So on any skip-bearing
+//    workflow this sweep painted a step that NEVER RAN as Complete, while a reconcile
+//    rebuilt from those same rows restored 'Not started': the live view and the reload
+//    disagreed … which is precisely what Req 4 forbids."
+//
+// The identical fail-open lived on in the LIVE branch's own positional derivation, where
+// `i < current` painted Complete over whatever the DB row said. It is the SAME argument
+// under the SAME requirement, so it gets the same answer.
+//
+// MEASURED, so the fixtures below are the real shape and not a supposition:
+//   · `harness_engine.py` skip branch — `await skip_phase(pool, phase_id)` flips the
+//     from-phase to `skipped`, then `i = target_i; continue`. Every row between it and the
+//     target keeps `pending` and nothing revisits them.
+//   · `advance_current_phase` is called at ONE site (after `complete_phase`/`fail_phase`),
+//     and NOT on the skip branch — so the cursor can legitimately still be parked on the
+//     SKIPPED row when a reconcile lands, and can equally be ahead of it once the jump
+//     target completes. Both are covered below; both were wrong before the fix, and the
+//     parked one is the louder lie (a jumped-over step reported as executing right now).
+//
+// THE FIX IS NOT "OVERLAY STATUS". The positional derivation is a forward-only floor that
+// is sometimes MORE advanced than the rows, and overlaying wholesale is the regression
+// 188-04 refused. The rule is narrower: the floor may only ADVANCE a row the DB has left
+// UNRESOLVED (`pending`/`active`). A row the engine has already resolved — skipped, failed,
+// completed, or a status this client cannot name — is a truth the floor may not overwrite.
+// The floor-guard above is unaffected and stays green: its rows are all `pending`, i.e.
+// exactly the unresolved case the floor exists for.
+
+const SKIP_ROWS = [
+  { slug: "collect-inputs", phase_index: 0, status: "completed", phase_type: "programmatic" },
+  // The engine marked this one SKIPPED — an explicit terminal truth, not a lag.
+  { slug: "draft-the-letter", phase_index: 1, status: "skipped", phase_type: "llm_agent" },
+  // Jumped over. It will never run, and nothing will ever revisit this row.
+  { slug: "check-the-numbers", phase_index: 2, status: "pending", phase_type: "llm_single" },
+  { slug: "produce-the-report", phase_index: 3, status: "active", phase_type: "llm_emit" },
+]
+
+describe("Phase 188 CR-06 — the live floor never UPGRADES a row the engine resolved", () => {
+  beforeEach(() => {
+    resetPhases()
+  })
+
+  function liveFrame(currentIndex: number) {
+    return {
+      mode: "harness",
+      lock_is_stale: false,
+      definition_name: "Quarterly board letter",
+      run_status: "running",
+      total_phases: 4,
+      current_phase_index: currentIndex,
+      current_phase_slug: SKIP_ROWS[currentIndex].slug,
+      phases: SKIP_ROWS,
+    }
+  }
+
+  it("a SKIPPED row is never painted Complete when the cursor has moved past it", async () => {
+    mockGetThreadWorkflow.mockResolvedValue(liveFrame(3))
+    mountRealProvider()
+    const { result } = renderHook(() => RealStreams.usePhases(THREAD_LIVE))
+    await waitFor(() => expect(result.current.data).toHaveLength(4))
+
+    // Pre-fix: `1 < 3` → "done". The engine said `skipped`; a reload says `skipped`; the
+    // live view said Complete. That is the live-vs-reload disagreement Req 4 forbids.
+    expect(
+      result.current.data[1].status,
+      "the engine resolved this row to skipped — the positional floor may not overwrite it",
+    ).toBe("skipped")
+    expect(result.current.data[1].status).not.toBe("done")
+  })
+
+  it("a SKIPPED row is never painted Running when the cursor is still parked on it", async () => {
+    // `advance_current_phase` is NOT called on the skip branch, so this is the state a
+    // reconcile lands in for the whole time the jump target is executing.
+    mockGetThreadWorkflow.mockResolvedValue(liveFrame(1))
+    mountRealProvider()
+    const { result } = renderHook(() => RealStreams.usePhases(THREAD_LIVE))
+    await waitFor(() => expect(result.current.data).toHaveLength(4))
+
+    expect(
+      result.current.data[1].status,
+      "a jumped-over step must never be reported as executing right now",
+    ).toBe("skipped")
+    expect(result.current.data[1].status).not.toBe("running")
+  })
+
+  it("a COMPLETED row below the cursor still reads done — the fix changes nothing here", async () => {
+    mockGetThreadWorkflow.mockResolvedValue(liveFrame(3))
+    mountRealProvider()
+    const { result } = renderHook(() => RealStreams.usePhases(THREAD_LIVE))
+    await waitFor(() => expect(result.current.data).toHaveLength(4))
+
+    // POSITIVE CONTROL. Green before and after; it is here so the two assertions above
+    // are a measurement of the skipped row rather than of the branch as a whole.
+    expect(result.current.data[0].status).toBe("done")
+    expect(result.current.data[3].status).toBe("running")
+  })
+
+  it("a FAILED row below the cursor keeps its failure — the other resolved terminal", async () => {
+    mockGetThreadWorkflow.mockResolvedValue({
+      ...liveFrame(3),
+      phases: SKIP_ROWS.map((r) =>
+        r.phase_index === 1 ? { ...r, status: "failed" } : r,
+      ),
+    })
+    mountRealProvider()
+    const { result } = renderHook(() => RealStreams.usePhases(THREAD_LIVE))
+    await waitFor(() => expect(result.current.data).toHaveLength(4))
+
+    // A run that continues past a failed step (the 101.1 graceful-emit-failure path does
+    // exactly this) must not have that failure repainted green by the counter.
+    expect(result.current.data[1].status).toBe("failed")
+    expect(result.current.data[1].status).not.toBe("done")
+  })
+
+  it("an UNRECOGNISED row status below the cursor reads unknown, never done", async () => {
+    // Req 3's discipline, one level up: a status this client cannot name must never be
+    // upgraded to success by a positional counter. The same fail-open, same lesson.
+    mockGetThreadWorkflow.mockResolvedValue({
+      ...liveFrame(3),
+      phases: SKIP_ROWS.map((r) =>
+        r.phase_index === 1 ? { ...r, status: "quarantined" } : r,
+      ),
+    })
+    mountRealProvider()
+    const { result } = renderHook(() => RealStreams.usePhases(THREAD_LIVE))
+    await waitFor(() => expect(result.current.data).toHaveLength(4))
+
+    expect(result.current.data[1].status).toBe("unknown")
+    expect(result.current.data[1].status).not.toBe("done")
   })
 })
