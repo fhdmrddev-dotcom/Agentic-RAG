@@ -274,9 +274,26 @@ const BASELINE = {
   //     reproduced in the guard rather than in the product.
   //   · PhaseTimeline.test.tsx   8 →   8: unchanged. Recorded rather than omitted, so a reader
   //     can tell "measured and still 8" from "nobody looked".
-  "PhaseNodeCard.test.tsx": 105,
-  "PhaseNode.test.tsx": 25,
-  "PhaseTimeline.test.tsx": 8,
+  // ── 188.1-04 (Wave 4): three of the four suites this plan EXTENDED. ──
+  // EXTENSIONS ONLY, nothing lowered, `TARGETS` unedited (all four were already inside it).
+  // Every number is this script's own `actual` column across TWO agreeing runs on
+  // 2026-08-06 (total 2476, failed 0, per-file columns identical) — never a hand count of
+  // `it(` literals, which is unsound under `it.each` (`definitionOps.test.ts` declares ~122
+  // and runs 232).
+  //   · PhaseNodeCard.test.tsx 105 → 107: the WR-04 site-4 (`VERDICT_MARK`) and site-5
+  //     (`RING_STROKE`) falsifications, both observed RED against the shipped tree.
+  //   · PhaseNode.test.tsx      25 →  26: the WR-04 site-1 (`ICON_TINT`) falsification. ONE
+  //     case, not three, because `data.phaseType` feeds three lookups and the property is
+  //     about the VALUE — the measured first consequence of a prototype key was not a wrong
+  //     tint but a hard render crash out of `phaseGlyph`.
+  //   · PhaseTimeline.test.tsx   8 →  10: the WR-04 site-2 (`PHASE_TYPE_LABEL`) and site-3
+  //     (`STATUS_META`) falsifications. ⚠ They drive `panel/PhaseCard` DIRECTLY rather than a
+  //     timeline fixture: the fixture path is normalised by the already-guarded
+  //     `phaseStatusFromDb`, so a fixture-driven site-3 test would have been GREEN against
+  //     the unguarded tree — never observed RED, and therefore known to test nothing.
+  "PhaseNodeCard.test.tsx": 107,
+  "PhaseNode.test.tsx": 26,
+  "PhaseTimeline.test.tsx": 10,
   // 188 code-review fix pass (CR-06): 12 → 17. An EXTENSION, not a lowering. The five
   // added cases falsify the fail-open that survived ONE FUNCTION AWAY from the one 188-02
   // closed: the live branch's `i < current ? "done"` painted a `skipped` row Complete (or
@@ -347,7 +364,16 @@ const BASELINE = {
   //      did. Falsified live on ONE workflow across BOTH surfaces: the Builder canvas gave the
   //      node `data-grounded="true"`, the run surface no attribute. Both cases observed RED.
   //      The second is an R11 fence: the page must READ the server list, never author one.
-  "WorkflowRunPage.test.tsx": 87,
+  // 88 = 87 + the ONE 188.1-04 WR-07 case (2026-08-06). An EXTENSION, not a lowering. It
+  //      asserts the URL a mocked `fetch` RECEIVES when the REAL `getWorkflowRun` (reached
+  //      through `importActual`, which un-mocks that module for one call) is handed a
+  //      `runId` of `"a/b"` — encoded `a%2Fb`, never a bare `workflow-runs/a/b` path.
+  //      ⚠ IT LIVES HERE FOR A GATE REASON, not a topical one: the function under test is
+  //      `lib/api.ts`'s, and `frontend/src/lib/` sits outside BOTH knobs — `TARGETS` decides
+  //      what RUNS, `BASELINE` what is PINNED — so a suite written beside `api.ts` would
+  //      never be executed by this gate. A falsification that does not run has falsified
+  //      nothing (verification truth 14, round 5 of Phase 187). This file is inside both.
+  "WorkflowRunPage.test.tsx": 88,
   // 188 code-review fix pass (CR-03): 39 → 41. An EXTENSION, not a lowering — nothing was
   // deleted. The two added cases are the receipt's own reason for existing: `finish_run`
   // NULLs `threads.active_workflow_run_id` in the same transaction as the terminal status,
@@ -427,7 +453,11 @@ const BASELINE = {
 // note going stale twice in two plans is the evidence for the rule, not a counterexample to
 // it: this figure is a NOTE ABOUT the reduce's result and is never what the gate reads, so
 // only a deliberate correction in the same commit as the pin keeps it true.
-const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // ⚠ 2470 (188.1-03)
+// ⚠ AND A THIRD TIME BY 188.1-04: 2470 → 2476, the six falsification extensions above
+// (PhaseNodeCard +2, PhaseTimeline +2, PhaseNode +1, WorkflowRunPage +1). Re-derived from
+// this script's own printed `total` across two agreeing runs, in the same commit as the
+// pins — which is the only thing that keeps a note nothing checks from going stale again.
+const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // ⚠ 2476 (188.1-04)
 
 // ── The Wave-0 blast radius (184-VALIDATION.md § "quick run command"). ──
 const TARGETS = [

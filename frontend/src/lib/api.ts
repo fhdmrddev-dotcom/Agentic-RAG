@@ -3742,13 +3742,33 @@ export interface WorkflowRunRead {
  * `getWorkflowDeletePreview` does and what this deliberately does not multiply.
  * `ApiError`'s 403 side-effect cannot fire here: it is gated on the exact
  * `VISIBILITY_REFUSAL` literal, and this route's gate answers `{"detail": "Not Found"}`.
+ *
+ * ⚠ APPENDED BY 188.1-04 (WR-07), not a rewrite of the above. The run id is now encoded
+ * into the path segment. The ownership gate this docblock already describes is the
+ * SECURITY control and is unchanged; the encode is the defensive URL construction that
+ * pairs with it, in the `listRelationships` register. A falsification in
+ * `pages/WorkflowRunPage.test.tsx` asserts the URL a mocked `fetch` actually RECEIVES for
+ * `runId = "a/b"` — it was observed RED before the encode was written.
+ *
+ * The unused `signal` parameter is DELIBERATELY left alone (D4). The same review
+ * paragraph proposed threading an `AbortController` through it; that changes request-
+ * cancellation behaviour on a live polling surface and is a behaviour change this
+ * refactor phase may not make. Re-open trigger: the next phase touching
+ * `WorkflowRunPage`'s fetch lifecycle, or a superseded read causing a visible defect.
  */
 export async function getWorkflowRun(
   runId: string,
   signal?: AbortSignal,
 ): Promise<WorkflowRunRead> {
   const headers = await getAuthHeaders()
-  const res = await fetch(`${API_BASE}/workflow-runs/${runId}`, { headers, signal })
+  // encodeURIComponent the id (WR-07): run ids are UUIDs today so this is safe in
+  // practice, but `/`, `?` and `#` are STRUCTURAL in a path segment — defensive URL
+  // construction keeps a non-UUID value from reshaping the request the client sends
+  // (and pairs with the route's ownership gate, which answers a uniform 404).
+  const res = await fetch(`${API_BASE}/workflow-runs/${encodeURIComponent(runId)}`, {
+    headers,
+    signal,
+  })
   if (!res.ok) throw new ApiError(`Failed to load the run (status ${res.status})`, res.status)
   return (await res.json()) as WorkflowRunRead
 }
