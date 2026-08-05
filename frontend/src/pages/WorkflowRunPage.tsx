@@ -623,10 +623,25 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
   // completed ones.
   const createdMs = epochOf(run?.created_at)
 
+  /**
+   * ⚠ F6 (UAT 2026-08-05) — THE ANCHOR IS COMPUTED HERE, ONCE, AND THAT IS THE FIX.
+   *
+   * F3 moved the figure's anchor to the `created_at` fallback but left the TICK GATE below
+   * reading `claimedMs` — "is there an anchor?" existed in two places and only one was
+   * updated. Since `claimed_at` is null on essentially every run (F3's own measurement: 5 of
+   * 181 rows, 0 of 149 completed), the interval never armed on ANY live run: `nowMs` stayed
+   * frozen at its mount value and the band rendered a number that looked live and was not.
+   *
+   * Observed live on run `99f10a40` — created 15:38:45.8, read at 15:40:31 (~106 s), band
+   * saying "3s since it was queued". That is precisely the defect F3 existed to remove,
+   * one field along. Both the gate and the figure now read this const.
+   */
+  const anchorMs = claimedMs ?? createdMs
+
   // The once-per-second tick, and ONLY while the run is live and actually anchored. A
   // terminal run's figure is frozen, so it re-renders nothing.
   const [nowMs, setNowMs] = useState(() => Date.now())
-  const ticking = !isTerminal && claimedMs != null && loadPhase === "ready"
+  const ticking = !isTerminal && anchorMs != null && loadPhase === "ready"
   useEffect(() => {
     if (!ticking) return
     const id = window.setInterval(() => setNowMs(Date.now()), 1000)
@@ -724,7 +739,8 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
     // is UNCHANGED and is what makes the fallback safe: a number is only ever shown beside the
     // field it came from. A queued-anchored figure is not a lie — an UNLABELLED one is, which
     // is why the wording changes with the anchor rather than the anchor being hidden.
-    const anchorMs = claimedMs ?? createdMs
+    // F6: the anchor is the hoisted one — the SAME expression the tick gate reads, so the
+    // two can no longer disagree about whether this run has a clock at all.
     const queued = claimedMs == null
     if (anchorMs == null) return { text: WAITING_TO_START, number: null }
     if (isTerminal) {
@@ -740,7 +756,7 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
       text: queued ? "since it was queued" : "since it started processing",
       number: fmtElapsed(nowMs - anchorMs),
     }
-  }, [claimedMs, createdMs, updatedMs, isTerminal, nowMs])
+  }, [claimedMs, anchorMs, updatedMs, isTerminal, nowMs])
 
   // ── The band ────────────────────────────────────────────────────────────────
   /** The failing step's TITLE — the same `nodeTitle` the canvas paints on the face, so

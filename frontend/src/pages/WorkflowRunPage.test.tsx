@@ -1497,3 +1497,62 @@ describe("WorkflowRunPage — the run-time waiting reading (F5, SPEC Req 5)", ()
     )
   })
 })
+
+// ── F6 (UAT 2026-08-05) — THE LIVE CLOCK NEVER TICKED. F3's own residue. ──
+//
+// F3 moved the elapsed figure's ANCHOR from `claimed_at` to a `created_at` fallback, because
+// `claimed_at` is null on essentially every run (5 of 181 rows; 0 of 149 completed). It did
+// not move the TICK GATE, which still read `claimedMs != null`. So on every live run the
+// interval never armed, `nowMs` stayed frozen at its mount value, and the band rendered a
+// number that looked live and was not.
+//
+// Observed live on run `99f10a40`: created 15:38:45.8, screen read at 15:40:31 — about 106 s
+// elapsed — and the band said "3s since it was queued", the value as of mount. The same
+// class of defect F3 existed to remove: a figure claiming a measurement nobody is taking.
+//
+// Root cause is that "is there an anchor?" was computed in TWO places and F3 updated one.
+// The fix computes it once.
+
+describe("WorkflowRunPage — the live elapsed figure actually advances (F6)", () => {
+  async function settle() {
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0)
+    })
+  }
+
+  it("ticks on a live run whose claimed_at is null — the case that is EVERY run", async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date("2026-08-05T14:03:05Z"))
+    getWorkflowRun.mockResolvedValue(mkRun({ status: "active", claimed_at: null }))
+    renderPage()
+    await settle()
+    const first = screen.getByTestId("run-elapsed").textContent ?? ""
+
+    // 3s — deliberately UNDER the 5s poll, so anything that changes here changed because
+    // the clock ticked, not because the run row was re-read.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3000)
+    })
+    const second = screen.getByTestId("run-elapsed").textContent ?? ""
+
+    expect(first).toContain("5s")
+    expect(second).toContain("8s")
+    expect(second).not.toBe(first)
+  })
+
+  // The guard against over-fixing: a run that has STOPPED must stay frozen. Its figure is
+  // measured between two recorded timestamps and has nothing to do with the wall clock.
+  it("does NOT tick on a terminal run — a finished figure is a measurement, not a clock", async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date("2026-08-05T14:03:05Z"))
+    getWorkflowRun.mockResolvedValue(mkRun({ status: "completed", claimed_at: null }))
+    renderPage()
+    await settle()
+    const first = screen.getByTestId("run-elapsed").textContent ?? ""
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30000)
+    })
+    expect(screen.getByTestId("run-elapsed").textContent ?? "").toBe(first)
+  })
+})

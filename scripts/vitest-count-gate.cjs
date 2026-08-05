@@ -317,7 +317,15 @@ const BASELINE = {
   //      human-input step with nothing pending (D-188-05's design-time/run-time split), a
   //      step the run has not reached, and a terminal run with a stale ask. The last was
   //      falsified by forcing its guard true and observed RED.
-  "WorkflowRunPage.test.tsx": 83,
+  // 85 = 83 + the two F6 cases (UAT 2026-08-05), found by WATCHING the F5 verification run
+  //      rather than by any suite. F3 moved the elapsed figure's anchor to the `created_at`
+  //      fallback and left the TICK GATE reading `claimedMs` — so on every live run (which
+  //      is all of them: 0 of 149 completed rows carry `claimed_at`) the 1s interval never
+  //      armed and the band rendered a mount-time number that looked live. Observed RED at
+  //      3 s advanced with the figure still reading its mount value. The second case is the
+  //      over-fix guard: a terminal run's figure is a measurement between two recorded
+  //      timestamps and must stay frozen.
+  "WorkflowRunPage.test.tsx": 85,
   // 188 code-review fix pass (CR-03): 39 → 41. An EXTENSION, not a lowering — nothing was
   // deleted. The two added cases are the receipt's own reason for existing: `finish_run`
   // NULLs `threads.active_workflow_run_id` in the same transaction as the terminal status,
