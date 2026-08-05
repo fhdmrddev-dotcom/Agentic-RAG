@@ -198,3 +198,22 @@ was staged, reverted, deleted or stashed; `STATE.md`, `ROADMAP.md` and `REQUIREM
 they write false completion records, and this plan's whole point is that nothing here is complete.
 
 Scratch probe scripts were written to the session scratchpad, never into the watched tree.
+
+## Self-Check: PASSED
+
+Files verified present on disk:
+
+- `FOUND: .planning/phases/188-non-technical-run-observability/188-UAT.md`
+- `FOUND: .planning/phases/188-non-technical-run-observability/188-13-SUMMARY.md`
+- `FOUND: .planning/reported-bugs/BUG-260609-04.md`
+
+Commits verified in `git log`:
+
+- `FOUND: 83cdea2d` — docs(188-13): open the G-4 gate — pre-flight re-run, zero rows driven
+- `FOUND: 2df3ac5c` — docs(188-13): BUG-260609-04 stays folded — the live observation is still owed
+- `FOUND: ab50eabd` — docs(188-13): the G-4 gate is open and unrun — 0/17 rows, recorded as a decision
+
+`grep -c '\[pending\]'` on the board returns **24** (17 row-result cells plus the per-column cells of
+the eight-row cross-provider table). **No cell anywhere on the board reads `PASS`.**
+`git status --short` on `.planning/reported-bugs/` and the phase directory is clean — nothing staged
+that this plan did not write, and no pre-existing dirty file touched.
