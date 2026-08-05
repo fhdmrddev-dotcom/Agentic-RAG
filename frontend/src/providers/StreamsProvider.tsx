@@ -3394,13 +3394,35 @@ async function reconcilePhases(threadId: string, signal?: AbortSignal): Promise<
       // `pending` / `running` are the UNRESOLVED readings — those, and only those, defer
       // to the floor. Everything else is a resolution the engine already wrote down.
       const resolved = db != null && db !== "pending" && db !== "running"
+      // ⚠ F2 (UAT 2026-08-05) — AND THE FLOOR MAY NEVER UPGRADE AN EARLIER ROW TO `done`.
+      //
+      // CR-06 taught the floor to respect a RESOLVED row. It did not cover the rows a skip
+      // leaves BEHIND: `harness_engine.py` jumps `i = target_i` and every row in between
+      // keeps `pending` forever, unresolved, with the cursor now past it. Those took the
+      // positional value and read `done` — a step that never ran, reported Complete. That is
+      // SPEC failure #2, and Req 3's rule in one line: success may never be inferred from the
+      // ABSENCE of an event, and a `pending` row before the cursor is exactly that absence.
+      //
+      // It is also Req 4, measured: `reconcilePhases` picks between two derivations on
+      // `wf.lock_is_stale`, and that flag was observed `true` on a run still `active` (an
+      // `llm_human_input` phase ends its producer run while the workflow run continues). So
+      // the same rows read `done` early and `Not started` later — the reading changed with no
+      // state change behind it. The two branches now agree by construction.
+      //
+      // The floor keeps its actual job: advancing the CURRENT row to `running` ahead of the
+      // DB write. What it loses is the right to call an earlier unresolved row finished. The
+      // cost is a sub-second lag in the ordinary case (a row completed but not yet written
+      // reads `running` rather than `done`, and self-corrects on the next poll) — the correct
+      // trade against claiming a success that never happened. The Phase-094 counter guard is
+      // untouched: that floor is over `current_phase_index`, not over these statuses.
+      const floored: Phase["status"] = i < current && db != null ? db : positional
       return {
         slug:
           row?.slug ??
           (i === current ? (wf.current_phase_slug ?? `phase-${i}`) : `phase-${i}`),
         phaseIndex: i,
         phaseType: row?.phase_type ?? "unknown",
-        status: resolved ? db : positional,
+        status: resolved ? db : floored,
         subAgents: [],
         pendingAsk: null,
       }

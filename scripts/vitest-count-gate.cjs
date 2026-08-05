@@ -271,7 +271,7 @@ const BASELINE = {
   // on the skip branch), and did the same to a `failed` row and to an unnameable one. Four
   // of the five were observed RED; the fifth is the positive control that a genuinely
   // completed row below the cursor is unaffected.
-  "PhaseReconcile.test.tsx": 17,
+  "PhaseReconcile.test.tsx": 19,
   // ── 188-12: the four suites Phase 188 CREATED (or deliberately adopted), pinned now. ──
   // Each was put into TARGETS by the plan that created it — in the same commit, because an
   // entry pointing at a not-yet-existing path makes the gate ERROR (exit 2) rather than fail —

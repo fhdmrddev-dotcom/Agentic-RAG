@@ -513,7 +513,28 @@ describe("Phase 188 — reconcilePhases LIVE branch identity overlay (BUG-260609
     ])
   })
 
-  it("THE FLOOR GUARD — status stays POSITIONAL: a DB row lagging behind the counter never drags it backward", async () => {
+  // ⚠ AMENDED BY F2 (UAT 2026-08-05) — this case's RATIONALE was measured and found obsolete.
+  //
+  //   It pinned an earlier UNRESOLVED row to the positional `done`, justified as: "overlaying
+  //   status would move the shipped forward-only counter at PhaseTimeline.tsx:115-127
+  //   backward." That counter does read the statuses (`activePhaseIndex(phases)`) — but the
+  //   SAME BLOCK clamps it: `counterFloorRef` holds the running maximum and
+  //   `displayedCurrent = Math.max(counterFloorRef.current, counterCurrent)` (INV-4). The
+  //   counter cannot regress no matter what these statuses say. The render layer already
+  //   guarantees, independently, the exact property this reducer-level assertion was buying —
+  //   and the Phase-094 counter guard above proves it and stays green.
+  //
+  //   What the old pin COST is what F2 measured: an earlier `pending` row read `done`, so a
+  //   step a `skip_to_phase` jumped over reported Complete, and the reading flipped to
+  //   `Not started` the moment `lock_is_stale` turned (observed `true` on a still-`active`
+  //   run). Req 3 forbids inferring success from the absence of an event; Req 4 forbids the
+  //   reading changing without the state changing. Both were being violated to protect a
+  //   counter that was never at risk.
+  //
+  //   So the assertion is inverted, and the floor keeps its real job — advancing the CURRENT
+  //   row ahead of the DB write — while losing the right to call an earlier unresolved row
+  //   finished.
+  it("THE FLOOR GUARD — an earlier UNRESOLVED row keeps its DB reading; the floor never claims it finished", async () => {
     mountRealProvider()
     const { result } = renderHook(() => RealStreams.usePhases(THREAD_LIVE))
     await waitFor(() => expect(result.current.data).toHaveLength(4))
@@ -532,8 +553,8 @@ describe("Phase 188 — reconcilePhases LIVE branch identity overlay (BUG-260609
     // under it. See the CR-06 block at the bottom of this file.
     expect(
       result.current.data[0].status,
-      "the positional floor outranks a lagging DB row — status is NOT overlaid",
-    ).toBe("done")
+      "an earlier unresolved row reads the DB, not a floor-invented `done` (F2/Req 3)",
+    ).toBe("pending")
     expect(result.current.data[1].status).toBe("running")
     expect(result.current.data[2].status).toBe("pending")
     expect(result.current.data[3].status).toBe("pending")
@@ -710,5 +731,67 @@ describe("Phase 188 CR-06 — the live floor never UPGRADES a row the engine res
 
     expect(result.current.data[1].status).toBe("unknown")
     expect(result.current.data[1].status).not.toBe("done")
+  })
+})
+
+// ── F2 (UAT 2026-08-05) — REQ 4's ACCEPTANCE CRITERION, ASSERTED END TO END ──────────
+//
+// "A mid-run reconcile leaves every visible node reading identical before and after."
+// Nothing asserted it across the thing that actually varies: `reconcilePhases` picks
+// between TWO derivations on `wf.lock_is_stale`, and that flag was measured `true` on a
+// run whose `workflow_runs.status` was still `active` (an `llm_human_input` phase ends
+// its producer run while the workflow run continues). So the same run, with the same DB
+// rows, is painted by the positional branch early and the DB branch later — and if the
+// two disagree the reading changes with no state change behind it.
+//
+// This drives both branches over one identical row set and compares the readings.
+describe("Phase 188 F2 — the two derivations must agree for identical rows (Req 4)", () => {
+  const THREAD_F2 = "thread-188-f2"
+
+  async function readingsWith(lockIsStale: boolean, rows: typeof LIVE_ROWS, current: number) {
+    resetPhases()
+    mockGetThreadWorkflow.mockResolvedValue({
+      mode: "harness",
+      lock_is_stale: lockIsStale,
+      definition_name: "Quarterly board letter",
+      run_status: "running",
+      total_phases: rows.length,
+      current_phase_index: current,
+      current_phase_slug: rows[current]?.slug ?? null,
+      phases: rows,
+    })
+    mountRealProvider()
+    const { result } = renderHook(() => RealStreams.usePhases(THREAD_F2))
+    await waitFor(() => expect(result.current.data).toHaveLength(rows.length))
+    return result.current.data.map((p) => `${p.slug}:${p.status}`)
+  }
+
+  it("a normally-advancing run reads the same through either branch", async () => {
+    // The ordinary case: the row the cursor has passed is already `completed` in the DB,
+    // so the floor and the rows agree by construction.
+    // Realistic: the harness sets the cursor's own row `active` (measured live —
+    // `draft=completed, confirm=active, finalize=pending` at current_phase_index 1).
+    const rows = LIVE_ROWS.map((r, i) =>
+      i === 0 ? { ...r, status: "completed" } : i === 1 ? { ...r, status: "active" } : r,
+    )
+    const live = await readingsWith(false, rows, 1)
+    const stale = await readingsWith(true, rows, 1)
+    expect(live).toEqual(stale)
+  })
+
+  it("a SKIP-bearing run reads the same through either branch", async () => {
+    // The skip path, from `harness_engine.py`: `skip_phase` resolves the target row, then
+    // `i = target_i; continue` — every row BETWEEN keeps `pending` forever and nothing
+    // revisits them, while the cursor sits past them. CR-06 taught the floor to respect a
+    // RESOLVED row; a jumped-over row is not resolved, it is `pending`.
+    const rows = [
+      { ...LIVE_ROWS[0], status: "completed" },
+      { ...LIVE_ROWS[1], status: "pending" }, // jumped over — never ran, never resolved
+      { ...LIVE_ROWS[2], status: "pending" }, // ditto
+      { ...LIVE_ROWS[3], status: "active" },
+    ]
+    const live = await readingsWith(false, rows, 3)
+    const stale = await readingsWith(true, rows, 3)
+    expect(live, "the same rows must not read differently just because the lock went stale").toEqual(stale)
   })
 })
