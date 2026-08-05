@@ -156,4 +156,10 @@ None. This plan writes no production code — it modifies one committed tooling 
 - **`src/lib/phaseState.test.ts` and `src/pages/WorkflowRunPage.test.tsx` are still outside `TARGETS`, deliberately** — neither file exists yet, and a `TARGETS` entry for a missing path makes the gate error rather than fail. Plans 05 and 08 must each add their own entry **in the same task that creates the file**, and pin it from the printed `actual` column.
 - The gate's new floor is **1037** across **26** files. Any later plan that sees `[count-decrease]` on one of the four new pins is looking at a deleted guard, not at gate noise.
 - `test_revert_byte_identical.py` + `test_182_canvas_gate.py` are **green today** — a red there later is attributable to this phase.
+
+## Self-Check: PASSED
+
+- Files claimed as modified/created all exist: `scripts/vitest-count-gate.cjs`, `188-VALIDATION.md`, `188-01-SUMMARY.md`.
+- All four commits resolve in `git log`: `78b97fd8`, `af284f9a`, `6f5ec819`, `ecd98406`.
+- `git diff --diff-filter=D --name-only HEAD~4 HEAD` is empty — no file was deleted by this plan.
 </content>
