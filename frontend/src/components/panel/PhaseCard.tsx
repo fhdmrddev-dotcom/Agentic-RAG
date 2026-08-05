@@ -49,8 +49,30 @@ const PHASE_TYPE_LABEL: Record<string, PhaseTypeMeta> = {
 }
 const UNKNOWN_PHASE_META: PhaseTypeMeta = { label: "Step", glyph: "•", oneLiner: "A workflow step ran." }
 
+/**
+ * The phase-type row. TOTAL: anything this table does not OWN reads as the generic
+ * unknown meta.
+ *
+ * ⚠ THE OWN-PROPERTY GUARD IS NOT CEREMONY (WR-04 site 2, 188.1-04), and it was measured
+ * RED before it was written. `PHASE_TYPE_LABEL` is a plain object literal, so it INHERITS
+ * `constructor`, `toString`, `__proto__` and friends. The shipped expression was
+ * `PHASE_TYPE_LABEL[phaseType] ?? UNKNOWN_PHASE_META`, and for those names the index
+ * returns a FUNCTION — never nullish, so the coalesce provably never fired and every
+ * consumer then read `.label` / `.glyph` / `.oneLiner` off it as `undefined`. The header
+ * above claims *"the renderer NEVER crashes on an unrecognized discriminator"*; that
+ * claim was true of a MISS and false of an inherited key, which is the distinction this
+ * guard adds rather than the promise it repeats. `phase.phaseType` is `string` and comes
+ * from the workflow definition's author-supplied JSONB — totality is a property of the
+ * lookup rather than of its current callers (`lib/phaseState.ts:65-75`, the house
+ * argument). Kept honest by `panel/__tests__/PhaseTimeline.test.tsx`'s 188.1-04
+ * falsification, which drives this component with a prototype key and asserts the
+ * rendered row is byte-equal to an ordinary unrecognised type's.
+ */
 function phaseTypeMeta(phaseType: string): PhaseTypeMeta {
-  return PHASE_TYPE_LABEL[phaseType] ?? UNKNOWN_PHASE_META
+  if (!Object.prototype.hasOwnProperty.call(PHASE_TYPE_LABEL, phaseType)) {
+    return UNKNOWN_PHASE_META
+  }
+  return PHASE_TYPE_LABEL[phaseType]
 }
 
 // ── STATUS_GLYPH (DATA-CONTRACT §5.3) — status → glyph + REAL text + AA color
@@ -87,6 +109,33 @@ const STATUS_META: Record<Phase["status"], StatusMeta> = {
   // `pending`/`skipped` already use; `--panel-*` is correct HERE because this is a
   // panel-scoped surface (it is the RUN surface, on `--background`, where it is forbidden).
   unknown: { glyph: "?", text: "Unknown", textClass: "text-panel-muted-foreground" },
+}
+
+/**
+ * The status atom. TOTAL: anything this table does not OWN reads as the declared
+ * `unknown` row.
+ *
+ * ⚠ THE OWN-PROPERTY GUARD IS NOT CEREMONY (WR-04 site 3, 188.1-04), and it was measured
+ * RED before it was written. This site was the sharpest of the five: the shipped
+ * expression was a bare `STATUS_META[phase.status]` with NO FALLBACK AT ALL, so an
+ * inherited name resolved to a FUNCTION and the header's status atom rendered its glyph,
+ * its text and its colour class as `undefined` — an empty atom on a card still claiming
+ * to show a phase. `Record<Phase["status"], StatusMeta>` makes the compiler the parity
+ * guarantee for every DECLARED member (`lib/phaseState.test.ts:80-85` leans on exactly
+ * that), and it says nothing at all about an inherited one. `phase.status` is derived one
+ * function away from a server-supplied string — totality is a property of the lookup
+ * rather than of its current callers (`lib/phaseState.ts:65-75`, the house argument).
+ *
+ * NO NEW VISUAL STATE WAS INVENTED. The fallback is the row this table ALREADY declares:
+ * `unknown`, added by Phase 188 Plan 02 so an unrecognised `workflow_phases.status` reads
+ * as *Unknown* and never as *Complete*. This guard is that same lesson applied to the key
+ * space rather than to the value space, and it changes no shipped state because no
+ * shipped status is a prototype key. Kept honest by
+ * `panel/__tests__/PhaseTimeline.test.tsx`'s 188.1-04 falsification.
+ */
+function statusMeta(status: Phase["status"]): StatusMeta {
+  if (!Object.prototype.hasOwnProperty.call(STATUS_META, status)) return STATUS_META.unknown
+  return STATUS_META[status]
 }
 
 // ── SUBSTEP_META (Phase 101.1-04 / GAP-C / D-11) — the emit-moment sub-steps the
@@ -254,7 +303,7 @@ export interface PhaseCardProps {
 
 export function PhaseCard({ phase, position }: PhaseCardProps) {
   const meta = phaseTypeMeta(phase.phaseType)
-  const status = STATUS_META[phase.status]
+  const status = statusMeta(phase.status)
   const isRunning = phase.status === "running"
   // GAP-C (D-11): a typed emit-failure value is failed-as-failed even before the phase
   // status flips to "failed" — the closed taxonomy renders the reason, never a 'done'.

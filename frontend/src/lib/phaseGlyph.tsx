@@ -75,6 +75,20 @@ const PHASE_GLYPH_MARKS: Record<string, PhaseMark> = {
  *   phase type so the caller can render its unicode fallback (e.g. "•").
  */
 export function phaseGlyph(phaseType: string | undefined): PhaseMark | null {
-  // The `?? null` mirrors providerLogo's `?? null` — total over any key.
-  return phaseType ? (PHASE_GLYPH_MARKS[phaseType] ?? null) : null
+  // ⚠ THIS LINE'S COMMENT USED TO READ "The `?? null` mirrors providerLogo's `?? null` —
+  // total over any key" (corrected 188.1-04). It was not total over any key, and the
+  // header's `@returns … null for any unmapped / unknown phase type` was false for the
+  // same reason. `PHASE_GLYPH_MARKS` is a plain object literal, so it INHERITS
+  // `constructor`, `toString`, `__proto__` and friends: `PHASE_GLYPH_MARKS["constructor"]`
+  // is the `Object` FUNCTION — never nullish, so `?? null` did not fire, and the caller
+  // then did `createElement(Object, { className })`, which React rejects with *"Objects
+  // are not valid as a React child"*. A HARD RENDER CRASH of the whole node, not a wrong
+  // icon, and it is what `PhaseNode.test.tsx` and `panel/__tests__/PhaseTimeline.test.tsx`
+  // both hit FIRST when their 188.1-04 WR-04 falsifications were observed RED — the
+  // measurement that put this line in scope. `phaseType` is author-supplied
+  // workflow-definition JSONB; totality is a property of the lookup rather than of its
+  // current callers (`lib/phaseState.ts:65-75`, the house argument).
+  if (!phaseType) return null
+  if (!Object.prototype.hasOwnProperty.call(PHASE_GLYPH_MARKS, phaseType)) return null
+  return PHASE_GLYPH_MARKS[phaseType]
 }

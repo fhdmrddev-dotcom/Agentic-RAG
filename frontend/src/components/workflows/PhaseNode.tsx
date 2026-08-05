@@ -146,7 +146,25 @@ function PhaseNodeImpl({ data, selected }: NodeProps<PhaseCanvasNode>) {
   // The 3D mark is resolved by `nodePresentation.renderPhaseMark`, a module-scope
   // helper in another file since the 184-03 split — see its docblock for why the
   // lookup does not live in this body.
-  const tint = ICON_TINT[data.phaseType] ?? DEFAULT_TINT
+  //
+  // ⚠ THE OWN-PROPERTY GUARD IS NOT CEREMONY (WR-04 site 1, 188.1-04), and it was
+  // measured RED before it was written. `ICON_TINT` is a plain object literal, so it
+  // INHERITS `constructor`, `toString`, `__proto__` and friends. A bare
+  // index-and-coalesce therefore returns a FUNCTION for those keys — never nullish, so
+  // `?? DEFAULT_TINT` never fires — and THIS value has a sink: `PhaseNodeCard`
+  // interpolates it into a CSS string, `radial-gradient(circle, ${tint}, …)`. It is the
+  // only one of the five WR-04 sites that reaches a style context. `data.phaseType` is
+  // author-supplied workflow-definition JSONB, and totality is a property of the lookup
+  // rather than of its current callers (`lib/phaseState.ts:65-75`, the house argument).
+  //
+  // The TERNARY shape is load-bearing and must not be refactored into a helper call:
+  // `PhaseNodeCard.test.tsx:373` is a POSITIVE CONTROL requiring the literal `ICON_TINT[`
+  // form to survive in this file, which is what keeps the sibling negative fence — the
+  // card looks up no tint — non-vacuous. `own(ICON_TINT, …)` would turn a shipped guard
+  // red. `PhaseNode.test.tsx`'s 188.1-04 falsification keeps this line honest.
+  const tint = Object.prototype.hasOwnProperty.call(ICON_TINT, data.phaseType)
+    ? ICON_TINT[data.phaseType]
+    : DEFAULT_TINT
 
   // VALID-03 (184-10): the server's verdict mark, threaded down on `data` by the shell
   // exactly as the ⌥ reveal is. The value was already reduced to one of three states by

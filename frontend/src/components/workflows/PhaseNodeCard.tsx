@@ -286,6 +286,29 @@ export interface PhaseNodeCardProps {
 
 // ── The status ring's constants (188-06 · sketch 153-A) ─────────────────────────
 
+/**
+ * Read one entry out of a keyed presentation table SAFELY (188.1-04, WR-04 sites 4/5).
+ *
+ * ⚠ NOT CEREMONY — it is `runVocabulary.own`'s argument applied to this file's own two
+ * tables, and both were measured RED before this helper was written. Every table here is
+ * a plain object literal, so it INHERITS `constructor`, `toString`, `__proto__` and
+ * friends: `TABLE[key] ?? fallback` does NOT fire its fallback for those names, because
+ * the inherited member is never nullish. It hands back a *function* typed as the table's
+ * value type — `[Function Object]` — and the two sinks in this file are a rendered mark
+ * (three `undefined` reads) and an SVG `stroke` ATTRIBUTE (React refuses a function-valued
+ * DOM prop and OMITS the attribute, so the arc paints nothing at all).
+ *
+ * WRITTEN LOCALLY RATHER THAN IMPORTED, deliberately. `runVocabulary.ts`'s `own()` is
+ * module-private AND typed to `CanvasReading`; exporting and widening it would change the
+ * signature of a function that file's own `?raw` fences constrain. One concept, two small
+ * private copies, is cheaper here than one shared function with a blast radius.
+ */
+function own<T>(table: Record<string, T>, key: string): T | undefined {
+  return Object.prototype.hasOwnProperty.call(table, key)
+    ? (table as Record<string, T>)[key]
+    : undefined
+}
+
 /** The arc's radius on the ring's own 72×72 viewBox. `d = 68px` inside a 72px box
  *  leaves the stroke 3px clear of the shipped 62px icon well on every side, so the ring
  *  never touches the 3D mark or its tint gradient. */
@@ -384,16 +407,31 @@ export function PhaseNodeCard(props: PhaseNodeCardProps) {
     anchors,
   } = props
 
-  // Total by construction: the slot is typed, but a forward-compat value arriving from
-  // a caller falls back to the degraded mark rather than to nothing. Falling back to
-  // NOTHING would render a node nobody could check as a checked-and-clean one.
+  // ⚠ THIS COMMENT USED TO OPEN BY CLAIMING THE LOOKUP WAS TOTAL "by construction"
+  // (WR-04 site 4, corrected 188.1-04). It was not — and the literal phrase is
+  // paraphrased here rather than quoted because this plan's acceptance grep asks the
+  // tree whether the false claim still exists, and a quotation of it would answer yes. `VERDICT_MARK` is a plain object literal, so it INHERITS
+  // `constructor`, `toString`, `__proto__` and friends; `VERDICT_MARK["constructor"]` is
+  // the `Object` FUNCTION — never nullish, so the `?? VERDICT_MARK.unknown` provably did
+  // not fire, and the three reads below (`.className`, `.glyph`, `.label`) each came back
+  // `undefined`. MEASURED, not argued: the falsification in `PhaseNodeCard.test.tsx`
+  // rendered an EMPTY mark and was observed RED before this guard was written. A node
+  // nobody could check then rendered as a mark with no glyph and no accessible name at
+  // all — strictly worse than the "checked-and-clean" failure the sentence below warns
+  // about. `verdict` is a SERVER SEVERITY read verbatim one function away, so the slot's
+  // type is a statement about the current callers; totality is a property of the lookup
+  // (`lib/phaseState.ts:65-75`, the house argument).
+  //
+  // The slot is typed, and a forward-compat value arriving from a caller falls back to
+  // the degraded mark rather than to nothing. Falling back to NOTHING would render a node
+  // nobody could check as a checked-and-clean one.
   //
   // (The word this sentence used to spell for "nobody could check" is on SPEC Req 7's
   // banned list, and 185-09's acceptance grep is file-wide rather than scoped to
   // rendered strings. The meaning is unchanged — `VERDICT_MARK.unknown` is exactly the
   // "we could not check" state — so the rewording costs nothing and lets the grep
   // return 0 honestly instead of carrying a documented exception forever.)
-  const mark = verdict ? (VERDICT_MARK[verdict] ?? VERDICT_MARK.unknown) : null
+  const mark = verdict ? (own(VERDICT_MARK, verdict) ?? VERDICT_MARK.unknown) : null
 
   // RUN MODE is exactly "a reading was supplied". Everything 188 adds hangs off this one
   // boolean, so the Builder — which supplies no reading — renders the 185 card unchanged.
@@ -686,7 +724,11 @@ export function PhaseNodeCard(props: PhaseNodeCardProps) {
                 fill="none"
                 strokeWidth="3.5"
                 strokeLinecap="round"
-                stroke={RING_STROKE[reading]}
+                // WR-04 site 5 (188.1-04): an unowned reading paints the `unknown`
+                // token, never an inherited member. See `own()`'s docblock — React
+                // OMITS a function-valued attribute, so the unguarded form left this
+                // arc with no stroke at all. Observed RED first.
+                stroke={own(RING_STROKE, reading) ?? RING_STROKE.unknown}
                 {...(arc.dasharray === null ? {} : { strokeDasharray: arc.dasharray })}
                 strokeDashoffset={arc.dashoffset}
                 className={arc.spinning ? "canvas-ring-spin" : undefined}

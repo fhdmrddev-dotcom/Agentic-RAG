@@ -53,6 +53,18 @@
  * `DEFAULT_TINT` and to the `"•"` mark rather than throwing — the definition JSONB is
  * author-supplied and a node face must not crash on an unrecognised discriminator.
  *
+ * ⚠ THAT PARAGRAPH WAS A CLAIM, NOT A PROPERTY, UNTIL 188.1-04. It held for a table MISS
+ * and failed for an INHERITED key: every table involved is a plain object literal, so
+ * `TABLE["constructor"]` returned the `Object` FUNCTION and no `??` fallback fired.
+ * `renderPhaseMark` then passed that function to `createElement` and the node face did
+ * exactly what the sentence promises it never does — it crashed, with *"Objects are not
+ * valid as a React child"*. Both halves are now own-property guarded (this file's
+ * `PHASE_GLYPHS` read, and `lib/phaseGlyph`'s `PHASE_GLYPH_MARKS` read), and the tint
+ * half is guarded at its consumer, `PhaseNode.tsx`. The claim is kept honest by machine:
+ * `PhaseNode.test.tsx`'s 188.1-04 falsification drives a prototype key through the real
+ * projection and asserts the painted face equals an ordinary unknown type's. It was
+ * observed RED against the shipped tree before any of the three guards existed.
+ *
  * THE COLOUR BUDGET IS LOAD-BEARING (sketch 137-D). Per-step-type colour is a TINT
  * BEHIND THE ICON ONLY; every card body stays neutral, because Phase 188 paints run
  * state (running / done / waiting-for-you / failed) onto these same nodes and needs
@@ -101,7 +113,21 @@ export const DEFAULT_TINT = "hsl(220 30% 100% / 0.18)"
  */
 export function renderPhaseMark(phaseType: string): ReactNode {
   const mark = phaseGlyph(phaseType)
-  return mark ? createElement(mark, { className: "h-8 w-8" }) : (PHASE_GLYPHS[phaseType] ?? "•")
+  // ⚠ THE SECOND LOOKUP IS GUARDED TOO (188.1-04). `PHASE_GLYPHS` is a plain object
+  // literal, so it INHERITS `constructor`, `toString`, `__proto__` and friends and
+  // `PHASE_GLYPHS[phaseType] ?? "•"` handed back a FUNCTION for those names rather than
+  // the fallback mark. The header's TOTALITY contract above — *"an unknown `phase_type`
+  // resolves to `DEFAULT_TINT` and to the `"•"` mark rather than throwing"* — was
+  // therefore true of a table MISS and false of an inherited key; the guard is what makes
+  // the sentence true rather than a repetition of it. `phaseGlyph`'s own half of the same
+  // defect is corrected at `lib/phaseGlyph.tsx` in the same commit: guarding only one of
+  // the two would leave this resolver returning `[Function Object]` as a React child.
+  // Both were reached by the WR-04 site-1 falsification in `PhaseNode.test.tsx`, observed
+  // RED before either guard was written.
+  if (mark) return createElement(mark, { className: "h-8 w-8" })
+  return Object.prototype.hasOwnProperty.call(PHASE_GLYPHS, phaseType)
+    ? PHASE_GLYPHS[phaseType]
+    : "•"
 }
 
 // ── Phase 184-08 (VALID-03 · R9) — the verdict marks ────────────────────────────
