@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio — 🚧 ACTIVE
 status: executing
-last_updated: "2026-08-05T18:57:01.547Z"
-last_activity: 2026-08-05 -- Phase 188.1 planning complete
+last_updated: "2026-08-05T19:14:18.612Z"
+last_activity: 2026-08-05 -- Phase 188.1 Plan 01 executed (fence re-scope)
 progress:
   total_phases: 20
   completed_phases: 8
   total_plans: 119
-  completed_plans: 113
+  completed_plans: 114
   percent: 40
 ---
 
@@ -44,7 +44,26 @@ Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 op
 
 ## Current Position
 
-Phase: 188.1 (WorkflowCanvas extraction refactor — INSERTED 2026-08-05) — **not planned yet**
+Phase: 188.1 (WorkflowCanvas extraction refactor — INSERTED 2026-08-05) — **EXECUTING, plan 1 of 5 done**
+
+**⚑ 188.1-01 LANDED 2026-08-05** (`004a6486` / `262543ae` / `ef972bd9`). Wave 1: the fence re-scope,
+done BEFORE the code moves so it is provably behaviour-neutral. Twelve negative `?raw` assertions in
+`WorkflowCanvas.test.tsx` + `WorkflowCanvas.composition.test.tsx` now read a `canvasSubtreeSource`
+whose `import.meta.glob` path list already names `./PlaneEditingLayer.tsx` and `./editAffordance.ts`
+— the two modules plan 188.1-03 creates — so the 311-line extraction cannot narrow a fence while
+leaving it green. Positives and the per-file `phase_index` count pin deliberately stay on
+`workflowCanvasSource` (T-188.1-04b, accepted). SC#4's no-focusable-control walk was **vacuous**
+w.r.t. the moved code — both shipped assertions render read-only, so `PlaneEditingLayer` never
+mounted — and now has an editable variant proven by inversion (`expected 6 to be +0`). Measured:
+suites **68 passed / 0 failed**, gate `count gate OK` at **2465/2465, zero slack** (pins 46→48 and
+19→20, twice-measured, `TARGETS` untouched), `tsc -p tsconfig.app.json` **33**, zero production
+files changed. **Deviation worth carrying:** the plan's non-vacuity control was blind to a
+SUBSTITUTED path literal (`toHaveLength(3)` catches truncation only) — strengthened under Rule 2 and
+observed RED. **⚠ Orchestrator note:** `state.record-metric` also bumped `completed_plans` and
+rewrote two unrelated historical prose lines (a "Resume file:" line and a superseded "Plan: 1 of 13");
+that write was reverted and only the true, bounded edits re-applied by hand.
+
+**▶ NEXT: `/gsd:execute-phase 188.1` wave 2 (plan 188.1-02).**
 
 **▶ NEXT ACTION: `/gsd:plan-phase 188.1`.** Phase 188 is CLOSED (code + UAT + SECURED). 188.1 was
 inserted ahead of 189 because **G-5 fires on `WorkflowCanvas.tsx`** and the debt is owed, not new:
@@ -2535,6 +2554,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 | Phase 186 P05 | 15min | 2 tasks | 3 files |
 | Phase 186 P06 | 55min | 3 tasks | 2 files |
 | Phase 186 P07 | 65min | 3 tasks | 12 files |
+| Phase 188.1 P01 | 25min | 2 tasks | 3 files |
 
 ## Decisions
 
