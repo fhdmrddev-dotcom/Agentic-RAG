@@ -638,13 +638,27 @@ describe("WorkflowCanvas 184-12 — the library's measurement is echoed back", (
 // 188-07 · RUNVIZ-01 — the capped run-state pass-through
 // ═══════════════════════════════════════════════════════════════════════════════
 //
-// ⚠ A NOTE ON THE COUNT GATE, so the next author does not read a stale number. This file
-// is pinned at 31 in `scripts/vitest-count-gate.cjs` while it RUNS 35 — four cases have
-// been sitting in that slack since before this phase. The cases below raise the real
-// count further; the gate only fails on a DECREASE, so nothing breaks, but plan 188-11
-// re-pins this file from the script's printed `actual` column across two agreeing runs
-// (never by hand-counting `it(` literals — `definitionOps.test.ts` declares ~122 and runs
-// 232 under `it.each`).
+// ⚠ A NOTE ON THE COUNT GATE, so the next author does not read a stale number. MEASURED at
+// this commit, from the gate script's own printed `actual` column across two agreeing runs:
+// this file is pinned at 48 in `scripts/vitest-count-gate.cjs` and RUNS 48 — ZERO slack.
+// The gate fails on a DECREASE, so with the slack gone any case deleted from this file reds
+// it immediately rather than being quietly absorbed. That is the point, but it also means a
+// legitimate removal must ride a deliberate LOWERING of the pin in the same commit, per the
+// LOWERED / EXTENDED doctrine in the script's own header. Re-pin the same way this number
+// was arrived at — the script's `actual` column, twice, and never by hand-counting `it(`
+// literals (`definitionOps.test.ts` declares ~122 and runs 232 under `it.each`).
+//
+// ⚠ REWRITTEN BY 188.1-02 — this note previously put the pin at thirty-one against a run of
+// thirty-five and told the reader there were four spare cases of slack to sit in. Both
+// figures were true when 188-07 wrote them and neither survived the year: 185-08 (`30cb77f9`)
+// was the last commit at which the pin was thirty-one, 188-12 (`37b8cb49`) re-pinned this
+// file to 46 in the pass that pinned every suite the gate executes at its measured actual,
+// and 188.1-01 (`262543ae`) extended it to 48 when the editable SC#4 walk landed. All three
+// read back out of `git show <sha>:scripts/vitest-count-gate.cjs` rather than inherited from
+// any document. The note's METHOD was right all along and is exactly why the arithmetic
+// could be corrected at all; only its numbers rotted, which is the default fate of a figure
+// in a comment that no machine checks. Its warning about slack is now the OPPOSITE of the
+// truth — there is none — which is the one kind of staleness worth spending an edit on.
 //
 // THE PROPERTY THIS BLOCK EXISTS TO PIN. `WorkflowCanvas.tsx` is a G-5 hot file — nine
 // plans across three phases — and this phase honours the guardrail by SCOPE: the run

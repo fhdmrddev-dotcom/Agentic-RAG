@@ -370,7 +370,12 @@ const BASELINE = {
   // already required them to pass and this imports no new rot. What changes is only that
   // deleting one is now visible.
   "canvasModel.roundtrip.test.ts": 517,
-  "WorkflowCanvas.editing.test.tsx": 57,
+  // 188.1-02: 57 → 58. EXTENDED, not lowered — nothing was deleted, renamed or
+  // re-described in that suite; the added case is the pre-move AFFORDANCE_SHAPE capture
+  // that SC#2's "renders identically" is checked against, and it must be pinned BEFORE
+  // 188.1-03 moves the code it fences, or the extraction could take the only baseline
+  // with it. Read from this script's own `actual` column across two agreeing runs.
+  "WorkflowCanvas.editing.test.tsx": 58,
   "builderStore.test.ts": 52,
   "phaseVocabulary.corpus.test.ts": 45,
   "StepTypePicker.test.tsx": 43,
@@ -407,11 +412,15 @@ const BASELINE = {
 // lowered it, 424 at the original 184 Wave-0 pin).
 // ⚠ CORRECTED BY 188.1-01: the trailing figure said `2421` while the reduce computed 2462 —
 // stale since 188-12 re-pinned every file, and harmless only because the gate reads the
-// reduce and never the comment. It is now 2465 (2462 + the two 188.1-01 extensions above),
+// reduce and never the comment. It became 2465 (2462 + the two 188.1-01 extensions above),
 // re-derived from this script's own printed `total` across two agreeing runs. A number in a
 // comment that nothing checks goes stale by default; recording the correction rather than
 // silently rewriting it is the house `⚠` rule.
-const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // 2465
+// ⚠ AND AGAIN BY 188.1-02: 2465 → 2466, the single editing-suite extension above. The same
+// note going stale twice in two plans is the evidence for the rule, not a counterexample to
+// it: this figure is a NOTE ABOUT the reduce's result and is never what the gate reads, so
+// only a deliberate correction in the same commit as the pin keeps it true.
+const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // 2466
 
 // ── The Wave-0 blast radius (184-VALIDATION.md § "quick run command"). ──
 const TARGETS = [
