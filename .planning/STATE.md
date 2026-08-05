@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio — 🚧 ACTIVE
 status: executing
-last_updated: "2026-08-05T21:40:00.000Z"
-last_activity: 2026-08-05 -- Phase 188 SECURED (46/46 threats closed, 0 open); phase CLOSED -- next is 189, G-5 check owed first
+last_updated: "2026-08-05T21:55:00.000Z"
+last_activity: 2026-08-05 -- Phase 188 SECURED (46/46) and CLOSED; Phase 188.1 INSERTED (G-5 canvas debt) ahead of 189
 progress:
-  total_phases: 19
+  total_phases: 20
   completed_phases: 8
   total_plans: 114
   completed_plans: 114
-  percent: 42
+  percent: 40
 ---
 
 # Project State
@@ -44,12 +44,30 @@ Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 op
 
 ## Current Position
 
-Phase: 188 (non-technical-run-observability) — **CODE + UAT + SECURED — CLOSED**
+Phase: 188.1 (WorkflowCanvas extraction refactor — INSERTED 2026-08-05) — **not planned yet**
 
-**▶ NEXT ACTION: `/gsd:discuss-phase 189` — but read the G-5 note below first.** All 13 plans
-executed; the UAT board is settled at **16 PASS · 0 FAIL · 1 ⛔ · 0 pending**; `188-SECURITY.md`
-now exists at **46/46 threats CLOSED, 0 open** (`97b2bd29`, 2026-08-05). Precedent held: 185, 186
-and now 188 all closed SECURED.
+**▶ NEXT ACTION: `/gsd:plan-phase 188.1`.** Phase 188 is CLOSED (code + UAT + SECURED). 188.1 was
+inserted ahead of 189 because **G-5 fires on `WorkflowCanvas.tsx`** and the debt is owed, not new:
+the CLAUDE.md hot-file ledger records the `PlaneEditingLayer` + `EDIT_AFFORDANCE` extraction as due
+in Phase 188, and 188 honoured its budget by *measurement* (13 ins / 2 del against a ≤15/≤4 cap) —
+which capped the diff without reducing the 1574 L file. Phase 189 places a governed external-action
+node **on the canvas**, so it would add a node type to the largest workflow file in the tree.
+
+**188.1 is behaviour-preserving and carries no requirement** — it delivers no new user-facing
+capability, so UAT is lean (prove *unchanged*, don't re-drive the 188 board). Two constraints must
+reach the plan: (1) the **ESM cycle** — `WorkflowCanvas` imports `FlowEdge`'s VALUE at module scope
+for the `edgeTypes` map, so the extracted module must NOT import back (the live constraint 185-10
+discovered when it named this seam); (2) every moved test must stay inside **both** `TARGETS` and
+`BASELINE` — a suite that silently stops running is the one failure mode a refactor can hide.
+It also carries the three bounded security fixes owed from 188's audit (WR-04 `own()` ×5, WR-07
+`encodeURIComponent(runId)`, UF-1 register `last_workflow_run_id`).
+
+**Then:** `/gsd:sketch 189` before `/gsd:spec-phase 189` — **G-2 fires** on 189 (`UI hint: yes`,
+node-vocabulary work on the surface 187 sketched).
+
+**Phase 188 — CLOSED 2026-08-05.** All 13 plans executed; the UAT board settled at **16 PASS ·
+0 FAIL · 1 ⛔ · 0 pending**; `188-SECURITY.md` exists at **46/46 threats CLOSED, 0 open**
+(`97b2bd29`). Precedent held: 185, 186 and now 188 all closed SECURED.
 
 **SECURED 2026-08-05 — 46/46, `block_on: high`, nothing blocking.** `register_authored_at_plan_time:
 true` (all 13 plans carried a `<threat_model>`), so this was mitigation *verification*, not a
@@ -70,11 +88,13 @@ Three findings recorded as warnings, none blocking:
   fail-closed defence-in-depth over an intact server boundary, so the risk stands; the wording in
   `188-SECURITY.md` is corrected to describe shipped code. **Lesson: a red line cited from memory
   can forbid the wrong thing — and here the misreading is what let the ungated view ship.**
+
 - **F7 is the sharpest lesson of the phase.** `T-188-06-01`'s invariance fence on the ⛨ governance
   seal held the entire time — and the seal still **never rendered on the run surface**, because
   `WorkflowRunPage` passed no `kbTools` and the intersection ran against an empty set. **An
   invariance fence on a shared component proves nothing about whether that component's
   security-relevant output is REACHABLE on a newly-built surface.**
+
 - **Two of the 10 deferred REVIEW warnings are security findings under a non-security label.**
   **WR-04** — `ICON_TINT[data.phaseType] ?? DEFAULT_TINT` returns a *function* for a prototype key
   (`??` never fires), interpolated into CSS at `PhaseNodeCard.tsx:738`; deferred on reachability,
@@ -109,6 +129,7 @@ phase exists to remove.** Now each of the sixteen carries its own record.
   figure moved (1m 15s → 1m 56s) — correct, and the reason F6 exists. Panel and canvas read side
   by side agree on every fact and differ only in vocabulary (§H #1). Terminal: `✓ Complete`,
   `Ran for 6m 05s — from when it was queued to its last update`.
+
 - **Row 14** (colour off) — **6 of 7 readings observed on REAL runs.** The 7th cannot be:
   `workflow_phases_status_check` restricts the column to five values, so `unknown` is not a run
   state at all but the total-function fallback for a value arriving over the **wire**. Driven
@@ -117,6 +138,7 @@ phase exists to remove.** Now each of the sixteen carries its own record.
   genuinely unrecognised value, and no row had ever made the observation.** Four readings on one
   grayscale screen separate by geometry alone (`1.5 6` dots · `5 7` coarse · no arc element ·
   unbroken ring), and the rendered numbers match `RING_GEOMETRY`'s computation exactly.
+
 - **Row 16** (`.docx`) — driven on run `27bb0f6b`, **fixture reuse recorded rather than silently
   made**. One control (the card IS the button); one click fired
   `GET /threads/…/workspace/files/…/raw` → blob → anchor `download="risk-register.docx"`,
@@ -172,12 +194,14 @@ re-pinned in the same commits) · `tsc --noEmit -p tsconfig.app.json` **33** (in
   activity by reading `_handle_search_documents` (`tool_dispatcher.py:686`) rather than
   inferring it from the citations' presence. Node read `Running` at both in-flight samples
   (DB `active` both times) and `Complete` only after the DB said `completed`.
+
 - **Row 10 parallel-thread** (runs `882e33dc` + `3bab9aa4`, two tabs, concurrent) — different
   spines, node counts and bands at the same instant; `active_workflow_run_id` differs per
   thread and each equals its own run; B reaching terminal and NULLing its own anchor did not
   disturb A. ⚠ **The row's "refresh either tab" is not literally performable — there is no
   router and no deep link to a run**, so a reload lands on Chat; it was done as reload → the
   thread → the D-188-13 "Open the run" receipt.
+
 - **Row 11 long-message** (run `0114b2fe`) — kickoff 5543 B persisted intact, run `completed`,
   no phase stranded, node correct at terminal, receipt opened it with `active_workflow_run_id`
   already NULL (CR-03 holding).
@@ -2376,6 +2400,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 **Planned Phase:** 112 (metadata-enrichment-document-detail-panel-manual-edit) — 4 plans — 2026-06-17T20:46:10.826Z
 
 - Phase 123.1 inserted after Phase 123: Trigger Tuner design fidelity + UX polish (post-live-UAT gaps) (URGENT)
+- Phase 188.1 inserted after Phase 188: WorkflowCanvas extraction refactor — G-5 debt owed from Phase 188 (PlaneEditingLayer + EDIT_AFFORDANCE lift); inserted before 189 places a node type on the canvas (URGENT)
 
 ## Performance Metrics
 
