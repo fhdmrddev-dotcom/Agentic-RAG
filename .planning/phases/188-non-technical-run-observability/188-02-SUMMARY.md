@@ -251,5 +251,11 @@ No security-relevant surface outside the register was introduced: no endpoint, n
 - **The count gate's `PhaseReconcile.test.tsx` pin is now stale-low at 2 while the file runs 7.** That is *allowed* (the gate prints `+5` and only a decrease fails), but the five new cases — including both falsifications — sit in slack and are deletable with the gate green. This is verbatim the post-round-5 "truth 14" situation Phase 187 had to fix afterwards. **A later 188 plan should re-pin it at its printed `actual`.**
 - **The live branch of `reconcilePhases` is still positional** and still emits `phase-${i}` placeholder slugs — D-188-22b's real-slug overlay is not in this plan and remains owed.
 - The `usePhases`-does-not-reconcile-on-reconnect finding (RESEARCH #2) is untouched here; Req 4's "reconciles at every reconnect" is still aspirational at HEAD.
+
+## Self-Check: PASSED
+
+- All four modified files exist on disk: `PhaseReconcile.test.tsx`, `StreamsProvider.tsx`, `types/index.ts`, `PhaseCard.tsx` — plus this summary.
+- All four commits resolve in `git log`: `9c70e6ec`, `8c61785a`, `7cff4efc`, `8aff0f21`.
+- `git diff --diff-filter=D --name-only HEAD~4 HEAD` is empty — this plan deleted no file.
 </content>
 </invoke>
