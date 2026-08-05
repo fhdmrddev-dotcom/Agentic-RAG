@@ -45,9 +45,14 @@ import { mockReactFlow } from "@/test-utils/mockReactFlow"
 // The adapter SOURCE via Vite's `?raw` loader — the `canvasModel.purity.test.ts:14-17`
 // house idiom for a scope fence that must be machine-checkable.
 import phaseNodeSource from "./PhaseNode?raw"
+// 188-07: the vocabulary module is fenced from HERE as well as from its own consumers —
+// Req 2's grep is scoped to the run-state RENDER PATH, which is these two files together.
+import runVocabularySource from "./runVocabulary?raw"
 import { EndCapNode, PhaseNode, UnresolvedSkipNode } from "./PhaseNode"
 import { CANVAS_NODE_TYPES, toCanvas } from "./canvasModel"
 import { PHASE_TYPE_SUBTITLES, type NameContext, type PhaseSpecJSON } from "./phaseVocabulary"
+import { runReadingLabel, type NodeRunState } from "./runVocabulary"
+import type { CanvasReading } from "@/lib/phaseState"
 
 mockReactFlow()
 
@@ -115,11 +120,18 @@ const nodeTypes = {
  * (`WorkflowCanvas.tsx:949`), so this harness cannot accidentally test a reveal
  * mechanism the app does not have.
  */
-async function renderNodes(opts: { technical: boolean; ctx?: NameContext }) {
+async function renderNodes(opts: {
+  technical: boolean
+  ctx?: NameContext
+  /** 188-07: the shell's `runState` lookup, merged onto `data` in the SAME shape
+   *  `WorkflowCanvas`'s `settledNodes` memo uses. Omitted ⇒ no node is in run mode,
+   *  which is the Builder's canvas and every case above it. */
+  run?: (slug: string) => NodeRunState | undefined
+}) {
   const projection = toCanvas(renewalDraft, { nameContext: opts.ctx ?? nameContext })
   const nodes: Node[] = projection.nodes.map((node) => ({
     ...node,
-    data: { ...node.data, technical: opts.technical },
+    data: { ...node.data, technical: opts.technical, run: opts.run?.(node.id) },
   }))
 
   const view = render(
@@ -338,5 +350,284 @@ describe("PhaseNode — an omitted name context is the SAFE direction (D-187-05)
     const { title, subtitle } = slotsOf(container, AGENT_SLUG)
     expect(title?.textContent).toBe("Work out how to do it")
     expect(subtitle?.textContent).toBe(TECHNICAL_AGENT_TITLE)
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 188-07 · RUNVIZ-01 — the run-state render path
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+// Everything below was added by plan 188-07, which is the plan that first threads a
+// reading through this adapter. Appended rather than woven into the blocks above, so a
+// reader can still see exactly what 187-09 asserted.
+
+/** The seven readings, DERIVED from a compiler-forced exhaustive table rather than
+ *  hand-listed — the 188-06 discipline. An eighth `CanvasReading` member cannot be added
+ *  without this list growing, so no loop below can silently under-cover the union. */
+const ALL_READINGS: Record<CanvasReading, true> = {
+  "not-started": true,
+  running: true,
+  done: true,
+  failed: true,
+  skipped: true,
+  "waiting-for-you": true,
+  unknown: true,
+}
+const READINGS = Object.keys(ALL_READINGS) as CanvasReading[]
+
+/** A run state in exactly the shape the PAGE builds one: the reading, and the sentence
+ *  worded ONCE by `runReadingLabel`. The label is never hand-typed here — a typed one
+ *  would test that the author can copy a string, not that the surface derives it once. */
+function runFor(reading: CanvasReading, emitFailure?: NodeRunState["emitFailure"]): NodeRunState {
+  return { reading, label: runReadingLabel(reading, emitFailure), emitFailure }
+}
+
+/** The card's run line, by its own test hook. `null` ⇒ the card is not in run mode. */
+function runLineOf(container: HTMLElement, slug: string): HTMLElement | null {
+  const card = container.querySelector(`[data-testid="canvas-node-${slug}"]`)
+  if (!card) throw new Error(`no card rendered for ${slug}`)
+  return card.querySelector('[data-testid="canvas-node-run-line"]')
+}
+
+/** Strip block and line comments, so a fence can ask about CODE rather than about prose.
+ *  Copied in shape from `PhaseNodeCard.test.tsx` — and for the same measured reason: the
+ *  adapter's docblock has to be free to NAME the readings it forwards, while the code
+ *  must contain no database vocabulary at all. A bare-token grep could only be satisfied
+ *  by deleting the explanation. Exact for these two files: neither contains a regex
+ *  literal nor a string containing `//`. */
+function stripComments(source: string): string {
+  return source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "")
+}
+
+// ── Needles, ASSEMBLED FROM PARTS (the 187-24 lesson) ───────────────────────────
+//
+// Spelled inline, this file's own source would satisfy any grep later run over a file
+// set that included it, and the fence would become vacuous. Every needle below is joined
+// at runtime instead. Each also carries a positive control in its own `it(`.
+
+/** The DB status values that exist ONLY in the database vocabulary — none of them is a
+ *  `CanvasReading` member, so their absence is a clean, decidable claim. */
+const DB_ONLY_STATUSES = [
+  ["pen", "ding"].join(""),
+  ["act", "ive"].join(""),
+  ["comp", "leted"].join(""),
+  ["retry", "ing"].join(""),
+] as const
+
+/** The two DB values whose SPELLING is shared with a `CanvasReading` member. They are
+ *  fenced out of the adapter (which names no reading in code at all) but CANNOT be
+ *  fenced out of the vocabulary module, because there they ARE the reading — see the
+ *  measured note on the `runVocabulary` block below. */
+const SHARED_SPELLINGS = [["fai", "led"].join(""), ["skip", "ped"].join("")] as const
+
+const STEP_ORDINAL_FIELD = ["phase", "_index"].join("")
+const STEP_ORDINAL_CAMEL = ["phase", "Index"].join("")
+
+// ── 7 · Req 2 — no harness vocabulary in the run-state render path ──────────────
+
+describe("PhaseNode 188-07 — Req 2: the render path names no database status", () => {
+  it("the stripper strips and every needle really matches (positive controls)", () => {
+    expect(stripComments(phaseNodeSource).length).toBeLessThan(phaseNodeSource.length)
+    expect(stripComments(runVocabularySource).length).toBeLessThan(runVocabularySource.length)
+    expect(stripComments(`/* ${DB_ONLY_STATUSES[0]} */`)).not.toContain(DB_ONLY_STATUSES[0])
+    for (const needle of [...DB_ONLY_STATUSES, ...SHARED_SPELLINGS]) {
+      expect(stripComments(`const s = "${needle}"`)).toContain(needle)
+    }
+    expect(`{ ${STEP_ORDINAL_FIELD}: 3 }`).toContain(STEP_ORDINAL_FIELD)
+    expect(`{ ${STEP_ORDINAL_CAMEL}: 3 }`).toContain(STEP_ORDINAL_CAMEL)
+  })
+
+  it("the ADAPTER's code contains no database status and no step ordinal — all six", () => {
+    const code = stripComments(phaseNodeSource)
+    for (const needle of [...DB_ONLY_STATUSES, ...SHARED_SPELLINGS]) {
+      expect(code).not.toContain(needle)
+    }
+    expect(code).not.toContain(STEP_ORDINAL_FIELD)
+    expect(code).not.toContain(STEP_ORDINAL_CAMEL)
+    // Non-vacuity: the adapter really does forward a reading, so "no status literal"
+    // is a statement about a file that HAS a run-state render path.
+    expect(code).toMatch(/status=\{run\?\.reading\}/)
+  })
+
+  it("the VOCABULARY's code names no DB-only status, no ordinal and no derivation", () => {
+    const code = stripComments(runVocabularySource)
+    for (const needle of DB_ONLY_STATUSES) expect(code).not.toContain(needle)
+    expect(code).not.toContain(STEP_ORDINAL_FIELD)
+    expect(code).not.toContain(STEP_ORDINAL_CAMEL)
+    // D-188-02 — one derivation, two vocabularies. This module holds WORDS, so it must
+    // not name the mapping symbols at all; a status map is what would have forced the
+    // four needles above back into it.
+    expect(code).not.toMatch(/phaseStatusFromDb/)
+    expect(code).not.toMatch(/DB_PHASE_STATUS/)
+    expect(code).not.toMatch(/canvasReading\(/)
+  })
+
+  it("MEASURED CORRECTION — the two shared spellings cannot be fenced out of the words", () => {
+    // The plan's acceptance asks for zero occurrences of five DB literals across the
+    // render path. Two of those five — the failure and the bypass words — are ALSO
+    // `CanvasReading` members, spelled identically. In `runVocabulary.ts` they are the
+    // reading, so "zero occurrences" there could only be satisfied by deleting the
+    // vocabulary the phase exists to add. The honest fence is therefore split: the four
+    // DB-ONLY values are absent (above), and the two shared ones are proved to be
+    // READINGS rather than statuses — they appear, and nothing that maps a status does.
+    const code = stripComments(runVocabularySource)
+    for (const needle of SHARED_SPELLINGS) expect(code).toContain(needle)
+    // The mechanical half of "they are readings": the module's own reading-keyed tables
+    // are exhaustive over the union, so every occurrence is a union member by typecheck.
+    expect(code).toMatch(/Record<CanvasReading/)
+    // …and the RENDER fence below is what proves none of them reaches a person's eyes.
+  })
+})
+
+describe("PhaseNode 188-07 — Req 2: nothing technical reaches the face at any reading", () => {
+  it("renders no database word and no step ordinal, at all seven readings", async () => {
+    for (const reading of READINGS) {
+      const view = await renderNodes({ technical: false, run: () => runFor(reading) })
+      for (const phase of renewalDraft) {
+        const card = view.container.querySelector(`[data-testid="canvas-node-${phase.slug}"]`)
+        const text = card?.textContent ?? ""
+        for (const needle of [...DB_ONLY_STATUSES, ...SHARED_SPELLINGS]) {
+          expect(text).not.toContain(needle)
+        }
+        expect(text).not.toContain(STEP_ORDINAL_FIELD)
+      }
+      // Non-vacuity: the run line really is on the face at this reading, so the absences
+      // above are measured against a card that is genuinely in run mode.
+      expect(runLineOf(view.container, AGENT_SLUG)?.textContent ?? "").not.toBe("")
+      view.unmount()
+    }
+  })
+
+  it("puts no slug on any face at any reading, with the reveal OFF", async () => {
+    for (const reading of READINGS) {
+      const view = await renderNodes({ technical: false, run: () => runFor(reading) })
+      for (const phase of renewalDraft) {
+        const { card } = slotsOf(view.container, phase.slug)
+        expect(card.textContent ?? "").not.toContain(phase.slug)
+      }
+      view.unmount()
+    }
+  })
+})
+
+// ── 8 · Req 5 — two facts on one node, and they read as two ────────────────────
+
+describe("PhaseNode 188-07 — Req 5: the design-time badge and the run-time reading", () => {
+  /** Word set of a sentence, lowercased and stripped of punctuation. */
+  function wordsOf(sentence: string): Set<string> {
+    return new Set(
+      sentence
+        .toLowerCase()
+        .replace(/[^a-z\s]/g, " ")
+        .split(/\s+/)
+        .filter(Boolean),
+    )
+  }
+
+  /** A crude English stem — enough to strip the inflections a "tense variant" would be
+   *  built from. If two sentences differ ONLY by tense, their stem sets are equal. */
+  function stemsOf(sentence: string): Set<string> {
+    return new Set([...wordsOf(sentence)].map((w) => w.replace(/(ing|ed|es|s)$/, "")))
+  }
+
+  const WAITING_SLUG = "confirm-with-owner"
+
+  async function renderWaitingNode() {
+    // The human-input step is BOTH: the shipped design-time badge (it *will* pause) and,
+    // here, the run-time reading (it *is* paused). Both are on one card at once — which
+    // is the only configuration in which Req 5 can actually be tested.
+    const view = await renderNodes({
+      technical: false,
+      run: (slug) => (slug === WAITING_SLUG ? runFor("waiting-for-you") : undefined),
+    })
+    const card = view.container.querySelector(`[data-testid="canvas-node-${WAITING_SLUG}"]`)!
+    const badge = card.querySelector('[data-testid="canvas-waits-for-you"]')
+    const runLine = card.querySelector('[data-testid="canvas-node-run-line"]')
+    return { view, card, badgeText: badge?.textContent ?? "", runText: runLine?.textContent ?? "" }
+  }
+
+  it("draws BOTH on the same node — the badge in the badge row, the reading in the body", async () => {
+    const { view, card, badgeText, runText } = await renderWaitingNode()
+    // Both really rendered — the whole test is vacuous otherwise.
+    expect(badgeText.length).toBeGreaterThan(0)
+    expect(runText.length).toBeGreaterThan(0)
+    // Different CHANNELS: the badge is inside the badge row's chip, the reading is a
+    // paragraph in the card body. Neither is nested inside the other.
+    expect(card.querySelectorAll('[data-testid="canvas-waits-for-you"]')).toHaveLength(1)
+    expect(card.querySelectorAll('[data-testid="canvas-node-run-line"]')).toHaveLength(1)
+    expect(
+      card
+        .querySelector('[data-testid="canvas-node-run-line"]')!
+        .querySelector('[data-testid="canvas-waits-for-you"]'),
+    ).toBeNull()
+    view.unmount()
+  })
+
+  it("the two strings are NOT equal and NOT tense variants of each other", async () => {
+    const { view, badgeText, runText } = await renderWaitingNode()
+
+    expect(runText).not.toBe(badgeText)
+
+    // Not a tense variant, asserted mechanically rather than asserted about: each
+    // sentence contains a WORD the other does not…
+    const badgeWords = wordsOf(badgeText)
+    const runWords = wordsOf(runText)
+    expect([...badgeWords].filter((w) => !runWords.has(w)).length).toBeGreaterThan(0)
+    expect([...runWords].filter((w) => !badgeWords.has(w)).length).toBeGreaterThan(0)
+    // …and the difference survives STEMMING, which is what makes it a difference of
+    // meaning rather than of inflection. Two sentences that differed only by tense would
+    // have equal stem sets and would pass the word check above only by accident.
+    const badgeStems = stemsOf(badgeText)
+    const runStems = stemsOf(runText)
+    expect([...badgeStems].filter((s) => !runStems.has(s)).length).toBeGreaterThan(0)
+    expect([...runStems].filter((s) => !badgeStems.has(s)).length).toBeGreaterThan(0)
+    view.unmount()
+  })
+
+  it("the vocabulary module does not carry the badge's literal (source fence)", async () => {
+    const { view, badgeText, runText } = await renderWaitingNode()
+    // The needle is READ OFF THE DOM, never typed — so this cannot pass because two
+    // hand-typed strings happened to match, and it fails the moment the run vocabulary
+    // absorbs the design-time wording.
+    expect(runVocabularySource).not.toContain(badgeText)
+    // POSITIVE CONTROL — the needle is a real, matchable string.
+    expect(`x ${badgeText} y`).toContain(badgeText)
+    // …and the module really does own the RUN wording, so the absence above is about a
+    // file that genuinely holds the other half of the pair.
+    expect(runVocabularySource).toContain(runText.split(" — ")[0])
+    view.unmount()
+  })
+})
+
+// ── 9 · One function for the visible line and the announced one ────────────────
+
+describe("PhaseNode 188-07 — the run sentence is derived ONCE", () => {
+  it("the rendered run line is byte-equal to the label the shell will announce", async () => {
+    // `NodeRunState.label` is the string `WorkflowCanvas` appends to the node's
+    // accessible name. If the card re-worded anything, the sighted and the assistive
+    // reading would drift — this asserts they are the same bytes, at every reading.
+    for (const reading of READINGS) {
+      const run = runFor(reading)
+      const view = await renderNodes({ technical: false, run: () => run })
+      expect(runLineOf(view.container, AGENT_SLUG)?.textContent).toBe(run.label)
+      view.unmount()
+    }
+  })
+
+  it("the failure clause follows the typed enum, never free-form harness text", async () => {
+    const withEmit = runFor("failed", "citation_gate_rejected")
+    const withoutEmit = runFor("failed")
+    const view = await renderNodes({ technical: false, run: () => withEmit })
+    expect(runLineOf(view.container, AGENT_SLUG)?.textContent).toBe(withEmit.label)
+    // Non-vacuity: the enum really does change the sentence, so threading `emitFailure`
+    // is load-bearing rather than decorative (188-06's note to this plan).
+    expect(withEmit.label).not.toBe(withoutEmit.label)
+    view.unmount()
+  })
+
+  it("no run line at all when the shell supplies nothing — the Builder's card", async () => {
+    const view = await renderNodes({ technical: false })
+    for (const phase of renewalDraft) expect(runLineOf(view.container, phase.slug)).toBeNull()
+    view.unmount()
   })
 })

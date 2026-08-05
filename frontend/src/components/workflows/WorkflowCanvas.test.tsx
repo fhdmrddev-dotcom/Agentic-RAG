@@ -39,6 +39,8 @@ import {
   researchSummarize,
   unresolvableSkip,
 } from "./__fixtures__/canvasFixtures"
+import { runReadingLabel, type NodeRunState } from "./runVocabulary"
+import type { CanvasReading } from "@/lib/phaseState"
 import { TechnicalNamesProvider } from "@/providers/TechnicalNamesProvider"
 
 mockReactFlow()
@@ -62,6 +64,11 @@ function renderCanvas(
      *  passing `undefined` here leaves every pre-185 assertion projecting exactly as it
      *  did. Only the grounded-node walk below supplies one. */
     kbTools?: readonly string[]
+    /** 188-07: the page-owned run-state lookup. OMITTED on every shipped call above and
+     *  on every shipped caller in the app, and omitting it puts NO node in run mode — so
+     *  passing `undefined` here leaves every pre-188 assertion rendering exactly as it
+     *  did. Only the RUNVIZ-01 block at the foot of this file supplies one. */
+    runState?: (slug: string) => NodeRunState | undefined
   } = {},
 ) {
   const ui = (
@@ -72,6 +79,7 @@ function renderCanvas(
         onSelectNode={opts.onSelectNode ?? vi.fn()}
         onClearSelection={opts.onClearSelection ?? vi.fn()}
         kbTools={opts.kbTools}
+        runState={opts.runState}
       />
     </div>
   )
@@ -527,5 +535,212 @@ describe("WorkflowCanvas 184-12 — the library's measurement is echoed back", (
   it("threads a measured field back onto the node objects", () => {
     // Not merely READ for layout (heightAt does that) — spread onto the node we hand back.
     expect(workflowCanvasSource).toMatch(/\{ measured \}/)
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 188-07 · RUNVIZ-01 — the capped run-state pass-through
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+// ⚠ A NOTE ON THE COUNT GATE, so the next author does not read a stale number. This file
+// is pinned at 31 in `scripts/vitest-count-gate.cjs` while it RUNS 35 — four cases have
+// been sitting in that slack since before this phase. The cases below raise the real
+// count further; the gate only fails on a DECREASE, so nothing breaks, but plan 188-11
+// re-pins this file from the script's printed `actual` column across two agreeing runs
+// (never by hand-counting `it(` literals — `definitionOps.test.ts` declares ~122 and runs
+// 232 under `it.each`).
+//
+// THE PROPERTY THIS BLOCK EXISTS TO PIN. `WorkflowCanvas.tsx` is a G-5 hot file — nine
+// plans across three phases — and this phase honours the guardrail by SCOPE: the run
+// state crosses it as an opaque value it neither derives, words nor inspects, inside a
+// diff capped at 15 insertions / 4 deletions and measured with `git diff --numstat`
+// (13/2 as shipped). Everything below is what makes that cap structural rather than a
+// promise: if the canvas ever learned to derive a reading, the fences would go red.
+
+/** A run state in the shape the PAGE builds one. The label is worded by the single
+ *  vocabulary function, never hand-typed — the canvas must receive it already worded. */
+function mkRun(reading: CanvasReading): NodeRunState {
+  return { reading, label: runReadingLabel(reading) }
+}
+
+/** Needles assembled from parts, so this suite's own source cannot satisfy a grep later
+ *  run over a file set that includes it (the 187-24 lesson). Positive controls below. */
+const READING_WORDS = [
+  ["Not ", "started"].join(""),
+  ["Runn", "ing"].join(""),
+  ["Comp", "lete"].join(""),
+  ["Fai", "led"].join(""),
+  ["Skip", "ped"].join(""),
+  ["Paused for ", "your answer"].join(""),
+  ["State ", "unknown"].join(""),
+] as const
+const ORDINAL_FIELD = ["phase", "_index"].join("")
+const ORDINAL_CAMEL = ["phase", "Index"].join("")
+
+function stripComments(source: string): string {
+  return source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "")
+}
+
+describe("WorkflowCanvas 188-07 — the prop mirror (run state passes through)", () => {
+  it("hands each node exactly what the lookup returned for ITS slug, and nothing to the rest", () => {
+    const run = mkRun("running")
+    const { container } = renderCanvas(researchSummarize, {
+      runState: (slug) => (slug === "summarize" ? run : undefined),
+    })
+
+    const marked = screen.getByTestId("canvas-node-summarize")
+    const line = marked.querySelector('[data-testid="canvas-node-run-line"]')
+    expect(line).not.toBeNull()
+    expect(line!.getAttribute("data-reading")).toBe("running")
+    expect(line!.textContent).toBe(run.label)
+
+    // The OTHER node got `undefined` and is therefore not in run mode at all — which is
+    // what makes the assertion above evidence about the lookup rather than about a canvas
+    // that paints a reading on everything.
+    expect(
+      screen
+        .getByTestId("canvas-node-research")
+        .querySelectorAll('[data-testid="canvas-node-run-line"]'),
+    ).toHaveLength(0)
+    expect(container.querySelectorAll('[data-testid="canvas-node-run-line"]')).toHaveLength(1)
+  })
+
+  it("distinct readings reach distinct nodes — the lookup is per-slug, not per-canvas", () => {
+    const byslug: Record<string, CanvasReading> = { research: "done", summarize: "waiting-for-you" }
+    renderCanvas(researchSummarize, {
+      runState: (slug) => (byslug[slug] ? mkRun(byslug[slug]) : undefined),
+    })
+    for (const [slug, reading] of Object.entries(byslug)) {
+      const line = screen
+        .getByTestId(`canvas-node-${slug}`)
+        .querySelector('[data-testid="canvas-node-run-line"]')
+      expect(line?.getAttribute("data-reading")).toBe(reading)
+    }
+  })
+
+  it("OMITTING the prop renders the shipped read-only Builder canvas — no run mode anywhere", () => {
+    const { container } = renderCanvas(researchSummarize)
+    expect(container.querySelectorAll('[data-testid="canvas-node-run-line"]')).toHaveLength(0)
+    expect(container.querySelectorAll("[data-reading]")).toHaveLength(0)
+    // Non-vacuity: the nodes really are on the canvas, so "no run line" is a statement
+    // about rendered cards rather than about an empty plane.
+    expect(screen.getAllByTestId(/^canvas-node-/).length).toBe(researchSummarize.length)
+  })
+})
+
+describe("WorkflowCanvas 188-07 — the canvas DERIVES nothing (Req 2 · the G-5 cap)", () => {
+  it("the stripper strips and every needle really matches (positive controls)", () => {
+    expect(stripComments(workflowCanvasSource).length).toBeLessThan(workflowCanvasSource.length)
+    for (const word of READING_WORDS) expect(`the step reads ${word}.`).toContain(word)
+    expect(`{ ${ORDINAL_FIELD}: 3 }`).toContain(ORDINAL_FIELD)
+    expect(`{ ${ORDINAL_CAMEL}: 3 }`).toContain(ORDINAL_CAMEL)
+    expect(stripComments(`/* ${ORDINAL_FIELD} */`)).not.toContain(ORDINAL_FIELD)
+  })
+
+  it("spells NONE of the seven reading words — the vocabulary never entered this file", () => {
+    // Asserted over the WHOLE source, comments included: unlike the ordinal below, no
+    // shipped comment here names a reading, so the stronger claim is the true one.
+    for (const word of READING_WORDS) expect(workflowCanvasSource).not.toContain(word)
+  })
+
+  it("imports the run type TYPE-ONLY, and imports no derivation module at all", () => {
+    // A type-only import contributes nothing to the runtime graph, which is what keeps
+    // the live ESM cycle (`edgeTypes` holds `FlowEdge`'s VALUE at module scope) safe.
+    expect(workflowCanvasSource).toMatch(
+      /import type \{[^}]*NodeRunState[^}]*\} from ["']@\/components\/workflows\/runVocabulary["']/,
+    )
+    // …and NOT as a value import, which is how a vocabulary table would arrive.
+    expect(workflowCanvasSource).not.toMatch(
+      /^import \{[^}]*\} from ["']@\/components\/workflows\/runVocabulary["']/m,
+    )
+    // The derivation module is not imported in ANY form — the reading is decided by the
+    // page, once (D-188-01 / D-188-02).
+    expect(workflowCanvasSource).not.toMatch(/from\s+["']@\/lib\/phaseState["']/)
+    // POSITIVE CONTROLS — both regexes match the shapes they forbid.
+    expect(
+      'import { runReadingWord } from "@/components/workflows/runVocabulary"',
+    ).toMatch(/^import \{[^}]*\} from ["']@\/components\/workflows\/runVocabulary["']/m)
+    expect('import { canvasReading } from "@/lib/phaseState"').toMatch(
+      /from\s+["']@\/lib\/phaseState["']/,
+    )
+  })
+
+  it("reads no step ordinal in CODE — and its PROSE names it exactly once", () => {
+    // A measured correction to the plan's acceptance grep, which asked for zero
+    // occurrences in the file. That was already false at HEAD: the `onInsertAt` docblock
+    // has named the ordinal since 184-12, explaining what the page renumbers. So the
+    // fence is anchored on CODE, and the prose count is PINNED at one — which makes the
+    // explanation exactly as hard to delete as the field is to introduce.
+    const code = stripComments(workflowCanvasSource)
+    expect(code).not.toContain(ORDINAL_FIELD)
+    expect(code).not.toContain(ORDINAL_CAMEL)
+    expect(workflowCanvasSource.match(new RegExp(ORDINAL_FIELD, "g")) ?? []).toHaveLength(1)
+  })
+
+  it("merges the run inside the SETTLED memo, never in the drag overlay (the anti-blink split)", () => {
+    // The split is load-bearing: `handleNodesChange` fires on every pointer frame, and
+    // when the overlay was a dependency of the ONE memo a drag rebuilt every node's
+    // `data` ~60x/s and the cards visibly flickered. A run lookup in the overlay memo
+    // would reintroduce exactly that, so the dependency list is pinned here.
+    expect(workflowCanvasSource).toMatch(/const settledNodes = useMemo/)
+    const settled = workflowCanvasSource.slice(
+      workflowCanvasSource.indexOf("const settledNodes = useMemo"),
+      workflowCanvasSource.indexOf("const nodes = useMemo"),
+    )
+    expect(settled).toMatch(/const run = runState\?\.\(node\.id\)/)
+    expect(settled).toMatch(/\[projection\.nodes,[^\]]*runState[^\]]*\]/)
+    // The overlay memo, taken as its own slice, names the lookup nowhere.
+    const overlay = workflowCanvasSource.slice(workflowCanvasSource.indexOf("const nodes = useMemo"))
+    expect(overlay).not.toContain("runState")
+    // POSITIVE CONTROL — the slice really is the overlay memo and really is non-empty.
+    expect(overlay).toContain("dragOverlay[node.id]")
+  })
+})
+
+describe("WorkflowCanvas 188-07 — the run reading joins the node's ACCESSIBLE NAME", () => {
+  /** The wrapper React Flow renders for a node — the element that owns the tab stop and
+   *  the accessible name. The card's inner text is NOT part of that name, which is the
+   *  whole reason this append exists. */
+  function nodeLabel(container: HTMLElement, slug: string): string {
+    const wrapper = container.querySelector(`.react-flow__node[data-id="${slug}"]`)
+    expect(wrapper).not.toBeNull()
+    return wrapper!.getAttribute("aria-label") ?? ""
+  }
+
+  it("appends the page's sentence to the shipped label, and leaves other nodes untouched", () => {
+    const plain = renderCanvas(researchSummarize)
+    const before = nodeLabel(plain.container, "summarize")
+    const otherBefore = nodeLabel(plain.container, "research")
+    expect(before.length).toBeGreaterThan(0)
+    plain.unmount()
+
+    const run = mkRun("failed")
+    const withRun = renderCanvas(researchSummarize, {
+      runState: (slug) => (slug === "summarize" ? run : undefined),
+    })
+    expect(nodeLabel(withRun.container, "summarize")).toBe(`${before} — ${run.label}`)
+    // The node the lookup said nothing about keeps its shipped name, byte for byte.
+    expect(nodeLabel(withRun.container, "research")).toBe(otherBefore)
+  })
+
+  it("the announced sentence IS the visible one — one function, so they cannot drift", () => {
+    const run = mkRun("waiting-for-you")
+    const { container } = renderCanvas(researchSummarize, { runState: () => run })
+    const visible =
+      screen
+        .getByTestId("canvas-node-summarize")
+        .querySelector('[data-testid="canvas-node-run-line"]')?.textContent ?? ""
+    expect(visible.length).toBeGreaterThan(0)
+    expect(nodeLabel(container, "summarize").endsWith(` — ${visible}`)).toBe(true)
+  })
+
+  it("no reading ⇒ the accessible name is byte-identical to the shipped one", () => {
+    const a = renderCanvas(researchSummarize)
+    const shipped = researchSummarize.map((p) => nodeLabel(a.container, p.slug))
+    a.unmount()
+    const b = renderCanvas(researchSummarize, { runState: () => undefined })
+    expect(researchSummarize.map((p) => nodeLabel(b.container, p.slug))).toEqual(shipped)
+    // Non-vacuity: the labels are real strings, not a list of empties.
+    for (const label of shipped) expect(label.length).toBeGreaterThan(0)
   })
 })
