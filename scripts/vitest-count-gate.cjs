@@ -298,7 +298,12 @@ const BASELINE = {
   // is unmounted here — so the canvas painted its mount-time snapshot for the whole run.
   // Three of the four cases were observed RED; the fourth pins that nothing fires before a
   // run has resolved.
-  "WorkflowRunPage.test.tsx": 64,
+  // …and CR-01: 64 → 69. Also an extension. `setRun` had ONE caller, so the band, the
+  // terminality, the elapsed anchor and the assertive alert were frozen at mount — a live
+  // run read "● Running" forever with a clock still counting under it. Three of the five
+  // added cases were observed RED; the other two guard the poll's teardown and its
+  // never-tear-down-a-good-surface rule.
+  "WorkflowRunPage.test.tsx": 69,
   // 188 code-review fix pass (CR-03): 39 → 41. An EXTENSION, not a lowering — nothing was
   // deleted. The two added cases are the receipt's own reason for existing: `finish_run`
   // NULLs `threads.active_workflow_run_id` in the same transaction as the terminal status,

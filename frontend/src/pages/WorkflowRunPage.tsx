@@ -296,6 +296,9 @@ function readBand(status: string, claimedAt: string | null, failedStepTitle: str
  *  and announcing each renders the surface unusable for a screen-reader user. */
 const ALERTING_STATUSES = new Set(["failed", "cap_paused"])
 
+/** CR-01 — how often the RUN row itself is re-read while it is still live. */
+const RUN_POLL_MS = 5000
+
 // ── The page ───────────────────────────────────────────────────────────────────
 
 type LoadPhase = "loading" | "ready" | "missing" | "broken"
@@ -348,6 +351,35 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
       cancelled = true
     }
   }, [runId, retryNonce])
+
+  /**
+   * ⚠ CR-01 — RE-READ THE RUN ITSELF. A run-level status is the ONE fact no other source
+   * on this surface carries: the phase slice knows about steps, the file list knows about
+   * artefacts, and neither can tell you the run finished. Before this, `setRun` had exactly
+   * one caller (the mount effect above, whose other key is bumped only by a button that
+   * renders on the broken screen), so `band`, `isTerminal`, `ticking` and the alert were
+   * all frozen at mount — the surface asserted a run was running at exactly the moment it
+   * was not, with a clock still counting to make the claim actively.
+   *
+   * TWO RULES, both load-bearing:
+   *   1. `loadPhase` is NEVER touched here. This is a refresh of a surface that already
+   *      resolved, so a blip must leave the run standing rather than replacing it with the
+   *      broken screen. Only the mount read owns the load phase.
+   *   2. The stale-response guard is re-applied per call. A poll in flight across a run
+   *      switch must not write the OLD run's payload over the new one — the same reason
+   *      the mount read carries it.
+   */
+  const refreshRun = useCallback(() => {
+    const requested = currentRunRef.current
+    if (!requested) return
+    getWorkflowRun(requested)
+      .then((r) => {
+        if (currentRunRef.current === requested) setRun(r)
+      })
+      .catch(() => {
+        /* a blip must not tear down a good surface — see rule 1 above */
+      })
+  }, [])
 
   // ── The live slice. This page is the ONLY component on this surface that touches the
   //    stream (067.5 Branch-D3): one subscription, one join, one lookup handed down. ──
@@ -419,6 +451,11 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
       void reconcileStream(threadId)
       void reconcile()
       void reconcileFiles()
+      // CR-01: and the RUN. A lid closed across the run's completion must re-read the
+      // VERDICT on wake rather than wait out the poll below — the phase slice cannot
+      // supply it, and a stale "Running" is the single loudest thing this surface can
+      // get wrong.
+      refreshRun()
     }
     window.addEventListener("visibilitychange", onWake)
     window.addEventListener("online", onWake)
@@ -426,7 +463,7 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
       window.removeEventListener("visibilitychange", onWake)
       window.removeEventListener("online", onWake)
     }
-  }, [run?.thread_id, reconcile, reconcileFiles, reconcileStream])
+  }, [run?.thread_id, reconcile, reconcileFiles, reconcileStream, refreshRun])
 
   /** A download that fails must say so where the user clicked — a swallowed rejection
    *  leaves a dead row, and an unhandled one is a console-only failure. */
@@ -516,6 +553,21 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
     const id = window.setInterval(() => setNowMs(Date.now()), 1000)
     return () => window.clearInterval(id)
   }, [ticking])
+
+  // CR-01: the run poll, sited HERE because it is gated on `isTerminal` and that is derived
+  // just above. It runs ONLY while the run is non-terminal and the surface has resolved,
+  // and it tears itself down the moment a read comes back terminal — `isTerminal` is a
+  // dependency, and the value it reads is the one this poll wrote. So a finished run is
+  // never re-read forever, and no interval survives a run switch.
+  //
+  // 5s is a deliberate order of magnitude apart from the 1s clock above: the clock is a
+  // local render, the poll is a network read, and pinning them to the same beat would make
+  // a per-second request out of a per-second repaint.
+  useEffect(() => {
+    if (!runId || loadPhase !== "ready" || isTerminal) return
+    const id = window.setInterval(refreshRun, RUN_POLL_MS)
+    return () => window.clearInterval(id)
+  }, [runId, loadPhase, isTerminal, refreshRun])
 
   /**
    * The elapsed slot: a number and the field it derives from, or NOTHING AT ALL.

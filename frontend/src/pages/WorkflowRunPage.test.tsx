@@ -1017,6 +1017,114 @@ describe("WorkflowRunPage — the run's stream is opened (CR-02)", () => {
     await screen.findByText("Opening the run…")
     expect(reconcileStream).not.toHaveBeenCalled()
   })
+})
+
+// ── CR-01 (Phase 188 review) — THE RUN ROW IS RE-READ, not frozen at mount ────────────
+//
+// `setRun` had exactly one caller: the effect keyed on `[runId, retryNonce]`, and
+// `retryNonce` is bumped only by a button that renders on the broken screen. There was no
+// poll, no interval, and the reconnect effect re-read the phase slice and the file list but
+// never the RUN. Everything derived from `run.status` was therefore frozen for the whole
+// session — and a run-level status is the one fact no other source on this surface carries:
+//
+//   · the band renders "● Running" until the user leaves the page, long after the run
+//     completed or failed;
+//   · `isTerminal` never flips, so `aria-busy` stays true and the elapsed slot never
+//     switches to its frozen "Ran for …" form;
+//   · the once-a-second clock KEEPS COUNTING after the run stopped — worse than a stale
+//     word, because a ticking number is an active claim of liveness;
+//   · a run that FAILS while being watched never fires the assertive alert, because
+//     `run.status` is still the launch-time value.
+//
+// That is the headline requirement inverted: the surface asserts a run is running at
+// exactly the moment it is not.
+
+describe("WorkflowRunPage — the run row is re-read while it is live (CR-01)", () => {
+  /** Let the mount read resolve under fake timers before advancing anything. */
+  async function settle() {
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0)
+    })
+  }
+
+  it("polls while non-terminal, so a run that finishes stops claiming it is running", async () => {
+    vi.useFakeTimers()
+    getWorkflowRun.mockResolvedValue(mkRun({ status: "active" }))
+    renderPage()
+    await settle()
+    expect(screen.getByTestId("run-band")).toHaveTextContent("● Running")
+
+    // The run finishes on the server. Nothing on this surface would ever learn that.
+    getWorkflowRun.mockResolvedValue(mkRun({ status: "completed" }))
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000)
+    })
+    expect(screen.getByTestId("run-band")).toHaveTextContent("✓ Complete")
+    // …and the clock is frozen rather than still counting.
+    expect(screen.getByTestId("run-elapsed")).toHaveTextContent("Ran for")
+  })
+
+  it("stops polling once the run is terminal — a finished run is not re-read forever", async () => {
+    vi.useFakeTimers()
+    getWorkflowRun.mockResolvedValue(mkRun({ status: "completed" }))
+    renderPage()
+    await settle()
+    expect(getWorkflowRun).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30000)
+    })
+    expect(getWorkflowRun).toHaveBeenCalledTimes(1)
+  })
+
+  it("a failing poll leaves a good surface standing — a blip is not a broken run", async () => {
+    vi.useFakeTimers()
+    getWorkflowRun.mockResolvedValue(mkRun({ status: "active" }))
+    renderPage()
+    await settle()
+
+    getWorkflowRun.mockRejectedValue(new ApiError("gateway", 502))
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000)
+    })
+    // Still the run, NOT the broken screen: the mount read's error branch owns the
+    // load-phase, and a poll must never be able to tear down a surface that resolved.
+    expect(screen.getByTestId("run-band")).toHaveTextContent("● Running")
+    expect(screen.queryByText("We couldn't load this run.")).not.toBeInTheDocument()
+  })
+
+  it("a run that FAILS while being watched fires the assertive alert", async () => {
+    vi.useFakeTimers()
+    getWorkflowRun.mockResolvedValue(mkRun({ status: "active" }))
+    renderPage()
+    await settle()
+    expect(screen.getByTestId("run-alert")).toHaveTextContent("")
+
+    getWorkflowRun.mockResolvedValue(mkRun({ status: "failed" }))
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000)
+    })
+    // The alert exists to be un-missable; it could never fire while the status was frozen
+    // at its launch-time value.
+    expect(screen.getByTestId("run-alert")).toHaveTextContent("Failed")
+  })
+
+  it("re-reads the RUN on wake, beside the slice and the file list", async () => {
+    getWorkflowRun.mockResolvedValue(mkRun({ status: "active" }))
+    renderPage()
+    await screen.findByTestId("run-band")
+    await waitFor(() => expect(getWorkflowRun).toHaveBeenCalledTimes(1))
+
+    // A lid closed across the run's completion: the verdict must be re-read on wake, not
+    // waited out. (Real timers here on purpose — this path is event-driven, not polled.)
+    getWorkflowRun.mockResolvedValue(mkRun({ status: "completed" }))
+    await act(async () => {
+      window.dispatchEvent(new Event("online"))
+    })
+    await waitFor(() =>
+      expect(screen.getByTestId("run-band")).toHaveTextContent("✓ Complete"),
+    )
+  })
 
   it("adds no date library and constructs no HTML", () => {
     const DATE_A = ["date", "-fns"].join("")
