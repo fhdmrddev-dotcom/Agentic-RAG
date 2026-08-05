@@ -48,6 +48,36 @@
  *      deletion to ride in the same commit. Nothing was removed, no existing
  *      pin moved by a single test, and all three numbers came from the `actual`
  *      column of two agreeing runs. See the map entry below.
+ *   4. EXTENDED AND DE-SLACKED — Phase 188 plan 188-12 pinned EVERY file the
+ *      gate executes, at the `actual` it reported across two agreeing runs on
+ *      2026-08-05 (total 2421 · failed 0, identical per-file columns). Pinned
+ *      total 1037 → 2421 across 26 → 45 files. Nothing was lowered; every
+ *      movement is an increase or a first pin.
+ *
+ *      WHY the whole set, and not just Phase 188's own suites: a pin BELOW a
+ *      file's real count is not a weaker guard, it is NO guard for the cases in
+ *      the gap. `PhaseReconcile.test.tsx` was pinned at 2 while running 12 — the
+ *      ten in the slack were every falsification test Phase 188 wrote, all of
+ *      them deletable with the gate green. That is verbatim the "verification
+ *      truth 14" failure Phase 187 shipped and had to correct afterwards, and it
+ *      was flagged as owed by five separate 188 plans (188-02/04/05/06/07/08)
+ *      before this one closed it. The same slack existed in five inherited pins
+ *      (`canvasModel.purity` 69/143, `phaseVocabulary` 33/96, `canvasModel` 26/49,
+ *      `PublishGauntlet` 24/46, `PhaseSpineGraph` 14/20) and fifteen files ran
+ *      inside TARGETS with no pin at all (including `canvasModel.roundtrip.test.ts`
+ *      at 517 — a single file holding more cases than the entire original pin).
+ *
+ *      Adopting them into BASELINE imports NO rot: they were already inside
+ *      TARGETS, so the gate already required them to pass. The only thing that
+ *      changes is that deleting one is now visible. (Contrast the 188-01
+ *      blast-radius argument for declining a bare TARGETS *directory* entry —
+ *      that adds files the gate must keep green forever, which is a real cost.
+ *      A BASELINE entry for a file already inside TARGETS is not.)
+ *
+ *      CONSEQUENCE, stated plainly: BASELINE_TOTAL now EQUALS the measured total,
+ *      so the gate has zero slack. A legitimate deletion must move its pin in the
+ *      SAME commit — which is the rule below, now actually enforced rather than
+ *      merely written down.
  *
  * **A pin is LOWERED only alongside a deliberate, plan-authorized deletion —
  * never to make a red gate go quiet.** Adding a pin needs no deletion; it needs
@@ -109,12 +139,18 @@ const BASELINE = {
   // with `[count-decrease]` naming that file.
   "definitionOps.test.ts": 232,
   "canvasModel.fixtures.test.ts": 100,
-  "canvasModel.purity.test.ts": 69,
+  // 188-12: 69 → 143. A stale-low pin inherited from 187-25 and flagged as owed by
+  // five 188 plans. The 74 cases in the slack were deletable with the gate green.
+  "canvasModel.purity.test.ts": 143,
   "SeedReceipt.test.tsx": 68,
   // 185-08: 42 → 33. Req 6 deleted the slot-1 grounding word-badge; the 9 `it()`
   // blocks over its three faces went with it. Measured, not computed.
-  "phaseVocabulary.test.ts": 33,
-  "WorkflowCanvas.test.tsx": 31,
+  // 188-12: 33 → 96. The suite has grown by 63 since; de-slacked, not lowered.
+  "phaseVocabulary.test.ts": 96,
+  // 188-12: 31 → 46. GREW IN THIS PHASE — 188-06 added the seven-readings and ring-spec
+  // cases, 188-07 the derives-nothing property and the type-only-import fence that is the
+  // mechanical half of the G-5 diff cap. It began this phase pinned at 31 while running 35.
+  "WorkflowCanvas.test.tsx": 46,
   // 187-29: gap-closure round 5's three suites, pinned for exactly the reason
   // 187-25 pinned its two — each now carries a guard that a failures-only
   // differential cannot see the deletion of:
@@ -161,13 +197,15 @@ const BASELINE = {
   "DescribeKbPicker.test.tsx": 37,
   "ProblemsTray.test.tsx": 30,
   "verdictModel.test.ts": 29,
-  "canvasModel.test.ts": 26,
-  "PublishGauntlet.test.tsx": 24,
+  // 188-12 de-slacking, both inherited stale-low pins (26/49 and 24/46).
+  "canvasModel.test.ts": 49,
+  "PublishGauntlet.test.tsx": 46,
   "WorkflowBuilderPage.canvas.test.tsx": 128,
   "WorkflowBuilderPage.describe.test.tsx": 19,
   "PhaseFormPanel.test.tsx": 19,
   "WorkflowBuilderPage.test.tsx": 15,
-  "PhaseSpineGraph.test.tsx": 14,
+  // 188-12: 14 → 20, inherited stale-low pin.
+  "PhaseSpineGraph.test.tsx": 20,
   "soulData.test.ts": 14,
   // 21 → 23: the two end-to-end WIRE fences for CR-R5-01 (a pick whose folder is gone,
   // and a pick that survived a failed re-fetch, each asserting the `project_folder_id`
@@ -205,22 +243,96 @@ const BASELINE = {
   // record. `PhaseNodeCard.test.tsx` was then observed catching a deletion: one whole `it(`
   // block removed reds the gate with `[count-decrease]` naming that file at `failed 0` — the
   // count decrease being the ONLY signal is the entire point. Raw output in 188-01-SUMMARY.md.
-  "PhaseNodeCard.test.tsx": 68,
-  "PhaseNode.test.tsx": 13,
+  //
+  // ── 188-12 (Wave 10): the four 188-01 pins RAISED to their measured `actual`. ──
+  // 188-01 pinned each at the count it ran ON THE DAY IT WAS PINNED, which was correct then
+  // and stopped being correct the moment the phase started writing into these files. Every
+  // number below is the `actual` column of the two agreeing runs on 2026-08-05 (total 2421,
+  // failed 0, per-file columns identical) — never a hand count of `it(` literals.
+  //   · PhaseNodeCard.test.tsx  68 → 105: 188-06 added the seven-readings-distinct-by-shape
+  //     block and the seal-invariant-at-seven guard.
+  //   · PhaseNode.test.tsx      13 →  25: 188-07 added Req 2's split harness-vocabulary fence
+  //     and Req 5's waiting-words stem-set separation.
+  //   · PhaseReconcile.test.tsx  2 →  12: ⚠ THE ONE THAT MATTERED. 188-02's falsification of
+  //     the REACHABLE fail-open (`finalizeAllPhasesForThread` sweeping `pending` → `done`)
+  //     and 188-04's identity-overlay cases ALL landed in the ten-case gap between the pin
+  //     and the run. Every falsification this phase wrote sat in gate slack, deletable with
+  //     the gate green — which is the exact failure mode the falsifications exist to prevent,
+  //     reproduced in the guard rather than in the product.
+  //   · PhaseTimeline.test.tsx   8 →   8: unchanged. Recorded rather than omitted, so a reader
+  //     can tell "measured and still 8" from "nobody looked".
+  "PhaseNodeCard.test.tsx": 105,
+  "PhaseNode.test.tsx": 25,
   "PhaseTimeline.test.tsx": 8,
-  "PhaseReconcile.test.tsx": 2,
+  "PhaseReconcile.test.tsx": 12,
+  // ── 188-12: the four suites Phase 188 CREATED (or deliberately adopted), pinned now. ──
+  // Each was put into TARGETS by the plan that created it — in the same commit, because an
+  // entry pointing at a not-yet-existing path makes the gate ERROR (exit 2) rather than fail —
+  // and each was deliberately left OUT of BASELINE while its count was still growing. This is
+  // the plan that closes the second knob. Until this commit, every one of them RAN and NONE of
+  // them was pinned: the whole run-observability estate could have been deleted at `failed 0`.
+  //   · WorkflowRunPage.test.tsx     60 (188-08 authored at 45, 188-10 grew it to 60 — 188-08's
+  //     closing note saying "pin at 45" is STALE and is superseded by the measurement here).
+  //     Carries the `phase_index` join fence (a slug-keyed join silently misses every
+  //     not-yet-started node mid-run), the run band's totality, and the `claimed_at == null`
+  //     no-number rule. All three are ABSENCE assertions.
+  //   · WorkspacePanel.test.tsx      39 (31 shipped + 8 added by 188-10). The THREAD side of
+  //     D-188-13's bidirectional seam — the only route back to a finished run while `GET /runs`
+  //     is deferred and the app has no router.
+  //   · phaseState.test.ts           34 (188-05). Req 8's zero-re-derivation SOURCE fence, the
+  //     only mechanical thing preventing a second copy of the derivation in the canvas tree,
+  //     plus the totality guard measured RED on the plan's own proposed `?? "done"` expression.
+  //   · ChatLayout.launch.test.tsx   12 (188-09). The only fence on the launch path: lands on
+  //     the run not on chat, the thread still anchors the run, the two-bare-uuid id trap, and
+  //     the positional-fallback hazard.
+  "WorkflowRunPage.test.tsx": 60,
+  "WorkspacePanel.test.tsx": 39,
+  "phaseState.test.ts": 34,
+  "ChatLayout.launch.test.tsx": 12,
+  // ── 188-12: the fifteen files that RAN inside TARGETS with NO pin at all. ──
+  // Inherited from Phases 183-187, none authored by this phase. They are pinned here because
+  // the reason to leave a suite unpinned ("it postdates the pin, its count is free to grow")
+  // expires the moment the suite stops growing, and nothing ever expires it — so the note
+  // outlives the reason and the file stays permanently deletable. `canvasModel.roundtrip.test.ts`
+  // alone runs 517 cases: more than the entire original 424 pin, guarded by nothing.
+  // Every value is the `actual` column of the two agreeing runs on 2026-08-05.
+  // ⚠ These are pins, not adoptions: all fifteen were ALREADY inside TARGETS, so the gate
+  // already required them to pass and this imports no new rot. What changes is only that
+  // deleting one is now visible.
+  "canvasModel.roundtrip.test.ts": 517,
+  "WorkflowCanvas.editing.test.tsx": 57,
+  "builderStore.test.ts": 52,
+  "phaseVocabulary.corpus.test.ts": 45,
+  "StepTypePicker.test.tsx": 43,
+  "GovernanceSection.test.tsx": 42,
+  "StarterTemplatePicker.test.tsx": 40,
+  "canvasNudge.test.ts": 31,
+  "governanceVocabulary.test.ts": 30,
+  "PhaseFormPanel.rails.test.tsx": 27,
+  // 184.1 pinned NOTHING here on purpose ("it postdates the 424 pin, so it reports as `new`
+  // and its own count is free to grow"). Four phases later it is still the ONLY guard on the
+  // flag-off Builder header — D-181-01's byte-identity promise — and it has stopped growing.
+  // The now-false TARGETS comment below is corrected in this same commit.
+  "WorkflowBuilderPage.header.test.tsx": 27,
+  "FlowEdge.test.tsx": 22,
+  "WorkflowCanvas.composition.test.tsx": 19,
+  "CanvasToolbar.test.tsx": 14,
+  "BuilderSaveRegion.test.tsx": 11,
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
 // trailing figure below is a note about the reduce's result and can never be the
-// thing the gate reads. 1037 = 946 + 68 + 13 + 8 + 2 (188-01 extended: two suites
+// thing the gate reads. 2421 after 188-12 pinned EVERY file the gate executes at
+// its measured `actual` (41 files); the figure now equals the run's own printed
+// `total`, i.e. the gate carries ZERO slack and any deletion anywhere in the blast
+// radius is visible. Was 1037 = 946 + 68 + 13 + 8 + 2 (188-01 extended: two suites
 // that already RAN unpinned, plus two pinned in the same commit that first made
 // them run). Was 946 = 804 + 7 (DescribeKbPicker 30→37) + 106 (canvas 22→128)
 // + 10 (DoorSwitch 13→23) + 19 (describe.test.tsx, newly RUN and pinned)
 // — the post-round-5 truth-14 correction. Was 804 = 715 + 30 + 30 + 29 (187-29
 // extended; 715 = 415 + 232 + 68 after 187-25 extended; was 415 after 185-08
 // lowered it, 424 at the original 184 Wave-0 pin).
-const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // 1037
+const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // 2421
 
 // ── The Wave-0 blast radius (184-VALIDATION.md § "quick run command"). ──
 const TARGETS = [
@@ -231,8 +343,10 @@ const TARGETS = [
   // Added in 184.1. This suite is the ONLY thing pinning the flag-off Builder header —
   // D-181-01's Builder half was unguarded until it existed — so leaving it outside the
   // gate's blast radius would mean the one guard for a byte-identity promise could be
-  // deleted without the gate noticing. It is deliberately NOT added to BASELINE: it
-  // postdates the 424 pin, so it reports as `new` and its own count is free to grow.
+  // deleted without the gate noticing. It was deliberately NOT added to BASELINE while its
+  // count was still growing ("it postdates the 424 pin, so it reports as `new`"). CORRECTED
+  // BY 188-12: it has stopped growing and is now PINNED at 27. An unpinned file is not a
+  // lightly-guarded one, it is an unguarded one, and nothing ever expired the exemption.
   "src/pages/WorkflowBuilderPage.header.test.tsx",
   // Added post-round-5 (CR-R5-01 / verification truth 14). TARGETS and BASELINE are TWO
   // knobs: TARGETS decides what RUNS, BASELINE decides what is PINNED, and a page-level
@@ -272,8 +386,9 @@ const TARGETS = [
   // FILE-LEVEL, deliberately NOT the bare directory `src/lib`: it holds ten other
   // suites this phase does not read, and adopting them would make this phase the owner
   // of their future rot (the same reasoning recorded for the panel directory above).
-  // Left OUT of BASELINE on purpose — it postdates the 1037 pin, so it reports as
-  // `new` and its own count is free to grow; 188-11 pins it from the printed `actual`.
+  // Left OUT of BASELINE while its count was still growing. PINNED at 34 by 188-12 (not
+  // 188-11 as this comment used to say — the pinning plan is 188-12), from the printed
+  // `actual` column across two agreeing runs.
   "src/lib/phaseState.test.ts",
   // Added in 188-08, in the SAME COMMIT that creates the file — the fourth occurrence of
   // the SAME two-knob trap, so this comment records the rule rather than the incident:
@@ -298,8 +413,10 @@ const TARGETS = [
   //
   // FILE-LEVEL, deliberately NOT the bare directory `src/pages` — see the same reasoning
   // recorded for `src/components/panel/__tests__` and `src/lib` above. Left OUT of
-  // BASELINE on purpose: it postdates the 1037 pin, so it reports as `new` and its own
-  // count is free to grow; 188-11 pins it from this script's printed `actual` column.
+  // BASELINE while its count was still growing — and it DID grow, 45 → 60 when 188-10
+  // filled the deliverable region. PINNED at 60 by 188-12 from this script's printed
+  // `actual` column across two agreeing runs. (188-08's closing note said "pin at 45";
+  // that is exactly why a pin is read at the END, from a measurement, not booked ahead.)
   "src/pages/WorkflowRunPage.test.tsx",
   // Added in 188-09, in the SAME COMMIT that creates the file — the FIFTH occurrence of
   // the two-knob trap the entry above states as a rule. `src/components/layout/` lands
@@ -322,9 +439,9 @@ const TARGETS = [
   // reasoning recorded for `src/components/panel/__tests__`, `src/lib` and `src/pages`
   // above: the directory holds suites this phase does not read (NavPanel, ProfileMenu,
   // orgRefetch, and the Phase-121 launch suite under `__tests__/`), and adopting them
-  // would make this phase the owner of their future rot. Left OUT of BASELINE on purpose:
-  // it postdates the 1037 pin, so it reports as `new` and its own count is free to grow;
-  // 188-11 pins it from this script's printed `actual` column.
+  // would make this phase the owner of their future rot. Left OUT of BASELINE while its
+  // count was still growing; PINNED at 12 by 188-12 from this script's printed `actual`
+  // column across two agreeing runs.
   "src/components/layout/ChatLayout.launch.test.tsx",
   // Added in 188-10 — and this one is an ADOPTION, not a new file, which is the case the
   // panel-directory comment above explicitly reserved: "a later phase that wants
@@ -342,9 +459,10 @@ const TARGETS = [
   // no anchor, nothing when the anchor read fails), plus the wrong-id guard where the
   // panel's workflow lock holds a PRODUCER run id and both ids are bare uuids.
   //
-  // Left OUT of BASELINE on purpose: it postdates the 1037 pin, so it reports as `new`
-  // and its own count is free to grow; 188-11 pins it from this script's printed `actual`
-  // column (expected 39 — 31 shipped + 8 added here), across two agreeing runs.
+  // Left OUT of BASELINE while its count was still growing; PINNED at 39 by 188-12 from
+  // this script's printed `actual` column across two agreeing runs — which is exactly the
+  // 31 shipped + 8 added here that 188-10 predicted, but the pin is the MEASUREMENT, not
+  // the prediction it happens to agree with.
   "src/components/panel/__tests__/WorkspacePanel.test.tsx",
 ]
 
