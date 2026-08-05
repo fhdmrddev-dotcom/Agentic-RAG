@@ -39,6 +39,9 @@ import phaseNodeCardSource from "./PhaseNodeCard?raw"
 // boundary is asserted from ONE place (the `PhaseSpine.test.tsx:16-18` precedent).
 import phaseNodeSource from "./PhaseNode?raw"
 import nodePresentationSource from "./nodePresentation?raw"
+// 188-06: the vocabulary module's source, so the geometry fence can prove the expected
+// decimals live in NEITHER module that produces them.
+import runVocabularySource from "./runVocabulary?raw"
 import { PhaseNodeCard, type BadgeSlot, type BadgeSlots } from "./PhaseNodeCard"
 import { DEFAULT_TINT, ICON_TINT } from "./nodePresentation"
 // 184-08's additions land as a SEPARATE import statement rather than by widening the
@@ -53,6 +56,12 @@ import { CANVAS_LAYOUT } from "./canvasModel"
 // the ONE home the card also imports from — the pair is asserted still-in-agreement
 // below, which is what stops Req 7's locked words drifting between panel and canvas.
 import { GOVERNANCE_SEAL_LABEL, GROUNDING_DIAL_STRICT_LABEL } from "./definitionOps"
+// 188-06: the reading union (type-only — the derivation is `lib/phaseState`'s and this
+// suite drives none of it) and the canvas words the card renders. The words are IMPORTED
+// rather than re-typed for the same reason the seal's label is: a locked string with two
+// copies has two places to drift from.
+import type { CanvasReading } from "@/lib/phaseState"
+import { RUN_READING_WORD, runReadingLabel } from "./runVocabulary"
 
 /** The minimal slot set — everything else on the contract is optional by design. */
 function renderCard(overrides: Partial<React.ComponentProps<typeof PhaseNodeCard>> = {}) {
@@ -87,6 +96,36 @@ const waitsBadge: BadgeSlot = {
  *  occupancy block and the 185-09 block below select on it, and a second spelling of a
  *  test id is how two halves of one suite start measuring different elements. */
 const SEAL_TEST_ID = "canvas-node-seal"
+
+/** 188-06's four stable hooks, at module scope for the same reason `SEAL_TEST_ID` is:
+ *  the occupancy block, the greyscale block and the card-budget block all select on
+ *  them, and a second spelling of a test id is how two halves of one suite start
+ *  measuring different elements. */
+const RING_TEST_ID = "canvas-node-ring"
+const ARC_TEST_ID = "canvas-node-ring-arc"
+const RUN_LINE_TEST_ID = "canvas-node-run-line"
+const PAUSE_CHIP_TEST_ID = "canvas-node-pause-chip"
+
+/**
+ * THE SEVEN READINGS, derived from a COMPILER-FORCED exhaustive table rather than
+ * hand-listed (the `phaseState.test.ts` idiom, 188-05).
+ *
+ * D-188-04 fixes the reading set at seven, and the SPEC's phrase "all six readings" means
+ * every NORMAL reading plus the explicit unknown — which is the one that matters most
+ * here, because `unknown` is precisely the reading a fail-open hides behind. If a later
+ * phase widens `CanvasReading`, this object stops typechecking and every loop below is
+ * forced to confront the new member instead of silently under-covering it.
+ */
+const ALL_READINGS_TABLE: Record<CanvasReading, true> = {
+  "not-started": true,
+  running: true,
+  done: true,
+  failed: true,
+  skipped: true,
+  "waiting-for-you": true,
+  unknown: true,
+}
+const ALL_READINGS = Object.keys(ALL_READINGS_TABLE) as CanvasReading[]
 
 describe("PhaseNodeCard — renders with no provider at all (D-184-06)", () => {
   it("renders the data-attribute contract outside any provider, without throwing", () => {
@@ -723,23 +762,35 @@ function overlapArea(a: MarkBox, b: MarkBox): number {
   return w > 0 && h > 0 ? w * h : 0
 }
 
-/** Read the three rendered marks' classes back off a real render of the card.
+/** Read the rendered marks' classes back off a real render of the card.
  *
  *  185-09 added the seal, which means this render must pass `grounded` — a card that is
  *  not grounded paints no seal at all, and a silently-empty class string would make
  *  every seal box collapse to `no size class` and throw rather than pass vacuously
- *  (`sizeOf` refuses to default). The verdict and icon classes are unaffected by it. */
-function renderedMarkClasses(): { icon: string; verdict: string; seal: string } {
-  const { container, unmount } = renderCard({ verdict: "error", grounded: true })
+ *  (`sizeOf` refuses to default). The verdict and icon classes are unaffected by it.
+ *
+ *  188-06 added the run-state ring, which means this render must ALSO supply a reading
+ *  — a card with no reading is the Builder's card and paints no ring at all, and (as
+ *  above) a silently-empty class string would make `sizeOf` throw rather than pass
+ *  vacuously. The reading chosen is the one that paints the most: `running` is the only
+ *  one that also carries the spin class. */
+function renderedMarkClasses(): { icon: string; verdict: string; seal: string; ring: string } {
+  const { container, unmount } = renderCard({
+    verdict: "error",
+    grounded: true,
+    status: "running",
+  })
   // The icon well is the PARENT of the radial-gradient tint layer — the same handle
   // `wellBackground` above already uses, so there is one way to find it in this file.
   const well = container.querySelector('[style*="radial-gradient"]')?.parentElement
   const verdict = container.querySelector('[data-testid="canvas-node-verdict"]')
   const seal = container.querySelector(`[data-testid="${SEAL_TEST_ID}"]`)
+  const ring = container.querySelector(`[data-testid="${RING_TEST_ID}"]`)
   const classes = {
     icon: well?.className ?? "",
     verdict: verdict?.className ?? "",
     seal: seal?.className ?? "",
+    ring: ring?.className ?? "",
   }
   unmount()
   return classes
@@ -763,16 +814,39 @@ const STEP_NUMBER_BOX: MarkBox = { x0: 12, y0: 12, x1: 34, y1: 34 }
  * governance, and the seal's own docblock in `PhaseNodeCard.tsx` says so.
  */
 function markTable(): MarkZone[] {
-  const { icon, verdict, seal } = renderedMarkClasses()
+  const { icon, verdict, seal, ring } = renderedMarkClasses()
   const w = CANVAS_LAYOUT.NODE_WIDTH
+  // Every mark on this card is placed at an absolute `top-[Npx]`, so the container
+  // HEIGHT is not read by any of these boxes — which is why run mode's raised floor
+  // (120) and the Builder's (104) produce the same table. Pinned as an assertion in the
+  // 188-06 block below rather than assumed here.
   const h = CANVAS_LAYOUT.NODE_MIN_HEIGHT
   return [
     { name: "icon well", rendered: true, box: boxOf(icon, w, h) },
     { name: "verdict", rendered: true, box: boxOf(verdict, w, h) },
     { name: "governance seal", rendered: true, box: boxOf(seal, w, h) },
+    // 188-06 adds the row the block above predicted, from the classes of the element the
+    // card actually renders — never an invented box.
+    { name: "run state", rendered: true, box: boxOf(ring, w, h) },
     { name: "stepNumber", rendered: false, box: STEP_NUMBER_BOX },
   ]
 }
+
+/**
+ * THE ONE PAIR IN THE TABLE THAT IS CONCENTRIC BY DESIGN, and therefore the one pair a
+ * bounding-box zone check is the wrong instrument for.
+ *
+ * The status ring is an ANNULUS and the 3D mark well sits inside its hole. Their
+ * axis-aligned boxes necessarily intersect — the smaller box is wholly inside the larger
+ * one — and that intersection is not a collision in any sense a reader would recognise:
+ * the two never touch, because the ring's STROKE is a circle 3px clear of the well on
+ * every side. What must be checked here is RADIAL clearance, which a rectangle cannot
+ * express, and it is checked directly in the 188-06 block below.
+ *
+ * Recorded as a named exception with its own assertions rather than by loosening the
+ * zero-overlap check, so nothing else can quietly slip through the same door.
+ */
+const CONCENTRIC_BY_DESIGN = "icon well × run state"
 
 describe("PhaseNodeCard — 137-B mark occupancy (SPEC criterion 23)", () => {
   it("the verdict mark is on the card's LEFT — top-right is CLAIMED for governance", () => {
@@ -808,13 +882,25 @@ describe("PhaseNodeCard — 137-B mark occupancy (SPEC criterion 23)", () => {
     // check would trivially succeed over an empty or one-element set. 185-09 widened
     // the expected set from two names to three — the seal joined the rendered marks,
     // so a seal that silently stops painting fails HERE rather than in a screenshot.
-    expect(rendered.map((z) => z.name)).toEqual(["icon well", "verdict", "governance seal"])
+    // 188-06 widened it to four for exactly the same reason: the status ring joined
+    // them, and a ring that silently stops painting must fail here too.
+    expect(rendered.map((z) => z.name)).toEqual([
+      "icon well",
+      "verdict",
+      "governance seal",
+      "run state",
+    ])
 
     const collisions: string[] = []
     for (let i = 0; i < rendered.length; i += 1) {
       for (let j = i + 1; j < rendered.length; j += 1) {
+        const pair = `${rendered[i].name} × ${rendered[j].name}`
+        // The ring and the well are CONCENTRIC — see `CONCENTRIC_BY_DESIGN`. Their
+        // rectangles nest by construction and their real clearance is radial, asserted
+        // in the 188-06 block. Named-and-skipped, never loosened.
+        if (pair === CONCENTRIC_BY_DESIGN) continue
         const area = overlapArea(rendered[i].box, rendered[j].box)
-        if (area > 0) collisions.push(`${rendered[i].name} × ${rendered[j].name} = ${area}px²`)
+        if (area > 0) collisions.push(`${pair} = ${area}px²`)
       }
     }
     expect(collisions).toEqual([])
@@ -1024,17 +1110,22 @@ describe("PhaseNodeCard — the seal cannot READ run state (props fence, criteri
     expect(phaseNodeCardSource).toMatch(statusIdentifier())
   })
 
-  it("renders a BYTE-IDENTICAL seal at all four run states (the strongest jsdom form)", () => {
+  it("renders a BYTE-IDENTICAL seal at ALL SEVEN readings (the strongest jsdom form)", () => {
     // The visual claim is UAT (G-4 #2). This is the part a machine can hold: the seal's
     // whole rendered element, whatever the run says.
     //
-    // 188-06 RE-SPELLED THE FOUR STATES, and the reason is mechanical rather than
-    // editorial. In 184 `status` was an open string, so criterion 16's four names could
-    // be written as prose. 188-06 narrows the slot to the seven-member reading union, so
-    // `"idle"` and `"needs-you"` stopped typechecking — they were never readings, only
-    // labels for them. These are the SAME four states under the names the union gives
-    // them. (188's own guard widens this loop from four to seven; that is a separate
-    // change with its own reason, made where D-188-04 asks for it.)
+    // 188-06 CHANGED THIS LOOP TWICE, and the two changes are different in kind.
+    //
+    //  1. RE-SPELLED, mechanically. In 184 `status` was an open string, so criterion
+    //     16's four names could be written as prose. 188-06 narrows the slot to the
+    //     seven-member reading union, and `"idle"` / `"needs-you"` stopped typechecking
+    //     — they were never readings, only labels for them.
+    //  2. WIDENED FROM FOUR TO SEVEN, deliberately (D-188-04). The SPEC's "all six
+    //     readings" means every normal reading, and `unknown` must be covered too,
+    //     because `unknown` is exactly the reading a fail-open hides behind: a seal that
+    //     dimmed only for the state nobody thinks to render would pass a four-value
+    //     loop forever. The list is DERIVED from the compiler-forced table at module
+    //     scope, so an eighth reading cannot be added without this loop growing with it.
     //
     // IT COMPARES `outerHTML`, AND THAT IS A CORRECTION THIS PLAN'S OWN FALSIFICATION
     // FORCED. Written first as `{ className, textContent }`, it stayed GREEN while a
@@ -1042,21 +1133,33 @@ describe("PhaseNodeCard — the seal cannot READ run state (props fence, criteri
     // on run state is invisible to both of those readings. The props fence caught it and
     // this did not, so the two guards were not the complementary pair they were meant to
     // be. `outerHTML` closes it: every attribute, class and character is in the compare.
-    const readings = (["not-started", "running", "waiting-for-you", "failed"] as const).map((runState) => {
+    const seals = ALL_READINGS.map((runState) => {
       const { container, unmount } = renderCard({ grounded: true, status: runState })
       const seal = container.querySelector(`[data-testid="${SEAL_TEST_ID}"]`)
-      expect(seal).not.toBeNull()
-      const reading = seal!.outerHTML
+      expect(seal, `no seal at reading ${runState}`).not.toBeNull()
+      const rendered = seal!.outerHTML
       unmount()
-      return reading
+      return rendered
     })
 
-    expect(readings).toHaveLength(4)
-    for (const reading of readings) expect(reading).toBe(readings[0])
+    expect(seals).toHaveLength(7)
+    expect(ALL_READINGS).toContain("unknown")
+    for (const seal of seals) expect(seal).toBe(seals[0])
     // Non-vacuity: the value being compared is a real seal, not an empty string.
-    expect(readings[0].length).toBeGreaterThan(0)
-    expect(readings[0]).toContain(GOVERNANCE_SEAL_LABEL)
-    expect(readings[0]).toContain(SEAL_TEST_ID)
+    expect(seals[0].length).toBeGreaterThan(0)
+    expect(seals[0]).toContain(GOVERNANCE_SEAL_LABEL)
+    expect(seals[0]).toContain(SEAL_TEST_ID)
+
+    // …and the CARDS around those identical seals are NOT identical, which is what makes
+    // the sameness above a measurement rather than a tautology. Without this, a card that
+    // ignored the reading entirely would satisfy every assertion in this test.
+    const cards = ALL_READINGS.map((runState) => {
+      const { container, unmount } = renderCard({ grounded: true, status: runState })
+      const html = container.innerHTML
+      unmount()
+      return html
+    })
+    expect(new Set(cards).size).toBe(7)
   })
 })
 
@@ -1199,13 +1302,15 @@ describe("PhaseNodeCard — the seal's zone (criterion 23, extended to four mark
     expect(seal!.x1).toBeLessThan(cardRightBorder)
   })
 
-  it("all FOUR marks are pairwise clear — the only nonzero pair is the recorded residual", () => {
+  it("all FIVE marks are pairwise clear — the only nonzero pairs are both recorded", () => {
     const table = markTable()
-    // Non-vacuity first: four zones, in the order criterion 23 names them.
+    // Non-vacuity first: five zones, in the order criterion 23 names them (188-06 added
+    // the run-state ring the block above predicted).
     expect(table.map((z) => z.name)).toEqual([
       "icon well",
       "verdict",
       "governance seal",
+      "run state",
       "stepNumber",
     ])
 
@@ -1217,11 +1322,22 @@ describe("PhaseNodeCard — the seal's zone (criterion 23, extended to four mark
       }
     }
 
-    // The verdict × stepNumber graze is 185-01's WRITTEN residual against a slot that
-    // paints nothing (D-183-07 keeps `phase_index` off the face), pinned above with its
-    // remedy. Every other pair — and therefore every pair of marks a person can actually
-    // SEE — is zero, which is what criterion 23 asks for.
-    expect(collisions).toEqual(["verdict × stepNumber = 32px²"])
+    // TWO nonzero pairs, and neither is a collision a person could see:
+    //
+    //  • `icon well × run state` = 62 × 62 — the ring is an ANNULUS and the well sits in
+    //    its hole. Their rectangles nest by construction; the real measure is the RADIAL
+    //    clearance, asserted at 3px in the 188-06 block. Listed rather than filtered,
+    //    with its exact area pinned, so the ring moving off-centre changes this number.
+    //  • `verdict × stepNumber` = 2 × 16 — 185-01's WRITTEN residual against a slot that
+    //    paints nothing (D-183-07 keeps the step's index off the face), pinned above
+    //    with its remedy.
+    //
+    // Every other pair — and therefore every pair of marks a person can actually SEE —
+    // is zero, which is what criterion 23 asks for.
+    expect(collisions).toEqual([
+      "icon well × run state = 3844px²",
+      "verdict × stepNumber = 32px²",
+    ])
   })
 
   it("the seal clears the UNRENDERED stepNumber slot too, with room to spare", () => {
@@ -1290,5 +1406,578 @@ describe("PhaseNodeCard — the seal's zone check CAN go red (falsification cont
     for (const zone of markTable()) {
       expect(overlapArea(planted, zone.box)).toBe(0)
     }
+  })
+})
+
+/**
+ * ── 188-06 (RUNVIZ-01 · sketch 153-A / 154-A · D-188-04 / D-188-06 / D-188-07) ───────
+ *          THE STATUS RING, THE RUN LINE, AND THE GREYSCALE ACCEPTANCE CLAUSE
+ *
+ * APPENDED, not woven in: everything above belongs to 184-03 / 184-08 / 185-01 / 185-09
+ * and stays theirs. Exactly THREE shipped assertions were touched by this plan, and each
+ * had to be — the reason is written at the assertion itself rather than here, where a
+ * later reader would not find it:
+ *
+ *   1. the byte-identical proof stopped passing a run reading (this plan renders it),
+ *   2. the seal-identity loop grew four → seven (D-188-04) after its four state NAMES
+ *      were re-spelled as the reading union members they always meant,
+ *   3. the zone check's non-vacuity name lists grew by one, because the ring is a
+ *      fourth rendered mark.
+ *
+ * Nothing was deleted and no expectation was weakened.
+ *
+ * WHAT THIS BLOCK PROVES, AND WHY IT IS THE RIGHT THING TO PROVE. Sketch 153-A won on a
+ * single claim: **the arc SHAPE is the state, and colour only ever reinforces it.** The
+ * UI contract turns that into a BUILD CRITERION rather than a preference — *with colour
+ * switched off, all seven readings must remain distinguishable* — and names the shape
+ * property that is unique to each. So this block asserts THOSE properties, never "they
+ * look different": the signature it compares deliberately EXCLUDES the stroke colour, so
+ * a green run could not pass by relying on it.
+ *
+ * WHAT jsdom CANNOT DO HERE, stated so nothing claims otherwise: it computes no paint,
+ * so an actual greyscale screenshot of the real canvas remains operator UAT. What is
+ * mechanically checkable is stronger than a screenshot of any one state — the seven
+ * readings differ in the ATTRIBUTES that survive colour being removed, and a surface
+ * that cannot express a dependency on colour cannot regress into one.
+ */
+
+/** One reading's ring, read back off a real render. **The stroke colour is deliberately
+ *  NOT in this signature** — that omission is the greyscale clause, expressed as a type. */
+interface RingSignature {
+  hasArc: boolean
+  dasharray: string | null
+  dashoffset: string | null
+  spins: boolean
+  hasChip: boolean
+}
+
+function ringSignature(reading: CanvasReading): RingSignature {
+  const { container, unmount } = renderCard({ status: reading })
+  const ring = container.querySelector(`[data-testid="${RING_TEST_ID}"]`)
+  if (ring === null) throw new Error(`no ring at reading ${reading}`)
+  const arc = container.querySelector(`[data-testid="${ARC_TEST_ID}"]`)
+  const signature: RingSignature = {
+    hasArc: arc !== null,
+    dasharray: arc?.getAttribute("stroke-dasharray") ?? null,
+    dashoffset: arc?.getAttribute("stroke-dashoffset") ?? null,
+    spins: (arc?.getAttribute("class") ?? "").includes("canvas-ring-spin"),
+    hasChip: container.querySelector(`[data-testid="${PAUSE_CHIP_TEST_ID}"]`) !== null,
+  }
+  unmount()
+  return signature
+}
+
+/** The arc's stroke, read separately — used ONLY to prove colour still reinforces, never
+ *  to establish that two readings differ. */
+function arcStroke(reading: CanvasReading): string | null {
+  const { container, unmount } = renderCard({ status: reading })
+  const stroke = container.querySelector(`[data-testid="${ARC_TEST_ID}"]`)?.getAttribute("stroke")
+  unmount()
+  return stroke ?? null
+}
+
+/** Split a `stroke-dasharray` into its numbers. `null` ⇒ no pattern at all. */
+function dashNumbers(dasharray: string | null): number[] {
+  return dasharray === null ? [] : dasharray.trim().split(/\s+/).map(Number)
+}
+
+describe("188-06 — seven readings, seven ring SHAPES (the greyscale acceptance clause)", () => {
+  it("the seven signatures are PAIRWISE DISTINCT with colour excluded from the compare", () => {
+    const signatures = ALL_READINGS.map(ringSignature)
+    expect(signatures).toHaveLength(7)
+    // The compare below reads only shape attributes; `stroke` is not a member of the
+    // signature type at all, so this distinctness cannot be borrowed from colour.
+    expect(new Set(signatures.map((s) => JSON.stringify(s))).size).toBe(7)
+  })
+
+  it("`not-started` is the ONLY reading with no arc — the track, untravelled", () => {
+    const withoutArc = ALL_READINGS.filter((r) => !ringSignature(r).hasArc)
+    expect(withoutArc).toEqual(["not-started"])
+    // …and it still paints a RING (the track), so "no arc" is a reading and not an
+    // absent element. Without this the assertion above is satisfied by a missing ring.
+    const { container } = renderCard({ status: "not-started" })
+    expect(container.querySelector(`[data-testid="${RING_TEST_ID}"]`)).not.toBeNull()
+    expect(container.querySelector(`[data-testid="${ARC_TEST_ID}"]`)).toBeNull()
+  })
+
+  it("`done` is the ONLY closed, unbroken ring — an arc with no dash pattern", () => {
+    const unbroken = ALL_READINGS.filter((r) => {
+      const s = ringSignature(r)
+      return s.hasArc && s.dasharray === null
+    })
+    expect(unbroken).toEqual(["done"])
+    // The distinction that matters most on this whole surface: *Complete* and
+    // *Not started* are the two readings a person must never confuse, and they are the
+    // two extremes of the same channel — a whole ring against none of one.
+    expect(ringSignature("done").hasArc).toBe(true)
+    expect(ringSignature("not-started").hasArc).toBe(false)
+  })
+
+  it("`running` is the ONLY moving arc — and statically, the only SHORT single arc", () => {
+    const moving = ALL_READINGS.filter((r) => ringSignature(r).spins)
+    expect(moving).toEqual(["running"])
+
+    // WITH MOTION SUPPRESSED IT IS STILL UNMISTAKABLE, which is why reduced motion is
+    // safe by construction here rather than by a degraded fallback: `running` covers
+    // ~26% of the ring and the other moving-adjacent reading covers ~74%.
+    const run = dashNumbers(ringSignature("running").dasharray)
+    const wait = dashNumbers(ringSignature("waiting-for-you").dasharray)
+    expect(run).toHaveLength(2)
+    expect(wait).toHaveLength(2)
+    expect(run[0]).toBeLessThan(wait[0])
+    expect(run[0] / (run[0] + run[1])).toBeCloseTo(0.26, 3)
+    expect(wait[0] / (wait[0] + wait[1])).toBeCloseTo(0.74, 3)
+  })
+
+  it("`waiting-for-you` is the ONLY reading that also paints the pause chip", () => {
+    const chipped = ALL_READINGS.filter((r) => ringSignature(r).hasChip)
+    expect(chipped).toEqual(["waiting-for-you"])
+
+    // THE CHIP IS TWO RECTANGLES, NEVER A GLYPH (D-188-06). The phase ships zero
+    // net-new marks, and this is the element that would have been the exception.
+    const { container } = renderCard({ status: "waiting-for-you" })
+    const chip = container.querySelector(`[data-testid="${PAUSE_CHIP_TEST_ID}"]`)!
+    const bars = chip.querySelectorAll("span")
+    expect(bars).toHaveLength(2)
+    for (const bar of Array.from(bars)) {
+      expect(bar.className).toContain("h-[9px]")
+      expect(bar.className).toContain("w-[3px]")
+      expect(bar.textContent).toBe("")
+    }
+    // No character content anywhere in it — a glyph would have shown up here.
+    expect((chip.textContent ?? "").trim()).toBe("")
+    expect(chip.getAttribute("aria-hidden")).toBe("true")
+  })
+
+  it("`failed` is the ONLY ring snapped into TWO arcs", () => {
+    const twoArcs = ALL_READINGS.filter((r) => dashNumbers(ringSignature(r).dasharray).length === 4)
+    expect(twoArcs).toEqual(["failed"])
+    const [d1, g1, d2, g2] = dashNumbers(ringSignature("failed").dasharray)
+    expect(d1).toBe(d2)
+    expect(g1).toBe(g2)
+    expect(d1).toBeGreaterThan(g1) // two long arcs separated by two short gaps
+  })
+
+  it("`skipped` and `unknown` are both fully patterned, at DIFFERENT dash/gap ratios", () => {
+    const skipped = dashNumbers(ringSignature("skipped").dasharray)
+    const unknown = dashNumbers(ringSignature("unknown").dasharray)
+    expect(skipped).toHaveLength(2)
+    expect(unknown).toHaveLength(2)
+
+    // "Fully patterned" means the pattern repeats many times around the ring rather than
+    // describing one arc — both are far shorter than a quarter of the circumference.
+    const circumference = 2 * Math.PI * 34
+    expect(skipped[0] + skipped[1]).toBeLessThan(circumference / 4)
+    expect(unknown[0] + unknown[1]).toBeLessThan(circumference / 4)
+
+    // Coarse dashes against fine dots: `unknown`'s mark is both shorter and sparser.
+    expect(unknown[0]).toBeLessThan(skipped[0])
+    expect(unknown[0] / unknown[1]).toBeLessThan(skipped[0] / skipped[1])
+    // Neither spins, neither carries a chip — the ratio really is the whole difference.
+    expect(ringSignature("skipped").spins).toBe(false)
+    expect(ringSignature("unknown").spins).toBe(false)
+  })
+
+  it("colour REINFORCES: the arcs also differ in stroke, which nothing above relied on", () => {
+    // Stated as its own assertion precisely so the separation is visible. If this test
+    // were deleted the greyscale block above would be unaffected — which is the property
+    // sketch 153-A's acceptance test is really about.
+    expect(arcStroke("not-started")).toBeNull()
+    const strokes = ALL_READINGS.filter((r) => r !== "not-started").map(arcStroke)
+    expect(strokes.every((s) => typeof s === "string" && s.length > 0)).toBe(true)
+    // `skipped` and `unknown` deliberately SHARE the muted token — their separation is
+    // the dash ratio asserted above, and spending an alarm colour on "we can't tell"
+    // would make it look like a warning the run has not actually raised.
+    expect(arcStroke("skipped")).toBe(arcStroke("unknown"))
+    expect(new Set(strokes).size).toBe(5)
+  })
+
+  it("EVERY reading also carries the word as REAL TEXT — three carriers, colour fourth", () => {
+    for (const reading of ALL_READINGS) {
+      const { container, unmount } = renderCard({ status: reading })
+      const line = container.querySelector(`[data-testid="${RUN_LINE_TEST_ID}"]`)
+      expect(line, `no run line at reading ${reading}`).not.toBeNull()
+      expect(line!.textContent).toContain(RUN_READING_WORD[reading])
+      expect(RUN_READING_WORD[reading].trim().length).toBeGreaterThan(0)
+      unmount()
+    }
+    // Seven readings, seven distinct words — so the text channel separates them on its
+    // own, exactly as the shape channel does.
+    expect(new Set(Object.values(RUN_READING_WORD)).size).toBe(7)
+  })
+})
+
+/**
+ * ── THE GEOMETRY FALSIFICATION ──────────────────────────────────────────────────────
+ *
+ * The decimals below are the ONLY place in the repository they are written. The card
+ * and `runVocabulary` both COMPUTE them from `offset = (D + G/2) − p` at `r = 34`, and a
+ * fence at the foot of this block asserts neither module contains them. That is what
+ * makes these numbers a falsification of the formula rather than a copy of it: if the
+ * formula were pasted wrong, or replaced by a rotation, or the radius silently changed,
+ * these go red.
+ *
+ * (They ARE spelled literally here, and must be. A needle assembled from parts would
+ * test that the source agrees with itself; the haystack for every fence below is the
+ * OTHER file, never this one.)
+ */
+const EXPECTED_RING = {
+  /** 0.26C 0.74C — one short arc; placement is irrelevant because it spins. */
+  running: { dasharray: "55.543 158.085", dashoffset: "0" },
+  /** D G with G = 0.26C, and its gap centred at 12 o'clock ⇒ p = 0.75C. */
+  "waiting-for-you": { dasharray: "158.085 55.543", dashoffset: "25.635" },
+  /** d1 g1 d1 g1 with d1 = 0.42C, g1 = 0.08C, first gap centred at p = 0.375C. */
+  failed: { dasharray: "89.724 17.090 89.724 17.090", dashoffset: "18.158" },
+} as const
+
+describe("188-06 — the ring's geometry is COMPUTED, and these decimals falsify it", () => {
+  it("the circle really is r = 34 on a 72×72 viewBox ⇒ C = 213.628", () => {
+    const { container } = renderCard({ status: "running" })
+    const svg = container.querySelector(`[data-testid="${RING_TEST_ID}"] svg`)!
+    expect(svg.getAttribute("viewBox")).toBe("0 0 72 72")
+    const circles = Array.from(svg.querySelectorAll("circle"))
+    expect(circles).toHaveLength(2) // the track, then the arc
+    for (const circle of circles) {
+      expect(circle.getAttribute("r")).toBe("34")
+      expect(circle.getAttribute("cx")).toBe("36")
+      expect(circle.getAttribute("cy")).toBe("36")
+      expect(circle.getAttribute("fill")).toBe("none")
+    }
+    expect((2 * Math.PI * 34).toFixed(3)).toBe("213.628")
+  })
+
+  for (const [reading, expected] of Object.entries(EXPECTED_RING)) {
+    it(`\`${reading}\` emits the dasharray/dashoffset the formula predicts`, () => {
+      const signature = ringSignature(reading as CanvasReading)
+      expect(signature.dasharray).toBe(expected.dasharray)
+      expect(signature.dashoffset).toBe(expected.dashoffset)
+    })
+  }
+
+  it("each pattern SUMS to the circumference — the arithmetic closes on the real circle", () => {
+    // The strongest single check on the formula: a dash pattern that did not sum to C
+    // would leave a seam wherever the pattern wrapped, whatever the individual numbers.
+    const circumference = 2 * Math.PI * 34
+    for (const reading of ["running", "waiting-for-you"] as const) {
+      const [d, g] = dashNumbers(ringSignature(reading).dasharray)
+      expect(d + g).toBeCloseTo(circumference, 2)
+    }
+    const [d1, g1, d2, g2] = dashNumbers(ringSignature("failed").dasharray)
+    expect(d1 + g1 + d2 + g2).toBeCloseTo(circumference, 2)
+  })
+
+  it("the waiting gap really is centred at 12 o'clock, computed not eyeballed", () => {
+    // An SVG circle starts at 3 o'clock and runs clockwise, so 12 o'clock is 0.75C.
+    // `offset = (D + G/2) − p` is re-derived here from the numbers the DOM reported,
+    // independently of the module that produced them.
+    const [d, g] = dashNumbers(ringSignature("waiting-for-you").dasharray)
+    const offset = Number(ringSignature("waiting-for-you").dashoffset)
+    const twelveOClock = 0.75 * (2 * Math.PI * 34)
+    expect(d + g / 2 - offset).toBeCloseTo(twelveOClock, 2)
+  })
+
+  it("the decimals appear in NEITHER module — they are results, not literals", () => {
+    for (const source of [phaseNodeCardSource, runVocabularySource]) {
+      for (const expected of Object.values(EXPECTED_RING)) {
+        for (const number of expected.dasharray.split(" ")) {
+          expect(source).not.toContain(number)
+        }
+        if (expected.dashoffset !== "0") expect(source).not.toContain(expected.dashoffset)
+      }
+    }
+    // POSITIVE CONTROLS. Without them this passes just as happily on an empty string, a
+    // typo'd needle, or a `?raw` import that silently resolved to nothing.
+    expect(runVocabularySource.length).toBeGreaterThan(1000)
+    expect(phaseNodeCardSource.length).toBeGreaterThan(1000)
+    expect(`const d = "${EXPECTED_RING.failed.dasharray}"`).toContain("89.724")
+    // …and the formula's own operands ARE in the vocabulary module, so "not found"
+    // cannot mean "the ring is built somewhere else entirely".
+    expect(runVocabularySource).toContain("0.26")
+    expect(runVocabularySource).toContain("0.375")
+  })
+})
+
+/**
+ * ── THE BUILD RULES THE RING DEPENDS ON ─────────────────────────────────────────────
+ *
+ * Two of them, and both are the kind that fail silently and visually rather than loudly.
+ */
+
+/** Strip block and line comments, so a fence can ask about CODE rather than about prose.
+ *
+ *  This exists because of a measured fact rather than a preference: the card's own
+ *  docblock has to be free to NAME the clipping utility it forbids — that comment is the
+ *  rule — while the class lists must never contain it. A bare-token grep can only be
+ *  satisfied by deleting the explanation, which is the trap this project has hit half a
+ *  dozen times. Scoped to this file's needs: the card contains no regex literal and no
+ *  string containing `//`, so the two naive patterns below are exact for it. */
+function stripComments(source: string): string {
+  return source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "")
+}
+
+/** Assembled, never spelled — see `stripComments`. */
+const CLIP_UTILITY = ["overflow", "-hidden"].join("")
+const SVG_TRANSFORM_ATTR = ["transform", "="].join("")
+const CSS_ROTATE = ["rotate", "("].join("")
+
+describe("188-06 — no clipping anywhere in the node subtree (the mark overhangs)", () => {
+  it("the stripper really strips, and the needle really matches (positive controls)", () => {
+    expect(stripComments(phaseNodeCardSource).length).toBeLessThan(phaseNodeCardSource.length)
+    expect(stripComments(`const c = "flex ${CLIP_UTILITY}"`)).toContain(CLIP_UTILITY)
+    expect(stripComments(`/* ${CLIP_UTILITY} */`)).not.toContain(CLIP_UTILITY)
+  })
+
+  it("neither the card nor the adapter CLIPS — the mark overhangs 26px and the ring 31px", () => {
+    expect(stripComments(phaseNodeCardSource)).not.toContain(CLIP_UTILITY)
+    expect(stripComments(phaseNodeSource)).not.toContain(CLIP_UTILITY)
+  })
+
+  it("the card's PROSE names it exactly once — the rule, and only the rule", () => {
+    // A measured correction the plan's own acceptance grep got wrong: the shipped card
+    // already spelled the utility once at HEAD, inside the comment that FORBIDS it. So
+    // "zero occurrences in the file" was false before this plan started, and 188-06 kept
+    // the count at one rather than adding a second. Pinning the number is what stops the
+    // rule being deleted as easily as it stops the utility being added.
+    const occurrences = phaseNodeCardSource.split(CLIP_UTILITY).length - 1
+    expect(occurrences).toBe(1)
+  })
+
+  it("the ring's svg opts INTO overflow explicitly, as belt-and-braces", () => {
+    const { container } = renderCard({ status: "running" })
+    const svg = container.querySelector(`[data-testid="${RING_TEST_ID}"] svg`)!
+    expect(svg.getAttribute("class")).toContain("overflow-visible")
+  })
+})
+
+describe("188-06 — a gap is placed with stroke-dashoffset, NEVER with a rotation", () => {
+  it("the card sets no SVG transform attribute and no CSS rotation (D-188-07)", () => {
+    // Setting BOTH an SVG transform attribute and the CSS transform-box/origin pair
+    // composes them and pivots the arc about a DOUBLED offset — the bug that shipped in
+    // the sketch's own first two drafts and put the waiting gap in the wrong quadrant.
+    // The only transform in the whole subtree is the spin utility's, which lives in the
+    // stylesheet and is applied by class name.
+    expect(phaseNodeCardSource).not.toContain(SVG_TRANSFORM_ATTR)
+    expect(phaseNodeCardSource).not.toContain(CSS_ROTATE)
+    expect(runVocabularySource).not.toContain(CSS_ROTATE)
+  })
+
+  it("the POSITIVE CONTROLS: both needles match the forms they forbid", () => {
+    expect(`<circle ${SVG_TRANSFORM_ATTR}"rotate(90 36 36)" />`).toContain(SVG_TRANSFORM_ATTR)
+    expect(`transform: ${CSS_ROTATE}360deg)`).toContain(CSS_ROTATE)
+  })
+
+  it("the spin is a CLASS NAME on the arc, and only on the running one", () => {
+    const spinning = ALL_READINGS.filter((r) => ringSignature(r).spins)
+    expect(spinning).toEqual(["running"])
+    expect(phaseNodeCardSource).toContain("canvas-ring-spin")
+  })
+})
+
+/**
+ * ── THE CARD BODY IS ONE BUDGET (D-188-17 · UI-SPEC § Card Body Budget) ─────────────
+ *
+ * 188 spends the run line and NOTHING else: zero badge slots, no step number, no
+ * technical line. Each of those is asserted as an absence WITH the render that would
+ * have shown it, so none of them is vacuous.
+ */
+describe("188-06 — the card body budget, and the three slots 188 does NOT spend", () => {
+  it("spends ZERO badge slots — the badge row is byte-identical at every reading", () => {
+    const rows = ALL_READINGS.map((reading) => {
+      const { container, unmount } = renderCard({ badges: [waitsBadge], status: reading })
+      expect(container.querySelectorAll("[data-tone]")).toHaveLength(1)
+      const row = container.querySelector("[data-tone]")!.closest("div")!.outerHTML
+      unmount()
+      return row
+    })
+    for (const row of rows) expect(row).toBe(rows[0])
+    // Non-vacuity: it is a real badge row, and slot 1 is still empty and still reserved.
+    expect(rows[0]).toContain("Waits for you")
+    expect(rows[0].length).toBeGreaterThan(0)
+  })
+
+  it("DECLINES technicalLine — run mode alone never produces it", () => {
+    for (const reading of ALL_READINGS) {
+      const { container, unmount } = renderCard({ status: reading })
+      expect(container.querySelector('[data-testid="canvas-node-technical-line"]')).toBeNull()
+      unmount()
+    }
+    // POSITIVE CONTROL: the slot is still WIRED, so "declined" means the 188 adapter
+    // does not pass it — not that the card lost the ability to render it.
+    const { container } = renderCard({ status: "running", technicalLine: "llm_single · x" })
+    expect(container.querySelector('[data-testid="canvas-node-technical-line"]')).not.toBeNull()
+  })
+
+  it("leaves stepNumber unrendered even in run mode (D-183-07)", () => {
+    const { container } = renderCard({ status: "running", stepNumber: 3, title: "Draft it" })
+    expect(container.textContent).not.toContain("3")
+  })
+
+  it("keeps ONE TAB STOP PER NODE at every reading — the run line is a <p>", () => {
+    for (const reading of ALL_READINGS) {
+      const { container, unmount } = renderCard({
+        status: reading,
+        badges: [waitsBadge],
+        grounded: true,
+        verdict: "error",
+        subtitle: "Writes one paragraph",
+      })
+      expect(container.querySelectorAll("button, a, [tabindex]")).toHaveLength(0)
+      const line = container.querySelector(`[data-testid="${RUN_LINE_TEST_ID}"]`)!
+      expect(line.tagName).toBe("P")
+      expect(line.getAttribute("role")).toBeNull()
+      unmount()
+    }
+  })
+
+  it("the ring announces NOTHING — the visible line and the node name already do", () => {
+    const { container } = renderCard({ status: "failed" })
+    const ring = container.querySelector(`[data-testid="${RING_TEST_ID}"]`)!
+    expect(ring.getAttribute("aria-hidden")).toBe("true")
+    expect(ring.getAttribute("role")).toBeNull()
+    expect(ring.className).toContain("pointer-events-none")
+    expect(container.querySelectorAll(".sr-only")).toHaveLength(0)
+  })
+})
+
+describe("188-06 — the run line renders at EVERY reading, so nothing reflows mid-run", () => {
+  it("renders for `not-started` exactly as it does for the terminal readings", () => {
+    for (const reading of ALL_READINGS) {
+      const { container, unmount } = renderCard({ status: reading })
+      const line = container.querySelector(`[data-testid="${RUN_LINE_TEST_ID}"]`)
+      expect(line, `no run line at reading ${reading}`).not.toBeNull()
+      expect((line!.textContent ?? "").trim().length).toBeGreaterThan(0)
+      unmount()
+    }
+  })
+
+  it("renders NOTHING at all when no reading is supplied — the Builder's card", () => {
+    // The other half of the sentence above. Without it, "renders at every reading" is
+    // consistent with a line that renders unconditionally.
+    const { container } = renderCard()
+    expect(container.querySelector(`[data-testid="${RUN_LINE_TEST_ID}"]`)).toBeNull()
+    expect(container.querySelector(`[data-testid="${RING_TEST_ID}"]`)).toBeNull()
+  })
+
+  it("the card's min-height is CONSTANT across all seven readings (104 → 120 once)", () => {
+    const heights = ALL_READINGS.map((reading) => {
+      const { container, unmount } = renderCard({ status: reading })
+      const height = container.querySelector(`[data-testid="canvas-node-summarize"]`)!
+        .getAttribute("style")
+      unmount()
+      return height ?? ""
+    })
+    for (const height of heights) expect(height).toBe(heights[0])
+    expect(heights[0]).toContain("min-height: 120px")
+
+    // The floor really did move, and it moved for RUN MODE rather than for a reading —
+    // which is the whole reason a card cannot change height as its step progresses.
+    const { container } = renderCard()
+    expect(container.querySelector(`[data-testid="canvas-node-summarize"]`)!.getAttribute("style"))
+      .toContain(`min-height: ${CANVAS_LAYOUT.NODE_MIN_HEIGHT}px`)
+    expect(CANVAS_LAYOUT.NODE_MIN_HEIGHT).toBe(104)
+  })
+
+  it("says exactly what the vocabulary says — one function, two consumers", () => {
+    // The visible line and the node's accessible-name suffix are built by the SAME
+    // function, so a screen-reader user and a sighted user cannot be told two things.
+    for (const reading of ALL_READINGS) {
+      const { container, unmount } = renderCard({ status: reading })
+      const line = container.querySelector(`[data-testid="${RUN_LINE_TEST_ID}"]`)!
+      expect(line.textContent).toBe(runReadingLabel(reading))
+      unmount()
+    }
+  })
+
+  it("the FAILED clause is a closed set of three, selected by the typed enum only", () => {
+    const clauseFor = (emitFailure: React.ComponentProps<typeof PhaseNodeCard>["emitFailure"]) => {
+      const { container, unmount } = renderCard({ status: "failed", emitFailure })
+      const text = container.querySelector(`[data-testid="${RUN_LINE_TEST_ID}"]`)!.textContent ?? ""
+      unmount()
+      return text
+    }
+
+    const document1 = clauseFor("model_failed_to_emit")
+    expect(clauseFor("render_failed")).toBe(document1)
+    expect(clauseFor("no_template_bound")).toBe(document1)
+
+    const checks = clauseFor("citation_gate_rejected")
+    expect(clauseFor("integrity_failed")).toBe(checks)
+
+    const unfinished = clauseFor(null)
+    expect(clauseFor(undefined)).toBe(unfinished)
+
+    // Exactly THREE distinct sentences over all five enum members plus the null case,
+    // and every one of them names the word `Failed` first.
+    expect(new Set([document1, checks, unfinished]).size).toBe(3)
+    for (const clause of [document1, checks, unfinished]) {
+      expect(clause.startsWith(RUN_READING_WORD.failed)).toBe(true)
+    }
+  })
+
+  it("Req 5: the run-time waiting words are NOT the design-time badge's", () => {
+    // Not equal, and not a tense variant: different verb, different object. Asserted
+    // against BOTH real strings — the badge label the canvas already ships, and the
+    // reading word this phase adds — so neither can be edited into the other silently.
+    const badge = waitsBadge.label
+    const runtime = RUN_READING_WORD["waiting-for-you"]
+    expect(runtime).not.toBe(badge)
+    expect(runtime.toLowerCase()).not.toContain(badge.toLowerCase())
+    expect(badge.toLowerCase()).not.toContain(runtime.toLowerCase())
+    expect(runtime.toLowerCase()).toContain("paused")
+    expect(badge.toLowerCase()).toContain("waits")
+
+    // BOTH APPEAR ON ONE CARD, and that is the case Req 5 exists for: a waiting
+    // human-input step draws the badge (a property of the step) and the ring plus the
+    // run line (a state of the run). They must read as two facts, not one said twice.
+    const { container } = renderCard({ badges: [waitsBadge], status: "waiting-for-you" })
+    expect(screen.getByTestId("canvas-waits-for-you").textContent).toBe(badge)
+    expect(container.querySelector(`[data-testid="${RUN_LINE_TEST_ID}"]`)!.textContent).toContain(
+      runtime,
+    )
+    // Two channels: the badge is in the body's badge row, the ring is outside the card.
+    expect(container.querySelector(`[data-testid="${PAUSE_CHIP_TEST_ID}"]`)).not.toBeNull()
+  })
+})
+
+describe("188-06 — the ring and the icon well are CONCENTRIC, not colliding", () => {
+  it("the ring's box nests around the well's, which is why the zone check names the pair", () => {
+    const table = markTable()
+    const ring = table.find((z) => z.name === "run state")!
+    const well = table.find((z) => z.name === "icon well")!
+    expect(ring.box).toEqual({ x0: 94, y0: -31, x1: 166, y1: 41 })
+    expect(well.box).toEqual({ x0: 99, y0: -26, x1: 161, y1: 36 })
+
+    // Nested, and concentric: the same 5px inset on all four sides ⇒ (72 − 62) / 2.
+    expect(well.box.x0 - ring.box.x0).toBe(5)
+    expect(ring.box.x1 - well.box.x1).toBe(5)
+    expect(well.box.y0 - ring.box.y0).toBe(5)
+    expect(ring.box.y1 - well.box.y1).toBe(5)
+    // The rectangle intersection the zone check reports is the whole well — which is
+    // what a bounding box says about an annulus, and why the real check is radial.
+    expect(overlapArea(ring.box, well.box)).toBe(62 * 62)
+  })
+
+  it("the STROKE clears the well by 3px on every side — the check a rectangle can't make", () => {
+    const { container } = renderCard({ status: "running" })
+    const radius = Number(
+      container.querySelector(`[data-testid="${RING_TEST_ID}"] svg circle`)!.getAttribute("r"),
+    )
+    const { icon } = renderedMarkClasses()
+    const wellDiameter = sizeOf(icon, "w")
+    expect(wellDiameter).toBe(62)
+    // d = 68 on a 72px box ⇒ 3px of air between the arc and the 3D mark's tint disc.
+    expect((radius * 2 - wellDiameter) / 2).toBe(3)
+  })
+
+  it("the ring clears the seal, the verdict and the step-number slot outright", () => {
+    const table = markTable()
+    const ring = table.find((z) => z.name === "run state")!
+    for (const name of ["governance seal", "verdict", "stepNumber"]) {
+      const other = table.find((z) => z.name === name)!
+      expect(overlapArea(ring.box, other.box), `${name} overlaps the ring`).toBe(0)
+    }
+    // …and it does NOT take the corner governance claims. Top-right is spoken for.
+    const seal = table.find((z) => z.name === "governance seal")!
+    expect(ring.box.x1).toBeLessThan(seal.box.x0)
   })
 })

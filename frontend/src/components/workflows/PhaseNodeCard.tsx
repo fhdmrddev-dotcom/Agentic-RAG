@@ -19,7 +19,10 @@
  * `verdict`, `technicalLine` and `stepNumber` are the declared slots those phases
  * fill. In 184 the adapter passes only `badges`; every other optional slot renders
  * NOTHING when absent, which is what keeps this extraction behaviour-preserving
- * (D-184-08) while still adding the seam.
+ * (D-184-08) while still adding the seam. Three of the five are now filled — `verdict`
+ * by 184-08, `grounded` by 185-09, `status` by 188-06 — and every one of them cost a
+ * change to this component's body and to nobody else's contract, which is the seam
+ * doing exactly the job it was cut for.
  *
  * WHAT 185 FILLED, stated literally so this paragraph does not drift either: plan
  * 185-09 added ONE slot, `grounded`, and renders it as the corner seal at top-right
@@ -39,8 +42,10 @@
  *
  * WHAT 184-08 CHANGED, stated literally so this docblock does not drift: the `verdict`
  * slot is now RENDERED — a corner mark on the card's left edge (it landed on the right
- * in 184-08 and was moved by 185-01; see the mark's own docblock) — while `status` and
- * `stepNumber` are still declared and still render nothing. The seam worked exactly as
+ * in 184-08 and was moved by 185-01; see the mark's own docblock). (This sentence used
+ * to end "…while `status` and `stepNumber` are still declared and still render nothing",
+ * which 188-06 made false for the first of the two; `stepNumber` alone still holds.)
+ * The seam worked exactly as
  * D-184-06 intended: filling it was a change to this component's body and to nobody
  * else's contract. The card is still the wrong place to ask what a verdict MEANS: the
  * value arrives already reduced to one of three states by `verdictModel.markFor`, which
