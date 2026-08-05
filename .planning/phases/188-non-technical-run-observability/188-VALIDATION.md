@@ -31,7 +31,15 @@ created: 2026-08-05
 |---|---|
 | Frontend count gate | **2196 tests / 0 failing / 946 pinned** — green |
 | `tsc -p tsconfig.app.json` | **33** pre-existing errors, **0** in `components/workflows` |
-| Backend full suite | **211 failed / 3296 passed** (deterministic across two runs). ⚠ Session memory's *"~62-red"* is **REFUTED** — do not re-inherit it. |
+| Backend full suite | **211 failed / 3296 passed** (`pytest tests/ -q -p no:randomly`, deterministic across two runs) |
+
+> ⚠ **Scope correction (orchestrator, 2026-08-05).** `188-RESEARCH.md` states that session memory's
+> *"~62-red backend suite"* is **REFUTED** by the 211 figure. That framing is a **scope confusion, not
+> a refutation**: the 62-red measurement was `pytest tests/unit -q` (62 failed / 1700 passed, Phase 187
+> round 5); the 211 figure is `pytest tests/ -q -p no:randomly` over the **whole** `tests/` tree. A
+> subset being 62-red and its superset being 211-red are consistent. **Use 211 as the full-suite
+> non-attribution baseline** (that part is correct and is what `188-01` records) — but do not conclude
+> the `tests/unit` async-mock rot was imagined, and do not cite "REFUTED" in any summary.
 | Backend canvas/gate suites | `test_revert_byte_identical.py` + `test_182_canvas_gate.py` = **12 passed** |
 | ⚠ `test_thread_workflow_endpoint.py` | **1 of 7 RED at HEAD** — this is the suite fencing the endpoint the run surface reads. Record it; do not attribute it to this phase. |
 | Unpinned but running | `PhaseNode.test.tsx` (13) · `PhaseNodeCard.test.tsx` (68) — they RUN but are **not pinned**; this phase should pin them. |

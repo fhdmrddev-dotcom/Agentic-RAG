@@ -1234,8 +1234,15 @@ viewed thread**, or the file list on the run surface will read "No files yet" un
 
 ### 10. Backend test-suite reality — re-measured
 
-**Answer: 211 failed / 3296 passed, deterministic across two runs. The memory figure of "~62-red" is
-REFUTED.** `[VERIFIED: executed twice at db086240, `pytest tests/ -q -p no:randomly`]`
+**Answer: 211 failed / 3296 passed, deterministic across two runs.** `[VERIFIED: executed twice at
+db086240, `pytest tests/ -q -p no:randomly`]`
+
+> ⚠ **Corrected by the orchestrator, 2026-08-05.** This section originally concluded *"the memory figure
+> of ~62-red is REFUTED"*. That is wrong — it compares **two different scopes**. The 62-red figure was
+> `pytest tests/unit -q` (62 failed / 1700 passed, measured at Phase 187 round 5); the 211 figure below
+> is the whole `tests/` tree. A subset at 62-red and its superset at 211-red are **consistent**, so
+> nothing is refuted. **Use 211 as the full-suite non-attribution baseline** — that part stands — but do
+> not conclude the `tests/unit` async-mock rot was imagined, and do not repeat "REFUTED" downstream.
 
 ```
 3541 tests collected in 5.11s          (0 collection errors)
@@ -1428,7 +1435,7 @@ currently produces a *wrong* reading rather than a *missing* one — and both ar
 
 ### Tertiary (LOW confidence — flagged, not relied on)
 
-- Session memory's *"backend unit suite is ~62-red"* — **REFUTED by measurement (211)**. Recorded so the stale figure is not re-inherited.
+- Session memory's *"backend unit suite is ~62-red"* — **NOT refuted; a different scope.** That figure was `pytest tests/unit -q` (62 failed / 1700 passed, Phase 187 round 5); the 211 figure here is the whole `tests/` tree. A subset at 62-red and its superset at 211-red are consistent. Corrected by the orchestrator 2026-08-05 — the original "REFUTED" wording in this document is wrong.
 - Session memory's *"frontend vitest rot ~14-17"* — not re-measured this session (A4). The count gate's blast radius **was** measured and is 0-failing.
 - `graphify query` — **unavailable this session**: `graphify query "…"` crashes with `UnicodeEncodeError: 'charmap' codec can't encode character '→'` on this Windows console. `graphify-out/graph.json` exists; the CLI read path is broken under cp1252. Recorded as an environment note; no research conclusion depends on it.
 
