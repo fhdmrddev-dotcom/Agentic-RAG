@@ -2,16 +2,15 @@
 gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio
-status: ready_to_plan
-last_updated: 2026-08-04T15:03:08.302Z
-last_activity: 2026-08-04 -- Phase 187 COMPLETE (29/29 plans, verification passed 13/14). Round-5 verification opened 2 gaps; BOTH were closed by direct fast-fix rather than a gap-closure round 6, on the operator question of why a 15-plan phase had become 29 across five rounds. Measured answer: both gaps lived in code round 5 authored that same day (DescribeKbPicker.tsx f5a28e7e, the pin block 51c44f37), so round 6 would have been 100% cleanup of round 5 while every ROADMAP success criterion was already verified. Fixes: 12069204 + f2a43fc9 (CR-R5-01 -- the picker surrenders a folder id it cannot show; a dead id could otherwise suppress unbound_retrieval and unblock Publish; fenced on the REQUEST via 2 end-to-end wire cases, all observed RED with the single onChange("") severed), e854a505 (truth 14 -- TARGETS vs BASELINE are two knobs; describe.test.tsx was never RUN by the gate, now run + pinned; DoorSwitch 13->23, canvas 22->128, picker 30->37, total 804->946, both new pins observed biting), 5d9ba921 (PublishGauntlet load flake, D-ITEM-187-20-01). Gates: count gate exit 0 at 2196/failed 0/22-22 pinned, tsc -p tsconfig.app.json 33 unchanged and 0 in the touched tree, vite build exit 0. MANUAL DEBT OWED: 187-UAT.md 6 passed / 1 blocked / 7 pending + 12 human_verification items -- VOCAB-01/02/03 marked Complete on code + live rows 1/2/3/9, NOT because every row ran; run M15b first. Logged D-ITEM-187-CLOSE-01 (server tests nullity not resolvability) and D-ITEM-187-CLOSE-02 (proposed G-7: cap gap-closure ROUNDS the way G-1 caps phase inserts)
+status: planning
+last_updated: "2026-08-05T03:35:12.081Z"
+last_activity: 2026-08-04
 progress:
   total_phases: 19
-  completed_phases: 6
+  completed_phases: 7
   total_plans: 101
   completed_plans: 100
-  percent: 32
-stopped_at: Phase 187 complete (29/29) — ready to discuss Phase 188
+  percent: 37
 ---
 
 # Project State
@@ -1171,7 +1170,7 @@ Manual-Only rows still unrun, row 4 still ⛔, `.planning/REQUIREMENTS.md` unmod
 and `CONCUR-02` stay **Pending** until the operator runs the board. **Phase 186 is now ready for
 `/gsd:verify-work 186`, with SC#4 the only thing no automated evidence can close.**
 
-Resume file: .planning/phases/187-business-vocabulary-ai-seeded-canvas/187-CONTEXT.md
+Resume file: .planning/phases/188-non-technical-run-observability/188-CONTEXT.md
 
 Both owed items are now ROUTED at the discuss-phase touchpoint:
 
