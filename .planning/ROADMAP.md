@@ -500,7 +500,7 @@ Plans:
 
 **Wave 4** *(blocked on 188-04)*
 
-- [ ] 188-05-PLAN.md — **the G-5 extraction the milestone's own ledger names**: `frontend/src/lib/phaseState.ts` holds the ONE derivation (`phaseStatusFromDb` total, `canvasReading` collapsing `retrying` in one named place, `TERMINAL_RUN_STATUSES` carried forward with the `timed_out` measurement recorded). Both shipped views rewired; a `?raw` fence with positive controls proves zero local re-derivations (wave 4)
+- [x] 188-05-PLAN.md — **the G-5 extraction the milestone's own ledger names**: `frontend/src/lib/phaseState.ts` holds the ONE derivation (`phaseStatusFromDb` total, `canvasReading` collapsing `retrying` in one named place, `TERMINAL_RUN_STATUSES` carried forward with the `timed_out` measurement recorded). Both shipped views rewired; a `?raw` fence with positive controls proves zero local re-derivations (wave 4)
 
 
 **Wave 5** *(blocked on 188-05 — needs `CanvasReading`)*
