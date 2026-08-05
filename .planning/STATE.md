@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio — 🚧 ACTIVE
 status: executing
-last_updated: "2026-08-05T23:45:00.000Z"
-last_activity: 2026-08-05 -- Phase 188.1 Plan 02 executed (pre-move affordance-shape capture)
+last_updated: "2026-08-06T00:10:00.000Z"
+last_activity: 2026-08-06 -- Phase 188.1 Plan 03 executed (THE EXTRACTION — WorkflowCanvas 1593 → 1292 L)
 progress:
   total_phases: 20
   completed_phases: 8
   total_plans: 119
-  completed_plans: 115
+  completed_plans: 116
   percent: 40
 ---
 
@@ -44,7 +44,32 @@ Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 op
 
 ## Current Position
 
-Phase: 188.1 (WorkflowCanvas extraction refactor — INSERTED 2026-08-05) — **EXECUTING, plan 2 of 5 done**
+Phase: 188.1 (WorkflowCanvas extraction refactor — INSERTED 2026-08-05) — **EXECUTING, plan 3 of 5 done**
+
+**⚑ 188.1-03 LANDED 2026-08-06 — THE EXTRACTION** (`14917821` / `718ccd48` / `e92224c2`). Wave 3,
+the reason the phase exists. `PlaneEditingLayer` + `EDIT_AFFORDANCE` (with `REVEAL_ON_HOVER`,
+`insertPointX`, `verticalOffsetFor`) lifted out of `WorkflowCanvas.tsx` into
+`PlaneEditingLayer.tsx` + `editAffordance.ts` — **two** modules per D-01, so the `.tsx` exports the
+component and its props TYPE and **no runtime value**. Done in two commits on purpose: the modules
+were created ADDITIVELY first, so the cut is a pure deletion and `git diff --numstat` alone proves
+"move, not rewrite". Measured: **1593 → 1292 L** at **22 insertions / 323 deletions**; the moved
+bodies diff byte-identical against `sed -n '526,728p'` of the pre-move file. Exactly three imports
+dropped (`ViewportPortal`, `useStore as useFlowStore`, `CANVAS_LAYOUT`), one added, JSX site
+byte-identical, **no re-export shim** (grep `EDIT_AFFORDANCE` in the shell → no match, now
+machine-asserted). **RED OBSERVED 2×:** `grounding_mode` planted in `PlaneEditingLayer.tsx` turned
+BOTH Plan-01 subtree fences red — the measurement that converts *"the fence still covers the moved
+311 lines"* from a claim into a finding — and a back-import planted in `editAffordance.ts` turned
+the new ESM-cycle fence red. Battery: `count gate OK` **2470/2470 zero slack, failed 0** (canvas pin
+48→52, twice-measured, `TARGETS` untouched); `tsc -p tsconfig.app.json` **33** with the TS6133 set
+byte-identical to baseline; **`eslint src/components/workflows/` 6 → 5 — D-01's win collected**;
+`vite build` exit 0, zero circular warnings; **Plan 02's `AFFORDANCE_SHAPE_BASELINE` still
+deep-equals and was NOT edited** (128/128 across the three canvas suites). **⚠ Carry forward:** the
+plan's `[INEFFECTIVE_DYNAMIC_IMPORT]` baseline of *"exactly one"* is FALSE — re-measured on the
+pre-move tree it is **2 before and 2 after** (the second is `ShikiCode.tsx`, in the chat subtree);
+and `FlowEdge.tsx`'s pre-existing eslint error is now at **`:147`**, not `:135`. Two plan-internal
+contradictions were resolved in the shipped `⚠ REWRITTEN BY` register rather than smoothed over (the
+`ViewportPortal` grep vs the byte-identical JSX comment; the G-5 flag vs the zero-`EDIT_AFFORDANCE`
+grep).
 
 **⚑ 188.1-02 LANDED 2026-08-05** (`91f104c1` / `36964d05`). Wave 2: the pre-move behaviour-identity
 capture, the artifact SC#2's *"renders identically before and after"* will be checked against. An
@@ -85,7 +110,10 @@ observed RED. **⚠ Orchestrator note:** `state.record-metric` also bumped `comp
 rewrote two unrelated historical prose lines (a "Resume file:" line and a superseded "Plan: 1 of 13");
 that write was reverted and only the true, bounded edits re-applied by hand.
 
-**▶ NEXT: `/gsd:execute-phase 188.1` wave 3 (plan 188.1-03 — the actual move).**
+**▶ NEXT: `/gsd:execute-phase 188.1` wave 4 (plan 188.1-04 — the WR-04 own-guards + the A7 audit).
+LANDMINE restated: use `Object.prototype.hasOwnProperty.call(...)`, never `Object.hasOwn` (ZERO
+occurrences in `frontend/src`), and preserve the literal `ICON_TINT[` form in `PhaseNode.tsx` —
+`PhaseNodeCard.test.tsx:373` is a positive control the obvious fix turns RED.**
 
 **▶ NEXT ACTION: `/gsd:plan-phase 188.1`.** Phase 188 is CLOSED (code + UAT + SECURED). 188.1 was
 inserted ahead of 189 because **G-5 fires on `WorkflowCanvas.tsx`** and the debt is owed, not new:
