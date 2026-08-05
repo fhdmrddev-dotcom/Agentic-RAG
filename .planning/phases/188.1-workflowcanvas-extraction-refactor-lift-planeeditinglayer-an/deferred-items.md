@@ -7,7 +7,7 @@ are **not** fixed by the plan that found them.
 
 ## D-188.1-DEF-01 — `WorkflowRunPage.test.tsx` has a genuinely FLAKY case inside the count gate
 
-> **✅ CLOSED by plan `188.1-04`, commit `92c5920d`.** Its own re-open trigger — *"the next phase
+> **✅ CLOSED by plan `188.1-04`, commit `23046860`.** Its own re-open trigger — *"the next phase
 > that touches `WorkflowRunPage.tsx` or its suite"* — fired: `188.1-04` extends this suite with the
 > WR-07 falsification, so the one-line fix was in the plan's declared blast radius rather than a
 > widening of it. The assertion is now `await waitFor(() => expect(reconcile).toHaveBeenCalled())`,
