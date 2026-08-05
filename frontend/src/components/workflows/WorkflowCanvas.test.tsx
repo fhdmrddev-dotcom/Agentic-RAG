@@ -43,6 +43,36 @@ import { runReadingLabel, type NodeRunState } from "./runVocabulary"
 import type { CanvasReading } from "@/lib/phaseState"
 import { TechnicalNamesProvider } from "@/providers/TechnicalNamesProvider"
 
+// ── 188.1-01 — THE SUBTREE SOURCE, and why it names files that do not exist yet ──────
+//
+// The house `?raw` / `import.meta.glob` directory sweep (`PhaseFormPanel.rails.test.tsx:422-426`,
+// cited by `governanceVocabulary.test.ts:65` as "the house idiom"), narrowed to the canvas
+// subtree by an explicit path list. Every NEGATIVE fence in this file reads this instead of
+// `workflowCanvasSource`; every POSITIVE assertion, and the per-file count pin, does not.
+//
+// ⚠ TWO OF THE THREE PATHS DO NOT EXIST AT THIS COMMIT, AND THAT IS THE POINT.
+// `PlaneEditingLayer.tsx` and `editAffordance.ts` arrive in plan 188.1-03, which cuts 311
+// lines (`WorkflowCanvas.tsx:346-413` and `:486-728`) out of the canvas into them. A fence
+// anchored on `WorkflowCanvas?raw` alone would stay GREEN across that move while covering
+// 311 fewer lines — Phase 188's F7 lesson in a new dress: an invariance fence says nothing
+// about what it no longer covers, and neither the count gate nor `tsc` can see the loss.
+// Naming the two files BEFORE they exist means the extraction cannot narrow a fence.
+// `import.meta.glob` expands at build time over files that EXIST, so a path with no file
+// simply has no key in the record and contributes the empty string — it never throws.
+const CANVAS_SUBTREE_PATHS = [
+  "./WorkflowCanvas.tsx",
+  "./PlaneEditingLayer.tsx",
+  "./editAffordance.ts",
+] as const
+const CANVAS_MODULES = import.meta.glob("./*.{ts,tsx}", {
+  query: "?raw",
+  eager: true,
+  import: "default",
+}) as Record<string, string>
+const canvasSubtreeSource = CANVAS_SUBTREE_PATHS.map((path) => CANVAS_MODULES[path] ?? "").join(
+  "\n",
+)
+
 mockReactFlow()
 
 beforeEach(() => {
@@ -504,13 +534,39 @@ describe("WorkflowCanvas — the scope fences (source guard)", () => {
   })
 
   it("ships no minimap and no attribution removal", () => {
-    expect(workflowCanvasSource).not.toMatch(/MiniMap/)
-    expect(workflowCanvasSource).not.toMatch(/hideAttribution/)
+    expect(canvasSubtreeSource).not.toMatch(/MiniMap/)
+    expect(canvasSubtreeSource).not.toMatch(/hideAttribution/)
   })
 
   it("makes no network call and reads no Phase-185 authoring field", () => {
-    expect(workflowCanvasSource).not.toMatch(/workflows\/validate/)
-    expect(workflowCanvasSource).not.toMatch(/grounding_mode/)
+    expect(canvasSubtreeSource).not.toMatch(/workflows\/validate/)
+    expect(canvasSubtreeSource).not.toMatch(/grounding_mode/)
+  })
+
+  it("the subtree fence covers the code 188.1-03 moves, wherever that code lives", () => {
+    // MOVE-INVARIANT CONTROL. Both literals are true TODAY — `EDIT_AFFORDANCE` is declared
+    // at `WorkflowCanvas.tsx:365` and `PlaneEditingLayer` at `:569` — and stay true AFTER
+    // 188.1-03 moves them into `editAffordance.ts` / `PlaneEditingLayer.tsx`, because the
+    // path list above already names those files. So this proves the fenced source really
+    // reaches the moved code at BOTH ends of the refactor, and it goes red the moment a
+    // later edit narrows `CANVAS_SUBTREE_PATHS` past one of the two homes.
+    expect(canvasSubtreeSource).toContain("EDIT_AFFORDANCE = {")
+    expect(canvasSubtreeSource).toContain("function PlaneEditingLayer(")
+    // NON-VACUITY: a truncated list or a glob that resolved to nothing cannot satisfy the
+    // two lines above by accident, because both the list's length and the record's
+    // non-emptiness are pinned here (the `PhaseFormPanel.rails.test.tsx:440` control shape).
+    expect(CANVAS_SUBTREE_PATHS).toHaveLength(3)
+    expect(Object.keys(CANVAS_MODULES).length).toBeGreaterThan(5)
+    // …and the two DESTINATIONS are named individually, because a length pin catches a
+    // TRUNCATION but not a SUBSTITUTION: swapping `./PlaneEditingLayer.tsx` for any other
+    // path keeps the length at 3 and — while the code still sits in the canvas — keeps both
+    // `toContain`s green too. Measured RED under exactly that edit before this line existed.
+    for (const path of ["./PlaneEditingLayer.tsx", "./editAffordance.ts"] as const) {
+      expect(CANVAS_SUBTREE_PATHS).toContain(path)
+      // And once 188.1-03 creates the file, the sweep must really resolve it — a fence that
+      // names a module the glob pattern no longer matches reads an empty string in silence.
+      if (path in CANVAS_MODULES) expect(CANVAS_MODULES[path].length).toBeGreaterThan(0)
+    }
   })
 })
 
@@ -640,7 +696,7 @@ describe("WorkflowCanvas 188-07 — the canvas DERIVES nothing (Req 2 · the G-5
   it("spells NONE of the seven reading words — the vocabulary never entered this file", () => {
     // Asserted over the WHOLE source, comments included: unlike the ordinal below, no
     // shipped comment here names a reading, so the stronger claim is the true one.
-    for (const word of READING_WORDS) expect(workflowCanvasSource).not.toContain(word)
+    for (const word of READING_WORDS) expect(canvasSubtreeSource).not.toContain(word)
   })
 
   it("imports the run type TYPE-ONLY, and imports no derivation module at all", () => {
@@ -650,12 +706,13 @@ describe("WorkflowCanvas 188-07 — the canvas DERIVES nothing (Req 2 · the G-5
       /import type \{[^}]*NodeRunState[^}]*\} from ["']@\/components\/workflows\/runVocabulary["']/,
     )
     // …and NOT as a value import, which is how a vocabulary table would arrive.
-    expect(workflowCanvasSource).not.toMatch(
+    expect(canvasSubtreeSource).not.toMatch(
       /^import \{[^}]*\} from ["']@\/components\/workflows\/runVocabulary["']/m,
     )
     // The derivation module is not imported in ANY form — the reading is decided by the
-    // page, once (D-188-01 / D-188-02).
-    expect(workflowCanvasSource).not.toMatch(/from\s+["']@\/lib\/phaseState["']/)
+    // page, once (D-188-01 / D-188-02). D-14 relevant, so it reads the whole subtree: an
+    // extracted module that grew this import would otherwise be invisible here.
+    expect(canvasSubtreeSource).not.toMatch(/from\s+["']@\/lib\/phaseState["']/)
     // POSITIVE CONTROLS — both regexes match the shapes they forbid.
     expect(
       'import { runReadingWord } from "@/components/workflows/runVocabulary"',
@@ -671,9 +728,14 @@ describe("WorkflowCanvas 188-07 — the canvas DERIVES nothing (Req 2 · the G-5
     // has named the ordinal since 184-12, explaining what the page renumbers. So the
     // fence is anchored on CODE, and the prose count is PINNED at one — which makes the
     // explanation exactly as hard to delete as the field is to introduce.
-    const code = stripComments(workflowCanvasSource)
+    const code = stripComments(canvasSubtreeSource)
     expect(code).not.toContain(ORDINAL_FIELD)
     expect(code).not.toContain(ORDINAL_CAMEL)
+    // ⚠ THE COUNT PIN IS DELIBERATELY NOT WIDENED (188.1-01, T-188.1-04b). It is a
+    // PER-FILE count: exactly one prose mention, in `WorkflowCanvas.tsx:845`'s `onInsertAt`
+    // docblock, which stays put across 188.1-03. Pointing a count at three files changes
+    // what the number means, so this line keeps reading `workflowCanvasSource` while the
+    // two negatives above read the whole subtree.
     expect(workflowCanvasSource.match(new RegExp(ORDINAL_FIELD, "g")) ?? []).toHaveLength(1)
   })
 

@@ -43,6 +43,33 @@ import { WorkflowCanvas, type CanvasSession } from "./WorkflowCanvas"
 import { evalCoverage } from "./__fixtures__/canvasFixtures"
 import workflowCanvasSource from "./WorkflowCanvas?raw"
 
+// ── 188.1-01 — THE SUBTREE SOURCE, and why it names files that do not exist yet ──────
+//
+// The house `?raw` / `import.meta.glob` directory sweep (`PhaseFormPanel.rails.test.tsx:422-426`,
+// cited by `governanceVocabulary.test.ts:65`), narrowed to the canvas subtree by an explicit
+// path list. Every NEGATIVE fence at the foot of this file reads this; every POSITIVE control
+// keeps reading `workflowCanvasSource`, because a positive is a claim about ONE file.
+//
+// ⚠ TWO OF THE THREE PATHS DO NOT EXIST AT THIS COMMIT, AND THAT IS THE POINT. Plan
+// 188.1-03 cuts 311 lines out of `WorkflowCanvas.tsx` into `PlaneEditingLayer.tsx` and
+// `editAffordance.ts`; a fence anchored on `WorkflowCanvas?raw` alone would stay GREEN
+// across that move while covering 311 fewer lines, and nothing in the count gate or `tsc`
+// would see it. `import.meta.glob` expands over files that EXIST, so an absent path has no
+// key in the record and contributes the empty string rather than throwing.
+const CANVAS_SUBTREE_PATHS = [
+  "./WorkflowCanvas.tsx",
+  "./PlaneEditingLayer.tsx",
+  "./editAffordance.ts",
+] as const
+const CANVAS_MODULES = import.meta.glob("./*.{ts,tsx}", {
+  query: "?raw",
+  eager: true,
+  import: "default",
+}) as Record<string, string>
+const canvasSubtreeSource = CANVAS_SUBTREE_PATHS.map((path) => CANVAS_MODULES[path] ?? "").join(
+  "\n",
+)
+
 mockReactFlow()
 
 /** The width the R12 row names. Everything in this file renders inside it. */
@@ -367,14 +394,33 @@ describe("WorkflowCanvas composition — the toolbar row, in place", () => {
 
 describe("WorkflowCanvas composition — the scope fences still hold", () => {
   it("the canvas still names no validation seam and no Phase-185 authoring field", () => {
-    expect(workflowCanvasSource).not.toMatch(/workflows\/validate/)
-    expect(workflowCanvasSource).not.toMatch(/grounding_mode/)
+    expect(canvasSubtreeSource).not.toMatch(/workflows\/validate/)
+    expect(canvasSubtreeSource).not.toMatch(/grounding_mode/)
   })
 
   it("it still ships no minimap, no attribution removal, and keeps the interactivity lock off", () => {
-    expect(workflowCanvasSource).not.toMatch(/MiniMap/)
-    expect(workflowCanvasSource).not.toMatch(/hideAttribution/)
+    expect(canvasSubtreeSource).not.toMatch(/MiniMap/)
+    expect(canvasSubtreeSource).not.toMatch(/hideAttribution/)
+    // POSITIVE — a claim that ONE named file contains the string, so it stays on that file.
     expect(workflowCanvasSource).toContain("showInteractive={false}")
+  })
+
+  it("the subtree fence covers the code 188.1-03 moves, wherever that code lives", () => {
+    // MOVE-INVARIANT CONTROL — the same one `WorkflowCanvas.test.tsx` carries, repeated here
+    // because this suite's fences are re-scoped independently and a control that lives in
+    // another file protects another file. Both literals are true today (`WorkflowCanvas.tsx:365`
+    // and `:569`) and stay true after the extraction, so this goes red only if someone
+    // narrows `CANVAS_SUBTREE_PATHS`.
+    expect(canvasSubtreeSource).toContain("EDIT_AFFORDANCE = {")
+    expect(canvasSubtreeSource).toContain("function PlaneEditingLayer(")
+    expect(CANVAS_SUBTREE_PATHS).toHaveLength(3)
+    expect(Object.keys(CANVAS_MODULES).length).toBeGreaterThan(5)
+    // A length pin catches a TRUNCATION but not a SUBSTITUTION, so the two destinations are
+    // named one by one, and each is required to resolve non-empty once its file exists.
+    for (const path of ["./PlaneEditingLayer.tsx", "./editAffordance.ts"] as const) {
+      expect(CANVAS_SUBTREE_PATHS).toContain(path)
+      if (path in CANVAS_MODULES) expect(CANVAS_MODULES[path].length).toBeGreaterThan(0)
+    }
   })
 
   it("the bottom region composes leaves — it derives no severity of its own", () => {
@@ -382,7 +428,7 @@ describe("WorkflowCanvas composition — the scope fences still hold", () => {
     // derives no severity, and a fence run over the raw file goes red on the sentence that
     // documents it — the D-ITEM-183-02 trap, which this phase has now hit often enough
     // that stripping is the house answer rather than a one-off.
-    const code = workflowCanvasSource
+    const code = canvasSubtreeSource
       .replace(/\/\*[\s\S]*?\*\//g, "")
       .replace(/^\s*\/\/.*$/gm, "")
       .replace(/\{\/\*[\s\S]*?\*\/\}/g, "")
