@@ -110,9 +110,39 @@ opened reading `✓ Complete`. Caught only because the spine had 2 nodes and row
 1; settled by reading the actual `GET /workflow-runs/{id}` off the network. **Identify a run by
 its id on the wire — a title and a prompt are not identifiers.**
 
-**Next action:** row 15's full "Tomorrow" journey (the last pending row). Then the 10 deferred
-review WARNINGs (WR-01, WR-04 first), the minimax SC#10 re-drive (⛔ `SC10-188-RUN`, real spend —
-operator's call), and the still-OWED G-5 `PlaneEditingLayer` / `EDIT_AFFORDANCE` extraction.
+**F7 FIXED + ROW 15 DRIVEN 2026-08-05 (`c50e93f4`). UAT BOARD COMPLETE: 16 PASS · 0 FAIL ·
+1 ⛔ · 0 pending.**
+
+**F7 — SC#1's governance half never reached the run surface.** The criterion requires each node
+to show live state **and its grounded-cited vs open governance state**; `grep -c grounded` over
+both `188-UAT.md` and `188-VALIDATION.md` returned **0**, and it did not work. `toCanvas`
+resolves `grounded` via `isGrounded(phase, kbTools)` and defaults an omitted `kbTools` to the
+frozen empty `NO_KB_TOOLS`; the run page passed none, so `available_tools ∩ kb_tools` ran against
+the empty set and the **`detected`** cause could never resolve. Quiet because `already-set` and
+`escalated` still did — governance LOOKED right on workflows that declare it explicitly, while
+every step grounded merely by reading the KB painted as ungoverned. **All 8 published KB-reading
+fixtures in this org are detected-only**, so the failure covered the whole realistic population.
+Falsified live on ONE workflow across BOTH surfaces before any edit: Builder canvas
+`data-grounded="true"`, run surface no attribute. Fixed with the Builder's rule verbatim
+(`useGroundingBundle`, ready-or-unavailable), R11 intact. RED first; verified live — the ⛨ corner
+seal now renders and the two non-KB steps correctly carry none.
+
+**Row 15 · the 🕐 Tomorrow journey — PASS** (run `27bb0f6b`, `risk-register-bnoz7n`, chosen
+because the row needs a real deliverable). Launch landed on the run surface with **no composer**;
+a full cache-busting reload; found the thread; "Open the run" re-opened it with **no live
+stream** showing the full spine, `✓ Complete` on both nodes, `Ran for 2m 35s — from when it was
+queued to its last update`, and `risk-register.docx · 37.4 KB` with its download control.
+⚠ One clause of that row is **superseded**: it demands "no clock when `claimed_at` is null", which
+**F3 deliberately reversed** on the 0-of-149 measurement. The intent (never an unlabelled clock)
+holds; the wording predates F3/F6.
+
+**Every ROADMAP success criterion for 188 is now verified**, SC#7 with 7/8 providers and minimax
+recorded ⛔ `SC10-188-RUN` rather than omitted.
+
+**Next action:** `/gsd:verify-work 188` — the phase-goal check, with a complete board behind it.
+Then the 10 deferred review WARNINGs (WR-01, WR-04 first), the minimax re-drive (real spend —
+operator's call), and the still-OWED G-5 `PlaneEditingLayer` / `EDIT_AFFORDANCE` extraction,
+which is due before any further `WorkflowCanvas.tsx` feature touch (i.e. before Phase 189).
 
 **Plan 187-01 COMPLETE (Wave 1, 2026-08-02, `6793f651`).** The SC#6 property test
 (`backend/tests/unit/test_187_armed_checkpoint_property.py`, 30 tests) is written and **observed RED

@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "timestamp": "2026-08-05T16:15:00.000Z",
+  "timestamp": "2026-08-05T16:50:00.000Z",
   "phase": "188",
   "phase_name": "non-technical-run-observability",
   "phase_dir": ".planning/phases/188-non-technical-run-observability",
@@ -74,6 +74,18 @@
       "name": "UAT rows 9/10/11 driven live — all three PASS (runs 4d82ab27 / 882e33dc+3bab9aa4 / 0114b2fe)",
       "status": "done",
       "commit": ""
+    },
+    {
+      "id": 11,
+      "name": "F7 — SC#1's governance seal never reached the run surface; fixed and verified live",
+      "status": "done",
+      "commit": "c50e93f4"
+    },
+    {
+      "id": 12,
+      "name": "UAT row 15 (the Tomorrow journey) driven — PASS. Board COMPLETE: 16 PASS / 0 FAIL / 1 blocked / 0 pending",
+      "status": "done",
+      "commit": ""
     }
   ],
   "remaining_tasks": [
@@ -108,11 +120,6 @@
       "description": "SC#10 row 6 (minimax) failed after 600s — recorded blocked SC10-188-RUN",
       "type": "external",
       "workaround": "Provider-side; re-drive with scripts/sc10_188_run_board.py --providers minimax to separate flake from defect"
-    },
-    {
-      "description": "Row 15 (full 'Tomorrow' journey) is the last pending board row",
-      "type": "human_action",
-      "workaround": "Nothing blocks it technically; any workflow that completes with a deliverable works"
     }
   ],
   "human_actions_pending": [
@@ -182,9 +189,14 @@
       "decision": "Substituted multitool_scope_098uat for research_summarize on rows 9 and 11",
       "rationale": "research_summarize is is_system_global but in org 430bffc6 while this account is in 22f9c615, so it is not visible to this user — v3.4 RLS working as designed. Both rows name multitool_scope_098uat as the alternative",
       "phase": "188"
+    },
+    {
+      "decision": "Fixed F7 with the Builder's kbTools rule copied verbatim rather than a new one",
+      "rationale": "The kb-tool list is served outside every registry read, so carrying it only on `ready` would let an unrelated folder-registry blip silently un-mark a locked step. One rule, two readers — the seal, the dial and the locked row cannot disagree",
+      "phase": "188"
     }
   ],
   "uncommitted_files": [],
-  "next_action": "Drive UAT row 15 — the full 'Tomorrow' journey end to end. It is the last pending row on the board (15 PASS / 0 FAIL / 1 blocked / 1 pending).",
-  "context_notes": "Rows 9/10/11 are driven and PASS. Two things to carry: (1) IDENTIFY A RUN BY ITS ID ON THE WIRE — the longmsg smoke script titles every thread identically AND builds the same deterministic prompt, so a June thread matched both and its surface read '✓ Complete'; a false PASS was avoided only because its spine had 2 nodes and row 11's workflow has 1. (2) There is NO ROUTER and no deep link to a run, so 'refresh the run page' is only performable as reload -> the thread -> the D-188-13 receipt. Also: tool activity is evidenced from the Redis run buffer (run:{run_id}), not from assistant prose — the model claimed code ran while showing a plain list. Gates unchanged: count 2460/2460 zero slack failed 0; tsc -p tsconfig.app.json 33; vite build 0; zero migrations."
+  "next_action": "Run /gsd:verify-work 188 — the phase-goal check, now with a complete UAT board (16 PASS / 0 FAIL / 1 blocked / 0 pending) and every ROADMAP success criterion verified.",
+  "context_notes": "188's UAT board is COMPLETE and every success criterion is verified. SEVEN defects were found by driving it (F1-F7), all fixed and re-verified live. The two most instructive were found by NEITHER a plan, a review, nor a board row: F6 by watching a number for ten seconds (and it was INTRODUCED by F3, an earlier UAT fix), and F7 by reading the phase's own success criteria and grepping the board for the word 'grounded' — which returned 0. Carry that habit: check the SC text against the board, not just the board against itself. Gates: count 2462/2462 zero slack failed 0; tsc -p tsconfig.app.json 33 (root config checks ZERO files); vite build 0; zero migrations; WorkflowCanvas.tsx untouched all session. G-5 PlaneEditingLayer extraction still OWED before any further WorkflowCanvas feature touch."
 }
