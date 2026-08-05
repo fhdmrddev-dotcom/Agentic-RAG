@@ -33,23 +33,52 @@ files rather than a shared fixture.
 """
 from types import SimpleNamespace
 
-# The two canvas-gated routes (182-02). Kept as literals here — this file is the EXPECTATION
-# side, so it must not read ``CANVAS_GATED_PATHS`` (a test that imports the constant it is
-# checking would pass even if someone emptied the constant).
+# The canvas-gated routes. Kept as literals here — this file is the EXPECTATION side, so it
+# must not read ``CANVAS_GATED_PATHS`` (a test that imports the constant it is checking would
+# pass even if someone emptied the constant).
 _VALIDATE_PATH = "/workflows/validate"
 _BUNDLE_PATH = "/workflows/grounding-bundle"
-_CANVAS_PATHS = (_VALIDATE_PATH, _BUNDLE_PATH)
+# Phase 188 (RUNVIZ-03 / D-188-15) — the run read, on its OWN router prefix. This is a path
+# TEMPLATE, and it is the member that proves ``CANVAS_GATED_PATHS`` is a set of absolute
+# templates spanning routers rather than "the /workflows namespace". Note the asymmetry it
+# exposes: a template can never match the middleware's exact-request-path half, so this member
+# is load-bearing for the OpenAPI filter ONLY — its request-path 404 comes from
+# ``Depends(require_canvas())`` (pinned in test_188_workflow_run_read.py +
+# test_revert_byte_identical.py), which is why the path probes below stay on the two
+# ``/workflows`` members.
+_RUN_READ_PATH = "/workflow-runs/{workflow_run_id}"
+_CANVAS_PATHS = (_VALIDATE_PATH, _BUNDLE_PATH, _RUN_READ_PATH)
+
+# The two literal-path canvas routes — the subset that the REQUEST-path probes (malformed
+# body / wrong method / trailing slash) can meaningfully target. A templated path cannot be
+# probed as a literal, and its request-side gate is a different mechanism.
+_CANVAS_LITERAL_PATHS = (_VALIDATE_PATH, _BUNDLE_PATH)
 
 # The honest 404 baseline: a path in the SAME namespace that was never built.
 _UNBUILT_PATH = "/workflows/__nope__/__nope__"
 
-# The five models declared ONLY by the two canvas routes.
+# The models declared ONLY by the canvas routes — five from the two /workflows routes (182-02)
+# plus the two Phase-188 run-read models.
+#
+# ⚠ MEASURED, NOT PREDICTED (188-03 Task 2; RESEARCH A5). Which models actually move is a
+# property of the reference graph, not of which route declared them: ``canvas_filtered_openapi``
+# subtracts ``kept_refs`` so anything a surviving path still references is NEVER removed. The
+# observed set difference at 188-03 was exactly:
+#     {'GroundingBundleResponse', 'PaletteFolder', 'PaletteSkill', 'ValidateResponse',
+#      'Verdict', 'WorkflowRunPhaseRead', 'WorkflowRunRead'}
+# ``WorkflowDefinition`` did NOT move even though ``POST /workflows/validate`` takes it as its
+# body — it stays published because three NON-canvas paths still reference it
+# (``POST /workflows``, ``PATCH /workflows/{definition_id}``, ``POST /workflows/generate``).
+# That is the filter behaving correctly, and it is why this list is read off a run rather than
+# derived by reading the route decorators.
 _CANVAS_SCHEMAS = (
     "ValidateResponse",
     "Verdict",
     "GroundingBundleResponse",
     "PaletteFolder",
     "PaletteSkill",
+    "WorkflowRunRead",
+    "WorkflowRunPhaseRead",
 )
 
 # CONTROLS — a schema and a path from NON-canvas routes on the same router. These are what
@@ -104,7 +133,10 @@ def test_malformed_body_is_byte_identical_to_an_unbuilt_path(client, monkeypatch
     baseline = client.post(_UNBUILT_PATH, content=b"{", headers=_JSON_CT)
     assert baseline.status_code == 404, baseline.text
 
-    for path in _CANVAS_PATHS:
+    # Only the LITERAL-path members can be probed as request paths — a templated member
+    # (``/workflow-runs/{workflow_run_id}``) is not a URL, and its request-side gate is
+    # ``Depends(require_canvas())`` rather than this middleware (see _RUN_READ_PATH).
+    for path in _CANVAS_LITERAL_PATHS:
         resp = client.post(path, content=b"{", headers=_JSON_CT)
         assert resp.status_code == 404, f"{path}: {resp.text}"
         assert resp.status_code != 422, (
@@ -333,3 +365,36 @@ def test_non_canvas_paths_are_untouched_while_off(client, monkeypatch):
 
     # And the unbuilt-path baseline itself still answers the honest 404.
     assert client.get(_UNBUILT_PATH).status_code == 404
+
+
+# ── 8) the expectation literals are test-local BY CONSTRUCTION, not by comment ─
+
+
+def test_this_file_never_imports_the_module_it_checks():
+    """The literals at the top of this file must never become an import (188-03 Task 2).
+
+    The header has said since 182 that this file *"must not read ``CANVAS_GATED_PATHS``"* —
+    but that was enforced only by the sentence itself. Phase 188 was the first time the
+    constant grew, and the temptation to import it (so the fence "can't drift") is exactly
+    what the convention forbids: a test that imports the constant it is checking passes even
+    if someone empties that constant, and the whole exact-set fence becomes vacuous.
+
+    This pins it mechanically. The needle is ASSEMBLED FROM PARTS (the 187-24 lesson) so this
+    file's OWN source cannot satisfy the grep that is run over it — spelling the module path
+    inline, even inside this docblock, would make the assertion fail against a clean file and
+    teach the next reader to delete it.
+    """
+    from pathlib import Path
+
+    source = Path(__file__).read_text(encoding="utf-8")
+    gate_module = "app.middleware." + "canvas_gate"
+
+    assert gate_module not in source, (
+        "this file imports (or names) the gate module — the expectation side must keep its "
+        "own literals, or the exact-set fence passes against an emptied constant"
+    )
+
+    # POSITIVE CONTROL — the needle really does match the shape it forbids, so its absence
+    # above is a measurement and not a tautology.
+    forbidden_import = "from " + gate_module + " import " + "CANVAS_" + "GATED_PATHS"
+    assert gate_module in forbidden_import

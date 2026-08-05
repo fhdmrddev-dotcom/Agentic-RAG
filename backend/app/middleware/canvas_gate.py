@@ -56,12 +56,30 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 # THE ONE source of canvas-gated absolute paths for the whole app — read by BOTH halves
 # below (the request-path gate and the schema filter). When Phase 183+ mounts a new canvas
 # route, add its absolute path HERE in the SAME commit that mounts it — that single edit is
-# what makes the route non-discoverable while off, on both channels. (Router prefix is
-# "/workflows", hence the absolute form.)
+# what makes the route non-discoverable while off, on both channels.
+#
+# The members are ABSOLUTE FastAPI path templates and SPAN ROUTERS — they are not relative to
+# any one prefix. Two prefixes are represented today: "/workflows" (workflows.py) and
+# "/workflow-runs" (workflow_runs.py, Phase 188). This note previously read "(Router prefix
+# is /workflows, hence the absolute form.)", which stopped being true the moment the second
+# prefix joined; it is corrected here rather than left, because a comment that still names a
+# shape the code no longer has is the same defect as a false docblock.
+#
+# ⚠ THE TWO HALVES ARE ASYMMETRIC — know which one a given member is load-bearing for.
+# ``_is_canvas_path`` (below) does EXACT membership on the REQUEST path, so a member
+# containing a ``{...}`` placeholder can never match there; for a parameterised route the
+# request-side authority is ``Depends(require_canvas())`` on the route itself, whose 404 body
+# is byte-identical to this middleware's. ``canvas_filtered_openapi`` pops these strings from
+# FastAPI's ``paths`` dict, whose keys ARE templates — that is the half a parameterised member
+# exists for. Both halves still read this ONE constant, so the single edit remains the
+# contract; only its effect differs per member shape.
 CANVAS_GATED_PATHS: frozenset[str] = frozenset(
     {
         "/workflows/validate",
         "/workflows/grounding-bundle",
+        # Phase 188 (RUNVIZ-03 / D-188-16) — the run read. TEMPLATE form: OpenAPI-half only
+        # (see the asymmetry note above); its request-path 404 comes from require_canvas.
+        "/workflow-runs/{workflow_run_id}",
     }
 )
 

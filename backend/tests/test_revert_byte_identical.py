@@ -57,6 +57,16 @@ from types import SimpleNamespace
 _BUNDLE_PATH = "/workflows/grounding-bundle"
 _VALIDATE_PATH = "/workflows/validate"
 
+# Phase 188 (RUNVIZ-03 / D-188-16) — the third canvas-gated route, on its own router prefix.
+# The TEMPLATE is what FastAPI mounts (and what ``CANVAS_GATED_PATHS`` holds for the OpenAPI
+# half); the concrete URL is what a caller probes. Both are needed: the template for the
+# mounted-routes positive control, the URL for the request.
+_RUN_READ_TEMPLATE = "/workflow-runs/{workflow_run_id}"
+# A WELL-FORMED uuid on purpose. FastAPI validates the ``workflow_run_id: UUID`` path param,
+# so a non-uuid segment could 422 and a probe would then pass for the wrong reason — the same
+# Pitfall-5 discipline the ``_MINIMAL_VALID_DEFINITION`` body above applies to the POST route.
+_RUN_READ_PATH = "/workflow-runs/2f1c9a5e-0000-4000-8000-00000000188a"
+
 # The smallest schema-valid WorkflowDefinition (Pitfall 5): ``phases: []`` IS shape-valid, so
 # this body cannot 422 — the ONLY thing that can 404 the POST probe is the flag gate. Validated
 # against the real model inside the test so schema drift can never silently weaken the proof.
@@ -163,6 +173,92 @@ def test_require_canvas_404s_when_off(client, monkeypatch):
     }
     assert (_BUNDLE_PATH, "GET") in mounted, f"{_BUNDLE_PATH} is not mounted — the 404 is vacuous"
     assert (_VALIDATE_PATH, "POST") in mounted, f"{_VALIDATE_PATH} is not mounted — 404 is vacuous"
+
+
+# ── 2-bis) Phase 188: GET /workflow-runs/{id} is a 404 when off, for all four callers ──
+
+def test_run_read_404s_when_off(client, monkeypatch):
+    """The Phase-188 run read returns 404 (never 403/401) while off, for EVERY caller shape.
+
+    The sibling this file's header mandates: *"Each future canvas route (183+) MUST add its own
+    '404 when off' assertion ... so the reachable-route set stays provably empty while off — the
+    gate grows WITH the surface it protects."* ``GET /workflow-runs/{workflow_run_id}`` is the
+    first canvas route mounted OUTSIDE the ``/workflows`` prefix, so it is also the first one
+    whose flag-off 404 comes from ``Depends(require_canvas())`` alone rather than from
+    ``CanvasGateMiddleware``: the middleware's ``_is_canvas_path`` does exact membership on the
+    REQUEST path, and a request path (``/workflow-runs/<uuid>``) can never equal the TEMPLATE
+    that lives in ``CANVAS_GATED_PATHS``. That template earns its place on the OpenAPI half
+    (``test_182_canvas_gate.py``'s exact-set fence); THIS test is what proves the request half
+    still holds for the route without it.
+
+    Four caller shapes, all folded into the same byte-identical payload:
+      (a) an authenticated OPERATOR — with the caller seam INJECTED, so the 404 cannot be the
+          anonymous fold and this row genuinely pins the D-181-01 step order (flag before the
+          operator no-op);
+      (b) an end user;
+      (c) anonymous — no Authorization header at all;
+      (d) a malformed/bogus bearer token.
+
+    Body-free GET, well-formed uuid: nothing (no body decode, no path-param 422) can race the
+    flag gate, so a 404 here can only be the gate or an absent route — and the positive control
+    at the bottom rules out "absent".
+    """
+    import app.dependencies as deps
+    from app.dependencies import get_current_user
+    from app.main import app
+
+    _cold_off(monkeypatch)
+
+    async def _fake_caller(credentials, supabase):
+        return {"id": "00000000-0000-0000-0000-000000000001", "email": "op@x.co"}
+
+    # (a) operator, caller seam injected — the discriminating case (D-181-01)
+    monkeypatch.setattr(deps, "authenticate_canvas_request", _fake_caller)
+    monkeypatch.setattr(deps, "is_operator", _is_op_true)
+    resp_op = client.get(_RUN_READ_PATH)
+    assert resp_op.status_code == 404, resp_op.text
+    assert resp_op.status_code not in (200, 401, 403, 422)
+    assert resp_op.json() == {"detail": "Not Found"}
+
+    # (b) end user — same 404
+    monkeypatch.setattr(deps, "is_operator", _is_op_false)
+    resp_user = client.get(_RUN_READ_PATH)
+    assert resp_user.status_code == 404, resp_user.text
+    assert resp_user.status_code != 403
+    assert resp_user.json() == {"detail": "Not Found"}
+
+    # (c)/(d) the PRE-AUTH shapes — restore the REAL auth seam and pop the blanket
+    # get_current_user override so an absent / bogus token flows through as in production.
+    monkeypatch.undo()
+    _cold_off(monkeypatch)
+    app.dependency_overrides.pop(get_current_user, None)
+
+    anon = client.get(_RUN_READ_PATH)
+    assert anon.status_code == 404, anon.text
+    assert anon.status_code not in (401, 403)
+    assert anon.json() == {"detail": "Not Found"}
+
+    bogus = client.get(_RUN_READ_PATH, headers={"Authorization": "Bearer not-a-real-token"})
+    assert bogus.status_code == 404, bogus.text
+    assert bogus.status_code not in (401, 403)
+    assert bogus.json() == {"detail": "Not Found"}
+
+    # Byte-identity against an unbuilt path in the run route's OWN namespace (two segments,
+    # for the same reason the /workflows baseline uses two).
+    unbuilt = client.get("/workflow-runs/__nope__/__nope__")
+    assert unbuilt.status_code == 404, unbuilt.text
+    assert anon.json() == unbuilt.json() == {"detail": "Not Found"}
+
+    # POSITIVE CONTROL — the 404s above are the GATE, not an absent route. The path template is
+    # genuinely mounted with the probed METHOD, so "404" cannot mean "never built" here.
+    mounted = {
+        (getattr(r, "path", None), m)
+        for r in app.routes
+        for m in (getattr(r, "methods", None) or set())
+    }
+    assert (_RUN_READ_TEMPLATE, "GET") in mounted, (
+        f"{_RUN_READ_TEMPLATE} is not mounted — the 404 is vacuous"
+    )
 
 
 # ── 2a) D-181-01: the flag wins over the operator no-op on a REAL authenticated call ──
