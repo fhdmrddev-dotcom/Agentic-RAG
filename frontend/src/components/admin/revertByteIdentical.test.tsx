@@ -20,10 +20,19 @@
  *      and Off writes `"off"`.
  *
  * DEFERRED (D-181 Claude's-discretion): the `ChatLayout` render-guard vitest — a stale
- * canvas `activeView` must return the fallback (never the canvas) when the map is off — is
- * intentionally NOT present here. It lands WITH the first canvas `ActiveView` render branch
- * in Phase 182/183; there is no canvas view to guard yet in 181, so asserting it now would
- * test a branch that does not exist.
+ * canvas `activeView` must return the fallback (never the canvas) when the map is off — was
+ * intentionally NOT present here, because it had to land WITH the first canvas `ActiveView`
+ * render branch and there was no canvas view to guard in 181.
+ *
+ * ✅ NO LONGER DEFERRED. Phase 188 mounted that first branch (`"workflow-run"`, the run's
+ * own room) and shipped it UNGATED, which is exactly the hole this note anticipated: with
+ * the map off, launching landed on a home that did not exist before the canvas was built
+ * and then blamed the user's account for the operator's kill switch. The guard now lives in
+ * `components/layout/ChatLayout.launch.test.tsx` — beside the launch-path harness it needs
+ * and inside the count gate's blast radius — and covers BOTH halves (the navigation and the
+ * render), because gating only the render would strand a launch on the fallback. It is
+ * recorded here rather than moved here so the 181 promise and its discharge stay in one
+ * reading.
  */
 import { describe, it, expect, vi, afterEach } from "vitest"
 import { render, cleanup, within, fireEvent, waitFor } from "@testing-library/react"

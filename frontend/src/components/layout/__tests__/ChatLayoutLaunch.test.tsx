@@ -112,6 +112,7 @@ vi.mock("../NavPanel", () => ({ NavPanel: () => <nav data-testid="nav-stub" /> }
 vi.mock("@/components/panel/WorkspacePanel", () => ({ WorkspacePanel: () => <aside data-testid="panel-stub" /> }))
 
 import { ChatLayout } from "../ChatLayout"
+import { EffectiveFeaturesProvider } from "@/providers/EffectiveFeaturesProvider"
 
 /** One published def so WorkflowsPage renders a published-card with a Run button. */
 const publishedDef = {
@@ -147,13 +148,24 @@ beforeEach(() => {
 
 function renderLayout(onNavigate = vi.fn()) {
   render(
-    <ChatLayout
-      onSignOut={vi.fn()}
-      activeView="workflows"
-      onNavigate={onNavigate}
-      prefillMessage={null}
-      onSetPrefillMessage={vi.fn()}
-    />,
+    // ⚠ AMENDED AGAIN BY THE PHASE-188 CODE-REVIEW FIX (CR-05). The run home is
+    // canvas-era surface and is now gated on `visual_workflow_canvas`, so the retarget
+    // this file asserts only happens with the flag ON — and a NULL features context is
+    // FAIL-CLOSED by contract, which is why the provider has to be explicit here rather
+    // than assumed. Without it this render exercises the flag-OFF path, where the launch
+    // correctly falls back to selecting the thread and landing in chat (the shipped
+    // pre-canvas behaviour). The flag-off half is asserted in `ChatLayout.launch.test.tsx`.
+    <EffectiveFeaturesProvider
+      value={{ features: { visual_workflow_canvas: true }, loading: false, refetch: vi.fn() }}
+    >
+      <ChatLayout
+        onSignOut={vi.fn()}
+        activeView="workflows"
+        onNavigate={onNavigate}
+        prefillMessage={null}
+        onSetPrefillMessage={vi.fn()}
+      />
+    </EffectiveFeaturesProvider>,
   )
   return { onNavigate }
 }

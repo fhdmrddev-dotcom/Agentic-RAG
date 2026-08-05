@@ -164,7 +164,28 @@ vi.mock("@/pages/WorkflowsPage", () => ({
 
 import { ChatLayout } from "./ChatLayout"
 import chatLayoutSource from "./ChatLayout?raw"
+import { EffectiveFeaturesProvider } from "@/providers/EffectiveFeaturesProvider"
 import type { ActiveView } from "@/App"
+
+// ── CR-05: the canvas kill switch. ────────────────────────────────────────────────────
+//
+// The run surface is a canvas-era home, so `visual_workflow_canvas` must gate BOTH the
+// navigation and the render — otherwise flipping the operator's off-switch produces the
+// one thing REVERT-01 forbids: a surface that did not exist before the canvas was built,
+// which then 404s on its own read (the flag-off backend gate) and blames the user's
+// account for it.
+//
+// The provider is a pure value-passing broadcast and a NULL context is FAIL-CLOSED, so
+// every render below states its flag explicitly rather than relying on a default.
+function withCanvas(on: boolean, node: React.ReactElement) {
+  return (
+    <EffectiveFeaturesProvider
+      value={{ features: on ? { visual_workflow_canvas: true } : {}, loading: false, refetch: vi.fn() }}
+    >
+      {node}
+    </EffectiveFeaturesProvider>
+  )
+}
 
 function baseProps(activeView: ActiveView, onNavigate = vi.fn()) {
   return {
@@ -185,12 +206,13 @@ function baseProps(activeView: ActiveView, onNavigate = vi.fn()) {
   }
 }
 
-function renderLayout(activeView: ActiveView = "workflows") {
+function renderLayout(activeView: ActiveView = "workflows", canvasOn = true) {
   const onNavigate = vi.fn()
   const props = baseProps(activeView, onNavigate)
-  const utils = render(<ChatLayout {...props} />)
+  const utils = render(withCanvas(canvasOn, <ChatLayout {...props} />))
   /** Re-render the SAME instance on another view (ChatLayout's activeRunId survives). */
-  const showView = (view: ActiveView) => utils.rerender(<ChatLayout {...props} activeView={view} />)
+  const showView = (view: ActiveView) =>
+    utils.rerender(withCanvas(canvasOn, <ChatLayout {...props} activeView={view} />))
   return { ...utils, onNavigate, showView }
 }
 
@@ -316,19 +338,89 @@ describe("ChatLayout launch — the run gets its own room (SPEC Req 6 / D-188-12
   })
 })
 
+// ── CR-05. The canvas kill switch gates the whole home ────────────────────────
+//
+// `WorkflowBuilderPage` gates its canvas on `visual_workflow_canvas === true`. The fourth
+// home did not: `WorkflowRunPage` read no feature map and `doRun` navigated to it
+// unconditionally. `getThreadWorkflow` is NOT canvas-gated, so the anchor resolved fine
+// with the flag off and the shipped fallback was never taken. With the switch off,
+// launching therefore
+//   (1) landed on a surface that did not exist before the canvas was built — REVERT-01
+//       byte-identity broken at the LAYOUT level;
+//   (2) immediately 404'd on the run read (the flag-off backend gate) and rendered "It may
+//       have been deleted, or it belongs to another account" — both stated reasons FALSE,
+//       the real one being the operator's kill switch;
+//   (3) offered only a link back to Workflows, while `doRun` had not selected the thread
+//       either — so the live run was unreachable from the UI in exactly the state the
+//       kill switch exists to make safest.
+//
+// Both halves are gated, deliberately: the NAVIGATION (so a launch never leaves for it)
+// and the RENDER (so a stale `activeView` cannot resurrect it). Gating only the render
+// would leave a launch stranded on the positional fallback; gating only the navigation
+// would leave the home reachable from any surviving pointer.
+
+describe("ChatLayout — the run home is gated on visual_workflow_canvas (CR-05)", () => {
+  it("a flag-off launch restores the shipped behaviour: select the thread, land in chat", async () => {
+    const { onNavigate } = renderLayout("workflows", false)
+
+    fireEvent.click(screen.getByTestId("drive-launch"))
+
+    await waitFor(() => expect(onNavigate).toHaveBeenCalledWith("chat"))
+    expect(onNavigate).not.toHaveBeenCalledWith("workflow-run")
+    // The thread is SELECTED — this is the half that made the flag-off launch a dead end.
+    expect(mockSelectThread).toHaveBeenCalledWith(expect.objectContaining({ id: THREAD_ID }))
+    // The launch itself is untouched: still created, still kicked off, still not deleted.
+    expect(mockCreateThread).toHaveBeenCalledTimes(1)
+    expect(mockPostMessage).toHaveBeenCalledTimes(1)
+    expect(mockDeleteThread).not.toHaveBeenCalled()
+  })
+
+  it("does not even resolve the run anchor while off — the extra read is canvas-era too", async () => {
+    renderLayout("workflows", false)
+    fireEvent.click(screen.getByTestId("drive-launch"))
+    await waitFor(() => expect(mockPostMessage).toHaveBeenCalled())
+    await waitFor(() => expect(mockSelectThread).toHaveBeenCalled())
+    expect(mockGetThreadWorkflow).not.toHaveBeenCalled()
+  })
+
+  it("a stale workflow-run view renders the fallback, never the run surface, while off", () => {
+    // The Phase-181 note deferred exactly this assertion to "the first canvas ActiveView
+    // render branch". This is it. Falling through to the positional fallback IS the
+    // byte-identical answer: a view a never-built feature would not have had behaves like
+    // any other unknown member (the `library-health` positive control above).
+    render(withCanvas(false, <ChatLayout {...baseProps("workflow-run")} />))
+    expect(screen.queryByTestId("run-page-stub")).not.toBeInTheDocument()
+    expect(screen.getByTestId("knowledge-health-stub")).toBeInTheDocument()
+  })
+
+  it("POSITIVE CONTROL — the same view with the flag ON does render the run surface", () => {
+    render(withCanvas(true, <ChatLayout {...baseProps("workflow-run")} />))
+    expect(screen.getByTestId("run-page-stub")).toBeInTheDocument()
+    expect(screen.queryByTestId("knowledge-health-stub")).not.toBeInTheDocument()
+  })
+
+  it("hands the panel NO run-receipt callback while off — the receipt cannot render", () => {
+    // The receipt is the OTHER door into this home. It renders nothing without the
+    // callback (its own suite fences that), so withholding the callback is what removes
+    // the affordance rather than leaving a control that opens a fallback page.
+    const code = codeOf(chatLayoutSource)
+    expect(code).toMatch(/onOpenRun=\{canvasEnabled \? openRunSurface : undefined\}/)
+  })
+})
+
 // ── 5 + 6. The structural properties of the branch split ──────────────────────
 
 describe("ChatLayout — the run surface is on the non-chat side of the split", () => {
   it("renders NO message list and NO composer on the run surface (with the positive control)", () => {
     // POSITIVE CONTROL FIRST: on the chat view both elements DO render, so their absence
     // below is a measurement of the branch split and not of a broken render.
-    const chat = render(<ChatLayout {...baseProps("chat")} />)
+    const chat = render(withCanvas(true, <ChatLayout {...baseProps("chat")} />))
     expect(screen.getByTestId("message-list-stub")).toBeInTheDocument()
     expect(screen.getByTestId("composer-stub")).toBeInTheDocument()
     expect(screen.getByTestId("workspace-panel-stub")).toBeInTheDocument()
     chat.unmount()
 
-    render(<ChatLayout {...baseProps("workflow-run")} />)
+    render(withCanvas(true, <ChatLayout {...baseProps("workflow-run")} />))
     expect(screen.queryByTestId("message-list-stub")).not.toBeInTheDocument()
     expect(screen.queryByTestId("composer-stub")).not.toBeInTheDocument()
     // The workspace panel goes with them — which is exactly why the run surface has to
@@ -338,7 +430,7 @@ describe("ChatLayout — the run surface is on the non-chat side of the split", 
   })
 
   it("is NOT the Knowledge-Health positional fallback (with the positive control)", () => {
-    render(<ChatLayout {...baseProps("workflow-run")} />)
+    render(withCanvas(true, <ChatLayout {...baseProps("workflow-run")} />))
     expect(screen.queryByTestId("knowledge-health-stub")).not.toBeInTheDocument()
     expect(screen.getByTestId("run-page-stub")).toBeInTheDocument()
     screen.getByTestId("run-page-stub").remove()
@@ -347,7 +439,7 @@ describe("ChatLayout — the run surface is on the non-chat side of the split", 
     // it falls THROUGH to the trailing element. That proves two things at once — the stub
     // can render, and the trailing element really is a POSITIONAL fallback rather than a
     // `default:` that throws. A `workflow-run` branch placed after it would be dead code.
-    const health = render(<ChatLayout {...baseProps("library-health")} />)
+    const health = render(withCanvas(true, <ChatLayout {...baseProps("library-health")} />))
     expect(screen.getByTestId("knowledge-health-stub")).toBeInTheDocument()
     health.unmount()
   })

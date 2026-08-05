@@ -309,7 +309,14 @@ const BASELINE = {
   // read from this script's own `actual` column.
   "WorkspacePanel.test.tsx": 41,
   "phaseState.test.ts": 34,
-  "ChatLayout.launch.test.tsx": 12,
+  // 188 code-review fix pass (CR-05): 12 → 17. An EXTENSION, not a lowering. The run home
+  // shipped UNGATED while `WorkflowBuilderPage` gates its canvas on the identical
+  // expression, so an operator flipping `visual_workflow_canvas` off produced a launch that
+  // landed on a surface the pre-canvas product never had, 404'd on its own read, and
+  // reported the kill switch as "deleted, or belongs to another account". Four of the five
+  // cases were observed RED; the fifth is the flag-ON positive control. This also
+  // discharges the render-guard assertion `revertByteIdentical.test.tsx` deferred in 181.
+  "ChatLayout.launch.test.tsx": 17,
   // ── 188-12: the fifteen files that RAN inside TARGETS with NO pin at all. ──
   // Inherited from Phases 183-187, none authored by this phase. They are pinned here because
   // the reason to leave a suite unpinned ("it postdates the pin, its count is free to grow")

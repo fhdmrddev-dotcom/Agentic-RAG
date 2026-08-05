@@ -25,6 +25,7 @@ import { OrgAdminShell } from "@/components/org/OrgAdminShell"
 // branch (the SkillStudioPage precedent — entered WITH an id, returned via callbacks).
 import { WorkflowRunPage } from "@/pages/WorkflowRunPage"
 import { useOrgOptional } from "@/providers/OrgProvider"
+import { useEffectiveFeaturesOptional } from "@/providers/EffectiveFeaturesProvider"
 import { useThreads } from "@/hooks/useThreads"
 import { useFolders } from "@/hooks/useFolders"
 import { useTheme } from "@/hooks/useTheme"
@@ -229,6 +230,25 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
   //    from the thread's run anchor — see the tail of doRun for the id trap. ──
   const [activeRunId, setActiveRunId] = useState<string | null>(null)
 
+  // ── CR-05 (Phase 188 review): the run home is CANVAS-ERA SURFACE, so the operator's
+  //    kill switch owns it exactly as it owns the Builder's canvas
+  //    (`WorkflowBuilderPage` gates on the identical expression).
+  //
+  //    ⚠ The backend gate is NOT sufficient on its own here, and that is the whole
+  //    finding: `getThreadWorkflow` is not canvas-gated, so the run anchor resolves fine
+  //    while the flag is off and the launch happily navigated to a home that then 404'd
+  //    on its own read — reporting the operator's kill switch as "deleted, or belongs to
+  //    another account". REVERT-01 promises the flag-off product is indistinguishable
+  //    from one where the canvas was never built; a fourth home is distinguishable.
+  //
+  //    STRICT `=== true`, never truthy, and a NULL context (no provider — an isolated
+  //    render) reads exactly like an empty map: HIDDEN. That is the Phase-148 vanish
+  //    convention, and reading null as "unknown, so show it" is the one hole this
+  //    plumbing could open. The fallback is the SHIPPED pre-canvas behaviour, so failing
+  //    closed here costs the user nothing. ──
+  const featuresCtx = useEffectiveFeaturesOptional()
+  const canvasEnabled = featuresCtx?.features.visual_workflow_canvas === true
+
   // ── Phase 103-06 (REQ-7 / D-103-CONF-1): doRun — the Run-from-page launch.
   //    Workflows are a MODE of a thread, never page-resident: Run creates a NEW
   //    thread, kicks off a REAL server-side run by REUSING the existing kickoff
@@ -316,9 +336,16 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
       //    already succeeded, so a network blip here must never be reported as a failed
       //    launch (the RunModal would render an error for a run that is genuinely under
       //    way). ──
-      const workflowRunId = await getThreadWorkflow(thread.id)
-        .then((wf) => wf.active_workflow_run_id)
-        .catch(() => null)
+      //    CR-05: the kill switch is consulted BEFORE the extra read, not after. The read
+      //    is itself canvas-era plumbing — it exists only to address a home the flag has
+      //    turned off — so issuing it while off would be a request the pre-canvas product
+      //    never made. Failing this way lands on the SHIPPED path below, which is the
+      //    definition of byte-identical rather than a degradation.
+      const workflowRunId = canvasEnabled
+        ? await getThreadWorkflow(thread.id)
+            .then((wf) => wf.active_workflow_run_id)
+            .catch(() => null)
+        : null
       if (workflowRunId) {
         setActiveRunId(workflowRunId)
         onNavigate("workflow-run")
@@ -327,7 +354,7 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
       selectThread(thread)
       onNavigate("chat")
     },
-    [loadThreads, selectThread, onNavigate],
+    [loadThreads, selectThread, onNavigate, canvasEnabled],
   )
 
   // ── Phase 188 Plan 10 (RUNVIZ-03 / D-188-13): the thread → run direction of the
@@ -648,7 +675,11 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
             state={panelState}
             onToggle={togglePanel}
             onExpand={expand}
-            onOpenRun={openRunSurface}
+            // CR-05: the receipt is the OTHER door into the run home, so the kill switch
+            // owns it too. The panel renders NOTHING without this callback (its own suite
+            // fences that), so withholding it removes the affordance entirely rather than
+            // leaving a control that opens the positional fallback.
+            onOpenRun={canvasEnabled ? openRunSurface : undefined}
           />
         </div>
       ) : (
@@ -718,7 +749,7 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
             // closes the reachability triad (App union [Plan 02] + this mount + the NavPanel
             // entry — all owned in-phase; the Phase-118 built-but-unreachable lesson).
             <OrgAdminShell onBack={() => onNavigate("chat")} />
-          ) : activeView === "workflow-run" ? (
+          ) : activeView === "workflow-run" && canvasEnabled ? (
             // Phase 188 Plan 09 (RUNVIZ-03 / SPEC Req 6 / D-188-10): the run's own room
             // mounts here as the FOURTH home — additive branch placed IMMEDIATELY BEFORE
             // the trailing KnowledgeHealthPage (the governance/skill-studio/control-room
@@ -733,6 +764,14 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
             // D-188-13's bidirectional seam back into the run's chat thread, resolved off
             // the already-loaded app-wide `threads` list (Phase 156's Wave-1 bootstrap)
             // because `selectThread` takes a Thread, not an id.
+            //
+            // ⚠ CR-05: the branch condition carries `&& canvasEnabled`, so a STALE
+            // activeView cannot resurrect this home after the operator flips the switch —
+            // it falls through to the positional fallback, which is how every other
+            // unclaimed member behaves and is therefore the byte-identical answer. This
+            // closes the render-guard assertion Phase 181 deferred to "the first canvas
+            // ActiveView render branch". Gating the render alone would strand a launch on
+            // the fallback, which is why doRun is gated too.
             //
             // NO nav-rail item claims this view: while activeView === "workflow-run" no
             // rail item carries aria-current (188-UI-SPEC § Copywriting Contract). This
