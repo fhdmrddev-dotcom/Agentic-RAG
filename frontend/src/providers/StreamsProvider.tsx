@@ -3351,7 +3351,17 @@ async function reconcilePhases(threadId: string, signal?: AbortSignal): Promise<
       slug: r.slug,
       phaseIndex: r.phase_index,
       phaseType: r.phase_type ?? "unknown",
-      status: DB_PHASE_STATUS[r.status] ?? "done",
+      // Phase 188 Plan 02 (RUNVIZ-02 / Req 3 / D-188-08): the fallback below WAS the
+      // literal `done` — an unrecognised server status READ AS SUCCESS. (Spelled that
+      // way here on purpose: a grep for the old fallback token must return zero over
+      // this file, and a comment quoting it would keep the guard vacuous — 187-24.)
+      // Every DB value is mapped
+      // today, which is exactly the argument under which the publish gauntlet shipped
+      // its `findIndex → -1` fail-open and painted an unknown `blocked_stage` as 8/8
+      // green. Third occurrence of the same lesson: fail CLOSED on a state we cannot
+      // name. Falsified first (`panel/__tests__/PhaseReconcile.test.tsx`, RED observed
+      // on unmodified source), with a positive control that `completed` still maps.
+      status: DB_PHASE_STATUS[r.status] ?? "unknown",
       subAgents: [],
       pendingAsk: null,
   }))

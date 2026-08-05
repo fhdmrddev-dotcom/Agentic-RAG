@@ -1011,7 +1011,13 @@ export interface Phase {
   slug: string
   phaseIndex: number
   phaseType: string
-  status: "pending" | "running" | "done" | "failed" | "retrying" | "skipped"
+  /** Phase 188 Plan 02 (RUNVIZ-02 / D-188-08) — `"unknown"` is ADDITIVE: the honest
+   *  fallback for a `workflow_phases.status` absent from the client's map. Success is
+   *  never inferred from an unrecognised value (`reconcilePhases` resolved it to `done`
+   *  until this member existed). Widening this union is the MECHANISM, not a side
+   *  effect: `STATUS_META` is `Record<Phase["status"], StatusMeta>`, so the compiler
+   *  forces every reader to state the honest unknown too. */
+  status: "pending" | "running" | "done" | "failed" | "retrying" | "skipped" | "unknown"
   attempt?: number
   error?: string
   subAgents: TaskRunIndexItem[]

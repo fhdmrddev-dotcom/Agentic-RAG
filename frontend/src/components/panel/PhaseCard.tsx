@@ -76,6 +76,17 @@ const STATUS_META: Record<Phase["status"], StatusMeta> = {
   // (≥3:1) and stays on the glyph + the card border below (UI-SPEC §Color).
   retrying: { glyph: "↻", text: "Attempt", textClass: "text-accent-violet-text" },
   skipped: { glyph: "⤳", text: "Skipped", textClass: "text-panel-muted-foreground" },
+  // Phase 188 Plan 02 (RUNVIZ-02 / D-188-08 / D-188-06) — ADDED, nothing above changed.
+  // This row exists because the compiler demanded it: `Phase["status"]` gained
+  // `"unknown"` so `reconcilePhases` could stop resolving an unrecognised
+  // `workflow_phases.status` to `done`, and `Record<Phase["status"], …>` then forced the
+  // developer panel to state that honestly too. That forcing is the mechanism, not
+  // collateral damage. The `?` is INHERITED from `VERDICT_MARK.unknown`
+  // (`workflows/nodePresentation.ts:185`) rather than invented — 188 spends zero net-new
+  // glyphs. `text-panel-muted-foreground` is the same AA-cleared muted token
+  // `pending`/`skipped` already use; `--panel-*` is correct HERE because this is a
+  // panel-scoped surface (it is the RUN surface, on `--background`, where it is forbidden).
+  unknown: { glyph: "?", text: "Unknown", textClass: "text-panel-muted-foreground" },
 }
 
 // ── SUBSTEP_META (Phase 101.1-04 / GAP-C / D-11) — the emit-moment sub-steps the
