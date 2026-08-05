@@ -232,26 +232,36 @@ describe("PhaseNodeCard — the absent slots render NOTHING (Wave 0 adds the sea
     expect(testIds.some((id) => id?.includes("status"))).toBe(false)
   })
 
-  it("renders BYTE-IDENTICAL DOM whether status / stepNumber are passed or not", () => {
+  it("renders BYTE-IDENTICAL DOM whether stepNumber is passed or not", () => {
     // This is the assertion that proves the extraction is behaviour-preserving:
-    // Phase 188 adds DATA to a declared slot, not layout to the card.
+    // a later phase adds DATA to a declared slot, not layout to the card.
     //
     // 184-08 NARROWED THIS ASSERTION, and the narrowing is the point rather than an
     // erosion of it. As written in 184-03 it also passed `verdict: "error"`, because
     // in Wave 0 that slot was declared and unrendered. 184-08 is the plan chartered to
     // FILL it, so the sentence "passing a verdict changes nothing" is exactly what
     // this plan had to make false — keeping it green would have required 184-08 not to
-    // exist. The two slots still unrendered are still guarded here, and the `verdict`
-    // slot's two remaining contracts are guarded below, more strongly than before:
-    // absent still renders nothing, and present renders a mark that CHANGES when only
-    // the server-derived value does (VALID-03's headline proof).
+    // exist.
+    //
+    // 188-06 NARROWED IT AGAIN, FOR THE SAME REASON AND ON THE SAME TERMS. It dropped
+    // `status: "running"`. 188-06 is the plan chartered to fill the run-state slot, so
+    // "passing a run reading changes nothing" is precisely what it had to make false;
+    // this went red against the real component before the line was removed, and the
+    // observed diff is quoted in `188-06-SUMMARY.md` (the ring's markup, the run line,
+    // the run border and the raised min-height, all appearing at once). What the run
+    // slot must still satisfy is guarded MORE strongly elsewhere in this file, not less:
+    // the seal is byte-identical across all seven readings, the seven rings are pairwise
+    // distinct in shape alone, and the badge row is unchanged when a reading is supplied.
+    //
+    // `stepNumber` is now the LAST slot this assertion guards, and that is the honest
+    // reading of it: D-183-07 keeps the step's index off the face, so it is the one
+    // declared slot that still paints nothing.
     const without = renderCard({ badges: [groundingBadge] })
     const before = without.container.innerHTML
     without.unmount()
 
     const withSlots = renderCard({
       badges: [groundingBadge],
-      status: "running",
       stepNumber: 3,
     })
     expect(withSlots.container.innerHTML).toBe(before)
@@ -1016,8 +1026,15 @@ describe("PhaseNodeCard — the seal cannot READ run state (props fence, criteri
 
   it("renders a BYTE-IDENTICAL seal at all four run states (the strongest jsdom form)", () => {
     // The visual claim is UAT (G-4 #2). This is the part a machine can hold: the seal's
-    // whole rendered element, whatever the run says. `status` is typed as an open string
-    // in 184, so these are the four states criterion 16 names, not a library union.
+    // whole rendered element, whatever the run says.
+    //
+    // 188-06 RE-SPELLED THE FOUR STATES, and the reason is mechanical rather than
+    // editorial. In 184 `status` was an open string, so criterion 16's four names could
+    // be written as prose. 188-06 narrows the slot to the seven-member reading union, so
+    // `"idle"` and `"needs-you"` stopped typechecking — they were never readings, only
+    // labels for them. These are the SAME four states under the names the union gives
+    // them. (188's own guard widens this loop from four to seven; that is a separate
+    // change with its own reason, made where D-188-04 asks for it.)
     //
     // IT COMPARES `outerHTML`, AND THAT IS A CORRECTION THIS PLAN'S OWN FALSIFICATION
     // FORCED. Written first as `{ className, textContent }`, it stayed GREEN while a
@@ -1025,7 +1042,7 @@ describe("PhaseNodeCard — the seal cannot READ run state (props fence, criteri
     // on run state is invisible to both of those readings. The props fence caught it and
     // this did not, so the two guards were not the complementary pair they were meant to
     // be. `outerHTML` closes it: every attribute, class and character is in the compare.
-    const readings = ["idle", "running", "needs-you", "failed"].map((runState) => {
+    const readings = (["not-started", "running", "waiting-for-you", "failed"] as const).map((runState) => {
       const { container, unmount } = renderCard({ grounded: true, status: runState })
       const seal = container.querySelector(`[data-testid="${SEAL_TEST_ID}"]`)
       expect(seal).not.toBeNull()

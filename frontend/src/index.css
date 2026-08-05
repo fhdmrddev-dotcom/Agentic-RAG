@@ -227,6 +227,32 @@
   .font-headline {
     font-family: "Manrope", "Inter", ui-sans-serif, system-ui, sans-serif;
   }
+  /* ─── Phase 188-06 (RUNVIZ-01, sketch 153-A) — the canvas status ring's spin.
+     THE ONLY TRANSFORM ANYWHERE IN THE RING SUBTREE. The `running` arc is the one
+     moving thing on the run surface. Every OTHER reading places its gaps with
+     `stroke-dashoffset` and never with a rotation: setting an SVG transform attribute
+     as well as this transform-box/transform-origin pair composes the two and pivots
+     the arc about a DOUBLED offset, which is the bug that shipped in the sketch's own
+     first two drafts (D-188-07).
+
+     `transform-box: view-box` is what makes `36px 36px` mean the centre of the ring's
+     72×72 viewBox rather than the centre of the element's own tight stroke bounding
+     box — without it the arc wobbles around its own chord instead of spinning in place.
+
+     REDUCED MOTION IS SAFE BY CONSTRUCTION, NOT BY A FALLBACK. Only the animation sits
+     behind the query; the class's geometry does not. With motion suppressed `running`
+     still renders a static 26%-covered arc and `waiting-for-you` a 74%-covered arc with
+     its two-bar chip, so the two adjacent readings stay unmistakable with nothing
+     moving at all. ─── */
+  .canvas-ring-spin {
+    transform-box: view-box;
+    transform-origin: 36px 36px;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .canvas-ring-spin {
+      animation: ringspin 1.5s linear infinite;
+    }
+  }
 }
 
 /* ─── Phase 117: relationship remove ✕ reachability (the fidelity audit's #1 a11y
@@ -241,6 +267,16 @@
 }
 
 /* ─── Animations ─── */
+
+/* Phase 188-06 — the canvas status ring's ONE keyframe. Sited with its siblings; the
+   `.canvas-ring-spin` utility that consumes it, and the reduced-motion guard around
+   the animation, are in the `@layer utilities` block above. */
+@keyframes ringspin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 @keyframes fadeSlideUp {
   from {
     opacity: 0;
