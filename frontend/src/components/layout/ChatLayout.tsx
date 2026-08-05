@@ -330,6 +330,20 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
     [loadThreads, selectThread, onNavigate],
   )
 
+  // ── Phase 188 Plan 10 (RUNVIZ-03 / D-188-13): the thread → run direction of the
+  //    bidirectional seam. The workspace panel resolves the run id from the thread's own
+  //    anchor and hands it here; this sets the same state doRun sets and opens the same
+  //    home. Memoised on purpose — the panel keys its anchor read on the callback's
+  //    PRESENCE, and a stable identity keeps that true for any future consumer that
+  //    keys on the callback itself. ──
+  const openRunSurface = useCallback(
+    (runId: string) => {
+      setActiveRunId(runId)
+      onNavigate("workflow-run")
+    },
+    [onNavigate],
+  )
+
   // ── Plan 06: lifted panel state machine (panel-shell.md D1). The chat|panel
   //    split is a single ChatLayout-level CSS grid; the single in-panel toggle +
   //    the seam signal drive THIS state.
@@ -634,6 +648,7 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
             state={panelState}
             onToggle={togglePanel}
             onExpand={expand}
+            onOpenRun={openRunSurface}
           />
         </div>
       ) : (
