@@ -483,14 +483,24 @@ describe("WorkflowRunPage — the elapsed figure names the field it derives from
     expect(slot).toContain("6m 41s")
   })
 
-  it("claimed_at == null renders `Waiting to start` and NO number at all", async () => {
+  // ⚠ AMENDED by F3 (UAT 2026-08-05). This case originally asserted that a null `claimed_at`
+  //   renders "Waiting to start" and no number. That was written when `claimed_at` was believed
+  //   to be the anchor; the live DB says it is populated on 5 of 181 runs and 0 of 149 completed
+  //   ones, so the branch this pinned fired on essentially every run and produced
+  //   "✓ Complete   Waiting to start". The RULE it was protecting is intact and re-asserted
+  //   below — a number is never shown without the field it came from — but the anchor now falls
+  //   back to `created_at` (NOT NULL) instead of the slot going silent.
+  it("claimed_at == null falls back to created_at and LABELS it — never a bare number", async () => {
     getWorkflowRun.mockResolvedValue(mkRun({ status: "active", claimed_at: null }))
     renderPage()
     await screen.findByTestId("canvas-stub")
     const slot = screen.getByTestId("run-elapsed").textContent ?? ""
-    expect(slot).toContain("Waiting to start")
-    // No digit followed by a unit anywhere in the elapsed slot — not even "0s".
-    expect(slot).not.toMatch(/\d+\s*[smh]\b/)
+    expect(slot).toContain("queued")
+    expect(slot).not.toContain("Waiting to start")
+    // A number IS shown now, inseparable from its label. The invariant this case protects is
+    // "never a figure without its anchor", not "never a figure" — the original no-digit rule
+    // was the right rule applied to an anchor that turned out never to be populated.
+    expect(slot).toMatch(/\d+\s*[smh]\b/)
     // POSITIVE CONTROL — the pattern above really does match the shape it forbids, so
     // its absence is a measurement and not a tautology.
     expect("4m 12s since it started processing").toMatch(/\d+\s*[smh]\b/)
@@ -541,13 +551,17 @@ describe("WorkflowRunPage — the run band is total", () => {
     })
   }
 
-  it("an `active` run that was never claimed reads Waiting to start, not Running", async () => {
+  // ⚠ AMENDED by F3 (UAT 2026-08-05). This asserted that a never-claimed `active` run reads
+  //   "Waiting to start". Observed live: the band said exactly that while the first step was
+  //   visibly Running on the canvas beside it. `claimed_at` is null for queued AND running runs
+  //   alike here, so it cannot separate them; the row's own `active` status can.
+  it("an `active` run that was never claimed still reads Running — claimed_at cannot mean queued", async () => {
     getWorkflowRun.mockResolvedValue(mkRun({ status: "active", claimed_at: null }))
     renderPage()
     await screen.findByTestId("canvas-stub")
     const band = screen.getByTestId("run-band").textContent ?? ""
-    expect(band).toContain("Waiting to start")
-    expect(band).not.toContain("Running")
+    expect(band).toContain("Running")
+    expect(band).not.toContain("Waiting to start")
   })
 
   it("an UNRECOGNISED status reads State unknown and NEVER Complete", async () => {
@@ -1075,6 +1089,49 @@ describe("WorkflowRunPage — the run row is re-read while it is live (CR-01)", 
   //
   // "Watch a run" is the phase goal, and the watching case is exactly the one with no wake
   // event in it. So the slice rides the SAME beat as the run.
+  // ── F3 (UAT 2026-08-05) — `claimed_at` IS NEVER POPULATED, so anchoring on it alone
+  //    made the surface contradict itself. Measured against the live DB:
+  //
+  //        workflow_runs: 181 total ·   5 with claimed_at
+  //          completed:   149 rows  ·   0 with claimed_at
+  //
+  //    Zero of 149 finished runs carry the field. So a completed run rendered
+  //    "✓ Complete   Waiting to start", and an ACTIVE run's band read "Waiting to start"
+  //    while its first step was visibly Running. `created_at` is NOT NULL and is the
+  //    honest fallback — a queued-anchored figure, labelled as one.
+  it("a finished run with no claimed_at still shows a number, anchored on created_at and SAID so", async () => {
+    vi.useFakeTimers()
+    getWorkflowRun.mockResolvedValue(mkRun({ status: "completed", claimed_at: null }))
+    renderPage()
+    await settle()
+    const el = screen.getByTestId("run-elapsed")
+    expect(el).not.toHaveTextContent("Waiting to start")
+    expect(el).toHaveTextContent("Ran for")
+    expect(el).toHaveTextContent("queued")
+  })
+
+  it("an active run whose claimed_at is null still reads Running — the field cannot mean queued when nothing sets it", async () => {
+    vi.useFakeTimers()
+    getWorkflowRun.mockResolvedValue(mkRun({ status: "active", claimed_at: null }))
+    renderPage()
+    await settle()
+    expect(screen.getByTestId("run-band")).toHaveTextContent("Running")
+    expect(screen.getByTestId("run-band")).not.toHaveTextContent("Waiting to start")
+  })
+
+  it("a queued-anchored figure names its anchor in the plain layer too", async () => {
+    vi.useFakeTimers()
+    getWorkflowRun.mockResolvedValue(mkRun({ status: "completed", claimed_at: null }))
+    renderPage()
+    await settle()
+    // The ⌥ layer additionally prints the literal field (`created_at`), but the plain wording
+    // must already say WHICH clock it is — the reveal is an elaboration, never the only place
+    // the anchor is disclosed.
+    const slot = screen.getByTestId("run-elapsed").textContent ?? ""
+    expect(slot).toContain("queued")
+    expect(slot).toContain("Ran for")
+  })
+
   it("polls the PHASE SLICE on the same beat, so a watched canvas advances without a wake", async () => {
     vi.useFakeTimers()
     getWorkflowRun.mockResolvedValue(mkRun({ status: "active" }))

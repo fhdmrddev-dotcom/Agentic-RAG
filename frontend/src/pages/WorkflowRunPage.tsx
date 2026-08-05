@@ -257,12 +257,20 @@ const BAND_TONE_CLASS: Record<BandTone, string> = {
  * for `"constructor"` was `[Function Object]`).
  */
 function readBand(status: string, claimedAt: string | null, failedStepTitle: string | null): BandReading {
+  void claimedAt // F3: retained in the signature; deliberately no longer read (see below).
   switch (status) {
     case "active":
-      // A claimed-nothing run is QUEUED, not running — and it says so with no clock.
-      return claimedAt == null
-        ? { sentence: WAITING_TO_START, tone: "queued" }
-        : { sentence: "● Running", tone: "running" }
+      // F3 (UAT 2026-08-05) — this used to read `claimed_at == null` as "queued, not running".
+      // That inference is unsound HERE: nothing populates the field on the in-process producer
+      // path (0 of 149 completed runs carry it), so the branch fired on a run whose first step
+      // was visibly Running and the band announced "Waiting to start" over a moving canvas.
+      //
+      // A field that is null for queued AND running runs alike cannot separate them. Between
+      // two wrong readings the honest one is the one the row's own status asserts: `active`
+      // means the run was created and its producer spawned. The per-node readings carry the
+      // finer truth — an un-started step still says "Not started" beside this — so nothing is
+      // over-claimed by naming the RUN running.
+      return { sentence: "● Running", tone: "running" }
     case "paused":
       return { sentence: "Paused for your answer", tone: "waiting" }
     case "cap_paused":
@@ -543,6 +551,10 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
   const isTerminal = TERMINAL_RUN_STATUSES.has(runStatus)
   const claimedMs = epochOf(run?.claimed_at)
   const updatedMs = epochOf(run?.updated_at)
+  // F3: the fallback anchor. `created_at` is NOT NULL on `workflow_runs`, so this is the one
+  // timestamp always available — `claimed_at` is populated on 5 of 181 rows and 0 of 149
+  // completed ones.
+  const createdMs = epochOf(run?.created_at)
 
   // The once-per-second tick, and ONLY while the run is live and actually anchored. A
   // terminal run's figure is frozen, so it re-renders nothing.
@@ -616,16 +628,38 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
    * worse than silence because it claims a measurement that was never taken.
    */
   const elapsed: { text: string; number: string | null } = useMemo(() => {
-    if (claimedMs == null) return { text: WAITING_TO_START, number: null }
+    // F3 (UAT 2026-08-05) — `claimed_at` is NEVER POPULATED, so anchoring on it alone made
+    // this slot contradict the band beside it. Measured against the live DB:
+    //
+    //     workflow_runs: 181 total ·   5 with claimed_at
+    //       completed:   149 rows  ·   0 with claimed_at
+    //
+    // Zero of 149 finished runs carry it — `claim_run`'s CAS lease is the distributed-worker
+    // path and the in-process producer never takes it. So the original "no claimed_at ⇒ show
+    // nothing" rule fired on essentially every run, and a finished run rendered the
+    // self-contradiction "✓ Complete   Waiting to start".
+    //
+    // `created_at` is NOT NULL and is the honest fallback. The rule the docblock above states
+    // is UNCHANGED and is what makes the fallback safe: a number is only ever shown beside the
+    // field it came from. A queued-anchored figure is not a lie — an UNLABELLED one is, which
+    // is why the wording changes with the anchor rather than the anchor being hidden.
+    const anchorMs = claimedMs ?? createdMs
+    const queued = claimedMs == null
+    if (anchorMs == null) return { text: WAITING_TO_START, number: null }
     if (isTerminal) {
-      const end = updatedMs ?? claimedMs
+      const end = updatedMs ?? anchorMs
       return {
-        text: "— from when it started processing to its last update",
-        number: `Ran for ${fmtElapsed(end - claimedMs)}`,
+        text: queued
+          ? "— from when it was queued to its last update"
+          : "— from when it started processing to its last update",
+        number: `Ran for ${fmtElapsed(end - anchorMs)}`,
       }
     }
-    return { text: "since it started processing", number: fmtElapsed(nowMs - claimedMs) }
-  }, [claimedMs, updatedMs, isTerminal, nowMs])
+    return {
+      text: queued ? "since it was queued" : "since it started processing",
+      number: fmtElapsed(nowMs - anchorMs),
+    }
+  }, [claimedMs, createdMs, updatedMs, isTerminal, nowMs])
 
   // ── The band ────────────────────────────────────────────────────────────────
   /** The failing step's TITLE — the same `nodeTitle` the canvas paints on the face, so
@@ -729,9 +763,17 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
           </span>
           {showTechnical ? (
             <span className="font-mono text-[11px] text-muted-foreground" data-testid="run-elapsed-technical">
-              {isTerminal && run?.claimed_at
-                ? `claimed_at ${run?.claimed_at} → updated_at ${run?.updated_at}`
-                : `claimed_at ${run?.claimed_at ?? "null"}`}
+              {/* F3: the reveal must name the field the number ACTUALLY came from. Printing
+                  `claimed_at null` beside a real figure derived from `created_at` would make
+                  the ⌥ layer — whose entire job is to show the anchor — the least honest thing
+                  on the surface. */}
+              {run?.claimed_at
+                ? isTerminal
+                  ? `claimed_at ${run.claimed_at} → updated_at ${run?.updated_at}`
+                  : `claimed_at ${run.claimed_at}`
+                : isTerminal
+                  ? `claimed_at null → created_at ${run?.created_at} → updated_at ${run?.updated_at}`
+                  : `claimed_at null → created_at ${run?.created_at}`}
             </span>
           ) : null}
         </div>
