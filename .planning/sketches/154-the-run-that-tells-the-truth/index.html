@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sketch 154 — The run that tells the truth (Phase 188 / RUNVIZ-02)</title>
+<link rel="stylesheet" href="../themes/default.css">
+<script src="../themes/phase-icons-3d.js"></script>
+<style>
+/* ══════════════════════════════════════════════════════════════════════════════
+   SKETCH 154 — how does the canvas read when it CANNOT just say "done"?
+
+   SC#3: node state is a total function over the FULL event set — it never shows
+   "done" on a gate_failed / run_failed, and success is never inferred from the
+   ABSENCE of an event.
+   SC#4: the run view reconciles-on-fetch at every reconnect — Realtime is a
+   hint, not truth (D-v2.5-03).
+
+   DELIBERATE SCOPE FENCE: this sketch draws run state with the CARD BORDER
+   only — the neutral treatment. Choosing the state CHANNEL (ring / step number
+   / lane) is sketch 153's entire question, and deciding it here by accident
+   would answer 153 without anybody picking it. 154 tests the layer ABOVE that:
+   the reason, the verdict, and who says it.
+
+   MEASURED FACTS (audited 2026-08-04 by reading the tree, not inherited):
+
+     · THE FAIL-OPEN IS REAL AND IT IS ONE LINE.
+       StreamsProvider.tsx:3337 — `DB_PHASE_STATUS[r.status] ?? "done"`.
+       All five DB values are mapped today so it is unreachable, but the
+       fallback for an UNRECOGNISED status is "done" — exactly the reading SC#3
+       forbids. Same shape as the findIndex → -1 fail-open that painted an
+       unknown blocked_stage as 8/8 GREEN in the publish gauntlet.
+       The "Today (broken)" scenario draws it.
+
+     · `retrying` CANNOT SURVIVE A RELOAD.
+       The client union has it (types/index.ts:1013) but
+       workflow_phases_status_check does not (pending|active|completed|failed|
+       skipped). So reconcile can only bring a retrying phase back as RUNNING.
+       That is a state the run view will silently lose on every reconnect, and
+       SC#4 is the criterion it lands on. The "Reload mid-run" scenario draws
+       the before and after side by side.
+
+     · `cap_paused` HAS NO WORD ANYWHERE.
+       workflow_runs.status = active | paused | cap_paused | completed | failed
+       | cancelled (full-schema.sql:1962). A run parked by the step cap is
+       neither running nor finished. PhaseTimeline's TERMINAL_RUN_STATUSES is
+       {completed, failed, cancelled, timed_out} — so cap_paused is correctly
+       not terminal, but nothing tells the user what it IS. Note also that
+       `timed_out` in that set is NOT a valid workflow_runs.status: it can never
+       occur, and is dead code.
+
+     · THE RUN CLOCK HAS NO started_at TO ANCHOR TO.
+       workflow_runs has created_at / updated_at / claimed_at and nothing else,
+       so sketch 130-C's rule ("anchor the timer to started_at, never mount")
+       is RIGHT in spirit and WRONG in field. Drawn here as claimed_at, and
+       labelled, because an unlabelled clock that means "since queued" reads as
+       a lie the moment a run waits in a queue.
+
+   THE TIER LADDER THIS INHERITS (sketch 129-C, already shipped reasoning):
+     dim = the user did it on purpose · amber = an administrator//system parked
+     it · red framed = a genuine failure. Loudness earned by severity. Every
+     marker derived from PERSISTED state so it survives reload.
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+html, body { height: 100%; }
+body {
+  margin: 0; display: flex; flex-direction: column; overflow: hidden;
+  background: var(--color-bg); color: var(--color-text); font-family: var(--font-sans);
+}
+.variant-nav, .lead, .bar { flex-shrink: 0; }
+
+.lead {
+  padding: 11px 22px; font-size: 12.5px; color: var(--color-text-muted); line-height: 1.65;
+  border-bottom: 1px solid var(--color-border); background: var(--color-bg-elev1);
+}
+.lead b { color: var(--color-text); font-weight: 600; }
+.lead code { font-family: var(--font-mono); font-size: 11px; color: var(--color-primary); }
+.lead .warn { color: hsl(0 72% 70%); font-weight: 600; }
+
+.bar {
+  display: flex; align-items: center; gap: 7px; flex-wrap: wrap;
+  padding: 9px 22px; background: var(--color-bg-elev1);
+  border-bottom: 1px solid var(--color-border);
+}
+.bar .lbl {
+  font-size: 10px; letter-spacing: .09em; text-transform: uppercase;
+  color: var(--color-text-dim); margin-right: 2px; font-family: var(--font-mono);
+}
+.mbtn {
+  background: transparent; color: var(--color-text-muted);
+  border: 1px solid var(--color-border); border-radius: var(--radius-full);
+  padding: 5px 12px; font-size: 12px; font-family: inherit; cursor: pointer;
+  transition: all var(--dur-fast) var(--ease-out);
+}
+.mbtn:hover { background: var(--color-accent); color: var(--color-text); }
+.mbtn.on { background: var(--color-primary-dim); color: var(--color-primary); border-color: var(--color-primary-glow); }
+.mbtn.broken.on { background: var(--color-danger-dim); color: hsl(0 72% 72%); border-color: hsl(0 72% 51% / .5); }
+
+.stage { flex: 1; min-height: 0; overflow: auto; padding: 0; }
+.variant { display: none; height: 100%; }
+.variant.active { display: flex; flex-direction: column; }
+
+/* ── the run surface (drawn the same in all three so only the honesty differs) ── */
+.surface { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.shead {
+  flex-shrink: 0; padding: 12px 22px; border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg-elev1); display: flex; align-items: center; gap: 11px;
+}
+.shead h2 {
+  margin: 0; font-family: var(--font-headline); font-size: 15px; font-weight: 700; letter-spacing: -.01em;
+}
+.vchip {
+  font-family: var(--font-mono); font-size: 10px; color: var(--color-text-dim);
+  border: 1px solid var(--color-border); border-radius: var(--radius-full); padding: 2px 8px;
+}
+.shead .grow { flex: 1; }
+.clock {
+  font-family: var(--font-mono); font-size: 11.5px; color: var(--color-text-muted);
+  display: flex; align-items: center; gap: 6px;
+}
+.clock .anchor {
+  font-size: 9.5px; color: var(--color-text-dim);
+  border: 1px dashed var(--color-border); border-radius: 3px; padding: 0 4px;
+}
+
+/* ── the run-level verdict band (B's home, C's half) ───────────────────────── */
+.band { flex-shrink: 0; padding: 0 22px; }
+.notice {
+  display: flex; gap: 11px; align-items: flex-start; margin: 12px 0 0;
+  padding: 12px 15px; border-radius: var(--radius-md); border: 1px solid;
+  font-size: 12.5px; line-height: 1.6;
+}
+.notice .ico { font-size: 15px; line-height: 1.2; flex-shrink: 0; }
+.notice .nt-title { color: var(--color-text); font-weight: 600; }
+.notice .nt-reason { color: var(--color-text-muted); margin-top: 3px; }
+.notice .nt-where {
+  display: block; margin-top: 6px; font-family: var(--font-mono);
+  font-size: 10.5px; color: var(--color-text-dim);
+}
+.notice .grow { flex: 1; }
+/* the 129-C tier ladder — loudness earned by severity */
+.notice.red   { background: var(--color-danger-dim);  border-color: hsl(0 72% 51% / .45); }
+.notice.amber { background: var(--color-warning-dim); border-color: hsl(38 92% 60% / .4); }
+.notice.dim   { background: hsl(220 30% 9% / .5); border-color: var(--color-border); border-style: dashed; }
+.notice.dim .nt-title { color: var(--color-text-muted); font-weight: 500; }
+.notice.good  { background: var(--color-success-dim); border-color: hsl(142 71% 45% / .38); }
+
+/* ── canvas ────────────────────────────────────────────────────────────────── */
+.canvaswrap {
+  flex: 1; min-height: 0; overflow: auto; position: relative;
+  background:
+    radial-gradient(circle at 18% 22%, hsl(239 100% 82% / .05), transparent 46%),
+    var(--color-bg);
+}
+.canvaswrap::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background-image:
+    linear-gradient(hsl(220 20% 16% / .5) 1px, transparent 1px),
+    linear-gradient(90deg, hsl(220 20% 16% / .5) 1px, transparent 1px);
+  background-size: 26px 26px; opacity: .45;
+}
+.plane {
+  position: relative; display: flex; align-items: flex-start; padding: 76px 30px 40px;
+  min-width: max-content; transform: scale(.78); transform-origin: left top;
+}
+
+.node { position: relative; width: 260px; flex-shrink: 0; }
+.card {
+  width: 248px; margin: 0 auto; border-radius: 22px; padding: 42px 20px 20px;
+  min-height: 104px; text-align: center;
+  background: hsl(220 30% 7% / .3); backdrop-filter: blur(4px);
+  border: 1px solid var(--color-border-soft);
+  box-shadow: inset 0 1px 0 hsl(226 60% 97% / .06), 0 18px 36px -22px rgba(0,0,0,.95);
+  transition: all var(--dur-base) var(--ease-out);
+}
+.card .ttl {
+  margin: 0; font-family: var(--font-headline); font-size: 14px; font-weight: 600;
+  line-height: 1.2; color: var(--color-text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.card .sub { margin: 4px 0 0; font-size: 11px; line-height: 1.35; color: var(--color-text-muted); }
+/* A's inline reason — rendered into the technicalLine slot's position */
+.card .reason {
+  margin: 7px -6px -4px; padding: 7px 9px; border-radius: 9px; font-size: 10.5px;
+  line-height: 1.45; text-align: left; font-family: var(--font-mono);
+}
+.card .reason.red   { background: var(--color-danger-dim); color: hsl(0 72% 80%); border: 1px solid hsl(0 72% 51% / .35); }
+.card .reason.amber { background: var(--color-warning-dim); color: hsl(38 92% 78%); border: 1px solid hsl(38 92% 60% / .35); }
+.card .reason.dim   { background: hsl(220 30% 11% / .7); color: var(--color-text-dim); border: 1px dashed var(--color-border); }
+.badges { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 8px; }
+.badge {
+  font-size: 10px; border-radius: var(--radius-full); padding: 2px 8px;
+  border: 1px solid var(--color-primary-glow); color: var(--color-primary);
+  background: var(--color-primary-dim);
+}
+
+.card.st-done    { border-color: hsl(142 71% 45% / .55); }
+.card.st-running { border-color: var(--color-primary); }
+.card.st-needs   { border-color: var(--color-warning); }
+.card.st-failed  { border-color: var(--color-danger); }
+.card.st-skipped { border-color: var(--color-border-soft); opacity: .55; }
+.card.st-pending { border-color: var(--color-border-soft); opacity: .5; }
+.card.st-retrying{ border-color: var(--color-accent-violet); }
+.card.st-stopped { border-color: var(--color-border); border-style: dashed; opacity: .7; }
+.card.st-parked  { border-color: var(--color-warning); border-style: dashed; }
+/* the LIE: the fail-open painting an unknown status as a finished step */
+.card.st-lie     { border-color: hsl(142 71% 45% / .55); }
+
+.icowrap {
+  position: absolute; left: 50%; top: -26px; width: 62px; height: 62px;
+  transform: translateX(-50%); display: grid; place-items: center; pointer-events: none;
+}
+.icowrap .well { position: absolute; inset: 0; border-radius: 50%; }
+.icowrap .lift { position: absolute; inset: 4px; border-radius: 50%; background: hsl(226 60% 97% / .1); filter: blur(2px); }
+.icowrap .shadow {
+  position: absolute; bottom: 0; left: 50%; width: 36px; height: 8px;
+  transform: translateX(-50%); border-radius: 50%; background: rgba(0,0,0,.5); filter: blur(5px);
+}
+.icowrap .mk { position: relative; display: grid; place-items: center; filter: drop-shadow(0 9px 13px rgba(0,0,0,.8)); }
+.seal {
+  position: absolute; right: 17px; top: 11px; width: 21px; height: 21px; z-index: 6;
+  display: grid; place-items: center; border-radius: 50%; font-size: 11px; line-height: 1;
+  border: 1px solid hsl(220 30% 100% / .34); background: hsl(220 30% 100% / .1);
+  color: var(--color-text); pointer-events: none;
+}
+/* C's node-level mark — a shape on the card's left edge, where the verdict lives */
+.cmark {
+  position: absolute; left: -8px; top: 6px; width: 22px; height: 22px; z-index: 8;
+  display: grid; place-items: center; border-radius: 50%; font-size: 11px;
+  font-weight: 700; line-height: 1; pointer-events: none; color: #fff;
+}
+.cmark.red   { background: var(--color-danger); }
+.cmark.amber { background: var(--color-warning); color: #241701; }
+.cmark.dim   { background: var(--color-muted); color: var(--color-text-dim); border: 1px solid var(--color-border); }
+
+.link { flex-shrink: 0; width: 60px; height: 2px; background: var(--color-border); position: relative; margin-top: 51px; }
+.link.flow { background: linear-gradient(90deg, var(--color-success), var(--color-primary)); }
+.link.cut { background: repeating-linear-gradient(90deg, hsl(0 72% 51% / .5) 0 4px, transparent 4px 9px); }
+
+/* ── the reload split-screen ───────────────────────────────────────────────── */
+.split { display: grid; grid-template-columns: 1fr 1fr; gap: 0; flex: 1; min-height: 0; }
+.split > div { min-width: 0; overflow: auto; position: relative; }
+.split > div + div { border-left: 1px dashed hsl(0 72% 51% / .4); }
+.splitlbl {
+  position: sticky; top: 0; z-index: 5; padding: 7px 16px; font-family: var(--font-mono);
+  font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase;
+  background: hsl(220 40% 5% / .95); border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-dim); backdrop-filter: blur(8px);
+}
+.splitlbl.after { color: hsl(0 72% 72%); }
+.split .plane { transform: scale(.6); padding: 70px 18px 30px; }
+
+/* ── the cost note ─────────────────────────────────────────────────────────── */
+.cost {
+  flex-shrink: 0; padding: 10px 22px; font-size: 11.5px; line-height: 1.65;
+  border-top: 1px solid var(--color-border); background: hsl(220 30% 7% / .5);
+  color: var(--color-text-muted);
+}
+.cost b { color: var(--color-text); font-weight: 600; }
+.cost .warn { color: hsl(0 72% 70%); }
+.cost .good { color: hsl(142 71% 62%); }
+.cost code { font-family: var(--font-mono); font-size: 11px; color: var(--color-primary); }
+</style>
+</head>
+<body>
+
+<nav class="variant-nav" id="vnav">
+  <span class="label">Sketch 154</span>
+  <button class="variant-tab active" data-v="a" type="button">A: Every node states its own truth <span class="star">★</span></button>
+  <button class="variant-tab" data-v="b" type="button">B: The run says it once, nodes stay quiet</button>
+  <button class="variant-tab" data-v="c" type="button">C: Mark the node, the run explains</button>
+</nav>
+
+<div class="lead">
+  <b>SC#3: node state is a total function over the FULL event set — it never shows “done” on a <code>gate_failed</code>, and success is never inferred from the absence of an event. SC#4: it reconciles on every reconnect.</b><br>
+  All three variants draw run state with the <b>card border only</b> — picking the state <i>channel</i> is sketch 153's question and deciding it here by accident would answer 153 without anyone choosing.
+  What differs below is the layer above: <b>the reason, and who says it.</b> The last scenario is the real fail-open, drawn honestly.
+</div>
+
+<div class="bar">
+  <span class="lbl">What happened</span>
+  <button class="mbtn on" data-s="gate" type="button">Gate failed at step 5</button>
+  <button class="mbtn" data-s="reload" type="button">↻ Reload mid-run</button>
+  <button class="mbtn" data-s="cancel" type="button">Cancelled at step 3</button>
+  <button class="mbtn" data-s="unknown" type="button">Failed — reason unknown</button>
+  <button class="mbtn" data-s="cap" type="button">Parked by the step cap</button>
+  <button class="mbtn broken" data-s="lie" type="button">☠ Today (the fail-open)</button>
+</div>
+
+<div class="stage" id="stage">
+  <section class="variant active" id="variant-a"></section>
+  <section class="variant" id="variant-b"></section>
+  <section class="variant" id="variant-c"></section>
+</div>
+
+<div id="toast" style="position:fixed;left:50%;bottom:26px;transform:translate(-50%,8px);z-index:9998;
+  background:hsl(220 30% 8% / .97);border:1px solid var(--color-border);border-radius:var(--radius-md);
+  padding:10px 16px;font-size:12px;color:var(--color-text);box-shadow:var(--shadow-lg);
+  opacity:0;transition:all var(--dur-base) var(--ease-out);pointer-events:none;max-width:680px;text-align:center;"></div>
+
+<div class="sketch-toolbar">
+  <select id="theme-switcher" title="theme">
+    <option value="default">default</option>
+    <option value="canvas-184">canvas-184</option>
+  </select>
+  <button type="button" data-act="vp" data-w="1280">1280</button>
+  <button type="button" data-act="vp" data-w="1040">1040</button>
+  <button type="button" data-act="vp" data-w="0">full</button>
+</div>
+
+<script>
+'use strict';
+
+var STEPS = [
+  { slug:'find-renewal-contracts', type:'llm_agent',       title:'Find the renewal contracts', sub:'Reads Supplier Contracts',     grounded:true  },
+  { slug:'pull-risk-clauses',      type:'llm_agent',       title:'Pull the risk clauses',      sub:'Reads Supplier Contracts',     grounded:true  },
+  { slug:'score-suppliers',        type:'llm_single',      title:'Score each supplier',        sub:'Writes one piece in one pass', grounded:false },
+  { slug:'approve-summary',        type:'llm_human_input', title:'Check the summary with you', sub:'Check with you',               grounded:false, waits:true },
+  { slug:'fill-board-pack',        type:'llm_emit',        title:'Fill the board pack',        sub:'Produce the deliverable',      grounded:false }
+];
+
+var TINT = {
+  llm_agent:'hsl(239 100% 82% / .34)', llm_single:'hsl(258 90% 66% / .30)',
+  llm_human_input:'hsl(38 92% 60% / .28)', llm_emit:'hsl(142 71% 45% / .26)',
+  programmatic:'hsl(220 16% 65% / .24)', llm_batch_agents:'hsl(199 89% 60% / .28)'
+};
+
+/* ── the six scenarios ──────────────────────────────────────────────────────
+   Each carries: per-step state, per-step REASON (A renders these in the card),
+   and one run-level verdict (B renders this, C renders both halves).          */
+var SCENARIOS = {
+  gate: {
+    clock: '4:52', anchor: 'claimed_at → updated_at',
+    states:  ['done','done','done','done','failed'],
+    reasons: [null,null,null,null,{ tone:'red', text:'citation_gate_rejected · 3 of 18 values had no source, 0 invented' }],
+    verdict: {
+      tier:'red', ico:'✕',
+      title:'Failed at step 5 — the board pack was not written',
+      reason:'The citation gate rejected the draft: 3 of 18 values could not be traced to a source. Nothing was produced and nothing was sent.',
+      where:'run_failed · gate_failed · workflow_runs.status = "failed" · phase fill-board-pack'
+    },
+    cost:'The step that matters is the LAST one, and it is the one furthest from the eye on a left-to-right spine. <b>Whatever wins has to survive the failure being off-screen right</b> — that is the case to test at 1040px.'
+  },
+  reload: {
+    split: true, clock: '2:18', anchor: 'claimed_at',
+    before: { states:['done','done','retrying','pending','pending'],
+              reasons:[null,null,{ tone:'amber', text:'retrying · attempt 2 of 3' },null,null] },
+    after:  { states:['done','done','running','pending','pending'],
+              reasons:[null,null,null,null,null] },
+    verdict: {
+      tier:'amber', ico:'↻',
+      title:'Reconnected — and one reading changed on its own',
+      reason:'The step was retrying. After the reconcile it reads as simply running. Nothing went wrong: retrying has no representation in the database, so it is the one state a refresh cannot bring back.',
+      where:'workflow_phases_status_check = pending|active|completed|failed|skipped · client union adds "retrying" · types/index.ts:1013'
+    },
+    cost:'<b class="warn">This is a real loss of information at every reconnect, not a rendering bug.</b> Either the run view stops claiming <code>retrying</code>, or the attempt count becomes durable. It is a decision, and it belongs in the plan — SC#4 lands on it.'
+  },
+  cancel: {
+    clock: '1:44', anchor: 'claimed_at → updated_at',
+    states:  ['done','done','stopped','skipped','skipped'],
+    reasons: [null,null,{ tone:'dim', text:'you stopped the run here' },
+              { tone:'dim', text:'never started' },{ tone:'dim', text:'never started' }],
+    verdict: {
+      tier:'dim', ico:'⊘',
+      title:'Stopped — you cancelled this run',
+      reason:'Two steps finished. The scoring step was interrupted part-way and its work was not kept. No board pack was written.',
+      where:'workflow_runs.status = "cancelled" · stopped at 1:44'
+    },
+    cost:'The 129-C ladder says this is the <b>quietest</b> tier — the user did it on purpose, so framing it as loudly as a failure adds chrome to a deliberate act. Note the last two steps: <b>“never started” is not “skipped by the workflow”</b>, and the shipped union only has one word for both.'
+  },
+  unknown: {
+    clock: '3:31', anchor: 'claimed_at → updated_at',
+    states:  ['done','done','failed','skipped','skipped'],
+    reasons: [null,null,{ tone:'red', text:'reason_unknown — the run ended without saying why' },
+              { tone:'dim', text:'never started' },{ tone:'dim', text:'never started' }],
+    verdict: {
+      tier:'red', ico:'✕',
+      title:'Failed at step 3 — and we do not know why',
+      reason:'The run ended without a reason we recognise. That is being shown as itself rather than guessed at: no cause is invented, and the two later steps are marked as never started rather than skipped.',
+      where:'run_failed · reason_unknown (the closed-taxonomy fallback) · workflow_runs.status = "failed"'
+    },
+    cost:'<b>The honest fallback already exists</b> — <code>reason_unknown</code> is part of the shipped closed taxonomy (RC-4). The test is whether the surface can say “we do not know” without looking broken.'
+  },
+  cap: {
+    clock: '6:02', anchor: 'claimed_at',
+    states:  ['done','done','parked','pending','pending'],
+    reasons: [null,null,{ tone:'amber', text:'cap_paused · the step budget ran out' },null,null],
+    verdict: {
+      tier:'amber', ico:'‖',
+      title:'Paused — this run used up its step budget',
+      reason:'It is not finished and it has not failed. It is waiting for someone to let it continue. Two steps are still ahead of it.',
+      where:'workflow_runs.status = "cap_paused" · POST /runs/{id}/continue exists · continues_used = 1'
+    },
+    cost:'<b class="warn">Nothing in the product says this today.</b> <code>cap_paused</code> is a real value in the CHECK constraint and <code>POST /runs/{id}/continue</code> is a real route, but <code>PhaseTimeline</code>\'s terminal set is <code>{completed, failed, cancelled, timed_out}</code> — so a capped run is correctly non-terminal and completely unexplained. <i>(Also: <code>timed_out</code> in that set is not a valid status and can never occur — dead code.)</i>'
+  },
+  lie: {
+    broken: true, clock: '4:52', anchor: 'claimed_at → updated_at',
+    states:  ['done','done','done','done','lie'],
+    reasons: [null,null,null,null,null],
+    verdict: {
+      tier:'good', ico:'✓',
+      title:'All 5 steps complete',
+      reason:'Every step finished. The board pack is ready.',
+      where:'…except step 5 returned a status this client has never seen'
+    },
+    cost:'<b class="warn">This is the bug, drawn as it would actually look.</b> <code>DB_PHASE_STATUS[r.status] ?? "done"</code> (<code>StreamsProvider.tsx:3337</code>) maps an unrecognised status to <b>done</b>. Today all five DB values are mapped so it cannot fire — but the fallback is chosen wrong, and it is the same fail-open shape as the <code>findIndex → -1</code> that painted an unknown <code>blocked_stage</code> as 8/8 green. <b>The fix is one word: fall back to an explicit unknown, never to success.</b>'
+  }
+};
+
+var scenario = 'gate';
+
+function mark(type, size) {
+  if (typeof icon3d === 'function') {
+    try { return icon3d(type, size || 30); } catch (e) { /* fall through */ }
+  }
+  return '<span style="font-size:20px">◆</span>';
+}
+
+/* INHERITED, NOT INVENTED. ✕ is STATUS_META.failed (PhaseCard.tsx:72) and also
+   VERDICT_MARK.error (nodePresentation.ts:176) — the same mark for the same news.
+   ⊘ is sketch 129-C's shipped stopped/cancelled marker. ‖ is the ONE net-new mark
+   here, because `cap_paused` has no vocabulary anywhere in the product. */
+var CMARK = { red:{ c:'red', g:'✕' }, amber:{ c:'amber', g:'‖' }, dim:{ c:'dim', g:'⊘' } };
+
+function nodeHTML(v, i, state, reason) {
+  var step = STEPS[i];
+  var badges = step.waits ? '<div class="badges"><span class="badge">Waits for you</span></div>' : '';
+
+  /* A puts the reason INSIDE the card. B never does. C marks the node only. */
+  var reasonHTML = '';
+  if (v === 'a' && reason) {
+    reasonHTML = '<div class="reason ' + reason.tone + '">' + reason.text + '</div>';
+  }
+  var cmarkHTML = '';
+  if (v === 'c' && reason) {
+    var m = CMARK[reason.tone] || CMARK.dim;
+    cmarkHTML = '<span class="cmark ' + m.c + '"><span>' + m.g + '</span></span>';
+  }
+
+  return '<div class="node">' +
+    '<div class="card st-' + state + '">' +
+      '<p class="ttl">' + step.title + '</p>' +
+      '<p class="sub">' + step.sub + '</p>' +
+      badges + reasonHTML +
+    '</div>' +
+    (step.grounded ? '<span class="seal" title="Must prove it">⛨</span>' : '') +
+    cmarkHTML +
+    '<span class="icowrap">' +
+      '<span class="well" style="background:radial-gradient(circle,' + (TINT[step.type] || TINT.programmatic) + ',transparent 68%)"></span>' +
+      '<span class="lift"></span><span class="shadow"></span>' +
+      '<span class="mk">' + mark(step.type, 30) + '</span>' +
+    '</span>' +
+  '</div>';
+}
+
+function planeHTML(v, states, reasons) {
+  var out = '';
+  for (var i = 0; i < STEPS.length; i++) {
+    out += nodeHTML(v, i, states[i], reasons ? reasons[i] : null);
+    if (i < STEPS.length - 1) {
+      var cls = '';
+      if (states[i] === 'done' && states[i + 1] !== 'pending') cls = ' flow';
+      if (states[i] === 'failed' || states[i] === 'stopped') cls = ' cut';
+      out += '<div class="link' + cls + '"></div>';
+    }
+  }
+  return out;
+}
+
+function verdictHTML(v, sc) {
+  /* A carries the truth on the nodes, so it shows only a one-line frame.
+     B carries it entirely here. C carries the sentence here and the mark there. */
+  var vd = sc.verdict;
+  if (v === 'a') {
+    return '<div class="notice ' + vd.tier + '" style="padding:9px 14px;">' +
+      '<span class="ico">' + vd.ico + '</span>' +
+      '<div class="grow"><div class="nt-title">' + vd.title + '</div></div>' +
+      '<span style="font-size:10.5px;color:var(--color-text-dim);font-family:var(--font-mono);align-self:center;">the detail is on the steps</span>' +
+    '</div>';
+  }
+  return '<div class="notice ' + vd.tier + '">' +
+    '<span class="ico">' + vd.ico + '</span>' +
+    '<div class="grow">' +
+      '<div class="nt-title">' + vd.title + '</div>' +
+      '<div class="nt-reason">' + vd.reason +
+        '<span class="nt-where">' + vd.where + '</span>' +
+      '</div>' +
+    '</div>' +
+  '</div>';
+}
+
+function surfaceHTML(v) {
+  var sc = SCENARIOS[scenario];
+
+  var body;
+  if (sc.split) {
+    body = '<div class="split">' +
+      '<div><div class="splitlbl">Before — the live stream said “retrying”</div>' +
+        '<div class="plane">' + planeHTML(v, sc.before.states, sc.before.reasons) + '</div></div>' +
+      '<div><div class="splitlbl after">After the reconcile — it says “running”</div>' +
+        '<div class="plane">' + planeHTML(v, sc.after.states, sc.after.reasons) + '</div></div>' +
+    '</div>';
+  } else {
+    body = '<div class="canvaswrap"><div class="plane">' + planeHTML(v, sc.states, sc.reasons) + '</div></div>';
+  }
+
+  return '<div class="surface">' +
+    '<div class="shead">' +
+      '<h2>Supplier renewal risk pack</h2>' +
+      '<span class="vchip">run #128 · v3</span>' +
+      '<span class="grow"></span>' +
+      '<span class="clock">' + sc.clock + '<span class="anchor">' + sc.anchor + '</span></span>' +
+    '</div>' +
+    '<div class="band">' + verdictHTML(v, sc) + '</div>' +
+    body +
+    '<div class="cost">' + sc.cost + '</div>' +
+  '</div>';
+}
+
+function render() {
+  ['a', 'b', 'c'].forEach(function (v) {
+    document.getElementById('variant-' + v).innerHTML = surfaceHTML(v);
+  });
+}
+
+/* ── wiring ─────────────────────────────────────────────────────────────── */
+var toastT = null;
+function toast(msg) {
+  var el = document.getElementById('toast');
+  el.textContent = msg;
+  el.style.opacity = '1'; el.style.transform = 'translate(-50%, 0)';
+  if (toastT) clearTimeout(toastT);
+  toastT = setTimeout(function () {
+    el.style.opacity = '0'; el.style.transform = 'translate(-50%, 8px)';
+  }, 4200);
+}
+
+document.getElementById('vnav').addEventListener('click', function (e) {
+  var b = e.target.closest('[data-v]'); if (!b) return;
+  var tabs = document.querySelectorAll('.variant-tab');
+  for (var i = 0; i < tabs.length; i++) tabs[i].classList.remove('active');
+  b.classList.add('active');
+  var vs = document.querySelectorAll('.variant');
+  for (var j = 0; j < vs.length; j++) vs[j].classList.remove('active');
+  document.getElementById('variant-' + b.getAttribute('data-v')).classList.add('active');
+});
+
+document.querySelector('.bar').addEventListener('click', function (e) {
+  var b = e.target.closest('[data-s]'); if (!b) return;
+  var btns = document.querySelectorAll('.mbtn');
+  for (var i = 0; i < btns.length; i++) btns[i].classList.remove('on');
+  b.classList.add('on');
+  scenario = b.getAttribute('data-s');
+  render();
+  if (scenario === 'lie') {
+    toast('Step 5 returned a status this client has never seen — and the ?? fallback painted it DONE. Success must never be the fallback.');
+  } else if (scenario === 'reload') {
+    toast('Watch step 3. Nothing failed — "retrying" simply has no database representation, so a reconnect cannot bring it back.');
+  }
+});
+
+document.querySelector('.sketch-toolbar').addEventListener('click', function (e) {
+  var b = e.target.closest('[data-act="vp"]'); if (!b) return;
+  var w = b.getAttribute('data-w');
+  document.getElementById('stage').style.maxWidth = (w === '0') ? 'none' : (w + 'px');
+});
+
+document.getElementById('theme-switcher').addEventListener('change', function (e) {
+  document.querySelector('link[href*="themes"]').href = '../themes/' + e.target.value + '.css';
+});
+
+render();
+</script>
+</body>
+</html>
