@@ -9,7 +9,15 @@
  * run-confirm), and asserts the doRun wiring fired end to end:
  *   - createThread(def.name)                                  (always a NEW thread, D-03)
  *   - postMessage(thread.id, kickoff, { workflowDefinitionId })  (the live route, D-02)
- *   - onNavigate("chat")                                       (switches to the thread)
+ *   - onNavigate(<the run surface>)                            (Phase 188 — see below)
+ *
+ * ⚠ AMENDED BY PHASE 188 PLAN 09 (RUNVIZ-03 / SPEC Req 6 / D-188-12). The third
+ * assertion used to read `onNavigate("chat")` — the launch dropped the user into a
+ * chat message list, which is the operator report Phase 188 exists to answer. A
+ * running workflow now lands on its OWN surface. The FIRST TWO assertions are
+ * unchanged and are load-bearing in both phases: Phase 121's D-02/D-03 launch route
+ * and Phase 188's Req 6 second assertion (*the thread is still created and still
+ * anchors the run*) are the same two facts, so this file guards both at once.
  *
  * No assertion on the removed in-chat picker — that is gone (covered by SC#1 in
  * ChatAreaMode.test.tsx). NavPanel + WorkspacePanel are stubbed to trivial nodes
@@ -32,6 +40,7 @@ const {
   mockPublish,
   mockListFolders,
   mockListSkills,
+  mockGetThreadWorkflow,
 } = vi.hoisted(() => ({
   mockCreateThread: vi.fn(),
   mockPostMessage: vi.fn(),
@@ -45,6 +54,8 @@ const {
   mockPublish: vi.fn(),
   mockListFolders: vi.fn(),
   mockListSkills: vi.fn(),
+  // Phase 188-09: doRun resolves the run surface's id from the thread's run anchor.
+  mockGetThreadWorkflow: vi.fn(),
 }))
 
 // The api seam: ChatLayout.doRun consumes createThread + postMessage; the hosted
@@ -65,6 +76,16 @@ vi.mock("@/lib/api", () => ({
   publishWorkflow: mockPublish,
   listFolders: mockListFolders,
   listSkills: mockListSkills,
+  getThreadWorkflow: mockGetThreadWorkflow,
+}))
+
+// Phase 188-09: ChatLayout now mounts the run surface in its non-chat else branch.
+// Stubbed to a leaf so this launch suite stays scoped to the doRun wiring (the page
+// itself is fenced by WorkflowRunPage.test.tsx).
+vi.mock("@/pages/WorkflowRunPage", () => ({
+  WorkflowRunPage: ({ runId }: { runId: string | null }) => (
+    <div data-testid="run-page-stub">{runId ?? "no-run"}</div>
+  ),
 }))
 
 // ChatLayout's thread/folder/theme hooks — return the exact fns ChatLayout
@@ -119,6 +140,9 @@ beforeEach(() => {
   mockListDrafts.mockResolvedValue([])
   mockListFolders.mockResolvedValue([])
   mockListSkills.mockResolvedValue([])
+  // Phase 188-09: the thread anchor carries the `workflow_runs` id the run surface
+  // is addressed by. Deliberately DIFFERENT from any producer id so a swap is visible.
+  mockGetThreadWorkflow.mockResolvedValue({ active_workflow_run_id: "wfrun-121" })
 })
 
 function renderLayout(onNavigate = vi.fn()) {
@@ -135,7 +159,7 @@ function renderLayout(onNavigate = vi.fn()) {
 }
 
 describe("ChatLayout — Workflows-page Run launches a workflow (SC#2, D-02/D-03)", () => {
-  it("Run → doRun calls createThread + postMessage({workflowDefinitionId}) + navigates to chat", async () => {
+  it("Run → doRun calls createThread + postMessage({workflowDefinitionId}) + navigates to the run surface", async () => {
     const { onNavigate } = renderLayout()
 
     // Drive the page launch: click the published card's Run, fill the kickoff, confirm.
@@ -156,8 +180,14 @@ describe("ChatLayout — Workflows-page Run launches a workflow (SC#2, D-02/D-03
       workflowDefinitionId: "pub-1",
     })
 
-    // doRun: the user is switched to the thread to watch the run.
-    await waitFor(() => expect(onNavigate).toHaveBeenCalledWith("chat"))
+    // Phase 188-09 (D-188-11): the run surface's id is resolved from the CREATED
+    // thread's run anchor — the `workflow_runs` row, not the producer row the message
+    // POST hands back.
+    await waitFor(() => expect(mockGetThreadWorkflow).toHaveBeenCalledWith("thread-new"))
+
+    // Phase 188-09 (D-188-12): the user lands on the run, NOT in the chat message list.
+    await waitFor(() => expect(onNavigate).toHaveBeenCalledWith("workflow-run"))
+    expect(onNavigate).not.toHaveBeenCalledWith("chat")
 
     // WR-04 invariant: a SUCCESSFUL launch never deletes the created thread.
     expect(mockDeleteThread).not.toHaveBeenCalled()

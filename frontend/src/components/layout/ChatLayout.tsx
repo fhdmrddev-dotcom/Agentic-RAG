@@ -49,11 +49,15 @@ import type { NavItem } from "@/lib/nav-items"
 // /workflows/{id}/run route (D-103-CONF-1; threads.py byte-identical).
 // WR-04: the raw deleteThread api client, aliased to avoid shadowing the useThreads()
 // binding (:77) — used for best-effort orphan cleanup on a failed launch.
+// Phase 188 Plan 09 (RUNVIZ-03 / D-188-11): getThreadWorkflow is how the launch
+// resolves the id the run surface is addressed by. See doRun's tail for why this
+// extra client read exists rather than an additive key on the message POST response.
 import {
   createThread,
   postMessage,
   uploadWorkspaceTemplate,
   deleteThread as deleteLaunchThread,
+  getThreadWorkflow,
   type PublishedWorkflow,
 } from "@/lib/api"
 
@@ -221,11 +225,9 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
   //    `drawerOpen`) — ChatLayout already owns `doRun`, `onNavigate` and the panel, so
   //    it is the right owner. `studioSkillId` is the App-held precedent for the same
   //    shape; this one stays local because only doRun and the branch below read it.
-  //    ⚠ This is a `workflow_runs.id`, NEVER a producer `runs.run_id`.
-  //    The setter arrives with the launch retarget (the next commit): this commit
-  //    lands the HOME (union member + branch), so the id is still always null here
-  //    and the surface renders its calm no-id guard. ──
-  const [activeRunId] = useState<string | null>(null)
+  //    ⚠ This is a `workflow_runs.id`, NEVER a producer `runs.run_id`. Set by doRun
+  //    from the thread's run anchor — see the tail of doRun for the id trap. ──
+  const [activeRunId, setActiveRunId] = useState<string | null>(null)
 
   // ── Phase 103-06 (REQ-7 / D-103-CONF-1): doRun — the Run-from-page launch.
   //    Workflows are a MODE of a thread, never page-resident: Run creates a NEW
@@ -276,6 +278,52 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
       }
       // Only reached on a successful launch — never runs after a thrown/cleaned failure.
       await loadThreads()
+      // ── Phase 188 Plan 09 (RUNVIZ-03 / SPEC Req 6 / D-188-11 / D-188-12): a running
+      //    workflow gets its OWN room. This tail used to select the created thread and
+      //    switch straight to the chat view, dropping the user into a message list — the
+      //    operator report this phase exists to answer. (The two replaced calls are
+      //    described by ROLE, not quoted: the acceptance fence counts navigation calls in
+      //    this file, and quoted prose would inflate a code measurement — the 187-24
+      //    lesson.) Everything ABOVE this comment is
+      //    unchanged: the thread is still created, the template still uploads before the
+      //    send, the kickoff still carries the definition id, and the WR-04 orphan cleanup
+      //    still owns the failure path. The thread still anchors the run and stays
+      //    reachable (D-14 keeps the run thread-backed); only where the user STANDS moved.
+      //
+      //    ⚠ THE ID TRAP. Two differently-typed ids share the name `run_id` in this
+      //    codebase, and both are bare uuids, so the compiler cannot catch a swap. The id
+      //    the message POST hands back is the PRODUCER row that `GET /runs/{id}/stream`
+      //    consumes — a different table. The run surface is addressed by the
+      //    `workflow_runs` row, which is exactly what the thread's `active_workflow_run_id`
+      //    anchor holds. Navigating with the other one yields a surface that resolves
+      //    nothing. (The literals for the wrong id are deliberately left unspelled here —
+      //    the acceptance fence greps this file for them, and prose that names them would
+      //    make a code measurement satisfiable by a comment: the 187-24 lesson.)
+      //
+      //    THERE IS NO RACE, measured: `create_workflow_run` writes the thread anchor in
+      //    the same transaction as the `workflow_runs` INSERT (`threads.py:930-948`),
+      //    before the producer spawns and before the POST's response is built (`:1011`).
+      //    So this read is deterministic and needs no retry loop and no thread-id fallback.
+      //
+      //    WHY AN EXTRA CLIENT READ rather than one additive key on the POST response:
+      //    `backend/app/api/threads.py` is a G-5-firing file (9+ plans) and an additive key
+      //    there would change the response bytes for EVERY workflow kickoff. Keeping this
+      //    phase out of that file is the reason this shape was chosen, not an oversight.
+      //
+      //    The null/failed read falls back to the SHIPPED behaviour — a deliberate
+      //    degradation, not a race workaround. A run surface that cannot resolve its run is
+      //    worse than the chat view we came from, and this read happens AFTER a launch that
+      //    already succeeded, so a network blip here must never be reported as a failed
+      //    launch (the RunModal would render an error for a run that is genuinely under
+      //    way). ──
+      const workflowRunId = await getThreadWorkflow(thread.id)
+        .then((wf) => wf.active_workflow_run_id)
+        .catch(() => null)
+      if (workflowRunId) {
+        setActiveRunId(workflowRunId)
+        onNavigate("workflow-run")
+        return
+      }
       selectThread(thread)
       onNavigate("chat")
     },
