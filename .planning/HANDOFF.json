@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "timestamp": "2026-08-05T16:00:00.000Z",
+  "timestamp": "2026-08-05T16:15:00.000Z",
   "phase": "188",
   "phase_name": "non-technical-run-observability",
   "phase_dir": ".planning/phases/188-non-technical-run-observability",
@@ -68,14 +68,15 @@
       "name": "F6 — the live elapsed clock never ticked on any run (F3's residue); found by watching, fixed, verified live",
       "status": "done",
       "commit": "abd4ce64"
+    },
+    {
+      "id": 10,
+      "name": "UAT rows 9/10/11 driven live — all three PASS (runs 4d82ab27 / 882e33dc+3bab9aa4 / 0114b2fe)",
+      "status": "done",
+      "commit": ""
     }
   ],
   "remaining_tasks": [
-    {
-      "id": 10,
-      "name": "UAT rows 9/10/11 — multi-tool, parallel-thread, long-message",
-      "status": "not_started"
-    },
     {
       "id": 11,
       "name": "UAT row 15 — the full 'Tomorrow' journey end to end",
@@ -109,9 +110,9 @@
       "workaround": "Provider-side; re-drive with scripts/sc10_188_run_board.py --providers minimax to separate flake from defect"
     },
     {
-      "description": "UAT rows 9/10/11 and 15 need a driving session",
+      "description": "Row 15 (full 'Tomorrow' journey) is the last pending board row",
       "type": "human_action",
-      "workaround": "Nothing blocks them technically; scripts/longmsg_workflow_smoke.py already builds the >=5KB prompt for row 11"
+      "workaround": "Nothing blocks it technically; any workflow that completes with a deliverable works"
     }
   ],
   "human_actions_pending": [
@@ -176,9 +177,14 @@
       "decision": "Fixed F6 inline rather than opening a round",
       "rationale": "G-3: one file, one hoisted const, no schema or API surface — and it was found by live UAT of the very surface, not manufactured by a review",
       "phase": "188"
+    },
+    {
+      "decision": "Substituted multitool_scope_098uat for research_summarize on rows 9 and 11",
+      "rationale": "research_summarize is is_system_global but in org 430bffc6 while this account is in 22f9c615, so it is not visible to this user — v3.4 RLS working as designed. Both rows name multitool_scope_098uat as the alternative",
+      "phase": "188"
     }
   ],
   "uncommitted_files": [],
-  "next_action": "Drive UAT rows 9/10/11 (multi-tool, parallel-thread, long-message) and row 15's full 'Tomorrow' journey — none has been driven. scripts/longmsg_workflow_smoke.py already builds the >=5KB prompt for row 11. Then the 10 deferred review WARNINGs (WR-01 and WR-04 first).",
-  "context_notes": "The through-line held, and then repeated itself. F5 was the third way this surface claimed something that was not happening; F6 was the fourth — and F6 was INTRODUCED BY F3, a UAT fix, surviving because that fix was verified by re-reading the wording rather than watching the number for ten seconds. No suite could have found it: the figure is correct at every single sample and wrong only across two. Drive a real run and WATCH it; a paired DB read at one instant is necessary and not sufficient. Gates at hand-off: count 2460/2460 zero slack failed 0; tsc -p tsconfig.app.json 33 (root config checks ZERO files); vite build 0; zero migrations; WorkflowCanvas.tsx untouched."
+  "next_action": "Drive UAT row 15 — the full 'Tomorrow' journey end to end. It is the last pending row on the board (15 PASS / 0 FAIL / 1 blocked / 1 pending).",
+  "context_notes": "Rows 9/10/11 are driven and PASS. Two things to carry: (1) IDENTIFY A RUN BY ITS ID ON THE WIRE — the longmsg smoke script titles every thread identically AND builds the same deterministic prompt, so a June thread matched both and its surface read '✓ Complete'; a false PASS was avoided only because its spine had 2 nodes and row 11's workflow has 1. (2) There is NO ROUTER and no deep link to a run, so 'refresh the run page' is only performable as reload -> the thread -> the D-188-13 receipt. Also: tool activity is evidenced from the Redis run buffer (run:{run_id}), not from assistant prose — the model claimed code ran while showing a plain list. Gates unchanged: count 2460/2460 zero slack failed 0; tsc -p tsconfig.app.json 33; vite build 0; zero migrations."
 }

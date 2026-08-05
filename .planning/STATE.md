@@ -78,10 +78,41 @@ Gates: count gate **2460/2460, failed 0, 45/45 pinned, zero slack** (WorkflowRun
 re-pinned in the same commits) · `tsc --noEmit -p tsconfig.app.json` **33** (inherited baseline,
 0 in touched files) · `vite build` exit 0 · zero migrations · `WorkflowCanvas.tsx` untouched.
 
-**Next action:** UAT rows 9/10/11 (multi-tool · parallel-thread · long-message) and row 15's full
-"Tomorrow" journey — none driven. Then the 10 deferred review WARNINGs (WR-01, WR-04 first), the
-minimax SC#10 re-drive (⛔ `SC10-188-RUN`, costs real spend — operator's call), and the still-OWED
-G-5 `PlaneEditingLayer` / `EDIT_AFFORDANCE` extraction.
+**UAT rows 9 · 10 · 11 DRIVEN 2026-08-05 — all three PASS.** Board now **15 PASS · 0 FAIL ·
+1 ⛔ · 1 pending**.
+
+- **Row 9 multi-tool** (run `4d82ab27`) — both tools fired in one phase, evidenced from the
+  Redis run buffer, NOT from the model's prose (which claimed "The Python code was executed"
+  while showing a plain list). `execute_code`: `code_execution_start` + 5 × `code_stdout` +
+  `exit_code 0`. `search_documents`: its `sources`/`citations` events, confirmed to be its
+  activity by reading `_handle_search_documents` (`tool_dispatcher.py:686`) rather than
+  inferring it from the citations' presence. Node read `Running` at both in-flight samples
+  (DB `active` both times) and `Complete` only after the DB said `completed`.
+- **Row 10 parallel-thread** (runs `882e33dc` + `3bab9aa4`, two tabs, concurrent) — different
+  spines, node counts and bands at the same instant; `active_workflow_run_id` differs per
+  thread and each equals its own run; B reaching terminal and NULLing its own anchor did not
+  disturb A. ⚠ **The row's "refresh either tab" is not literally performable — there is no
+  router and no deep link to a run**, so a reload lands on Chat; it was done as reload → the
+  thread → the D-188-13 "Open the run" receipt.
+- **Row 11 long-message** (run `0114b2fe`) — kickoff 5543 B persisted intact, run `completed`,
+  no phase stranded, node correct at terminal, receipt opened it with `active_workflow_run_id`
+  already NULL (CR-03 holding).
+
+⚠ **Fixture substitution, recorded not silent:** rows 9/11 nominate `research_summarize`, which
+is `is_system_global` but in org `430bffc6…` while this account is in `22f9c615…` — **not visible
+to this user**, v3.4 RLS working as designed. Both rows name `multitool_scope_098uat` as the
+alternative and that is what was driven.
+
+⚠ **Methodology lesson — a false PASS was nearly recorded on row 11.** The smoke script titles
+every thread `EVAL-02 long-message axis row` **and builds the same deterministic prompt each
+time**, so a June thread matched both the title and a prompt substring, and its run surface
+opened reading `✓ Complete`. Caught only because the spine had 2 nodes and row 11's workflow has
+1; settled by reading the actual `GET /workflow-runs/{id}` off the network. **Identify a run by
+its id on the wire — a title and a prompt are not identifiers.**
+
+**Next action:** row 15's full "Tomorrow" journey (the last pending row). Then the 10 deferred
+review WARNINGs (WR-01, WR-04 first), the minimax SC#10 re-drive (⛔ `SC10-188-RUN`, real spend —
+operator's call), and the still-OWED G-5 `PlaneEditingLayer` / `EDIT_AFFORDANCE` extraction.
 
 **Plan 187-01 COMPLETE (Wave 1, 2026-08-02, `6793f651`).** The SC#6 property test
 (`backend/tests/unit/test_187_armed_checkpoint_property.py`, 30 tests) is written and **observed RED
