@@ -42,9 +42,45 @@ findings:
   info: 0
   total: 16
 status: issues_found
+triage:
+  applied: 2026-08-05
+  critical_fixed: 6
+  warnings_deferred: 10
+  gap_closure_rounds_used: 0
 ---
 
 # Phase 188: Code Review Report
+
+## ⚠ Triage applied 2026-08-05 (orchestrator) — read this before the findings
+
+**All 6 CRITICAL findings are FIXED**, each with a RED observation recorded before the fix
+(`f13fdb3a` CR-01 · `29e2d042` CR-02 · `fa8f73a2` CR-03 · `cb7a793f` CR-04 · `bce384ef` CR-05 ·
+`50c534cf` CR-06). Gates after the pass: count gate **2442 / 2442 · failed 0**, `tsc -p
+tsconfig.app.json` **33** unchanged, backend canvas/gate suites **20 passed**, `vite build` exit 0,
+`WorkflowCanvas.tsx` still **13 ins / 2 del** against the ≤15/≤4 cap, **zero migrations**.
+
+**Two findings did not survive contact and are recorded as corrected, not silently applied:**
+
+- **CR-02's proposed fix was inoperative.** The review said restoring `selectThread(thread)` in
+  `doRun` would arm the stream. Measured: `selectThread` only moves `useThreads`' pointer; the only
+  production callers of `setViewingThread` (whose body fires the store `reconcile` that calls
+  `subscribeToRun`) are in `ChatArea.tsx`, which mounts **only** inside the chat branch. The defect
+  was real; the prescription was not. Fixed on the page instead, which is also path-independent.
+- **CR-06's symptom was sharper than described.** The review said a jumped-over step reads
+  *Complete*; measured in `harness_engine.py`, the skip branch does not call
+  `advance_current_phase`, so the cursor can be **parked on** the skipped row and paint it
+  *running* — a step reported as executing right now. The fix is not "overlay status" (that is the
+  counter-backward regression 188-04 refused): the floor may only ADVANCE a row the DB left
+  unresolved, never overwrite one the engine already resolved.
+
+**The 10 WARNINGs are DEFERRED, not fixed** — a deliberate G-7 decision, recorded rather than
+implied. This phase has used **0 gap-closure rounds**; the blockers were fixed directly because
+multiple ROADMAP success criteria were genuinely unmet (SC#1 live per-node state, SC#5 launch lands
+on a live run, SC#6 a finished run is retrievable). The warnings do not block any success criterion.
+Re-open trigger: the next phase touching the run surface, or immediately if manual UAT surfaces one.
+Two worth doing early — **WR-01** (a terminal run with a null `claimed_at` renders "✓ Complete …
+Waiting to start", a self-contradiction on an honesty surface) and **WR-04** (prototype-key lookups
+that survive in this phase's own files against its stated totality contracts).
 
 **Reviewed:** 2026-08-05
 **Depth:** standard
