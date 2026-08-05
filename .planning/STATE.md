@@ -4,12 +4,12 @@ milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio — 🚧 ACTIVE
 status: executing
 last_updated: "2026-08-05T14:41:59.608Z"
-last_activity: 2026-08-05 -- Phase 188 execution started
+last_activity: 2026-08-05 -- Phase 188 UAT board COMPLETE (16 PASS / 0 FAIL / 1 blocked); security review owed
 progress:
   total_phases: 19
   completed_phases: 8
   total_plans: 114
-  completed_plans: 113
+  completed_plans: 114
   percent: 42
 ---
 
@@ -44,7 +44,47 @@ Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 op
 
 ## Current Position
 
-Phase: 188 (non-technical-run-observability) — EXECUTING
+Phase: 188 (non-technical-run-observability) — **UAT COMPLETE · security review OWED**
+
+**▶ NEXT ACTION: `/gsd:secure-phase 188`.** All 13 plans executed; the UAT board is settled at
+**16 PASS · 0 FAIL · 1 ⛔ · 0 pending**; no `188-SECURITY.md` exists and `security_enforcement`
+defaults on, so the phase is NOT yet verified. Precedent: 185 and 186 both closed SECURED.
+
+**UAT rows 12 · 14 · 16 DRIVEN 2026-08-05 at `/gsd:verify-work 188` — all three PASS.** They
+were already *counted* as PASS in the board's header but **none carried a driven record of its
+own**: row 12's evidence lived inside the F1/F2 defect write-ups, row 14 was recorded verbatim
+as "PARTIAL — cannot exercise all seven while F1 stands" and was never re-driven after F1 was
+fixed, and row 16 had no record at all (its evidence was incidental to row 15, and its actual
+observable — *"no broken preview pane renders"* — had never been checked). **Three of sixteen
+claimed PASSes resting on evidence gathered while driving other rows is the exact pattern this
+phase exists to remove.** Now each of the sixteen carries its own record.
+
+- **Row 12** (run `b48cd039`, `doc_qa_scoped_098uat`) — 3 transitions watched live with no
+  reload, each paired to a `workflow_phases` read; then a **hard refresh with `confirm` sitting
+  `active`** returned **byte-identical** node readings against an unchanged DB. Only the elapsed
+  figure moved (1m 15s → 1m 56s) — correct, and the reason F6 exists. Panel and canvas read side
+  by side agree on every fact and differ only in vocabulary (§H #1). Terminal: `✓ Complete`,
+  `Ran for 6m 05s — from when it was queued to its last update`.
+- **Row 14** (colour off) — **6 of 7 readings observed on REAL runs.** The 7th cannot be:
+  `workflow_phases_status_check` restricts the column to five values, so `unknown` is not a run
+  state at all but the total-function fallback for a value arriving over the **wire**. Driven
+  that way, an unrecognised status rendered **"State unknown — we can't tell what happened to
+  this step"** — **not** `Complete`, no crash. **That is SC#3's total function proven against a
+  genuinely unrecognised value, and no row had ever made the observation.** Four readings on one
+  grayscale screen separate by geometry alone (`1.5 6` dots · `5 7` coarse · no arc element ·
+  unbroken ring), and the rendered numbers match `RING_GEOMETRY`'s computation exactly.
+- **Row 16** (`.docx`) — driven on run `27bb0f6b`, **fixture reuse recorded rather than silently
+  made**. One control (the card IS the button); one click fired
+  `GET /threads/…/workspace/files/…/raw` → blob → anchor `download="risk-register.docx"`,
+  instrumented not inferred; and **0 iframes / 0 embeds / 0 file-bearing images** — there is no
+  preview element to break.
+
+⚠ **Two things recorded, not graded.** (1) The run surface is `👁 View only`, so a node reading
+*"Pauses here until you answer"* sits on a screen with no way to answer — the route out is
+present and labelled (`Open the chat thread`), so this is honest rather than broken, but it is a
+legibility question worth a future row. (2) Two screenshots timed out (`Page.captureScreenshot`
+— the known Chrome-MCP behaviour here); the ring geometry was read out of the DOM instead, which
+is machine-checkable. The missing artefacts are pictures, not findings.
 
 **F5 + F6 FIXED AND VERIFIED LIVE (2026-08-05, `3748e6d1` + `abd4ce64`).**
 
