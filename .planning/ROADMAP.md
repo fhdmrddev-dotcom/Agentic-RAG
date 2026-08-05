@@ -515,7 +515,7 @@ Plans:
 
 **Wave 7** *(blocked on 188-03 + 188-05 + 188-07)*
 
-- [ ] 188-08-PLAN.md — `getWorkflowRun` and `WorkflowRunPage`: the header, the one-line run band (total over `workflow_runs.status` — an unrecognised value reads *State unknown*, never *Complete*), the `claimed_at`-anchored elapsed label with no clock at all when it is null, and the **page-owned `phase_index` join** that keeps `phase_index` out of the canvas (wave 7)
+- [x] 188-08-PLAN.md — `getWorkflowRun` and `WorkflowRunPage`: the header, the one-line run band (total over `workflow_runs.status` — an unrecognised value reads *State unknown*, never *Complete*), the `claimed_at`-anchored elapsed label with no clock at all when it is null, and the **page-owned `phase_index` join** that keeps `phase_index` out of the canvas (wave 7)
 
 
 **Wave 8** *(blocked on 188-08)*
