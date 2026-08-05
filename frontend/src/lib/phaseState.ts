@@ -61,9 +61,21 @@ export const DB_PHASE_STATUS: Record<string, Phase["status"]> = {
  *
  * The fallback lives inside this function rather than at each call site precisely so
  * that there is exactly ONE place it can be got wrong.
+ *
+ * ⚠ THE OWN-PROPERTY GUARD IS NOT CEREMONY, and it was measured RED before it was
+ * written. `DB_PHASE_STATUS` is a plain object literal, so it INHERITS `constructor`,
+ * `toString`, `__proto__` and friends. A bare index-and-coalesce therefore returns a
+ * FUNCTION (or `Object.prototype`) for those keys — never nullish, so the coalesce
+ * never fires — typed as a `Phase["status"]`. That value then misses the panel's
+ * `STATUS_META` lookup and crashes the card reading `.glyph` off `undefined`. The
+ * observed value for `constructor` was literally `[Function Object]`. It is
+ * unreachable from the CHECK-constrained column today, which is precisely the argument
+ * under which every fail-open in this file's history shipped: totality is a property
+ * of the function, not of its current callers.
  */
 export function phaseStatusFromDb(raw: string): Phase["status"] {
-  return DB_PHASE_STATUS[raw] ?? "unknown"
+  if (!Object.prototype.hasOwnProperty.call(DB_PHASE_STATUS, raw)) return "unknown"
+  return DB_PHASE_STATUS[raw]
 }
 
 /**

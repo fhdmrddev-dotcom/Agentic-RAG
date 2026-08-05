@@ -260,6 +260,21 @@ const TARGETS = [
   // them deliberately, with its own measured number.
   "src/components/panel/__tests__/PhaseReconcile.test.tsx",
   "src/components/panel/__tests__/PhaseTimeline.test.tsx",
+  // Added in 188-05, in the SAME COMMIT that creates the file — never earlier (a
+  // TARGETS entry pointing at a path that does not exist yet makes the gate ERROR, not
+  // fail) and never later (the two-knob trap above, third occurrence). `src/lib/`
+  // lands outside BOTH knobs by default: the directory entries above cover only
+  // `src/components/workflows`, four named `src/pages/` files and two named
+  // `src/components/panel/__tests__/` files. Without this entry `phaseState.test.ts`
+  // would never be EXECUTED by the gate, and Req 8's zero-re-derivation source fence —
+  // the ONLY mechanical thing standing between the shared derivation and a second copy
+  // of it appearing in the canvas tree — would be deletable with the gate green.
+  // FILE-LEVEL, deliberately NOT the bare directory `src/lib`: it holds ten other
+  // suites this phase does not read, and adopting them would make this phase the owner
+  // of their future rot (the same reasoning recorded for the panel directory above).
+  // Left OUT of BASELINE on purpose — it postdates the 1037 pin, so it reports as
+  // `new` and its own count is free to grow; 188-11 pins it from the printed `actual`.
+  "src/lib/phaseState.test.ts",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
