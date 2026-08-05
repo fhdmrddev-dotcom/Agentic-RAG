@@ -489,8 +489,8 @@ Plans:
 
 **Wave 2** *(blocked on 188-01 so the baselines are recorded first; these two share no files and run in parallel)*
 
-- [ ] 188-02-PLAN.md — **TWO fail-opens, both observed RED first**: the SPEC named `?? "done"` (unreachable); RESEARCH found the REACHABLE one — `finalizeAllPhasesForThread` sweeps `pending` → `done`, and `skip_to_phase` leaves jumped-over phases `pending` forever, so a step that never ran paints Complete live and Not started after a refresh. Narrows the predicate, widens `Phase["status"]` with `"unknown"` and takes the compiler-forced `STATUS_META` entry (wave 2)
-- [ ] 188-03-PLAN.md — `GET /workflow-runs/{workflow_run_id}` (D-188-15, NOT `/runs/{id}`): ownership-gated FIRST with 404-on-miss through the user-JWT client, `require_canvas()` alone, the path template added to `CANVAS_GATED_PATHS`, and BOTH shipped gate fences updated in the same commit (wave 2)
+- [x] 188-02-PLAN.md — **TWO fail-opens, both observed RED first**: the SPEC named `?? "done"` (unreachable); RESEARCH found the REACHABLE one — `finalizeAllPhasesForThread` sweeps `pending` → `done`, and `skip_to_phase` leaves jumped-over phases `pending` forever, so a step that never ran paints Complete live and Not started after a refresh. Narrows the predicate, widens `Phase["status"]` with `"unknown"` and takes the compiler-forced `STATUS_META` entry (wave 2)
+- [x] 188-03-PLAN.md — `GET /workflow-runs/{workflow_run_id}` (D-188-15, NOT `/runs/{id}`): ownership-gated FIRST with 404-on-miss through the user-JWT client, `require_canvas()` alone, the path template added to `CANVAS_GATED_PATHS`, and BOTH shipped gate fences updated in the same commit (wave 2)
 
 
 **Wave 3** *(blocked on 188-02 — same reducer)*
