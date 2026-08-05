@@ -82,6 +82,10 @@ import {
   ApiError,
   type StreamCallbacks,
   type ThreadSnapshot,
+  // Phase 188 Plan 04 (D-188-22) — one durable workflow_phases row, as the wire
+  // sends it. The LIVE reconcile branch below joins these onto its positional
+  // skeleton by `phase_index` to recover the REAL step identity.
+  type WorkflowPhaseState,
 } from "@/lib/api"
 import { usePanelReconcile } from "@/hooks/usePanelReconcile"
 // Phase 166 (D-166-07/08): the org-context bridge. OrgProvider mounts ABOVE this
@@ -3316,18 +3320,55 @@ const DB_PHASE_STATUS: Record<string, Phase["status"]> = {
 
 async function reconcilePhases(threadId: string, signal?: AbortSignal): Promise<Phase[]> {
   const wf = await getThreadWorkflow(threadId, signal)
-  // Live/ACTIVE harness run → the existing forward-only skeleton floor (UNCHANGED):
-  // total_phases rows, the current one running. Slugs are unknown ahead of live
-  // phase_started (only current_phase_slug is known), so non-current rows carry
-  // positional placeholder slugs the live events replace.
+  // Live/ACTIVE harness run → the forward-only skeleton floor: total_phases rows, the
+  // current one running, with the REAL step identity overlaid from `wf.phases`.
+  //
+  // Phase 188 Plan 04 (RUNVIZ-01 / D-188-22) — BUG-260609-04 closed at its root. This
+  // comment used to read "slugs are unknown ahead of live phase_started, so non-current
+  // rows carry positional placeholders the live events replace". THAT PREMISE IS FALSE,
+  // and it is measured, not argued: `create_workflow_run`
+  // (`backend/app/db/workflows.py:206-214`) inserts EVERY `workflow_phases` row at run
+  // CREATION, all `pending`, inside one transaction — and it is the ONLY
+  // `INSERT INTO workflow_phases` anywhere in `backend/app`. `GET /threads/{id}/workflow`
+  // resolves `phases_source_run_id = active_workflow_run_id` FIRST, so `slug`,
+  // `phase_index`, `status` and `phase_type` arrive for every position of a LIVE run too.
+  // The real names were always on the wire; this branch was discarding them and painting
+  // `phase-0` at the operator (the exact render the bug report screenshotted).
+  //
+  // The overlay is therefore COMPLETE, not partial. D-188-22's hedge — "keep the
+  // total_phases floor for rows the harness has not inserted yet" — describes a case that
+  // cannot occur. `total_phases` stays the array length as defence in depth ONLY; it is
+  // not load-bearing (it equals `len(phases)` whenever the anchor is set,
+  // `threads.py:1100-1101`). The `?? placeholder` tails below are kept for the same
+  // reason, and are exercised by a positive control rather than assumed.
+  //
+  // THE JOIN KEY IS `phase_index`, NEVER the slug: the very value this branch can emit as
+  // a placeholder cannot also be the key that repairs it. Same reasoning as the
+  // BUG-260609-01 by-INDEX sweep above. `byIndex.get(i)` is deliberately read twice
+  // rather than hoisted into a block body, so the status line below stays BYTE-identical
+  // in the diff — the cheap lookup buys a mechanically checkable no-op.
+  //
+  // STATUS IS DELIBERATELY NOT OVERLAID — the overlay carries IDENTITY ONLY (`slug`,
+  // `phaseType`). The positional derivation is a FORWARD-ONLY floor and is in some cases
+  // MORE advanced than the DB rows, because a row flips only at `complete_phase`.
+  // Overlaying it would let a lagging row drag `PhaseTimeline`'s shipped counter
+  // (`PhaseTimeline.tsx:115-127`) BACKWARD — a regression dressed as a fix, and strictly
+  // worse than the cosmetic defect being closed (T-188-04-01). That is fenced
+  // mechanically by the floor guard in `panel/__tests__/PhaseReconcile.test.tsx`, whose
+  // fixture holds every DB row at `pending` while the counter has already advanced.
   if (wf.mode === "harness" && !wf.lock_is_stale) {
     const total = wf.total_phases ?? 0
     if (total <= 0) return []
     const current = wf.current_phase_index ?? 0
+    const byIndex = new Map<number, WorkflowPhaseState>(
+      (wf.phases ?? []).map((r) => [r.phase_index, r]),
+    )
     return Array.from({ length: total }, (_, i): Phase => ({
-      slug: i === current ? (wf.current_phase_slug ?? `phase-${i}`) : `phase-${i}`,
+      slug:
+        byIndex.get(i)?.slug ??
+        (i === current ? (wf.current_phase_slug ?? `phase-${i}`) : `phase-${i}`),
       phaseIndex: i,
-      phaseType: "unknown",
+      phaseType: byIndex.get(i)?.phase_type ?? "unknown",
       status: i < current ? "done" : i === current ? "running" : "pending",
       subAgents: [],
       pendingAsk: null,
