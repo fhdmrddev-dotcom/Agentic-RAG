@@ -301,6 +301,31 @@ const TARGETS = [
   // BASELINE on purpose: it postdates the 1037 pin, so it reports as `new` and its own
   // count is free to grow; 188-11 pins it from this script's printed `actual` column.
   "src/pages/WorkflowRunPage.test.tsx",
+  // Added in 188-09, in the SAME COMMIT that creates the file — the FIFTH occurrence of
+  // the two-knob trap the entry above states as a rule. `src/components/layout/` lands
+  // outside BOTH knobs by default: nothing above covers it, so the layout directory's
+  // suites have never been executed by this gate. The rule, restated so it survives a
+  // future reader who skips the block above: TARGETS decides what RUNS, BASELINE decides
+  // what is PINNED, a file can be outside BOTH, and an entry pointing at a path that does
+  // not exist yet makes the gate ERROR (exit 2) rather than fail — so the entry can only
+  // be added in the commit that creates the file.
+  //
+  // What would be unguarded without it: this suite is the ONLY mechanical fence for the
+  // launch path. It pins (a) that launching lands on the run and never on chat, (b) that
+  // the thread is still created and still anchors the run — the guard against
+  // OVER-deleting `doRun`'s surviving half, (c) the id trap, where two differently-typed
+  // ids share the name `run_id` and BOTH ARE BARE UUIDS so the compiler cannot help, and
+  // (d) the positional-fallback hazard, where an `ActiveView` member with no branch of its
+  // own renders Knowledge Health silently. (b), (c) and (d) are ABSENCE assertions.
+  //
+  // FILE-LEVEL, deliberately NOT the bare directory `src/components/layout` — the same
+  // reasoning recorded for `src/components/panel/__tests__`, `src/lib` and `src/pages`
+  // above: the directory holds suites this phase does not read (NavPanel, ProfileMenu,
+  // orgRefetch, and the Phase-121 launch suite under `__tests__/`), and adopting them
+  // would make this phase the owner of their future rot. Left OUT of BASELINE on purpose:
+  // it postdates the 1037 pin, so it reports as `new` and its own count is free to grow;
+  // 188-11 pins it from this script's printed `actual` column.
+  "src/components/layout/ChatLayout.launch.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")

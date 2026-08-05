@@ -724,11 +724,15 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
             // home is reached by launching or by the thread's run receipt, never from the
             // rail — so `nav-items.ts` is deliberately untouched.
             //
-            // The message list, the composer and <WorkspacePanel> all live inside the
+            // The message list, the composer and the workspace panel all live inside the
             // `activeView === "chat" ?` branch above, so a view on THIS side renders none
             // of them. That is what makes SPEC Req 6's "no message list and no composer" a
             // structural property of the layout rather than a discipline — and the reason
             // the run surface renders its own deliverable list (Plan 10).
+            // ⚠ Those two components are named in WORDS, never as JSX tags: the source
+            // fence in ChatLayout.launch.test.tsx measures that their tags appear ONLY
+            // before the split point, and prose spelling a tag would break a real
+            // measurement (the 187-24 lesson, met three times in this phase alone).
             <WorkflowRunPage
               runId={activeRunId}
               onBack={() => onNavigate("workflows")}
