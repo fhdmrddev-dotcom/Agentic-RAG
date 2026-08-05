@@ -536,7 +536,7 @@ Plans:
 
 **Wave 11** *(blocked on 188-11 + 188-12 — the operator gate)*
 
-> ⚠ **188-13 is AT ITS CHECKPOINT, not complete.** Its autonomous half ran (pre-flight re-run, 8/8 provider keys confirmed at gate time, BUG-260609-04 kept ). **0 of 17 UAT rows were driven** — auto-approval of the  checkpoint was deliberately REFUSED, because every row on this board requires a human watching a live run. Run row 17 first (the live single-phase run that closes BUG-260609-04).
+> ⚠ **188-13 is AT ITS CHECKPOINT, not complete.** Its autonomous half ran (gate-time pre-flight re-run, 8/8 provider keys re-confirmed, `BUG-260609-04` kept `folded` rather than closed). **0 of 17 UAT rows were driven.** Auto-approval of the `human-verify` checkpoint was deliberately **REFUSED** — every row on this board requires a human watching a live run, and a PASS nobody observed would commit into this phase's own record the exact defect the phase exists to remove. Run **row 17 first** (the live single-phase run on `readonly_refusal_098uat`, the fixture the defect was photographed on) — it is the only thing that can flip `BUG-260609-04` to `closed`, and its own trigger forbids closing on 188-04's reducer tests.
 
 - [~] 188-13-PLAN.md — the G-4 lived-experience gate: eight operator-driven scenarios (watch a real run, refresh mid-run, the skip case in the wild, **colour off**, the `🕐 Tomorrow` journey, the `.docx` download, the anchored clock, and the live single-phase run that is BUG-260609-04's own closure condition), plus the executed SC#10 board. Owed rows are recorded as a DECISION, never as a claim that everything ran (wave 11)
 
