@@ -178,16 +178,49 @@ const BASELINE = {
   "deriveTier.test.ts": 9,
   "WorkflowSoul.test.tsx": 8,
   "revertByteIdentical.test.tsx": 7,
+  // 188-01 (Wave 0): FOUR EXTENSIONS, no lowering — nothing was deleted and no existing pin
+  // moved, so no deliberate deletion needs to ride along (the LOWERED-vs-EXTENDED distinction
+  // in the header). Two of the four are the exact 187-25 situation recurring:
+  //   · PhaseNode.test.tsx     (13) — RAN inside the `src/components/workflows` directory entry
+  //     and counted toward the total, but was PINNED BY NOTHING. Phase 188 writes Req 2's
+  //     no-harness-vocabulary fence and Req 5's waiting-words string-INEQUALITY guard into it.
+  //     A string-inequality guard is an absence assertion; those are the easiest cases to
+  //     delete unnoticed, and with 1260 tests of slack above the floor a whole file's worth
+  //     could go without `[total-below-baseline]` ever firing.
+  //   · PhaseNodeCard.test.tsx (68) — same: running, unpinned. It carries 188's seal-at-seven
+  //     guard and the ring-dial geometry assertions, i.e. the mechanical half of the SPEC's
+  //     "all seven readings stay distinguishable" criterion.
+  // The other two are pinned in the same commit that first made them RUN (see the TARGETS
+  // entries below); pinning at first execution is cheaper than discovering later that the
+  // suite was inside one knob and outside the other:
+  //   · PhaseReconcile.test.tsx (2) — Req 3's REACHABLE fail-open, where
+  //     `finalizeAllPhasesForThread` sweeps `pending` → `done`.
+  //   · PhaseTimeline.test.tsx  (8) — the developer-view suite Req 1's parity assertion leans
+  //     on: the non-technical face and the developer face must agree on the SAME derivation.
+  // ALL FOUR NUMBERS WERE READ FROM THIS SCRIPT'S OWN PRINTED `actual` COLUMN, across two
+  // agreeing runs of `node scripts/vitest-count-gate.cjs` on 2026-08-05 (13 / 68 / 2 / 8) —
+  // never hand-counted from `it(` literals, which is unsound under `it.each` and yields a pin
+  // BELOW the real count that can therefore never fire. The 13 and 68 in 188-VALIDATION.md are
+  // the EXPECTED figures; the printed column agreed with them, so there is no discrepancy to
+  // record. `PhaseNodeCard.test.tsx` was then observed catching a deletion: one whole `it(`
+  // block removed reds the gate with `[count-decrease]` naming that file at `failed 0` — the
+  // count decrease being the ONLY signal is the entire point. Raw output in 188-01-SUMMARY.md.
+  "PhaseNodeCard.test.tsx": 68,
+  "PhaseNode.test.tsx": 13,
+  "PhaseTimeline.test.tsx": 8,
+  "PhaseReconcile.test.tsx": 2,
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
 // trailing figure below is a note about the reduce's result and can never be the
-// thing the gate reads. 946 = 804 + 7 (DescribeKbPicker 30→37) + 106 (canvas
-// 22→128) + 10 (DoorSwitch 13→23) + 19 (describe.test.tsx, newly RUN and pinned)
+// thing the gate reads. 1037 = 946 + 68 + 13 + 8 + 2 (188-01 extended: two suites
+// that already RAN unpinned, plus two pinned in the same commit that first made
+// them run). Was 946 = 804 + 7 (DescribeKbPicker 30→37) + 106 (canvas 22→128)
+// + 10 (DoorSwitch 13→23) + 19 (describe.test.tsx, newly RUN and pinned)
 // — the post-round-5 truth-14 correction. Was 804 = 715 + 30 + 30 + 29 (187-29
 // extended; 715 = 415 + 232 + 68 after 187-25 extended; was 415 after 185-08
 // lowered it, 424 at the original 184 Wave-0 pin).
-const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // 946
+const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // 1037
 
 // ── The Wave-0 blast radius (184-VALIDATION.md § "quick run command"). ──
 const TARGETS = [
