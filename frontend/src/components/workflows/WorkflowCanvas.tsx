@@ -211,6 +211,7 @@ import type { VerdictMarkKind } from "@/components/workflows/nodePresentation"
 import { EndCapNode, PhaseNode, UnresolvedSkipNode } from "@/components/workflows/PhaseNode"
 import type { NameContext, PhaseSpecJSON } from "@/components/workflows/phaseVocabulary"
 import { ProblemsTray } from "@/components/workflows/ProblemsTray"
+import type { NodeRunState } from "@/components/workflows/runVocabulary"
 import { StepTypePicker } from "@/components/workflows/StepTypePicker"
 import type { VerdictGroups } from "@/components/workflows/verdictModel"
 import { useTechnicalNamesOptional } from "@/providers/TechnicalNamesProvider"
@@ -806,6 +807,13 @@ export interface WorkflowCanvasProps {
    */
   marks?: (slug: string) => VerdictMarkKind | undefined
   /**
+   * One node's live run state, `undefined` when the run says nothing about it. The PAGE
+   * owns all of it — the join onto the definition (D-188-01), the reading and the words —
+   * so **this canvas derives no run state, reads no step ordinal and imports no
+   * vocabulary**; its own suite greps for all three. Optional and inert when absent.
+   */
+  runState?: (slug: string) => NodeRunState | undefined
+  /**
    * slug → the cosmetic vertical offset, in canvas pixels. Read from `canvasNudge.ts`
    * by the PAGE and handed down; browser storage never appears in this file, so the
    * `dy` has exactly one home and cannot acquire a second.
@@ -871,6 +879,7 @@ export function WorkflowCanvas({
   nameContext,
   editable = false,
   marks,
+  runState,
   nudges,
   onNudge,
   onCommitNodes,
@@ -935,10 +944,12 @@ export function WorkflowCanvas({
         const position = dy === 0 ? node.position : { x: node.position.x, y: node.position.y + dy }
 
         const measured = measuredById[node.id]
+        const run = runState?.(node.id)
 
         return {
           ...node,
           position,
+          ariaLabel: run === undefined ? node.ariaLabel : `${node.ariaLabel} — ${run.label}`,
           // Carried so `adoptUserNodes`'s else-branch finds a measurement on the object
           // we hand it. Without this every rebuilt node is briefly `hidden`.
           ...(measured === undefined ? {} : { measured }),
@@ -949,10 +960,10 @@ export function WorkflowCanvas({
           // The verdict is threaded exactly as the ⌥ reveal is (D-183-08 / D-184-06), so
           // `PhaseNode` stays a context-free leaf and cannot grow a second source of
           // truth for a value only the server owns.
-          data: { ...node.data, technical: showTechnical, verdict: marks?.(node.id) },
+          data: { ...node.data, technical: showTechnical, verdict: marks?.(node.id), run },
         }
       }),
-    [projection.nodes, selectedSlug, showTechnical, editable, marks, nudges, measuredById],
+    [projection.nodes, selectedSlug, showTechnical, editable, marks, runState, nudges, measuredById],
   )
 
   /**
