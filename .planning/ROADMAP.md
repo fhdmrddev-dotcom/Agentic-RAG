@@ -495,7 +495,7 @@ Plans:
 
 **Wave 3** *(blocked on 188-02 — same reducer)*
 
-- [ ] 188-04-PLAN.md — **BUG-260609-04 closed at its root**: `reconcilePhases`' live branch overlays real `slug` + `phaseType` from `wf.phases` by `phase_index` (measured: the rows are fully populated at run creation). Identity ONLY — the positional status derivation stays byte-identical so the shipped forward-only floor cannot move backward (wave 3)
+- [x] 188-04-PLAN.md — **BUG-260609-04 closed at its root**: `reconcilePhases`' live branch overlays real `slug` + `phaseType` from `wf.phases` by `phase_index` (measured: the rows are fully populated at run creation). Identity ONLY — the positional status derivation stays byte-identical so the shipped forward-only floor cannot move backward (wave 3)
 
 
 **Wave 4** *(blocked on 188-04)*
