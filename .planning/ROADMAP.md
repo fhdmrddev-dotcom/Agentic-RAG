@@ -483,48 +483,60 @@ Plans:
 
 **Plans**: 13 plans in 10 waves
 
-**Wave 1** *(no shared files — run in parallel)*
+**Wave 1** *(Wave 0 in effect — the pre-edit baselines must be measured against an unmodified tree)*
 
 - [ ] 188-01-PLAN.md — Wave 0 harness: extend the count gate's `TARGETS` so the panel reconcile suites RUN, pin the two running-but-unpinned node suites, and record the six pre-edit baselines (frontend gate, `tsc -p tsconfig.app.json` = 33, the backend 211-failure baseline, the canvas/gate 12-pass, and the pre-existing `test_thread_workflow_endpoint.py` 1-of-7 RED) before any production edit (wave 1)
-- [ ] 188-02-PLAN.md — **TWO fail-opens, both observed RED first**: the SPEC named `?? "done"` (unreachable); RESEARCH found the REACHABLE one — `finalizeAllPhasesForThread` sweeps `pending` → `done`, and `skip_to_phase` leaves jumped-over phases `pending` forever, so a step that never ran paints Complete live and Not started after a refresh. Narrows the predicate, widens `Phase["status"]` with `"unknown"` and takes the compiler-forced `STATUS_META` entry (wave 1)
-- [ ] 188-03-PLAN.md — `GET /workflow-runs/{workflow_run_id}` (D-188-15, NOT `/runs/{id}`): ownership-gated FIRST with 404-on-miss through the user-JWT client, `require_canvas()` alone, the path template added to `CANVAS_GATED_PATHS`, and BOTH shipped gate fences updated in the same commit (wave 1)
 
-**Wave 2** *(blocked on 188-02 — same reducer)*
+**Wave 2** *(blocked on 188-01 so the baselines are recorded first; these two share no files and run in parallel)*
 
-- [ ] 188-04-PLAN.md — **BUG-260609-04 closed at its root**: `reconcilePhases`' live branch overlays real `slug` + `phaseType` from `wf.phases` by `phase_index` (measured: the rows are fully populated at run creation). Identity ONLY — the positional status derivation stays byte-identical so the shipped forward-only floor cannot move backward (wave 2)
+- [ ] 188-02-PLAN.md — **TWO fail-opens, both observed RED first**: the SPEC named `?? "done"` (unreachable); RESEARCH found the REACHABLE one — `finalizeAllPhasesForThread` sweeps `pending` → `done`, and `skip_to_phase` leaves jumped-over phases `pending` forever, so a step that never ran paints Complete live and Not started after a refresh. Narrows the predicate, widens `Phase["status"]` with `"unknown"` and takes the compiler-forced `STATUS_META` entry (wave 2)
+- [ ] 188-03-PLAN.md — `GET /workflow-runs/{workflow_run_id}` (D-188-15, NOT `/runs/{id}`): ownership-gated FIRST with 404-on-miss through the user-JWT client, `require_canvas()` alone, the path template added to `CANVAS_GATED_PATHS`, and BOTH shipped gate fences updated in the same commit (wave 2)
 
-**Wave 3** *(blocked on 188-04)*
 
-- [ ] 188-05-PLAN.md — **the G-5 extraction the milestone's own ledger names**: `frontend/src/lib/phaseState.ts` holds the ONE derivation (`phaseStatusFromDb` total, `canvasReading` collapsing `retrying` in one named place, `TERMINAL_RUN_STATUSES` carried forward with the `timed_out` measurement recorded). Both shipped views rewired; a `?raw` fence with positive controls proves zero local re-derivations (wave 3)
+**Wave 3** *(blocked on 188-02 — same reducer)*
 
-**Wave 4** *(blocked on 188-05 — needs `CanvasReading`)*
+- [ ] 188-04-PLAN.md — **BUG-260609-04 closed at its root**: `reconcilePhases`' live branch overlays real `slug` + `phaseType` from `wf.phases` by `phase_index` (measured: the rows are fully populated at run creation). Identity ONLY — the positional status derivation stays byte-identical so the shipped forward-only floor cannot move backward (wave 3)
 
-- [ ] 188-06-PLAN.md — the canvas business-word table (`runVocabulary.ts`) and the status ring: seven readings as seven distinct arc geometries, gaps placed with `stroke-dashoffset` and every number computed from `offset = (D + G/2) − p`, zero net-new glyphs, the run line as one budget with `technicalLine` DECLINED, and the ⛨ seal guard widened from four run states to seven (wave 4)
 
-**Wave 5** *(blocked on 188-06)*
+**Wave 4** *(blocked on 188-04)*
 
-- [ ] 188-07-PLAN.md — the `PhaseNode` adapter and the **capped** `WorkflowCanvas` pass-through: a prop mirroring the shipped `marks?:` plus one `ariaLabel` append, inside a pinned **≤ 15 insertions / ≤ 4 deletions** `git diff --numstat`. Req 2's no-harness-vocabulary fence and Req 5's string separation land here (wave 5)
+- [ ] 188-05-PLAN.md — **the G-5 extraction the milestone's own ledger names**: `frontend/src/lib/phaseState.ts` holds the ONE derivation (`phaseStatusFromDb` total, `canvasReading` collapsing `retrying` in one named place, `TERMINAL_RUN_STATUSES` carried forward with the `timed_out` measurement recorded). Both shipped views rewired; a `?raw` fence with positive controls proves zero local re-derivations (wave 4)
 
-**Wave 6** *(blocked on 188-03 + 188-05 + 188-07)*
 
-- [ ] 188-08-PLAN.md — `getWorkflowRun` and `WorkflowRunPage`: the header, the one-line run band (total over `workflow_runs.status` — an unrecognised value reads *State unknown*, never *Complete*), the `claimed_at`-anchored elapsed label with no clock at all when it is null, and the **page-owned `phase_index` join** that keeps `phase_index` out of the canvas (wave 6)
+**Wave 5** *(blocked on 188-05 — needs `CanvasReading`)*
 
-**Wave 7** *(blocked on 188-08)*
+- [ ] 188-06-PLAN.md — the canvas business-word table (`runVocabulary.ts`) and the status ring: seven readings as seven distinct arc geometries, gaps placed with `stroke-dashoffset` and every number computed from `offset = (D + G/2) − p`, zero net-new glyphs, the run line as one budget with `technicalLine` DECLINED, and the ⛨ seal guard widened from four run states to seven (wave 5)
 
-- [ ] 188-09-PLAN.md — the fourth home: `ActiveView` 11 → 12, a render branch immediately BEFORE the trailing positional-fallback `<KnowledgeHealthPage />`, and `doRun`'s tail retargeted to the run — resolved via `active_workflow_run_id`, never `PostMessageResponse.run_id`. `createThread` / `postMessage` / the WR-04 cleanup all survive verbatim; `threads.py` is not touched (wave 7)
 
-**Wave 8** *(blocked on 188-09)*
+**Wave 6** *(blocked on 188-06)*
 
-- [ ] 188-10-PLAN.md — the deliverable region (`useWorkspaceFiles(run.thread_id)` + `downloadWorkspaceFile`, zero net-new backend wire, no promised preview) and the reciprocal `Open the run` seam on the thread — D-188-13's other half, and the only route back to a finished run while `GET /runs` is deferred (wave 8)
+- [ ] 188-07-PLAN.md — the `PhaseNode` adapter and the **capped** `WorkflowCanvas` pass-through: a prop mirroring the shipped `marks?:` plus one `ariaLabel` append, inside a pinned **≤ 15 insertions / ≤ 4 deletions** `git diff --numstat`. Req 2's no-harness-vocabulary fence and Req 5's string separation land here (wave 6)
 
-**Wave 9** *(blocked on 188-10; the two plans share no files and run in parallel)*
 
-- [ ] 188-11-PLAN.md — the SC#10 board: `scripts/sc10_188_run_board.py` derives the 8-provider roster by executing `MODEL_CAPABILITIES`, probes API keys FIRST (a keyless row silently looks like a pass), reads the EFFECTIVE provider back from `runs`, and `188-UAT.md` is authored with every row present and none pre-marked (wave 9)
-- [ ] 188-12-PLAN.md — final pins + phase gates: every suite this phase authored moves from `TARGETS` into `BASELINE` at its measured count, one pin is watched producing `[count-decrease]`, and nine gates are recorded — including the WHOLE-PHASE `WorkflowCanvas.tsx` numstat, zero migrations, and backend non-attribution proved by DIFFING the failure set (wave 9)
+**Wave 7** *(blocked on 188-03 + 188-05 + 188-07)*
 
-**Wave 10** *(blocked on 188-11 + 188-12 — the operator gate)*
+- [ ] 188-08-PLAN.md — `getWorkflowRun` and `WorkflowRunPage`: the header, the one-line run band (total over `workflow_runs.status` — an unrecognised value reads *State unknown*, never *Complete*), the `claimed_at`-anchored elapsed label with no clock at all when it is null, and the **page-owned `phase_index` join** that keeps `phase_index` out of the canvas (wave 7)
 
-- [ ] 188-13-PLAN.md — the G-4 lived-experience gate: eight operator-driven scenarios (watch a real run, refresh mid-run, the skip case in the wild, **colour off**, the `🕐 Tomorrow` journey, the `.docx` download, the anchored clock, and the live single-phase run that is BUG-260609-04's own closure condition), plus the executed SC#10 board. Owed rows are recorded as a DECISION, never as a claim that everything ran (wave 10)
+
+**Wave 8** *(blocked on 188-08)*
+
+- [ ] 188-09-PLAN.md — the fourth home: `ActiveView` 11 → 12, a render branch immediately BEFORE the trailing positional-fallback `<KnowledgeHealthPage />`, and `doRun`'s tail retargeted to the run — resolved via `active_workflow_run_id`, never `PostMessageResponse.run_id`. `createThread` / `postMessage` / the WR-04 cleanup all survive verbatim; `threads.py` is not touched (wave 8)
+
+
+**Wave 9** *(blocked on 188-09)*
+
+- [ ] 188-10-PLAN.md — the deliverable region (`useWorkspaceFiles(run.thread_id)` + `downloadWorkspaceFile`, zero net-new backend wire, no promised preview) and the reciprocal `Open the run` seam on the thread — D-188-13's other half, and the only route back to a finished run while `GET /runs` is deferred (wave 9)
+
+
+**Wave 10** *(blocked on 188-10; the two plans share no files and run in parallel)*
+
+- [ ] 188-11-PLAN.md — the SC#10 board: `scripts/sc10_188_run_board.py` derives the 8-provider roster by executing `MODEL_CAPABILITIES`, probes API keys FIRST (a keyless row silently looks like a pass), reads the EFFECTIVE provider back from `runs`, and `188-UAT.md` is authored with every row present and none pre-marked (wave 10)
+- [ ] 188-12-PLAN.md — final pins + phase gates: every suite this phase authored moves from `TARGETS` into `BASELINE` at its measured count, one pin is watched producing `[count-decrease]`, and nine gates are recorded — including the WHOLE-PHASE `WorkflowCanvas.tsx` numstat, zero migrations, and backend non-attribution proved by DIFFING the failure set (wave 10)
+
+
+**Wave 11** *(blocked on 188-11 + 188-12 — the operator gate)*
+
+- [ ] 188-13-PLAN.md — the G-4 lived-experience gate: eight operator-driven scenarios (watch a real run, refresh mid-run, the skip case in the wild, **colour off**, the `🕐 Tomorrow` journey, the `.docx` download, the anchored clock, and the live single-phase run that is BUG-260609-04's own closure condition), plus the executed SC#10 board. Owed rows are recorded as a DECISION, never as a claim that everything ran (wave 11)
 
 **UI hint**: yes
 **Flags**: G-2 sketch (live run "feels like"); SC#10 (live run state, all providers); one run stream / two views — `CanvasRunView` reads the SAME `usePhases(threadId)` slice `PhaseTimeline` uses (no new Redis events, no new demux); shows grounded-cited vs open per node (185); node state = total function over the FULL event set (Pitfall 4); reconcile-on-fetch on reconnect (D-v2.5-03); G-5 ledger (`PhaseTimeline.tsx`/`PhaseCard.tsx`/`StreamsProvider.tsx` — the hottest cluster; proactively extract a shared phase-state module; keep the canvas OUTSIDE the stream path per the 067.5 Branch-D3 guard); `elkjs` deferred (→ Phase 191 only if `llm_batch_agents` fan-out needs a branching layout); red line D-14; no threat model; no migration. **RUNVIZ-03 (added 2026-07-31)**: the run gets its own home — G-2 sketch input already exists (`.planning/sketches/145-the-review-moment/README.md` — own header, own spine, no message list, no composer; the sketch explicitly disclaims being a commitment, so it is evidence, not a decision). Landmine: D-14 forbids a second *runtime*, NOT a second *view* — the harness engine stays the only executor and the run stays thread-backed (`active_workflow_run_id`); what changes is where the user stands and how a finished run + its artefact are reached. Two seed positions are now overridden and must not be re-inherited: SEED-051's "Execution = in a thread … NO separate execution route" (superseded 2026-07-31) and D-094-UNIFY's "artefacts live in the chat-thread panel FILES section, NOT a separate place" (re-opened, workflow-run-scoped) — both carry dated notes.
