@@ -292,7 +292,13 @@ const BASELINE = {
   //   · ChatLayout.launch.test.tsx   12 (188-09). The only fence on the launch path: lands on
   //     the run not on chat, the thread still anchors the run, the two-bare-uuid id trap, and
   //     the positional-fallback hazard.
-  "WorkflowRunPage.test.tsx": 60,
+  // 188 code-review fix pass (CR-02): 60 → 64. An EXTENSION, not a lowering. Nothing on
+  // this surface opened the run's SSE stream after the retarget — the store reconcile that
+  // calls `subscribeToRun` is fired from `ChatArea`'s layout effect alone, and `ChatArea`
+  // is unmounted here — so the canvas painted its mount-time snapshot for the whole run.
+  // Three of the four cases were observed RED; the fourth pins that nothing fires before a
+  // run has resolved.
+  "WorkflowRunPage.test.tsx": 64,
   // 188 code-review fix pass (CR-03): 39 → 41. An EXTENSION, not a lowering — nothing was
   // deleted. The two added cases are the receipt's own reason for existing: `finish_run`
   // NULLs `threads.active_workflow_run_id` in the same transaction as the terminal status,

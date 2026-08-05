@@ -77,7 +77,7 @@ import {
 import { runReadingLabel, type NodeRunState } from "@/components/workflows/runVocabulary"
 import { nodeTitle, type PhaseSpecJSON } from "@/components/workflows/phaseVocabulary"
 import { WorkflowCanvas } from "@/components/workflows/WorkflowCanvas"
-import { usePhases, useWorkspaceFiles } from "@/providers/StreamsProvider"
+import { usePhases, useStreamActions, useWorkspaceFiles } from "@/providers/StreamsProvider"
 import { useTechnicalNamesOptional } from "@/providers/TechnicalNamesProvider"
 import type { Phase, WorkspaceFile } from "@/types"
 
@@ -373,14 +373,50 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
     reconcile: reconcileFiles,
   } = useWorkspaceFiles(run?.thread_id ?? null)
 
+  /**
+   * ⚠ CR-02 — SOMETHING HAS TO OPEN THE RUN'S STREAM, and after the retarget nothing did.
+   *
+   * The store's `reconcile(threadId)` action is the ONLY caller of `subscribeToRun` for a
+   * thread the user did not send from. It is NOT the `reconcile()` returned by `usePhases`
+   * beside it — that one refetches the slice and opens no connection. Before this phase the
+   * subscription was armed by landing on the CHAT view: `ChatArea`'s layout effect calls
+   * `setViewingThread`, whose body fires this action, and `ChatArea` is the ONLY production
+   * caller of it (`ChatArea.tsx:224,:323` — measured). `ChatArea` mounts only inside the
+   * `activeView === "chat"` branch, so on this surface that chain does not exist and no
+   * `phase_started` / `phase_completed` / `phase_failed` event ever reached the slice. The
+   * canvas painted its mount-time snapshot and stayed there for the whole run.
+   *
+   * Restoring `selectThread` in the launch path would NOT have fixed it: selection alone
+   * arms nothing, and the component that turns selection into a subscription is unmounted
+   * here. Doing it on the PAGE also makes it path-independent — the panel-receipt door and
+   * a re-opened finished run get the same treatment as a fresh launch.
+   *
+   * The action is called DIRECTLY rather than through `setViewingThread`, which would also
+   * write `viewedThreadId`: opening a run writes no chat state, the same rule this surface
+   * already keeps from the reading side by never resolving the globally-viewed thread. The
+   * consequence is recorded rather than discovered — the provider's own visibility/focus
+   * listeners key on the thread `setViewingThread` publishes, so they still do not cover
+   * this one, and the wake handler below carries it instead.
+   */
+  const { reconcile: reconcileStream } = useStreamActions()
+  useEffect(() => {
+    const tid = run?.thread_id
+    if (!tid) return
+    void reconcileStream(tid)
+  }, [run?.thread_id, reconcileStream])
+
   // Reconnect-driven reconcile, LOCAL to this page (see the header docblock). The shared
   // hook is untouched; this only calls the escape hatch it already returns — for the live
   // slice AND for the file list, because a lid closed while the last step was writing is
-  // precisely when the deliverable row appears without anyone watching.
+  // precisely when the deliverable row appears without anyone watching. CR-02 adds the
+  // STREAM to the same handler: a reconnect drops the SSE connection, so re-reading the
+  // slice without re-attaching leaves the surface frozen from that moment on.
   useEffect(() => {
     if (!run?.thread_id) return
+    const threadId = run.thread_id
     const onWake = () => {
       if (typeof document !== "undefined" && document.visibilityState === "hidden") return
+      void reconcileStream(threadId)
       void reconcile()
       void reconcileFiles()
     }
@@ -390,7 +426,7 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
       window.removeEventListener("visibilitychange", onWake)
       window.removeEventListener("online", onWake)
     }
-  }, [run?.thread_id, reconcile, reconcileFiles])
+  }, [run?.thread_id, reconcile, reconcileFiles, reconcileStream])
 
   /** A download that fails must say so where the user clicked — a swallowed rejection
    *  leaves a dead row, and an unhandled one is a console-only failure. */

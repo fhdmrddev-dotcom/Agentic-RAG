@@ -58,10 +58,16 @@ const useWorkspaceFiles = vi.fn()
 // value than the run's thread, so the mistake shows up as a failing assertion rather than
 // as a list that quietly belongs to somebody else's thread.
 const useViewingThread = vi.fn()
+// CR-02: the STORE reconcile — the only thing in the app that opens an SSE subscription
+// for a thread the user did not send from. It is a different function from the panel
+// reconcile behind `usePhases`, which only refetches the slice.
+const reconcileStream = vi.fn(() => Promise.resolve())
+const setViewingThread = vi.fn()
 vi.mock("@/providers/StreamsProvider", () => ({
   usePhases: (...a: unknown[]) => usePhases(...(a as [string | null])),
   useWorkspaceFiles: (...a: unknown[]) => useWorkspaceFiles(...(a as [string | null])),
   useViewingThread: () => useViewingThread(),
+  useStreamActions: () => ({ reconcile: reconcileStream, setViewingThread }),
 }))
 
 // ── The canvas leaf-stub: it renders what the page HANDED it and nothing else, so a
@@ -931,6 +937,85 @@ describe("WorkflowRunPage — source fence", () => {
     expect("import { usePanelReconcile } from '@/hooks/usePanelReconcile'").toMatch(
       new RegExp(SHARED_HOOK),
     )
+  })
+})
+
+// ── CR-02 (Phase 188 review) — SOMETHING HAS TO OPEN THE RUN'S STREAM ─────────────────
+//
+// Before this phase, `doRun` ended `selectThread(thread); onNavigate("chat")`. The stream
+// was armed by the SECOND call, not the first: `selectThread` only moves `useThreads`'
+// selection, and the store's `setViewingThread` — whose body fires `actions.reconcile`,
+// the ONLY caller of `subscribeToRun` for a thread the user did not send from — is
+// invoked from exactly ONE production site, `ChatArea`'s layout effect. `ChatArea` mounts
+// ONLY inside the `activeView === "chat"` branch, and `ChatLayout.launch.test.tsx`'s own
+// source fence asserts that.
+//
+// ⚠ SO THE REVIEW'S "MINIMAL" FIX — putting `selectThread(thread)` back in `doRun` beside
+// `onNavigate("workflow-run")` — WOULD NOT WORK. With the chat branch unmounted there is
+// nothing left to turn a selection into a subscription. Measured, not assumed: the only
+// production callers of `setViewingThread` are `ChatArea.tsx:224` and `:323`.
+//
+// The fix therefore lands where the review's own stated alternative put it — on the page,
+// once the run read resolves. That is also strictly better than the ChatLayout version,
+// because it is PATH-INDEPENDENT: the panel-receipt door (`openRunSurface`) and a
+// re-opened finished run get the same treatment as a fresh launch, rather than the launch
+// path being special-cased.
+//
+// It calls the store reconcile DIRECTLY rather than `setViewingThread`, and that is
+// deliberate: `setViewingThread` also writes `viewedThreadId`, i.e. chat state, and this
+// surface's standing rule is that opening a run writes no chat state (the same rule the
+// file-list fence above enforces from the reading side). The consequence — that the
+// provider's own visibility listeners key on `activeThreadIdRef` and so still do not
+// cover this thread — is already answered by the page's OWN wake listeners, which is why
+// the wake case is asserted below rather than left implied.
+
+describe("WorkflowRunPage — the run's stream is opened (CR-02)", () => {
+  beforeEach(() => {
+    setLiveSlice([])
+    setFiles([])
+    getWorkflowRun.mockResolvedValue(mkRun({ thread_id: RUN_THREAD_ID }))
+  })
+
+  it("reconciles the RUN's thread once the run read resolves — the subscription seam", async () => {
+    renderPage()
+    await screen.findByTestId("run-band")
+    await waitFor(() => expect(reconcileStream).toHaveBeenCalledWith(RUN_THREAD_ID))
+  })
+
+  it("never reconciles the VIEWED thread — opening a run is not a chat navigation", async () => {
+    useViewingThread.mockReturnValue(VIEWED_THREAD_ID)
+    renderPage()
+    await screen.findByTestId("run-band")
+    await waitFor(() => expect(reconcileStream).toHaveBeenCalledWith(RUN_THREAD_ID))
+    expect(reconcileStream).not.toHaveBeenCalledWith(VIEWED_THREAD_ID)
+    // And chat's own pointer is never written — the same property the file-list fence
+    // protects from the reading side.
+    expect(setViewingThread).not.toHaveBeenCalled()
+  })
+
+  it("re-opens the stream on wake, beside the slice and the file list", async () => {
+    renderPage()
+    await screen.findByTestId("run-band")
+    await waitFor(() => expect(reconcileStream).toHaveBeenCalledTimes(1))
+
+    reconcileStream.mockClear()
+    reconcile.mockClear()
+    reconcileFiles.mockClear()
+    await act(async () => {
+      window.dispatchEvent(new Event("online"))
+    })
+
+    // A lid closed across a reconnect drops the SSE connection; re-reading the slice
+    // without re-attaching leaves the surface frozen from that moment on.
+    await waitFor(() => expect(reconcileStream).toHaveBeenCalledWith(RUN_THREAD_ID))
+    expect(reconcile).toHaveBeenCalled()
+    expect(reconcileFiles).toHaveBeenCalled()
+  })
+
+  it("does nothing at all before a run has resolved", async () => {
+    renderPage({ runId: null })
+    await screen.findByText("Opening the run…")
+    expect(reconcileStream).not.toHaveBeenCalled()
   })
 
   it("adds no date library and constructs no HTML", () => {
