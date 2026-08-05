@@ -520,7 +520,7 @@ Plans:
 
 **Wave 8** *(blocked on 188-08)*
 
-- [ ] 188-09-PLAN.md — the fourth home: `ActiveView` 11 → 12, a render branch immediately BEFORE the trailing positional-fallback `<KnowledgeHealthPage />`, and `doRun`'s tail retargeted to the run — resolved via `active_workflow_run_id`, never `PostMessageResponse.run_id`. `createThread` / `postMessage` / the WR-04 cleanup all survive verbatim; `threads.py` is not touched (wave 8)
+- [x] 188-09-PLAN.md — the fourth home: `ActiveView` 11 → 12, a render branch immediately BEFORE the trailing positional-fallback `<KnowledgeHealthPage />`, and `doRun`'s tail retargeted to the run — resolved via `active_workflow_run_id`, never `PostMessageResponse.run_id`. `createThread` / `postMessage` / the WR-04 cleanup all survive verbatim; `threads.py` is not touched (wave 8)
 
 
 **Wave 9** *(blocked on 188-09)*
