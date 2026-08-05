@@ -525,7 +525,7 @@ Plans:
 
 **Wave 9** *(blocked on 188-09)*
 
-- [ ] 188-10-PLAN.md — the deliverable region (`useWorkspaceFiles(run.thread_id)` + `downloadWorkspaceFile`, zero net-new backend wire, no promised preview) and the reciprocal `Open the run` seam on the thread — D-188-13's other half, and the only route back to a finished run while `GET /runs` is deferred (wave 9)
+- [x] 188-10-PLAN.md — the deliverable region (`useWorkspaceFiles(run.thread_id)` + `downloadWorkspaceFile`, zero net-new backend wire, no promised preview) and the reciprocal `Open the run` seam on the thread — D-188-13's other half, and the only route back to a finished run while `GET /runs` is deferred (wave 9)
 
 
 **Wave 10** *(blocked on 188-10; the two plans share no files and run in parallel)*
