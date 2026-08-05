@@ -698,7 +698,7 @@ async def list_models():
     return {"models": models, "default": settings.llm_model}
 
 
-from app.api import threads, runs, documents, settings as settings_api, folders, kb, skills, audit, knowledge_health, feedback, sandbox_outputs, workspace, admin, panel, workflows, metadata_fields, document_views, document_relationships, classification_rules, document_governance, skill_tuner, skill_test_cases, evals, features, setup as setup_api, org, me_preferences  # noqa: E402
+from app.api import threads, runs, documents, settings as settings_api, folders, kb, skills, audit, knowledge_health, feedback, sandbox_outputs, workspace, admin, panel, workflows, workflow_runs, metadata_fields, document_views, document_relationships, classification_rules, document_governance, skill_tuner, skill_test_cases, evals, features, setup as setup_api, org, me_preferences  # noqa: E402
 
 app.include_router(threads.router)
 app.include_router(runs.router)
@@ -715,6 +715,7 @@ app.include_router(workspace.router)
 app.include_router(admin.router)
 app.include_router(panel.router)  # Phase 085 D-085-23 — thread-scoped panel data endpoints
 app.include_router(workflows.router)  # Phase 092 MODE-01 — published-workflows picker feed
+app.include_router(workflow_runs.router)  # Phase 188 RUNVIZ-03 — GET /workflow-runs/{id}: the one net-new read that gives a RUN an address (run + the definition version that RAN + the durable phase spine, D-188-14); ownership-gated 404 + require_canvas ALONE, path template registered in CANVAS_GATED_PATHS (D-188-15/16)
 app.include_router(metadata_fields.router)  # Phase 111 META-01 — custom metadata field-definition CRUD
 app.include_router(document_views.router)  # Phase 113 VIEW-01/02 — virtual-folder views CRUD + per-viewer resolve
 app.include_router(document_relationships.router)  # Phase 116 REL-01/03 — typed document-relationship CRUD (visible-both gate + audit)
