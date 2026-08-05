@@ -37,6 +37,13 @@
 // reconnect-driven reconcile remains UNSHIPPED globally. That is a recorded gap, not a
 // closed one.
 //
+// Phase 188 Plan 10 (SPEC Req 7) filled the fourth region — the deliverable list. It is
+// sourced from the RUN's thread (`run.thread_id`) through the shipped thread-scoped
+// workspace-files read, so the thing the run made is reachable with **zero net-new
+// backend wire and no new endpoint**. Every row is a one-click download and NOTHING on
+// this surface previews a file; see the region's own docblock for why that is a decision
+// rather than a shortfall.
+//
 // This surface ships ZERO destructive actions and zero run-mutating ones: nothing here
 // stops a run, restarts one, or resumes a step-capped one (SPEC out of scope).
 // `cap_paused` gets a WORD (D-188-19). The only two controls are the two navigations.
@@ -47,10 +54,19 @@
 // again by 188-03 and 188-07). 188-UI-SPEC § Copywriting Contract names all four in full.
 // ─────────────────────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { ChevronLeft } from "lucide-react"
+import {
+  ChevronLeft,
+  Download,
+  File as FileIcon,
+  FileCode,
+  FileImage,
+  FileSpreadsheet,
+  FileText,
+  Presentation,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { getWorkflowRun, type WorkflowRunRead } from "@/lib/api"
+import { downloadWorkspaceFile, getWorkflowRun, type WorkflowRunRead } from "@/lib/api"
 import { ApiError } from "@/lib/api"
 import {
   canvasReading,
@@ -61,9 +77,9 @@ import {
 import { runReadingLabel, type NodeRunState } from "@/components/workflows/runVocabulary"
 import { nodeTitle, type PhaseSpecJSON } from "@/components/workflows/phaseVocabulary"
 import { WorkflowCanvas } from "@/components/workflows/WorkflowCanvas"
-import { usePhases } from "@/providers/StreamsProvider"
+import { usePhases, useWorkspaceFiles } from "@/providers/StreamsProvider"
 import { useTechnicalNamesOptional } from "@/providers/TechnicalNamesProvider"
-import type { Phase } from "@/types"
+import type { Phase, WorkspaceFile } from "@/types"
 
 interface Props {
   /** The `workflow_runs.id` to open. ⚠ NOT a producer `runs.run_id` — see
@@ -88,13 +104,87 @@ const COPY_OPEN_THREAD = "Open the chat thread"
 /** The queued reading. Used in BOTH the run band and the elapsed slot, from one
  *  constant, so the two can never word the same fact differently. */
 const WAITING_TO_START = "Waiting to start"
+/** The deliverable region's identity. Not a claim about contents — the two empty
+ *  states below carry that, and they differ because the truth differs. */
+const COPY_DELIVERABLE_HEADING = "What this run produced"
+const COPY_NO_FILES_LIVE = "No files yet — this run hasn't written anything."
+const COPY_NO_FILES_TERMINAL = "This run produced no files."
+const COPY_DOWNLOAD_FAILED = "Download failed — try again."
+
+// ── The deliverable list (SPEC Req 7) ──────────────────────────────────────────
+//
+// ZERO NET-NEW BACKEND WIRE. A run is 1:1 with a thread, `run.thread_id` is on the
+// payload, and `GET /threads/{tid}/workspace/files` already lists a TERMINAL run's
+// files exactly as it lists a live one's (no run-state condition on the route). So the
+// thing the run made is reachable with the shipped thread-scoped read and the shipped
+// bearer-authed raw-bytes helper — the SPEC excludes a new file endpoint and none is
+// owed. Two independent ownership gates stand in front of it: the run read that yielded
+// this thread id, and the thread-ownership check on the files route itself.
+//
+// ⚠ THE ROWS ARE DOWNLOADS. THERE IS NO PREVIEW HERE AND NONE IS PROMISED.
+// DOCX / PPTX / XLSX / PDF are download-only by decision, and the template-fill engine
+// emits .docx — so the flagship deliverable is precisely the artefact a reviewer cannot
+// read in place. Req 7 asks that it be LISTED and DOWNLOADABLE, which is exactly what
+// ships. Text / markdown / csv lose their in-place read on this surface too, and that is
+// deliberate rather than an oversight: the chat thread's panel still renders them, and
+// the header's thread seam is the route to it. Building a viewer here would duplicate a
+// shipped one on a surface whose job is the run, not the file.
+//
+// ⚠ The panel's own file list is MIRRORED, never imported — it resolves its thread from
+// the globally-viewed-thread selector rather than from a prop, so mounting it here would
+// mean writing chat's viewed thread as a side effect of opening a run. Only the icon
+// mapping and the byte formatter are copied; both are pure.
+
+/** Byte-for-byte the panel's formatter (itself copied from the chat output card — the
+ *  source function is not exported). Keep the three branches identical. */
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+/** The last path segment. The row shows the NAME; the full path lives in `title=`. */
+function baseName(path: string): string {
+  return path.split("/").pop() || "download"
+}
+
+const OOXML_DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+const OOXML_PPTX = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+const OOXML_XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+/** The per-extension office icons, mirrored from the panel list. Extension first, then
+ *  mime: the OOXML mimes are long and the path extension is the reliable signal. */
+function iconFor(file: WorkspaceFile) {
+  const mime = file.mime_type ?? ""
+  const ext = file.path.split(".").pop()?.toLowerCase() ?? ""
+  if (ext === "docx" || mime === OOXML_DOCX) return FileText
+  if (ext === "xlsx" || mime === OOXML_XLSX) return FileSpreadsheet
+  if (ext === "pptx" || mime === OOXML_PPTX) return Presentation
+  if (mime === "text/markdown" || ext === "md") return FileText
+  if (mime === "text/csv" || ext === "csv") return FileSpreadsheet
+  if (mime.startsWith("image/")) return FileImage
+  const codeExts = [
+    "py", "ts", "tsx", "js", "jsx", "mjs", "json", "sh",
+    "bash", "sql", "yml", "yaml", "html", "css",
+  ]
+  if (mime.startsWith("text/x-") || mime === "application/json" || codeExts.includes(ext)) {
+    return FileCode
+  }
+  if (mime.startsWith("text/")) return FileText
+  return FileIcon
+}
 
 // ── The elapsed figure (D-188-18) ──────────────────────────────────────────────
 
 /**
  * `< 60s → 12s` · `< 60m → 4m 12s` · else `1h 06m`. A local formatter sited next to its
- * one consumer, in the `FilesSection.tsx:38-42` house shape — NO date library is added
- * for one label, and none is wanted: the three branches below are the entire contract.
+ * one consumer, in the house shape the panel's own file list uses for its byte figure —
+ * NO date library is added for one label, and none is wanted: the three branches below
+ * are the entire contract.
+ *
+ * ⚠ The panel component is named by ROLE here, never by its identifier: this plan's
+ * acceptance fence measures that this page does NOT import it, and a comment spelling
+ * the name would turn that measurement into prose (the 187-24 lesson, met again).
  */
 function fmtElapsed(ms: number): string {
   const total = Math.max(0, Math.floor(ms / 1000))
@@ -263,13 +353,36 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
   //    stream (067.5 Branch-D3): one subscription, one join, one lookup handed down. ──
   const { data: livePhases, reconcile } = usePhases(run?.thread_id ?? null)
 
+  /**
+   * The deliverable list, keyed on **the RUN's thread — never the viewed thread**. The
+   * shipped hook is already thread-parameterised and fetches on every thread-id change,
+   * so it fills itself the moment the run read resolves; nothing new is fetched from the
+   * server that was not already reachable.
+   *
+   * MEASURED, because getting this wrong reads "No files yet" exactly when a deliverable
+   * has just been written: the shipped terminal refetch (`StreamsProvider.tsx:1053-1063`,
+   * the Phase-101.1-09 gap-4 fix) is keyed on the **owning** thread — it lives inside the
+   * per-thread SSE consumer factory and closes over that factory's `threadId`, and it
+   * writes through `replaceWorkspaceFilesForThread(threadId, …)`. It is NOT keyed on the
+   * viewed thread, so a run watched from this surface self-heals its own list with no
+   * extra call from here.
+   */
+  const {
+    data: files,
+    isLoading: filesLoading,
+    reconcile: reconcileFiles,
+  } = useWorkspaceFiles(run?.thread_id ?? null)
+
   // Reconnect-driven reconcile, LOCAL to this page (see the header docblock). The shared
-  // hook is untouched; this only calls the escape hatch it already returns.
+  // hook is untouched; this only calls the escape hatch it already returns — for the live
+  // slice AND for the file list, because a lid closed while the last step was writing is
+  // precisely when the deliverable row appears without anyone watching.
   useEffect(() => {
     if (!run?.thread_id) return
     const onWake = () => {
       if (typeof document !== "undefined" && document.visibilityState === "hidden") return
       void reconcile()
+      void reconcileFiles()
     }
     window.addEventListener("visibilitychange", onWake)
     window.addEventListener("online", onWake)
@@ -277,7 +390,23 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
       window.removeEventListener("visibilitychange", onWake)
       window.removeEventListener("online", onWake)
     }
-  }, [run?.thread_id, reconcile])
+  }, [run?.thread_id, reconcile, reconcileFiles])
+
+  /** A download that fails must say so where the user clicked — a swallowed rejection
+   *  leaves a dead row, and an unhandled one is a console-only failure. */
+  const [downloadError, setDownloadError] = useState<string | null>(null)
+  const runThreadId = run?.thread_id ?? null
+  const onDownload = useCallback(
+    (file: WorkspaceFile) => {
+      const fileId = file.id
+      if (!runThreadId || !fileId) return
+      setDownloadError(null)
+      downloadWorkspaceFile(runThreadId, fileId, baseName(file.path)).catch((err: unknown) => {
+        setDownloadError(err instanceof Error ? err.message : COPY_DOWNLOAD_FAILED)
+      })
+    },
+    [runThreadId],
+  )
 
   /** The definition's step specs — the version that RAN (D-188-14), read defensively:
    *  a definition the server could not load degrades to an empty spine rather than a
@@ -522,15 +651,79 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
         />
       </section>
 
-      {/* 4. DELIVERABLE REGION — the frame only. **Plan 188-10 fills it**; this plan
-             fetches no files and renders no rows, so the heading below is the region's
-             identity rather than a claim about contents. (Plan 188-09 is the launch
-             retarget and never touches this file.) */}
+      {/* 4. DELIVERABLE REGION — the thing the run made, listed and downloadable. The
+             region caps its height on desktop and flows on mobile (<768px), where a
+             fixed cap would hide the very rows the surface exists to hand over. It is
+             the only new focus-stop GROUP on this page (§ Focus order): one stop per
+             downloadable row, and nothing else here is focusable. */}
       <section
         data-testid="run-deliverables"
-        className="max-h-[220px] shrink-0 overflow-auto border-t border-border/10 px-6 py-4"
+        className="shrink-0 overflow-auto border-t border-border/10 px-6 py-4 md:max-h-[220px]"
       >
-        <h2 className="text-xs font-semibold text-foreground">What this run produced</h2>
+        <h2 className="text-xs font-semibold text-foreground">{COPY_DELIVERABLE_HEADING}</h2>
+        {files.length === 0 ? (
+          // No heading on the empty state, and the two copies differ because the truths
+          // differ: a live run may still write something; a terminal one never will.
+          // While the very first read is still in flight we claim NEITHER — asserting
+          // "produced no files" before the answer arrives is a lie with a short lifetime.
+          filesLoading ? null : (
+            <p className="mt-2 text-sm text-muted-foreground" data-testid="run-deliverables-empty">
+              {isTerminal ? COPY_NO_FILES_TERMINAL : COPY_NO_FILES_LIVE}
+            </p>
+          )
+        ) : (
+          <ul role="list" className="mt-2 flex flex-col gap-0.5">
+            {files.map((file) => {
+              const Icon = iconFor(file)
+              const name = baseName(file.path)
+              const size = formatBytes(file.size_bytes)
+              const fileId = file.id
+              return (
+                <li key={fileId ?? file.path}>
+                  {fileId ? (
+                    <button
+                      type="button"
+                      onClick={() => onDownload(file)}
+                      title={file.path}
+                      aria-label={`Download ${name} (${size})`}
+                      className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left transition-colors hover:bg-accent focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    >
+                      <Icon className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                      <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-foreground/90">
+                        {name}
+                      </span>
+                      <span className="shrink-0 font-mono text-[11px] text-muted-foreground">
+                        {size}
+                      </span>
+                      <Download className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                    </button>
+                  ) : (
+                    // A row the listing gave us with no id cannot be fetched — the raw
+                    // route would be built with an empty segment and 404. Show it as a
+                    // fact rather than as a control that does nothing when clicked.
+                    <div
+                      title={file.path}
+                      className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left"
+                    >
+                      <Icon className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                      <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-foreground/90">
+                        {name}
+                      </span>
+                      <span className="shrink-0 font-mono text-[11px] text-muted-foreground">
+                        {size}
+                      </span>
+                    </div>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
+        )}
+        {downloadError ? (
+          <p className="mt-2 text-xs text-[hsl(0_80%_80%)]" data-testid="run-download-error">
+            {downloadError}
+          </p>
+        ) : null}
       </section>
     </div>
   )

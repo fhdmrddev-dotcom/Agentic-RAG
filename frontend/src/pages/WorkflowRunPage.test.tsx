@@ -13,13 +13,17 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { render, screen, cleanup, fireEvent, waitFor, act } from "@testing-library/react"
-import type { Phase } from "@/types"
+import type { Phase, WorkspaceFile } from "@/types"
 import type { PhaseSpecJSON } from "@/components/workflows/phaseVocabulary"
 
 // ── The api surface. `ApiError` is declared INSIDE the factory (never imported from
 //    the real module) so the page's `err instanceof ApiError` branch is exercised
 //    against the very class this suite throws. ──
 const getWorkflowRun = vi.fn()
+// Plan 10: the shipped bearer-authed raw-bytes helper. Mocked so a download is a
+// RECORDED CALL rather than a jsdom navigation — the argument this suite cares about is
+// the thread id, and it must be the RUN's.
+const downloadWorkspaceFile = vi.fn(() => Promise.resolve())
 
 vi.mock("@/lib/api", () => {
   class ApiError extends Error {
@@ -33,14 +37,18 @@ vi.mock("@/lib/api", () => {
   return {
     ApiError,
     getWorkflowRun: (...a: unknown[]) => getWorkflowRun(...(a as [string])),
+    downloadWorkspaceFile: (...a: unknown[]) =>
+      downloadWorkspaceFile(...(a as [])),
   }
 })
 
-// ── The live slice. The page is the ONLY component on this surface that touches the
-//    stream, so exactly one hook is mocked. ──
+// ── The live slice + the deliverable list. The page is the ONLY component on this
+//    surface that touches the stream, so exactly these two hooks are mocked. ──
 const usePhases = vi.fn()
+const useWorkspaceFiles = vi.fn()
 vi.mock("@/providers/StreamsProvider", () => ({
   usePhases: (...a: unknown[]) => usePhases(...(a as [string | null])),
+  useWorkspaceFiles: (...a: unknown[]) => useWorkspaceFiles(...(a as [string | null])),
 }))
 
 // ── The canvas leaf-stub: it renders what the page HANDED it and nothing else, so a
@@ -164,9 +172,16 @@ function mkPhase(
 }
 
 const reconcile = vi.fn()
+const reconcileFiles = vi.fn()
 
 function setLiveSlice(data: Phase[]) {
   usePhases.mockReturnValue({ data, isLoading: false, error: null, reconcile })
+}
+
+/** The deliverable slice. Defaults to an answered-and-empty list, which is the state
+ *  every pre-Plan-10 case in this suite implicitly assumed. */
+function setFiles(data: WorkspaceFile[] = [], isLoading = false) {
+  useWorkspaceFiles.mockReturnValue({ data, isLoading, error: null, reconcile: reconcileFiles })
 }
 
 function renderPage(props: Partial<Parameters<typeof WorkflowRunPage>[0]> = {}) {
@@ -197,6 +212,8 @@ beforeEach(() => {
   vi.clearAllMocks()
   window.localStorage.clear()
   setLiveSlice([])
+  setFiles([])
+  downloadWorkspaceFile.mockResolvedValue(undefined)
   getWorkflowRun.mockResolvedValue(mkRun())
 })
 
