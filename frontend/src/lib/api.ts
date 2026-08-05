@@ -3643,6 +3643,102 @@ export async function getGroundingBundle(
   return (await res.json()) as GroundingBundle
 }
 
+// ── Phase 188 Plan 08 (RUNVIZ-03 / D-188-14 / D-188-15) — the ONE net-new read that
+//    gives a workflow RUN an address. Mirrors `GET /workflow-runs/{id}` (Plan 03).
+//    Sited beside the two other canvas-gated reads above rather than beside
+//    `getThreadWorkflow`, because it shares their gate, not their router. ──────────
+
+/** One durable `workflow_phases` row as the run read returns it (backend
+ *  `WorkflowRunPhaseRead`). `status` is the **DB-native** vocabulary
+ *  (`pending | active | completed | failed | skipped`) and is deliberately
+ *  untranslated on the wire — `@/lib/phaseState`'s `phaseStatusFromDb` owns the one
+ *  mapping to the client union, and this client must never grow a second one.
+ *  `phase_type` is derived server-side from the definition JSON (the table stores no
+ *  such column), so it is nullable for a slug the definition no longer names. */
+export interface WorkflowRunPhase {
+  slug: string
+  phase_index: number
+  status: string
+  phase_type: string | null
+}
+
+/**
+ * One workflow run + the definition version that RAN + its durable phase spine
+ * (backend `WorkflowRunRead`, `api/workflow_runs.py`).
+ *
+ * ⚠ **THE ID TRAP.** `WorkflowRunRead.id` is a `workflow_runs.id`. It is **NOT**
+ * `PostMessageResponse.run_id`, which is the producer `runs` row consumed by
+ * `GET /runs/{id}/stream`. **They are different tables with different id spaces** —
+ * `backend/app/api/runs.py:714-729` has to resolve a `workflow_runs.id` handed to a
+ * `runs` route as a documented repair, which is the whole reason this route is spelled
+ * `/workflow-runs/{id}` and not `/runs/{id}` (D-188-15). Navigating the run surface with
+ * the wrong one yields a page that resolves nothing, and the two ids look identical
+ * (both bare uuids), so the compiler cannot help — read the field name.
+ *
+ * **Why `definition` is returned INLINE, and why it is the version that ACTUALLY ran
+ * (D-188-14).** The server joins it on `workflow_runs.definition_id`, never by slug:
+ * `listPublishedWorkflows` only ever returns the *current* published version, so a
+ * re-opened older run resolved by slug would be drawn against a definition it never
+ * executed — a spine whose steps the run never had. Carrying it inline also means a
+ * terminal run renders with no stream and no second fetch.
+ *
+ * **`claimed_at` is the ONLY honest elapsed anchor.** `workflow_runs` has no
+ * `started_at` and no `completed_at` (measured — `supabase/full-schema.sql`), so a
+ * duration is `updated_at − claimed_at` and a null `claimed_at` means the run has not
+ * started processing at all. See `WorkflowRunPage`'s elapsed contract (D-188-18).
+ *
+ * The degrade path Plan 03 recorded: if the definition row cannot be read, the server
+ * returns `workflow_name: ""` / `workflow_slug: ""` / `workflow_version: 0` /
+ * `definition: null` rather than 404ing. Treat an empty `workflow_name` as "definition
+ * unavailable", never render the empty string.
+ */
+export interface WorkflowRunRead {
+  /** `workflow_runs.id` — NOT `PostMessageResponse.run_id`. See the docblock. */
+  id: string
+  /** The thread this run streamed into. The deliverable list and the live phase slice
+   *  are both reachable from it, which is why no new file endpoint was needed. */
+  thread_id: string
+  definition_id: string
+  workflow_name: string
+  workflow_slug: string
+  workflow_version: number
+  /** `active | paused | cap_paused | completed | failed | cancelled` — the
+   *  `workflow_runs_status_check` members. Consumers must map it TOTALLY: an
+   *  unrecognised value reads as unknown, never as success. */
+  status: string
+  created_at: string | null
+  /** When the worker picked the run up. **The elapsed anchor** — null ⇒ queued. */
+  claimed_at: string | null
+  updated_at: string | null
+  /** The raw `workflow_definitions.definition` JSONB of the version that ran. */
+  definition: WorkflowDefinitionJSON | null
+  phases: WorkflowRunPhase[]
+}
+
+/**
+ * GET /workflow-runs/{id} — the run read (Plan 03). Ownership-gated server-side: a run
+ * belonging to another account is indistinguishable from one that does not exist, and
+ * both are a 404.
+ *
+ * Throws the shipped status-carrying `ApiError` rather than the bare `Error` most reads
+ * in this file use, because the run surface has to WORD a 404 ("That run isn't
+ * available.") differently from a 5xx ("We couldn't load this run."). That is the
+ * existing in-tree convention (`ApiError`, used by `postMessage`), not a second one —
+ * the alternative would have been a bespoke error class per outcome, which is what
+ * `getWorkflowDeletePreview` does and what this deliberately does not multiply.
+ * `ApiError`'s 403 side-effect cannot fire here: it is gated on the exact
+ * `VISIBILITY_REFUSAL` literal, and this route's gate answers `{"detail": "Not Found"}`.
+ */
+export async function getWorkflowRun(
+  runId: string,
+  signal?: AbortSignal,
+): Promise<WorkflowRunRead> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/workflow-runs/${runId}`, { headers, signal })
+  if (!res.ok) throw new ApiError(`Failed to load the run (status ${res.status})`, res.status)
+  return (await res.json()) as WorkflowRunRead
+}
+
 // ── Phase 152-04 (WFIN-03 / D-LOCK-03/04/05) — the published-workflow safe DELETE
 //    cascade + its server-sourced victim-naming counts. These hit DISTINCT routes on
 //    api/workflows.py (Plan 02, D-08) — NEVER the draft `DELETE /workflows/{id}` above
