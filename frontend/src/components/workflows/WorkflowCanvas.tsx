@@ -30,11 +30,22 @@
  * BOTH modes, and an edge whose target step declares no action-risk checkpoint renders
  * exactly as the library's built-in bezier renderer drew it.
  *
- * ⚑ G-5 (CLAUDE.md hot-file ledger): `WorkflowCanvas.tsx` is the largest file in the
- * workflow tree and this plan adds to it again. `PlaneEditingLayer` and the `EDIT_AFFORDANCE`
- * geometry table are the natural extraction — they are already self-contained, and 185-10
- * had to export the table for a cross-module drift pin, which is the seam asking to be a
- * module. Flagged for **Phase 188**, whose run-state work touches this file next.
+ * ⚑ G-5 DISCHARGED BY 188.1-03 (CLAUDE.md hot-file ledger). This block used to FLAG the
+ * extraction rather than record it — it named `PlaneEditingLayer` and the editing-geometry
+ * table as "the natural extraction … already self-contained", noted that 185-10 had had to
+ * export the table for a cross-module drift pin, and flagged the seam for Phase 188. Phase
+ * 188.1 performed it, and the paragraph is restated rather than deleted because the flag's
+ * REASONING is what makes the result auditable. Both went out: the component to
+ * `PlaneEditingLayer.tsx`, and the geometry table with `REVEAL_ON_HOVER`, `insertPointX`
+ * and `verticalOffsetFor` to the `editAffordance.ts` leaf — two modules rather than one,
+ * per D-01, because a component module may not export a shared runtime value
+ * (`react-refresh/only-export-components`, which this file errored under at its old `:365`).
+ * It was a VERBATIM move of 311 lines out of `:346-413` and `:486-728`, and a HARD CUT:
+ * this file now declares none of them, re-exports none of them and imports only the
+ * component, rendered at the byte-identical JSX site inside `<ReactFlow>`. MEASURED,
+ * 1593 L before → 1292 L after. The scope fences listed below did not narrow when the code
+ * left, because 188.1-01 had already re-pointed them at a three-file subtree source that
+ * named both destinations before either existed.
  *
  * ── D-184-12 — DELETE IS IMMEDIATE, AND THE REFUSAL IS NOT A CONFIRM ──────────────
  *
@@ -187,8 +198,6 @@ import {
   Controls,
   MarkerType,
   ReactFlow,
-  ViewportPortal,
-  useStore as useFlowStore,
   type DefaultEdgeOptions,
   type NodeChange,
   type OnNodeDrag,
@@ -198,7 +207,6 @@ import {
 import { TechnicalNamesToggle } from "@/components/admin/TechnicalNamesToggle"
 import {
   CANVAS_EDGE_KINDS,
-  CANVAS_LAYOUT,
   CANVAS_NODE_TYPES,
   toCanvas,
   type CanvasEdge,
@@ -210,6 +218,7 @@ import { FlowEdge } from "@/components/workflows/FlowEdge"
 import type { VerdictMarkKind } from "@/components/workflows/nodePresentation"
 import { EndCapNode, PhaseNode, UnresolvedSkipNode } from "@/components/workflows/PhaseNode"
 import type { NameContext, PhaseSpecJSON } from "@/components/workflows/phaseVocabulary"
+import { PlaneEditingLayer } from "@/components/workflows/PlaneEditingLayer"
 import { ProblemsTray } from "@/components/workflows/ProblemsTray"
 import type { NodeRunState } from "@/components/workflows/runVocabulary"
 import { StepTypePicker } from "@/components/workflows/StepTypePicker"
@@ -344,75 +353,6 @@ const EDGE_STYLE: Record<string, CSSProperties> = {
 }
 
 /**
- * MODULE SCOPE for the same Pattern-4 reason as `nodeTypes` (`:99-104`) — every
- * placement number the editing affordances use, derived from `CANVAS_LAYOUT` and from
- * nothing else, so a stray literal cannot creep in beside the table the projection and
- * the CSS both already read.
- *
- * `GAP` is the empty space between one card's right edge and the next card's left edge
- * (`PITCH_X - NODE_WIDTH`), which is exactly where the connector — and therefore the
- * `＋` — lives. `INSERT_Y` is the connector's own height: `canvasModel` anchors every
- * edge at `EDGE_ANCHOR_Y` from the node top (never 50%), so the `＋` sits ON the drawn
- * line rather than merely near it, which is sketch 138-A's whole finding.
- *
- * EXPORTED BY 185-10, for a test and for nothing else. `FlowEdge.tsx` draws the armed
- * detour inside the SAME gap and derives `GAP` / `INSERT_Y` from `CANVAS_LAYOUT` in its
- * own `DETOUR` table, because importing this one would close a value-level ESM cycle
- * (this module needs `FlowEdge` at module scope for `edgeTypes`). `FlowEdge.test.tsx`
- * therefore imports BOTH tables and pins them equal, so the two derivations of one
- * number cannot drift apart without a red test.
- */
-export const EDIT_AFFORDANCE = {
-  /** The `＋` circle, `canvas-184.css` `.conn .ins`. */
-  INSERT_SIZE: 26,
-  /** The `✕` square, `canvas-184.css` `.acts button`. */
-  REMOVE_SIZE: 24,
-  /** Horizontal room between two cards — the connector's span. */
-  GAP: CANVAS_LAYOUT.PITCH_X - CANVAS_LAYOUT.NODE_WIDTH,
-  /** The line's height off the node top, so the `＋` lands on it. */
-  INSERT_Y: CANVAS_LAYOUT.LANE_Y + CANVAS_LAYOUT.EDGE_ANCHOR_Y,
-  /** How far below the `＋` the menu's top edge opens. */
-  PICKER_DROP: 22,
-  /** The picker's own width (`StepTypePicker.tsx` `w-[300px]`), halved to centre it. */
-  PICKER_WIDTH: 300,
-} as const
-
-/**
- * VISIBILITY, and why it is spelled as two states rather than one hover rule.
- *
- * Above 1024px the `＋` is hover-revealed, so a canvas at rest is the flow and not a
- * row of controls. At or below 1024px — and on ANY device whose pointer cannot hover,
- * at any width — it is permanently visible, because a hover-only affordance on a touch
- * device is an affordance that does not exist. The base class is the VISIBLE one and
- * the hiding is scoped under `lg:`, which is what makes "present without a hover event"
- * assertable from the class list alone in a renderer that applies no CSS.
- *
- * ⚠ TWO CORRECTIONS, both found in live UAT and neither visible to a class-list assertion.
- *
- * 1. `pointer-events-auto` is REQUIRED, not decoration. These buttons render through
- *    `<ViewportPortal>`, and the library sets `pointer-events: none` on BOTH
- *    `.react-flow__viewport-portal` and `.react-flow__viewport` so the pane underneath
- *    stays draggable. Without re-enabling it here the buttons are not hit-testable:
- *    `document.elementFromPoint` at a button's own centre returns the CARD, so the
- *    affordance can be neither clicked nor hovered.
- *
- * 2. The reveal hangs off `group-hover/canvas`, NOT the button's own `:hover`. The
- *    original `lg:hover:opacity-100` was self-defeating twice over — an element at
- *    `pointer-events: none` can never receive the hover that is supposed to reveal it,
- *    and even once hit-testable, an `opacity: 0` control that only appears when the
- *    pointer is already on top of it has to be found blind. Hovering anywhere on the
- *    plane now reveals the whole affordance set, which is what "a canvas at rest is the
- *    flow" was always describing.
- *
- * Net effect of the bug: at >=1024px with a mouse, add-step and delete-step were
- * unreachable — CANVAS-02 was false for the primary desktop path while every unit test
- * passed, because jsdom applies no CSS and the suite asserted the CLASS LIST, which
- * cannot see a `pointer-events: none` inherited from a library ancestor.
- */
-const REVEAL_ON_HOVER =
-  "pointer-events-auto opacity-100 lg:opacity-0 lg:group-hover/canvas:opacity-100 lg:focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
-
-/**
  * WHAT THE SURFACE SAYS AFTER A STRUCTURAL EDIT — and the two acts are DIFFERENT acts,
  * so they are different members of a union rather than one string with a flag.
  *
@@ -481,250 +421,6 @@ export interface CanvasSession {
   onToggleTray: () => void
   /** A tray row was activated: take the author to that step. */
   onJumpToStep: (slug: string) => void
-}
-
-/** The flow x of insertion boundary `index`: 0 = before the first card, `lanes.length`
- *  = after the last one, anything between = the midpoint of that connector. */
-/**
- * THE VERTICAL OFFSET AN AFFORDANCE MUST INHERIT FROM THE CARD IT BELONGS TO.
- *
- * `EDIT_AFFORDANCE.INSERT_Y` is a LANE constant — it describes where the connector sits
- * when every card is at its computed lane position. But a card can leave that line two
- * ways: the cosmetic `dy` nudge (D-184-10), and a drag in flight. Positioning the
- * affordances from the lane alone stranded them in empty space the moment either
- * happened — a `✕` floating where its card used to be, which is what the operator
- * screenshotted.
- *
- * The `✕` belongs to exactly one card, so it takes that card's whole offset. The `＋`
- * sits ON the connector BETWEEN two cards, and the drawn edge slants when they differ,
- * so it takes the midpoint — which keeps it on the line rather than merely near it,
- * preserving sketch 138-A's finding under nudge.
- *
- * Reads the live overlay first so the affordances track the card DURING a drag, not
- * only after it lands.
- */
-function verticalOffsetFor(
-  slug: string | undefined,
-  nudges: Record<string, number> | undefined,
-  overlay: Record<string, XYPosition>,
-  laneY: number,
-): number {
-  if (slug === undefined) return 0
-  const live = overlay[slug]
-  if (live !== undefined) return live.y - laneY
-  return nudges?.[slug] ?? 0
-}
-
-function insertPointX(lanes: readonly number[], index: number): number {
-  if (lanes.length === 0) return 0
-  const half = EDIT_AFFORDANCE.GAP / 2
-  if (index <= 0) return lanes[0] - half
-  if (index >= lanes.length) return lanes[lanes.length - 1] + CANVAS_LAYOUT.NODE_WIDTH + half
-  return (lanes[index - 1] + CANVAS_LAYOUT.NODE_WIDTH + lanes[index]) / 2
-}
-
-interface PlaneEditingLayerProps {
-  phases: PhaseSpecJSON[]
-  /** Lane centres in render order — the x of every phase column. */
-  lanes: readonly number[]
-  /** Phase slugs in render order, the same array the keyboard reorder indexes. */
-  phaseOrder: readonly string[]
-  /** The cosmetic offsets, so an affordance can follow the card it belongs to. */
-  nudges?: Record<string, number>
-  /** Live drag positions, so it follows DURING the gesture and not only after it. */
-  dragOverlay: Record<string, XYPosition>
-  /** Which insertion boundary the picker is open at, or null. */
-  pickerAt: number | null
-  onOpenPicker: (index: number) => void
-  onDismissPicker: () => void
-  onChooseType: (index: number, type: PhaseTypeId) => void
-  onRequestRemove?: (slug: string) => void
-}
-
-/**
- * The `＋` / `✕` layer, and the one structural reason it looks the way it does.
- *
- * `WorkflowCanvas.test.tsx:231-238` asserts that for EVERY `.react-flow__node`,
- * `querySelectorAll("button, a, [tabindex]")` is empty — one tab stop per node, no
- * double stop. So a per-node action cannot be a child of the node, and this layer is
- * not a workaround for that: the affordances are positioned against the LANE, in flow
- * coordinates, through the library's own `<ViewportPortal>`, so they pan and zoom with
- * the cards they belong to while living outside every node's DOM subtree.
- *
- * Under 137-B (`themes/canvas-184.css` `body.card-b`, built by 185-01) every other edge
- * of the card is already spoken for: the TOP edge belongs to the floating 3D icon, the
- * LEFT edge carries the verdict mark (184-08, moved left by 185-01), and the TOP-RIGHT
- * corner is CLAIMED for the governance seal (SPEC Req 6 / D-185-17). So the `✕` sits on
- * the BOTTOM edge — `body.card-b .acts { bottom: -12px }`, i.e. straddling the card's
- * lower border. The card's height is READ from the library's measurement rather
- * than assumed, because a card grows downward from `NODE_MIN_HEIGHT` and a fixed offset
- * would drift up into the body of a two-line title.
- *
- * IT AUTHORS NO REFUSAL AND CONSULTS NO SERVER. Every disabled row and every reason in
- * the menu comes from `definitionOps.allowedTypesAt` by way of `StepTypePicker`; the
- * removal predicate is the caller's `canRemovePhase`. A refusal is a SHAPE rule decided
- * from the phases already in hand, a verdict is a server judgement, and this file names
- * the validation seam nowhere (its suite greps for that).
- */
-function PlaneEditingLayer({
-  phases,
-  lanes,
-  phaseOrder,
-  nudges,
-  dragOverlay,
-  pickerAt,
-  onOpenPicker,
-  onDismissPicker,
-  onChooseType,
-  onRequestRemove,
-}: PlaneEditingLayerProps) {
-  // The live viewport zoom. The menu is COUNTER-SCALED by it so a person reading six
-  // sentences at 0.3× is not handed 4px type; the ＋ and ✕ deliberately do scale, since
-  // they are glued to the cards and read as part of the drawing.
-  const zoom = useFlowStore((state) => state.transform[2])
-
-  // Measured card heights, joined into ONE primitive so the selector's result is
-  // reference-stable and zustand does not re-render on every unrelated store write. A
-  // node the library has not measured yet (and every node under jsdom) reports 0 and
-  // falls back to the layout table's floor.
-  const heightKey = useFlowStore((state) =>
-    phaseOrder
-      .map((id) => Math.round(state.nodeLookup.get(id)?.measured?.height ?? 0))
-      .join(","),
-  )
-  const heights = heightKey.split(",")
-  const heightAt = (position: number) => {
-    const measured = Number(heights[position])
-    return Number.isFinite(measured) && measured > 0 ? measured : CANVAS_LAYOUT.NODE_MIN_HEIGHT
-  }
-
-  const boundaries = lanes.length + 1
-
-  return (
-    <ViewportPortal>
-      {Array.from({ length: boundaries }, (_, index) => (
-        <button
-          key={`canvas-insert-${index}`}
-          type="button"
-          data-testid={`canvas-insert-${index}`}
-          data-canvas-affordance="insert"
-          aria-haspopup="menu"
-          aria-expanded={pickerAt === index}
-          aria-label={
-            index >= lanes.length ? "Add a step at the end" : `Add a step before step ${index + 1}`
-          }
-          onClick={() => onOpenPicker(index)}
-          className={[
-            "absolute grid place-items-center rounded-full border border-dashed border-border",
-            "bg-card text-[15px] leading-none text-muted-foreground transition-opacity",
-            "hover:border-solid hover:border-primary hover:text-primary",
-            "motion-reduce:transition-none",
-            REVEAL_ON_HOVER,
-          ].join(" ")}
-          style={{
-            left: 0,
-            top: 0,
-            width: EDIT_AFFORDANCE.INSERT_SIZE,
-            height: EDIT_AFFORDANCE.INSERT_SIZE,
-            transform: `translate(${insertPointX(lanes, index) - EDIT_AFFORDANCE.INSERT_SIZE / 2}px, ${
-              EDIT_AFFORDANCE.INSERT_Y -
-              EDIT_AFFORDANCE.INSERT_SIZE / 2 +
-              // The connector's own slant: the mean of the two cards this boundary sits
-              // between, so the `＋` stays ON the drawn line when either is nudged. At
-              // the two ends there is only one neighbour, so it simply follows that one.
-              (verticalOffsetFor(phaseOrder[index - 1], nudges, dragOverlay, CANVAS_LAYOUT.LANE_Y) +
-                verticalOffsetFor(phaseOrder[index], nudges, dragOverlay, CANVAS_LAYOUT.LANE_Y)) /
-                (index > 0 && index < phaseOrder.length ? 2 : 1)
-            }px)`,
-          }}
-        >
-          <span aria-hidden="true">＋</span>
-        </button>
-      ))}
-
-      {phaseOrder.map((slug, position) => (
-        <button
-          key={`canvas-remove-${slug}`}
-          type="button"
-          data-testid={`canvas-remove-${slug}`}
-          data-canvas-affordance="remove"
-          aria-label={`Remove step ${position + 1}`}
-          onClick={() => onRequestRemove?.(slug)}
-          className={[
-            "absolute grid place-items-center rounded-[7px] border border-border",
-            "bg-card text-[11px] leading-none text-muted-foreground transition-opacity",
-            // ⚠ THE HOVER RED IS A RAW LITERAL, NOT THE `destructive` DESIGN TOKEN, and
-            // that is deliberate. R9 reserves that token for the `error` verdict mark and
-            // proves it by SCANNING the emitted HTML for the token's name: a draft that
-            // is all "not finished yet" must spend it zero times. Dressing this button in
-            // it would make that shipped scan report a colour it was never written to
-            // measure — a guard passing (or failing) for the wrong reason. The values are
-            // `canvas-184.css`'s own `.acts button.danger:hover`.
-            "hover:border-[hsl(0_72%_51%/0.6)] hover:text-[hsl(0_85%_74%)]",
-            "motion-reduce:transition-none",
-            REVEAL_ON_HOVER,
-          ].join(" ")}
-          style={{
-            left: 0,
-            top: 0,
-            width: EDIT_AFFORDANCE.REMOVE_SIZE,
-            height: EDIT_AFFORDANCE.REMOVE_SIZE,
-            transform: `translate(${
-              lanes[position] + CANVAS_LAYOUT.NODE_WIDTH / 2 - EDIT_AFFORDANCE.REMOVE_SIZE / 2
-            }px, ${
-              heightAt(position) -
-              EDIT_AFFORDANCE.REMOVE_SIZE / 2 +
-              // This button belongs to exactly one card, so it takes that card's whole
-              // offset — nudged or mid-drag. Without it the `✕` stays on the lane while
-              // its card walks away, which is the stranded control in the screenshots.
-              verticalOffsetFor(slug, nudges, dragOverlay, CANVAS_LAYOUT.LANE_Y)
-            }px)`,
-          }}
-        >
-          <span aria-hidden="true">✕</span>
-        </button>
-      ))}
-
-      {pickerAt !== null ? (
-        <div
-          data-testid="canvas-insert-picker"
-          // `pointer-events-auto` for the SAME reason the affordances carry it: this
-          // wrapper renders through `<ViewportPortal>`, whose ancestors the library
-          // pins to `pointer-events: none`. Without it the menu opens, reads correctly,
-          // and every row silently ignores the click — the failure the operator hit.
-          className="pointer-events-auto absolute"
-          style={{
-            left: 0,
-            top: 0,
-            transformOrigin: "top left",
-            transform: `translate(${
-              insertPointX(lanes, pickerAt) - EDIT_AFFORDANCE.PICKER_WIDTH / 2
-            }px, ${
-              EDIT_AFFORDANCE.INSERT_Y +
-              EDIT_AFFORDANCE.PICKER_DROP +
-              // Opens under the `＋` it belongs to, so it tracks the same slant.
-              (verticalOffsetFor(
-                phaseOrder[pickerAt - 1],
-                nudges,
-                dragOverlay,
-                CANVAS_LAYOUT.LANE_Y,
-              ) +
-                verticalOffsetFor(phaseOrder[pickerAt], nudges, dragOverlay, CANVAS_LAYOUT.LANE_Y)) /
-                (pickerAt > 0 && pickerAt < phaseOrder.length ? 2 : 1)
-            }px) scale(${1 / (zoom || 1)})`,
-          }}
-        >
-          <StepTypePicker
-            phases={phases}
-            index={pickerAt}
-            open
-            onChoose={(type) => onChooseType(pickerAt, type)}
-            onDismiss={onDismissPicker}
-          />
-        </div>
-      ) : null}
-    </ViewportPortal>
-  )
 }
 
 /**
@@ -1491,8 +1187,11 @@ export function WorkflowCanvas({
       ) : null}
       {/* The parent MUST have a width and a height or the plane measures to zero.
           `group/canvas` is the hover root the edit affordances reveal from — see
-          REVEAL_ON_HOVER. It is named rather than bare so a future nested `group`
-          cannot capture it by accident. `relative` anchors the floated notice below. */}
+          `REVEAL_ON_HOVER`, which 188.1-03 moved OUT of this file and into
+          `editAffordance.ts` (it was declared here at `:412` until then, so read this as
+          a pointer across a module boundary rather than at a local const). It is named
+          rather than bare so a future nested `group` cannot capture it by accident.
+          `relative` anchors the floated notice below. */}
       <div className="group/canvas relative h-full w-full min-w-0 flex-1">
         {/* FLOATED OVER THE PLANE, not stacked above it. The notice is TRANSIENT — it
             appears after a delete or an add and then goes — but as a layout band it spent

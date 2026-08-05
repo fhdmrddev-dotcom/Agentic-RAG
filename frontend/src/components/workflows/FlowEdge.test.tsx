@@ -72,8 +72,14 @@ import {
   FlowEdge,
   LINE,
 } from "./FlowEdge"
-import { EDIT_AFFORDANCE, WorkflowCanvas } from "./WorkflowCanvas"
+import { WorkflowCanvas } from "./WorkflowCanvas"
 import { CANVAS_LAYOUT, type CanvasEdgeData } from "./canvasModel"
+// 188.1-03 cut `EDIT_AFFORDANCE` out of `WorkflowCanvas.tsx` into the `editAffordance.ts`
+// leaf (D-01), and left NO re-export shim — this statement is the tree's only importer of
+// it. Added as a SEPARATE statement rather than by widening the line above, so this file's
+// whole diff is added lines and "no shipped assertion was touched" is auditable by
+// `git diff` alone (`canvasModel.purity.test.ts:18-21`, the shipped statement of the rule).
+import { EDIT_AFFORDANCE } from "./editAffordance"
 import { docQaHuman } from "./__fixtures__/canvasFixtures"
 import type { PhaseSpecJSON } from "./phaseVocabulary"
 

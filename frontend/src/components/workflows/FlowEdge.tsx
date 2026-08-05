@@ -104,6 +104,18 @@
  * `DETOUR.GAP === EDIT_AFFORDANCE.GAP` and `DETOUR.INSERT_Y === EDIT_AFFORDANCE.INSERT_Y`
  * so the two derivations cannot drift apart silently.
  *
+ * ⚠ THE CYCLE REASON ABOVE WAS SUPERSEDED BY 188.1-03, AND THE DUPLICATION STAYS ANYWAY.
+ * `EDIT_AFFORDANCE` no longer lives in `WorkflowCanvas.tsx`: that plan cut it, with
+ * `REVEAL_ON_HOVER`, `insertPointX` and `verticalOffsetFor`, into the leaf module
+ * `editAffordance.ts`, which imports nothing but `canvasModel` and a type. Importing it
+ * from here would therefore close NO cycle today, and the paragraph above must be read as
+ * the history of why this table exists rather than as a live constraint (the `＋` layer
+ * itself moved out too, into `PlaneEditingLayer.tsx`, so the `WorkflowCanvas.tsx:NNN`
+ * pointers below address the PRE-MOVE file). The duplication is nevertheless KEPT
+ * DELIBERATELY (D2): the drift pin is the whole value of having two derivations written
+ * down, it has been observed RED, and deleting one side of a pin deletes the pin's
+ * meaning. Collapsing it is a behaviour-shaped change owed its own phase, not a line
+ * inside a refactor whose entire promise is that nothing changed.
  * CLEARANCE, computed by the sketch and re-computed by the suite rather than asserted:
  * the ＋ is `INSERT_SIZE` 26 centred in the 60px gap at `INSERT_Y` 28, i.e. x 17…43,
  * y 15…41. The arc's tightest point inside that x-range sits **8.2px BELOW** the ＋'s
