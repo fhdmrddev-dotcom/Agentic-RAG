@@ -63,9 +63,13 @@ const useViewingThread = vi.fn()
 // reconcile behind `usePhases`, which only refetches the slice.
 const reconcileStream = vi.fn(() => Promise.resolve())
 const setViewingThread = vi.fn()
+// F5: the DURABLE pending-ask slice. Shipped at `StreamsProvider.tsx:3263` long before this
+// phase — the run surface simply never consumed it, which is the whole defect.
+const useAskUserPrompt = vi.fn()
 vi.mock("@/providers/StreamsProvider", () => ({
   usePhases: (...a: unknown[]) => usePhases(...(a as [string | null])),
   useWorkspaceFiles: (...a: unknown[]) => useWorkspaceFiles(...(a as [string | null])),
+  useAskUserPrompt: (...a: unknown[]) => useAskUserPrompt(...(a as [string | null])),
   useViewingThread: () => useViewingThread(),
   useStreamActions: () => ({ reconcile: reconcileStream, setViewingThread }),
 }))
@@ -192,9 +196,32 @@ function mkPhase(
 
 const reconcile = vi.fn()
 const reconcileFiles = vi.fn()
+const reconcileAsks = vi.fn()
 
 function setLiveSlice(data: Phase[]) {
   usePhases.mockReturnValue({ data, isLoading: false, error: null, reconcile })
+}
+
+/** One row of the shipped `PendingAsk[]` slice. ⚠ Deliberately built with its REAL fields:
+ *  `PendingAsk` carries NO phase reference (`types/index.ts:925-937`), which is exactly why
+ *  the page cannot join an ask to a step by id and derives the waiting step instead. */
+function mkAsk(toolCallId = "call-1") {
+  return {
+    tool_call_id: toolCallId,
+    prompt: "Is this renewal letter ready to send?",
+    options: ["Yes, send it", "No, revise it"],
+    timeout_seconds: null,
+  }
+}
+
+/** The pending-ask slice. Defaults to empty — the state every pre-F5 case assumed. */
+function setAsks(data: ReturnType<typeof mkAsk>[] = []) {
+  useAskUserPrompt.mockReturnValue({
+    data,
+    isLoading: false,
+    error: null,
+    reconcile: reconcileAsks,
+  })
 }
 
 /** The deliverable slice. Defaults to an answered-and-empty list, which is the state
@@ -258,6 +285,7 @@ beforeEach(() => {
   window.localStorage.clear()
   setLiveSlice([])
   setFiles([])
+  setAsks([])
   useViewingThread.mockReturnValue(VIEWED_THREAD_ID)
   downloadWorkspaceFile.mockResolvedValue(undefined)
   getWorkflowRun.mockResolvedValue(mkRun())
@@ -1317,5 +1345,155 @@ describe("WorkflowRunPage — the run row is re-read while it is live (CR-01)", 
     const code = codeOf(pageSource)
     expect(code.match(/No files yet — this run hasn't written anything\./g) ?? []).toHaveLength(1)
     expect(code.match(/This run produced no files\./g) ?? []).toHaveLength(1)
+  })
+})
+
+// ── F5 (UAT 2026-08-05) — THE RUN-TIME WAITING READING WAS STRUCTURALLY UNREACHABLE ──
+//
+// Observed live on `doc_qa_scoped_098uat`: phase 1 `confirm`, an `llm_human_input` step, DB
+// status `active`, a real pending ask sitting on the thread — and the canvas read
+// "Running". Never "Paused for your answer".
+//
+// The mechanism, measured: `canvasReading` has always had its `pendingAsk != null` arm
+// (`phaseState.ts:124`) and it is FIRST, ahead of every status. But `reconcilePhases`
+// hardcodes `pendingAsk: null` in BOTH of its branches (`StreamsProvider.tsx:3427` live,
+// `:3466` terminal), so the field is populated only by a live SSE event — and after F1 this
+// surface rides POLLED reconciles, each of which resets it to null. The reading Req 5
+// specifies was real in `runVocabulary`, real in the unit suite, and not reachable in the
+// product on this surface.
+//
+// The fix consumes the DURABLE ask slice that already shipped and derives the waiting step,
+// because `PendingAsk` carries no phase reference. The derivation is sound only because the
+// harness runs a LINEAR spine one phase at a time and only an `llm_human_input` phase blocks
+// on an ask — so the negative controls below are not ceremony: each one is a way the
+// derivation could over-claim, and over-claiming is the exact defect this phase exists to
+// remove.
+
+describe("WorkflowRunPage — the run-time waiting reading (F5, SPEC Req 5)", () => {
+  it("an ACTIVE llm_human_input step with a pending ask reads Paused for your answer, not Running", async () => {
+    setLiveSlice([
+      mkPhase(0, "done", "gather-contracts"),
+      mkPhase(1, "done", "draft-letter"),
+      mkPhase(2, "running", "final-check", { phaseType: "llm_human_input" }),
+    ])
+    setAsks([mkAsk()])
+    renderPage()
+    await screen.findByTestId("canvas-stub")
+
+    expect(readings()["final-check"]).toBe("waiting-for-you")
+    expect(labels()["final-check"]).toContain("Paused for your answer")
+    expect(labels()["final-check"]).not.toContain("Running")
+  })
+
+  // NEGATIVE CONTROL 1 — the ask must not spill onto the step that merely happens to be
+  // running. A `llm_agent` step cannot block on an ask, so an ask on the thread says
+  // nothing about it.
+  it("a pending ask does NOT make a running llm_agent step read as waiting", async () => {
+    setLiveSlice([
+      mkPhase(0, "done", "gather-contracts"),
+      mkPhase(1, "running", "draft-letter"),
+      mkPhase(2, "pending", "final-check", { phaseType: "llm_human_input" }),
+    ])
+    setAsks([mkAsk()])
+    renderPage()
+    await screen.findByTestId("canvas-stub")
+
+    expect(readings()["draft-letter"]).toBe("running")
+  })
+
+  // NEGATIVE CONTROL 2 — D-188-05, the separation this phase locked. The design-time
+  // property ("this step WILL pause") is true before anything runs; the run-time state
+  // ("it IS paused, now") requires an actual ask. A step that carries the badge and is
+  // running with nothing pending is RUNNING.
+  it("an active llm_human_input step with NO pending ask still reads Running", async () => {
+    setLiveSlice([
+      mkPhase(0, "done", "gather-contracts"),
+      mkPhase(1, "done", "draft-letter"),
+      mkPhase(2, "running", "final-check", { phaseType: "llm_human_input" }),
+    ])
+    setAsks([])
+    renderPage()
+    await screen.findByTestId("canvas-stub")
+
+    expect(readings()["final-check"]).toBe("running")
+  })
+
+  // NEGATIVE CONTROL 3 — a step the run has not REACHED is not waiting on anyone, whatever
+  // is pending on the thread. Without the status arm the whole spine would read as paused.
+  it("a not-yet-reached llm_human_input step reads Not started even with an ask pending", async () => {
+    setLiveSlice([
+      mkPhase(0, "done", "gather-contracts"),
+      mkPhase(1, "running", "draft-letter"),
+      mkPhase(2, "pending", "final-check", { phaseType: "llm_human_input" }),
+    ])
+    setAsks([mkAsk()])
+    renderPage()
+    await screen.findByTestId("canvas-stub")
+
+    expect(readings()["final-check"]).toBe("not-started")
+  })
+
+  // NEGATIVE CONTROL 4 — the run itself has to still be live. A cancelled run can leave a
+  // phase row at `active` with an unanswered ask on its thread; the band correctly reads
+  // "⊘ Cancelled", and a node beside it saying "it needs your reply before it can continue"
+  // would be the phase's own defect in a new place — the run needs nothing from anyone.
+  it("a terminal run does not claim a step is waiting, even with an ask still pending", async () => {
+    getWorkflowRun.mockResolvedValue(
+      mkRun({
+        status: "cancelled",
+        phases: [
+          { slug: "gather-contracts", phase_index: 0, status: "completed", phase_type: null },
+          { slug: "draft-letter", phase_index: 1, status: "completed", phase_type: null },
+          { slug: "final-check", phase_index: 2, status: "active", phase_type: null },
+        ],
+      }),
+    )
+    setAsks([mkAsk()])
+    renderPage()
+    await screen.findByTestId("canvas-stub")
+
+    expect(readings()["final-check"]).toBe("running")
+    expect(labels()["final-check"]).not.toContain("Paused for your answer")
+  })
+
+  it("reads the ask slice for the RUN's thread, never the globally-viewed one", async () => {
+    getWorkflowRun.mockResolvedValue(mkRun({ thread_id: RUN_THREAD_ID }))
+    renderPage()
+    await screen.findByTestId("canvas-stub")
+
+    expect(useAskUserPrompt).toHaveBeenCalledWith(RUN_THREAD_ID)
+    expect(useAskUserPrompt).not.toHaveBeenCalledWith(VIEWED_THREAD_ID)
+  })
+
+  // The staleness half. An ask slice fetched once at mount inherits EXACTLY the defect F1
+  // just fixed: someone sitting and watching produces no wake event, so a step that starts
+  // waiting after mount would never be seen to.
+  it("re-reads the ask slice on the 5s poll", async () => {
+    vi.useFakeTimers()
+    getWorkflowRun.mockResolvedValue(mkRun({ status: "active" }))
+    renderPage()
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0)
+    })
+    const afterMount = reconcileAsks.mock.calls.length
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000)
+    })
+    expect(reconcileAsks.mock.calls.length).toBeGreaterThan(afterMount)
+  })
+
+  it("re-reads the ask slice on wake", async () => {
+    getWorkflowRun.mockResolvedValue(mkRun({ status: "active" }))
+    renderPage()
+    await screen.findByTestId("canvas-stub")
+    const afterMount = reconcileAsks.mock.calls.length
+
+    await act(async () => {
+      fireEvent(window, new Event("visibilitychange"))
+    })
+    await waitFor(() =>
+      expect(reconcileAsks.mock.calls.length).toBeGreaterThan(afterMount),
+    )
   })
 })

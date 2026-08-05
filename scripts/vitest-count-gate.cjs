@@ -305,7 +305,19 @@ const BASELINE = {
   // never-tear-down-a-good-surface rule.
   // 72 = 69 + the three F1 cases (UAT 2026-08-05): the phase slice and the stream now ride
   //      the run poll, and a final slice+file read lands on the terminal edge.
-  "WorkflowRunPage.test.tsx": 75,
+  // 83 = 75 + the eight F5 cases (UAT 2026-08-05). An EXTENSION, not a lowering. The
+  //      run-time waiting reading was STRUCTURALLY UNREACHABLE here: `reconcilePhases`
+  //      hardcodes `pendingAsk: null` in both branches, so `canvasReading`'s waiting arm —
+  //      which is first, ahead of every status — could never fire on a surface that rides
+  //      polled reconciles. Four of the eight were observed RED (the reading itself, the
+  //      run-thread keying, and the ask slice riding both the poll and the wake). The other
+  //      four are the derivation's negative controls, and they are not ceremony: `PendingAsk`
+  //      carries no phase reference, so the waiting step is DERIVED, and each control pins
+  //      one way that derivation could over-claim — a running `llm_agent` step, a
+  //      human-input step with nothing pending (D-188-05's design-time/run-time split), a
+  //      step the run has not reached, and a terminal run with a stale ask. The last was
+  //      falsified by forcing its guard true and observed RED.
+  "WorkflowRunPage.test.tsx": 83,
   // 188 code-review fix pass (CR-03): 39 → 41. An EXTENSION, not a lowering — nothing was
   // deleted. The two added cases are the receipt's own reason for existing: `finish_run`
   // NULLs `threads.active_workflow_run_id` in the same transaction as the terminal status,

@@ -75,9 +75,14 @@ import {
   type CanvasReading,
 } from "@/lib/phaseState"
 import { runReadingLabel, type NodeRunState } from "@/components/workflows/runVocabulary"
-import { nodeTitle, type PhaseSpecJSON } from "@/components/workflows/phaseVocabulary"
+import { nodeTitle, waitsForYou, type PhaseSpecJSON } from "@/components/workflows/phaseVocabulary"
 import { WorkflowCanvas } from "@/components/workflows/WorkflowCanvas"
-import { usePhases, useStreamActions, useWorkspaceFiles } from "@/providers/StreamsProvider"
+import {
+  useAskUserPrompt,
+  usePhases,
+  useStreamActions,
+  useWorkspaceFiles,
+} from "@/providers/StreamsProvider"
 import { useTechnicalNamesOptional } from "@/providers/TechnicalNamesProvider"
 import type { Phase, WorkspaceFile } from "@/types"
 
@@ -414,6 +419,25 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
   } = useWorkspaceFiles(run?.thread_id ?? null)
 
   /**
+   * ⚠ F5 (UAT 2026-08-05) — THE RUN-TIME WAITING READING WAS UNREACHABLE ON THIS SURFACE.
+   *
+   * `canvasReading` has always had its `pendingAsk != null` arm, and it is FIRST, ahead of
+   * every status (`phaseState.ts:124`). But `reconcilePhases` hardcodes `pendingAsk: null`
+   * in BOTH branches (`StreamsProvider.tsx:3427` live, `:3466` terminal), so the field is
+   * populated only by a live SSE event — and after F1 this surface rides POLLED reconciles,
+   * every one of which resets it to null. Observed live on `doc_qa_scoped_098uat`: an
+   * `llm_human_input` step sitting `active` with a real ask pending read "Running".
+   *
+   * The DURABLE slice below already shipped (`StreamsProvider.tsx:3263`) — a fetched
+   * `PendingAsk[]` with its own reconcile. **No new endpoint is owed.**
+   *
+   * It is read here rather than fixed in `reconcilePhases` deliberately: that reducer is
+   * shared with the developer `PhaseTimeline`, teaching it about asks would put the ask
+   * slice inside the phase fetcher, and the SPEC puts panel changes out of scope.
+   */
+  const { data: asks, reconcile: reconcileAsks } = useAskUserPrompt(run?.thread_id ?? null)
+
+  /**
    * ⚠ CR-02 — SOMETHING HAS TO OPEN THE RUN'S STREAM, and after the retarget nothing did.
    *
    * The store's `reconcile(threadId)` action is the ONLY caller of `subscribeToRun` for a
@@ -459,6 +483,9 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
       void reconcileStream(threadId)
       void reconcile()
       void reconcileFiles()
+      // F5: and the ASKS. The waiting reading is derived from this slice, so leaving it out
+      // here would give it exactly the staleness F1 just removed from the phase slice.
+      void reconcileAsks()
       // CR-01: and the RUN. A lid closed across the run's completion must re-read the
       // VERDICT on wake rather than wait out the poll below — the phase slice cannot
       // supply it, and a stale "Running" is the single loudest thing this surface can
@@ -471,7 +498,7 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
       window.removeEventListener("visibilitychange", onWake)
       window.removeEventListener("online", onWake)
     }
-  }, [run?.thread_id, reconcile, reconcileFiles, reconcileStream, refreshRun])
+  }, [run?.thread_id, reconcile, reconcileAsks, reconcileFiles, reconcileStream, refreshRun])
 
   /** A download that fails must say so where the user clicked — a swallowed rejection
    *  leaves a dead row, and an unhandled one is a console-only failure. */
@@ -526,16 +553,56 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
   /** slug → the whole worded run state. Built ONCE per (specs, rows) pair, over the
    *  DEFINITION's steps — so a step the run never reached still gets a reading rather
    *  than falling off the spine. */
+  // Hoisted above the memo below (F5) — the run-level live/terminal fact is part of whether
+  // a step can honestly be said to be waiting. The elapsed block downstream reads these same
+  // two consts rather than re-deriving them.
+  const runStatus = run?.status ?? ""
+  const isTerminal = TERMINAL_RUN_STATUSES.has(runStatus)
+
   const runStateBySlug = useMemo(() => {
     const m = new Map<string, NodeRunState>()
+    /**
+     * F5 — WHICH step the pending ask belongs to, derived rather than joined.
+     *
+     * ⚠ `PendingAsk` carries NO phase reference at all (`types/index.ts:925-937`), so an
+     * ask cannot be matched to a step by id. The derivation is sound only because of two
+     * facts about the harness, and it is written out here because the moment either stops
+     * holding this reading starts over-claiming:
+     *
+     *   1. the spine is LINEAR and one phase runs at a time, so there is at most one
+     *      candidate; and
+     *   2. only an `llm_human_input` phase blocks on an ask, so an ask on the thread says
+     *      nothing about any other step that happens to be running.
+     *
+     * Hence all three conditions, none of them removable: an ask must exist, the step must
+     * be the one actually RUNNING (a step the run has not reached is waiting on nobody),
+     * and it must be the step type that can block. The run must also still be live — a
+     * cancelled run with an unanswered ask left on its thread does NOT need your reply,
+     * and saying so would be this phase's own defect in a new place.
+     *
+     * The step TYPE is read off the definition spec, never off the live phase row: the
+     * terminal seed carries `phase_type: null` on older rows (`:517` degrades it to
+     * `"unknown"`), and D-188-14 makes the definition the version that RAN.
+     *
+     * `pendingAsk` is a `tool_call_id` POINTER (`types/index.ts:1024`), so this hands
+     * `canvasReading` the same shape a live SSE event would have. That is the point: the
+     * waiting arm stays inside the ONE derivation function rather than being re-decided
+     * here, and the page's `canvasReading(` count stays at 1.
+     */
+    const askToken = asks.length > 0 ? asks[0].tool_call_id : null
+    const runIsLive = !isTerminal
     for (const spec of specs) {
       const phase = byIndex.get(spec.phase_index)
-      const reading: CanvasReading = canvasReading(phase)
+      const waiting =
+        askToken != null && runIsLive && phase?.status === "running" && waitsForYou(spec)
+      const reading: CanvasReading = canvasReading(
+        waiting && phase ? { ...phase, pendingAsk: askToken } : phase,
+      )
       const emitFailure = phase?.emitFailure ?? null
       m.set(spec.slug, { reading, label: runReadingLabel(reading, emitFailure), emitFailure })
     }
     return m
-  }, [specs, byIndex])
+  }, [specs, byIndex, asks, isTerminal])
 
   /**
    * ⚠ `useCallback`, NOT an inline arrow at the call site. An inline arrow is a NEW
@@ -547,8 +614,8 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
   const runState = useCallback((slug: string) => runStateBySlug.get(slug), [runStateBySlug])
 
   // ── The elapsed figure (D-188-18) ────────────────────────────────────────────
-  const runStatus = run?.status ?? ""
-  const isTerminal = TERMINAL_RUN_STATUSES.has(runStatus)
+  // (`runStatus` / `isTerminal` are hoisted above the run-state memo — F5 needs the live/
+  // terminal fact to decide whether any step can honestly be said to be waiting.)
   const claimedMs = epochOf(run?.claimed_at)
   const updatedMs = epochOf(run?.updated_at)
   // F3: the fallback anchor. `created_at` is NOT NULL on `workflow_runs`, so this is the one
@@ -603,10 +670,24 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
       if (!threadId) return
       void reconcile()
       void reconcileStream(threadId)
+      // F5: the pending-ask slice rides the SAME beat. A step that starts waiting after
+      // mount is precisely the case with no wake event in it — someone sitting and
+      // watching — which is the F1 lesson applied to the second slice this page derives
+      // a reading from.
+      void reconcileAsks()
     }
     const id = window.setInterval(tick, RUN_POLL_MS)
     return () => window.clearInterval(id)
-  }, [runId, loadPhase, isTerminal, refreshRun, run?.thread_id, reconcile, reconcileStream])
+  }, [
+    runId,
+    loadPhase,
+    isTerminal,
+    refreshRun,
+    run?.thread_id,
+    reconcile,
+    reconcileAsks,
+    reconcileStream,
+  ])
 
   // The terminal EDGE. The poll above tears itself down on the read that observes the
   // verdict, so that same tick is the last one — and the deliverable row is written as the
