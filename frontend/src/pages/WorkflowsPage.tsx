@@ -1078,6 +1078,9 @@ function RunModal({
 }) {
   const def = wf.definition as DefShape | undefined
   const keys = entryInputKeys(def)
+  // F4: read the SAME gate `doRun` reads, so the destination line cannot drift from the
+  // destination. Called here rather than threaded as a prop — one reader, no new surface.
+  const canvasEnabled = useCanvasGate()
 
   // ── WFIN-02 (D-LOCK-01) + WR-05: the KB-scope <select>. The "" option is ALWAYS the
   //    resting selection and truthfully labels the server-applied scope: for a BOUND
@@ -1351,8 +1354,28 @@ function RunModal({
           </p>
         </div>
         <div className="flex items-center justify-between border-t border-border px-4 py-3">
-          <span className="text-[12px] text-muted-foreground">
-            Run opens a <b className="text-foreground">new chat thread</b> and streams there.
+          {/* F4 (UAT 2026-08-05) — this line promised a destination the launch had stopped
+              going to. 188-09 retargeted `doRun` to the run surface, and the modal still
+              said "Run opens a new chat thread and streams there" right above the button.
+              It is the LAST thing a person reads before committing, so it is the one place
+              the surface cannot be vague about where they are about to land.
+
+              It is NOT a flat string swap, because there are genuinely two destinations:
+              CR-05 gated the retarget on the canvas flag, and with the flag OFF `doRun`
+              still falls through to the shipped `selectThread` + chat path. So the copy
+              reads the SAME gate the launch reads — one source, and it cannot drift from
+              the behaviour by construction. */}
+          <span className="text-[12px] text-muted-foreground" data-testid="run-destination">
+            {canvasEnabled ? (
+              <>
+                Run opens this workflow&apos;s <b className="text-foreground">run surface</b>. The
+                chat thread is still created, and stays reachable from there.
+              </>
+            ) : (
+              <>
+                Run opens a <b className="text-foreground">new chat thread</b> and streams there.
+              </>
+            )}
           </span>
           <div className="flex items-center gap-2">
             <button
