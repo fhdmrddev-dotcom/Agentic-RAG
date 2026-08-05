@@ -3,7 +3,7 @@ phase: 188
 slug: non-technical-run-observability
 status: draft
 nyquist_compliant: false
-wave_0_complete: false
+wave_0_complete: true
 created: 2026-08-05
 ---
 
@@ -44,6 +44,108 @@ created: 2026-08-05
 | ⚠ `test_thread_workflow_endpoint.py` | **1 of 7 RED at HEAD** — this is the suite fencing the endpoint the run surface reads. Record it; do not attribute it to this phase. |
 | Unpinned but running | `PhaseNode.test.tsx` (13) · `PhaseNodeCard.test.tsx` (68) — they RUN but are **not pinned**; this phase should pin them. |
 | Outside `TARGETS` entirely | `src/lib/**`, `src/components/panel/**`, `src/pages/**` — a new file there is **silently never run** unless `TARGETS` is extended. |
+
+---
+
+## Measured baselines — recorded at plan 188-01, before any production edit
+
+> Measured on **2026-08-05** at the working tree as it stood after 188-01 tasks 1–2 (which touch
+> `scripts/vitest-count-gate.cjs` only) and **before any file under `frontend/src` or `backend/app`
+> was modified by this phase**. Every figure below is the command's own printed output — none is
+> inherited from `188-RESEARCH.md`, and none is hand-counted. Where a figure differs from the
+> `db086240` value already recorded above, BOTH are kept and the current one is named.
+>
+> These are what the phase-close **non-attribution diff** is taken against. Non-attribution is
+> proved by diffing the recorded failure SET, never by a rollback run (T-188-01-02).
+
+### 1. Frontend count gate — POST-task-1/2
+
+```
+node scripts/vitest-count-gate.cjs
+```
+
+| Figure | Measured now | At `db086240` | Which is current |
+|---|---|---|---|
+| `total` | **2206** | 2196 | **2206** — task 1 brought `PhaseReconcile.test.tsx` (2) and `PhaseTimeline.test.tsx` (8) into `TARGETS`, so they now EXECUTE. +10 is exactly 2 + 8; no other suite's count moved. |
+| `failed` | **0** | 0 | unchanged |
+| `pinned total` | **1037** | 946 | **1037** — task 2 pinned four suites: `PhaseNodeCard.test.tsx` 68, `PhaseNode.test.tsx` 13, `PhaseTimeline.test.tsx` 8, `PhaseReconcile.test.tsx` 2. 946 + 91 = 1037. `BASELINE_TOTAL` remains the computed reduce. |
+| pinned files present | **26/26** | 22/22 | **26/26** — grew by exactly the 4 entries added. |
+
+All four pin values were read from the script's own printed `actual` column across **two agreeing
+runs**, never hand-counted (unsound under `it.each`). The `PhaseNodeCard.test.tsx` pin was then
+**observed biting**: one whole `it(` block deleted → exit 1, `[count-decrease] PhaseNodeCard.test.tsx
+— pinned 68, ran 67 (-1)` at `failed 0`, then restored. Raw output in `188-01-SUMMARY.md`.
+
+### 2. Frontend typecheck
+
+```
+cd frontend && npx tsc --noEmit -p tsconfig.app.json
+```
+
+**33 errors.** Matches the `db086240` figure. ⚠ The passing gate for every later task is
+**"still 33"**, NOT 0 — the 33 are pre-existing (the tail one is a `StreamsState` /
+`viewedThreadId: string | null` vs `null` widening in the streams store). And the `-p tsconfig.app.json`
+flag is load-bearing: the root `tsconfig.json` is `{"files": [], "references": [...]}` and therefore
+checks **zero** files, so a bare `npx tsc --noEmit` reports 0 errors while checking nothing.
+
+### 3. Backend full suite — THE non-attribution baseline
+
+```
+cd backend && ./venv/Scripts/python.exe -m pytest tests/ -q -p no:randomly
+```
+
+**211 failed · 3296 passed · 19 skipped · 5 xfailed · 9 xpassed · 1 error** in **308.39 s (5 m 08 s)**.
+Identical to the `db086240` measurement. This is the baseline the phase-close non-attribution diff
+is taken against.
+
+Full `tests/` baseline = **211 failed / 3296 passed**; the separate `tests/unit` async-mock rot
+figure (62 failed / 1700 passed, measured at Phase 187 round 5 with `pytest tests/unit -q`) is a
+**different, narrower measurement and is not contradicted by this one** — a subset at 62-red and its
+superset at 211-red are consistent. Do not treat the narrower figure as overturned, and do not
+describe it as such in any summary.
+
+> ⚠ Use `./venv/Scripts/python.exe -m pytest`. `source venv/Scripts/activate` does not take in the
+> Bash tool and falls through to a system python missing `pydantic_settings`.
+
+### 4. Backend canvas / byte-identity gate suites
+
+```
+cd backend && ./venv/Scripts/python.exe -m pytest tests/test_revert_byte_identical.py tests/test_182_canvas_gate.py -q
+```
+
+**12 passed** in 1.83 s. Matches the expected 12. This is the honest gate for the SPEC's
+byte-identity criterion, and it is **green today** — so any red here later belongs to this phase.
+
+### 5. ⚠ Pre-existing RED in the endpoint the run surface reads
+
+```
+cd backend && ./venv/Scripts/python.exe -m pytest tests/test_thread_workflow_endpoint.py -q
+```
+
+**1 failed · 6 passed** in 1.12 s — the 1-of-7 RED, recorded here **by name and failing assertion**
+because this suite fences `GET /threads/{id}/workflow`, which the run surface reads:
+
+| Field | Value |
+|---|---|
+| Failing test | `tests/test_thread_workflow_endpoint.py::test_thread_workflow_state_shape` |
+| Failing assertion | `assert body["locked"] is True` → `E assert False is True` (`test_thread_workflow_endpoint.py:99`) |
+| Note | The endpoint answers **HTTP 200** and the full key shape is present (the loop over `thread_id … continues_remaining` passes, as does `body["mode"] == "harness"`). Only the `locked` value disagrees. |
+
+**This RED pre-dates every line this phase writes.** It must not be attributed to Phase 188, and
+Phase 188 must not be credited with fixing it unless a plan deliberately does so.
+
+### 6. Other pre-existing reds in the adjacent canvas suites
+
+```
+cd backend && ./venv/Scripts/python.exe -m pytest tests/test_181_flip_on.py tests/test_182_grounding_bundle.py -q
+```
+
+**3 failed · 10 passed** in 1.64 s — matching `188-RESEARCH.md`'s 1 and 2 respectively:
+
+| Suite | Failing tests |
+|---|---|
+| `test_181_flip_on.py` | `test_canvas_ping_200_after_flip_on` (1) |
+| `test_182_grounding_bundle.py` | `test_grounding_bundle_returns_server_sourced_palette`, `test_grounding_bundle_fields_come_from_the_bundle` (2) |
 
 ---
 
