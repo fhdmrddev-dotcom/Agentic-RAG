@@ -518,7 +518,16 @@ describe("WorkflowRunPage — a reconcile leaves every visible node reading iden
     await screen.findByTestId("canvas-stub")
     reconcile.mockClear()
     fireEvent(window, new Event("visibilitychange"))
-    expect(reconcile).toHaveBeenCalled()
+    // ⚠ AWAITED SINCE 188.1-04 (deferred item D-188.1-DEF-01, closed here). This assertion
+    // used to run SYNCHRONOUSLY after the dispatch — alone in this describe, where every
+    // other assertion awaits — and was measured failing 1 run in 6 during 188.1-02 with
+    // `expected "vi.fn()" to be called at least once`. Because this suite is pinned in the
+    // count gate and the gate requires `failed 0`, that flake could red the gate for any
+    // plan in any phase, attributable to nothing its author did. `waitFor` does not weaken
+    // the claim: the call must still happen, it is merely allowed to land on a later tick.
+    // Fixed HERE rather than deferred again because this plan already modifies this file —
+    // its own re-open trigger named exactly this circumstance.
+    await waitFor(() => expect(reconcile).toHaveBeenCalled())
   })
 })
 
