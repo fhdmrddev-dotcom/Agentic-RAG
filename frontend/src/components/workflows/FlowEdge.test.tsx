@@ -63,6 +63,9 @@ import { mockReactFlow } from "@/test-utils/mockReactFlow"
 // house idiom for making a scope fence machine-checkable.
 import flowEdgeSource from "./FlowEdge?raw"
 import workflowCanvasSource from "./WorkflowCanvas?raw"
+// 188.1-03 — the layer the `＋`/`✕` handlers moved into. Read here so the criterion-24
+// control below keeps covering them rather than going quietly green over less code.
+import planeEditingLayerSource from "./PlaneEditingLayer?raw"
 import {
   ARC,
   DETOUR,
@@ -302,6 +305,16 @@ describe("FlowEdge — the mark carries no control (criterion 24, T-185-10-01)",
     // so an empty result below is evidence rather than a broken matcher.
     const foundInCanvas = FOCUSABLE_TOKENS.filter((t) => workflowCanvasSource.includes(t))
     expect(foundInCanvas.length).toBeGreaterThan(0)
+    // 188.1-03 — AND the extracted layer, because the control moved out from under this
+    // line. The `＋` / `✕` click handlers — the very controls criterion 24 is about — now
+    // live in `PlaneEditingLayer.tsx`. MEASURED across that move: the click-handler
+    // spelling fell from 4 occurrences to 2 in `WorkflowCanvas.tsx` and appears twice in
+    // the new file. The canvas half therefore still passes while covering less, which is
+    // Phase 188's F7 lesson exactly — a green control says nothing about what it stopped
+    // reading. Both halves are asserted, and this one is an ADDITION: the line above is
+    // untouched.
+    const foundInLayer = FOCUSABLE_TOKENS.filter((t) => planeEditingLayerSource.includes(t))
+    expect(foundInLayer.length).toBeGreaterThan(0)
 
     expect(FOCUSABLE_TOKENS.filter((t) => flowEdgeSource.includes(t))).toEqual([])
   })

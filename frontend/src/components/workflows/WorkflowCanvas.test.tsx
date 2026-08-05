@@ -30,6 +30,11 @@ import { mockReactFlow } from "@/test-utils/mockReactFlow"
 // The component SOURCE via Vite's ?raw loader — the idiomatic vitest way to make a
 // scope fence machine-checkable (the PhaseSpineGraph.test.tsx:20-22 precedent).
 import workflowCanvasSource from "./WorkflowCanvas?raw"
+// 188.1-03 — the two modules the extraction created, read the same way and for the same
+// reason: the ESM-cycle fence below is about their IMPORT GRAPH, which no rendered DOM
+// can show and neither `tsc` nor eslint can fail on.
+import planeEditingLayerSource from "./PlaneEditingLayer?raw"
+import editAffordanceSource from "./editAffordance?raw"
 import { WorkflowCanvas } from "./WorkflowCanvas"
 import { toCanvas } from "./canvasModel"
 import {
@@ -607,6 +612,81 @@ describe("WorkflowCanvas — the scope fences (source guard)", () => {
       // names a module the glob pattern no longer matches reads an empty string in silence.
       if (path in CANVAS_MODULES) expect(CANVAS_MODULES[path].length).toBeGreaterThan(0)
     }
+  })
+})
+
+// ── 188.1-03 — THE ESM-CYCLE FENCE (SC#3, T-188.1-05) ────────────────────────────────
+//
+// WHY A TEST AND NOT A DOCBLOCK. `WorkflowCanvas.tsx` imports `FlowEdge`'s component
+// VALUE at module scope for its `edgeTypes` map, so the canvas subtree already contains a
+// live value-level edge. If either module 188.1-03 extracted imported `WorkflowCanvas`
+// back, the cycle would typecheck clean and lint clean and fail only at RUNTIME — a TDZ
+// `ReferenceError` in whichever module a caller reached first, which under Vitest is
+// whichever suite happens to import first. Nothing in the build can see that, so the
+// constraint is spelled as an assertion over the two files' own source.
+//
+// The forbidden shape is stated ONCE and covers every import form deliberately: a static
+// import, a re-export, and `import type` all end in `from "<specifier>"`, and a type-only
+// import back is forbidden too even though it is erased at build — `verbatimModuleSyntax`
+// makes the value/type distinction easy to get wrong under a later edit, and a fence that
+// permits the cheap mistake is not worth the line it costs. Dynamic `import()` is its own
+// regex because it has no `from`.
+const IMPORT_FROM_CANVAS = /from\s+["'][^"']*WorkflowCanvas["']/
+const DYNAMIC_IMPORT_CANVAS = /import\s*\(\s*["'][^"']*WorkflowCanvas["']\s*\)/
+
+describe("WorkflowCanvas 188.1-03 — the extracted modules cannot import back (SC#3)", () => {
+  it("the two regexes match the shapes they forbid, and both sources are really loaded", () => {
+    // POSITIVE CONTROLS, inline and first: a fence whose matcher is broken passes
+    // vacuously and looks exactly like a fence that holds.
+    expect('import { WorkflowCanvas } from "./WorkflowCanvas"').toMatch(IMPORT_FROM_CANVAS)
+    expect('import type { CanvasNotice } from "@/components/workflows/WorkflowCanvas"').toMatch(
+      IMPORT_FROM_CANVAS,
+    )
+    expect('export { EDIT_AFFORDANCE } from "./WorkflowCanvas"').toMatch(IMPORT_FROM_CANVAS)
+    expect('const m = await import("@/components/workflows/WorkflowCanvas")').toMatch(
+      DYNAMIC_IMPORT_CANVAS,
+    )
+    // …and the subjects are non-empty, so the negatives below are about real files.
+    expect(planeEditingLayerSource.length).toBeGreaterThan(0)
+    expect(editAffordanceSource.length).toBeGreaterThan(0)
+  })
+
+  it("neither extracted module names a WorkflowCanvas specifier in ANY import form", () => {
+    for (const source of [planeEditingLayerSource, editAffordanceSource]) {
+      expect(source).not.toMatch(IMPORT_FROM_CANVAS)
+      expect(source).not.toMatch(DYNAMIC_IMPORT_CANVAS)
+    }
+  })
+
+  it("editAffordance is a LEAF — no react import, and no component module at all", () => {
+    // The house naming rule in this directory is the mechanism: a PascalCase sibling is a
+    // component module, a camelCase one is a plain module (10 of 10, measured by 188.1's
+    // pattern map). So "imports no component" is checkable without listing every file.
+    const COMPONENT_SIBLING = /from\s+["']@\/components\/workflows\/[A-Z]/
+    const REACT_IMPORT = /from\s+["']react["']/
+    // POSITIVE CONTROLS first.
+    expect('import { StepTypePicker } from "@/components/workflows/StepTypePicker"').toMatch(
+      COMPONENT_SIBLING,
+    )
+    expect('import { useMemo } from "react"').toMatch(REACT_IMPORT)
+
+    expect(editAffordanceSource).not.toMatch(COMPONENT_SIBLING)
+    expect(editAffordanceSource).not.toMatch(REACT_IMPORT)
+    // Non-vacuity for the leaf claim: it DOES import the one thing it is allowed to, so
+    // the two negatives above describe a wired module rather than an empty file.
+    expect(editAffordanceSource).toMatch(/from\s+["']@\/components\/workflows\/canvasModel["']/)
+  })
+
+  it("the canvas imports the layer rather than declaring it — the cut has one direction", () => {
+    // The other half of "no cycle": the edge exists, and it points one way. Without this
+    // the three negatives above are also satisfied by two modules nobody uses.
+    expect(workflowCanvasSource).toMatch(
+      /import \{ PlaneEditingLayer \} from ["']@\/components\/workflows\/PlaneEditingLayer["']/,
+    )
+    expect(workflowCanvasSource).not.toContain("function PlaneEditingLayer(")
+    // …and no re-export shim was left behind, which is what would quietly preserve the
+    // coupling this phase exists to remove while every other assertion here stayed green.
+    expect(workflowCanvasSource).not.toContain("EDIT_AFFORDANCE")
   })
 })
 

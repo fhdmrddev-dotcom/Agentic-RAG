@@ -156,7 +156,14 @@ const BASELINE = {
   // negatives from narrowing when 188.1-03 cuts 311 lines out of `WorkflowCanvas.tsx`) and
   // the editable SC#4 walk (the two shipped no-focusable-control assertions render READ-ONLY,
   // so neither ever mounted `PlaneEditingLayer` — the layer this phase moves).
-  "WorkflowCanvas.test.tsx": 48,
+  // 188.1-03 EXTENDED 48 → 52, read from this script's own `actual` column across two
+  // agreeing runs (never by counting `it(` literals). The four are the ESM-cycle fence
+  // SC#3 owes: the extraction's two new modules may not import `WorkflowCanvas` back in
+  // ANY form, `editAffordance` must stay a leaf, and the canvas must import the layer
+  // rather than declare it. A cycle there typechecks clean, lints clean and fails only at
+  // RUNTIME, so nothing else in the battery can see it. Extension only — no test was
+  // relocated by that plan and no pin was lowered.
+  "WorkflowCanvas.test.tsx": 52,
   // 187-29: gap-closure round 5's three suites, pinned for exactly the reason
   // 187-25 pinned its two — each now carries a guard that a failures-only
   // differential cannot see the deletion of:
@@ -420,7 +427,7 @@ const BASELINE = {
 // note going stale twice in two plans is the evidence for the rule, not a counterexample to
 // it: this figure is a NOTE ABOUT the reduce's result and is never what the gate reads, so
 // only a deliberate correction in the same commit as the pin keeps it true.
-const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // 2466
+const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // ⚠ 2470 (188.1-03)
 
 // ── The Wave-0 blast radius (184-VALIDATION.md § "quick run command"). ──
 const TARGETS = [
