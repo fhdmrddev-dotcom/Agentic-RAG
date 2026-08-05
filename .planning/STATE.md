@@ -46,6 +46,43 @@ Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 op
 
 Phase: 188 (non-technical-run-observability) — EXECUTING
 
+**F5 + F6 FIXED AND VERIFIED LIVE (2026-08-05, `3748e6d1` + `abd4ce64`).**
+
+**F5** — the run-time waiting reading was structurally unreachable on the run surface.
+`reconcilePhases` hardcodes `pendingAsk: null` in both branches, so `canvasReading`'s waiting
+arm could never fire on a surface that rides polled reconciles. `WorkflowRunPage` now consumes
+the durable `useAskUserPrompt` slice that already shipped — **no new endpoint, no wire change,
+`reconcilePhases` untouched**. `PendingAsk` carries no phase reference, so the waiting step is
+DERIVED under four conditions: an ask exists AND the run is live AND the step is the one running
+AND it is `llm_human_input`. The ask token is written on as the `tool_call_id` pointer a live
+event would have carried, so the derivation stays inside `canvasReading` and the Req 8 fence
+(`canvasReading(` count == 1) is untouched. RED observed first on 4 of 8 cases.
+
+**F6** — *found by watching the F5 verification run, not by any suite.* F3 moved the elapsed
+figure's anchor to the `created_at` fallback and left the TICK GATE reading `claimedMs != null`;
+since `claimed_at` is null on essentially every run (0 of 149 completed), the 1 s interval never
+armed on ANY live run and the band rendered a frozen mount-time number that looked live.
+Observed: a run 106 s old displaying "3s since it was queued". `anchorMs` is now computed once
+and read by both the gate and the figure. **F6 is a defect introduced by a UAT fix (F3), which
+survived because that fix was verified by re-reading the wording rather than watching the number
+for ten seconds.**
+
+Live evidence — run `2ad460f0` on `doc_qa_scoped_098uat`, paired DB read: DB
+`completed/active/pending` rendered `Complete` / `Paused for your answer — it needs your reply
+before it can continue` / `Not started`, with the clock advancing 37s → 57s across a 20 s gap.
+The waiting reading arrived via the 5 s poll with **no wake event and no reload**. D-188-05 was
+confirmed visible on one card: the design-time badge "Waits for you" sits directly beneath the
+run-time sentence "Paused for your answer".
+
+Gates: count gate **2460/2460, failed 0, 45/45 pinned, zero slack** (WorkflowRunPage 75 → 85,
+re-pinned in the same commits) · `tsc --noEmit -p tsconfig.app.json` **33** (inherited baseline,
+0 in touched files) · `vite build` exit 0 · zero migrations · `WorkflowCanvas.tsx` untouched.
+
+**Next action:** UAT rows 9/10/11 (multi-tool · parallel-thread · long-message) and row 15's full
+"Tomorrow" journey — none driven. Then the 10 deferred review WARNINGs (WR-01, WR-04 first), the
+minimax SC#10 re-drive (⛔ `SC10-188-RUN`, costs real spend — operator's call), and the still-OWED
+G-5 `PlaneEditingLayer` / `EDIT_AFFORDANCE` extraction.
+
 **Plan 187-01 COMPLETE (Wave 1, 2026-08-02, `6793f651`).** The SC#6 property test
 (`backend/tests/unit/test_187_armed_checkpoint_property.py`, 30 tests) is written and **observed RED
 on unmodified HEAD** — 8 failed / 22 passed, exit 1. Four author-validator-set rows fail on both P1

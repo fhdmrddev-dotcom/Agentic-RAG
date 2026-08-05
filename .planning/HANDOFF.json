@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "timestamp": "2026-08-05T14:43:36.298Z",
+  "timestamp": "2026-08-05T16:00:00.000Z",
   "phase": "188",
   "phase_name": "non-technical-run-observability",
   "phase_dir": ".planning/phases/188-non-technical-run-observability",
@@ -9,31 +9,100 @@
   "total_tasks": 1,
   "status": "paused",
   "completed_tasks": [
-    { "id": 1, "name": "13/13 plans executed across 11 waves", "status": "done", "commit": "8e7e98d3" },
-    { "id": 2, "name": "Code review — 6 BLOCKERS found and fixed, 10 WARNINGs deferred", "status": "done", "commit": "6bdc4684" },
-    { "id": 3, "name": "F1 — phase slice + stream ride the run poll (frozen canvas)", "status": "done", "commit": "f47cf4c9" },
-    { "id": 4, "name": "F3 — elapsed anchors on created_at when claimed_at is absent", "status": "done", "commit": "f3572693" },
-    { "id": 5, "name": "F2 — floor may not upgrade an earlier unresolved row to done", "status": "done", "commit": "13030a5e" },
-    { "id": 6, "name": "F4 — Run modal names the destination the launch goes to", "status": "done", "commit": "6bdc4684" },
-    { "id": 7, "name": "Row 13 — authored skip_probe_188uat fixture and drove it (PASS)", "status": "done", "commit": "" },
-    { "id": 8, "name": "BUG-260609-04 closed on live evidence", "status": "done", "commit": "" },
-    { "id": 9, "name": "F5 — run-time waiting reading", "status": "in_progress", "progress": "fully diagnosed and written into 188-UAT.md; deliberately NOT started at ~23% context to avoid a half-applied edit" }
+    {
+      "id": 1,
+      "name": "13/13 plans executed across 11 waves",
+      "status": "done",
+      "commit": "8e7e98d3"
+    },
+    {
+      "id": 2,
+      "name": "Code review — 6 BLOCKERS found and fixed, 10 WARNINGs deferred",
+      "status": "done",
+      "commit": "6bdc4684"
+    },
+    {
+      "id": 3,
+      "name": "F1 — phase slice + stream ride the run poll (frozen canvas)",
+      "status": "done",
+      "commit": "f47cf4c9"
+    },
+    {
+      "id": 4,
+      "name": "F3 — elapsed anchors on created_at when claimed_at is absent",
+      "status": "done",
+      "commit": "f3572693"
+    },
+    {
+      "id": 5,
+      "name": "F2 — floor may not upgrade an earlier unresolved row to done",
+      "status": "done",
+      "commit": "13030a5e"
+    },
+    {
+      "id": 6,
+      "name": "F4 — Run modal names the destination the launch goes to",
+      "status": "done",
+      "commit": "6bdc4684"
+    },
+    {
+      "id": 7,
+      "name": "Row 13 — authored skip_probe_188uat fixture and drove it (PASS)",
+      "status": "done",
+      "commit": ""
+    },
+    {
+      "id": 8,
+      "name": "BUG-260609-04 closed on live evidence",
+      "status": "done",
+      "commit": ""
+    },
+    {
+      "id": 9,
+      "name": "F5 — run-time waiting reading fixed and verified live",
+      "status": "done",
+      "commit": "3748e6d1"
+    },
+    {
+      "id": 9.5,
+      "name": "F6 — the live elapsed clock never ticked on any run (F3's residue); found by watching, fixed, verified live",
+      "status": "done",
+      "commit": "abd4ce64"
+    }
   ],
   "remaining_tasks": [
-    { "id": 9, "name": "F5 — llm_human_input active reads 'Running', never 'Paused for your answer'", "status": "not_started" },
-    { "id": 10, "name": "UAT rows 9/10/11 — multi-tool, parallel-thread, long-message", "status": "not_started" },
-    { "id": 11, "name": "UAT row 15 — the full 'Tomorrow' journey end to end", "status": "not_started" },
-    { "id": 12, "name": "Re-drive SC#10 row 6 (minimax) — currently blocked SC10-188-RUN", "status": "not_started" },
-    { "id": 13, "name": "10 deferred review WARNINGs — WR-01 and WR-04 first", "status": "not_started" },
-    { "id": 14, "name": "PlaneEditingLayer / EDIT_AFFORDANCE extraction (G-5, still OWED)", "status": "not_started" },
-    { "id": 15, "name": "WorkflowRunPage imports WorkflowCanvas statically, defeating the lazy split", "status": "not_started" }
+    {
+      "id": 10,
+      "name": "UAT rows 9/10/11 — multi-tool, parallel-thread, long-message",
+      "status": "not_started"
+    },
+    {
+      "id": 11,
+      "name": "UAT row 15 — the full 'Tomorrow' journey end to end",
+      "status": "not_started"
+    },
+    {
+      "id": 12,
+      "name": "Re-drive SC#10 row 6 (minimax) — currently blocked SC10-188-RUN",
+      "status": "not_started"
+    },
+    {
+      "id": 13,
+      "name": "10 deferred review WARNINGs — WR-01 and WR-04 first",
+      "status": "not_started"
+    },
+    {
+      "id": 14,
+      "name": "PlaneEditingLayer / EDIT_AFFORDANCE extraction (G-5, still OWED)",
+      "status": "not_started"
+    },
+    {
+      "id": 15,
+      "name": "WorkflowRunPage imports WorkflowCanvas statically, defeating the lazy split",
+      "status": "not_started"
+    }
   ],
   "blockers": [
-    {
-      "description": "F5 diagnosed but not started — stopped on context budget, not on any external dependency",
-      "type": "technical",
-      "workaround": "Complete plan is in 188-UAT.md under 'F5 · DIAGNOSED, NOT FIXED'; the change is local to WorkflowRunPage.tsx and needs no new endpoint"
-    },
     {
       "description": "SC#10 row 6 (minimax) failed after 600s — recorded blocked SC10-188-RUN",
       "type": "external",
@@ -58,15 +127,58 @@
     }
   ],
   "decisions": [
-    { "decision": "Refused auto-approval of 188-13's human-verify checkpoint under auto-mode", "rationale": "Its content is 'a human watches a real run'; a PASS nobody observed would commit into the phase's own record the exact defect the phase exists to remove", "phase": "188" },
-    { "decision": "Fixed the 6 review blockers directly instead of opening a gap-closure round", "rationale": "G-7 was clear (0 rounds) and ROADMAP success criteria were genuinely unmet — the only thing that justifies iterating", "phase": "188" },
-    { "decision": "Deferred all 10 review WARNINGs with a re-open trigger", "rationale": "None blocks a success criterion; prevents the review manufacturing scope (G-7's stated failure mode)", "phase": "188" },
-    { "decision": "F1 fixed with a poll rather than a second SSE stream", "rationale": "D-v2.5-03 already mandates 'Realtime is a hint, not a source of truth; always reconcile via fetch' — the slice is then correct whether or not a subscription ever arms", "phase": "188" },
-    { "decision": "F3 keeps the original rule and changes only the anchor", "rationale": "'Never a figure without its anchor' survives; a queued-anchored figure is not a lie, an unlabelled one is", "phase": "188" },
-    { "decision": "Inverted a shipped 188-04 test pin on a measurement", "rationale": "Its rationale (the counter would regress) was obsolete — PhaseTimeline clamps the counter with counterFloorRef (INV-4), so it could never regress regardless of statuses", "phase": "188" },
-    { "decision": "Corrected my own earlier claim that the '62-red backend suite' memory was refuted", "rationale": "Different commands, different scopes; 188-12 later measured the 17 tests/unit rows summing to exactly 62", "phase": "188" }
+    {
+      "decision": "Refused auto-approval of 188-13's human-verify checkpoint under auto-mode",
+      "rationale": "Its content is 'a human watches a real run'; a PASS nobody observed would commit into the phase's own record the exact defect the phase exists to remove",
+      "phase": "188"
+    },
+    {
+      "decision": "Fixed the 6 review blockers directly instead of opening a gap-closure round",
+      "rationale": "G-7 was clear (0 rounds) and ROADMAP success criteria were genuinely unmet — the only thing that justifies iterating",
+      "phase": "188"
+    },
+    {
+      "decision": "Deferred all 10 review WARNINGs with a re-open trigger",
+      "rationale": "None blocks a success criterion; prevents the review manufacturing scope (G-7's stated failure mode)",
+      "phase": "188"
+    },
+    {
+      "decision": "F1 fixed with a poll rather than a second SSE stream",
+      "rationale": "D-v2.5-03 already mandates 'Realtime is a hint, not a source of truth; always reconcile via fetch' — the slice is then correct whether or not a subscription ever arms",
+      "phase": "188"
+    },
+    {
+      "decision": "F3 keeps the original rule and changes only the anchor",
+      "rationale": "'Never a figure without its anchor' survives; a queued-anchored figure is not a lie, an unlabelled one is",
+      "phase": "188"
+    },
+    {
+      "decision": "Inverted a shipped 188-04 test pin on a measurement",
+      "rationale": "Its rationale (the counter would regress) was obsolete — PhaseTimeline clamps the counter with counterFloorRef (INV-4), so it could never regress regardless of statuses",
+      "phase": "188"
+    },
+    {
+      "decision": "Corrected my own earlier claim that the '62-red backend suite' memory was refuted",
+      "rationale": "Different commands, different scopes; 188-12 later measured the 17 tests/unit rows summing to exactly 62",
+      "phase": "188"
+    },
+    {
+      "decision": "Kept F5's derivation inside canvasReading by synthesizing the pendingAsk pointer",
+      "rationale": "Returning the reading from the page would be a second derivation site, which Req 8's fence exists to prevent; Phase.pendingAsk is a tool_call_id string, so the page hands canvasReading the exact shape a live SSE event would have",
+      "phase": "188"
+    },
+    {
+      "decision": "Added a fourth F5 condition the diagnosis did not have — the run must still be live",
+      "rationale": "A cancelled run can leave a phase row at active with an unanswered ask; a node saying 'it needs your reply' beside a '⊘ Cancelled' band would be this phase's own defect in a new place. Falsified by forcing the guard true and observed RED",
+      "phase": "188"
+    },
+    {
+      "decision": "Fixed F6 inline rather than opening a round",
+      "rationale": "G-3: one file, one hoisted const, no schema or API surface — and it was found by live UAT of the very surface, not manufactured by a review",
+      "phase": "188"
+    }
   ],
   "uncommitted_files": [],
-  "next_action": "Fix F5 per 188-UAT.md § 'F5 · DIAGNOSED, NOT FIXED': consume useAskUserPrompt in WorkflowRunPage, derive waiting as (asks.length>0 && phase running && phase_type llm_human_input) since PendingAsk carries no phase ref, add reconcileAsks to BOTH the 5s poll and the wake handler, RED first, re-pin WorkflowRunPage.test.tsx (75) in the same commit, then verify live on doc_qa_scoped_098uat's confirm step.",
-  "context_notes": "The through-line: this phase's subject is a surface that must not claim something happened when it did not — and it shipped doing exactly that, three ways, because every guard it built was a guard over a MOCKED store. 13 plans, all RED-first, plus a code review, all passed while the canvas was frozen. Only driving a real run against paired DB reads found it. Treat any run-surface claim as unproven until a real run has been watched. Gates at pause: count 2450/2450 zero slack failed 0; tsc -p tsconfig.app.json 33 (root config checks ZERO files); vite build 0; backend canvas/gate 20 passed; WorkflowCanvas.tsx 13/2 against the <=15/<=4 G-5 cap; zero migrations."
+  "next_action": "Drive UAT rows 9/10/11 (multi-tool, parallel-thread, long-message) and row 15's full 'Tomorrow' journey — none has been driven. scripts/longmsg_workflow_smoke.py already builds the >=5KB prompt for row 11. Then the 10 deferred review WARNINGs (WR-01 and WR-04 first).",
+  "context_notes": "The through-line held, and then repeated itself. F5 was the third way this surface claimed something that was not happening; F6 was the fourth — and F6 was INTRODUCED BY F3, a UAT fix, surviving because that fix was verified by re-reading the wording rather than watching the number for ten seconds. No suite could have found it: the figure is correct at every single sample and wrong only across two. Drive a real run and WATCH it; a paired DB read at one instant is necessary and not sufficient. Gates at hand-off: count 2460/2460 zero slack failed 0; tsc -p tsconfig.app.json 33 (root config checks ZERO files); vite build 0; zero migrations; WorkflowCanvas.tsx untouched."
 }
