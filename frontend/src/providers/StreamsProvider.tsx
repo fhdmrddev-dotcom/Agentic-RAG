@@ -2808,6 +2808,23 @@ export function StreamsProvider({ children }: PropsWithChildren) {
         // phase of a completed run IS completed). NEVER touch a phase that
         // legitimately ended failed/skipped — those are terminal truths, not
         // stragglers. Closure threadId only (PANEL-09); phasesByThread only.
+        //
+        // Phase 188 Plan 02 (RUNVIZ-02 / Req 3 / Req 4) — `pending` LEFT the predicate,
+        // and the sentence directly above is the argument for it. The 098-UAT reason
+        // for this sweep is a MISSED `phase_completed` for a phase that DID run, so the
+        // legitimate stragglers are exactly {running, retrying}; `pending` was never one
+        // of them, and it is REACHABLE. `skip_to_phase` marks ONLY the current phase
+        // (`harness_engine.py:1561-1563`) — every phase between it and the jump target
+        // keeps `status='pending'` in `workflow_phases` for the life of the run, and
+        // nothing ever revisits them. So on any skip-bearing workflow this sweep painted
+        // a step that NEVER RAN as Complete, while a reconcile rebuilt from those same
+        // rows restored "Not started": the live view and the reload disagreed about
+        // whether work happened, which is precisely what Req 4 forbids. A never-ran
+        // `pending` at run completion is a terminal truth by the same logic that already
+        // protects failed/skipped, not a straggler to be tidied. Falsified first, RED
+        // observed on unmodified source, in `panel/__tests__/PhaseReconcile.test.tsx`
+        // (D-188-09) — with positive controls that the running/retrying sweep survives,
+        // so this narrowing cannot be mistaken for disabling the sweep.
         finalizeAllPhasesForThread: (threadId) =>
           useStreamsStore.setState((s) => {
             const next = new Map(s.phasesByThread)
@@ -2815,7 +2832,7 @@ export function StreamsProvider({ children }: PropsWithChildren) {
             if (!prev || prev.length === 0) return {}
             let changed = false
             const swept = prev.map((p) => {
-              if (p.status === "running" || p.status === "retrying" || p.status === "pending") {
+              if (p.status === "running" || p.status === "retrying") {
                 changed = true
                 return { ...p, status: "done" as const }
               }
