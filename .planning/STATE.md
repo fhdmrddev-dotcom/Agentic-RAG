@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio — 🚧 ACTIVE
 status: executing
-last_updated: "2026-08-06T17:46:23.851Z"
-last_activity: 2026-08-05 -- Phase 188.1 planning complete
+last_updated: "2026-08-06T19:16:39.528Z"
+last_activity: 2026-08-06 -- Phase 188.2 planning complete
 progress:
   total_phases: 21
   completed_phases: 9
-  total_plans: 119
+  total_plans: 126
   completed_plans: 118
   percent: 43
 ---
@@ -22,7 +22,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-20 — Phase 163 THE ATOMIC CRUX complete; membership RLS enforced)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase **188.2 (INSERTED)** — PhaseNodeCard extraction refactor, NOT PLANNED. Inserted 2026-08-06 because G-5 fires on `PhaseNodeCard.tsx` (measured 797 L / 4 phases) and Phase 189 adds a node type to it; 189's CONTEXT is locked and 189 now waits behind this. 188.1 is CLOSED (verified 6/6 · SECURED 18/18 · validated 16/16). **CONTEXT LOCKED 2026-08-06** (`8cbbb2d3`) — 11 decisions. Next: `/gsd:plan-phase 188.2`.
+**Current focus:** Phase **188.2 (INSERTED)** — PhaseNodeCard extraction refactor, NOT PLANNED. Inserted 2026-08-06 because G-5 fires on `PhaseNodeCard.tsx` (measured 797 L / 4 phases) and Phase 189 adds a node type to it; 189's CONTEXT is locked and 189 now waits behind this. 188.1 is CLOSED (verified 6/6 · SECURED 18/18 · validated 16/16). **CONTEXT LOCKED 2026-08-06** (`8cbbb2d3`) — 11 decisions. **PLANNED 2026-08-06 — 7 plans in 6 waves** (`b5b4259f`, revised `71e2bd52`); research + patterns + validation strategy all committed; plan-checker PASSED at iteration 2 (0 blockers). **The pipeline measured 10 upstream claims FALSE** — 7 CONTEXT figures (M1–M7), 3 in RESEARCH/PATTERNS — plus one landmine CONTEXT never named (`:1776`). Two contracts, disjoint evidence: prove the card UNCHANGED, prove the affordance FIXED. Next: `/gsd:execute-phase 188.2`.
 
 ## Deferred Items
 
@@ -70,12 +70,15 @@ exception at verification:** `PhaseNodeCard.tsx` + its four new modules **prove 
 `PlaneEditingLayer` stacking (`BUG-260806-01`) **proves FIXED**.
 
 **Three measurements taken at discuss time reshaped the phase — re-derive them at plan time:**
+
 - `PhaseNodeCard.tsx` is **797 L but only 249 lines of CODE** — **62.5 % is prose**. G-5 fired on a
   line count that is two-thirds comment. Hence D-03: the acceptance bar is a **body-line target
   carried with BOTH totals**, not 188.1's "measurably smaller".
+
 - **`PhaseNodeCard.test.tsx:1745` pins PROSE** — the clipping utility must appear in the card's
   source **exactly once**, and that one mention sits at `PhaseNodeCard.tsx:772` inside the 3D-mark
   block the extraction moves. A naive cut takes it to **0 and RED** (D-08 re-anchors it to the subtree).
+
 - **"A third badge is a typecheck error" is asserted NOWHERE** — the two-badge block tests 0/1/2
   badges *rendering*; no `@ts-expect-error`, no `BadgeSlot2Tuple` reference. Widening `BadgeSlots`
   during the move would leave every test green (D-09 pins it in Wave 0, RED first).
@@ -2173,7 +2176,7 @@ Status: Ready to execute
 
 **G-2 sketch gate for Phase 183: SATISFIED (2026-07-25).** Sketches 134-137 committed (`01bb4c64`, `7b74d2b5`, `01d50bba`, `86f866c5`, `e35c7489`). Winners: **136-B** (horizontal left->right flow) + **137-D** (frosted-glass step cards, 3D icon floating at the left edge, plain language with technical names behind the Alt reveal, Alive-by-default motion). Locked rules the canvas phases inherit: **colour budget** (step-type colour is a tint behind the icon only — the strong colours belong to Phase 188 run status) and **motion keys off run state, never selection**. New reusable asset `.planning/sketches/themes/phase-icons-3d.js` (verified 3D fluent-emoji marks; NEVER text glyphs). Icon choices: `llm_agent` -> `compass`; `llm_batch_agents` gets a lighter icon well in-scope, with the cross-cutting `handshake` swap left open. **Two findings that must reach the 183 plan: (1) `skip_to_phase` is used ZERO times in all 95 live definitions — SC#1's branch edge needs a fixture; (2) 40 of 95 definitions have zero phases — the empty projection is the most common canvas state.**
 
-Last activity: 2026-08-05 -- Phase 188.1 planning complete
+Last activity: 2026-08-06 -- Phase 188.2 planning complete
 
 ### Quick Tasks Completed
 
@@ -2189,6 +2192,7 @@ Last activity: 2026-08-05 -- Phase 188.1 planning complete
 
 **Guardrail overrides:**
 
+- **UI-SPEC gate + G-2 / Phase 188.2 (2026-08-06, plan-phase) — OVERRIDDEN by the operator, deliberately.** The `workflow.ui_safety_gate` fires on 188.2 because the ROADMAP section matches `frontend`, and G-2 would normally want a `/gsd:sketch` before planning. Both instruments specify **what a surface should look like** — and 188.2's charter is **zero user-visible change to the card**. The operator chose *Skip UI-SPEC*: the acceptance bar is already stricter than a mockup (`CARD_HTML_BASELINE` + the geometry matrix across all 7 `CanvasReading` values and all 3 verdicts, captured on the **UNMOVED** tree in plan `188.2-03` and compared deep-equal), and an approved sketch would compete with that baseline rather than add to it. The one user-visible change — `BUG-260806-01`, a *selected* card occluding its own `✕` — is a stacking-order defect with a measured hit-test table and a traced mechanism (`SELECTED_NODE_Z = 1000` inline vs the portal's `auto`), not a design decision. **No design contract was skipped in substance; a redundant one was skipped in form.** Recorded here so it is auditable rather than silent.
 - **G-5 / Phase 187 (2026-08-02, plan-phase) — FIRED on `WorkflowCanvas.tsx`, honoured by construction, no override taken.** The ledger row for `WorkflowCanvas.tsx` (1574 L, extraction due in Phase 188, seam named by `185-10`) fires, and `187-RESEARCH.md` initially recorded the file as "must not be touched". **It must be touched:** `toCanvas` has exactly ONE production call site and it is `WorkflowCanvas.tsx:879`, so Req 1's derived node face is unreachable without a pass-through. Plan **187-08** takes the narrowest possible diff — the same shape Phase 185 added for `kbTools` — and **caps it as a checkable acceptance criterion** (`git diff --numstat`: ≤ 7 insertions / ≤ 2 deletions on `WorkflowCanvas.tsx`, plus a grep criterion asserting **no new state / effect / function**). `ProblemsTray.tsx` is threaded through the same file (mounted at `:1383`), capped ≤ 8 ins / ≤ 1 del. **The Phase-188 extraction remains due and is not discharged by this.** Deviation surfaced by the planner, not silent.
 - **G-5 / Phase 187 — `WorkflowBuilderPage.tsx` (D-187-14) — honoured by construction, and the cap is now DERIVED rather than round.** Both new surfaces (`SeedReceipt.tsx`, `StarterTemplatePicker.tsx`) ship as their own component files; the page gains gated mount lines plus a bounded `nameContext` memo. Plan **187-15** Task 3 gates it in two parts: a **structural sub-gate** on the literal D-187-14 wording (4 comment-filtered `git diff -U0` counts — 2 mounts / 0 other elements / 2 new props / 0 new functions) and a **total cap of ≤ 46 ins / ≤ 5 del derived as an 8-row component table** (41 for the base work + 5 for the Open-Q6 announcement-site threading), with the single extra deletion named (Prettier re-wrap) and an instruction to **name the overrunning row rather than move the total.**
 - **Named gap carried out of 187 planning (not silent):** `definitionOps.canRemovePhase` (`definitionOps.ts:282`) is the ONE `nodeTitle()` call site left without the name context. Consequence, stated: the `Added` / `Removed` notices resolve the derived face while the `refusal` notice **in the same surface** does not. Recorded as threat `T-187-15-07`, in `187-VALIDATION.md`, and in `187-RESEARCH.md` Q6, with an acceptance criterion that **fails if the deferral is closed silently**. Re-open trigger: Phase 188's `WorkflowCanvas.tsx` extraction, which reopens these seams anyway.
