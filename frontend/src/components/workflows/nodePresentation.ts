@@ -141,8 +141,11 @@ export function renderPhaseMark(phaseType: string): ReactNode {
  * The three states a node's corner mark can be in.
  *
  * Two of them are SERVER SEVERITIES read verbatim; the third is a state of the CHECK
- * rather than of any finding. `PhaseNodeCard.NodeVerdictMark` is an alias of this type,
- * kept so every existing caller's name still resolves.
+ * rather than of any finding. `phaseNodeCardContract.NodeVerdictMark` is an alias of this
+ * type, kept so every existing caller's name still resolves. (188.2-06 corrected the
+ * qualified name in the SAME COMMIT that made the old one false: the alias used to live on
+ * the card and now lives in the card's own contract leaf. A docblock naming a home a type
+ * no longer has is the same defect as a false one.)
  */
 export type VerdictMarkKind = "error" | "incomplete" | "unknown"
 

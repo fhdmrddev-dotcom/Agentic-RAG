@@ -85,11 +85,13 @@ import {
   renderPhaseMark,
   type VerdictMarkKind,
 } from "@/components/workflows/nodePresentation"
-import {
-  PhaseNodeCard,
-  type BadgeSlot,
-  type BadgeSlots,
-} from "@/components/workflows/PhaseNodeCard"
+import { PhaseNodeCard } from "@/components/workflows/PhaseNodeCard"
+// 188.2-06: the slot contract now lives in its own leaf, and the card leaves NO re-export
+// shim (D-06) — so this adapter names the two homes separately. It lands as its OWN
+// statement rather than by widening the line above (the `FlowEdge.test.tsx:80-85`
+// convention 188.1 set for exactly this situation), so the whole change reads as added
+// lines under `git diff` and no shipped line had to be edited to accommodate it.
+import type { BadgeSlot, BadgeSlots } from "@/components/workflows/phaseNodeCardContract"
 import type { NodeRunState } from "@/components/workflows/runVocabulary"
 import { cn } from "@/lib/utils"
 

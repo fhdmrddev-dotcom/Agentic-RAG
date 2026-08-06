@@ -42,7 +42,13 @@ import nodePresentationSource from "./nodePresentation?raw"
 // 188-06: the vocabulary module's source, so the geometry fence can prove the expected
 // decimals live in NEITHER module that produces them.
 import runVocabularySource from "./runVocabulary?raw"
-import { PhaseNodeCard, type BadgeSlot, type BadgeSlots } from "./PhaseNodeCard"
+import { PhaseNodeCard } from "./PhaseNodeCard"
+// 188.2-06: the two slot-contract types moved to their own leaf and the card leaves NO
+// re-export shim (D-06). Their import lands as a SEPARATE statement rather than by
+// widening the line above — the `FlowEdge.test.tsx:80-85` convention — so this file's
+// whole 188.2-06 diff reads as added lines and "no shipped assertion was touched" is
+// auditable by `git diff` alone.
+import type { BadgeSlot, BadgeSlots } from "./phaseNodeCardContract"
 import { DEFAULT_TINT, ICON_TINT } from "./nodePresentation"
 // 184-08's additions land as a SEPARATE import statement rather than by widening the
 // line above, so this file's whole 184-08 diff reads as added lines plus the two
