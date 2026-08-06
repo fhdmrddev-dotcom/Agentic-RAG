@@ -544,9 +544,18 @@ describe("PhaseNodeCard — the scope fences (source guard)", () => {
     // `toContain`s green too. Measured RED under exactly that edit before this line existed.
     for (const path of CARD_DESTINATION_PATHS) {
       expect(CARD_SUBTREE_PATHS).toContain(path)
-      // And once the cut creates the file, the sweep must really resolve it — a fence naming a
-      // module the glob pattern no longer matches reads an empty string in silence.
-      if (path in CARD_MODULES) expect(CARD_MODULES[path].length).toBeGreaterThan(0)
+      // And the sweep must really RESOLVE it — a fence naming a module the glob pattern no
+      // longer matches reads an empty string in silence.
+      //
+      // 188.2-05: THE GUARD IS GONE, AND ITS REMOVAL IS THE ASSERTION. `188.2-01` wrapped this
+      // line in a membership TEST because none of the five destinations existed yet, and said
+      // so inline. `188.2-04` created `phaseNodeCardContract.ts` and `ownProperty.ts`;
+      // `188.2-05` created the three `.tsx` modules. ALL FIVE now exist, so NO path stays
+      // guarded: a guard left over a file that now exists reads nothing and reports success,
+      // which is the precise failure mode this loop was written to catch. An unresolved path
+      // now fails on the membership line rather than being skipped in silence.
+      expect(Object.keys(CARD_MODULES)).toContain(path)
+      expect(CARD_MODULES[path].length).toBeGreaterThan(0)
     }
   })
 })
@@ -603,16 +612,19 @@ describe("PhaseNodeCard 188.2 — the extracted modules cannot import back (SC#3
   })
 
   it("no extracted module names a PhaseNodeCard specifier in ANY import form", () => {
-    // ⚠ AT THIS COMMIT THE GUARD SKIPS EVERY PATH, and that is deliberate rather than an
-    // oversight: none of the five destinations exists yet. The loop is authored HERE so the
-    // fence is in place BEFORE the modules it guards, which is the whole shape of this plan.
-    // `188.2-05` is where it is observed RED (C-5) against a deliberately planted back-import.
+    // ⚠ 188.2-01 AUTHORED THIS LOOP BEHIND A MEMBERSHIP GUARD, because none of
+    // the five destinations existed yet — the fence had to be in place BEFORE the modules it
+    // guards. 188.2-04 created two of them and 188.2-05 the other three, so THE GUARD IS NOW
+    // GONE and all five are checked unconditionally: a guard left over a file that now exists
+    // reads nothing and reports success, and this fence would have gone on looking exactly like
+    // a fence that holds. `188.2-05` is where it was observed RED (C-5) against a deliberately
+    // planted back-import — in BOTH the value form and the type-only form, since
+    // `verbatimModuleSyntax: true` makes the cheap mistake the likely one.
     expect(CARD_DESTINATION_PATHS).toHaveLength(5)
     for (const path of CARD_DESTINATION_PATHS) {
-      if (path in CARD_MODULES) {
-        expect(CARD_MODULES[path]).not.toMatch(IMPORT_FROM_CARD)
-        expect(CARD_MODULES[path]).not.toMatch(DYNAMIC_IMPORT_CARD)
-      }
+      expect(Object.keys(CARD_MODULES)).toContain(path)
+      expect(CARD_MODULES[path]).not.toMatch(IMPORT_FROM_CARD)
+      expect(CARD_MODULES[path]).not.toMatch(DYNAMIC_IMPORT_CARD)
     }
   })
 
