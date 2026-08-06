@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio — 🚧 ACTIVE
 status: executing
-last_updated: "2026-08-06T21:15:00.000Z"
-last_activity: 2026-08-06 -- Phase 188.1 CLOSED (verified 6/6, SECURED 18/18, validated 16/16); Phase 184.1 retro-validated nyquist_compliant (2 prose-only decisions now asserted); next = Phase 189, which OWES a PhaseNodeCard.tsx G-5 refactor recommendation as its FIRST discuss-phase option
+last_updated: "2026-08-06T17:27:00.042Z"
+last_activity: 2026-08-05 -- Phase 188.1 planning complete
 progress:
   total_phases: 20
-  completed_phases: 8
+  completed_phases: 9
   total_plans: 119
-  completed_plans: 119
-  percent: 40
+  completed_plans: 118
+  percent: 45
 ---
 
 # Project State
@@ -1523,7 +1523,7 @@ Manual-Only rows still unrun, row 4 still ⛔, `.planning/REQUIREMENTS.md` unmod
 and `CONCUR-02` stay **Pending** until the operator runs the board. **Phase 186 is now ready for
 `/gsd:verify-work 186`, with SC#4 the only thing no automated evidence can close.**
 
-Resume file: .planning/phases/188-non-technical-run-observability/188-UAT.md
+Resume file: .planning/phases/189-governed-external-action-node-model/189-CONTEXT.md
 
 Both owed items are now ROUTED at the discuss-phase touchpoint:
 
