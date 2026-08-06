@@ -3635,3 +3635,41 @@ describe("PhaseNodeCard 188.2-03 — the pre-move geometry matrix", () => {
     expect(new Set(classes).size).toBe(4)
   })
 })
+
+/**
+ * THE GEOMETRY MATRIX UNDER THE NAME THIS PLAN'S CONTRACT PROMISES.
+ *
+ * 188.2-03's frontmatter names the artifact `CARD_SHAPE_BASELINE`; its task text names
+ * `CARD_READING_SHAPES` and `CARD_VERDICT_SHAPES` (and this plan added a third, the border
+ * branches). Both names are honoured rather than one silently dropped: the three literals
+ * above are the instruments the assertions compare against, and this is the single handle a
+ * later reader — or a later plan's grep — will find them under.
+ *
+ * IT IS AN AGGREGATE, NOT A COPY. It holds the SAME OBJECT REFERENCES, so it cannot drift
+ * from what is actually asserted, and the row below proves that identity rather than
+ * assuming it. A second literal here would be a fourth baseline nobody maintains.
+ */
+const CARD_SHAPE_BASELINE = {
+  readings: CARD_READING_SHAPES,
+  verdicts: CARD_VERDICT_SHAPES,
+  borders: CARD_BORDER_SHAPES,
+} as const
+
+describe("PhaseNodeCard 188.2-03 — the geometry matrix, under its contract name", () => {
+  it("CARD_SHAPE_BASELINE IS the asserted matrices — same references, all three total", () => {
+    // Identity, not equality: an aggregate that had been given copies could go stale while
+    // every assertion above stayed green, which is precisely the drift this file exists to
+    // refuse elsewhere.
+    expect(CARD_SHAPE_BASELINE.readings).toBe(CARD_READING_SHAPES)
+    expect(CARD_SHAPE_BASELINE.verdicts).toBe(CARD_VERDICT_SHAPES)
+    expect(CARD_SHAPE_BASELINE.borders).toBe(CARD_BORDER_SHAPES)
+
+    // …and each is total over the set it enumerates, read from the compiler-forced tables
+    // rather than from a hand-written count.
+    expect(Object.keys(CARD_SHAPE_BASELINE.readings).sort()).toEqual([...ALL_READINGS].sort())
+    expect(Object.keys(CARD_SHAPE_BASELINE.verdicts).sort()).toEqual([...ALL_VERDICTS].sort())
+    expect(Object.keys(CARD_SHAPE_BASELINE.borders).sort()).toEqual(
+      Object.keys(CARD_BORDER_ROWS).sort(),
+    )
+  })
+})
