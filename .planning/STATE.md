@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio — 🚧 ACTIVE
 status: executing
-last_updated: "2026-08-06T21:16:16.678Z"
-last_activity: 2026-08-07 -- Phase 188.2 plan 01 complete (source fences re-scoped before the cut)
+last_updated: "2026-08-06T21:56:00.000Z"
+last_activity: 2026-08-07 -- Phase 188.2 plan 02 complete (BUG-260806-01 fixed at the portal tier)
 progress:
   total_phases: 21
   completed_phases: 9
   total_plans: 126
-  completed_plans: 119
+  completed_plans: 120
   percent: 43
 ---
 
@@ -64,7 +64,54 @@ next picked up.
 
 Phase: 188.2 (phasenodecard-extraction-refactor-pay-down-the-g-5-debt-on-p) — EXECUTING
 Plan 188.2-01 COMPLETE (`471104d4` · `28f7ee64` · `8cb82a6b`; summary `188.2-01-SUMMARY.md`).
-Next: plan 188.2-02. 11 decisions in `188.2-CONTEXT.md` (`8cbbb2d3`).
+Plan 188.2-02 COMPLETE (`7f77af44` · `fe3de624` · `30c2e66f`; summary `188.2-02-SUMMARY.md`).
+Next: plan 188.2-03. 11 decisions in `188.2-CONTEXT.md` (`8cbbb2d3`).
+
+**188.2-02 — `BUG-260806-01` is fixed, at the PORTAL tier, with the card untouched.** All three
+affordance groups (the `＋`, the `✕` AND the picker) now carry `zIndex: AFFORDANCE_Z` = **1002**,
+above `@xyflow`'s inline `SELECTED_NODE_Z` = **1000**. Production change is **83 insertions,
+0 deletions** — one CSS property on three elements and two named constants. Gates at close:
+vitest `61 passed (61)` (58 → 61, exit 0), `tsc -p tsconfig.app.json` **33** with 0 in
+`src/components/workflows/`, eslint **5 errors / 0 warnings**, `count gate OK` (total 2482 → **2490**,
+`failed 0`, no pin edited).
+
+- **The mechanism was re-derived from `node_modules`, not inherited — all six readings held
+  exactly.** `SELECTED_NODE_Z = 1000` (`@xyflow/system:1547`) applied as an INLINE style
+  (`@xyflow/react:2343`); `.react-flow__nodes` has neither `position` nor `z-index`
+  (`base.css:174-177`) and `.react-flow__viewport-portal` has no `z-index` (`:301-310`), so
+  NEITHER opens a stacking context and a positioned portal child escapes into the viewport's
+  context where it can be ranked against the nodes. 1002 not 1001 avoids
+  `.react-flow__connectionline` (`base.css:170`). Versions `@xyflow/react 12.11.2` /
+  `@xyflow/system 0.0.79`.
+- **The library control ships in the RENDERED form, chosen from a printed measurement** —
+  a selected node's wrapper reads `"1000"` and its unselected sibling reads `"0"`, reproducing the
+  bug report's table. The `node_modules` `?raw` fallback (no precedent in this repo, RESEARCH A4)
+  was NOT taken; no new house style was introduced.
+- **Guard observed RED twice.** `AFFORDANCE_Z = 999` fails the relation AND the wiring assertion;
+  removing the `✕` group's property fails the wiring assertion ALONE (`expected '' to be '1002'`)
+  while the other two stay green — which is what separates *"the constants are consistent"* from
+  *"the constants reach the DOM"*.
+- **The `AFFORDANCE_SHAPE_BASELINE` re-capture is the ONE authorised exception** to that literal's
+  own rule, and it is proven rather than asserted: two byte-identical dumps of the reducer's own
+  output, plus a parse of the OLD literal out of `HEAD` showing **12 of 72 fields differ, ALL of
+  them `style`, each by exactly the appended ` z-index: 1002;`** — no `class`, no `aria-*`, no
+  geometry. The docblock quotes the rule, names D-10/D-11 as authority, and re-arms it.
+- **⚠ TWO ACCEPTANCE CRITERIA WERE UNSATISFIABLE AS WRITTEN** (every line reference and baseline
+  in the plan held exactly — only these two): (1) *"`git diff --name-only` lists exactly two
+  files"* — the tree carries ~230 pre-existing unrelated `.claude/` GSD-update modifications, so it
+  was measured scoped to `frontend/ backend/ scripts/ supabase/migrations/`, which lists exactly
+  two. (2) *"`grep "^[-+].*style:" | grep -vc "z-index"` returns 0"* — **arithmetically impossible
+  for any edit**, because every REMOVED line carries the old string and can never contain the new
+  term; met instead by the added-lines-only form (**0**) plus the strictly stronger field-by-field
+  parse above.
+- **⚠ BOARD B's DRIVEN ROW IS STILL OWED — this plan closed the UNIT half only.** No test written
+  here can see the defect it fixes: jsdom applies no CSS and `.click()` bypasses hit-testing, which
+  is exactly why this bug survived from 184-12 with all 58 tests green. **Plan 07 owes the driven
+  `document.elementFromPoint` row at the `✕`'s centre with the card SELECTED.**
+- **Plan 01's count-gate flake did NOT recur** (clean first run, `failed 0`). Still worth watching
+  in 188.2-03..07 rather than declared closed on one observation.
+- **Plan 07's pin move now covers TWO files:** `PhaseNodeCard.test.tsx` 107 → 112 AND
+  `WorkflowCanvas.editing.test.tsx` 58 → 61; total 2482 → **2490**.
 
 **188.2-01 — the fences are in place BEFORE the cut.** `cardSubtreeSource` names all five
 destination modules while none of them exists; all **17** negative fences + **4** haystacks
