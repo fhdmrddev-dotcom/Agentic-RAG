@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio — 🚧 ACTIVE
 status: executing
-last_updated: "2026-08-06T21:56:00.000Z"
-last_activity: 2026-08-07 -- Phase 188.2 plan 02 complete (BUG-260806-01 fixed at the portal tier)
+last_updated: "2026-08-06T22:50:00.000Z"
+last_activity: 2026-08-07 -- Phase 188.2 plan 03 complete (the pre-move card capture, taken on the UNMOVED tree)
 progress:
   total_phases: 21
   completed_phases: 9
   total_plans: 126
-  completed_plans: 120
+  completed_plans: 121
   percent: 43
 ---
 
@@ -65,7 +65,40 @@ next picked up.
 Phase: 188.2 (phasenodecard-extraction-refactor-pay-down-the-g-5-debt-on-p) — EXECUTING
 Plan 188.2-01 COMPLETE (`471104d4` · `28f7ee64` · `8cb82a6b`; summary `188.2-01-SUMMARY.md`).
 Plan 188.2-02 COMPLETE (`7f77af44` · `fe3de624` · `30c2e66f`; summary `188.2-02-SUMMARY.md`).
-Next: plan 188.2-03. 11 decisions in `188.2-CONTEXT.md` (`8cbbb2d3`).
+Plan 188.2-03 COMPLETE (`99a383c7` · `1fc193b4` · `b1942579`; summary `188.2-03-SUMMARY.md`).
+Next: plan 188.2-04. 11 decisions in `188.2-CONTEXT.md` (`8cbbb2d3`).
+
+**188.2-03 — the pre-move capture exists, and it provably PREDATES the cut.** `ls` on all five
+destination modules answers *No such file or directory* at every commit in this plan, and
+`git diff --stat -- PhaseNodeCard.tsx` is **0 files changed**. `CARD_HTML_BASELINE` pins whole-
+`innerHTML` byte-identity for a maximal running row, a maximal waiting row (the only reading with a
+pause chip) and a minimal Builder row, each proven by its own marker `it(` to have rendered the
+blocks it claims. `CARD_SHAPE` + `CARD_READING_SHAPES` / `CARD_VERDICT_SHAPES` /
+`CARD_BORDER_SHAPES` (aggregated as `CARD_SHAPE_BASELINE`) pin 7 readings × 3 verdicts × 4 border
+branches. Gates: vitest **124/124** (112 → 124), `tsc` **33** / 0 in `src/components/workflows/`,
+eslint **5/0**, `count gate OK` **failed 0** (2482 → **2502**, pin untouched).
+
+- **Every literal was captured by SCRIPT SUBSTITUTION from two byte-identical dumps** (`cmp` clean
+  both times, temp harness stripped — `grep -c` for its markers reads 0). No string was hand-typed
+  or hand-edited, which is the only thing that keeps a capture from decaying into an expectation.
+- **C-6 RED observed on TWO instruments under two different one-value edits.** `RING_RADIUS` 34 → 35
+  fails the reading matrix with a diff naming `canvas-node-ring-arc` (`r` 34→35, dasharray
+  55.543→57.177); the seal's `right-[17px]` → `right-[16px]` fails `MAXIMAL_RUNNING`'s `innerHTML`.
+  Both reverted; `git status -- frontend/` clean.
+- **Totality proven both ways:** deleting one reading key moved `tsc` **33 → 34** (`TS2741 Property
+  '"not-started"' is missing`) → **33** on restore.
+- **⚠ THREE plan claims measured FALSE, each of which changed the instrument.** (1) `RING_RADIUS` is
+  at `:315`, not `:313` — the same stale figure Plan 01 already corrected once. (2) MAXIMAL_RUNNING
+  does **not** exercise the grounded-and-selected border branch: `runReadingBorder("running")`
+  returns `"border-primary"`, so the RUN arm shadows both — hence a third literal
+  `CARD_BORDER_SHAPES` (Rule 2) covering all four arms **and** their precedence. (3) The seven
+  readings are **not** distinct on the arc's `class`/`style` — measured **3**, because the arc's
+  whole geometry rides SVG PRESENTATION attributes; `CARD_SHAPE` therefore captures **eleven**
+  attributes, not the five the plan named, and that finding is itself now a pinned assertion.
+- **Owed forward:** Plan 06 must keep both instruments green with **zero** re-capture (188.2-02's
+  `AFFORDANCE_SHAPE_BASELINE` exception does not extend here); Plan 07's pin move now covers
+  **three** files (`PhaseNodeCard.test.tsx` 107 → **124**, `WorkflowCanvas.editing.test.tsx`
+  58 → 61, plus whatever 04–06 add).
 
 **188.2-02 — `BUG-260806-01` is fixed, at the PORTAL tier, with the card untouched.** All three
 affordance groups (the `＋`, the `✕` AND the picker) now carry `zIndex: AFFORDANCE_Z` = **1002**,
