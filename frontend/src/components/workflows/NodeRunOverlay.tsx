@@ -14,6 +14,24 @@
  * context read, no state owned, nothing fetched, nothing closed over at module scope —
  * and, per D-184-06, NOTHING imported from the canvas graph library.
  *
+ * WHAT 188 FILLED, in the same voice, because a docblock that still names a slot the
+ * component now fills is the same defect as a false one: plan 188-06 filled `status` (with
+ * a new `emitFailure` companion) and it is the first slot that puts the card into a MODE —
+ * supplying a reading adds THE STATUS RING ABOVE THE CARD, which is this module. (Arrived
+ * from `PhaseNodeCard.tsx:34-41` in the 188.2-06 cut, and SPLIT rather than moved whole:
+ * the same slot also adds the run line inside the card, a run-state branch on its border
+ * and a raised minimum height, and all three of those STAYED. Half-true is the worst state
+ * a docblock can be in, so each half now sits in the file that owns what it describes.)
+ *
+ * MOTION KEYS OFF RUN STATE, NEVER OFF SELECTION — the defect found in the sketch 137
+ * review, and 188-06 is where that sentence stopped being hypothetical: the ONE animation
+ * on the card is the running arc's spin, guarded behind `prefers-reduced-motion`, and it
+ * lives here. A card with no reading is still completely still, and any ambient drift
+ * still belongs to the canvas backdrop. The colour budget 137-B banked is spent here too —
+ * the arc's stroke, and the run border on the three loud readings. (From
+ * `PhaseNodeCard.tsx:89-95`, whose opening clause about the per-type tint behind the icon
+ * went to `NodeIconWell.tsx` with the well it describes.)
+ *
  * STATE OF THE EXTRACTION — read this literally, it is not a claim about the future.
  * **AT THIS COMMIT THE CARD STILL DECLARES ITS OWN COPIES OF ALL FIVE RANGES AND IMPORTS
  * NONE OF THEM.** 188.2-05 is ADDITIVE by design — create additively, then cut, the split

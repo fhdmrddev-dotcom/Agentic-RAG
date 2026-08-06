@@ -15,6 +15,27 @@
  * later editor needs. Trimming the prose to improve the ratio would delete the only part
  * of this file that is hard to reconstruct.
  *
+ * THE 3D MARK FLOATS ABOVE THE CARD'S TOP EDGE OVER ITS OWN CONTACT SHADOW — sketch 137-B,
+ * the locked acceptance bar, whose card is a 248px frosted-glass block centred inside the
+ * 260px node box with this mark floating above it and the title, supporting line and
+ * word-badges centred beneath. (185-01 rebuilt that shape from 137-D, where the mark sat at
+ * the LEFT edge of a full-width card pushed 24px right by a left margin, its body padded to
+ * clear the icon. The move is not decoration: SPEC Req 6 CLAIMS top-right for the governance
+ * seal and relocates the verdict mark to the left, and on 137-D a left verdict overlapped
+ * the left-edge icon well by 14×8px — no left placement was reachable at all. D-185-17
+ * sequences that rebuild ahead of every governance mark, as its own separately-committed
+ * plan, and raises the card's top padding 34 → 42 so this mark clears the title by 11px.)
+ *
+ * PER-STEP-TYPE COLOUR IS A TINT BEHIND THE ICON ONLY — this element and nowhere else. The
+ * card banked its whole colour budget for exactly that, and Phase 188 is what spends the
+ * rest of it, one file away in `NodeRunOverlay.tsx`.
+ *
+ * ⚠ THE TWO PARAGRAPHS ABOVE ARRIVED FROM `PhaseNodeCard.tsx:72-87` AND `:89-95` IN THE
+ * 188.2-06 CUT (D-01 — the prose travels WITH its code). Both were MIXED and both were
+ * SPLIT rather than moved whole: the card's own padding and min-height CONSTANTS stayed
+ * with the card div that spends them, and the run-state motion clause went to
+ * `NodeRunOverlay.tsx`.
+ *
  * IT PERFORMS NO LOOKUP — THAT IS THE TOTALITY CONTRACT, AND IT IS FENCED. Both props
  * arrive ALREADY RESOLVED at the card (`PhaseNodeCard.tsx:220-222`, `:232-234`): the
  * ADAPTER resolves the per-type tint, falling back to `nodePresentation.DEFAULT_TINT`,

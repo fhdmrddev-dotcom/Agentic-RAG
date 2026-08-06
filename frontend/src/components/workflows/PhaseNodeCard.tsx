@@ -1,6 +1,6 @@
 /**
  * Phase 184-03 Task 2 (D-184-06, Wave-0 G-5 extraction, sketch 137-B/137-D) —
- * PhaseNodeCard.
+ * PhaseNodeCard, cut down to the card itself by 188.2-06.
  *
  * THE PHASE CARD, PURELY PRESENTATIONAL. Every value it paints arrives as a prop;
  * it reads no context, fetches nothing, owns no state, and — the whole point of
@@ -15,46 +15,29 @@
  * idiom) carrying a positive control, so the guard is falsifiable rather than
  * vacuous.
  *
+ * WHERE THE REST OF THE CARD WENT (188.2-06 · D-01 — the prose travels WITH its code, and
+ * a paragraph describing both what left and what stayed was SPLIT rather than moved, since
+ * half-true is the worst state a docblock can be in). `NodeCornerMarks.tsx`: the ⛨ seal,
+ * the verdict mark, and the lifetime argument that decides which corner each gets.
+ * `NodeRunOverlay.tsx`: the status ring, its five geometry constants, the arc, the pause
+ * chip. `NodeIconWell.tsx`: the 3D mark above the top edge. `phaseNodeCardContract.ts`:
+ * every slot on these props, including the max-2 badge tuple. `ownProperty.ts`: the WR-04
+ * own-guard both mark modules read. STILL HERE: the node box, `{anchors}`, the 137-B card
+ * div and its four-branch border, the title, the subtitle, the RUN LINE, the badge row.
+ *
+ * THE TREE GOT BIGGER WHILE THE FILE GOT SMALLER, and a phase headlined "the file shrank"
+ * owes that out loud. Measured at the cut: this file 274 L against 797 before it, and
+ * the six-file card subtree 1332 L against the same 797 — +67 %. The five new files
+ * carry their own headers, imports, props types and wrappers, so the SUM rises; that is the
+ * price of the split, not a regression. It is far steeper than 188.1's +8 %, for the
+ * measurable reason that its two destinations came out of a 1593-line file, not a 797.
+ *
  * EXTENSIBILITY SEAM #1 — 185 / 188 / 189 ADD DATA, NOT LAYOUT. `badges`, `status`,
- * `verdict`, `technicalLine` and `stepNumber` are the declared slots those phases
- * fill. In 184 the adapter passes only `badges`; every other optional slot renders
- * NOTHING when absent, which is what keeps this extraction behaviour-preserving
- * (D-184-08) while still adding the seam. Three of the five are now filled — `verdict`
- * by 184-08, `grounded` by 185-09, `status` by 188-06 — and every one of them cost a
- * change to this component's body and to nobody else's contract, which is the seam
- * doing exactly the job it was cut for.
- *
- * WHAT 185 FILLED, stated literally so this paragraph does not drift either: plan
- * 185-09 added ONE slot, `grounded`, and renders it as the corner seal at top-right
- * plus a border reinforcement — no new layout constant, no new badge. Badge slot 1
- * stayed EMPTY on purpose: SPEC Req 6 says governance spends no colour and no
- * word-badge slot, so the freed slot belongs to 188 / 189 and the governance reading is
- * made of SHAPE instead.
- *
- * WHAT 188 FILLED, in the same voice, because a docblock that still names a slot the
- * component now fills is the same defect as a false one: plan 188-06 filled `status`
- * (with a new `emitFailure` companion) and it is the first slot that puts the card into
- * a MODE — supplying a reading adds the status ring above the card, the run line inside
- * it and a run-state branch on the border, and raises the card's minimum height. It
- * spends **ZERO badge slots**: slot 1 is still empty and still reserved for Phase 189.
- * `technicalLine` is DECLINED by 188 and `stepNumber` is STILL declared and STILL
- * renders nothing — those two are the only unspent slots left on this contract.
- *
- * WHAT 184-08 CHANGED, stated literally so this docblock does not drift: the `verdict`
- * slot is now RENDERED — a corner mark on the card's left edge (it landed on the right
- * in 184-08 and was moved by 185-01; see the mark's own docblock). (This sentence used
- * to end "…while `status` and `stepNumber` are still declared and still render nothing",
- * which 188-06 made false for the first of the two; `stepNumber` alone still holds.)
- * The seam worked exactly as
- * D-184-06 intended: filling it was a change to this component's body and to nobody
- * else's contract. The card is still the wrong place to ask what a verdict MEANS: the
- * value arrives already reduced to one of three states by `verdictModel.markFor`, which
- * reads the server's `severity` and derives none of it (VALID-03 / D-182-06).
- *
- * THE TWO-BADGE BUDGET IS ENFORCED BY THE TYPE SYSTEM (137-B / D-183-07). `BadgeSlots`
- * is a max-2 TUPLE union, so a third badge is a typecheck error rather than a review
- * comment. Phase 185's graded-governance dial therefore physically cannot spend a
- * budget it was not given — it adds data to an existing row.
+ * `verdict`, `technicalLine` and `stepNumber` are the declared slots, and every optional
+ * one renders NOTHING when absent. Three are filled (`verdict` 184-08, `grounded` 185-09,
+ * `status` 188-06), each costing a change to this body and to nobody else's contract;
+ * `technicalLine` is DECLINED and `stepNumber` declared-and-unread. Badge slot 1 stays
+ * EMPTY and RESERVED FOR PHASE 189 (D-12) — governance spends no colour and no word-badge.
  *
  * ONE TAB STOP PER NODE (Pattern 3 Option A) — carried here verbatim with the code it
  * constrains. The canvas keeps `nodesFocusable` at its `true` default and the node
@@ -70,29 +53,11 @@
  * the lane rather than into the card (184-12).
  *
  * THE LOOK IS SKETCH 137-B, the locked acceptance bar: a frosted-glass card that stays
- * NEUTRAL — 248px wide, centre-aligned, centred inside the 260px node box — with the 3D
- * mark FLOATING ABOVE ITS TOP EDGE over its own contact shadow, then one plain-language
- * title, one supporting line, and at most two word-badges, all centred beneath it.
- *
- * (185-01 rebuilt this from 137-D, where the mark sat at the LEFT edge of a full-width
- * card pushed 24px right by a left margin, its body padded to clear the icon. The card
- * class names of that shape are deliberately NOT quoted anywhere in this file: the
- * plan's acceptance greps assert they are gone, and a docblock that spelled them would
- * make its own guard vacuous. The move is not decoration: SPEC Req 6 CLAIMS top-right
- * for the governance seal and relocates the verdict mark to the left, and on 137-D a
- * left verdict overlapped the left-edge icon well by 14×8px — no left placement was
- * reachable at all. D-185-17 sequences the rebuild ahead of every governance mark, as
- * its own separately-committed plan. The clearance numbers `pt-[42px]` and
- * `NODE_MIN_HEIGHT: 104` are D-185-17's amendments to the sketch theme, which carries
- * 34 and 96; every other constant here is the theme's, verbatim.)
- *
- * Per-step-type colour is a TINT BEHIND THE ICON ONLY — the colour budget was banked
- * for exactly this, and 188-06 is what spends it: the status ring's arc, and the run
- * border on the three loud readings. Motion keys off RUN STATE, never off selection
- * (the defect found in the sketch 137 review), and 188-06 is where that sentence stops
- * being hypothetical: the ONE animation on this card is the running arc's spin, guarded
- * behind `prefers-reduced-motion`. A card with no reading is still completely still,
- * and any ambient drift still belongs to the canvas backdrop.
+ * NEUTRAL — 248px wide, centre-aligned inside the 260px node box — with one plain-language
+ * title, one supporting line and at most two word-badges centred beneath it. The 137-D
+ * class names 185-01 rebuilt it from are NOT quoted here: the greps assert they are gone,
+ * and a docblock spelling them would make its own guard vacuous. `pt-[42px]` and
+ * `NODE_MIN_HEIGHT: 104` are D-185-17's amendments to a theme carrying 34 and 96.
  *
  * TOTALITY: an unrecognised `phaseType` is a data attribute here, never a lookup —
  * the adapter resolves the tint (falling back to `nodePresentation.DEFAULT_TINT`) and
@@ -146,20 +111,15 @@ const RUN_MODE_NODE_MIN_HEIGHT = 120
  * server's adjacency.
  */
 export function PhaseNodeCard(props: PhaseNodeCardProps) {
-  // `stepNumber` is the LAST slot still declared and deliberately unread — D-183-07
-  // keeps the step's index off the face, and putting it on is a sketch decision with
-  // its own acceptance bar. `verdict` joined the rendered set in 184-08 and is the ONE
-  // slot whose value comes from the server rather than from a local derivation.
-  // `grounded` joined it in 185-09 and is the ONE slot resolved by a shared client rule
-  // rather than by the server. `status` joined it in 188-06 (with `emitFailure`) and is
-  // the ONE slot that puts the whole card into a different MODE.
-  //
-  // `technicalLine` is DECLINED by Phase 188 (UI-SPEC § Card Body Budget rule 2): 187-09
-  // left it notionally free for this phase and this phase chooses not to spend it, which
-  // is what dissolves the three-way competition D-188-17 warned about between the ⌥
-  // subtitle, the run line and a machine identifier. Declining a slot is a decision, and
-  // it is recorded here rather than discovered later. It stays wired for a caller that
-  // supplies it; the 188 adapter does not.
+  // THE TWO UNSPENT SLOTS, kept here because they describe slots the card STILL OWNS —
+  // 188.2-06 (door b) removed the sentences narrating which phase filled the seal, the
+  // ring and the mark, since those blocks and their accounts now live in the three
+  // destination modules. `stepNumber` is declared and deliberately unread: D-183-07 keeps
+  // the step's index off the face. `technicalLine` is DECLINED by Phase 188 (UI-SPEC §
+  // Card Body Budget rule 2) — 187-09 left it notionally free and 188 chose not to spend
+  // it, which dissolves the three-way competition D-188-17 warned about between the ⌥
+  // subtitle, the run line and a machine identifier. Declining a slot is a decision, so it
+  // is recorded rather than discovered. Both stay wired for a caller that supplies them.
   const {
     slug,
     phaseType,

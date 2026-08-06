@@ -20,6 +20,31 @@
  * `grounded` is resolved by a shared client rule. This module derives neither, and it
  * must never start — that is red line D-14.
  *
+ * WHAT 185 FILLED, stated literally so this paragraph does not drift either: plan
+ * 185-09 added ONE slot, `grounded`, and renders it as the corner seal at top-right
+ * plus a border reinforcement — no new layout constant, no new badge. Badge slot 1
+ * stayed EMPTY on purpose: SPEC Req 6 says governance spends no colour and no
+ * word-badge slot, so the freed slot belongs to 188 / 189 and the governance reading is
+ * made of SHAPE instead.
+ *
+ * WHAT 184-08 CHANGED, stated literally so this docblock does not drift: the `verdict`
+ * slot is now RENDERED — a corner mark on the card's left edge (it landed on the right
+ * in 184-08 and was moved by 185-01; see the mark's own docblock). (This sentence used
+ * to end "…while `status` and `stepNumber` are still declared and still render nothing",
+ * which 188-06 made false for the first of the two; `stepNumber` alone still holds.)
+ * The seam worked exactly as D-184-06 intended: filling it was a change to
+ * `PhaseNodeCard`'s body and to nobody else's contract. The card is still the wrong
+ * place to ask what a verdict MEANS: the value arrives already reduced to one of three
+ * states by `verdictModel.markFor`, which reads the server's `severity` and derives none
+ * of it (VALID-03 / D-182-06).
+ *
+ * ⚠ BOTH PARAGRAPHS ABOVE ARRIVED HERE FROM `PhaseNodeCard.tsx:27-32` AND `:43-52` IN THE
+ * 188.2-06 CUT — relocated rather than re-argued (D-01, the prose travels WITH its code).
+ * They are the card's own account of what filled these two corners, and after the cut the
+ * card holds neither block; leaving them in its header would have left it narrating code
+ * that is not in the file. The only edit is the pronoun: "this component's body" became
+ * "`PhaseNodeCard`'s body", because "this component" now means `NodeCornerMarks`.
+ *
  * STATE OF THE EXTRACTION — read this literally, it is not a claim about the future.
  * **AT THIS COMMIT THE CARD STILL DECLARES ITS OWN COPIES OF BOTH BLOCKS AND IMPORTS
  * NEITHER.** 188.2-05 is ADDITIVE by design, which is the split 188.1 proved: create
