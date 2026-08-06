@@ -421,7 +421,13 @@ const BASELINE = {
   // and its own count is free to grow"). Four phases later it is still the ONLY guard on the
   // flag-off Builder header — D-181-01's byte-identity promise — and it has stopped growing.
   // The now-false TARGETS comment below is corrected in this same commit.
-  "WorkflowBuilderPage.header.test.tsx": 27,
+  // Nyquist gap-closure (2026-08-06): 27 → 32. EXTENDED, not lowered — nothing deleted or
+  // reworded; five appended cases now pin D-184.1-03 (the merged row driven onto the SPINE
+  // tab explicitly, not just incidentally by default) and D-184.1-04's non-breach half
+  // (useEffectiveFeatures() has exactly one non-test call site, App.tsx). Both falsified and
+  // reverted before this pin moved. Read from this script's own `actual` column across two
+  // agreeing runs, same as every other extension in this map.
+  "WorkflowBuilderPage.header.test.tsx": 32,
   "FlowEdge.test.tsx": 22,
   // 188.1-01: 19 → 20. EXTENDED — the same move-invariant subtree-fence control, carried
   // here as well because this suite re-scopes its own five negatives and a control living in
@@ -457,7 +463,11 @@ const BASELINE = {
 // (PhaseNodeCard +2, PhaseTimeline +2, PhaseNode +1, WorkflowRunPage +1). Re-derived from
 // this script's own printed `total` across two agreeing runs, in the same commit as the
 // pins — which is the only thing that keeps a note nothing checks from going stale again.
-const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // ⚠ 2477 (188.1-05 fast-fix)
+// ⚠ AND A FOURTH TIME BY the 184.1 Nyquist gap-closure: 2477 → 2482, the five
+// `WorkflowBuilderPage.header.test.tsx` extensions above (D-184.1-03's Spine-view pin +
+// D-184.1-04's non-breach guard, both falsified and reverted before the pin moved).
+// Re-derived from this script's own printed `total` across two agreeing runs.
+const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // ⚠ 2482 (184.1 gap-closure)
 
 // ── The Wave-0 blast radius (184-VALIDATION.md § "quick run command"). ──
 const TARGETS = [

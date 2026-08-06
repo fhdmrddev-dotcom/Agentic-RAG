@@ -745,3 +745,104 @@ describe("186-08 — the UNBIND premise: no authoring control writes folder_scop
     expect(code).not.toMatch(/folder_scope\s*:/)
   })
 })
+
+// ══════════════════════════════════════════════════════════════════════════════════
+// Nyquist gap-closure round — two D-184.1 claims recorded in prose only, now asserted.
+//
+// Appended; nothing above this line was edited.
+// ══════════════════════════════════════════════════════════════════════════════════
+
+// GAP-2 (D-184.1-04's non-breach half): the fetching hook's source and the ONE
+// docblock that legitimately NAMES its call without making it (the negative control).
+import appSource from "@/App?raw"
+import effectiveFeaturesProviderSource from "@/providers/EffectiveFeaturesProvider?raw"
+
+// ── GAP-1 — D-184.1-03: the merged row also appears on the SPINE view ──────────────
+//
+// The decision reads: "with the flag ON the merged header also appears in the Spine
+// view; permitted because D-181-01 constrains flag-OFF only, and recorded as a
+// decision rather than discovered." Nothing above asserted it — every flag-ON case
+// earlier in this file opens a draft and reads the header without ever driving the
+// [≣ Spine] / [⬡ Canvas] tablist, so a regression that made the merged row
+// TAB-CONDITIONAL (rendered on Canvas but silently dropped back to three bands on
+// Spine) would ship green through every one of them.
+
+describe("Builder header, canvas flag ON — the merged row also appears on Spine (D-184.1-03)", () => {
+  it("driving the Spine tab explicitly still renders ONE merged band with every control", async () => {
+    const { container } = await openDraftBuilder(FLAG_ON)
+
+    // Spine is ALREADY the default landing view — `graphView` cold-starts at "spine"
+    // (D-183-02), so every flag-on case earlier in this file already exercises it
+    // INCIDENTALLY, never by driving the tab. Driven here EXPLICITLY instead, through
+    // the real tab control, so this case keeps its meaning if that default ever flips.
+    const spineTab = screen.getByTestId("builder-view-spine")
+    expect(spineTab.getAttribute("aria-selected")).toBe("true")
+    fireEvent.click(spineTab)
+    expect(screen.getByTestId("builder-view-spine").getAttribute("aria-selected")).toBe("true")
+    expect(screen.getByTestId("builder-view-canvas").getAttribute("aria-selected")).toBe("false")
+
+    const bands = headerBandsAbove(screen.getByTestId("builder-grid"), container)
+    expect(bands).toHaveLength(1)
+    expect(bands[0].getAttribute("data-testid")).toBe("builder-header-bar")
+
+    // Every control from all three original bands is still reachable, on the Spine view.
+    const bar = screen.getByTestId("builder-header-bar")
+    expect(bar.contains(screen.getByTestId("builder-back"))).toBe(true)
+    expect(bar.contains(screen.getByTestId("both-doors"))).toBe(true)
+    expect(bar.contains(screen.getByTestId("builder-save-state"))).toBe(true)
+    expect(bar.contains(screen.getByTestId("publish-trigger"))).toBe(true)
+    expect(bar.contains(screen.getByTestId("net-new-flag"))).toBe(true)
+    expect(bar.contains(screen.getByTestId("judge-locked"))).toBe(true)
+    expect(screen.getByRole("button", { name: "← Workflows" })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "‹ both doors" })).toBeInTheDocument()
+  })
+})
+
+// ── GAP-2 — D-184.1-04's non-breach half: the fetching hook has ONE call site ──────
+//
+// The decision's load-bearing claim: "the fetching `useEffectiveFeatures()` has ZERO
+// non-test call sites — the single FETCH in `App.tsx` is unchanged." True on
+// measurement today, but nothing above pinned it — a future component adding its OWN
+// fetch is the exact flash-then-shift D-183-03 forbids, and it would ship green
+// through every case above.
+
+describe("Builder header — useEffectiveFeatures() has ZERO non-test call sites beyond App.tsx (D-184.1-04)", () => {
+  /** Call-EXPRESSION occurrences, comments stripped — reusing this file's own
+   *  `stripComments` (already used above for the KB-invitation source fence) so a
+   *  docblock that merely NAMES the hook is never mistaken for a second call site. */
+  const callSites = (src: string) => (stripComments(src).match(/useEffectiveFeatures\(/g) ?? []).length
+
+  it("App.tsx is the fetch's ONLY call site", () => {
+    expect(callSites(appSource)).toBe(1)
+  })
+
+  it("the three band owners never call the fetching hook — they read the broadcast context instead", () => {
+    expect(callSites(workflowsPageSource)).toBe(0)
+    expect(callSites(doorSwitchSource)).toBe(0)
+    // `WorkflowBuilderPage.tsx`'s OWN docblock spells `useEffectiveFeatures()` (empty
+    // parens) while crediting App.tsx with the one fetch — the same trap as the
+    // provider's negative control below, caught here on the file this suite already
+    // imports as `builderSource` for the D-184.1-04 gate-defined-once guards above.
+    expect(callSites(builderSource)).toBe(0)
+  })
+
+  it("NEGATIVE CONTROL — the provider's own docblock spells the call and must NOT be counted", () => {
+    // `EffectiveFeaturesProvider.tsx`'s docblock literally contains the substring
+    // `useEffectiveFeatures(user?.id ?? null)` while explaining why App owns the one
+    // call — proof the fence is measured against real prose, not a synthetic stand-in.
+    expect(effectiveFeaturesProviderSource).toMatch(/useEffectiveFeatures\(user\?\.id/)
+    expect(callSites(effectiveFeaturesProviderSource)).toBe(0)
+    // Its TYPE-ONLY import of the hook's return-shape interface is not a call either —
+    // read directly rather than assumed, per the gap's instruction.
+    expect(effectiveFeaturesProviderSource).toMatch(/import type \{ UseEffectiveFeatures \}/)
+  })
+
+  it("POSITIVE CONTROL — a planted second call site is actually found", () => {
+    const planted = workflowsPageSource.replace(
+      "export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {",
+      'export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {\n  const leak = useEffectiveFeatures("planted")',
+    )
+    expect(planted).not.toBe(workflowsPageSource) // the plant actually landed
+    expect(callSites(planted)).toBe(1)
+  })
+})
