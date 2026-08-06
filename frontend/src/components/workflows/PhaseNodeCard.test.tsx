@@ -2468,3 +2468,1170 @@ describe("PhaseNodeCard 188.2-03 — the pre-move rendered DOM, byte for byte", 
     expect(html).toContain(`data-testid="canvas-node-summarize"`)
   })
 })
+
+// ── Plan 188.2-03 Task 2 — THE GEOMETRY MATRIX ─────────────────────────────────────────
+//
+// The second instrument, because the two fail differently. `CARD_HTML_BASELINE` above pins
+// whole-`innerHTML` byte-identity: the strongest possible statement, and useless at saying
+// WHERE a diff is. This one pins per-element attributes across every reading and every
+// verdict: compact, reviewable, and its failure output NAMES the element that moved.
+
+/** The synthetic key the 137-B card div is filed under. It carries no `data-testid` of its
+ *  own (measured: it is reached structurally, as the node root's only direct `div` child),
+ *  and it is the element that holds the four-branch border ternary — so it may not be left
+ *  out of the capture merely because it has no hook. The leading parenthesis keeps it in a
+ *  stable sort position and makes it unmistakable for a real test id. */
+const CARD_DIV_KEY = "(card-div — the 137-B card, no data-testid)"
+
+/**
+ * The captured shape of one element under the node root.
+ *
+ * ORDER-INDEPENDENT BY CONSTRUCTION — sorted by key before it is returned, so jsdom's DOM
+ * traversal order cannot leak into the baseline.
+ *
+ * EVERY FIELD IS READ WITH `getAttribute`, so A MISSING ATTRIBUTE CAPTURES AS `null` rather
+ * than being omitted. That is the property that makes an attribute which DISAPPEARS a diff
+ * instead of a silent pass — the `AFFORDANCE_SHAPE` rule (`WorkflowCanvas.editing.test.tsx`),
+ * reproduced here rather than re-invented.
+ *
+ * ⚠ THE SVG PRESENTATION ATTRIBUTES ARE CAPTURED, AND THEY ARE NOT OPTIONAL EXTRAS. The
+ * PLAN named five fields — testid, class, style, aria-hidden, aria-label — and five fields
+ * would have made this matrix a fence around PRESENCE and not around GEOMETRY, which is the
+ * opposite of its purpose. MEASURED: the status arc's whole geometry reaches the DOM as SVG
+ * PRESENTATION ATTRIBUTES (`r`, `stroke-dasharray`, `stroke-dashoffset`, `stroke`), never
+ * through `class` or `style`. On class and style ALONE the seven readings collapse to THREE
+ * distinct arc signatures — `not-started` (no arc element), `running` (the spin utility) and
+ * the five that capture identically — so `RING_RADIUS` could move and this matrix would not
+ * notice. Widening it to the six attributes below is what makes the C-6 RED observation
+ * below possible at all.
+ */
+function CARD_SHAPE(container: HTMLElement) {
+  const shapeOf = (el: Element, key: string) => ({
+    key,
+    class: el.getAttribute("class"),
+    style: el.getAttribute("style"),
+    ariaHidden: el.getAttribute("aria-hidden"),
+    ariaLabel: el.getAttribute("aria-label"),
+    r: el.getAttribute("r"),
+    stroke: el.getAttribute("stroke"),
+    strokeWidth: el.getAttribute("stroke-width"),
+    strokeLinecap: el.getAttribute("stroke-linecap"),
+    strokeDasharray: el.getAttribute("stroke-dasharray"),
+    strokeDashoffset: el.getAttribute("stroke-dashoffset"),
+  })
+
+  const entries = Array.from(container.querySelectorAll("[data-testid]")).map((el) =>
+    shapeOf(el, el.getAttribute("data-testid") ?? ""),
+  )
+
+  // The card div, reached STRUCTURALLY. `[data-slug]` is the node root and nothing else in
+  // this subtree carries it; the card is its only direct `div` child (the verdict mark, the
+  // seal, the ring, the pause chip and the icon well are all `span`s).
+  const cardDiv = container.querySelector("[data-slug]")?.querySelector(":scope > div")
+  if (cardDiv) entries.push(shapeOf(cardDiv, CARD_DIV_KEY))
+
+  return entries.sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0))
+}
+
+/**
+ * The three verdict values, from a COMPILER-FORCED exhaustive table — the `ALL_READINGS_TABLE`
+ * idiom above, applied to `VerdictMarkKind` for the same reason: a hand-written list silently
+ * under-covers the moment the union widens.
+ */
+const ALL_VERDICTS_TABLE: Record<VerdictMarkKind, true> = {
+  error: true,
+  incomplete: true,
+  unknown: true,
+}
+const ALL_VERDICTS = Object.keys(ALL_VERDICTS_TABLE) as VerdictMarkKind[]
+
+/**
+ * THE FOUR BRANCHES OF THE CARD DIV'S BORDER TERNARY (`PhaseNodeCard.tsx`, measured at
+ * `:490-496`), and their PRECEDENCE, in one capture.
+ *
+ * ⚠ ADDED BEYOND THE PLAN'S TWO LITERALS, and the reason is a measurement rather than a
+ * preference. This plan's own `must_haves` require the capture to reach "the card div's four
+ * border branches", and the plan then asserted that MAXIMAL_RUNNING exercises "the border
+ * ternary's grounded-and-selected branch". IT DOES NOT: `runReadingBorder("running")` returns
+ * `"border-primary"`, so the RUN branch fires first and shadows both — the captured class
+ * ends `… border-primary` with no selected-shadow term. Without this record the `selected`
+ * and `grounded` branches would have been captured by nothing at all, and neither the reading
+ * matrix (which passes no selection and no grounding) nor the three HTML rows would cover
+ * them.
+ *
+ * EACH ROW IS A PRECEDENCE TEST, not merely a branch: the `run` row also passes `selected`
+ * and `grounded`, and the `selected` row also passes `grounded`, so the four captures pin
+ * the ORDER `run > selected > grounded > default` and not just the four strings.
+ */
+const CARD_BORDER_ROWS: Record<string, Partial<React.ComponentProps<typeof PhaseNodeCard>>> = {
+  run: { status: "failed", selected: true, grounded: true },
+  selected: { selected: true, grounded: true },
+  grounded: { grounded: true },
+  default: {},
+}
+
+/** One render, its captured shape, unmounted. Shared by the capture and by every assertion
+ *  below, so the two can never read the DOM differently. */
+function cardShapeOf(overrides: Partial<React.ComponentProps<typeof PhaseNodeCard>>) {
+  const rendered = renderCard(overrides)
+  const shape = CARD_SHAPE(rendered.container)
+  rendered.unmount()
+  return shape
+}
+
+/**
+ * ⚠ THE CAPTURE RULE FROM `CARD_HTML_BASELINE` ABOVE APPLIES TO ALL THREE LITERALS BELOW,
+ * in full and unchanged — it is referenced rather than re-typed so there is one copy of it
+ * to read. In summary and specific to these arrays: every value was READ OUT of the rendered
+ * DOM of the unmoved tree at this commit by running `CARD_SHAPE` and substituting what it
+ * printed; not one number was typed from the source, computed by hand or reasoned about; the
+ * capture was OBSERVED TWICE and the two dumps compared byte for byte and agreed BEFORE
+ * either was written here; and A DIFF AGAINST THESE ARRAYS AFTER PLANS 188.2-05 AND 188.2-06
+ * IS A BEHAVIOUR CHANGE AND NOT A TEST TO UPDATE.
+ *
+ * `CARD_READING_SHAPES` — one capture per `CanvasReading`. This is the instrument that pins
+ * the status ring's seven shapes, the arc's dash geometry, the run line and the run-state
+ * border. It is a `Record<CanvasReading, …>` on purpose: if a later phase widens the union,
+ * this literal stops typechecking and the matrix is forced to confront the new member instead
+ * of silently under-covering it. Proven, not asserted — deleting one key was observed to move
+ * `npx tsc --noEmit -p tsconfig.app.json` from 33 errors to 34 and back.
+ */
+const CARD_READING_SHAPES: Record<CanvasReading, ReturnType<typeof CARD_SHAPE>> =
+  {
+  "not-started": [
+    {
+      key: "(card-div — the 137-B card, no data-testid)",
+      class: "mx-auto block w-[248px] rounded-[22px] border pb-5 pt-[42px] px-5 text-center bg-card/30 backdrop-blur-sm shadow-[0_1px_0_hsl(var(--foreground)/0.06)_inset,0_18px_36px_-22px_rgba(0,0,0,0.95)] border-border/50",
+      style: "min-height: 120px;",
+      ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
+      key: "canvas-node-ring",
+      class: "pointer-events-none absolute left-1/2 top-[-31px] z-[5] h-[72px] w-[72px] -translate-x-1/2",
+      style: null,
+      ariaHidden: "true",
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
+      key: "canvas-node-run-line",
+      class: "mt-1 line-clamp-2 text-[11px] leading-snug text-foreground/90",
+      style: null,
+      ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
+      key: "canvas-node-summarize",
+      class: "relative",
+      style: "width: 260px; min-height: 120px;",
+      ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
+      key: "probe-icon",
+      class: null,
+      style: null,
+      ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+  ],
+  running: [
+    {
+      key: "(card-div — the 137-B card, no data-testid)",
+      class: "mx-auto block w-[248px] rounded-[22px] border pb-5 pt-[42px] px-5 text-center bg-card/30 backdrop-blur-sm shadow-[0_1px_0_hsl(var(--foreground)/0.06)_inset,0_18px_36px_-22px_rgba(0,0,0,0.95)] border-primary",
+      style: "min-height: 120px;",
+      ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
+      key: "canvas-node-ring",
+      class: "pointer-events-none absolute left-1/2 top-[-31px] z-[5] h-[72px] w-[72px] -translate-x-1/2",
+      style: null,
+      ariaHidden: "true",
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
+      key: "canvas-node-ring-arc",
+      class: "canvas-ring-spin",
+      style: null,
+      ariaHidden: null,
+      ariaLabel: null,
+      r: "34",
+      stroke: "hsl(var(--primary))",
+      strokeWidth: "3.5",
+      strokeLinecap: "round",
+      strokeDasharray: "55.543 158.085",
+      strokeDashoffset: "0",
+    },
+    {
+      key: "canvas-node-run-line",
+      class: "mt-1 line-clamp-2 text-[11px] leading-snug text-foreground/90",
+      style: null,
+      ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
+      key: "canvas-node-summarize",
+      class: "relative",
+      style: "width: 260px; min-height: 120px;",
+      ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
+      key: "probe-icon",
+      class: null,
+      style: null,
+      ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+  ],
+  done: [
+    {
+      key: "(card-div — the 137-B card, no data-testid)",
+      class: "mx-auto block w-[248px] rounded-[22px] border pb-5 pt-[42px] px-5 text-center bg-card/30 backdrop-blur-sm shadow-[0_1px_0_hsl(var(--foreground)/0.06)_inset,0_18px_36px_-22px_rgba(0,0,0,0.95)] border-border/50",
+      style: "min-height: 120px;",
+      ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
+      key: "canvas-node-ring",
+      class: "pointer-events-none absolute left-1/2 top-[-31px] z-[5] h-[72px] w-[72px] -translate-x-1/2",
+      style: null,
+      ariaHidden: "true",
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
+      key: "canvas-node-ring-arc",
+      class: null,
+      style: null,
+      ariaHidden: null,
+      ariaLabel: null,
+      r: "34",
+      stroke: "hsl(var(--success))",
+      strokeWidth: "3.5",
+      strokeLinecap: "round",
+      strokeDasharray: null,
+      strokeDashoffset: "0",
+    },
+    {
+      key: "canvas-node-run-line",
+      class: "mt-1 line-clamp-2 text-[11px] leading-snug text-foreground/90",
+      style: null,
+      ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
+      key: "canvas-node-summarize",
+      class: "relative",
+      style: "width: 260px; min-height: 120px;",
+      ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
+      key: "probe-icon",
+      class: null,
+      style: null,
+      ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+  ],
+  failed: [
+    {
+      key: "(card-div — the 137-B card, no data-testid)",
+      class: "mx-auto block w-[248px] rounded-[22px] border pb-5 pt-[42px] px-5 text-center bg-card/30 backdrop-blur-sm shadow-[0_1px_0_hsl(var(--foreground)/0.06)_inset,0_18px_36px_-22px_rgba(0,0,0,0.95)] border-destructive",
+      style: "min-height: 120px;",
+      ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
+      key: "canvas-node-ring",
+      class: "pointer-events-none absolute left-1/2 top-[-31px] z-[5] h-[72px] w-[72px] -translate-x-1/2",
+      style: null,
+      ariaHidden: "true",
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
+      key: "canvas-node-ring-arc",
+      class: null,
+      style: null,
+      ariaHidden: null,
+      ariaLabel: null,
+      r: "34",
+      stroke: "hsl(var(--destructive))",
+      strokeWidth: "3.5",
+      strokeLinecap: "round",
+      strokeDasharray: "89.724 17.090 89.724 17.090",
+      strokeDashoffset: "18.158",
+    },
+    {
+      key: "canvas-node-run-line",
+      class: "mt-1 line-clamp-2 text-[11px] leading-snug text-foreground/90",
+      style: null,
+      ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
+      key: "canvas-node-summarize",
+      class: "relative",
+      style: "width: 260px; min-height: 120px;",
+      ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
+      key: "probe-icon",
+      class: null,
+      style: null,
+      ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+  ],
+  skipped: [
+    {
+      key: "(card-div — the 137-B card, no data-testid)",
+      class: "mx-auto block w-[248px] rounded-[22px] border pb-5 pt-[42px] px-5 text-center bg-card/30 backdrop-blur-sm shadow-[0_1px_0_hsl(var(--foreground)/0.06)_inset,0_18px_36px_-22px_rgba(0,0,0,0.95)] border-border/50",
+      style: "min-height: 120px;",
+      ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
+      key: "canvas-node-ring",
+      class: "pointer-events-none absolute left-1/2 top-[-31px] z-[5] h-[72px] w-[72px] -translate-x-1/2",
+      style: null,
+      ariaHidden: "true",
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
+      key: "canvas-node-ring-arc",
+      class: null,
+      style: null,
+      ariaHidden: null,
+      ariaLabel: null,
+      r: "34",
+      stroke: "hsl(var(--muted-foreground))",
+      strokeWidth: "3.5",
+      strokeLinecap: "round",
+      strokeDasharray: "5 7",
+      strokeDashoffset: "0",
+    },
+    {
+      key: "canvas-node-run-line",
+      class: "mt-1 line-clamp-2 text-[11px] leading-snug text-foreground/90",
+      style: null,
+      ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
+      key: "canvas-node-summarize",
+      class: "relative",
+      style: "width: 260px; min-height: 120px;",
+      ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
+      key: "probe-icon",
+      class: null,
+      style: null,
+      ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+  ],
+  "waiting-for-you": [
+    {
+      key: "(card-div — the 137-B card, no data-testid)",
+      class: "mx-auto block w-[248px] rounded-[22px] border pb-5 pt-[42px] px-5 text-center bg-card/30 backdrop-blur-sm shadow-[0_1px_0_hsl(var(--foreground)/0.06)_inset,0_18px_36px_-22px_rgba(0,0,0,0.95)] border-[hsl(var(--warning))]",
+      style: "min-height: 120px;",
+      ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
+      key: "canvas-node-pause-chip",
+      class: "pointer-events-none absolute left-1/2 top-[-37px] z-[9] flex -translate-x-1/2 gap-[3px] rounded border border-[hsl(var(--warning))] bg-background px-[5px] py-[3px]",
+      style: null,
+      ariaHidden: "true",
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
+      key: "canvas-node-ring",
+      class: "pointer-events-none absolute left-1/2 top-[-31px] z-[5] h-[72px] w-[72px] -translate-x-1/2",
+      style: null,
+      ariaHidden: "true",
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
+      key: "canvas-node-ring-arc",
+      class: null,
+      style: null,
+      ariaHidden: null,
+      ariaLabel: null,
+      r: "34",
+      stroke: "hsl(var(--warning))",
+      strokeWidth: "3.5",
+      strokeLinecap: "round",
+      strokeDasharray: "158.085 55.543",
+      strokeDashoffset: "25.635",
+    },
+    {
+      key: "canvas-node-run-line",
+      class: "mt-1 line-clamp-2 text-[11px] leading-snug text-foreground/90",
+      style: null,
+      ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
+      key: "canvas-node-summarize",
+      class: "relative",
+      style: "width: 260px; min-height: 120px;",
+      ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
+      key: "probe-icon",
+      class: null,
+      style: null,
+      ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+  ],
+  unknown: [
+    {
+      key: "(card-div — the 137-B card, no data-testid)",
+      class: "mx-auto block w-[248px] rounded-[22px] border pb-5 pt-[42px] px-5 text-center bg-card/30 backdrop-blur-sm shadow-[0_1px_0_hsl(var(--foreground)/0.06)_inset,0_18px_36px_-22px_rgba(0,0,0,0.95)] border-border/50",
+      style: "min-height: 120px;",
+      ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
+      key: "canvas-node-ring",
+      class: "pointer-events-none absolute left-1/2 top-[-31px] z-[5] h-[72px] w-[72px] -translate-x-1/2",
+      style: null,
+      ariaHidden: "true",
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
+      key: "canvas-node-ring-arc",
+      class: null,
+      style: null,
+      ariaHidden: null,
+      ariaLabel: null,
+      r: "34",
+      stroke: "hsl(var(--muted-foreground))",
+      strokeWidth: "3.5",
+      strokeLinecap: "round",
+      strokeDasharray: "1.5 6",
+      strokeDashoffset: "0",
+    },
+    {
+      key: "canvas-node-run-line",
+      class: "mt-1 line-clamp-2 text-[11px] leading-snug text-foreground/90",
+      style: null,
+      ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
+      key: "canvas-node-summarize",
+      class: "relative",
+      style: "width: 260px; min-height: 120px;",
+      ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
+      key: "probe-icon",
+      class: null,
+      style: null,
+      ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+  ],
+}
+
+/** `CARD_VERDICT_SHAPES` — the verdict mark's three states, captured the same way and total
+ *  over `VerdictMarkKind` for the same compiler-forced reason. */
+const CARD_VERDICT_SHAPES: Record<VerdictMarkKind, ReturnType<typeof CARD_SHAPE>> =
+  {
+  error: [
+    {
+      key: "(card-div — the 137-B card, no data-testid)",
+      class: "mx-auto block w-[248px] rounded-[22px] border pb-5 pt-[42px] px-5 text-center bg-card/30 backdrop-blur-sm shadow-[0_1px_0_hsl(var(--foreground)/0.06)_inset,0_18px_36px_-22px_rgba(0,0,0,0.95)] border-border/50",
+      style: "min-height: 104px;",
+      ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
+      key: "canvas-node-summarize",
+      class: "relative",
+      style: "width: 260px; min-height: 104px;",
+      ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
+      key: "canvas-node-verdict",
+      class: "pointer-events-none absolute -left-2 top-1.5 z-[8] grid h-[22px] w-[22px] place-items-center rounded-full text-[11px] font-bold leading-none border border-destructive/70 bg-destructive/15 text-destructive",
+      style: null,
+      ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
+      key: "probe-icon",
+      class: null,
+      style: null,
+      ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+  ],
+  incomplete: [
+    {
+      key: "(card-div — the 137-B card, no data-testid)",
+      class: "mx-auto block w-[248px] rounded-[22px] border pb-5 pt-[42px] px-5 text-center bg-card/30 backdrop-blur-sm shadow-[0_1px_0_hsl(var(--foreground)/0.06)_inset,0_18px_36px_-22px_rgba(0,0,0,0.95)] border-border/50",
+      style: "min-height: 104px;",
+      ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
+      key: "canvas-node-summarize",
+      class: "relative",
+      style: "width: 260px; min-height: 104px;",
+      ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
+      key: "canvas-node-verdict",
+      class: "pointer-events-none absolute -left-2 top-1.5 z-[8] grid h-[22px] w-[22px] place-items-center rounded-full text-[11px] font-bold leading-none border border-dashed border-border bg-muted text-muted-foreground",
+      style: null,
+      ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
+      key: "probe-icon",
+      class: null,
+      style: null,
+      ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+  ],
+  unknown: [
+    {
+      key: "(card-div — the 137-B card, no data-testid)",
+      class: "mx-auto block w-[248px] rounded-[22px] border pb-5 pt-[42px] px-5 text-center bg-card/30 backdrop-blur-sm shadow-[0_1px_0_hsl(var(--foreground)/0.06)_inset,0_18px_36px_-22px_rgba(0,0,0,0.95)] border-border/50",
+      style: "min-height: 104px;",
+      ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
+      key: "canvas-node-summarize",
+      class: "relative",
+      style: "width: 260px; min-height: 104px;",
+      ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
+      key: "canvas-node-verdict",
+      class: "pointer-events-none absolute -left-2 top-1.5 z-[8] grid h-[22px] w-[22px] place-items-center rounded-full text-[11px] font-bold leading-none border border-dashed border-border bg-muted text-muted-foreground",
+      style: null,
+      ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
+      key: "probe-icon",
+      class: null,
+      style: null,
+      ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+  ],
+}
+
+/** `CARD_BORDER_SHAPES` — the four branches of the card div's border ternary and their
+ *  precedence. See `CARD_BORDER_ROWS` above for why this third literal exists. */
+const CARD_BORDER_SHAPES: Record<string, ReturnType<typeof CARD_SHAPE>> =
+  {
+  run: [
+    {
+      key: "(card-div — the 137-B card, no data-testid)",
+      class: "mx-auto block w-[248px] rounded-[22px] border pb-5 pt-[42px] px-5 text-center bg-card/30 backdrop-blur-sm shadow-[0_1px_0_hsl(var(--foreground)/0.06)_inset,0_18px_36px_-22px_rgba(0,0,0,0.95)] border-destructive",
+      style: "min-height: 120px;",
+      ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
+      key: "canvas-node-ring",
+      class: "pointer-events-none absolute left-1/2 top-[-31px] z-[5] h-[72px] w-[72px] -translate-x-1/2",
+      style: null,
+      ariaHidden: "true",
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
+      key: "canvas-node-ring-arc",
+      class: null,
+      style: null,
+      ariaHidden: null,
+      ariaLabel: null,
+      r: "34",
+      stroke: "hsl(var(--destructive))",
+      strokeWidth: "3.5",
+      strokeLinecap: "round",
+      strokeDasharray: "89.724 17.090 89.724 17.090",
+      strokeDashoffset: "18.158",
+    },
+    {
+      key: "canvas-node-run-line",
+      class: "mt-1 line-clamp-2 text-[11px] leading-snug text-foreground/90",
+      style: null,
+      ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
+      key: "canvas-node-seal",
+      class: "pointer-events-none absolute right-[17px] top-[11px] z-[6] grid h-[21px] w-[21px] place-items-center rounded-full text-[11px] leading-none border border-[hsl(220_30%_100%/0.34)] bg-[hsl(220_30%_100%/0.1)] text-foreground",
+      style: null,
+      ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
+      key: "canvas-node-summarize",
+      class: "relative",
+      style: "width: 260px; min-height: 120px;",
+      ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
+      key: "probe-icon",
+      class: null,
+      style: null,
+      ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+  ],
+  selected: [
+    {
+      key: "(card-div — the 137-B card, no data-testid)",
+      class: "mx-auto block w-[248px] rounded-[22px] border pb-5 pt-[42px] px-5 text-center bg-card/30 backdrop-blur-sm border-primary shadow-[0_0_0_1px_hsl(var(--primary)/0.4)]",
+      style: "min-height: 104px;",
+      ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
+      key: "canvas-node-seal",
+      class: "pointer-events-none absolute right-[17px] top-[11px] z-[6] grid h-[21px] w-[21px] place-items-center rounded-full text-[11px] leading-none border border-[hsl(220_30%_100%/0.34)] bg-[hsl(220_30%_100%/0.1)] text-foreground",
+      style: null,
+      ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
+      key: "canvas-node-summarize",
+      class: "relative",
+      style: "width: 260px; min-height: 104px;",
+      ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
+      key: "probe-icon",
+      class: null,
+      style: null,
+      ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+  ],
+  grounded: [
+    {
+      key: "(card-div — the 137-B card, no data-testid)",
+      class: "mx-auto block w-[248px] rounded-[22px] border pb-5 pt-[42px] px-5 text-center bg-card/30 backdrop-blur-sm shadow-[0_1px_0_hsl(var(--foreground)/0.06)_inset,0_18px_36px_-22px_rgba(0,0,0,0.95)] border-[hsl(220_30%_100%/0.34)]",
+      style: "min-height: 104px;",
+      ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
+      key: "canvas-node-seal",
+      class: "pointer-events-none absolute right-[17px] top-[11px] z-[6] grid h-[21px] w-[21px] place-items-center rounded-full text-[11px] leading-none border border-[hsl(220_30%_100%/0.34)] bg-[hsl(220_30%_100%/0.1)] text-foreground",
+      style: null,
+      ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
+      key: "canvas-node-summarize",
+      class: "relative",
+      style: "width: 260px; min-height: 104px;",
+      ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
+      key: "probe-icon",
+      class: null,
+      style: null,
+      ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+  ],
+  default: [
+    {
+      key: "(card-div — the 137-B card, no data-testid)",
+      class: "mx-auto block w-[248px] rounded-[22px] border pb-5 pt-[42px] px-5 text-center bg-card/30 backdrop-blur-sm shadow-[0_1px_0_hsl(var(--foreground)/0.06)_inset,0_18px_36px_-22px_rgba(0,0,0,0.95)] border-border/50",
+      style: "min-height: 104px;",
+      ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
+      key: "canvas-node-summarize",
+      class: "relative",
+      style: "width: 260px; min-height: 104px;",
+      ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
+      key: "probe-icon",
+      class: null,
+      style: null,
+      ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+  ],
+}
+
+describe("PhaseNodeCard 188.2-03 — the pre-move geometry matrix", () => {
+  it("every one of the seven readings reproduces its CAPTURED shape, element for element", () => {
+    // Driven from `ALL_READINGS`, never from a hand-written list — see `ALL_READINGS_TABLE`.
+    for (const reading of ALL_READINGS) {
+      const captured = cardShapeOf({ status: reading })
+      // NON-VACUITY: a deep-equal between two empty arrays passes forever.
+      expect(captured.length).toBeGreaterThan(0)
+      expect(captured.some((e) => e.key === RING_TEST_ID)).toBe(true)
+      expect(captured).toEqual(CARD_READING_SHAPES[reading])
+    }
+  })
+
+  it("every one of the three verdicts reproduces its CAPTURED shape, element for element", () => {
+    for (const verdict of ALL_VERDICTS) {
+      const captured = cardShapeOf({ verdict })
+      expect(captured.some((e) => e.key === VERDICT_TEST_ID)).toBe(true)
+      expect(captured).toEqual(CARD_VERDICT_SHAPES[verdict])
+    }
+  })
+
+  it("each of the four border branches reproduces its CAPTURED card div, precedence included", () => {
+    for (const branch of Object.keys(CARD_BORDER_ROWS)) {
+      const captured = cardShapeOf(CARD_BORDER_ROWS[branch])
+      expect(captured.some((e) => e.key === CARD_DIV_KEY)).toBe(true)
+      expect(captured).toEqual(CARD_BORDER_SHAPES[branch])
+    }
+  })
+
+  it("the seven readings capture SEVEN DISTINCT arc signatures", () => {
+    // If two readings captured identically this matrix would not be pinning what it claims:
+    // a ring whose shape IS its meaning would have two readings it cannot tell apart.
+    const signatures = ALL_READINGS.map((reading) =>
+      JSON.stringify(CARD_READING_SHAPES[reading].find((e) => e.key === ARC_TEST_ID) ?? null),
+    )
+    expect(new Set(signatures).size).toBe(ALL_READINGS.length)
+    expect(ALL_READINGS.length).toBe(7)
+
+    // ⚠ MEASURED, AND IT IS WHY `CARD_SHAPE` CAPTURES THE SVG ATTRIBUTES. On `class` and
+    // `style` ALONE — the field set the plan named — the seven collapse to THREE: the
+    // reading with no arc at all, the one carrying the spin utility, and the five that are
+    // indistinguishable. This assertion is the standing proof of that finding, so nobody
+    // later narrows the reducer back to five fields believing it was ever sufficient.
+    const classStyleOnly = ALL_READINGS.map((reading) => {
+      const arc = CARD_READING_SHAPES[reading].find((e) => e.key === ARC_TEST_ID)
+      return JSON.stringify(arc ? [arc.class, arc.style] : null)
+    })
+    expect(new Set(classStyleOnly).size).toBe(3)
+  })
+
+  it("the four border branches capture FOUR DISTINCT card-div class lists", () => {
+    // Two branches that captured the same class list would mean the ternary has fewer live
+    // branches than it has arms — and the precedence rows above would be proving nothing.
+    const classes = Object.keys(CARD_BORDER_ROWS).map(
+      (branch) => CARD_BORDER_SHAPES[branch].find((e) => e.key === CARD_DIV_KEY)?.class ?? null,
+    )
+    expect(classes.every((c) => typeof c === "string" && c.length > 0)).toBe(true)
+    expect(new Set(classes).size).toBe(4)
+  })
+})
