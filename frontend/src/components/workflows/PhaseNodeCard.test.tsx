@@ -2286,3 +2286,185 @@ describe("PhaseNodeCard 188.1-04 — WR-04 sites 4 and 5: the lookups are total"
     expect(stroke).toBe(okStroke)
   })
 })
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Plan 188.2-03 — THE PRE-MOVE CARD CAPTURE (SC#2).
+//
+// Appended at the foot of the file as a PURE INSERTION. Nothing above was edited,
+// renamed or re-described; every `it(` this file shipped before this block still reads
+// exactly as it did.
+//
+// WHY A CAPTURE AND NOT AN EXPECTATION. Phase 188.2 cuts the verdict mark, the ⛨ seal,
+// the status ring, the pause chip and the 3D icon well out of `PhaseNodeCard.tsx` into
+// modules of their own, and the phase's first contract is "the card renders exactly what
+// it rendered". The cheap wrong way to check that is to hand-type the attributes the card
+// OUGHT to carry — which proves only what the author believed the geometry was, and would
+// ratify a move that changed it whenever the change happened to match the belief. So this
+// block CAPTURES the rendered DOM from the tree AS IT SHIPS.
+//
+// ⚠ THE BASELINE MUST PREDATE THE CHANGE, and that is why this is a wave of its own,
+// committed before any destination module exists. A baseline taken after the edit proves
+// the edit against itself. This is not a preference: it is one of Phase 188.1's nine
+// measured-false inherited claims, and `ls src/components/workflows/NodeRunOverlay.tsx`
+// at this commit answers "No such file or directory".
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** The verdict mark's stable hook. The other five already live at module scope above
+ *  (`SEAL_TEST_ID`, `RING_TEST_ID`, `ARC_TEST_ID`, `RUN_LINE_TEST_ID`,
+ *  `PAUSE_CHIP_TEST_ID`); this one did not, and a sixth inline spelling is how two
+ *  halves of one suite start measuring different elements. */
+const VERDICT_TEST_ID = "canvas-node-verdict"
+
+/**
+ * The maximal slot set: every optional slot on the contract filled AT ONCE, so one render
+ * exercises the card div, the 3D icon well, the verdict mark, the ⛨ seal, the status ring
+ * and its arc, the run line, BOTH badge slots and the ⌥ technical line together.
+ *
+ * `stepNumber: 3` is deliberate and it is deliberately expected to paint NOTHING —
+ * D-183-07 keeps the step's index off the face. It is in here so that the day somebody
+ * brings it to the face, the capture goes red and says so.
+ */
+const CAPTURE_MAXIMAL: Partial<React.ComponentProps<typeof PhaseNodeCard>> = {
+  subtitle: "Writes one paragraph",
+  technicalLine: "llm_single · summarize",
+  badges: [groundingBadge, waitsBadge],
+  stepNumber: 3,
+  verdict: "error",
+  grounded: true,
+  selected: true,
+}
+
+/**
+ * The three rows, declared ONCE so the props the baseline was captured from and the props
+ * the assertion renders cannot drift apart. A second copy of these overrides at the
+ * assertion site would let the two diverge silently and the fence would then be measuring
+ * a render nobody captured.
+ *
+ *   · MAXIMAL_RUNNING — the maximal set at the reading that paints an arc and claims the
+ *     card border.
+ *   · MAXIMAL_WAITING — the same at `waiting-for-you`, the ONLY reading that renders the
+ *     pause chip.
+ *   · MINIMAL_BUILDER — `renderCard()` with no overrides at all: the Builder's own
+ *     `minHeight`, the default border branch, and every optional block ABSENT. An absent
+ *     block is as much a behaviour to preserve as a present one, which is exactly what the
+ *     third marker row below asserts.
+ */
+const CARD_HTML_ROWS: Record<string, Partial<React.ComponentProps<typeof PhaseNodeCard>>> = {
+  MAXIMAL_RUNNING: { ...CAPTURE_MAXIMAL, status: "running" },
+  MAXIMAL_WAITING: { ...CAPTURE_MAXIMAL, status: "waiting-for-you" },
+  MINIMAL_BUILDER: {},
+}
+
+/** One render, its whole `innerHTML`, unmounted. Shared by the capture and the assertion
+ *  so both read the DOM the same way. */
+function cardHtml(overrides: Partial<React.ComponentProps<typeof PhaseNodeCard>>): string {
+  const rendered = renderCard(overrides)
+  const html = rendered.container.innerHTML
+  rendered.unmount()
+  return html
+}
+
+/**
+ * ⚠ THIS LITERAL IS A CAPTURE, NOT AN EXPECTATION. Every character below was READ OUT of
+ * the rendered DOM of the tree as it stands at this commit — `PhaseNodeCard.tsx` unmoved,
+ * all five destination modules still nonexistent — by running `cardHtml` above and pasting
+ * what it printed. Not one attribute here was typed from the source, computed by hand, or
+ * reasoned about. That is the whole point: an expectation records what its author believed
+ * the geometry to be, and a move that changed the geometry to match that belief would pass
+ * it.
+ *
+ * OBSERVED TWICE on the unchanged tree before it was committed, and the two runs agreed
+ * byte for byte — so it is a baseline rather than one sample of something that might vary.
+ * Fence N11 above forbids `Date.now`, `Math.random`, `document.`, `window.` and every
+ * measurement API across this whole subtree, so a capture that differed between two runs
+ * would be a REAL FINDING to report and not flake to re-roll.
+ *
+ * NOT ONE STRING BELOW WAS HAND-EDITED. They were written into this file by substitution
+ * from the dumped capture, for the same reason 188.1-02 dumped its own to a file: hand
+ * editing turns a capture back into an expectation recording what its author believed the
+ * change did, and silently masks any other attribute the edit disturbed.
+ *
+ * A DIFF AGAINST THIS RECORD AFTER PLANS 188.2-05 AND 188.2-06 IS A BEHAVIOUR CHANGE —
+ * the phase's first contract broken — AND NOT A TEST TO UPDATE. The extraction is supposed
+ * to move code, not move pixels. If this goes red during the move, the move is wrong;
+ * re-capturing it to make it green would delete the only evidence anybody has that the card
+ * still renders what it rendered.
+ *
+ * ── WHAT IS AND IS NOT CLAIMED TO BE BYTE-IDENTICAL ────────────────────────────────────
+ *
+ * THE RENDERED DOM must be byte-identical. THE MOVED SOURCE WILL NOT BE, and stating that
+ * here is the point of this paragraph: 188.1 measured a 22-insertion / 323-deletion move
+ * because it relocated a whole component and a whole const table, and no later reader should
+ * inherit from this phase a claim it never made. Here the moved bodies are JSX FRAGMENTS,
+ * which must acquire a component wrapper, a props destructure and a props type in order to
+ * live in a file of their own. Byte-identity is chased for the JSX element bodies and their
+ * comments — which D-01 requires anyway and which `sealJsxBlock`'s two string anchors
+ * enforce — and the wrapper is the ACCEPTED delta. A diff-stat showing more insertions than
+ * deletions on the destination side is therefore expected and is not evidence of drift; a
+ * diff against the strings below is.
+ */
+const CARD_HTML_BASELINE: Record<string, string> = {
+  MAXIMAL_RUNNING:
+    "<div data-testid=\"canvas-node-summarize\" data-slug=\"summarize\" data-phase-type=\"llm_single\" data-selected=\"true\" class=\"relative\" style=\"width: 260px; min-height: 120px;\"><div class=\"mx-auto block w-[248px] rounded-[22px] border pb-5 pt-[42px] px-5 text-center bg-card/30 backdrop-blur-sm shadow-[0_1px_0_hsl(var(--foreground)/0.06)_inset,0_18px_36px_-22px_rgba(0,0,0,0.95)] border-primary\" style=\"min-height: 120px;\"><p class=\"truncate font-headline text-[14px] font-semibold leading-tight text-foreground\">Summarise the findings</p><p class=\"mt-1 text-[11px] leading-snug text-muted-foreground\">Writes one paragraph</p><p data-testid=\"canvas-node-run-line\" data-reading=\"running\" class=\"mt-1 line-clamp-2 text-[11px] leading-snug text-foreground/90\">Running</p><p data-testid=\"canvas-node-technical-line\" class=\"mt-1 truncate font-mono text-[10px] leading-snug text-muted-foreground\">llm_single · summarize</p><div class=\"mt-2 flex flex-wrap items-center gap-1.5\"><span data-grounding=\"strict\"><span data-testid=\"canvas-grounding\" data-tone=\"success\" class=\"inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium border-success/30 bg-success/10 text-success\"><span aria-hidden=\"true\" class=\"mr-1\">🔒</span>Grounded in your files</span></span><span data-waits-for-you=\"true\"><span data-testid=\"canvas-waits-for-you\" data-tone=\"primary\" class=\"inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium border-primary/30 bg-primary/10 text-primary\">Waits for you</span></span></div></div><span data-testid=\"canvas-node-verdict\" data-verdict=\"error\" class=\"pointer-events-none absolute -left-2 top-1.5 z-[8] grid h-[22px] w-[22px] place-items-center rounded-full text-[11px] font-bold leading-none border border-destructive/70 bg-destructive/15 text-destructive\"><span aria-hidden=\"true\">✕</span><span class=\"sr-only\">Has a problem</span></span><span data-testid=\"canvas-node-seal\" data-grounded=\"true\" class=\"pointer-events-none absolute right-[17px] top-[11px] z-[6] grid h-[21px] w-[21px] place-items-center rounded-full text-[11px] leading-none border border-[hsl(220_30%_100%/0.34)] bg-[hsl(220_30%_100%/0.1)] text-foreground\"><span aria-hidden=\"true\">⛨</span><span class=\"sr-only\">Must prove it</span></span><span aria-hidden=\"true\" data-testid=\"canvas-node-ring\" data-reading=\"running\" class=\"pointer-events-none absolute left-1/2 top-[-31px] z-[5] h-[72px] w-[72px] -translate-x-1/2\"><svg viewBox=\"0 0 72 72\" class=\"block h-full w-full overflow-visible\"><circle cx=\"36\" cy=\"36\" r=\"34\" fill=\"none\" stroke-width=\"2.5\" stroke=\"hsl(var(--muted-foreground) / 0.35)\"></circle><circle data-testid=\"canvas-node-ring-arc\" cx=\"36\" cy=\"36\" r=\"34\" fill=\"none\" stroke-width=\"3.5\" stroke-linecap=\"round\" stroke=\"hsl(var(--primary))\" stroke-dasharray=\"55.543 158.085\" stroke-dashoffset=\"0\" class=\"canvas-ring-spin\"></circle></svg></span><span aria-hidden=\"true\" class=\"pointer-events-none absolute left-1/2 top-[-26px] grid h-[62px] w-[62px] -translate-x-1/2 place-items-center\"><span class=\"absolute inset-0 rounded-full\" style=\"background: radial-gradient(circle, rgba(255, 255, 255, 0.22), transparent 68%);\"></span><span class=\"absolute inset-1 rounded-full bg-foreground/10\" style=\"filter: blur(2px);\"></span><span class=\"absolute bottom-0 left-1/2 h-2 w-9 -translate-x-1/2 rounded-[50%] bg-black/50\" style=\"filter: blur(5px);\"></span><span class=\"relative grid place-items-center text-[20px] leading-none text-foreground drop-shadow-[0_9px_13px_rgba(0,0,0,0.8)]\"><span data-testid=\"probe-icon\">◆</span></span></span></div>",
+  MAXIMAL_WAITING:
+    "<div data-testid=\"canvas-node-summarize\" data-slug=\"summarize\" data-phase-type=\"llm_single\" data-selected=\"true\" class=\"relative\" style=\"width: 260px; min-height: 120px;\"><div class=\"mx-auto block w-[248px] rounded-[22px] border pb-5 pt-[42px] px-5 text-center bg-card/30 backdrop-blur-sm shadow-[0_1px_0_hsl(var(--foreground)/0.06)_inset,0_18px_36px_-22px_rgba(0,0,0,0.95)] border-[hsl(var(--warning))]\" style=\"min-height: 120px;\"><p class=\"truncate font-headline text-[14px] font-semibold leading-tight text-foreground\">Summarise the findings</p><p class=\"mt-1 text-[11px] leading-snug text-muted-foreground\">Writes one paragraph</p><p data-testid=\"canvas-node-run-line\" data-reading=\"waiting-for-you\" class=\"mt-1 line-clamp-2 text-[11px] leading-snug text-foreground/90\">Paused for your answer — it needs your reply before it can continue</p><p data-testid=\"canvas-node-technical-line\" class=\"mt-1 truncate font-mono text-[10px] leading-snug text-muted-foreground\">llm_single · summarize</p><div class=\"mt-2 flex flex-wrap items-center gap-1.5\"><span data-grounding=\"strict\"><span data-testid=\"canvas-grounding\" data-tone=\"success\" class=\"inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium border-success/30 bg-success/10 text-success\"><span aria-hidden=\"true\" class=\"mr-1\">🔒</span>Grounded in your files</span></span><span data-waits-for-you=\"true\"><span data-testid=\"canvas-waits-for-you\" data-tone=\"primary\" class=\"inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium border-primary/30 bg-primary/10 text-primary\">Waits for you</span></span></div></div><span data-testid=\"canvas-node-verdict\" data-verdict=\"error\" class=\"pointer-events-none absolute -left-2 top-1.5 z-[8] grid h-[22px] w-[22px] place-items-center rounded-full text-[11px] font-bold leading-none border border-destructive/70 bg-destructive/15 text-destructive\"><span aria-hidden=\"true\">✕</span><span class=\"sr-only\">Has a problem</span></span><span data-testid=\"canvas-node-seal\" data-grounded=\"true\" class=\"pointer-events-none absolute right-[17px] top-[11px] z-[6] grid h-[21px] w-[21px] place-items-center rounded-full text-[11px] leading-none border border-[hsl(220_30%_100%/0.34)] bg-[hsl(220_30%_100%/0.1)] text-foreground\"><span aria-hidden=\"true\">⛨</span><span class=\"sr-only\">Must prove it</span></span><span aria-hidden=\"true\" data-testid=\"canvas-node-ring\" data-reading=\"waiting-for-you\" class=\"pointer-events-none absolute left-1/2 top-[-31px] z-[5] h-[72px] w-[72px] -translate-x-1/2\"><svg viewBox=\"0 0 72 72\" class=\"block h-full w-full overflow-visible\"><circle cx=\"36\" cy=\"36\" r=\"34\" fill=\"none\" stroke-width=\"2.5\" stroke=\"hsl(var(--muted-foreground) / 0.35)\"></circle><circle data-testid=\"canvas-node-ring-arc\" cx=\"36\" cy=\"36\" r=\"34\" fill=\"none\" stroke-width=\"3.5\" stroke-linecap=\"round\" stroke=\"hsl(var(--warning))\" stroke-dasharray=\"158.085 55.543\" stroke-dashoffset=\"25.635\"></circle></svg></span><span aria-hidden=\"true\" data-testid=\"canvas-node-pause-chip\" class=\"pointer-events-none absolute left-1/2 top-[-37px] z-[9] flex -translate-x-1/2 gap-[3px] rounded border border-[hsl(var(--warning))] bg-background px-[5px] py-[3px]\"><span class=\"block h-[9px] w-[3px] bg-[hsl(var(--warning))]\"></span><span class=\"block h-[9px] w-[3px] bg-[hsl(var(--warning))]\"></span></span><span aria-hidden=\"true\" class=\"pointer-events-none absolute left-1/2 top-[-26px] grid h-[62px] w-[62px] -translate-x-1/2 place-items-center\"><span class=\"absolute inset-0 rounded-full\" style=\"background: radial-gradient(circle, rgba(255, 255, 255, 0.22), transparent 68%);\"></span><span class=\"absolute inset-1 rounded-full bg-foreground/10\" style=\"filter: blur(2px);\"></span><span class=\"absolute bottom-0 left-1/2 h-2 w-9 -translate-x-1/2 rounded-[50%] bg-black/50\" style=\"filter: blur(5px);\"></span><span class=\"relative grid place-items-center text-[20px] leading-none text-foreground drop-shadow-[0_9px_13px_rgba(0,0,0,0.8)]\"><span data-testid=\"probe-icon\">◆</span></span></span></div>",
+  MINIMAL_BUILDER:
+    "<div data-testid=\"canvas-node-summarize\" data-slug=\"summarize\" data-phase-type=\"llm_single\" data-selected=\"false\" class=\"relative\" style=\"width: 260px; min-height: 104px;\"><div class=\"mx-auto block w-[248px] rounded-[22px] border pb-5 pt-[42px] px-5 text-center bg-card/30 backdrop-blur-sm shadow-[0_1px_0_hsl(var(--foreground)/0.06)_inset,0_18px_36px_-22px_rgba(0,0,0,0.95)] border-border/50\" style=\"min-height: 104px;\"><p class=\"truncate font-headline text-[14px] font-semibold leading-tight text-foreground\">Summarise the findings</p></div><span aria-hidden=\"true\" class=\"pointer-events-none absolute left-1/2 top-[-26px] grid h-[62px] w-[62px] -translate-x-1/2 place-items-center\"><span class=\"absolute inset-0 rounded-full\" style=\"background: radial-gradient(circle, rgba(255, 255, 255, 0.22), transparent 68%);\"></span><span class=\"absolute inset-1 rounded-full bg-foreground/10\" style=\"filter: blur(2px);\"></span><span class=\"absolute bottom-0 left-1/2 h-2 w-9 -translate-x-1/2 rounded-[50%] bg-black/50\" style=\"filter: blur(5px);\"></span><span class=\"relative grid place-items-center text-[20px] leading-none text-foreground drop-shadow-[0_9px_13px_rgba(0,0,0,0.8)]\"><span data-testid=\"probe-icon\">◆</span></span></span></div>",
+}
+
+describe("PhaseNodeCard 188.2-03 — the pre-move rendered DOM, byte for byte", () => {
+  for (const row of Object.keys(CARD_HTML_ROWS)) {
+    it(`${row} reproduces the DOM CAPTURED from the unmoved tree, byte for byte`, () => {
+      // NON-VACUITY, first: a `toBe` against an empty string would pass forever if the row
+      // ever stopped rendering and the baseline were ever re-captured from that silence.
+      expect(CARD_HTML_BASELINE[row].length).toBeGreaterThan(0)
+      expect(cardHtml(CARD_HTML_ROWS[row])).toBe(CARD_HTML_BASELINE[row])
+    })
+  }
+
+  // ── THE MARKER ROWS ────────────────────────────────────────────────────────────────
+  // Byte-identity alone is compatible with a row that quietly rendered nothing: an empty
+  // capture deep-equals an empty render forever. These three rows say WHAT each capture
+  // contains, so a maximal row that stopped painting its blocks is a failure rather than a
+  // pass. They read the COMMITTED baseline strings, not a fresh render — the claim being
+  // pinned is about what was captured.
+
+  it("MAXIMAL_RUNNING captured the verdict mark, the seal, the ring, its arc and the run line", () => {
+    const html = CARD_HTML_BASELINE.MAXIMAL_RUNNING
+    for (const testId of [
+      VERDICT_TEST_ID,
+      SEAL_TEST_ID,
+      RING_TEST_ID,
+      ARC_TEST_ID,
+      RUN_LINE_TEST_ID,
+    ]) {
+      expect(html).toContain(`data-testid="${testId}"`)
+    }
+    // …and NOT the pause chip: `running` is not the reading that waits for a person.
+    expect(html).not.toContain(`data-testid="${PAUSE_CHIP_TEST_ID}"`)
+  })
+
+  it("MAXIMAL_WAITING captured the pause chip — the one reading that renders it", () => {
+    expect(CARD_HTML_BASELINE.MAXIMAL_WAITING).toContain(
+      `data-testid="${PAUSE_CHIP_TEST_ID}"`,
+    )
+  })
+
+  it("MINIMAL_BUILDER captured NONE of the six — the Builder paints no run or governance mark", () => {
+    const html = CARD_HTML_BASELINE.MINIMAL_BUILDER
+    for (const testId of [
+      VERDICT_TEST_ID,
+      SEAL_TEST_ID,
+      RING_TEST_ID,
+      ARC_TEST_ID,
+      RUN_LINE_TEST_ID,
+      PAUSE_CHIP_TEST_ID,
+    ]) {
+      expect(html).not.toContain(`data-testid="${testId}"`)
+    }
+    // POSITIVE CONTROL for the six negatives above: the minimal row is not empty — it
+    // really rendered a card, so "contains none of the six" is a statement about the
+    // Builder's card and not about a render that failed.
+    expect(html).toContain(`data-testid="canvas-node-summarize"`)
+  })
+})
