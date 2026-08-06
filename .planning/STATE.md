@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio — 🚧 ACTIVE
 status: executing
-last_updated: "2026-08-06T22:50:00.000Z"
-last_activity: 2026-08-07 -- Phase 188.2 plan 03 complete (the pre-move card capture, taken on the UNMOVED tree)
+last_updated: "2026-08-06T23:05:00.000Z"
+last_activity: 2026-08-07 -- Phase 188.2 plan 04 complete (the two camelCase leaves, both moved verbatim with an EMPTY span diff)
 progress:
   total_phases: 21
   completed_phases: 9
   total_plans: 126
-  completed_plans: 121
+  completed_plans: 122
   percent: 43
 ---
 
@@ -66,7 +66,44 @@ Phase: 188.2 (phasenodecard-extraction-refactor-pay-down-the-g-5-debt-on-p) — 
 Plan 188.2-01 COMPLETE (`471104d4` · `28f7ee64` · `8cb82a6b`; summary `188.2-01-SUMMARY.md`).
 Plan 188.2-02 COMPLETE (`7f77af44` · `fe3de624` · `30c2e66f`; summary `188.2-02-SUMMARY.md`).
 Plan 188.2-03 COMPLETE (`99a383c7` · `1fc193b4` · `b1942579`; summary `188.2-03-SUMMARY.md`).
-Next: plan 188.2-04. 11 decisions in `188.2-CONTEXT.md` (`8cbbb2d3`).
+Plan 188.2-04 COMPLETE (`82dd29a7` · `155b3832`; summary `188.2-04-SUMMARY.md`).
+Next: plan 188.2-05. 11 decisions in `188.2-CONTEXT.md` (`8cbbb2d3`).
+
+**188.2-04 — the two camelCase leaves exist, and both moves are EMPTY-DIFF verbatim.**
+`phaseNodeCardContract.ts` (**214 L**) holds `PhaseNodeCard.tsx:139-285` — 6 exported type names,
+**0** runtime exports, 5 `import type` statements, 0 value imports; it is the directory's FIRST
+types-only module (measured: all 11 camelCase leaves export ≥ 1 runtime value). `ownProperty.ts`
+(**86 L**) holds `:289-310` with **ZERO imports** — un-cyclable by construction — and its four body
+lines diff EMPTY against the card's, the only declaration change being the `export` keyword.
+**ADDITIVE: `PhaseNodeCard.tsx` (797 L), `PhaseNode.tsx` and `runVocabulary.ts` are byte-unchanged
+at both commits**, and Plan 03's five baseline literals were not re-captured. Gates: vitest
+**124/124 unchanged** (this plan adds no test), `tsc` **33** / 0 in `src/components/workflows/`,
+eslint **5/0**, `count gate OK` **failed 0** (total **2502**, pin untouched).
+
+- **The subtree fence's REACH into each new file was proven, not assumed** (deviation Rule 2 — the
+  plan asked for no such proof). `import.meta.glob` contributes the empty string for an unmatched
+  path *in silence*, so listing a path and reading it are different claims. One violation planted
+  inside each new file, the named guard observed RED — N5 `@xyflow` in `phaseNodeCardContract.ts`,
+  N10 `dangerouslySetInnerHTML=` in `ownProperty.ts` — then reverted from byte-copy backups.
+  **These are the first 2 of the 5 destination paths to resolve to a real file.**
+- **D-05 recorded IN PLACE rather than deleted:** the superseded *"two small private copies"*
+  paragraph is quoted, and what changed is named as arithmetic — 188.2 splits the card's two sinks
+  across two destination modules, so two copies would have become three. `runVocabulary.ts:84-88`
+  keeps its differently-signed private copy, its four call sites and its fences, untouched.
+- **⚠ Deviation Rule 1 — the plan's literal STATE-OF-THE-EXTRACTION wording would have shipped a
+  FALSE docblock.** It instructs both headers to say the code "were CUT out … it is a HARD CUT",
+  but this plan is ADDITIVE BY DESIGN and the card still declares every moved item. Both headers
+  state the additive position in bold and attribute the hard cut to `188.2-06` as its contract.
+- **⚠ THREE inherited claims measured FALSE (16 of 19 held).** (1) `grep -c "import type"` reads
+  **6**, not 5 — five statements plus the header sentence explaining them; `^import type` is 5.
+  (2) The WR-04 falsifications are at `PhaseNodeCard.test.tsx:2214-2288`, **not `:2000-2063`** —
+  the plan's figure was measured against the pre-188.2-01 file, which was 2063 lines TOTAL.
+  (3) The sentence that goes stale in `nodePresentation.ts` is at **`:144-145`**, not `:145-146`.
+- **OWED TO PLAN 06:** `nodePresentation.ts:144-145` still reads *"`PhaseNodeCard.NodeVerdictMark`
+  is an alias of this type, kept so every existing caller's name still resolves."* It is still true
+  at this commit (the card also still declares the alias) and goes false only at the cut. Plan 06
+  owns the one-line correction to `phaseNodeCardContract.NodeVerdictMark`. **Not edited here** —
+  outside this plan's `files_modified`, and D-01 forbids folding a correction into a move commit.
 
 **188.2-03 — the pre-move capture exists, and it provably PREDATES the cut.** `ls` on all five
 destination modules answers *No such file or directory* at every commit in this plan, and
