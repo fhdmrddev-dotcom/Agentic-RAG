@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio — 🚧 ACTIVE
 status: executing
-last_updated: "2026-08-06T19:10:00.000Z"
-last_activity: 2026-08-06 -- Phase 188.1 EXECUTED 5/5 plans; operator board 3/3 DRIVEN (0 blocked, 0 pending); G-5 ledger flipped to satisfied; F-3 duplicate run-status band fixed
+last_updated: "2026-08-06T21:15:00.000Z"
+last_activity: 2026-08-06 -- Phase 188.1 CLOSED (verified 6/6, SECURED 18/18, validated 16/16); Phase 184.1 retro-validated nyquist_compliant (2 prose-only decisions now asserted); next = Phase 189, which OWES a PhaseNodeCard.tsx G-5 refactor recommendation as its FIRST discuss-phase option
 progress:
   total_phases: 20
   completed_phases: 8
@@ -22,7 +22,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-20 — Phase 163 THE ATOMIC CRUX complete; membership RLS enforced)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 188.1 — WorkflowCanvas extraction refactor (code + UAT COMPLETE; next `/gsd:secure-phase 188.1`)
+**Current focus:** Phase 189 — Governed External-Action Node Model (CONN-01), NOT STARTED. 188.1 is CLOSED (verified 6/6 · SECURED 18/18 · validated 16/16). Next: `/gsd:discuss-phase 189` — which owes a `PhaseNodeCard.tsx` G-5 refactor recommendation as its FIRST option.
 
 ## Deferred Items
 
@@ -62,7 +62,37 @@ next picked up.
 
 ## Current Position
 
-Phase: 188.1 (WorkflowCanvas extraction refactor — INSERTED 2026-08-05) — **EXECUTING, plan 4 of 5 done**
+Phase: **189 — Governed External-Action Node Model (CONN-01) — NOT STARTED.** Next command:
+`/gsd:discuss-phase 189`.
+
+**⚑ 189 OWES A G-5 REFACTOR RECOMMENDATION AS ITS FIRST DISCUSS-PHASE OPTION.** `PhaseNodeCard.tsx`
+was hardened to `G-5 fires — extraction due` by operator direction at the 188.1-05 checkpoint
+(measured 7 plans / 4 phases, 478 → 797 L, +67 %). Per G-5 a dedicated refactor phase on that file
+is due BEFORE the next feature phase that touches it, and 189 adds a node type — which lands on it.
+Two invariants must be read before any new mark is proposed: **a third badge is a typecheck error**,
+and **no focusable control may live inside the card** (the ✕ and ＋ live on the lane).
+
+**⚑ 188.1 IS CLOSED — 2026-08-06.** 5/5 plans · verification PASSED 6/6 (`91c37b5c`) · **SECURED
+18/18** (`c2a5571f`) · validated 16/16 `nyquist_compliant` (`29c344b2`) · operator board 3/3 DRIVEN
+(0 blocked, 0 pending). This heading previously read *"EXECUTING, plan 4 of 5 done"* and the focus
+line still routed to `/gsd:secure-phase 188.1` — **both were stale for a full day and did misroute a
+session on 2026-08-06.** Corrected against the commit trail, not against this file. The standing
+lesson (`feedback_dont_echo_canned_routing_blocks`): read the commits before emitting any `▶` route.
+
+**⚑ 184.1 RETRO-VALIDATED — 2026-08-06** (`9cb702ef` tests, `b69bbc06` docs). The phase shipped
+2026-07-28 with no VALIDATION.md; State-B reconstruction found **11 requirements, 9 covered, 2
+gaps, 0 escalated → `nyquist_compliant: true`.** Both gaps were the same class and it is worth
+carrying: **a decision written into `must_haves.truths` is believed by every later reader and
+asserted by nothing** — D-184.1-03 (the merged header on the Spine view) and D-184.1-04's
+non-breach half (the fetching `useEffectiveFeatures()` has exactly ONE non-test call site, the
+claim that makes three gate call sites legal under D-183-03). Writing the Spine pin found that
+**Spine is already the default landing view** (D-183-02), so three pre-existing flag-on cases had
+been covering it only incidentally — falsifying the gate reded 4 tests, not 1. Count-gate pin
+extended 27 → 32, `BASELINE_TOTAL` 2477 → **2482**, read from the gate's own `actual` column across
+two agreeing runs. The SUMMARY's owed follow-up ("header.test.tsx sits outside the gate's blast
+radius") was re-measured and is **already closed** by 188-12 — do not re-file it.
+
+Prior 188.1 execution record follows.
 
 **⚑ 188.1-04 LANDED 2026-08-06 — THE BOUNDED HARDENING PASS (SC#6)** (`358a4c34` / `b018b20b` /
 `d17151bd` / `23046860`). Wave 4: the five WR-04 prototype-key lookups + WR-07's
