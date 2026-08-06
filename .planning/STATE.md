@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio — 🚧 ACTIVE
 status: executing
-last_updated: "2026-08-06T19:16:39.528Z"
-last_activity: 2026-08-06 -- Phase 188.2 planning complete
+last_updated: "2026-08-06T21:16:16.678Z"
+last_activity: 2026-08-07 -- Phase 188.2 plan 01 complete (source fences re-scoped before the cut)
 progress:
   total_phases: 21
   completed_phases: 9
   total_plans: 126
-  completed_plans: 118
+  completed_plans: 119
   percent: 43
 ---
 
@@ -22,7 +22,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-20 — Phase 163 THE ATOMIC CRUX complete; membership RLS enforced)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase **188.2 (INSERTED)** — PhaseNodeCard extraction refactor, NOT PLANNED. Inserted 2026-08-06 because G-5 fires on `PhaseNodeCard.tsx` (measured 797 L / 4 phases) and Phase 189 adds a node type to it; 189's CONTEXT is locked and 189 now waits behind this. 188.1 is CLOSED (verified 6/6 · SECURED 18/18 · validated 16/16). **CONTEXT LOCKED 2026-08-06** (`8cbbb2d3`) — 11 decisions. **PLANNED 2026-08-06 — 7 plans in 6 waves** (`b5b4259f`, revised `71e2bd52`); research + patterns + validation strategy all committed; plan-checker PASSED at iteration 2 (0 blockers). **The pipeline measured 10 upstream claims FALSE** — 7 CONTEXT figures (M1–M7), 3 in RESEARCH/PATTERNS — plus one landmine CONTEXT never named (`:1776`). Two contracts, disjoint evidence: prove the card UNCHANGED, prove the affordance FIXED. Next: `/gsd:execute-phase 188.2`.
+**Current focus:** Phase 188.2 — phasenodecard-extraction-refactor-pay-down-the-g-5-debt-on-p
 
 ## Deferred Items
 
@@ -62,8 +62,33 @@ next picked up.
 
 ## Current Position
 
-Phase: **188.2 (INSERTED) — PhaseNodeCard extraction refactor — CONTEXT LOCKED, NOT PLANNED.**
-Next command: `/gsd:plan-phase 188.2`. 11 decisions in `188.2-CONTEXT.md` (`8cbbb2d3`).
+Phase: 188.2 (phasenodecard-extraction-refactor-pay-down-the-g-5-debt-on-p) — EXECUTING
+Plan 188.2-01 COMPLETE (`471104d4` · `28f7ee64` · `8cb82a6b`; summary `188.2-01-SUMMARY.md`).
+Next: plan 188.2-02. 11 decisions in `188.2-CONTEXT.md` (`8cbbb2d3`).
+
+**188.2-01 — the fences are in place BEFORE the cut.** `cardSubtreeSource` names all five
+destination modules while none of them exists; all **17** negative fences + **4** haystacks
+re-pointed and **green against a completely unchanged production tree** (0 production files
+touched). Gates at close: vitest `112 passed (112)` (107 → 112), `tsc -p tsconfig.app.json` **33**
+with 0 in `src/components/workflows/`, eslint **5 errors / 0 warnings**, `count gate OK` (+5, an
+increase over a pin is legal — the pin move is Plan 07's).
+
+- **D-09's third-badge typecheck invariant is asserted for the first time in this repo** and was
+  observed RED at exactly **34** (`TS2578: Unused '@ts-expect-error' directive`) against a widened
+  `readonly BadgeSlot[]`, back to **33** on revert. Measured first: `BadgeSlot2Tuple` had ZERO
+  callers and `@ts-expect-error` occurred **0 times** in the whole workflows directory.
+- **The SUBSTITUTION asymmetry is now observed, not argued.** Swapping one destination path for
+  another real file keeps `toHaveLength(6)` green AND keeps all six move-invariant `toContain`s
+  green — only the individual-name loop fires. A length pin catches truncation, never substitution.
+- **Owed to later plans, each annotated inline in the test file:** C-5 + C-2/N10 RED plants →
+  Plan 05; the one-direction fence's `import` assertions → Plan 06; the count-gate pin move
+  (`PhaseNodeCard.test.tsx` 107 → 112, total 2482 → 2487) → Plan 07.
+- **Two inherited claims measured FALSE** (12 of 14 held): `const RING_RADIUS` is at
+  `PhaseNodeCard.tsx:315`, not `:313`; and `grep -n phaseNodeCardSource` returns **3** code lines
+  after Task 2, not 4 — P6's two operands share one line. No fence was missed.
+- **⚠ Watch item:** the count gate reported a **non-reproducible `failed 1`** on its first run
+  after Task 3, naming no test. All 12 TARGETS were then executed (2487 tests, 0 failures) and the
+  gate re-run clean. A flake outside this plan's file — if it recurs in 188.2-02..07 it needs naming.
 
 **⛑ THE PHASE HAS TWO CONTRACTS, and D-10 says state them up front rather than discover the
 exception at verification:** `PhaseNodeCard.tsx` + its four new modules **prove UNCHANGED**;
@@ -1582,7 +1607,7 @@ existing `updated_at` column, and the new `blocked_stage` is free-form metadata 
 already-registered `publish_blocked` event type (unlike 185-13's `action_risk_pending`).
 
 *(Historical, superseded — the 185 execution detail below was accurate when written:)*
-Plan: 1 of 13
+Plan: 1 of 7
 (Summaries on disk: 01, 02, 03, 04, 05, 06, 07, 08, 09, 10, 11, 12.)
 
 **⚑ WAVE 7 / PLAN 185-12 LANDED (2026-07-30) — BUG-260730-01 IS CLOSED IN CODE, AND IT WAS A
@@ -2168,7 +2193,7 @@ the U-5 accessibility-tree + real-key-press pass, operator confirmed each checkp
 
 **Re-verification 2026-07-26 (`096a9e58`): `gaps_found` → `human_needed`, 4/4 must-haves verified.** The SC#3 blocker is closed for real (verifier read `WorkflowCanvas.tsx` directly, did not trust the SUMMARY). **Nothing code-side blocks the phase; the only thing between 183 and `passed` is operator-driven live UAT** — the four G-4 rows **U-1…U-4** plus a real-screen-reader pass on the newly-added keyboard path, persisted as `183-HUMAN-UAT.md` (5 items, all pending). `visual_workflow_canvas` cold-defaults to `"off"` — flip it **On in the Control Room first**; U-4 flips it back. **New Warning-level debt from the scoped gap-closure review `183-REVIEW-08.md` (0 Critical / 4 Warning / 4 Info), independently re-derived by the verifier and NOT auto-folded:** **WR-08-01** no `event.repeat` guard — a held Enter rapid-toggles the panel and can settle CLOSED, contradicting the ARIA promise (the new test can't see it: synthetic `fireEvent.keyDown` never sets `repeat`); **WR-08-02** the grounding/tier agreement docblock overclaims — three gate-carrying configs still disagree and the new pin (`deriveTier(policy, new Set())`) is scoped to hide them, so WR-01's contradiction stays reachable; **WR-08-03** `ARIA_LABELS` is untyped so a library key rename silently reverts WR-06 with a green build; **WR-08-04** the end cap + unresolved-skip stub — the two nodes the CR-01 guard keeps inert — still announce "Press enter or space to open this step's details". **Operator decision owed:** fold these into a `183-09` gap plan, or accept as debt alongside WR-02/03/04 and carry into Phase 184. Orchestrator note: `state.advance-plan` bumped `completed_phases` 2→3 in `1b9fad84`, falsely marking 183 complete — reverted in `b6ae96f7`.
 
-Status: Ready to execute
+Status: Executing Phase 188.2
 
 **Phase 184 — ALL 13 PLANS EXECUTED 2026-07-27** (`184-13-SUMMARY.md`, commits `dfee9500` / `e72b561e` / `42bd7533` / `728fc564`). The final plan mounted the problems tray, put undo/redo + the honest save state on the canvas in one bottom region with the tray's summary (R12: one region, two rows, at 900 px), and landed D-184-04's four key bindings behind a single gated window listener that yields to text fields. Count gate exit 0 at **1037 tests / 0 failing**, `tsc` differential held at **33**, `npx vite build` exit 0, canvas snapshot byte-unchanged, `revertByteIdentical.test.tsx` green at 7. **Phase-wide: zero `backend/` files and zero `supabase/migrations` files changed** — slot 114 stays RESERVED. **All 5 REQ-IDs (CANVAS-02/03/04, VALID-02/03) remain Pending — REQUIREMENTS.md is deliberately untouched and the orchestrator marks them at phase end after live verification.** Orchestrator note: `state.advance-plan` again bumped `completed_phases` 3→4, falsely marking 184 complete before verification — **reverted here**, exactly as it was for 183 in `b6ae96f7`. Owed to `/gsd:verify-work`: regenerate `__fixtures__/corpusDump.json` (184-05) and the live five-surface icon sweep (184-01), both needing Docker up; plus R12's visual half at 900 px and the two-save-entry-points read (184-13 Deviation 3).
 
@@ -2176,7 +2201,7 @@ Status: Ready to execute
 
 **G-2 sketch gate for Phase 183: SATISFIED (2026-07-25).** Sketches 134-137 committed (`01bb4c64`, `7b74d2b5`, `01d50bba`, `86f866c5`, `e35c7489`). Winners: **136-B** (horizontal left->right flow) + **137-D** (frosted-glass step cards, 3D icon floating at the left edge, plain language with technical names behind the Alt reveal, Alive-by-default motion). Locked rules the canvas phases inherit: **colour budget** (step-type colour is a tint behind the icon only — the strong colours belong to Phase 188 run status) and **motion keys off run state, never selection**. New reusable asset `.planning/sketches/themes/phase-icons-3d.js` (verified 3D fluent-emoji marks; NEVER text glyphs). Icon choices: `llm_agent` -> `compass`; `llm_batch_agents` gets a lighter icon well in-scope, with the cross-cutting `handshake` swap left open. **Two findings that must reach the 183 plan: (1) `skip_to_phase` is used ZERO times in all 95 live definitions — SC#1's branch edge needs a fixture; (2) 40 of 95 definitions have zero phases — the empty projection is the most common canvas state.**
 
-Last activity: 2026-08-06 -- Phase 188.2 planning complete
+Last activity: 2026-08-06 -- Phase 188.2 execution started
 
 ### Quick Tasks Completed
 
