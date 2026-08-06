@@ -634,14 +634,50 @@ describe("PhaseNodeCard 188.2 — the extracted modules cannot import back (SC#3
     }
   })
 
-  it("the cut has ONE direction — the card declares none of the three components", () => {
-    // The other half of "no cycle": without it, the negatives above are also satisfied by five
-    // modules nobody uses. GREEN BY VACUITY TODAY — all three functions still live in the card
-    // under their pre-cut names, so none of these strings is present yet. `188.2-06` is where
-    // this becomes meaningful, by adding the matching `import` assertions once they exist.
+  it("the cut has ONE direction — the card IMPORTS the three modules and declares none", () => {
+    // ⚠ 188.2-06 IS WHAT MADE THIS FENCE MEAN ANYTHING. `188.2-01` authored the three
+    // negatives at the foot of this block while all three functions still lived INSIDE the
+    // card under their pre-cut names — so every one of them was GREEN BY VACUITY, and it said
+    // so inline. Three negatives about three modules nobody imports are satisfied just as
+    // happily by three dead files. The edge has to EXIST and it has to point ONE WAY: the
+    // fence above proves nothing points back, and these four assertions prove something
+    // points forward. Same shape as `WorkflowCanvas.test.tsx`'s one-direction half, which is
+    // where 188.1 proved it.
+    expect(phaseNodeCardSource).toMatch(
+      /import \{ NodeCornerMarks \} from ["']@\/components\/workflows\/NodeCornerMarks["']/,
+    )
+    expect(phaseNodeCardSource).toMatch(
+      /import \{ NodeIconWell \} from ["']@\/components\/workflows\/NodeIconWell["']/,
+    )
+    expect(phaseNodeCardSource).toMatch(
+      /import \{ NodeRunOverlay \} from ["']@\/components\/workflows\/NodeRunOverlay["']/,
+    )
+    // …and the slot contract comes BACK from its own leaf rather than being re-declared here,
+    // which is the fourth edge of the same cut.
+    expect(phaseNodeCardSource).toMatch(
+      /import type \{ PhaseNodeCardProps \} from ["']@\/components\/workflows\/phaseNodeCardContract["']/,
+    )
+
     expect(phaseNodeCardSource).not.toContain("function NodeRunOverlay(")
     expect(phaseNodeCardSource).not.toContain("function NodeCornerMarks(")
     expect(phaseNodeCardSource).not.toContain("function NodeIconWell(")
+
+    // NO RE-EXPORT SHIM (D-06) — the other half `WorkflowCanvas.test.tsx` ships, adapted. A
+    // re-export that exists so nobody has to change two lines is a SECOND NAME for the same
+    // type, free to be the one Phase 189 imports by accident; it would quietly preserve the
+    // coupling this phase exists to remove while every other assertion here stayed green. The
+    // needle is the FORM rather than any one type name, so a shim for a slot nobody has
+    // thought of yet is caught too.
+    expect(phaseNodeCardSource).not.toMatch(/export\s+\*\s+from/)
+    expect(phaseNodeCardSource).not.toMatch(/export\s+(type\s+)?\{[^}]*\}\s*from/)
+    // POSITIVE CONTROLS for both forms, inline, so neither negative can be vacuous.
+    expect('export * from "./phaseNodeCardContract"').toMatch(/export\s+\*\s+from/)
+    for (const shim of [
+      'export type { BadgeSlots } from "./phaseNodeCardContract"',
+      'export { type BadgeSlot } from "./phaseNodeCardContract"',
+    ]) {
+      expect(shim).toMatch(/export\s+(type\s+)?\{[^}]*\}\s*from/)
+    }
   })
 })
 
