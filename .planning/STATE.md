@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio — 🚧 ACTIVE
 status: executing
-last_updated: "2026-08-06T17:27:00.042Z"
+last_updated: "2026-08-06T17:46:23.851Z"
 last_activity: 2026-08-05 -- Phase 188.1 planning complete
 progress:
-  total_phases: 20
+  total_phases: 21
   completed_phases: 9
   total_plans: 119
   completed_plans: 118
-  percent: 45
+  percent: 43
 ---
 
 # Project State
@@ -22,7 +22,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-20 — Phase 163 THE ATOMIC CRUX complete; membership RLS enforced)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 189 — Governed External-Action Node Model (CONN-01), NOT STARTED. 188.1 is CLOSED (verified 6/6 · SECURED 18/18 · validated 16/16). Next: `/gsd:discuss-phase 189` — which owes a `PhaseNodeCard.tsx` G-5 refactor recommendation as its FIRST option.
+**Current focus:** Phase **188.2 (INSERTED)** — PhaseNodeCard extraction refactor, NOT PLANNED. Inserted 2026-08-06 because G-5 fires on `PhaseNodeCard.tsx` (measured 797 L / 4 phases) and Phase 189 adds a node type to it; 189's CONTEXT is locked and 189 now waits behind this. 188.1 is CLOSED (verified 6/6 · SECURED 18/18 · validated 16/16). **CONTEXT LOCKED 2026-08-06** (`8cbbb2d3`) — 11 decisions. Next: `/gsd:plan-phase 188.2`.
 
 ## Deferred Items
 
@@ -50,7 +50,7 @@ someone remembering.
 
 | # | Item | Why it is binding |
 |---|---|---|
-| **1** | **`PhaseNodeCard.tsx` G-5 refactor recommendation, as the FIRST option** — not the planned external-action-node feature | The CLAUDE.md hot-file ledger row was hardened from *THRESHOLD CROSSED* to **G-5 FIRES** by explicit operator direction at the 188.1-05 checkpoint: **797 L, 7 plans across 4 phases, +67 % growth**. Per G-5 a dedicated refactor phase on this file is due BEFORE the next feature phase that touches it, and 189 places a governed external-action node on the canvas. |
+| **1** | ~~**`PhaseNodeCard.tsx` G-5 refactor recommendation, as the FIRST option**~~ — **DISCHARGED 2026-08-06: the discuss ran, the operator chose the refactor, and it is now inserted as Phase 188.2.** 189 does not re-litigate this; it simply waits behind 188.2 | The CLAUDE.md hot-file ledger row was hardened from *THRESHOLD CROSSED* to **G-5 FIRES** by explicit operator direction at the 188.1-05 checkpoint: **797 L, 7 plans across 4 phases, +67 % growth**. Per G-5 a dedicated refactor phase on this file is due BEFORE the next feature phase that touches it, and 189 places a governed external-action node on the canvas. |
 | **2** | **[[SEED-133]] / `T-187-SEED-133`** — the NL-seed grounding-degradation gap | `accept`ed at the `/gsd:secure-phase 187` gate on 2026-08-06 **with a phase-bound trigger naming 189**. Its previous trigger (*"when Phase 187 is scoped"*) fired silently and was caught months later by `/gsd:audit-milestone`. Mechanical check: while `grep -c degraded backend/app/services/workflow_authoring.py` returns **0**, the defect is live. |
 
 **Also owed, not blocking 189:** **UAT-13 / M6** — the SC#6 LIVE row (an armed action-risk checkpoint
@@ -62,15 +62,42 @@ next picked up.
 
 ## Current Position
 
-Phase: **189 — Governed External-Action Node Model (CONN-01) — NOT STARTED.** Next command:
-`/gsd:discuss-phase 189`.
+Phase: **188.2 (INSERTED) — PhaseNodeCard extraction refactor — CONTEXT LOCKED, NOT PLANNED.**
+Next command: `/gsd:plan-phase 188.2`. 11 decisions in `188.2-CONTEXT.md` (`8cbbb2d3`).
 
-**⚑ 189 OWES A G-5 REFACTOR RECOMMENDATION AS ITS FIRST DISCUSS-PHASE OPTION.** `PhaseNodeCard.tsx`
-was hardened to `G-5 fires — extraction due` by operator direction at the 188.1-05 checkpoint
-(measured 7 plans / 4 phases, 478 → 797 L, +67 %). Per G-5 a dedicated refactor phase on that file
-is due BEFORE the next feature phase that touches it, and 189 adds a node type — which lands on it.
-Two invariants must be read before any new mark is proposed: **a third badge is a typecheck error**,
-and **no focusable control may live inside the card** (the ✕ and ＋ live on the lane).
+**⛑ THE PHASE HAS TWO CONTRACTS, and D-10 says state them up front rather than discover the
+exception at verification:** `PhaseNodeCard.tsx` + its four new modules **prove UNCHANGED**;
+`PlaneEditingLayer` stacking (`BUG-260806-01`) **proves FIXED**.
+
+**Three measurements taken at discuss time reshaped the phase — re-derive them at plan time:**
+- `PhaseNodeCard.tsx` is **797 L but only 249 lines of CODE** — **62.5 % is prose**. G-5 fired on a
+  line count that is two-thirds comment. Hence D-03: the acceptance bar is a **body-line target
+  carried with BOTH totals**, not 188.1's "measurably smaller".
+- **`PhaseNodeCard.test.tsx:1745` pins PROSE** — the clipping utility must appear in the card's
+  source **exactly once**, and that one mention sits at `PhaseNodeCard.tsx:772` inside the 3D-mark
+  block the extraction moves. A naive cut takes it to **0 and RED** (D-08 re-anchors it to the subtree).
+- **"A third badge is a typecheck error" is asserted NOWHERE** — the two-badge block tests 0/1/2
+  badges *rendering*; no `@ts-expect-error`, no `BadgeSlot2Tuple` reference. Widening `BadgeSlots`
+  during the move would leave every test green (D-09 pins it in Wave 0, RED first).
+
+**Badge slot 1 stays empty — reserved for 189 (D-12); 188.2 must not spend it.** The other shipped
+invariant, **no focusable control inside the card**, must survive the move too.
+
+**⚑ 189 IS BLOCKED BEHIND 188.2 — the G-5 gate is now a phase, not a reminder.** 189's CONTEXT is
+locked (13 decisions, `b1c987ab`) and it is otherwise ready, but `PhaseNodeCard.tsx` was hardened to
+`G-5 fires — extraction due` by operator direction at the 188.1-05 checkpoint (measured 7 plans /
+4 phases, 478 → 797 L, +67 %), and 189 adds a node type — which lands on that file. The operator
+chose the prescribed route at `/gsd:discuss-phase 189`: a dedicated behaviour-preserving refactor
+ships FIRST. **Inserted 2026-08-06 as Phase 188.2**, in the 188.1 shape (verbatim extraction,
+measured, zero user-visible change, lean prove-unchanged UAT). **The discuss deliberately ran BEFORE
+the refactor** — a blind extraction is the one that gets re-opened; 188.2 now knows the seams 189
+needs (a 7th `phase_type`'s face, a conditional badge in slot 1, a capability-derived subtitle),
+recorded in `189-CONTEXT.md`'s `<gate>` block.
+
+Two invariants must be read before any new mark is proposed, and both must survive the extraction:
+**a third badge is a typecheck error**, and **no focusable control may live inside the card** (the ✕
+and ＋ live on the lane). **Badge slot 1 stays empty — it is reserved for 189 (D-12); 188.2 must not
+spend it.** `BUG-260806-01` is folded into 188.2 (`status: folded`), not 189.
 
 **⚑ 188.1 IS CLOSED — 2026-08-06.** 5/5 plans · verification PASSED 6/6 (`91c37b5c`) · **SECURED
 18/18** (`c2a5571f`) · validated 16/16 `nyquist_compliant` (`29c344b2`) · operator board 3/3 DRIVEN
@@ -1523,7 +1550,7 @@ Manual-Only rows still unrun, row 4 still ⛔, `.planning/REQUIREMENTS.md` unmod
 and `CONCUR-02` stay **Pending** until the operator runs the board. **Phase 186 is now ready for
 `/gsd:verify-work 186`, with SC#4 the only thing no automated evidence can close.**
 
-Resume file: .planning/phases/189-governed-external-action-node-model/189-CONTEXT.md
+Resume file: .planning/phases/188.2-phasenodecard-extraction-refactor-pay-down-the-g-5-debt-on-p/188.2-CONTEXT.md
 
 Both owed items are now ROUTED at the discuss-phase touchpoint:
 
@@ -2548,6 +2575,7 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 
 - Phase 123.1 inserted after Phase 123: Trigger Tuner design fidelity + UX polish (post-live-UAT gaps) (URGENT)
 - Phase 188.1 inserted after Phase 188: WorkflowCanvas extraction refactor — G-5 debt owed from Phase 188 (PlaneEditingLayer + EDIT_AFFORDANCE lift); inserted before 189 places a node type on the canvas (URGENT)
+- Phase 188.2 inserted after Phase 188: G-5 refactor on PhaseNodeCard.tsx (797 L / 4 phases) before Phase 189 adds a node type; folds BUG-260806-01 (URGENT)
 
 ## Performance Metrics
 
