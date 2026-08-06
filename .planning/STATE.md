@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio — 🚧 ACTIVE
 status: executing
-last_updated: "2026-08-06T01:35:00.000Z"
-last_activity: 2026-08-06 -- Phase 188.1 Plan 04 executed (WR-04/WR-07 hardening — 6 falsifications RED first, 7 lookups closed)
+last_updated: "2026-08-06T19:10:00.000Z"
+last_activity: 2026-08-06 -- Phase 188.1 EXECUTED 5/5 plans; operator board 3/3 DRIVEN (0 blocked, 0 pending); G-5 ledger flipped to satisfied; F-3 duplicate run-status band fixed
 progress:
   total_phases: 20
   completed_phases: 8
   total_plans: 119
-  completed_plans: 117
+  completed_plans: 119
   percent: 40
 ---
 
@@ -22,7 +22,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-20 — Phase 163 THE ATOMIC CRUX complete; membership RLS enforced)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 188 — non-technical-run-observability
+**Current focus:** Phase 188.1 — WorkflowCanvas extraction refactor (code + UAT COMPLETE; next `/gsd:secure-phase 188.1`)
 
 ## Deferred Items
 
