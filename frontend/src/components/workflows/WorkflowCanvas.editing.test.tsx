@@ -54,6 +54,11 @@ import type { CanvasNode } from "./canvasModel"
 import type { CanvasNotice } from "./WorkflowCanvas"
 import { STRANDING_REASON, type PhaseTypeId } from "./definitionOps"
 import { VERDICT_DESTRUCTIVE_TOKEN, VERDICT_MARK } from "./nodePresentation"
+// Plan 188.2-02 (D-11), on their OWN line so this file's diff stays 0-deletion: the
+// affordance stacking tier and the library elevation it has to beat — IMPORTED, never
+// retyped, so lowering either constant turns the guard red instead of the guard agreeing
+// with whatever the source now says.
+import { AFFORDANCE_Z, SELECTED_NODE_Z_FROM_LIBRARY } from "./editAffordance"
 import { evalCoverage, unresolvableSkip } from "./__fixtures__/canvasFixtures"
 // Plan 186-07 (F12), on their OWN lines so this file's diff stays 0-deletion: the write
 // loop, the store it watches, the browser-local nudge module the gesture really writes to,
@@ -698,6 +703,82 @@ describe("WorkflowCanvas 184-12 — the ＋ / ✕ layer is on the plane, never i
     expect(classes).not.toContain("opacity-0")
     expect(classes).toContain("lg:opacity-0")
     expect(classes).toContain("[@media(hover:none)]:opacity-100")
+  })
+})
+
+// ── 12b. The affordances outrank a SELECTED card (188.2-02 · D-11 · BUG-260806-01) ──
+
+// WHY THIS BLOCK ASSERTS A RELATION AND NOT A HIT TEST, written out so nobody later
+// "improves" it into something that cannot work. jsdom applies no CSS, computes no
+// stacking contexts, and lays nothing out; `.click()` and `fireEvent.click()` dispatch
+// straight to the element and bypass hit-testing entirely. So NO UNIT TEST IN THIS ESTATE
+// CAN SEE OCCLUSION — this file included, and that is exactly why `BUG-260806-01` survived
+// from 184-12 until an operator found it by hand during 188.1's UAT with all 58 of these
+// tests green.
+//
+// The defect is therefore guarded BOTH ways, and neither half is sufficient alone:
+//
+//   · A DRIVEN `document.elementFromPoint` row with the card SELECTED — the only thing
+//     that can observe the real failure. It is owed to Board B and driven in Plan 07.
+//     But a driven row is a ONE-TIME PHOTOGRAPH: it says the pixel was right on the day
+//     somebody looked, and says nothing on any day after.
+//   · THIS BLOCK, which re-runs on every build. It cannot see the pixel, so instead it
+//     pins the three things the pixel depends on: the relation between our tier and the
+//     library's, the library's elevation still being what we think it is, and our tier
+//     actually reaching the DOM.
+//
+// D-11 requires BOTH NUMBERS NAMED AS LITERALS here rather than derived from each other.
+// A test that only asserted `AFFORDANCE_Z > SELECTED_NODE_Z_FROM_LIBRARY` would stay green
+// if both constants were edited together, which is the one edit most likely to happen.
+describe("WorkflowCanvas 188.2-02 — the ＋ / ✕ / picker outrank a selected card", () => {
+  it("AFFORDANCE_Z sits above the library's selected-node elevation, both numbers named", () => {
+    expect(AFFORDANCE_Z).toBeGreaterThan(SELECTED_NODE_Z_FROM_LIBRARY)
+    // Named, not derived — see the block header.
+    expect(AFFORDANCE_Z).toBe(1002)
+    expect(SELECTED_NODE_Z_FROM_LIBRARY).toBe(1000)
+  })
+
+  it("the LIBRARY still elevates a selected node to exactly that number", () => {
+    // THE POSITIVE CONTROL, against `@xyflow` changing its own constant on an upgrade.
+    // `SELECTED_NODE_Z` is declared in `@xyflow/system` and applied as an INLINE style by
+    // `@xyflow/react`, so it is readable off a really-rendered selected node — which is
+    // what this does, rather than reading a number out of `node_modules` (a form with no
+    // precedent anywhere in this repo). Measured before it was written: this wrapper
+    // reports `"1000"` and an unselected sibling reports `"0"`.
+    const { container } = renderCanvas(evalCoverage, { editable: true, selectedSlug: "fanout" })
+
+    const selected = container.querySelector<HTMLElement>('.react-flow__node[data-id="fanout"]')
+    expect(selected).not.toBeNull()
+    expect(selected!.style.zIndex).toBe(String(SELECTED_NODE_Z_FROM_LIBRARY))
+
+    // …and it is the SELECTION that elevates, not the renderer stamping 1000 on every
+    // node. Without this, the assertion above would still pass in a world where the
+    // mechanism recorded in `AFFORDANCE_Z`'s docblock was wrong.
+    const unselected = container.querySelector<HTMLElement>('.react-flow__node[data-id="split"]')
+    expect(unselected).not.toBeNull()
+    expect(unselected!.style.zIndex).toBe("0")
+  })
+
+  it("all THREE affordance groups carry that tier in the rendered DOM", () => {
+    // Without this, the two assertions above are two true statements about constants that
+    // never reach a single element. All three groups, because the report shows the ＋
+    // reachable only because no node beside one happened to be selected — a selected card
+    // occludes a nearby ＋ and the open picker by the identical mechanism.
+    const { container } = renderEditable(evalCoverage)
+    fireEvent.click(screen.getByTestId("canvas-insert-2"))
+
+    const groups = [
+      '[data-testid^="canvas-insert-"]',
+      '[data-testid^="canvas-remove-"]',
+      '[data-testid="canvas-insert-picker"]',
+    ]
+    for (const selector of groups) {
+      const els = Array.from(container.querySelectorAll<HTMLElement>(selector))
+      expect(els.length).toBeGreaterThan(0)
+      for (const el of els) {
+        expect(el.style.zIndex).toBe("1002")
+      }
+    }
   })
 })
 
