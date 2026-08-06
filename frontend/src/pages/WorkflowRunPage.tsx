@@ -908,10 +908,27 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
         </div>
       </header>
 
-      {/* 2. RUN BAND — exactly ONE line, truncating. The polite region carries the state
-             SENTENCE only; the ticking number lives in an aria-hidden sibling, because a
-             per-second announcement is a denial of service for a screen-reader user. */}
-      <div className="flex shrink-0 items-center gap-2 px-6 py-2 text-sm">
+      {/* 2. RUN BAND — the ANNOUNCEMENT channel, and only that. It carries the state
+             SENTENCE for assistive tech and is visually hidden, because the header above
+             already renders `band.sentence` (:888) and the same elapsed reading (:889-892)
+             to sighted users.
+
+             It used to be visible, and both this band and the header are `shrink-0` in a
+             flex column — so neither ever scrolled away and every run surface permanently
+             showed its status twice, one line under the other. Operator-reported 2026-08-06
+             against a completed run ("✓ Complete · Ran for 2m 18s" directly beneath "✓
+             Complete   Ran for 2m 18s — from when it was queued to its last update").
+
+             `sr-only` is the correct fix rather than deleting the node: the polite region is
+             what announces state CHANGES, and the header's copy is a plain child chosen
+             specifically so its per-second number is never announced. Removing this element
+             would silence the announcement; hiding it removes only the duplicate.
+
+             The previously-visible `· {elapsed.number}` sibling is gone with it — it was
+             `aria-hidden`, so inside an `sr-only` container it would have been markup no
+             one could reach. The header's `data-testid="run-elapsed"` remains the single
+             visible home for that number. */}
+      <div className="sr-only">
         <span
           aria-live="polite"
           aria-atomic="true"
@@ -920,11 +937,6 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
         >
           {band.sentence}
         </span>
-        {elapsed.number ? (
-          <span aria-hidden="true" className="shrink-0 text-xs text-muted-foreground">
-            · {elapsed.number}
-          </span>
-        ) : null}
       </div>
       {/* Fires once, on the run reaching a state the user must not miss. */}
       <div role="alert" className="sr-only" data-testid="run-alert">

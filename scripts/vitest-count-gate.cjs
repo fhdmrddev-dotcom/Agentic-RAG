@@ -373,7 +373,7 @@ const BASELINE = {
   //      what RUNS, `BASELINE` what is PINNED — so a suite written beside `api.ts` would
   //      never be executed by this gate. A falsification that does not run has falsified
   //      nothing (verification truth 14, round 5 of Phase 187). This file is inside both.
-  "WorkflowRunPage.test.tsx": 88,
+  "WorkflowRunPage.test.tsx": 89,
   // 188 code-review fix pass (CR-03): 39 → 41. An EXTENSION, not a lowering — nothing was
   // deleted. The two added cases are the receipt's own reason for existing: `finish_run`
   // NULLs `threads.active_workflow_run_id` in the same transaction as the terminal status,
@@ -457,7 +457,7 @@ const BASELINE = {
 // (PhaseNodeCard +2, PhaseTimeline +2, PhaseNode +1, WorkflowRunPage +1). Re-derived from
 // this script's own printed `total` across two agreeing runs, in the same commit as the
 // pins — which is the only thing that keeps a note nothing checks from going stale again.
-const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // ⚠ 2476 (188.1-04)
+const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // ⚠ 2477 (188.1-05 fast-fix)
 
 // ── The Wave-0 blast radius (184-VALIDATION.md § "quick run command"). ──
 const TARGETS = [

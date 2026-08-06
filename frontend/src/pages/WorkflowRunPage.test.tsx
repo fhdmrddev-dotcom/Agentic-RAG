@@ -699,9 +699,47 @@ describe("WorkflowRunPage — the polite region carries the sentence, not the cl
     expect(band.getAttribute("aria-atomic")).toBe("true")
     // The state sentence only — no digit-plus-unit anywhere in the announced content.
     expect(band.textContent ?? "").not.toMatch(/\d+\s*[smh]\b/)
-    // ...while the number IS on the surface, in an aria-hidden sibling.
-    const hidden = band.parentElement?.querySelector('[aria-hidden="true"]')
-    expect(hidden?.textContent ?? "").toMatch(/\d+\s*[smh]\b/)
+    // ...while the number IS still on the surface — in the HEADER, which is the single
+    // visible home for it since 2026-08-06. This assertion previously read the band's own
+    // aria-hidden sibling; that sibling was the second, duplicate rendering of the clock,
+    // and the band itself is now `sr-only`, so an aria-hidden child of it would have been
+    // reachable by nobody. The guarantee being kept is unchanged and is the point of this
+    // test: the clock must remain VISIBLE somewhere while never entering the polite region.
+    const visibleClock = screen.getByTestId("run-elapsed")
+    expect(visibleClock.textContent ?? "").toMatch(/\d+\s*[smh]\b/)
+    expect(band.contains(visibleClock)).toBe(false)
+  })
+
+  it("the status sentence is on screen exactly ONCE — the polite region must not duplicate it visually", async () => {
+    // REGRESSION GUARD for the operator-reported duplicate band (2026-08-06): the header
+    // and the polite region both rendered `band.sentence`, and both are `shrink-0`, so the
+    // run surface permanently showed its status twice. The sibling test above does NOT
+    // catch this — it passes whether or not the band is visible — so the guard has to
+    // count on-screen renderings rather than inspect the announcement.
+    getWorkflowRun.mockResolvedValue(mkRun({ status: "completed", claimed_at: CLAIMED }))
+    renderPage()
+    await screen.findByTestId("canvas-stub")
+
+    const sentence = (screen.getByTestId("run-band").textContent ?? "").trim()
+    expect(sentence.length).toBeGreaterThan(0)
+
+    const hiddenFromSight = (el: Element | null): boolean => {
+      let n: Element | null = el
+      while (n) {
+        if (n.classList?.contains("sr-only")) return true
+        n = n.parentElement
+      }
+      return false
+    }
+    // Leaf elements only — an ancestor's textContent includes its children's and would
+    // double-count the very thing being measured.
+    const carriers = [...document.body.querySelectorAll("*")].filter(
+      (el) => el.children.length === 0 && (el.textContent ?? "").trim() === sentence,
+    )
+    // POSITIVE CONTROL — the sentence really is in the DOM more than nowhere, so a zero
+    // here would mean the query is broken rather than the surface being clean.
+    expect(carriers.length).toBeGreaterThanOrEqual(1)
+    expect(carriers.filter((el) => !hiddenFromSight(el))).toHaveLength(1)
   })
 
   it("a failed run raises exactly one assertive notice", async () => {
