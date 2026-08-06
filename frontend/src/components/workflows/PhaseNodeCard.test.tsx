@@ -260,7 +260,7 @@ describe("PhaseNodeCard — ONE TAB STOP PER NODE (the leaf-level mirror)", () =
   it("registers no click handler on the card root (selection is the canvas's job)", () => {
     const { container } = renderCard()
     expect(container.querySelectorAll("[onclick]")).toHaveLength(0)
-    expect(phaseNodeCardSource).not.toMatch(/onClick=/)
+    expect(cardSubtreeSource).not.toMatch(/onClick=/)
   })
 })
 
@@ -413,11 +413,11 @@ describe("PhaseNodeCard — forward-compat on an unrecognised phase type", () =>
     // the card has exactly one legal way to read it. The property under guard is
     // unchanged and is asserted twice below — the card looks up no tint, and paints
     // only the resolved string it is handed.
-    expect(phaseNodeCardSource).not.toMatch(
+    expect(cardSubtreeSource).not.toMatch(
       /import[^;]*\b(ICON_TINT|DEFAULT_TINT)\b[^;]*from\s+["'][^"']*nodePresentation["']/,
     )
-    expect(phaseNodeCardSource).not.toMatch(/ICON_TINT\[/)
-    expect(phaseNodeCardSource).not.toMatch(/DEFAULT_TINT\s*[,)\]]/)
+    expect(cardSubtreeSource).not.toMatch(/ICON_TINT\[/)
+    expect(cardSubtreeSource).not.toMatch(/DEFAULT_TINT\s*[,)\]]/)
     // Positive controls: the ADAPTER is where all three forms live, so none of the
     // three regexes above can be silently vacuous.
     expect(phaseNodeSource).toMatch(
@@ -445,7 +445,7 @@ describe("PhaseNodeCard — the scope fences (source guard)", () => {
   })
 
   it("the card names the canvas graph package NOWHERE (D-184-06)", () => {
-    expect(phaseNodeCardSource).not.toContain(GRAPH_PKG_SCOPE)
+    expect(cardSubtreeSource).not.toContain(GRAPH_PKG_SCOPE)
   })
 
   it("the card constructs none of the library's elements or types", () => {
@@ -455,16 +455,16 @@ describe("PhaseNodeCard — the scope fences (source guard)", () => {
     // explaining why the card renders outside both. A bare-identifier grep would only
     // pass by making that explanation lie, which is the D-ITEM-183-02 trap this
     // project has already hit five times. Same convention as the HTML-sink fence.
-    expect(phaseNodeCardSource).not.toMatch(/<Handle[\s/>]/)
-    expect(phaseNodeCardSource).not.toMatch(/<ReactFlow/)
-    expect(phaseNodeCardSource).not.toMatch(/:\s*NodeProps</)
+    expect(cardSubtreeSource).not.toMatch(/<Handle[\s/>]/)
+    expect(cardSubtreeSource).not.toMatch(/<ReactFlow/)
+    expect(cardSubtreeSource).not.toMatch(/:\s*NodeProps</)
     // Positive control: the adapter DOES construct them, so the forms are real.
     expect(phaseNodeSource).toMatch(/<Handle[\s/>]/)
     expect(phaseNodeSource).toMatch(/:\s*NodeProps</)
   })
 
   it("the card imports nothing from the API client", () => {
-    expect(phaseNodeCardSource).not.toMatch(/from\s+["']@\/lib\/api["']/)
+    expect(cardSubtreeSource).not.toMatch(/from\s+["']@\/lib\/api["']/)
     // Positive control: the same regex DOES match a planted import line.
     expect('import { x } from "@/lib/api"').toMatch(/from\s+["']@\/lib\/api["']/)
   })
@@ -472,12 +472,12 @@ describe("PhaseNodeCard — the scope fences (source guard)", () => {
   it("the card renders authored strings as text children — never the HTML sink", () => {
     // Anchored on the JSX PROP FORM, so the docblock may quote the identifier
     // verbatim (the shipped `threadGroups`/`PhaseCard` guard convention).
-    expect(phaseNodeCardSource).not.toMatch(/dangerouslySetInnerHTML=/)
+    expect(cardSubtreeSource).not.toMatch(/dangerouslySetInnerHTML=/)
     expect('<p dangerouslySetInnerHTML={{ __html: x }} />').toMatch(/dangerouslySetInnerHTML=/)
   })
 
   it("the card reads no DOM, no clock and no randomness", () => {
-    expect(phaseNodeCardSource).not.toMatch(
+    expect(cardSubtreeSource).not.toMatch(
       /getBoundingClientRect|offsetHeight|offsetWidth|document\.|window\.|Date\.now|Math\.random/,
     )
   })
@@ -1176,7 +1176,7 @@ const PLANTED_SEAL_SOURCE = `
 
 describe("PhaseNodeCard — the seal cannot READ run state (props fence, criterion 16)", () => {
   it("the extractor really carves the seal's block — a slice, not nothing and not the file", () => {
-    const block = sealJsxBlock(phaseNodeCardSource)
+    const block = sealJsxBlock(cardSubtreeSource)
     expect(block).toContain(SEAL_TEST_ID)
     expect(block).toContain("aria-hidden")
     expect(block).toContain("sr-only")
@@ -1184,11 +1184,15 @@ describe("PhaseNodeCard — the seal cannot READ run state (props fence, criteri
     expect(block.endsWith(SEAL_GUARD_CLOSE)).toBe(true)
     // Not the whole file — otherwise the fence would be scanning the docblocks it is
     // deliberately scoped to exclude, and would go red for the wrong reason.
-    expect(block.length).toBeLessThan(phaseNodeCardSource.length / 4)
+    // ⚠ THE HAYSTACK RE-POINTS TO THE SUBTREE, NEVER TO `NodeCornerMarks?raw` ALONE. A ~56-line
+    // seal block inside a ~145-line destination file is ~39 %, well over this ¼ bound, so a
+    // narrower haystack would go RED for the wrong reason — and loosening `/ 4` to `/ 2` would
+    // be the wrong fix for the same reason. The BOUND is untouched; the haystack widened.
+    expect(block.length).toBeLessThan(cardSubtreeSource.length / 4)
   })
 
   it("the seal's JSX block never names the run-state prop", () => {
-    expect(sealJsxBlock(phaseNodeCardSource)).not.toMatch(statusIdentifier())
+    expect(sealJsxBlock(cardSubtreeSource)).not.toMatch(statusIdentifier())
   })
 
   it("the POSITIVE CONTROL: a seal that DID read run state turns this fence red", () => {
@@ -1201,7 +1205,11 @@ describe("PhaseNodeCard — the seal cannot READ run state (props fence, criteri
     // The component explains, at length, why the seal must not depend on run state. It
     // cannot do that without naming it. This asserts the needle is real against the real
     // file, and pins that the scoping is intentional rather than an accident of spelling.
-    expect(phaseNodeCardSource).toMatch(statusIdentifier())
+    // Re-pointed to the subtree in 188.2-01. This one stays GREEN either way — `status` survives
+    // in the destructure — but its MEANING would silently shift from "the docblock explains the
+    // seal" to "the destructure mentions a prop" once the seal's prose moves. Widening the
+    // haystack is what preserves what the assertion is actually about.
+    expect(cardSubtreeSource).toMatch(statusIdentifier())
   })
 
   it("renders a BYTE-IDENTICAL seal at ALL SEVEN readings (the strongest jsdom form)", () => {
@@ -1771,7 +1779,9 @@ describe("188-06 — the ring's geometry is COMPUTED, and these decimals falsify
   })
 
   it("the decimals appear in NEITHER module — they are results, not literals", () => {
-    for (const source of [phaseNodeCardSource, runVocabularySource]) {
+    // The card element re-points to the subtree (188.2-01); `runVocabularySource` does not —
+    // it is a NEIGHBOUR module with its own fences, not part of the card's cut.
+    for (const source of [cardSubtreeSource, runVocabularySource]) {
       for (const expected of Object.values(EXPECTED_RING)) {
         for (const number of expected.dasharray.split(" ")) {
           expect(source).not.toContain(number)
@@ -1782,6 +1792,9 @@ describe("188-06 — the ring's geometry is COMPUTED, and these decimals falsify
     // POSITIVE CONTROLS. Without them this passes just as happily on an empty string, a
     // typo'd needle, or a `?raw` import that silently resolved to nothing.
     expect(runVocabularySource.length).toBeGreaterThan(1000)
+    // PER-FILE BY DESIGN — deliberately NOT re-pointed to the subtree. It asserts that THIS
+    // file's `?raw` import resolved to a real file; widening it to the join would let five
+    // empty strings and one real module satisfy a floor meant to prove the card is still there.
     expect(phaseNodeCardSource.length).toBeGreaterThan(1000)
     expect(`const d = "${EXPECTED_RING.failed.dasharray}"`).toContain("89.724")
     // …and the formula's own operands ARE in the vocabulary module, so "not found"
@@ -1803,8 +1816,14 @@ describe("188-06 — the ring's geometry is COMPUTED, and these decimals falsify
  *  docblock has to be free to NAME the clipping utility it forbids — that comment is the
  *  rule — while the class lists must never contain it. A bare-token grep can only be
  *  satisfied by deleting the explanation, which is the trap this project has hit half a
- *  dozen times. Scoped to this file's needs: the card contains no regex literal and no
- *  string containing `//`, so the two naive patterns below are exact for it. */
+ *  dozen times. Scoped to the SIX-FILE CARD SUBTREE `CARD_SUBTREE_PATHS` names — the card plus
+ *  the five modules 188.2 cuts it into — because 188.2-01 re-pointed the fences below onto the
+ *  joined subtree source, and a docblock that still claimed a single-file scope would be
+ *  asserting a scope it no longer has (the exact defect `PhaseNodeCard.tsx:33-35` names in the
+ *  card's own words). No file in that subtree contains a regex literal or a string containing
+ *  `//`, so the two naive patterns below are exact for all six. The BODY needs no change: both
+ *  patterns are global and unanchored, and block comments are balanced within each file, so the
+ *  lazy match cannot straddle a join boundary. */
 function stripComments(source: string): string {
   return source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "")
 }
@@ -1816,13 +1835,16 @@ const CSS_ROTATE = ["rotate", "("].join("")
 
 describe("188-06 — no clipping anywhere in the node subtree (the mark overhangs)", () => {
   it("the stripper really strips, and the needle really matches (positive controls)", () => {
+    // PER-FILE BY DESIGN — a CONTROL on the stripper itself, not a scope fence. Widening either
+    // operand to the subtree changes what this measures (it would then prove only that SOME
+    // file in the join carries a comment), so both stay on `phaseNodeCardSource`.
     expect(stripComments(phaseNodeCardSource).length).toBeLessThan(phaseNodeCardSource.length)
     expect(stripComments(`const c = "flex ${CLIP_UTILITY}"`)).toContain(CLIP_UTILITY)
     expect(stripComments(`/* ${CLIP_UTILITY} */`)).not.toContain(CLIP_UTILITY)
   })
 
   it("neither the card nor the adapter CLIPS — the mark overhangs 26px and the ring 31px", () => {
-    expect(stripComments(phaseNodeCardSource)).not.toContain(CLIP_UTILITY)
+    expect(stripComments(cardSubtreeSource)).not.toContain(CLIP_UTILITY)
     expect(stripComments(phaseNodeSource)).not.toContain(CLIP_UTILITY)
   })
 
@@ -1832,7 +1854,13 @@ describe("188-06 — no clipping anywhere in the node subtree (the mark overhang
     // "zero occurrences in the file" was false before this plan started, and 188-06 kept
     // the count at one rather than adding a second. Pinning the number is what stops the
     // rule being deleted as easily as it stops the utility being added.
-    const occurrences = phaseNodeCardSource.split(CLIP_UTILITY).length - 1
+    // D-08 — RE-ANCHORED TO THE SUBTREE IN 188.2-01, and this is the landmine the phase was
+    // scoped around. The tree's ONE mention sits at `PhaseNodeCard.tsx:772`, inside the 3D-mark
+    // JSX comment that D-04 moves to `NodeIconWell.tsx`; a naive cut takes this count to 0 and
+    // RED. Counted over the SUBTREE it stays exactly 1 wherever the rule lives, and it still
+    // cannot be satisfied by shuffling the prose between files — which is precisely the failure
+    // mode a per-file count invites during a refactor.
+    const occurrences = cardSubtreeSource.split(CLIP_UTILITY).length - 1
     expect(occurrences).toBe(1)
   })
 
@@ -1850,8 +1878,8 @@ describe("188-06 — a gap is placed with stroke-dashoffset, NEVER with a rotati
     // the sketch's own first two drafts and put the waiting gap in the wrong quadrant.
     // The only transform in the whole subtree is the spin utility's, which lives in the
     // stylesheet and is applied by class name.
-    expect(phaseNodeCardSource).not.toContain(SVG_TRANSFORM_ATTR)
-    expect(phaseNodeCardSource).not.toContain(CSS_ROTATE)
+    expect(cardSubtreeSource).not.toContain(SVG_TRANSFORM_ATTR)
+    expect(cardSubtreeSource).not.toContain(CSS_ROTATE)
     expect(runVocabularySource).not.toContain(CSS_ROTATE)
   })
 
@@ -1863,7 +1891,11 @@ describe("188-06 — a gap is placed with stroke-dashoffset, NEVER with a rotati
   it("the spin is a CLASS NAME on the arc, and only on the running one", () => {
     const spinning = ALL_READINGS.filter((r) => ringSignature(r).spins)
     expect(spinning).toEqual(["running"])
-    expect(phaseNodeCardSource).toContain("canvas-ring-spin")
+    // THE TWIN OF D-08'S LANDMINE, AND CONTEXT DOES NOT NAME IT. This is a POSITIVE assertion
+    // whose single needle moves: the spin class is at `PhaseNodeCard.tsx:734` and lands in
+    // `NodeRunOverlay.tsx`, so left on the card alone it goes RED on the cut and would be
+    // discovered at execution as "a test to fix" rather than as a fence to re-anchor.
+    expect(cardSubtreeSource).toContain("canvas-ring-spin")
   })
 })
 
