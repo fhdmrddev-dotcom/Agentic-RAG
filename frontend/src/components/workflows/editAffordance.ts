@@ -123,6 +123,74 @@ export const EDIT_AFFORDANCE = {
 export const REVEAL_ON_HOVER =
   "pointer-events-auto opacity-100 lg:opacity-0 lg:group-hover/canvas:opacity-100 lg:focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
 
+/**
+ * Phase 188.2-02 (D-10 · D-11 · `BUG-260806-01`) — THE STACKING TIER THE AFFORDANCES SIT AT.
+ *
+ * NOT A KEY OF `EDIT_AFFORDANCE`, deliberately. That table's docblock (`:57-61`) defines
+ * itself as *"every placement number the editing affordances use, derived from
+ * `CANVAS_LAYOUT` and from nothing else"*. This number is derived from `@xyflow`, so putting
+ * it there would make that sentence false. It sits beside `REVEAL_ON_HOVER` instead, which is
+ * the closest analog in every other way: a standalone const whose whole value is the
+ * numbered list of corrections below it — corrections found in live UAT, none of which a
+ * class-list assertion could ever have seen.
+ *
+ * ⚠ CORRECTION 3, and it is the same defect class as the two `REVEAL_ON_HOVER` records: an
+ *    enabled, fully-revealed control that silently receives no pointer, found by hitting it
+ *    with `document.elementFromPoint` and getting back the CARD.
+ *
+ * 3. A SELECTED card painted over its own `✕` (`BUG-260806-01`, found by hand during 188.1's
+ *    operator UAT; the mechanism is older than that phase — the pre-extraction tree set no
+ *    `zIndex` either). Traced end to end from the installed packages rather than guessed:
+ *
+ *      · `@xyflow/system/dist/esm/index.js:1547` declares `SELECTED_NODE_Z = 1000`, and
+ *        `@xyflow/react/dist/esm/index.js:2343` applies it to the node wrapper as an INLINE
+ *        STYLE (`zIndex: internals.z`). Inline, so no stylesheet of ours can outrank it.
+ *      · `.react-flow__nodes` carries neither `position` nor `z-index` (`base.css:174-177`),
+ *        so it opens NO stacking context — every `.react-flow__node` therefore competes
+ *        directly inside the viewport's context at its own inline z.
+ *      · `.react-flow__viewport-portal` has no `z-index` at all (`base.css:301-310`) and is
+ *        the LAST sibling, so it is not a stacking context either and a POSITIONED child of
+ *        it escapes into the viewport's context, where it can be ranked against the nodes.
+ *        That is why one property on the child fixes this and nothing has to change about
+ *        the portal, the DOM order, or the card.
+ *      · Deselected, a node is `0` and the affordance is `auto`: a tie on z, later in DOM
+ *        order wins, and the `✕` is reachable. Selected, the node is `1000` and beats
+ *        `auto` outright — which is exactly the report's measured flip of reachable
+ *        false → true on deselection with nothing else changed.
+ *
+ *    1002 RATHER THAN 1001, because `svg.react-flow__connectionline` is pinned at
+ *    `z-index: 1001` (`@xyflow/react/dist/base.css:170`). This canvas draws no connection
+ *    line today; colliding with a library layer for no benefit is free to avoid.
+ *
+ *    ALL THREE AFFORDANCE GROUPS CARRY IT — the `＋`, the `✕` and the picker wrapper. The
+ *    report shows the `＋` reachable only because no node adjacent to one happened to be
+ *    selected; a selected card occludes a nearby `＋` by the identical mechanism, so fixing
+ *    the `✕` alone would have been fixing the symptom.
+ *
+ *    MEASURED PACKAGE VERSIONS: `@xyflow/react 12.11.2`, `@xyflow/system 0.0.79`. Recorded so
+ *    an upgrade has something to check against — and checked by machine, not by this
+ *    paragraph: `WorkflowCanvas.editing.test.tsx` asserts the relation below AND asserts the
+ *    library's own elevation off a really-rendered selected node, so a version that changes
+ *    `SELECTED_NODE_Z` turns a test red instead of silently re-opening the bug.
+ */
+export const AFFORDANCE_Z = 1002
+
+/**
+ * `@xyflow`'s number, mirrored here so the relation can be ASSERTED rather than implied.
+ *
+ * IT IS NOT OURS TO CHOOSE. `SELECTED_NODE_Z = 1000` is declared in
+ * `@xyflow/system/dist/esm/index.js:1547` and applied as an inline style by
+ * `@xyflow/react/dist/esm/index.js:2343`; this constant only records it. Changing it does not
+ * change the library — it only breaks the guard that notices when the library changed.
+ *
+ * It exists because `AFFORDANCE_Z > SELECTED_NODE_Z_FROM_LIBRARY` is the property that makes
+ * the `✕` reachable, and a property nobody names is a property nothing can re-check. jsdom
+ * applies no CSS and computes no stacking contexts, so no unit test in this estate can
+ * observe the occlusion itself — the relation, and a positive control that reads the
+ * library's live elevation off a rendered selected node, are what re-run on every build.
+ */
+export const SELECTED_NODE_Z_FROM_LIBRARY = 1000
+
 /** The flow x of insertion boundary `index`: 0 = before the first card, `lanes.length`
  *  = after the last one, anything between = the midpoint of that connector. */
 /**

@@ -55,6 +55,7 @@ import { ViewportPortal, useStore as useFlowStore, type XYPosition } from "@xyfl
 import { CANVAS_LAYOUT } from "@/components/workflows/canvasModel"
 import type { PhaseTypeId } from "@/components/workflows/definitionOps"
 import {
+  AFFORDANCE_Z,
   EDIT_AFFORDANCE,
   REVEAL_ON_HOVER,
   insertPointX,
@@ -176,6 +177,10 @@ export function PlaneEditingLayer({
                 verticalOffsetFor(phaseOrder[index], nudges, dragOverlay, CANVAS_LAYOUT.LANE_Y)) /
                 (index > 0 && index < phaseOrder.length ? 2 : 1)
             }px)`,
+            // Above `@xyflow`'s selected-node elevation — see `AFFORDANCE_Z`. The `＋` is in
+            // the SAME failure as the `✕` (`BUG-260806-01`), and only looked reachable in the
+            // report because no node next to one happened to be selected at that moment.
+            zIndex: AFFORDANCE_Z,
           }}
         >
           <span aria-hidden="true">＋</span>
@@ -219,6 +224,11 @@ export function PlaneEditingLayer({
               // its card walks away, which is the stranded control in the screenshots.
               verticalOffsetFor(slug, nudges, dragOverlay, CANVAS_LAYOUT.LANE_Y)
             }px)`,
+            // `BUG-260806-01`, the reported one: a SELECTED card is elevated to 1000 by the
+            // library and painted straight over this button, so the natural flow — click the
+            // step you want gone, then click its `✕` — was not completable with a real
+            // pointer. See `AFFORDANCE_Z` for the traced mechanism.
+            zIndex: AFFORDANCE_Z,
           }}
         >
           <span aria-hidden="true">✕</span>
@@ -252,6 +262,11 @@ export function PlaneEditingLayer({
                 verticalOffsetFor(phaseOrder[pickerAt], nudges, dragOverlay, CANVAS_LAYOUT.LANE_Y)) /
                 (pickerAt > 0 && pickerAt < phaseOrder.length ? 2 : 1)
             }px) scale(${1 / (zoom || 1)})`,
+            // The menu opens 22px BELOW its `＋`, i.e. straight across the cards it sits
+            // between, so it is the group with the most card to lose to. Same tier for the
+            // same reason — `pointer-events-auto` above only restores hit-testing, it does
+            // nothing about what is painted on top.
+            zIndex: AFFORDANCE_Z,
           }}
         >
           <StepTypePicker
