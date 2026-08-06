@@ -304,6 +304,33 @@ describe("PhaseNodeCard — the 137-D two-badge budget", () => {
     expect(waits.closest("[data-waits-for-you]")?.getAttribute("data-waits-for-you")).toBe("true")
   })
 
+  it("a THIRD badge is a TYPECHECK ERROR, not a review comment (D-09)", () => {
+    // ⚠ THIS INVARIANT IS ASSERTED HERE FOR THE FIRST TIME, and that is a MEASUREMENT rather
+    // than a turn of phrase. It is named in `CLAUDE.md`'s hot-file ledger ("a third badge is a
+    // typecheck error"), in the card's own docblock at `PhaseNodeCard.tsx:165-175`, and in
+    // Phase 189's D-12 — and until this line nothing checked it. `BadgeSlot2Tuple` has ZERO
+    // callers anywhere in the tree outside its own declaration, `@ts-expect-error` occurred 0
+    // times in the entire workflows directory, and the budget block around this test exercises
+    // badges RENDERING at 0, 1 and 2 while asserting nothing whatever about the TYPE. So
+    // widening `BadgeSlots` to `readonly BadgeSlot[]` during the 188.2 extraction would have
+    // left every test in this estate green.
+    //
+    // The control is the TYPE GATE, not the runtime: `npx tsc --noEmit -p tsconfig.app.json`
+    // reads 33 errors with the union narrow and 34 with it widened, the extra one being
+    // `Unused '@ts-expect-error' directive` on the line below. Observed in both directions
+    // before this was trusted.
+    const two: BadgeSlots = [groundingBadge, waitsBadge]
+    expect(two).toHaveLength(2)
+    // @ts-expect-error a third badge is a typecheck error — the 137-B two-badge budget is
+    // enforced by the max-2 tuple union, not by convention.
+    const three: BadgeSlots = [groundingBadge, waitsBadge, groundingBadge]
+    // `noUnusedLocals: true` would make an unused `three` its own error, and the gate would
+    // then read 34 whether or not the union is narrow — the control would be indistinguishable
+    // from the failure it exists to detect. The house idiom for a deliberately-unused local
+    // (`deriveTier.ts:124-126`) closes that.
+    void three
+  })
+
   it("renders the decorative glyph aria-hidden, and omits it when absent", () => {
     const { container } = renderCard({ badges: [groundingBadge, waitsBadge] })
     const hidden = Array.from(container.querySelectorAll('[aria-hidden="true"]'))
@@ -521,6 +548,82 @@ describe("PhaseNodeCard — the scope fences (source guard)", () => {
       // module the glob pattern no longer matches reads an empty string in silence.
       if (path in CARD_MODULES) expect(CARD_MODULES[path].length).toBeGreaterThan(0)
     }
+  })
+})
+
+// ── 188.2-01 — THE ESM-CYCLE FENCE (SC#3, T-188.2-04) ────────────────────────────────
+//
+// WHY A TEST AND NOT A DOCBLOCK. After the 188.2 cut, `PhaseNodeCard` renders
+// `<NodeRunOverlay>`, `<NodeCornerMarks>` and `<NodeIconWell>` as JSX elements, and a JSX
+// element is a VALUE reference resolved at module scope. So the card's subtree will contain a
+// live value-level edge in exactly the shape 188.1 found on the canvas. If any extracted module
+// imported `PhaseNodeCard` back, the resulting cycle would typecheck clean and lint clean and
+// fail only at RUNTIME — a TDZ `ReferenceError` in whichever module a caller reached first,
+// which under Vitest is whichever suite happens to import first. No build tool in this repo can
+// see that, so the constraint is spelled as an assertion over the modules' own source.
+//
+// The forbidden shape is stated ONCE and covers every import form deliberately: a static
+// import, a re-export, and `import type` all end in `from "<specifier>"`. The type-only form is
+// forbidden too even though it erases at build — `verbatimModuleSyntax: true` is on in
+// `tsconfig.app.json`, which makes the value/type distinction easy to get wrong under a later
+// edit, and a fence that permits the cheap mistake is not worth the line it costs. Dynamic
+// `import()` needs its own regex because it has no `from`.
+//
+// Both regexes are anchored so the quote CLOSES immediately after `PhaseNodeCard`. That is what
+// keeps this file's own `from "./PhaseNodeCard?raw"` (line 37) and the extracted
+// `from "./phaseNodeCardContract"` out of the match — and it is asserted below as a pair of
+// NEGATIVE controls rather than trusted, because an over-broad regex here would make the fence
+// unfixable in the one file that has to carry it.
+const IMPORT_FROM_CARD = /from\s+["'][^"']*PhaseNodeCard["']/
+const DYNAMIC_IMPORT_CARD = /import\s*\(\s*["'][^"']*PhaseNodeCard["']\s*\)/
+
+describe("PhaseNodeCard 188.2 — the extracted modules cannot import back (SC#3)", () => {
+  it("the two regexes match the shapes they forbid and MISS the two that are legal", () => {
+    // POSITIVE CONTROLS, inline and first: a fence whose matcher is broken passes vacuously
+    // and looks exactly like a fence that holds.
+    expect('import { PhaseNodeCard } from "./PhaseNodeCard"').toMatch(IMPORT_FROM_CARD)
+    expect('import type { PhaseNodeCardProps } from "@/components/workflows/PhaseNodeCard"').toMatch(
+      IMPORT_FROM_CARD,
+    )
+    expect('export { PhaseNodeCard } from "./PhaseNodeCard"').toMatch(IMPORT_FROM_CARD)
+    expect('const m = await import("@/components/workflows/PhaseNodeCard")').toMatch(
+      DYNAMIC_IMPORT_CARD,
+    )
+    // NEGATIVE CONTROLS. These two specifiers are LEGAL and appear in this very subtree, so a
+    // regex that matched either would make the fence below permanently red for the wrong reason.
+    for (const legal of [
+      'import type { X } from "./PhaseNodeCard?raw"',
+      'import { own } from "./phaseNodeCardContract"',
+    ]) {
+      expect(legal).not.toMatch(IMPORT_FROM_CARD)
+      expect(legal).not.toMatch(DYNAMIC_IMPORT_CARD)
+    }
+    // …and the subject is real, so the negatives are about a loaded file rather than a miss.
+    expect(CARD_MODULES["./PhaseNodeCard.tsx"].length).toBeGreaterThan(0)
+  })
+
+  it("no extracted module names a PhaseNodeCard specifier in ANY import form", () => {
+    // ⚠ AT THIS COMMIT THE GUARD SKIPS EVERY PATH, and that is deliberate rather than an
+    // oversight: none of the five destinations exists yet. The loop is authored HERE so the
+    // fence is in place BEFORE the modules it guards, which is the whole shape of this plan.
+    // `188.2-05` is where it is observed RED (C-5) against a deliberately planted back-import.
+    expect(CARD_DESTINATION_PATHS).toHaveLength(5)
+    for (const path of CARD_DESTINATION_PATHS) {
+      if (path in CARD_MODULES) {
+        expect(CARD_MODULES[path]).not.toMatch(IMPORT_FROM_CARD)
+        expect(CARD_MODULES[path]).not.toMatch(DYNAMIC_IMPORT_CARD)
+      }
+    }
+  })
+
+  it("the cut has ONE direction — the card declares none of the three components", () => {
+    // The other half of "no cycle": without it, the negatives above are also satisfied by five
+    // modules nobody uses. GREEN BY VACUITY TODAY — all three functions still live in the card
+    // under their pre-cut names, so none of these strings is present yet. `188.2-06` is where
+    // this becomes meaningful, by adding the matching `import` assertions once they exist.
+    expect(phaseNodeCardSource).not.toContain("function NodeRunOverlay(")
+    expect(phaseNodeCardSource).not.toContain("function NodeCornerMarks(")
+    expect(phaseNodeCardSource).not.toContain("function NodeIconWell(")
   })
 })
 
