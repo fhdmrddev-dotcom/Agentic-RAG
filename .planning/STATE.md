@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio — 🚧 ACTIVE
 status: executing
-last_updated: "2026-08-06T23:05:00.000Z"
-last_activity: 2026-08-07 -- Phase 188.2 plan 04 complete (the two camelCase leaves, both moved verbatim with an EMPTY span diff)
+last_updated: "2026-08-07T03:45:00.000Z"
+last_activity: 2026-08-07 -- Phase 188.2 plan 05 complete (three presentational modules, nine EMPTY-DIFF spans, N10's XSS fence observed RED at the seal's own render site)
 progress:
   total_phases: 21
   completed_phases: 9
   total_plans: 126
-  completed_plans: 122
+  completed_plans: 123
   percent: 43
 ---
 
@@ -67,7 +67,43 @@ Plan 188.2-01 COMPLETE (`471104d4` · `28f7ee64` · `8cb82a6b`; summary `188.2-0
 Plan 188.2-02 COMPLETE (`7f77af44` · `fe3de624` · `30c2e66f`; summary `188.2-02-SUMMARY.md`).
 Plan 188.2-03 COMPLETE (`99a383c7` · `1fc193b4` · `b1942579`; summary `188.2-03-SUMMARY.md`).
 Plan 188.2-04 COMPLETE (`82dd29a7` · `155b3832`; summary `188.2-04-SUMMARY.md`).
-Next: plan 188.2-05. 11 decisions in `188.2-CONTEXT.md` (`8cbbb2d3`).
+Plan 188.2-05 COMPLETE (`7b417f71` · `53247c69` · `d6dfe716`; summary `188.2-05-SUMMARY.md`).
+Next: plan 188.2-06 — THE CUT. 11 decisions in `188.2-CONTEXT.md` (`8cbbb2d3`).
+
+**188.2-05 — all three presentational modules exist, and every one of the NINE moved spans diffs
+EMPTY.** `NodeCornerMarks.tsx` (**247 L**) holds `PhaseNodeCard.tsx:410-434` + `:567-656` — the
+WR-04 sink-4 verdict derivation, the verdict mark and the ⛨ seal, kept in their shipped order so
+`sealJsxBlock` still carves rather than throwing. `NodeRunOverlay.tsx` (**301 L**) holds `:287`,
+`:312-355`, `:440-443`, `:658-739` and `:741-762`; all five `RING_*` constants stay MODULE-PRIVATE
+and `@/lib/phaseState` is imported as a **TYPE only**. `NodeIconWell.tsx` (**146 L**) holds
+`:764-794`, carrying the tree's only mention of the clipping utility. Each file exports exactly two
+names — the component and its props type — so `eslint src/components/workflows/` is unmoved at
+**5 errors / 0 warnings**. **ADDITIVE: `PhaseNodeCard.tsx` is byte-unchanged at 797 L at all three
+commits, and Plan 03's five baseline literals were not re-captured.**
+**The three fences that could only be proven once real destination files existed were each driven
+RED against a plant inside one, every run showing exactly TWO failures (the plant + the expected
+N15):** N1 (`onClick=` in `NodeCornerMarks.tsx`), N5 (the graph-package scope in
+`NodeRunOverlay.tsx`) and **N10 (`dangerouslySetInnerHTML=` at the seal's own authored-string render
+site) — which converts 188.2-01's T-188.2-02 security mitigation from a re-scope ASSERTED into a
+guard OBSERVED.** C-5 went RED twice, on the value AND the type-only back-import; the regex needed
+no widening. **C-8 resolved HONESTLY: the rendered walk did NOT go red, because the card still
+renders its own inline copies and the module is not mounted — the SOURCE half (the `onClick=` fence)
+is what covers it today, and the RENDERED half is owed to Plan 06.** Both 188.2-01 membership guards
+were removed (Rule 2 — the plan named only one loop; there are two): all five destinations now
+resolve, so a guard over a live file would read nothing and report success.
+Gates: `tsc` **33** / 0 in workflows, eslint **5/0**, `count gate` per-file `PhaseNodeCard.test.tsx
+107→124 (+17)`, total **2502** with no per-file decrease and the pin untouched.
+**⚠ ONE EXPECTED RED, recorded not worked around:** fence N15 (the clip-utility count) reads **2**
+while both the card and `NodeIconWell.tsx` hold the sentence — that IS the proof the re-anchored
+fence reaches the new file. **Plan 06's cut returns it to 1; re-verify it green, do NOT edit the
+pin.** ⚠ Rule 3 deviation: the plan asks BOTH for the ring/chip/well prose to be lifted into each
+second docblock AND for the spans to diff EMPTY — mutually exclusive. The empty diff won (D-01:
+"moved with the code that it explains"); each design docblock names the in-place argument and adds
+only what the card never had to say. **⚠ FOUR inherited claims measured FALSE (18 of 22 held), all
+TEST-file anchors, all by the same mechanism** — Plans 01 and 03 grew `PhaseNodeCard.test.tsx`
+2063 → 3675: `sealJsxBlock` is at `:1251` not `:1046-1064`; the no-focusable-control walk is at
+`:249-265` not `:195-216`; fence N10 is at `:502-503` not `:423-428`; fence N2's narrowing is at
+`:430-454` not `:359-366`. Every CONTENT description was accurate; only the numbers rotted.
 
 **188.2-04 — the two camelCase leaves exist, and both moves are EMPTY-DIFF verbatim.**
 `phaseNodeCardContract.ts` (**214 L**) holds `PhaseNodeCard.tsx:139-285` — 6 exported type names,
