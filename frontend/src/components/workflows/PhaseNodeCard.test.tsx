@@ -67,6 +67,55 @@ import { RUN_READING_WORD, runReadingLabel } from "./runVocabulary"
 // `canvasModel.purity.test.ts:18-21` rule, so this plan's whole diff reads as ADDED lines.
 import type { VerdictMarkKind } from "./nodePresentation"
 
+// ── 188.2-01 — THE SUBTREE SOURCE, and why it names five files that do not exist yet ──
+//
+// The house `?raw` / `import.meta.glob` directory sweep (`PhaseFormPanel.rails.test.tsx:422-426`,
+// cited by `governanceVocabulary.test.ts:65` as "the house idiom"), narrowed to the card's own
+// subtree by an explicit path list, in the shape 188.1 shipped at `WorkflowCanvas.test.tsx:51-79`.
+// Every NEGATIVE fence in this file reads this instead of `phaseNodeCardSource`; the two per-FILE
+// assertions (the length floor, and the `stripComments` control) deliberately do not.
+//
+// ⚠ FIVE OF THE SIX PATHS DO NOT EXIST AT THIS COMMIT, AND THAT IS THE POINT.
+// `phaseNodeCardContract.ts`, `ownProperty.ts`, `NodeCornerMarks.tsx`, `NodeRunOverlay.tsx` and
+// `NodeIconWell.tsx` arrive later in Phase 188.2, which cuts ~471 lines out of `PhaseNodeCard.tsx`
+// into them. `import.meta.glob` expands at BUILD time over files that EXIST, so a path with no
+// file simply has no key in the record and contributes the empty string via `?? ""` — it never
+// throws. That property is proved by commit ancestry rather than by this comment: `004a6486`
+// shipped the canvas's block naming two non-existent files, `14917821` created them, and the
+// suite was green at every commit between.
+//
+// THE SCALE, MEASURED RATHER THAN ESTIMATED. There are SEVENTEEN negative fences over
+// `phaseNodeCardSource` in this file. Two of them go RED on the move (the clip-utility count and
+// the seal-block carve); the other FIFTEEN would stay green while covering nothing at all —
+// including the zero-graph-library fence D-184-06 exists for, and the `dangerouslySetInnerHTML`
+// XSS ban. Neither the count gate nor `tsc` can see that loss, and a reviewer reading a green
+// suite cannot tell a guard that guards from one that quietly stopped asking. Naming the five
+// destinations BEFORE they exist is what stops the extraction narrowing a fence.
+const CARD_SUBTREE_PATHS = [
+  "./PhaseNodeCard.tsx",
+  "./phaseNodeCardContract.ts",
+  "./ownProperty.ts",
+  "./NodeCornerMarks.tsx",
+  "./NodeRunOverlay.tsx",
+  "./NodeIconWell.tsx",
+] as const
+const CARD_MODULES = import.meta.glob("./*.{ts,tsx}", {
+  query: "?raw",
+  eager: true,
+  import: "default",
+}) as Record<string, string>
+const cardSubtreeSource = CARD_SUBTREE_PATHS.map((path) => CARD_MODULES[path] ?? "").join("\n")
+
+/** The five destinations, named once here and looped over below — a length pin catches a
+ *  TRUNCATION but never a SUBSTITUTION, so each one is asserted individually. */
+const CARD_DESTINATION_PATHS = [
+  "./phaseNodeCardContract.ts",
+  "./ownProperty.ts",
+  "./NodeCornerMarks.tsx",
+  "./NodeRunOverlay.tsx",
+  "./NodeIconWell.tsx",
+] as const
+
 /** The minimal slot set — everything else on the contract is optional by design. */
 function renderCard(overrides: Partial<React.ComponentProps<typeof PhaseNodeCard>> = {}) {
   return render(
@@ -431,6 +480,47 @@ describe("PhaseNodeCard — the scope fences (source guard)", () => {
     expect(phaseNodeCardSource).not.toMatch(
       /getBoundingClientRect|offsetHeight|offsetWidth|document\.|window\.|Date\.now|Math\.random/,
     )
+  })
+
+  it("the subtree fence covers the code 188.2 moves, wherever that code lives", () => {
+    // MOVE-INVARIANT CONTROL. Every literal below is true TODAY — all six are declared in
+    // `PhaseNodeCard.tsx` and each occurs there EXACTLY once (measured) — and every one stays
+    // true AFTER the cut, because the path list above already names the file it lands in:
+    //
+    //   "export interface PhaseNodeCardProps" → phaseNodeCardContract.ts
+    //   "function own<T>("                    → ownProperty.ts
+    //   "canvas-node-seal"                    → NodeCornerMarks.tsx
+    //   "const RING_RADIUS"                   → NodeRunOverlay.tsx
+    //   "canvas-node-pause-chip"              → NodeRunOverlay.tsx
+    //   "h-[62px]"                            → NodeIconWell.tsx
+    //
+    // So this proves the fenced source really REACHES the moved code at BOTH ends of the
+    // refactor, and it goes red the moment a later edit narrows `CARD_SUBTREE_PATHS` past one
+    // of the five homes. (Deliberately NOT anchored on `"function NodeRunOverlay("` and its
+    // siblings: those are FALSE today, so such a control would be red at Wave 0 for the wrong
+    // reason. 188.1's control worked precisely because its literals were true before AND after.)
+    expect(cardSubtreeSource).toContain("export interface PhaseNodeCardProps")
+    expect(cardSubtreeSource).toContain("function own<T>(")
+    expect(cardSubtreeSource).toContain("canvas-node-seal")
+    expect(cardSubtreeSource).toContain("const RING_RADIUS")
+    expect(cardSubtreeSource).toContain("canvas-node-pause-chip")
+    expect(cardSubtreeSource).toContain("h-[62px]")
+    // NON-VACUITY: a truncated list, or a glob that resolved to nothing, cannot satisfy the six
+    // lines above by accident, because both the list's length and the record's non-emptiness are
+    // pinned here (the `PhaseFormPanel.rails.test.tsx:440` control shape). The workflows
+    // directory holds 66 `.ts`/`.tsx` files, so `> 5` is a safe, non-brittle floor.
+    expect(CARD_SUBTREE_PATHS).toHaveLength(6)
+    expect(Object.keys(CARD_MODULES).length).toBeGreaterThan(5)
+    // …and the five DESTINATIONS are named individually, because a length pin catches a
+    // TRUNCATION but not a SUBSTITUTION: swapping `./NodeRunOverlay.tsx` for any other real file
+    // keeps the length at 6 and — while the code still sits in the card — keeps all six
+    // `toContain`s green too. Measured RED under exactly that edit before this line existed.
+    for (const path of CARD_DESTINATION_PATHS) {
+      expect(CARD_SUBTREE_PATHS).toContain(path)
+      // And once the cut creates the file, the sweep must really resolve it — a fence naming a
+      // module the glob pattern no longer matches reads an empty string in silence.
+      if (path in CARD_MODULES) expect(CARD_MODULES[path].length).toBeGreaterThan(0)
+    }
   })
 })
 
