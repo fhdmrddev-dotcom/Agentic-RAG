@@ -42,6 +42,24 @@ Items acknowledged and deferred at **v3.4 milestone close on 2026-07-22** (38 op
 
 **Open reported bugs rolling forward** to a planned post-v3.3 chat-polish phase (none were folded into 146–159): BUG-260708-01/-02 (major), BUG-260714-01 (major), BUG-260712-02, BUG-260718-02/-03/-04, BUG-260609-02/-04, BUG-260610-01, BUG-260623-01, BUG-260706-01, BUG-260707-03; deferred BUG-260626-02/-03, BUG-260711-02; external BUG-260714-02 (OpenRouter). BUG-260718-01 CLOSED (folded into 159).
 
+## ⚑ Phase 189 discuss-phase — TWO MANDATORY ITEMS (recorded 2026-08-06)
+
+`/gsd:discuss-phase 189` **MUST** surface both of these before proposing the planned feature. Neither
+is a suggestion; both are recorded here because each has already been missed once by relying on
+someone remembering.
+
+| # | Item | Why it is binding |
+|---|---|---|
+| **1** | **`PhaseNodeCard.tsx` G-5 refactor recommendation, as the FIRST option** — not the planned external-action-node feature | The CLAUDE.md hot-file ledger row was hardened from *THRESHOLD CROSSED* to **G-5 FIRES** by explicit operator direction at the 188.1-05 checkpoint: **797 L, 7 plans across 4 phases, +67 % growth**. Per G-5 a dedicated refactor phase on this file is due BEFORE the next feature phase that touches it, and 189 places a governed external-action node on the canvas. |
+| **2** | **[[SEED-133]] / `T-187-SEED-133`** — the NL-seed grounding-degradation gap | `accept`ed at the `/gsd:secure-phase 187` gate on 2026-08-06 **with a phase-bound trigger naming 189**. Its previous trigger (*"when Phase 187 is scoped"*) fired silently and was caught months later by `/gsd:audit-milestone`. Mechanical check: while `grep -c degraded backend/app/services/workflow_authoring.py` returns **0**, the defect is live. |
+
+**Also owed, not blocking 189:** **UAT-13 / M6** — the SC#6 LIVE row (an armed action-risk checkpoint
+cannot be preempted by an author-declared pre-gate, driven end-to-end on a real run). SC#6 has an
+**automated** pass only (38 tests, re-run at HEAD by `/gsd:secure-phase 187`); the live row is
+`result: [pending]`. SEED-137 was folded into 187 precisely because that preemption shipped once
+already, so an automated pass is not a live pass. **Run this row first** when the 187 manual board is
+next picked up.
+
 ## Current Position
 
 Phase: 188.1 (WorkflowCanvas extraction refactor — INSERTED 2026-08-05) — **EXECUTING, plan 4 of 5 done**

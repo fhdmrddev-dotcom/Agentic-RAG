@@ -62,3 +62,46 @@ this is a consumer wiring gap, not a new design.
 
 Related: [[SEED-131]] (the `/validate` always-200 invariant), and Phase 182's
 `182-VERIFICATION.md` Truth 8.
+
+---
+
+## Trigger fired and was missed — 2026-08-06
+
+**This seed's original re-open trigger was *"when Phase 187 is scoped."* Phase 187 was scoped,
+planned across 29 plans, executed, verified and closed — and this seed was never consulted.** The
+miss was caught only by `/gsd:audit-milestone` on 2026-08-06, which found
+`grep -c degraded backend/app/services/workflow_authoring.py` → **0** while auditing the 182↔187
+integration seam.
+
+That is a lesson about the trigger, not about anyone's diligence: **a trigger phrased as a condition
+someone has to remember to check is not a trigger.** It fires silently and nobody hears it.
+
+### Status: OPEN — `accept`ed once, deliberately, with a harder trigger
+
+`/gsd:secure-phase 187` (2026-08-06) registered this as **`T-187-SEED-133`** in
+`.planning/phases/187-business-vocabulary-ai-seeded-canvas/187-SECURITY.md` — the one row in that
+phase's 152-threat register that the plan-time register never named. The operator dispositioned it
+**`accept`** at the security gate, on the ground that the folder-blind draft still passes
+`POST /workflows/validate` and the publish gauntlet (both of which DO honour `bundle.degraded`), so
+the blast radius is a misleadingly confident first draft rather than an unsafe published workflow.
+
+**The seed is NOT closed by that acceptance.** The defect is present in shipped code.
+
+### Replacement trigger (binding — supersedes "when Phase 187 is scoped")
+
+- **(a) Phase-bound:** `/gsd:discuss-phase 189` MUST surface this seed. 189 is the next phase on the
+  authoring/generation surface. It is recorded in `STATE.md` alongside 189's other mandatory
+  discuss-phase item (the `PhaseNodeCard.tsx` G-5 refactor recommendation).
+- **(b) Mechanical, phase-independent:** while
+  `grep -c degraded backend/app/services/workflow_authoring.py` returns **0**, the defect is live and
+  the acceptance stands. The moment it returns non-zero, this seed is superseded and must be
+  **re-verified, not re-accepted**.
+- **(c) Immediate escalation:** if any consumer starts treating `POST /workflows/generate`'s
+  `ok: true` as evidence the grounding registry was READ — rather than merely that the model returned
+  a schema-valid definition — this stops being Medium and must be fixed BEFORE that consumer ships.
+
+### The acceptance has a dependency that must be watched
+
+The whole justification is that the sibling consumer is honest. If `api/workflows.py`'s validate path
+(currently `:685-690`) ever stops branching on `bundle.degraded`, the downstream catch this
+acceptance rests on disappears and **the disposition is void** — not weakened, void.
