@@ -3,13 +3,15 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio — 🚧 ACTIVE
 status: executing
-last_updated: "2026-08-07T03:55:00.000Z"
-last_activity: 2026-08-07 -- Phase 188.2 plan 06 complete (THE CUT -- PhaseNodeCard 797 -> 274 L, body 427 -> 169, code 249 -> 100; every Wave-2 DOM/geometry baseline green with ZERO re-capture)
+last_updated: "2026-08-07T04:50:00.000Z"
+last_activity: 2026-08-07 -- Phase 188.2 plan 07 PARTIAL, BLOCKED AT A CHECKPOINT. Task 1 done (G-5 ledger row flipped to *satisfied (188.2)* with re-derived figures; 4 stale doc pointers corrected; count-gate pins 107->124 and 58->61 from two agreeing runs; 188.2-DEFERRED.md created). Tasks 2-3 = the two UAT boards, AUTHORED BUT NOT DRIVEN -- executor has no browser tool. BUG-260806-01 stays `folded`.
+stopped_at: 188.2-07 Task 2 (blocking operator checkpoint) -- drive the 5 rows in 188.2-UAT.md
+resume_file: .planning/phases/188.2-phasenodecard-extraction-refactor-pay-down-the-g-5-debt-on-p/188.2-UAT.md
 progress:
   total_phases: 21
   completed_phases: 9
   total_plans: 126
-  completed_plans: 124
+  completed_plans: 124   # UNCHANGED -- 188.2-07 is NOT complete
   percent: 43
 ---
 
@@ -50,7 +52,7 @@ someone remembering.
 
 | # | Item | Why it is binding |
 |---|---|---|
-| **1** | ~~**`PhaseNodeCard.tsx` G-5 refactor recommendation, as the FIRST option**~~ — **DISCHARGED 2026-08-06: the discuss ran, the operator chose the refactor, and it is now inserted as Phase 188.2.** 189 does not re-litigate this; it simply waits behind 188.2 | The CLAUDE.md hot-file ledger row was hardened from *THRESHOLD CROSSED* to **G-5 FIRES** by explicit operator direction at the 188.1-05 checkpoint: **797 L, 7 plans across 4 phases, +67 % growth**. Per G-5 a dedicated refactor phase on this file is due BEFORE the next feature phase that touches it, and 189 places a governed external-action node on the canvas. |
+| **1** | ~~**`PhaseNodeCard.tsx` G-5 refactor recommendation, as the FIRST option**~~ — **DISCHARGED 2026-08-06: the discuss ran, the operator chose the refactor, and it is now inserted as Phase 188.2.** 189 does not re-litigate this; it simply waits behind 188.2. **⚑ AND THE LEDGER ROW IS NOW FLIPPED (2026-08-07, `188.2-07` Task 1, commit `615b2a06`): `CLAUDE.md` reads *satisfied (188.2 — 2026-08-07)* carrying the measured `797 → 274 L` / CODE `249 → 100` / BODY `427 → 169` and the honest subtree growth `797 → 1332 L (+67.1 %)`.** So a discuss-phase scan of 189's `files_modified` against the hot-file ledger no longer matches a G-5-firing row on this file. ⚠ The phase is **not** verified yet — `188.2-07`'s two UAT boards are authored but **NOT DRIVEN** and `BUG-260806-01` is still `folded`; 189 stays behind 188.2 until both close | The CLAUDE.md hot-file ledger row was hardened from *THRESHOLD CROSSED* to **G-5 FIRES** by explicit operator direction at the 188.1-05 checkpoint: **797 L, 7 plans across 4 phases, +67 % growth**. Per G-5 a dedicated refactor phase on this file is due BEFORE the next feature phase that touches it, and 189 places a governed external-action node on the canvas. |
 | **2** | **[[SEED-133]] / `T-187-SEED-133`** — the NL-seed grounding-degradation gap | `accept`ed at the `/gsd:secure-phase 187` gate on 2026-08-06 **with a phase-bound trigger naming 189**. Its previous trigger (*"when Phase 187 is scoped"*) fired silently and was caught months later by `/gsd:audit-milestone`. Mechanical check: while `grep -c degraded backend/app/services/workflow_authoring.py` returns **0**, the defect is live. |
 
 **Also owed, not blocking 189:** **UAT-13 / M6** — the SC#6 LIVE row (an armed action-risk checkpoint
