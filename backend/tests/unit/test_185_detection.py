@@ -291,6 +291,75 @@ def test_an_ungoverned_step_reports_no_cause():
     assert grounding_cause(_spec(_llm_agent(tools=["execute_code"]))) is None
 
 
+def test_no_external_action_capability_ever_arms_the_grounding_dial():
+    """189 (D-03 / T-189-12) — the 7th type carries `available_tools` and still reports None.
+
+    Detection is `available_tools ∩ KB_TOOLS`, and Phase 189 put a THIRD config type into
+    that read: an `external_action` step's whitelist carries its chosen capability, exactly
+    so it rides the guard every other tool rides. A capability colliding with a KB tool
+    would therefore make every external-action step read as grounding-`detected` — locking
+    a step that opens no document to a *must prove it* gate it can never satisfy.
+
+    Asserted over the whole capability SET, never one name: a `send_email`-only case would
+    stay green the day a fourth capability were added with a colliding name. The set is
+    read from `EXTERNAL_ACTION_CAPABILITIES` rather than re-typed, so it cannot drift.
+
+    THE MISSING ⛨ SEAL IS THE CORRECT ANSWER, NOT A BUG. `None` here means the step is
+    *free to think*, which is what a step that reads no knowledge base should be. Its
+    governance reading is the armed edge (D-04), not a grounding cause.
+    """
+    from app.models.harness import WorkflowDefinition
+    from app.services.harness.grounding import (
+        EXTERNAL_ACTION_CAPABILITIES,
+        KB_TOOLS,
+        grounding_cause,
+    )
+
+    assert EXTERNAL_ACTION_CAPABILITIES, "the capability set is empty — this would pass vacuously"
+
+    for capability in sorted(EXTERNAL_ACTION_CAPABILITIES):
+        spec = _spec(
+            {
+                "slug": "notify",
+                "phase_index": 0,
+                "config": {"phase_type": "external_action", "capability": capability},
+                "validators": [],
+            }
+        )
+        # D-03: the capability IS the whitelist, derived by the model — so this is the
+        # list `grounding_cause` actually intersects, not a hand-written stand-in.
+        assert spec.config.available_tools == [capability]
+        assert grounding_cause(spec) is None, (
+            f"an external_action step whose available_tools is {spec.config.available_tools!r} "
+            f"reported {grounding_cause(spec)!r} — a capability colliding with KB_TOOLS "
+            "would silently arm the grounding dial on a step that reads nothing"
+        )
+
+    # The whole-set disjointness, stated directly as well as observed through the cause.
+    assert set(EXTERNAL_ACTION_CAPABILITIES) & set(KB_TOOLS) == set()
+
+    # Control: the SAME assertion machinery DOES report `detected` when the intersection
+    # is non-empty, so the greens above measure disjointness rather than a broken read.
+    assert grounding_cause(_spec(_llm_agent(tools=sorted(KB_TOOLS)[:1]))) == "detected"
+
+    # And the step is armed regardless (D-04) — the absent seal is not an absent gate.
+    armed = WorkflowDefinition.model_validate(
+        _definition(
+            [
+                {
+                    "slug": "notify",
+                    "phase_index": 0,
+                    "config": {"phase_type": "external_action", "capability": "send_email"},
+                    "validators": [],
+                    "action_risk_armed": False,
+                }
+            ]
+        )
+    )
+    assert grounding_cause(armed.phases[0]) is None
+    assert armed.phases[0].action_risk_armed is True
+
+
 def test_a_whole_definition_mixes_governed_and_ungoverned_steps():
     """GOVERN-01's "a workflow freely MIXES both" — the graded half of graded governance."""
     from app.models.harness import WorkflowDefinition
@@ -422,25 +491,83 @@ def test_grounding_module_never_stores_a_derived_cause(token):
     )
 
 
-def test_the_models_module_declares_no_model_validator_on_phase_spec():
-    """The other half of L-2: the intent booleans carry no validator that could derive.
+def _phase_spec_source() -> str:
+    """`PhaseSpec`'s own source slice — the class, never the whole module.
 
-    `PhaseSpec`'s own source slice must contain no `model_validator`. The module has two
-    pre-existing ones on OTHER models, so this is scoped to the class, not the file.
+    `harness.py` carries validators on OTHER models (two on `WorkflowDefinition`, one on
+    `ExternalActionPhaseConfig`), and none of them is in scope for L-2.
     """
     from app.models import harness as h
 
     source = pathlib.Path(h.__file__).read_text(encoding="utf-8")
     start = source.index("class PhaseSpec(")
     end = source.index("class InputFieldSpec(", start)
-    phase_spec_src = source[start:end]
+    return source[start:end]
 
-    assert not re.search(r"@\s*model_validator", phase_spec_src), (
-        "PhaseSpec grew a model_validator — the draft save path persists "
-        "model_dump(mode='json'), so anything derived there is BAKED into the JSONB (L-2)"
+
+# The ONE validator `PhaseSpec` is permitted to carry, named rather than counted, so a
+# SECOND one cannot arrive under cover of the first. Phase 189 / D-04 — see that method's
+# own docstring in `harness.py` for why it lives on `PhaseSpec` rather than on the config
+# or on `WorkflowDefinition`.
+_ALLOWED_PHASE_SPEC_VALIDATOR = "_external_action_is_always_armed"
+
+
+def test_phase_spec_carries_no_validator_that_could_derive_a_grounding_state():
+    """The other half of L-2, narrowed at Phase 189 to the claim it was always making.
+
+    ⚠ NARROWED, NOT WEAKENED — and the reason is recorded because a loosened fence that
+    nobody explained is indistinguishable from a fence somebody gave up on. This test used
+    to assert that `PhaseSpec`'s slice contained NO `@model_validator` at all. That was a
+    PROXY for L-2's real claim: the draft save path persists `model_dump(mode="json")`, so
+    a value DERIVED here is BAKED into the JSONB — after which removing the KB tool would
+    leave the step locked forever, i.e. SPEC Req 3 inverted.
+
+    Phase 189 (D-04) required exactly one validator on this class: `action_risk_armed` must
+    be structurally TRUE on the `external_action` phase type, on every write path including
+    a hand-edited JSONB row. That pin is the OPPOSITE case to the one L-2 forbids. It bakes
+    a value that must NEVER change (it is a function of the phase type alone, and arming is
+    fail-closed), where L-2 forbids baking a value that must stay free to change when the
+    row changes. So the proxy is replaced by the property, in three parts:
+
+      1. the ONLY validator on `PhaseSpec` is the named D-04 pin — a second one, or a
+         rename, fails here;
+      2. that slice ASSIGNS or DECLARES none of the forbidden cause tokens, checked with
+         the same `_code_only` / `_stores` machinery (and therefore the same positive
+         controls) the `grounding.py` guard above uses; and
+      3. the detectors still fire on planted source, so a green here is a measurement.
+
+    Part 2 is strictly STRONGER than what this test asserted before: the old regex would
+    have passed a `PhaseSpec` that cached `grounding_cause` in a plain field, because a
+    plain field carries no decorator at all.
+    """
+    phase_spec_src = _phase_spec_source()
+
+    # (1) Exactly one validator, and it is the one D-04 authorised.
+    decorated = re.findall(
+        r"@\s*model_validator[^\n]*\n\s*def\s+(\w+)", phase_spec_src
     )
-    # Control: the regex DOES fire on a planted decorator.
-    assert re.search(r"@\s*model_validator", "@model_validator(mode='after')\ndef f(): ...")
+    assert decorated == [_ALLOWED_PHASE_SPEC_VALIDATOR], (
+        f"PhaseSpec's validators are {decorated!r}; the only one L-2 admits is "
+        f"[{_ALLOWED_PHASE_SPEC_VALIDATOR!r}] (Phase 189 / D-04, the arming pin). A new "
+        "one here can BAKE derived state into the saved JSONB — read that method's "
+        "docstring, and the (b) block above `grounding_escalated`, before adding another."
+    )
+
+    # (2) THE ACTUAL L-2 CLAIM: no cause is assigned or declared anywhere in the class.
+    flat = _code_only(phase_spec_src)
+    for token in _FORBIDDEN_TOKENS:
+        assert not _stores(flat, token), (
+            f"PhaseSpec assigns or declares {token!r} — a grounding cause is DERIVED at "
+            "read time by grounding.grounding_cause() and must never be stored, because "
+            "the draft save path persists model_dump(mode='json') (D-185-07 / L-2)"
+        )
+
+    # (3) Controls — both detectors fire on planted source, so (1) and (2) are measurements.
+    assert re.findall(
+        r"@\s*model_validator[^\n]*\n\s*def\s+(\w+)",
+        "@model_validator(mode='after')\n    def _planted(self): ...",
+    ) == ["_planted"]
+    assert _stores(_code_only(f"    {_CAUSE_FIELD}: str | None = None\n"), _CAUSE_FIELD)
 
 
 # ══ D-185-09 — the palette route serves the list as DATA ═════════════════════

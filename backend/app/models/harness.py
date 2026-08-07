@@ -349,10 +349,21 @@ class PhaseSpec(_StrictBase):
     #     data already in the row and are NEVER stored — which is what makes SPEC
     #     Req 3 true BY CONSTRUCTION rather than by a code audit: "a detected step
     #     set back to free-to-think" is not a representable value, so a stale or
-    #     hand-edited JSONB row cannot lie about it. Nothing here is a
-    #     `model_validator` on purpose — the draft save path persists
-    #     `model_dump(mode="json")`, so a derivation living in this model would be
-    #     BAKED into the JSONB and would contradict (b) permanently.
+    #     hand-edited JSONB row cannot lie about it. NO GROUNDING CAUSE IS EVER
+    #     DERIVED HERE — the draft save path persists `model_dump(mode="json")`,
+    #     so a derivation living in this model would be BAKED into the JSONB and
+    #     would contradict (b) permanently.
+    #
+    #     ⚠ CORRECTED at Phase 189 (D-04), in the commit that falsified it. This
+    #     sentence used to read "Nothing here is a `model_validator` on purpose".
+    #     `PhaseSpec` now carries exactly one — the D-04 arming pin at the bottom
+    #     of this class — and the distinction the old wording collapsed is the
+    #     load-bearing one: what (b) forbids is baking a value that must be free
+    #     to CHANGE when the row changes. The arming pin bakes a value that must
+    #     never change at all, for one phase type, and baking it is the point
+    #     (the canvas reads the STORED boolean). The 185 fence in
+    #     `tests/unit/test_185_detection.py` was narrowed to that actual claim in
+    #     the same commit rather than deleted.
     #
     # (c) THE ONE HOME of that derivation is
     #     `app.services.harness.grounding` (`KB_TOOLS` / `grounding_cause`) — the
@@ -385,9 +396,69 @@ class PhaseSpec(_StrictBase):
     #     stored — same reason as (b) in the block above: the save path persists
     #     `model_dump(mode="json")`, so a derivation living in this model would be
     #     BAKED into the JSONB and a stale row could then lie about its own face.
-    #     Nothing here is a model-level validator hook, on purpose — see the
-    #     (b) block above, which names the decorator and explains the trap.
+    #     NO FACE IS DERIVED BY A VALIDATOR HERE — see the (b) block above, which
+    #     names the decorator and explains the trap. (⚠ CORRECTED at Phase 189 /
+    #     D-04, in the commit that falsified it: this used to say "Nothing here is
+    #     a model-level validator hook, on purpose". One now exists; it derives no
+    #     face and no grounding cause. The rule the sentence defends is unchanged.)
     name_seeded_by_ai: bool = False     # VOCAB-01 / D-187-03 — the NL generator wrote `name`, not a human
+
+    # ── Phase 189 (CONN-01 / D-04) — the arming pin ──────────────────────────
+    @model_validator(mode="after")
+    def _external_action_is_always_armed(self) -> "PhaseSpec":
+        """D-04 — `action_risk_armed` is STRUCTURALLY TRUE on `external_action`.
+
+        Not a default the author can clear. SC#2 says the node cannot be wired around a
+        gate, and 185's hard-won rule is that a gate which can be loosened away is not a
+        gate. This makes the property true BY CONSTRUCTION in the same sense `PhaseSpec`'s
+        grounding block above uses: an unarmed external-action step is not a representable
+        stored value, so a stale client or a hand-edited JSONB row cannot lie about it.
+
+        ⚠ IT COERCES, IT DOES NOT RAISE — and that is a deliberate DEPARTURE from both
+        shipped validators on `WorkflowDefinition` below, which raise. Copying a shape
+        while inverting its disposition is exactly the silent divergence a reviewer cannot
+        see, so it is stated here. An OLD row is safe either way (it never names the new
+        member), but a NEW row written with `armed: false` by a client that shipped before
+        its own pin would 422 the entire definition and BRICK the workflow. Coercion is
+        fail-CLOSED — it ARMS — and never destroys a row. Do not "tighten" this into a
+        raise later; the loosening it looks like is the opposite of what it does.
+
+        WHY HERE, and the three alternatives it was chosen over:
+
+          1. A `Literal[True]` FIELD cannot work. `action_risk_armed` lives on `PhaseSpec`,
+             shared by all seven phase types, so pinning it at the field would arm every
+             one of them. Moving the field onto `ExternalActionPhaseConfig` instead would
+             create a SECOND home for one fact — the exact drift D-03 rejects one line at
+             a time in that class's own validator.
+          2. Enforcement at RESOLVE time (in `harness_engine`) protects the RUN but not the
+             STORED ROW. The row would then read `armed: false` while the engine armed
+             anyway, and the canvas — which reads the stored boolean via
+             `phaseVocabulary.actionRiskArmed` — would paint an unarmed edge on an armed
+             step. A lie on screen is worse than the gap it papers over.
+          3. A validator on `WorkflowDefinition` (beside the two below) would have left
+             this class's shipped no-validator fence untouched, but it only fires when a
+             WHOLE definition is parsed. A `PhaseSpec` parsed on its own — which the
+             engine, the tests and any future partial-update path all do — would read
+             unarmed. `PhaseSpec` is the narrowest scope that no write path can bypass.
+
+        A `PhaseSpec` validator catches ALL SIX write paths at once (the field default, a
+        draft save, a canvas/panel edit, a direct JSONB hand-edit, the publish gauntlet and
+        the NL generator) because every one of them parses through this class.
+
+        The membership test is `isinstance`, not a `phase_type` string compare, so the
+        spelling of the discriminator value is not re-typed here — one home, one fact.
+        """
+        if isinstance(self.config, ExternalActionPhaseConfig) and not self.action_risk_armed:
+            # Observable, never silent: a coercion nobody can see is indistinguishable
+            # from a value that was already correct.
+            logger.info(
+                "189 D-04: phase %r is external_action(%s) and was stored unarmed; "
+                "coercing action_risk_armed to True (structurally armed, not disarmable)",
+                self.slug,
+                self.config.capability,
+            )
+            self.action_risk_armed = True
+        return self
 
 
 # ── 098 co-lock input/asset shapes (CONCLUSION.md §3 verbatim; JSONB makes the ──
