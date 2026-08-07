@@ -79,6 +79,21 @@ import { phaseGlyph } from "@/lib/phaseGlyph"
  * The per-step-type tint that sits BEHIND the floating mark — the whole of this
  * surface's type-colour budget (137-D). Values are the sketch's, expressed against
  * the same hue family the app already ships; every card body stays neutral.
+ *
+ * ⚠ THE TINT IS THE WHOLE BUDGET. It is never a card wash, never a border and never a
+ * text colour — Phase 188 paints run status onto these same nodes and needs the strong
+ * tokens free. A per-step-type colour anywhere else on the card is the regression this
+ * comment exists to name.
+ *
+ * Phase 189-13 Task 1 (CONN-01 / UI-SPEC §5c) — the 7th type. `310` (magenta) is the
+ * MIDPOINT OF THE LARGEST UNUSED HUE GAP: the shipped hues are 200 · 220 · 239 · 170 ·
+ * 38 · 258 and the reserved status hues are 239 (primary), 142 (success), 38 (warning)
+ * and 0 (destructive), leaving two large gaps — 258→360 and 38→142. The second gap's
+ * midpoint (~90, lime) is REJECTED because it sits adjacent to the `--success` family
+ * and would read as a success cue behind an icon, on the one step type whose whole point
+ * is that nothing was sent. 310 is 52° from llm_emit's violet 258 and 50° from
+ * destructive 0/360, its two nearest neighbours. Alpha 0.38 is inside the shipped range
+ * (0.22 … 0.40).
  */
 export const ICON_TINT: Record<string, string> = {
   programmatic: "hsl(200 85% 62% / 0.36)",
@@ -87,6 +102,7 @@ export const ICON_TINT: Record<string, string> = {
   llm_batch_agents: "hsl(170 80% 55% / 0.34)",
   llm_human_input: "hsl(38 92% 62% / 0.38)",
   llm_emit: "hsl(258 90% 70% / 0.40)",
+  external_action: "hsl(310 85% 66% / 0.38)",
 }
 
 export const DEFAULT_TINT = "hsl(220 30% 100% / 0.18)"

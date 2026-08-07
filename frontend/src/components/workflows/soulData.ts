@@ -40,6 +40,20 @@ import { deriveTier, type CitationPolicy, type ValidatorKind } from "@/component
 // the installed @iconify-json/fluent-emoji@1.2.7 set 2026-07-27; the swap landed
 // in ONE commit together with phaseGlyph.PHASE_GLYPH_MARKS, because changing this
 // map alone would leave phaseGlyph() returning the old 3D component.
+// Phase 189-13 Task 1 (CONN-01 / UI-SPEC §5a): the 7th type, `external_action`, gets
+// "outbox-tray" 📤 — "leaves here / goes outside", which is the TYPE's nature. The mark
+// is keyed by phase_type, so it is ONE mark for the type and NOT one per capability: an
+// envelope would say *email* on a step whose capability might be a ticket. Two things
+// were MEASURED against the installed @iconify-json/fluent-emoji@1.2.7 set (3174 icons)
+// rather than inherited — (a) `outbox-tray` is PRESENT while the bare `outbox` is ABSENT
+// (the empty-icon trap; never try it, it fails the build), and (b) presence is NECESSARY,
+// NOT SUFFICIENT, per the 184 swap above: the slug's palette measures mean luminance
+// 168.4, inside the shipped band (package 148.2 … handshake 189.0) and far above the 34.5
+// that made the old batch-agents mark disappear. That is an unweighted palette estimate,
+// not a rendered measurement — the rendered check is UAT row U1 (plan 189-16), because
+// jsdom applies no CSS and paints nothing. Landed in ONE commit with
+// phaseGlyph.PHASE_GLYPH_MARKS, and the two maps' key sets are now asserted IDENTICAL as
+// a property (soulData.test.ts), so a ninth type inherits the split-brain guard.
 export const PHASE_GLYPHS: Record<string, string> = {
   programmatic: "gear",
   llm_single: "memo",
@@ -47,6 +61,7 @@ export const PHASE_GLYPHS: Record<string, string> = {
   llm_batch_agents: "handshake",
   llm_human_input: "raised-hand",
   llm_emit: "package",
+  external_action: "outbox-tray",
 }
 
 /** A loose read-shape over the definition JSONB (we only read what the soul needs). */

@@ -20,9 +20,11 @@
  *     re-verified 2026-07-27 against the INSTALLED
  *     `@iconify-json/fluent-emoji@1.2.7` icon set, which is the source of
  *     truth the build resolves against):
- *     gear, memo, compass, handshake, raised-hand, package.
+ *     gear, memo, compass, handshake, raised-hand, package; and
+ *     re-verified again 2026-08-07 for the 7th type's `outbox-tray`.
  *     `fluent-emoji:direct-hit` and `fluent-emoji:no-entry-sign` are ABSENT
- *     from the set and are NEVER referenced here.
+ *     from the set and are NEVER referenced here — and so is the bare
+ *     `outbox` (measured ABSENT; `outbox-tray` is the one that exists).
  *
  * Phase 184-01 Task 2 (D-184-07) — the two cross-cutting slug swaps:
  * `llm_agent` moved off the previous generic mark to `compass`, and
@@ -34,6 +36,16 @@
  * this one and `soulData.PHASE_GLYPHS` — swapped in the SAME commit: swapping
  * one alone leaves phaseGlyph() returning the old component while the string
  * fallback changed, a silent split-brain.
+ *
+ * Phase 189-13 Task 1 (CONN-01) — the 7th type, `external_action` → `outbox-tray`.
+ * The SAME-COMMIT RULE above was honoured and is no longer only prose: this module
+ * now exports `PHASE_GLYPH_MARK_KEYS` and `soulData.test.ts` asserts the two maps'
+ * key SETS are IDENTICAL. That is the split-brain rule stated as a PROPERTY rather
+ * than as six comparisons, so a ninth type inherits the guard without anybody
+ * remembering to extend a list — and it was observed RED against a one-sided key.
+ * ⚠ The KEYS are exported and the MAP is not, deliberately: a second consumer
+ * reading the map directly would bypass `phaseGlyph()`'s own-property guard below,
+ * which is the 188.1-04 hard-render-crash this file already carries the scar of.
  */
 import type { ComponentType, SVGProps } from "react"
 // Build-time bundled imports — unplugin-icons resolves each slug to a React
@@ -45,6 +57,7 @@ import Compass from "~icons/fluent-emoji/compass"
 import Handshake from "~icons/fluent-emoji/handshake"
 import RaisedHand from "~icons/fluent-emoji/raised-hand"
 import Package from "~icons/fluent-emoji/package"
+import OutboxTray from "~icons/fluent-emoji/outbox-tray"
 
 /**
  * An unplugin-icons bundled SVG component. The full shim type includes SVGProps
@@ -54,8 +67,11 @@ export type PhaseMark = ComponentType<SVGProps<SVGSVGElement> & { size?: number 
 
 /**
  * The phase-type → 3D SVG mark map. Keys are the exact `phase_type` strings
- * from the workflow definition (matching the `PHASE_GLYPHS` keys in soulData.ts).
- * Only the 6 verified types are mapped; any other key returns null via phaseGlyph().
+ * from the workflow definition, and they MUST be the same set as the
+ * `PHASE_GLYPHS` keys in soulData.ts — that identity is asserted as a property
+ * (see `PHASE_GLYPH_MARK_KEYS` below), not restated as a count here, because the
+ * count has now rotted twice (6 at 127-01, 7 at 189-13). Any key neither map
+ * owns returns null via phaseGlyph() and the caller renders its "•" fallback.
  */
 const PHASE_GLYPH_MARKS: Record<string, PhaseMark> = {
   programmatic: Gear,
@@ -64,7 +80,20 @@ const PHASE_GLYPH_MARKS: Record<string, PhaseMark> = {
   llm_batch_agents: Handshake,
   llm_human_input: RaisedHand,
   llm_emit: Package,
+  external_action: OutboxTray,
 }
+
+/**
+ * THE SPLIT-BRAIN GUARD'S HANDLE — the mark map's key set, and nothing else.
+ *
+ * `soulData.test.ts` asserts this equals `Object.keys(soulData.PHASE_GLYPHS)`, which
+ * is the same-commit rule in the header expressed as something a machine checks. Only
+ * the KEYS are exported: handing out the map itself would let a caller read a mark
+ * without `phaseGlyph()`'s own-property guard, and an inherited key (`constructor`)
+ * read that way is the `[Function Object]` React child that hard-crashed a node face
+ * before 188.1-04. A key list cannot be misused that way.
+ */
+export const PHASE_GLYPH_MARK_KEYS: readonly string[] = Object.keys(PHASE_GLYPH_MARKS)
 
 /**
  * Resolve the 3D SVG glyph component for a workflow phase type.

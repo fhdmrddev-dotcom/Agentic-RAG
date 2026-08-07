@@ -225,7 +225,15 @@ const BASELINE = {
   "WorkflowBuilderPage.test.tsx": 15,
   // 188-12: 14 → 20, inherited stale-low pin.
   "PhaseSpineGraph.test.tsx": 20,
-  "soulData.test.ts": 14,
+  // 189-13 (CONN-01 / UI-SPEC §5a): 14 → 17. An EXTENSION, not a lowering — the six
+  // individual PHASE_GLYPHS key assertions were NOT collapsed into the new property, they
+  // were kept and the seventh added beside them, because a property rewrite that shrank
+  // this file would (a) trip `[count-decrease]` and (b) be exactly how coverage silently
+  // disappears. The +3 are the split-brain key-set identity property, its literal-driven
+  // positive control (`sameKeySet(["a","b"],["a"])` is false), and the resolver sweep that
+  // proves every slug in the string map resolves to a bundled component while an inherited
+  // key still floors to null. Read from THIS SCRIPT'S OWN `actual` column, never hand-counted.
+  "soulData.test.ts": 17,
   // 21 → 23: the two end-to-end WIRE fences for CR-R5-01 (a pick whose folder is gone,
   // and a pick that survived a failed re-fetch, each asserting the `project_folder_id`
   // KEY is absent from the request the client actually sends). Both observed RED with
@@ -327,7 +335,13 @@ const BASELINE = {
   // re-pinned at 8 (the seal loop, the card-distinctness set, the signature set, the word
   // set, the matrix total). None changes the count; all five stop the NINTH reading from
   // reading as a regression.
-  "PhaseNodeCard.test.tsx": 130,
+  // 189-13 (CONN-01 / UI-SPEC §5c): 130 → 131. An EXTENSION, not a lowering. The +1 is the
+  // tint-coverage property — every type in the GLYPH vocabulary has an `ICON_TINT` entry and
+  // none of them is `DEFAULT_TINT`, so a SHIPPED type silently falling to the floor cannot
+  // look like an unknown one. The existing tint case was EDITED in the same commit rather
+  // than added to: its `toHaveLength(6)` is now `Object.keys(PHASE_GLYPHS).length` (derived,
+  // so the EIGHTH type does not read as a regression) plus the new tint's exact value.
+  "PhaseNodeCard.test.tsx": 131,
   "PhaseNode.test.tsx": 26,
   // 189-10 (CONN-01 / D-16 / D-07) — a NEW FILE, pinned in the SAME COMMIT that creates it.
   //
@@ -609,9 +623,16 @@ const BASELINE = {
 // type and the D-23 cross-language mirror fence; `StepTypePicker.test.tsx` +3, the 7th
 // row's position, its resolver-sourced title and its fallback mark). Both read from THIS
 // SCRIPT'S OWN printed `actual` column, in the SAME COMMIT as the tests that moved them.
+// ⚠ AND AN ELEVENTH TIME BY 189-13: 2560 → 2564 (`soulData.test.ts` +3, the split-brain
+// key-set property, its literal positive control and the resolver sweep; `PhaseNodeCard.test.tsx`
+// +1, the tint-coverage property). Read from THIS SCRIPT'S OWN printed `actual` column, in the
+// SAME COMMIT as the tests that moved them. ⚠ `StepTypePicker.test.tsx` had its 3D-mark
+// exclusion DISCHARGED in the same commit and its pin was deliberately NOT moved — the case was
+// REWRITTEN in place rather than deleted, so its count is unchanged at 46 and moving the pin
+// would make the gate disagree with reality.
 // ⚠ The note below is prose beside a DERIVED value and has now drifted twice; it is
 // updated here for the reader, and `BASELINE_TOTAL` itself remains the `reduce`.
-const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // ⚠ 2560 (189-12)
+const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // ⚠ 2564 (189-13)
 
 // ── The Wave-0 blast radius (184-VALIDATION.md § "quick run command"). ──
 const TARGETS = [

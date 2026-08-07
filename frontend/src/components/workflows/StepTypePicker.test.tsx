@@ -141,8 +141,17 @@ const cardFaceFor = (type: PhaseTypeId): string =>
 /** Owed by plan 189-14: `PHASE_TYPE_SENTENCES` + `PHASE_TYPE_SUBTITLES` entries. */
 const TYPES_AWAITING_A_VOCABULARY_ENTRY: readonly PhaseTypeId[] = ["external_action"]
 
-/** Owed by plan 189-13: the `outbox-tray` 3D mark (UI-SPEC §5a). */
-const TYPES_AWAITING_A_3D_MARK: readonly PhaseTypeId[] = ["external_action"]
+/**
+ * ⚠ DISCHARGED by plan 189-13 — kept EMPTY rather than deleted, and that is deliberate.
+ *
+ * This list owed the `outbox-tray` 3D mark (UI-SPEC §5a). The mark landed, the two cases
+ * that read this list went RED exactly as their comments promised they would, and both
+ * were rewritten to assert the FINISHED state instead of the gap. The constant stays at
+ * `[]` so the mechanism is still here and visible the next time a phase type arrives
+ * ahead of its mark — and so the cases below keep a live non-vacuity floor rather than
+ * silently looping over nothing.
+ */
+const TYPES_AWAITING_A_3D_MARK: readonly PhaseTypeId[] = []
 
 /**
  * The row's TITLE line, isolated from its subtitle.
@@ -569,20 +578,26 @@ describe("StepTypePicker — the 3D mark (the locked sketch rule)", () => {
     expect(PHASE_TYPE_ORDER.length - TYPES_AWAITING_A_3D_MARK.length).toBeGreaterThan(1)
   })
 
-  it("falls back to the shipped '•' for a type whose mark has not landed yet", () => {
-    // ⚠ Phase 189's honest intermediate state, PINNED — and falsifiable. `renderPhaseMark`
-    // is TOTAL: an unmapped `phase_type` resolves to the "•" mark rather than throwing or
-    // painting a wrong icon, and 188.1-04 made that a property rather than a claim. The
-    // `outbox-tray` slug is plan 189-13's (UI-SPEC §5a), so the day it lands this case
-    // goes RED and `TYPES_AWAITING_A_3D_MARK` must be emptied with it.
+  it("EVERY offered type now has a real mark — no row is still on the '•' floor", () => {
+    // ⚠ THIS CASE WENT RED WHEN 189-13 LANDED `outbox-tray`, exactly as its previous
+    // comment promised: it used to assert that `external_action` rendered the "•"
+    // fallback and NO `<svg>`, which was Phase 189's honest intermediate state. The
+    // exclusion has been discharged rather than left to outlive its reason, and the case
+    // is REWRITTEN to the finished claim instead of deleted — deleting it would drop the
+    // only assertion that no row is quietly sitting on the floor.
+    expect(TYPES_AWAITING_A_3D_MARK).toHaveLength(0)
     renderPicker(twoSteps, 1)
-    for (const type of TYPES_AWAITING_A_3D_MARK) {
+    for (const type of PHASE_TYPE_ORDER) {
       const mark = screen.getByTestId(`step-type-mark-${type}`)
-      expect(mark.querySelector("svg")).toBeNull()
-      expect(mark.textContent).toBe("•")
+      expect(mark.querySelector("svg")).not.toBeNull()
+      expect(mark.textContent).not.toBe("•")
       // Still decorative, and still no wrong icon borrowed from another type.
       expect(mark).toHaveAttribute("aria-hidden", "true")
     }
+    // The "•" floor is NOT retired — `renderPhaseMark` stays total over an
+    // author-supplied discriminator (188.1-04's WR-04 property, pinned in
+    // `soulData.test.ts` and `PhaseNode.test.tsx`). What is retired is the EXCLUSION:
+    // no type this picker OFFERS is awaiting a mark.
   })
 
   it("marks the icon slot decorative — the sentence carries the meaning", () => {

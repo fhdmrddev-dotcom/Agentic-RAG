@@ -54,6 +54,10 @@ import { DEFAULT_TINT, ICON_TINT } from "./nodePresentation"
 // line above, so this file's whole 184-08 diff reads as added lines plus the two
 // narrowed assertions whose reasons are written at the assertions themselves (D-184-08).
 import { VERDICT_DESTRUCTIVE_TOKEN, VERDICT_MARK } from "./nodePresentation"
+// 189-13's tint-coverage property reads the glyph vocabulary — the map that decides
+// which types exist at all — so the tint table is asserted TOTAL over it rather than
+// pinned at a literal. Its own import statement, same convention as 184-08's above.
+import { PHASE_GLYPHS } from "./soulData"
 // 185-01's occupancy block reads the node box's dimensions from the ONE frozen table
 // the component itself reads, so a layout change moves the computed boxes rather than
 // silently disagreeing with them. Its own import line, same convention as 184-08's.
@@ -797,7 +801,29 @@ describe("nodePresentation — the 184-03 hard cut (source guard)", () => {
     expect(ICON_TINT.llm_agent).toBe("hsl(239 90% 70% / 0.40)")
     expect(ICON_TINT.llm_batch_agents).toBe("hsl(170 80% 55% / 0.34)")
     expect(DEFAULT_TINT).toBe("hsl(220 30% 100% / 0.18)")
-    expect(Object.keys(ICON_TINT)).toHaveLength(6)
+    // Phase 189-13 (CONN-01 / UI-SPEC §5c) — the 7th tint, moved in the SAME COMMIT as
+    // the `ICON_TINT` entry it counts. ⚠ DERIVED from the glyph vocabulary, not re-pinned
+    // at 7: the property is one-tint-per-known-type, and a literal makes the EIGHTH type
+    // read as a regression until somebody remembers to move it — which is exactly what
+    // happened to the six (189-10 / 189-12's derive-don't-re-pin lesson).
+    expect(Object.keys(ICON_TINT)).toHaveLength(Object.keys(PHASE_GLYPHS).length)
+    expect(ICON_TINT.external_action).toBe("hsl(310 85% 66% / 0.38)")
+  })
+
+  it("every phase type with a 3D mark also has a tint — no type falls to DEFAULT_TINT", () => {
+    // The coverage half of the decision recorded in 189-13-SUMMARY.md: `ICON_TINT` is
+    // asserted TOTAL over the glyph vocabulary rather than leaning on the shipped
+    // `?? DEFAULT_TINT` floor. The floor stays — it is the totality contract for an
+    // author-supplied discriminator we do not know — but a SHIPPED type reaching it
+    // would be a missing tint, not an unknown type, and those two must not look alike.
+    for (const type of Object.keys(PHASE_GLYPHS)) {
+      expect(ICON_TINT[type]).toBeDefined()
+      expect(ICON_TINT[type]).not.toBe(DEFAULT_TINT)
+    }
+    // Non-vacuity: the loop is measuring a real vocabulary, and the floor still exists
+    // for a type neither table owns.
+    expect(Object.keys(PHASE_GLYPHS).length).toBeGreaterThan(6)
+    expect(ICON_TINT.llm_future_type ?? DEFAULT_TINT).toBe(DEFAULT_TINT)
   })
 })
 
