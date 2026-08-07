@@ -39,8 +39,9 @@ import {
   vi,
   type MockInstance,
 } from "vitest"
-import { fireEvent, render, screen } from "@testing-library/react"
+import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
+import { useState } from "react"
 
 import stepTypePickerSource from "./StepTypePicker?raw"
 import { StepTypePicker } from "./StepTypePicker"
@@ -417,13 +418,24 @@ describe("StepTypePicker — WR-03: the row is a preview of the card it creates"
 // ── 2. R10b — the refusal is offered, disabled, WITH its reason ────────────────
 
 describe("StepTypePicker — R10b: refused choices are disabled WITH a visible reason", () => {
-  it("disables every choice past the deliverable and shows the reason in the DOM", () => {
+  it("refuses every choice past the deliverable, shows the reason, and stays FOCUSABLE", () => {
     renderPicker(withDeliverable, 3)
 
     for (const type of PHASE_TYPE_ORDER) {
       const row = screen.getByTestId(`step-type-choice-${type}`)
       expect(row).toHaveAttribute("aria-disabled", "true")
-      expect(row).toBeDisabled()
+      // ⚠ REWRITTEN IN PLACE BY `BUG-260807-02`'s KEYBOARD HALF, never deleted — the
+      // claim changed and the case is re-stated rather than dropped. This read
+      // `toBeDisabled()` while the row carried the NATIVE `disabled` attribute, which
+      // cannot receive focus — so a keyboard or screen-reader author could never reach
+      // the row and therefore never heard the reason this component exists to teach
+      // (its own docblock: "an option greyed out mutely is worse"). WAI-ARIA APG says a
+      // disabled menu item SHOULD stay focusable precisely so it stays discoverable, so
+      // the native attribute is gone and only `aria-disabled` announces the refusal.
+      // `jest-dom`'s `toBeDisabled` does NOT consult `aria-disabled`, which is exactly
+      // why this assertion had to be re-stated instead of quietly passing.
+      expect(row).not.toBeDisabled()
+      expect(row).toHaveAttribute("tabindex")
 
       // The reason is REAL text in the DOM, not a title attribute.
       const reason = screen.getByTestId(`step-type-reason-${type}`)
@@ -803,6 +815,345 @@ describe("StepTypePicker — BUG-260807-02: the caller's bound and the wheel opt
     // a harness where no wheel reaches anything.
     fireEvent.wheel(screen.getByTestId("outside-the-panel"))
     expect(onParentWheel).toHaveBeenCalledTimes(1)
+  })
+})
+
+// ── 8c. BUG-260807-02, the KEYBOARD half — the APG vertical-`menu` contract ────
+//
+// ⚠ WHAT THIS BLOCK CAN AND CANNOT SEE, stated before the first assertion. jsdom applies
+// no CSS and computes no layout, so it cannot observe the one thing that can go wrong in
+// the SCROLL half — arrow-keying to row 7 scrolling an ANCESTOR instead of the panel,
+// which `.react-flow`'s `overflow: hidden` makes possible and which manufactured a false
+// 7/7 in the clipping half's first probe. That is measured by DRIVING real key presses,
+// and the readings live on the bug report.
+//
+// What jsdom IS honest about is FOCUS: `document.activeElement`, `tabindex` and the order
+// in which the two move are real here. So the roving half is a unit test, and every case
+// below asserts BOTH the focused element AND the whole tabindex array — a component that
+// moved focus without moving the roving stop, or the reverse, fails.
+//
+// THE DEFECT THIS CLOSES, measured live on this build (2026-08-08, `Compliance Gap
+// Report` draft at 1280 × 666, door `canvas-insert-0`): after opening the menu
+// `document.activeElement` was the `＋` itself, a REAL `ArrowDown` moved it NOWHERE, and a
+// REAL `Tab` jumped straight PAST the open menu to the next door. All seven menuitems
+// carried `tabindex: null`.
+
+describe("StepTypePicker — BUG-260807-02: focus enters the menu, and roves", () => {
+  /** Every row's `tabindex`, in DOM order, as ONE array — never a spot check. */
+  const tabindexes = (): (string | null)[] => rows().map((r) => r.getAttribute("tabindex"))
+
+  /** The roving order with the stop at `i`: exactly one `0`, every other `-1`. */
+  const rovingAt = (i: number): string[] =>
+    PHASE_TYPE_ORDER.map((_, k) => (k === i ? "0" : "-1"))
+
+  const LAST = PHASE_TYPE_ORDER.length - 1
+  const testidAt = (i: number) => `step-type-choice-${PHASE_TYPE_ORDER[i]}`
+
+  it("moves focus INTO the menu on open — the measured inverse of the defect", () => {
+    renderPicker(twoSteps, 1)
+    const panel = screen.getByTestId("step-type-picker")
+
+    expect(panel.contains(document.activeElement)).toBe(true)
+    expect(document.activeElement).toBe(screen.getByTestId(testidAt(0)))
+  })
+
+  it("is ONE tab stop — exactly one row carries tabindex 0, asserted as a whole array", () => {
+    renderPicker(twoSteps, 1)
+    expect(tabindexes()).toEqual(rovingAt(0))
+    // Non-vacuity: the array really has the shape the claim describes, so a component
+    // that emitted seven `0`s (seven tab stops — the WR-04 defect) could not pass.
+    expect(tabindexes().filter((t) => t === "0")).toHaveLength(1)
+    expect(tabindexes()).toHaveLength(PHASE_TYPE_ORDER.length)
+  })
+
+  it("ArrowDown walks every row to the LAST one and then WRAPS to the first", async () => {
+    const user = userEvent.setup()
+    renderPicker(twoSteps, 1)
+
+    for (let i = 1; i <= LAST; i++) {
+      await user.keyboard("{ArrowDown}")
+      expect(document.activeElement).toBe(screen.getByTestId(testidAt(i)))
+      expect(tabindexes()).toEqual(rovingAt(i))
+    }
+    // Row 7 is `external_action` — the capability Phase 189 exists to ship, and the row
+    // this bug is named for. Named explicitly so a shrinking order cannot quietly make
+    // this walk shorter.
+    expect(document.activeElement).toBe(screen.getByTestId("step-type-choice-external_action"))
+
+    await user.keyboard("{ArrowDown}")
+    expect(document.activeElement).toBe(screen.getByTestId(testidAt(0)))
+    expect(tabindexes()).toEqual(rovingAt(0))
+  })
+
+  it("ArrowUp from the first row WRAPS to the last — the cheap route to row 7", async () => {
+    const user = userEvent.setup()
+    renderPicker(twoSteps, 1)
+
+    await user.keyboard("{ArrowUp}")
+    expect(document.activeElement).toBe(screen.getByTestId(testidAt(LAST)))
+    expect(tabindexes()).toEqual(rovingAt(LAST))
+
+    await user.keyboard("{ArrowUp}")
+    expect(document.activeElement).toBe(screen.getByTestId(testidAt(LAST - 1)))
+    expect(tabindexes()).toEqual(rovingAt(LAST - 1))
+  })
+
+  it("Home lands on the first row and End on the last", async () => {
+    const user = userEvent.setup()
+    renderPicker(twoSteps, 1)
+
+    await user.keyboard("{End}")
+    expect(document.activeElement).toBe(screen.getByTestId(testidAt(LAST)))
+    expect(tabindexes()).toEqual(rovingAt(LAST))
+
+    await user.keyboard("{Home}")
+    expect(document.activeElement).toBe(screen.getByTestId(testidAt(0)))
+    expect(tabindexes()).toEqual(rovingAt(0))
+  })
+
+  it("ArrowRight and ArrowLeft move NOTHING — and ArrowDown, here, moves it", async () => {
+    // ⚠ THE CONTROL, IN THE SAME CASE AS THE CLAIM IT PROPS UP. Without the pair,
+    // "the arrow keys work" is equally satisfied by a harness in which every key moves
+    // focus. Left/Right are unmapped BECAUSE this is a vertical `menu`;
+    // `ExternalActionSection` maps them because it is a `radiogroup`, where APG makes
+    // them synonyms of Down/Up. The difference between the two ARIA patterns is
+    // deliberate, and this is what keeps it deliberate.
+    const user = userEvent.setup()
+    renderPicker(twoSteps, 1)
+
+    const before = document.activeElement
+    await user.keyboard("{ArrowRight}")
+    expect(document.activeElement).toBe(before)
+    expect(tabindexes()).toEqual(rovingAt(0))
+
+    await user.keyboard("{ArrowLeft}")
+    expect(document.activeElement).toBe(before)
+    expect(tabindexes()).toEqual(rovingAt(0))
+
+    await user.keyboard("{ArrowDown}")
+    expect(document.activeElement).not.toBe(before)
+    expect(document.activeElement).toBe(screen.getByTestId(testidAt(1)))
+  })
+
+  it("NEVER calls scrollIntoView — the ancestor-scrolling cheat, fenced on source", () => {
+    // ⚠ `scrollIntoView` walks up and scrolls the NEAREST SCROLLABLE ANCESTOR, and
+    // `.react-flow` is `overflow: hidden` — programmatically scrollable with no scrollbar
+    // and no user gesture that can move it. The clipping half's first probe used it and
+    // manufactured a FALSE 7/7 reachability reading on 2026-08-07; the tell was that its
+    // falsification control refused to swing. The same trap lives in the DEFAULT
+    // `focus()` scroll, which is why the fix focuses with `preventScroll` and moves the
+    // panel's own `scrollTop` by hand.
+    // ⚠ THE FENCE MATCHES A CALL, NOT A MENTION, and that scoping is deliberate rather
+    // than a loosening: written bare as `/scrollIntoView/` it went RED against the fix's
+    // OWN DOCBLOCK, which names the trap three times so the next author sees why the
+    // panel is scrolled by hand. A fence that forbids explaining itself is a fence that
+    // gets deleted. `.scrollIntoView(` is the only spelling that can actually scroll an
+    // ancestor, so it is the only spelling forbidden.
+    expect(stepTypePickerSource).not.toMatch(/\.scrollIntoView\s*\(/)
+    expect(stepTypePickerSource).toMatch(/preventScroll:\s*true/)
+    expect(stepTypePickerSource).toMatch(/scrollTopToReveal/)
+    // The fence is real — the regex matches its planted literal, and the prose form the
+    // docblock uses is genuinely NOT matched, so the narrowing is measured not asserted.
+    expect('row.scrollIntoView({ block: "nearest" })').toMatch(/\.scrollIntoView\s*\(/)
+    expect("the default focus scroll — like `scrollIntoView` — walks ancestors").not.toMatch(
+      /\.scrollIntoView\s*\(/,
+    )
+  })
+
+  it("Escape still dismisses WITH focus inside the menu — the shipped listener unswallowed", async () => {
+    // ⚠ RE-STATED AS A NEW CASE rather than by editing the shipped one. The shipped
+    // "Escape calls onDismiss" fires the key with focus on the BODY, so it cannot see a
+    // container handler that swallows the key before it reaches the gated `window`
+    // listener — which is exactly the regression the new handler could introduce.
+    const onDismiss = vi.fn()
+    const user = userEvent.setup()
+    renderPicker(twoSteps, 1, { onDismiss })
+
+    const panel = screen.getByTestId("step-type-picker")
+    await user.keyboard("{ArrowDown}")
+    expect(panel.contains(document.activeElement)).toBe(true)
+
+    await user.keyboard("{Escape}")
+    expect(onDismiss).toHaveBeenCalledTimes(1)
+  })
+})
+
+/**
+ * A real opener, so focus RETURN is measured rather than assumed. The picker captures
+ * `document.activeElement` at open time, which is what lets ONE design cover BOTH mount
+ * sites — the `＋` doors in `PlaneEditingLayer` and the empty-state door in
+ * `WorkflowCanvas` — without either caller passing a ref down.
+ */
+function OpenerHarness({
+  onChoose,
+  onDismiss,
+}: {
+  onChoose?: (t: string) => void
+  onDismiss?: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div>
+      <button type="button" data-testid="the-opener" onClick={() => setOpen(true)}>
+        ＋
+      </button>
+      <StepTypePicker
+        phases={twoSteps}
+        index={1}
+        open={open}
+        onChoose={(t) => {
+          onChoose?.(t)
+          setOpen(false)
+        }}
+        onDismiss={() => {
+          onDismiss?.()
+          setOpen(false)
+        }}
+      />
+    </div>
+  )
+}
+
+describe("StepTypePicker — BUG-260807-02: focus comes back to the opener", () => {
+  it("returns focus to the ＋ after Escape, and never strands it on the body", async () => {
+    const user = userEvent.setup()
+    render(<OpenerHarness />)
+
+    const opener = screen.getByTestId("the-opener")
+    await user.click(opener)
+    expect(document.activeElement).toBe(screen.getByTestId("step-type-choice-programmatic"))
+
+    await user.keyboard("{Escape}")
+    // The restore lands on the NEXT animation frame, deliberately — awaited, never
+    // assumed synchronous.
+    await waitFor(() => expect(document.activeElement).toBe(opener))
+    expect(document.activeElement).not.toBe(document.body)
+  })
+
+  it("returns focus to the ＋ after CHOOSING a row", async () => {
+    const onChoose = vi.fn()
+    const user = userEvent.setup()
+    render(<OpenerHarness onChoose={onChoose} />)
+
+    const opener = screen.getByTestId("the-opener")
+    await user.click(opener)
+    await user.keyboard("{ArrowDown}")
+    await user.keyboard("{Enter}")
+
+    expect(onChoose).toHaveBeenCalledWith("llm_single")
+    await waitFor(() => expect(document.activeElement).toBe(opener))
+    expect(document.activeElement).not.toBe(document.body)
+  })
+})
+
+// ── 8d. The consequence of dropping the native `disabled`, stated as tests ─────
+//
+// ⚠ THE ACTIVATION GUARD IS NOW LOAD-BEARING, and it never had to be before. A natively
+// disabled button swallows a click in the BROWSER, and React's own
+// `shouldPreventMouseEvent` filters `onClick` for one on top of that — so the shipped
+// "does NOT call onChoose when a refused row is clicked" was satisfied by a harness in
+// which nothing was clicked at all. After this change a real mouse user can physically
+// press a refused row and a real keyboard user can press Enter or Space on one, and the
+// ONLY thing stopping the choice is `onClick`'s `if (refused) return`. So each case below
+// carries a POSITIVE CONTROL proving the event genuinely reached the row.
+
+describe("StepTypePicker — a refused row is reachable, announced, and still unchoosable", () => {
+  it("is reachable BY THE ARROW WALK — which is how the author finally hears the reason", async () => {
+    const user = userEvent.setup()
+    renderPicker(withDeliverable, 3)
+
+    // Every row is refused at this insertion point, so walking to the LAST one exercises
+    // the whole order and lands on `external_action`.
+    for (let i = 1; i < PHASE_TYPE_ORDER.length; i++) {
+      await user.keyboard("{ArrowDown}")
+    }
+    const row = screen.getByTestId("step-type-choice-external_action")
+    expect(document.activeElement).toBe(row)
+    expect(row).toHaveAttribute("aria-disabled", "true")
+    expect(row).not.toBeDisabled()
+
+    // …and the reason it announces is REAL DOM text, wired by `aria-describedby`.
+    const describedBy = row.getAttribute("aria-describedby")
+    expect(describedBy).toBeTruthy()
+    expect(document.getElementById(describedBy as string)?.textContent?.length ?? 0)
+      .toBeGreaterThan(0)
+  })
+
+  it("shows that it holds focus — a row that can be focused must say so (WCAG 2.4.7)", () => {
+    // Refused rows carried `cursor-not-allowed opacity-[0.42]` and NO focus style at all,
+    // because they could not take focus. They can now, so they must show it.
+    const refusedView = renderPicker(withDeliverable, 3)
+    const refused = screen.getByTestId("step-type-choice-llm_single")
+    expect(refused.className).toMatch(/cursor-not-allowed/)
+    expect(refused.className).toMatch(/focus-visible:/)
+    refusedView.unmount()
+
+    // The positive control, in the same case: the ENABLED row's own focus token, so this
+    // is measuring the refused row's branch rather than a class every row shares.
+    renderPicker(twoSteps, 1)
+    const enabled = screen.getByTestId("step-type-choice-llm_single")
+    expect(enabled.className).not.toMatch(/cursor-not-allowed/)
+    expect(enabled.className).toMatch(/focus-visible:/)
+  })
+
+  it("does NOT choose on a real click — WITH the control proving the click landed", async () => {
+    const onChoose = vi.fn()
+    const onDismiss = vi.fn()
+    const user = userEvent.setup()
+    renderPicker(withDeliverable, 3, { onChoose, onDismiss })
+
+    const row = screen.getByTestId("step-type-choice-llm_single")
+    const reached = vi.fn()
+    row.addEventListener("click", reached, true)
+
+    await user.click(row)
+
+    expect(onChoose).not.toHaveBeenCalled()
+    // ⚠ THE POSITIVE CONTROL. Without it, "onChoose was not called" is equally satisfied
+    // by a harness where the click never reached anything — the exact vacuity that kept
+    // the shipped case green while the row was natively disabled and unclickable.
+    expect(reached).toHaveBeenCalledTimes(1)
+    // And a second, independent witness that the press landed INSIDE the panel: the
+    // outside-press dismissal did not fire.
+    expect(onDismiss).not.toHaveBeenCalled()
+  })
+
+  it("does NOT choose on Enter or Space with the refused row focused", async () => {
+    const onChoose = vi.fn()
+    const user = userEvent.setup()
+    renderPicker(withDeliverable, 3, { onChoose })
+
+    const row = screen.getByTestId("step-type-choice-llm_single")
+    const reached = vi.fn()
+    row.addEventListener("click", reached, true)
+
+    await user.keyboard("{ArrowDown}")
+    expect(document.activeElement).toBe(row)
+
+    await user.keyboard("{Enter}")
+    await user.keyboard(" ")
+
+    expect(onChoose).not.toHaveBeenCalled()
+    // The control again: both keys really did activate the button — the guard is what
+    // stopped the choice, not an inert harness.
+    expect(reached.mock.calls.length).toBeGreaterThanOrEqual(2)
+  })
+
+  it("an ENABLED row still chooses on Enter and on Space", async () => {
+    const user = userEvent.setup()
+
+    const withEnter = vi.fn()
+    const a = renderPicker(twoSteps, 1, { onChoose: withEnter })
+    await user.keyboard("{ArrowDown}")
+    await user.keyboard("{Enter}")
+    expect(withEnter).toHaveBeenCalledWith("llm_single")
+    a.unmount()
+
+    const withSpace = vi.fn()
+    renderPicker(twoSteps, 1, { onChoose: withSpace })
+    await user.keyboard("{End}")
+    await user.keyboard(" ")
+    expect(withSpace).toHaveBeenCalledWith("external_action")
   })
 })
 

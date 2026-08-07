@@ -858,7 +858,7 @@ describe("WorkflowCanvas 184-12 — R10b: a stranding choice is offered DISABLED
     expect(screen.queryAllByTestId(/^step-type-reason-/)).toHaveLength(0)
   })
 
-  it("PAST the deliverable every choice is disabled and its reason is real DOM text", () => {
+  it("PAST the deliverable every choice is refused, FOCUSABLE, and its reason is real DOM text", () => {
     renderEditable(withDeliverable)
 
     fireEvent.click(screen.getByTestId("canvas-insert-3"))
@@ -869,8 +869,17 @@ describe("WorkflowCanvas 184-12 — R10b: a stranding choice is offered DISABLED
     // never the number.
     expect(rows).toHaveLength(PHASE_TYPE_ORDER.length)
     for (const row of rows) {
-      expect(row).toBeDisabled()
+      // ⚠ REWRITTEN IN PLACE BY `BUG-260807-02`'s KEYBOARD HALF, never deleted — this
+      // read `toBeDisabled()` while the row carried the NATIVE `disabled` attribute,
+      // which cannot take focus. A keyboard or screen-reader author could therefore never
+      // reach the row and never heard the reason R10b exists to teach. The refusal is now
+      // announced by `aria-disabled` and ENFORCED by the picker's own `onClick` guard,
+      // which the case below ("activating a refused row inserts NOTHING") is what proves
+      // — and that case is load-bearing for the first time, because before this change
+      // the browser swallowed the click before any guard could run.
+      expect(row).not.toBeDisabled()
       expect(row).toHaveAttribute("aria-disabled", "true")
+      expect(row).toHaveAttribute("tabindex")
     }
     // CHARACTER-IDENTICAL to the pure module's constant — which is what proves the
     // canvas authored no reason of its own.

@@ -59,17 +59,69 @@
  * disagree. Strong colour belongs to Phase 188's run status. The panel's entrance
  * animation keys off `open` and nothing else; no row animates on selection.
  *
+ * ── `BUG-260807-02`, the KEYBOARD half — THE NATIVE `disabled` IS GONE, ON PURPOSE ──
+ * The refusal rule above says every declined row is *"still rendered, disabled, with its
+ * sentence visible in the DOM beside it … wired to the row through `aria-describedby`"*,
+ * because *"an option that vanishes teaches nothing, and an option greyed out mutely is
+ * worse — the author is left to guess what they did wrong"*. The NATIVE `disabled`
+ * attribute contradicted that rule outright: a natively disabled button cannot receive
+ * focus, so a keyboard or screen-reader author could never reach the row and therefore
+ * never heard the reason this component exists to teach. WAI-ARIA APG for `menu` says a
+ * disabled item SHOULD stay focusable precisely so it stays discoverable. So the row now
+ * announces `aria-disabled` only, stays in the roving order, and is guarded in `onClick`.
+ *
+ * ⚠ THE CONSEQUENCE, STATED RATHER THAN DISCOVERED LATER: `onClick`'s `if (refused)
+ * return` IS NOW THE ONLY THING PREVENTING A REFUSED CHOICE — for the mouse AND for the
+ * keyboard. Before this, the browser swallowed a click on a disabled button and React's
+ * own `shouldPreventMouseEvent` filtered `onClick` on top of that, so the guard had never
+ * had to work; the shipped test that "proved" it used a click that could not even
+ * dispatch. `StepTypePicker.test.tsx` now drives a real click, `Enter` and `Space` against
+ * it, each with a POSITIVE CONTROL proving the event genuinely reaches the row.
+ *
+ * ⚠ `ArrowLeft` / `ArrowRight` DO NOTHING HERE, DELIBERATELY. `nextRovingIndex` is a
+ * vertical-`menu` key map; `ExternalActionSection` maps Left/Right because it is a
+ * `radiogroup`, where APG makes them synonyms of Up/Down. In a `menu` they belong to
+ * submenus and menubars, neither of which exists here. That non-move is the falsification
+ * control for the whole keyboard claim, in jsdom and on the live canvas alike.
+ *
+ * ⚠ FOCUS IS MOVED WITH `preventScroll`, AND THE PANEL IS SCROLLED BY HAND. The default
+ * focus scroll — like `scrollIntoView` — walks up and scrolls the NEAREST SCROLLABLE
+ * ANCESTOR, and `.react-flow` is `overflow: hidden`: programmatically scrollable, with no
+ * scrollbar and no user gesture that can move it. That is the exact cheat that
+ * manufactured a false 7/7 reachability reading in this bug's clipping half on
+ * 2026-08-07, and the tell was that the falsification control refused to swing. So this
+ * file calls `focus({ preventScroll: true })` and assigns `scrollTopToReveal`'s number to
+ * its OWN panel's `scrollTop`. No CALL to that method appears anywhere in this file, and a
+ * source fence with a positive control keeps it that way. ⚠ The fence matches the CALL
+ * spelling (a dot, the name, a paren) rather than the bare identifier, precisely so this
+ * paragraph may go on naming the trap — written bare, it went red against these very
+ * lines, and a fence that forbids explaining itself is a fence that gets deleted.
+ *
  * A LEAF, not a wired surface: it takes `phases` and an insertion `index`, renders, and
  * calls back. It creates no phase, holds no store reference and owns no placement, so
- * it renders in a plain unit test with no provider and no `ReactFlowProvider`.
+ * it renders in a plain unit test with no provider and no `ReactFlowProvider`. Reading
+ * and writing its OWN panel's `scrollTop` is the panel's own business and is the only DOM
+ * it touches.
  */
-import { useCallback, useEffect, useId, useRef } from "react"
+// ⚠ `KeyboardEvent` IS ALIASED, and the alias is load-bearing rather than stylistic.
+// Imported under its own name it SHADOWS the global DOM `KeyboardEvent` that the shipped
+// `window` Escape listener below is typed against, and `addEventListener` then matches no
+// overload — measured as two net-new `tsc` errors against a baseline of 33.
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from "react"
 
 import {
   allowedTypesAt,
   minimalPhaseFor,
   type PhaseTypeId,
 } from "@/components/workflows/definitionOps"
+import { nextRovingIndex, scrollTopToReveal } from "@/components/workflows/editAffordance"
 import { DEFAULT_TINT, ICON_TINT, renderPhaseMark } from "@/components/workflows/nodePresentation"
 import {
   PHASE_TYPE_SUBTITLES,
@@ -122,6 +174,26 @@ export function StepTypePicker({
 }: StepTypePickerProps) {
   const baseId = useId()
   const panelRef = useRef<HTMLDivElement | null>(null)
+  // THE ROVING STOP. One index, so the whole menu is ONE tab stop — the APG `menu`
+  // contract the `role` has been announcing since 184-07 without honouring it.
+  const [activeIndex, setActiveIndex] = useState(0)
+  const itemRefs = useRef<(HTMLButtonElement | null)[]>([])
+
+  // ⚠ THE ROVING STOP RESETS DURING RENDER, NOT INSIDE THE EFFECT. React's documented
+  // "adjusting state when a prop changes" pattern. A picker re-opened at the SAME mount
+  // must start its walk at row 1 again, and doing that with a `setActiveIndex(0)` in the
+  // effect body is a cascading re-render — which `react-hooks/set-state-in-effect`
+  // correctly flags, measured as a net-new lint error against a baseline of 5.
+  const [wasOpen, setWasOpen] = useState(open)
+  if (wasOpen !== open) {
+    setWasOpen(open)
+    if (open) setActiveIndex(0)
+  }
+
+  // Computed BEFORE the `open` early-return, because the keydown handler below needs the
+  // row count and hooks may not be declared after a conditional return. `allowedTypesAt`
+  // is pure and cheap, so hoisting it costs a closed picker nothing observable.
+  const choices = allowedTypesAt(phases, index)
 
   // The app-wide reveal, READ (never owned) here — the shipped fail-closed accessor
   // (`WorkflowCanvas.tsx:181-183`). Null outside a provider means plain language, no
@@ -166,9 +238,91 @@ export function StepTypePicker({
     return () => window.removeEventListener("mousedown", onPointer, true)
   }, [open, dismiss])
 
+  // ── FOCUS IN, AND FOCUS BACK OUT ──────────────────────────────────────────────
+  //
+  // Measured live on 2026-08-08 before this existed: opening the menu left
+  // `document.activeElement` on the `＋`, a real `ArrowDown` moved it nowhere, and a real
+  // `Tab` jumped straight PAST the open menu to the NEXT door. Focus never entered a
+  // `role="menu"` whose ARIA contract requires arrow-key roving focus.
+  //
+  // ⚠ THE OPENER IS CAPTURED FROM `document.activeElement`, NOT PASSED IN, AND THAT IS
+  // THE DESIGN. There are TWO mount sites — the `＋` doors in `PlaneEditingLayer` and the
+  // `canvas-add-first-step` empty-state door in `WorkflowCanvas` — so a ref threaded down
+  // from one caller would cover one and strand the other. Capturing at open time covers
+  // both for free and lets this plan modify NEITHER caller.
+  useEffect(() => {
+    if (!open) return
+    const active = document.activeElement
+    const opener = active instanceof HTMLElement && active !== document.body ? active : null
+
+    // Refs are attached during commit, i.e. before this effect runs, so row 0 is here.
+    // `preventScroll` — see the ⚠ in the docblock; the default focus scroll walks
+    // ancestors into `.react-flow`'s `overflow: hidden`.
+    itemRefs.current[0]?.focus({ preventScroll: true })
+
+    return () => {
+      // RESTORE ONLY WHEN FOCUS WOULD OTHERWISE BE STRANDED. Dismissing by clicking the
+      // canvas pane can hand focus to React Flow's own focusable wrapper; stealing it
+      // back would fight something the user deliberately pressed. The contract that binds
+      // is the weaker, honest one: focus is never left on `document.body`.
+      //
+      // On the NEXT frame, because the row holding focus is removed from the DOM as this
+      // unmounts and `document.activeElement` does not fall back to the body until after.
+      requestAnimationFrame(() => {
+        if (!opener || !opener.isConnected) return
+        const now = document.activeElement
+        if (now === null || now === document.body) opener.focus({ preventScroll: true })
+      })
+    }
+  }, [open])
+
+  /**
+   * ONE handler on the `role="menu"` container — row events bubble to it — rather than
+   * one per row, so the key map has a single home.
+   *
+   * ⚠ ON `null` IT TOUCHES THE EVENT AT ALL. No `preventDefault`, no `stopPropagation`.
+   * That is what keeps `Escape` reaching the gated `window` listener above and `Enter` /
+   * `Space` reaching the button's own native activation. A handler that called
+   * `preventDefault` unconditionally would make the menu inescapable — the defect the
+   * operator already hit once, from the other direction.
+   */
+  const onMenuKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    // Read the CURRENT row from the event's own target where possible. The keydown's
+    // target IS the focused row, so this stays correct even if two presses land inside
+    // one React batch and `activeIndex` has not re-rendered yet.
+    const fromTarget = itemRefs.current.indexOf(event.target as HTMLButtonElement)
+    const current = fromTarget >= 0 ? fromTarget : activeIndex
+
+    const next = nextRovingIndex(event.key, current, choices.length)
+    if (next === null) return
+    // An arrow inside an open menu must not also scroll whatever sits behind it.
+    event.preventDefault()
+    setActiveIndex(next)
+
+    const row = itemRefs.current[next]
+    if (!row) return
+    row.focus({ preventScroll: true })
+
+    const panel = panelRef.current
+    if (!panel) return
+    // ⚠ `row.offsetTop` IS NOT PANEL-RELATIVE HERE. The panel is `position: static`, so
+    // `offsetParent` is the `absolute` wrapper in `PlaneEditingLayer` — and something
+    // else again at the `canvas-add-first-step` mount site. Rect deltas are the only
+    // reading that is correct at both. Adding `position: relative` to the panel to make
+    // `offsetTop` work would change the stacking context the clipping fix was measured
+    // against, so it is not done.
+    const rowBox = row.getBoundingClientRect()
+    const panelBox = panel.getBoundingClientRect()
+    panel.scrollTop = scrollTopToReveal({
+      scrollTop: panel.scrollTop,
+      clientHeight: panel.clientHeight,
+      rowTop: rowBox.top - panelBox.top + panel.scrollTop,
+      rowHeight: rowBox.height,
+    })
+  }
+
   if (!open) return null
 
-  const choices = allowedTypesAt(phases, index)
   const atEnd = index >= phases.length
 
   return (
@@ -177,6 +331,11 @@ export function StepTypePicker({
       data-testid="step-type-picker"
       role="menu"
       aria-label="Add a step"
+      // A `role="menu"` that owns a keydown handler must itself be focusable
+      // (`jsx-a11y/interactive-supports-focus`, and APG says the same). `-1` keeps it OUT
+      // of the tab order — the roving stop on the rows is the menu's ONE tab stop — while
+      // giving the container somewhere to put focus if a row ever goes missing.
+      tabIndex={-1}
       className={[
         "w-[300px] rounded-[14px] border border-border bg-card p-[7px] shadow-lg",
         "animate-in fade-in-0 slide-in-from-bottom-1 duration-100 motion-reduce:animate-none",
@@ -216,12 +375,15 @@ export function StepTypePicker({
       // the shipped unbounded panel.
       style={{ maxHeight: typeof maxHeightPx === "number" ? `${maxHeightPx}px` : undefined }}
       onWheel={(event) => event.stopPropagation()}
+      // ONE handler for the whole menu — row keydowns bubble here. See `onMenuKeyDown`
+      // for why it must fall through untouched on every key it does not own.
+      onKeyDown={onMenuKeyDown}
     >
       <div className="px-2 pb-[7px] pt-[5px] font-mono text-[10px] uppercase tracking-[0.09em] text-muted-foreground">
         {atEnd ? "Add a step at the end" : `Add a step before step ${index + 1}`}
       </div>
 
-      {choices.map((choice) => {
+      {choices.map((choice, rowIndex) => {
         const reason = choice.disabledReason
         const refused = typeof reason === "string" && reason.length > 0
         const reasonId = `${baseId}-why-${choice.type}`
@@ -241,8 +403,18 @@ export function StepTypePicker({
             data-testid={`step-type-choice-${choice.type}`}
             data-phase-type={choice.type}
             data-refused={refused ? "true" : "false"}
-            disabled={refused}
+            // ⚠ NO NATIVE `disabled`. See the docblock: a natively disabled button cannot
+            // take focus, so the refusal sentence — the whole point of R10b — was
+            // unreachable by exactly the authors who most need it read aloud. The refusal
+            // is announced by `aria-disabled` and ENFORCED by the `onClick` guard below,
+            // which is now load-bearing for the mouse and the keyboard alike.
             aria-disabled={refused ? "true" : undefined}
+            // ROVING TABINDEX — the menu is ONE tab stop, so Tab reaches it and Tab
+            // leaves it, and the arrows do the walking inside.
+            tabIndex={rowIndex === activeIndex ? 0 : -1}
+            ref={(el) => {
+              itemRefs.current[rowIndex] = el
+            }}
             // The reason is REAL DOM text below, not a title attribute — assistive
             // technology reads the same sentence a sighted author reads.
             aria-describedby={refused ? reasonId : undefined}
@@ -254,7 +426,13 @@ export function StepTypePicker({
               "flex w-full items-center gap-[10px] rounded-[9px] border-0 bg-transparent px-2 py-[7px]",
               "text-left text-[12.5px] text-foreground",
               refused
-                ? "cursor-not-allowed opacity-[0.42]"
+                ? // A REFUSED ROW CAN HOLD FOCUS NOW, SO IT MUST SHOW THAT IT DOES
+                  // (WCAG 2.4.7). It carried `cursor-not-allowed opacity-[0.42]` and no
+                  // focus style at all, because it could never be focused. The indicator
+                  // spends NO new hue — `ring` and `accent` are the tokens already on the
+                  // enabled row — so the sketch-137 colour budget is untouched: type
+                  // colour stays a tint behind the mark and nothing else.
+                  "cursor-not-allowed opacity-[0.42] focus-visible:bg-accent/40 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 : "cursor-pointer hover:bg-accent focus-visible:bg-accent focus-visible:outline-none",
             ].join(" ")}
           >
