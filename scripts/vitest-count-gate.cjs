@@ -541,7 +541,16 @@ const BASELINE = {
   // 189-13 lands the `outbox-tray` mark, which is what forces the exclusions to be
   // emptied rather than to outlive their reason.
   "StepTypePicker.test.tsx": 46,
-  "GovernanceSection.test.tsx": 42,
+  // 189-14 Task 2 (D-04 / D-24): 42 -> 49. An EXTENSION — every shipped case is unmoved.
+  // The +7 pin the arming switch's refusing state on `external_action`: it renders ON with
+  // `actionRiskArmed: false` supplied (the state a freshly-placed step is in), it is
+  // `disabled` + `aria-disabled` and its callback is proven NOT to fire by a DRIVEN CLICK,
+  // its reason is real DOM text wired by `aria-describedby` with NO `title` anywhere, it is
+  // NOT struck through (with a positive control proving the strike-through class really
+  // does render where 142-B puts it), and `DIAL_TYPES` is asserted byte-identical on source.
+  // ⚠ The FIRST of the seven is the NEGATIVE CONTROL over all six shipped types — without
+  // it the whole block would pass on a switch disabled everywhere.
+  "GovernanceSection.test.tsx": 49,
   "StarterTemplatePicker.test.tsx": 40,
   "canvasNudge.test.ts": 31,
   "governanceVocabulary.test.ts": 30,
@@ -680,7 +689,8 @@ const BASELINE = {
 // picker's net-new suite; it neither absorbs nor replaces `PhaseFormPanel.test.tsx` (19)
 // or `PhaseFormPanel.rails.test.tsx` (32), both of which are unmoved beside it — the
 // Phase-177 coverage-loss shape this per-file pinning exists to make impossible.
-const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // ⚠ 2612 (189-14)
+// ⚠ AND BY 189-14 TASK 2: 2612 → 2619 (`GovernanceSection.test.tsx` 42 → 49).
+const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // ⚠ 2619 (189-14)
 
 // ── The Wave-0 blast radius (184-VALIDATION.md § "quick run command"). ──
 const TARGETS = [

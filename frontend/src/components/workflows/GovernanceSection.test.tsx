@@ -34,6 +34,7 @@ import { GovernanceSection, type GovernanceSectionProps } from "./GovernanceSect
 import {
   ACTION_RISK_ARM_LABEL,
   ACTION_RISK_ARMED_NOTE,
+  ACTION_RISK_LOCKED_REFUSAL,
   GROUNDING_ALREADY_SET_NOTE,
   GROUNDING_ATTACHED_GATE,
   GROUNDING_DIAL_LOOSE_LABEL,
@@ -333,6 +334,133 @@ describe("GovernanceSection — the action-risk checkpoint", () => {
     renderSection({ phaseType: "llm_agent", actionRiskArmed: true })
     expect(screen.getByText(ACTION_RISK_ARMED_NOTE)).toBeInTheDocument()
     expect(screen.getByTestId("governance-arm")).toHaveAttribute("aria-checked", "true")
+  })
+
+  // ── Phase 189 (D-04 / D-24) — the ONE type where the switch refuses ────────────────
+  //
+  // ⚠ THE NEGATIVE CONTROL IS NOT OPTIONAL and it is written FIRST. Every assertion below
+  // could be satisfied by disabling the switch on EVERY step type, which would silently
+  // delete a shipped control from six surfaces. The six-type case is what makes the pin
+  // mean "this type" rather than "all types".
+
+  it("NEGATIVE CONTROL — all SIX shipped types keep an INTERACTIVE switch that fires", () => {
+    for (const phaseType of ALL_TYPES) {
+      const onGovernanceChange = vi.fn()
+      const { unmount } = renderSection({ phaseType, onGovernanceChange })
+      const arm = screen.getByTestId("governance-arm")
+
+      expect(arm).not.toBeDisabled()
+      expect(arm).not.toHaveAttribute("aria-disabled")
+      expect(arm).toHaveAttribute("data-arm-pinned", "false")
+      expect(arm).toHaveAttribute("aria-checked", "false")
+      // DRIVEN, not read: the callback really does fire on these six.
+      fireEvent.click(arm)
+      expect(onGovernanceChange).toHaveBeenCalledWith({ action_risk_armed: true })
+      expect(screen.queryByTestId("governance-arm-refusal")).toBeNull()
+      unmount()
+    }
+  })
+
+  it("external_action: the switch renders ON, disabled, and its callback does NOT fire", () => {
+    const onGovernanceChange = vi.fn()
+    // ⚠ `actionRiskArmed: false` ON PURPOSE. That is the state a freshly-placed step is
+    // in — `minimalPhaseFor` emits no `action_risk_armed` — and rendering OFF there would
+    // be the exact lie D-04 exists to prevent. The rendered value is a fact about the
+    // TYPE, which the server pins at the Pydantic level (189-07).
+    renderSection({ phaseType: "external_action", actionRiskArmed: false, onGovernanceChange })
+
+    const arm = screen.getByTestId("governance-arm")
+    expect(arm).toHaveAttribute("aria-checked", "true")
+    expect(arm).toBeDisabled()
+    expect(arm).toHaveAttribute("aria-disabled", "true")
+    expect(arm.className).toContain("cursor-not-allowed")
+    // The ON track really is painted — `aria-checked` alone would pass on a switch that
+    // announces one state and paints the other.
+    expect(screen.getByTestId("governance-arm-track").className).toContain("hsl(38_92%_60%/0.55)")
+
+    // DRIVE THE CLICK. Asserting the attribute alone would pass on a control that still
+    // fires — `disabled` is a browser behaviour, and the handler is the second lock.
+    fireEvent.click(arm)
+    expect(onGovernanceChange).not.toHaveBeenCalled()
+  })
+
+  it("external_action: the reason is REAL DOM TEXT, and NO `title` carries it", () => {
+    renderSection({ phaseType: "external_action" })
+
+    const refusal = screen.getByTestId("governance-arm-refusal")
+    // Character-identity against the imported constant — the component authors nothing.
+    expect(refusal).toHaveTextContent(ACTION_RISK_LOCKED_REFUSAL)
+    expect(screen.getByText(ACTION_RISK_LOCKED_REFUSAL)).toBeInTheDocument()
+
+    // `aria-describedby` points AT it, and the id really resolves — a dangling id is a
+    // sentence a screen reader never reaches.
+    const describedBy = screen.getByTestId("governance-arm").getAttribute("aria-describedby") ?? ""
+    expect(describedBy.split(/\s+/)).toContain(refusal.id)
+    expect(refusal.id).not.toBe("")
+
+    // THE RECORDED LESSON, asserted explicitly: no element in this section carries the
+    // sentence as a tooltip, and no element carries a `title` at all.
+    expect(
+      screen.getByTestId("rail-governance").querySelectorAll("[title]"),
+    ).toHaveLength(0)
+  })
+
+  it("external_action: the switch is NOT struck through and NOT dimmed", () => {
+    // Strike-through is 142-B's treatment for a REFUSED OPTION. This control states a fact
+    // that is TRUE and ACTIVE; striking it would read as "this protection is off".
+    const { container } = renderSection({ phaseType: "external_action" })
+    const arm = screen.getByTestId("governance-arm")
+
+    expect(arm.className).not.toContain("line-through")
+    expect(arm.className).not.toContain("opacity-[0.42]")
+    expect(container.innerHTML).not.toContain("line-through")
+
+    // POSITIVE CONTROL — the strike-through class really IS rendered where 142-B puts it,
+    // so the absence above is a decision rather than a class name that never appears.
+    const locked = renderSection({ phaseType: "llm_agent", availableTools: ["search_documents"] })
+    expect(locked.container.innerHTML).toContain("line-through")
+  })
+
+  it("external_action: the cost note still renders BENEATH the refusal, unchanged", () => {
+    // Two facts, two sentences: the new one says why arming cannot be REMOVED, the shipped
+    // one says what arming COSTS. Neither restates the other, and the order is the reading.
+    renderSection({ phaseType: "external_action" })
+    const refusal = screen.getByTestId("governance-arm-refusal")
+    const note = screen.getByTestId("governance-armed-note")
+
+    expect(note).toHaveTextContent(ACTION_RISK_ARMED_NOTE)
+    expect(refusal.compareDocumentPosition(note) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(ACTION_RISK_LOCKED_REFUSAL).not.toBe(ACTION_RISK_ARMED_NOTE)
+  })
+
+  it("external_action: NO grounding dial, and the nothing-to-prove phrase instead (D-26)", () => {
+    // A connector performs an action and makes no claim: its capabilities are disjoint
+    // from `KB_TOOLS`, so it reads no documents and has nothing to prove. The MISSING dial
+    // and the MISSING ⛨ seal are both correct, not gaps.
+    renderSection({ phaseType: "external_action", availableTools: ["send_email"] })
+
+    expect(screen.queryByTestId("governance-dial")).toBeNull()
+    expect(looseButton()).toBeNull()
+    expect(strictButton()).toBeNull()
+    expect(screen.getByText(GROUNDING_NOTHING_TO_PROVE)).toBeInTheDocument()
+    expect(screen.getByTestId("rail-governance").getAttribute("data-cause")).toBe("none")
+    // …and a stored escalation bit cannot conjure one back on this type either.
+    const escalated = renderSection({ phaseType: "external_action", groundingEscalated: true })
+    expect(within(escalated.container).queryByTestId("governance-dial")).toBeNull()
+  })
+
+  it("`DIAL_TYPES` was NOT widened — external_action is absent from the source list", () => {
+    // A D-185-15 red line, asserted on source because the render cases above can only
+    // prove the types they render. `ARM_PINNED_TYPES` is a SEPARATE list answering a
+    // different question, and merging the two is the failure this guards.
+    const dialTypes = governanceSectionSource.match(
+      /const DIAL_TYPES: readonly string\[\] = \[[^\]]*\]/,
+    )
+    expect(dialTypes).not.toBeNull()
+    expect(dialTypes![0]).toBe('const DIAL_TYPES: readonly string[] = ["llm_agent", "llm_batch_agents"]')
+    expect(governanceSectionSource).toMatch(
+      /const ARM_PINNED_TYPES: readonly string\[\] = \["external_action"\]/,
+    )
   })
 
   it("renders read-only with NO writer wired — the section never disappears, and never throws", () => {

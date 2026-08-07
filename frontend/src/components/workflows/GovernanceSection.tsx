@@ -36,6 +36,18 @@
  *                  detection later applies, detection wins, the stored bit goes inert
  *                  and the undo affordance disappears regardless of it (SPEC Req 3).
  *
+ * ── THE ARMING SWITCH REFUSES ON ONE TYPE (Phase 189 / D-04 / D-24) ──
+ * The action-risk checkpoint is offered on every step type, and on `external_action` it
+ * is STRUCTURALLY armed: the server pins the field, so a control that could be pressed
+ * and changed nothing would be a lie. It therefore renders ON, `disabled`, `aria-disabled`
+ * and `cursor-not-allowed`, with ONE new sentence — `ACTION_RISK_LOCKED_REFUSAL` — as real
+ * DOM text in the shipped refusal block, wired by `aria-describedby`.
+ * ⚠ It is NOT struck through and NOT dimmed to the refused-option opacity. Strike-through
+ * is 142-B's treatment for a REFUSED OPTION; this control states a fact that is TRUE and
+ * ACTIVE. ⚠ And it is not REMOVED either: the "remove a dead control" rule below is really
+ * *replace a dead control with the sentence that states the fact*, and this control is not
+ * dead — it is pinned, and it displays the most important thing on the panel for this type.
+ *
  * ── WHICH STEPS CARRY A DIAL (D-185-15) ──
  * Only `llm_agent` and `llm_batch_agents`. They are the only configs whose tools can ever
  * INTERSECT the server's `KB_TOOLS`, i.e. the only steps that can ever SATISFY the gate.
@@ -68,6 +80,7 @@ import { useId } from "react"
 import {
   ACTION_RISK_ARM_LABEL,
   ACTION_RISK_ARMED_NOTE,
+  ACTION_RISK_LOCKED_REFUSAL,
   GROUNDING_ALREADY_SET_NOTE,
   GROUNDING_ATTACHED_GATE,
   GROUNDING_DIAL_LOOSE_LABEL,
@@ -106,6 +119,27 @@ const DIAL_TYPES: readonly string[] = ["llm_agent", "llm_batch_agents"]
 /** The deliverable — the one type whose strictness is owned by another control. */
 const EMIT_TYPE = "llm_emit"
 
+/**
+ * Phase 189 (D-04) — the step types whose action-risk checkpoint is STRUCTURALLY ARMED
+ * and cannot be disarmed by anyone. A NAMED module-scope constant, `DIAL_TYPES`' form,
+ * because a type gate written as an inline literal at its use site is a gate nobody can
+ * find when the eighth type arrives.
+ *
+ * ⚠ THIS IS NOT `DIAL_TYPES` AND MUST NEVER BE MERGED WITH IT. They answer opposite
+ * questions about different fields: `DIAL_TYPES` says which steps can be held to their
+ * SOURCES (grounding), and `external_action` is deliberately absent from it — its three
+ * capabilities are disjoint from `KB_TOOLS`, so it reads no documents and has nothing to
+ * prove. This list says which steps are always ARMED. A step can be one, both or neither.
+ *
+ * ⚠ AND THE SERVER IS THE GUARANTEE, NOT THIS LINE. `ExternalActionPhaseConfig` pins
+ * `action_risk_armed` true at the Pydantic level (189-07); this constant only makes the
+ * SURFACE tell the truth about it. Measured, and the reason the pin is needed on the
+ * client at all: `minimalPhaseFor("external_action", …)` emits no `action_risk_armed`, so
+ * a freshly-placed step arrives with the prop FALSE and the switch would render OFF —
+ * the exact lie D-04 exists to prevent — until the definition made a server round trip.
+ */
+const ARM_PINNED_TYPES: readonly string[] = ["external_action"]
+
 /** The `citation_policy` value that makes the deliverable already-strict. */
 const STRICT_POLICY = "strict"
 
@@ -134,7 +168,13 @@ export interface GovernanceSectionProps {
   /** Author intent only (D-185-07). Inert whenever detection applies. */
   groundingEscalated: boolean
   /** Author intent only. Default OFF in 185 — no engine step type performs outbound
-   *  egress yet; Phase 189's external-action node arrives armed-on per its SC#2. */
+   *  egress yet.
+   *  ⚠ CORRECTED at Phase 189-14, in the commit that made it true: this sentence used to
+   *  predict that *"Phase 189's external-action node arrives armed-on per its SC#2"*. It
+   *  does — but NOT through this prop. `ARM_PINNED_TYPES` above decides the rendered
+   *  state for that type, because a freshly-placed step has no stored bit yet and the
+   *  switch must not read OFF for the interval before its first save (D-04). This prop
+   *  stays what it always was: the author's intent on the six types that have one. */
   actionRiskArmed: boolean
   /** D-185-10 — the PhaseSpec-level write, caller-owned. ABSENT ⇒ the section renders
    *  read-only (presses are inert) rather than disappearing, so a dropped wiring is
@@ -205,6 +245,14 @@ export function GovernanceSection({
   const refused = hasDial && detected
   const reasonId = `${baseId}-why-locked`
   const armNoteId = `${baseId}-armed-note`
+  const armLockedId = `${baseId}-arm-locked`
+
+  // Phase 189 (D-04). The switch is ON and UNMOVABLE on this type. `armed` is the OR, not
+  // the prop, because the pinned value is a fact about the TYPE that the stored bit merely
+  // echoes — a step that has not round-tripped the server yet would otherwise render its
+  // single most important guarantee as switched off.
+  const armPinned = ARM_PINNED_TYPES.includes(phaseType)
+  const armed = armPinned || actionRiskArmed
 
   return (
     <section
@@ -296,18 +344,38 @@ export function GovernanceSection({
         </p>
       )}
 
-      {/* The action-risk checkpoint — offered on EVERY step type (SPEC Req 8). */}
+      {/* The action-risk checkpoint — offered on EVERY step type (SPEC Req 8), and on ONE
+          of them (D-04) it is ON and REFUSES TO MOVE. */}
       <div className="mt-2 border-t border-border pt-2">
         <button
           type="button"
           role="switch"
           data-testid="governance-arm"
-          aria-checked={actionRiskArmed}
-          aria-describedby={actionRiskArmed ? armNoteId : undefined}
-          onClick={() => onGovernanceChange?.({ action_risk_armed: !actionRiskArmed })}
+          data-arm-pinned={armPinned ? "true" : "false"}
+          aria-checked={armed}
+          disabled={armPinned}
+          aria-disabled={armPinned ? "true" : undefined}
+          // The reason is REAL DOM text below, never a `title` attribute (the 184-07
+          // lesson). When the switch is pinned a screen reader reaches BOTH sentences:
+          // why it cannot be removed, and what it costs.
+          aria-describedby={
+            armPinned ? `${armLockedId} ${armNoteId}` : armed ? armNoteId : undefined
+          }
+          onClick={() => {
+            // Belt as well as braces. `disabled` already stops the press in a real
+            // browser; this makes the refusal true of the HANDLER too, so a control
+            // rendered another way can still never write the disarmed intent.
+            if (armPinned) return
+            onGovernanceChange?.({ action_risk_armed: !actionRiskArmed })
+          }}
           className={[
             "flex w-full items-center gap-2 rounded border border-border px-2 py-1 text-left",
-            "text-[11px] text-foreground hover:bg-accent/40 focus:outline-none focus:ring-1 focus:ring-primary",
+            "text-[11px] text-foreground focus:outline-none focus:ring-1 focus:ring-primary",
+            // ⚠ NOT `DIAL_BUTTON_REFUSED`. Strike-through and the 0.42 dim are 142-B's
+            // treatment for a REFUSED OPTION; this control states a fact that is TRUE and
+            // ACTIVE, and striking it would read as "this protection is off" — the exact
+            // opposite of what it says. Only the cursor and the hover change.
+            armPinned ? "cursor-not-allowed" : "hover:bg-accent/40",
           ].join(" ")}
         >
           <span
@@ -315,14 +383,27 @@ export function GovernanceSection({
             data-testid="governance-arm-track"
             className={[
               "inline-block h-[13px] w-[24px] shrink-0 rounded-full border border-border",
-              actionRiskArmed ? "bg-[hsl(38_92%_60%/0.55)]" : "bg-muted",
+              armed ? "bg-[hsl(38_92%_60%/0.55)]" : "bg-muted",
             ].join(" ")}
           />
           <span className="min-w-0">{ACTION_RISK_ARM_LABEL}</span>
         </button>
 
+        {/* D-04 / D-24 — refused, never hidden. The shipped amber refusal block, the same
+            one the locked grounding dial uses one scroll up. The control is NOT removed:
+            185's "a control that could never do anything is REMOVED, not disabled" is
+            really *replace a DEAD control with the sentence that states the fact*, and
+            this one is not dead — it displays the single most important thing on the
+            panel for this type, so hiding it would delete the reading at the moment it
+            matters most (143-A's argument for the seal, one surface along). */}
+        {armPinned && (
+          <p id={armLockedId} data-testid="governance-arm-refusal" className={REFUSAL_CLASSES}>
+            {ACTION_RISK_LOCKED_REFUSAL}
+          </p>
+        )}
+
         {/* Said ONLY when armed. An unarmed step must never claim the run waits for it. */}
-        {actionRiskArmed && (
+        {armed && (
           <p id={armNoteId} data-testid="governance-armed-note" className={NOTE_CLASSES}>
             {ACTION_RISK_ARMED_NOTE}
           </p>

@@ -540,6 +540,28 @@ export const ACTION_RISK_ARM_LABEL = "Stop and ask me first"
 export const ACTION_RISK_ARMED_NOTE =
   "When this step is reached the run stops and waits for your answer. It will not continue on its own."
 
+/**
+ * Phase 189 (D-04 / D-24) — why the arming switch cannot be turned off on an
+ * external-action step. ONE new sentence, sited HERE beside the other governance strings
+ * so it is testable for drift, and rendered through the SHIPPED refusal block.
+ *
+ * ⚠ D-04 asked for the 185 refusal vocabulary to be REUSED rather than for new copy to be
+ * written, and that is not literally satisfiable — measured, not assumed. The only shipped
+ * refusal sentence is `GROUNDING_LOCK_REFUSAL` above, and EVERY clause of it is about
+ * knowledge-base tools ("reading your files", "the document tools below"). Rendered beside
+ * an arming switch on a step that opens no document it would be simply FALSE. So the
+ * SHAPE is reused verbatim — refused-never-hidden, the reason as real DOM text in
+ * `REFUSAL_CLASSES`, wired by `aria-describedby`, never a `title` — and exactly ONE
+ * sentence is authored. D-04's intent (don't invent a new refusal MECHANISM) is honoured
+ * in full; its literal wording is not, and that is recorded rather than glossed.
+ *
+ * IT PAIRS WITH `ACTION_RISK_ARMED_NOTE`, WHICH STILL RENDERS BENEATH IT UNCHANGED. That
+ * one says what arming COSTS; this one says why it cannot be REMOVED. Two different
+ * facts, two sentences, neither restating the other.
+ */
+export const ACTION_RISK_LOCKED_REFUSAL =
+  "This step reaches outside your workspace, so it always stops and asks you first. That cannot be switched off."
+
 // ── Phase 189 (CONN-01 / D-02 / D-15) — the external-action authoring vocabulary ──
 //
 // TWO sentences, sited HERE rather than in `ExternalActionSection.tsx`, for the reason
