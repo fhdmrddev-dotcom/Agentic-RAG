@@ -233,6 +233,104 @@ def test_grounding_bundle_rejects_a_malformed_template_asset_id(client, monkeypa
     assert resp.status_code == 422, resp.text
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+# PHASE 189 — V22 / D-20: THE AUTHOR-FACING TOOL RAIL MUST NOT WIDEN
+# ══════════════════════════════════════════════════════════════════════════════
+#
+# `189-RESEARCH.md` § Security Domain names this the single NET-NEW security property
+# Phase 189 introduces, and it is a STANDING FENCE authored BEFORE the change that could
+# break it — not a Wave-0 RED. **It passes today. That is correct and deliberate.**
+#
+# THE THREAT, in full, because the assertion alone does not carry it:
+#
+#   * `GroundingBundle.tools` is `sorted(tool_names)` and is served on
+#     `GET /workflows/grounding-bundle`.
+#   * `WorkflowBuilderPage.tsx` binds that array straight into `PhaseFormPanel`'s
+#     `toolOptions` — the AUTHOR-FACING WHITELIST RAIL for `llm_agent` and
+#     `llm_batch_agents`, whose own docblock reads "THE OPTION SET IS THE SERVER'S".
+#   * So anything in `tools` is a name an author may tick on ANY agent step.
+#
+# CONFLICT 2 (D-20) needs the three external-action capabilities to be in `tool_names`,
+# or a workflow built on D-03 cannot publish (stage 2.6 rule 2 — see
+# `tests/unit/test_103_grounding_fidelity.py`). **The cheapest way to achieve that is to
+# add them to `get_tools()`, and it is a governance hole**: an author could then whitelist
+# `send_email` on an ORDINARY, UNARMED `llm_agent` step, bypassing the `external_action`
+# type's structural arming entirely. That is precisely the wire-around D-04 and SC#2
+# forbid, and it would make `action_risk_armed` decorative.
+#
+# **THIS IS WHY THE D-20 FIX WIDENS `tool_names` AND NOT `tools`.** The two fields are
+# equal today by construction, and `render_grounding_prompt`'s docstring asserts that
+# identity in prose; plan 189-04 breaks it deliberately and must correct that prose in the
+# same commit.
+#
+# The bundle is read OFFLINE here (a `MagicMock` supabase, the same posture the palette
+# tests above use) rather than over HTTP: the route's own field mapping is already pinned
+# by `test_grounding_bundle_fields_come_from_the_bundle`, and driving a second HTTP read
+# would add a DB-dependent failure to a file whose failure set must stay at exactly the two
+# pre-existing `pool is closing` rows.
+
+# D-15's closed set, one collection. Kept in the shape `tests/unit/
+# test_103_grounding_fidelity.py` and `tests/unit/test_189_external_action_model.py` use.
+EXTERNAL_ACTION_CAPABILITIES = frozenset({"send_email", "create_ticket", "post_message"})
+
+
+async def _bundle_tools() -> list[str]:
+    """`GroundingBundle.tools` from the PRODUCTION assembler — the wire palette itself."""
+    from unittest.mock import MagicMock
+
+    from app.services.harness.grounding import assemble_grounding_bundle
+
+    bundle = await assemble_grounding_bundle(
+        supabase=MagicMock(), user_id="00000000-0000-0000-0000-0000000000a1"
+    )
+    return bundle.tools
+
+
+def test_external_action_capabilities_are_absent_from_the_author_facing_tool_options():
+    """V22 / D-20 — no external-action capability may reach the author-facing tool rail.
+
+    See this section's header for the threat. Three assertions, and the first two exist so
+    the third can never pass vacuously:
+
+      1. `tools` is NON-EMPTY — a disjointness check against an empty list proves nothing,
+         and a vacuous security guard is worse than none.
+      2. `tools` contains a KNOWN SHIPPED tool (`search_documents`), so it is demonstrably
+         the real registry rather than an arbitrary non-empty list.
+      3. `tools` is DISJOINT from `EXTERNAL_ACTION_CAPABILITIES` — asserted on the SET, so
+         a fix that leaks one of the three is caught as surely as one that leaks all three.
+
+    ⚠ **This test PASSES at HEAD**, because nothing has yet tried to widen the palette. It
+    is a regression fence around plan 189-04, not a falsification of current behaviour.
+    Its non-vacuity was proved separately, by planting `send_email` into `get_tools()` and
+    observing this guard go RED — recorded verbatim in `189-02-SUMMARY.md`; the plant was
+    removed before commit.
+    """
+    import asyncio
+
+    tools = asyncio.run(_bundle_tools())
+
+    assert tools, (
+        "GroundingBundle.tools is EMPTY — the disjointness assertion below would pass "
+        "vacuously and this guard would silently stop protecting anything"
+    )
+    assert "search_documents" in tools, (
+        f"GroundingBundle.tools does not contain a known shipped tool; it is not the real "
+        f"registry, so the disjointness check measures nothing. Got: {tools!r}"
+    )
+
+    leaked = EXTERNAL_ACTION_CAPABILITIES & set(tools)
+    assert leaked == set(), (
+        f"D-20 GOVERNANCE HOLE: {sorted(leaked)} reached GroundingBundle.tools, which is "
+        f"served on GET /workflows/grounding-bundle and bound straight into "
+        f"PhaseFormPanel's author-facing whitelist rail. An author can now tick "
+        f"{sorted(leaked)[0]!r} on an ORDINARY, UNARMED llm_agent step — bypassing the "
+        f"external_action type's structural arming and wiring around the gate D-04 and "
+        f"SC#2 make undisarmable. The stage-2.6 fidelity gate must be widened via "
+        f"tool_names ONLY (a closed EXTERNAL_ACTION_CAPABILITIES frozenset unioned in for "
+        f"the fidelity check), never via get_tools() / GroundingBundle.tools."
+    )
+
+
 # ── 3) the gate is require_canvas ALONE (Pitfall 3) ───────────────────────────
 
 
