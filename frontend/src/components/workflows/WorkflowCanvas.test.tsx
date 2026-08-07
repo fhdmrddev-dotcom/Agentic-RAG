@@ -631,8 +631,16 @@ describe("WorkflowCanvas — the scope fences (source guard)", () => {
 // makes the value/type distinction easy to get wrong under a later edit, and a fence that
 // permits the cheap mistake is not worth the line it costs. Dynamic `import()` is its own
 // regex because it has no `from`.
-const IMPORT_FROM_CANVAS = /from\s+["'][^"']*WorkflowCanvas["']/
-const DYNAMIC_IMPORT_CANVAS = /import\s*\(\s*["'][^"']*WorkflowCanvas["']\s*\)/
+//
+// ⚠ `(\.[jt]sx?)?` IS LOAD-BEARING AND WAS ADDED AT `/gsd:secure-phase 188.2`. This fence is
+// 188.1-03's, and it shipped with the SAME hole its 188.2 sibling did — the quote was anchored
+// to close immediately after `WorkflowCanvas`, so `from "./WorkflowCanvas.tsx"` evaded it in
+// every form. `frontend/tsconfig.app.json:13-14` sets `"moduleResolution": "bundler"` WITH
+// `"allowImportingTsExtensions": true`, so that specifier compiles and resolves and would build
+// a real TDZ cycle under a green fence. Fixed here in the same commit as
+// `PhaseNodeCard.test.tsx:592-593` because one file's fix leaves the identical hole next door.
+const IMPORT_FROM_CANVAS = /from\s+["'][^"']*WorkflowCanvas(\.[jt]sx?)?["']/
+const DYNAMIC_IMPORT_CANVAS = /import\s*\(\s*["'][^"']*WorkflowCanvas(\.[jt]sx?)?["']\s*\)/
 
 describe("WorkflowCanvas 188.1-03 — the extracted modules cannot import back (SC#3)", () => {
   it("the two regexes match the shapes they forbid, and both sources are really loaded", () => {
@@ -646,6 +654,23 @@ describe("WorkflowCanvas 188.1-03 — the extracted modules cannot import back (
     expect('const m = await import("@/components/workflows/WorkflowCanvas")').toMatch(
       DYNAMIC_IMPORT_CANVAS,
     )
+    // …and the SUFFIXED spelling of each, legal under `allowImportingTsExtensions: true` and
+    // admitted by this fence's anchor until `/gsd:secure-phase 188.2`. One per form: an
+    // optional group is only proven by exercising the branch that takes it.
+    expect('import { WorkflowCanvas } from "./WorkflowCanvas.tsx"').toMatch(IMPORT_FROM_CANVAS)
+    expect('import type { CanvasNotice } from "./WorkflowCanvas.tsx"').toMatch(IMPORT_FROM_CANVAS)
+    expect('export { EDIT_AFFORDANCE } from "./WorkflowCanvas.tsx"').toMatch(IMPORT_FROM_CANVAS)
+    expect('const m = await import("./WorkflowCanvas.tsx")').toMatch(DYNAMIC_IMPORT_CANVAS)
+    // NEGATIVE CONTROLS — absent before `/gsd:secure-phase 188.2`, which is why widening the
+    // anchor needed them written first. `?raw` is this very file's own spelling at line 32, and
+    // it must keep missing under BOTH branches of the new optional group.
+    for (const legal of [
+      'import workflowCanvasSource from "./WorkflowCanvas?raw"',
+      'import src from "./WorkflowCanvas.tsx?raw"',
+    ]) {
+      expect(legal).not.toMatch(IMPORT_FROM_CANVAS)
+      expect(legal).not.toMatch(DYNAMIC_IMPORT_CANVAS)
+    }
     // …and the subjects are non-empty, so the negatives below are about real files.
     expect(planeEditingLayerSource.length).toBeGreaterThan(0)
     expect(editAffordanceSource.length).toBeGreaterThan(0)

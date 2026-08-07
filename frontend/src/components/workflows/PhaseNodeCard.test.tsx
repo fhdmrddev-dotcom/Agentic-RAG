@@ -584,13 +584,25 @@ describe("PhaseNodeCard — the scope fences (source guard)", () => {
 // edit, and a fence that permits the cheap mistake is not worth the line it costs. Dynamic
 // `import()` needs its own regex because it has no `from`.
 //
-// Both regexes are anchored so the quote CLOSES immediately after `PhaseNodeCard`. That is what
-// keeps this file's own `from "./PhaseNodeCard?raw"` (line 37) and the extracted
-// `from "./phaseNodeCardContract"` out of the match — and it is asserted below as a pair of
-// NEGATIVE controls rather than trusted, because an over-broad regex here would make the fence
-// unfixable in the one file that has to carry it.
-const IMPORT_FROM_CARD = /from\s+["'][^"']*PhaseNodeCard["']/
-const DYNAMIC_IMPORT_CARD = /import\s*\(\s*["'][^"']*PhaseNodeCard["']\s*\)/
+// Both regexes are anchored so the quote CLOSES immediately after `PhaseNodeCard` — or after an
+// explicit module suffix, see below. That is what keeps this file's own
+// `from "./PhaseNodeCard?raw"` (line 37) and the extracted `from "./phaseNodeCardContract"` out
+// of the match — and it is asserted below as a pair of NEGATIVE controls rather than trusted,
+// because an over-broad regex here would make the fence unfixable in the one file that has to
+// carry it.
+//
+// ⚠ `(\.[jt]sx?)?` IS LOAD-BEARING AND WAS ADDED AT `/gsd:secure-phase 188.2` (T-188.2-04 /
+// T-188.2-20, found OPEN by the auditor). Without it the anchor admitted exactly one evasion:
+// `from "./PhaseNodeCard.tsx"`. That specifier is not hypothetical here —
+// `frontend/tsconfig.app.json:13-14` sets `"moduleResolution": "bundler"` WITH
+// `"allowImportingTsExtensions": true`, so the suffixed form compiles, resolves, and builds a
+// real cycle while this fence stayed green. The register claimed "ANY import form"; the code
+// covered one. The optional group closes it for the static, re-export, type-only and dynamic
+// forms at once, since all four route through these two regexes, and the `?raw` negative still
+// fails to match under BOTH branches (`?raw` is not a `.[jt]sx?` suffix, and the empty branch
+// then demands a quote it does not find).
+const IMPORT_FROM_CARD = /from\s+["'][^"']*PhaseNodeCard(\.[jt]sx?)?["']/
+const DYNAMIC_IMPORT_CARD = /import\s*\(\s*["'][^"']*PhaseNodeCard(\.[jt]sx?)?["']\s*\)/
 
 describe("PhaseNodeCard 188.2 — the extracted modules cannot import back (SC#3)", () => {
   it("the two regexes match the shapes they forbid and MISS the two that are legal", () => {
@@ -604,11 +616,24 @@ describe("PhaseNodeCard 188.2 — the extracted modules cannot import back (SC#3
     expect('const m = await import("@/components/workflows/PhaseNodeCard")').toMatch(
       DYNAMIC_IMPORT_CARD,
     )
-    // NEGATIVE CONTROLS. These two specifiers are LEGAL and appear in this very subtree, so a
-    // regex that matched either would make the fence below permanently red for the wrong reason.
+    // …and the SUFFIXED spelling of each, which `allowImportingTsExtensions: true` makes legal
+    // TypeScript in this project and which the pre-secure-phase anchor let through in all four
+    // forms. One assertion per form, because a group that is optional in the regex is only
+    // proven by exercising the branch that takes it.
+    expect('import { PhaseNodeCard } from "./PhaseNodeCard.tsx"').toMatch(IMPORT_FROM_CARD)
+    expect('import type { PhaseNodeCardProps } from "./PhaseNodeCard.tsx"').toMatch(
+      IMPORT_FROM_CARD,
+    )
+    expect('export { PhaseNodeCard } from "./PhaseNodeCard.tsx"').toMatch(IMPORT_FROM_CARD)
+    expect('const m = await import("./PhaseNodeCard.tsx")').toMatch(DYNAMIC_IMPORT_CARD)
+    // NEGATIVE CONTROLS. These specifiers are LEGAL and appear in this very subtree, so a
+    // regex that matched any would make the fence below permanently red for the wrong reason.
+    // The third is the one the suffix branch could plausibly have broken: `?raw` on a SUFFIXED
+    // specifier, where the optional group matches `.tsx` and the quote check then has to fail.
     for (const legal of [
       'import type { X } from "./PhaseNodeCard?raw"',
       'import { own } from "./phaseNodeCardContract"',
+      'import src from "./PhaseNodeCard.tsx?raw"',
     ]) {
       expect(legal).not.toMatch(IMPORT_FROM_CARD)
       expect(legal).not.toMatch(DYNAMIC_IMPORT_CARD)
