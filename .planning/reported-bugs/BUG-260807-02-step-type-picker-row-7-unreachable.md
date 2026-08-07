@@ -4,10 +4,10 @@ title: The StepTypePicker's last rows are clipped away inside the overflow-hidde
 reported: 2026-08-07
 surface: Agentic-RAG
 severity: blocker
-status: open
+status: closed
 affected_areas: [frontend/workflow-canvas, frontend/step-type-picker, a11y/keyboard-nav]
 folded_into: null
-verified_closed_by: null
+verified_closed_by: 260808-148
 related_seeds: []
 re_open_trigger: null
 reproduces_on:
@@ -120,11 +120,13 @@ tried in isolation and **failed**:
   guard must ship with it.
 - **Flip up when the menu would overflow the container**, the usual collision behaviour.
 
-⚠ **Also fix the keyboard path** — it is a second, independent defect surfaced by the same
-investigation. `role="menu"` with `role="menuitem"` children is a WAI-ARIA pattern that REQUIRES
-arrow-key roving focus; today focus never enters the menu. Note the *capability* picker
-(`ExternalActionSection`) got exactly this treatment as review finding WR-04 and now has a correct
-roving tabindex (`0,-1,-1`) with working `ArrowDown`/`ArrowUp` — that is the shape to copy.
+~~⚠ **Also fix the keyboard path**~~ — **DONE, 2026-08-08 (`/gsd:quick 260808-148`). See
+*Resolved — the keyboard half* below.** It was a second, independent defect surfaced by the same
+investigation: `role="menu"` with `role="menuitem"` children is a WAI-ARIA pattern that REQUIRES
+arrow-key roving focus, and focus never entered the menu. `ExternalActionSection`'s WR-04 roving
+tabindex was the shape copied — with ONE deliberate divergence, since that component is a
+`radiogroup` (where APG makes Left/Right synonyms of Up/Down) and this one is a vertical `menu`
+(where they are not). That divergence is the driven falsification control below.
 
 ⚠ **jsdom cannot see this defect.** It applies no CSS, computes no stacking contexts or overflow
 clipping, and `.click()` bypasses hit-testing — which is exactly why the picker's unit tests are green
@@ -133,12 +135,12 @@ viewport, with a falsification control observed swinging both ways.
 
 ## Resolved — the clipping half (2026-08-08, `/gsd:quick 260807-x9p`)
 
-> ⚠ **The report stays `open`.** Only the CLIPPING half is closed. The KEYBOARD defect
-> (item 3 above — `ArrowDown`/`Tab` never move focus into the menu, the menuitems carry no
-> `tabindex`) was NOT touched by this work and is why `status` is unchanged. `role="menu"`
-> with `role="menuitem"` children is a WAI-ARIA pattern that REQUIRES arrow-key roving
-> focus, and the shape to copy is the one `ExternalActionSection` already ships as review
-> finding WR-04 (roving tabindex `0,-1,-1`, working `ArrowDown`/`ArrowUp`).
+> ⚠ ~~**The report stays `open`.**~~ **SUPERSEDED 2026-08-08** — this caveat was true when
+> written and is no longer. The KEYBOARD defect it names (item 3 above) was closed the
+> next day by `/gsd:quick 260808-148`; see *Resolved — the keyboard half* below, and the
+> frontmatter, which now reads `status: closed` / `verified_closed_by: 260808-148`. It is
+> struck rather than deleted so the report cannot read as owing work that shipped, and so
+> the two halves stay legible as the two separate pieces of work they were.
 
 ### What shipped
 
@@ -234,6 +236,151 @@ overflow, which is precisely what "all seven rows clipped" looks like.
 - `WorkflowCanvas.editing.test.tsx`'s `AFFORDANCE_SHAPE_BASELINE` — **not re-captured.**
   The corrections are appended to the wrapper transform only when they are not the
   identity, so an unmeasured container still emits the shipped string byte-for-byte.
+
+## Resolved — the keyboard half (2026-08-08, `/gsd:quick 260808-148`)
+
+Every number below was DRIVEN: real key presses through CDP `Input.dispatchKeyEvent`
+(Playwright `keyboard.press`), never `dispatchEvent`, on the live app at **1280 × 666**, on
+the `Compliance Gap Report` draft (2 phases, 3 insertion doors) in the Builder canvas.
+State read with `evaluate`; no screenshot (it times out in this estate).
+
+### The RED, measured on this build before a line was written
+
+Not quoted from the report above — re-measured, because a before-state taken from a
+document is not evidence about the build being changed.
+
+| after | `document.activeElement` | `panel.contains(active)` | menuitems | with `tabindex` |
+|---|---|---|---|---|
+| opening door `canvas-insert-0` | `canvas-insert-0` (the `＋`) | **false** | 7 | **0** |
+| a REAL `ArrowDown` | `canvas-insert-0` — **unmoved** | false | 7 | 0 |
+| a REAL `Tab` | **`canvas-insert-1`** — the NEXT door | false | 7 | 0 |
+
+The `Tab` row is sharper than the original report: focus does not merely stay put, it
+jumps straight **past the open menu** to the next `＋`. All seven `tabindex` read `null`.
+
+### The same seven readings after the fix
+
+| # | Reading | Measured |
+|---|---|---|
+| 0 | panel genuinely scrollable | `scrollHeight 377 > clientHeight 209`, `max-height 210.612px` — a walk that never needs to scroll would prove nothing |
+| 1 | **focus enters** | `document.activeElement` = `step-type-choice-programmatic`, `panel.contains(active)` = **true** — the exact inverse of the RED |
+| 2 | the roving array | `["0","-1","-1","-1","-1","-1","-1"]` over the seven rows in DOM order |
+| 3 | the walk | `ArrowDown` ×6 → `llm_single`, `llm_agent`, `llm_batch_agents`, `llm_human_input`, `llm_emit`, **`external_action`**; a 7th WRAPS to `programmatic`; `ArrowUp` from row 1 wraps to `external_action`; `Home` → row 1; `End` → row 7 with roving `[…,"0"]` |
+| 4 | **the ancestor fence** | `.react-flow`, `.react-flow__viewport`, `.react-flow__viewport-portal`, `document.scrollingElement` all **`0,0 → 0,0`**; viewport transform `translate(53px, 114.565px) scale(1.57647)` **byte-identical** before and after; the PANEL's own `scrollTop` **0 → 18 → 66 → 114 → 162** |
+| 5 | reachability, unregressed | row 7 focused, rect `531.9..579.9`, `elementFromPoint` at its centre returns a descendant — **reaches: true** |
+| 6 | the refused row | door 2 (after the terminal `llm_emit`) refuses **all seven**; `End` lands focus on `external_action` with `aria-disabled="true"`, **no native `disabled`**, `tabindex="0"`, `aria-describedby` → real DOM text *"This would come after the deliverable, so the workflow would no longer end with it."* `Enter`, `Space` and a **real pointer click at (986.2, 549.5)** each left the menu open and the node count at **3 → 3 → 3 → 3** |
+| 7 | dismissal | see the three routes below |
+
+Note the panel `scrollTop` column in row 4: it stays `0` for the first two presses (rows 2
+and 3 are already visible) and then moves only as far as each row needs. That is the
+reveal arithmetic working, not a blanket jump — and `162` is the panel's own maximum.
+
+### The three dismissal routes — focus is never stranded on `document.body`
+
+| route | menu | `document.activeElement` after |
+|---|---|---|
+| `Escape` | closed | **`canvas-insert-0`** — the `＋` that opened it |
+| choosing a row (`ArrowDown`, `Enter`) | closed | **`canvas-insert-0`**, and the canvas went **3 → 4 nodes**, so the choice really landed |
+| clicking the BARE `.react-flow__pane` (1206, 569) | closed | **`canvas-insert-0`** — the press focuses nothing, so the restore correctly fires |
+| clicking a phase CARD (900, 300) | closed | `rf__node-emit` — React Flow's own focusable node wrapper. The restore correctly **stood down**: the user deliberately moved focus, and the contract that binds is the weaker, honest one — never `document.body`. |
+
+### Both controls, observed swinging BOTH ways
+
+**Keyboard — vertical `menu`, not `radiogroup`.** In one session, from row 1:
+`ArrowRight` → `programmatic` (unmoved) · `ArrowLeft` → `programmatic` (unmoved) ·
+`ArrowDown` → `llm_single` (**moved**).
+
+**Scroll.** Door 0 open, focus in the menu, walking `Home` → `End`:
+
+| | state | panel `scrollTop` | row 7 rect | `elementFromPoint` |
+|---|---|---|---|---|
+| a | as shipped | `0 → 162` (**moves**) | `531.9..579.9` | **reaches** |
+| b | `maxHeight:none` + `overflowY:visible` set live | `0 → 0` (**does not move**) | `693.9..741.9` | **`hit: null`** |
+| c | restored | `35 → 162` (**moves**) | `531.9..579.9` | **reaches** |
+
+Ancestors read `0,0` throughout all three legs.
+
+⚠ **THE FIRST PROBE'S LEG (c) DID NOT RESTORE, AND THE FAULT WAS THE PROBE'S.** It cleared
+`p.style.maxHeight`, but React had set that `max-height` as an **inline** style — clearing
+it removes React's own declaration, and React does not re-apply it without a re-render. So
+the panel stayed unbounded and leg (c) read as a failure of the fix. The probe now
+restores by re-assigning the captured value (`210.612px`). Recorded because a control that
+appears not to swing back is exactly the shape of a real regression, and the difference
+between the two is a measurement rather than a judgement call.
+
+### ⚠ THE DEFECT THE UNIT SUITE COULD NOT SEE, found by driving
+
+The first driven run reported `Escape` closing the menu and leaving
+`document.activeElement` on **`document.body`** — five samples out to 1000 ms, with the
+real `＋` still in the DOM and still the same node throughout. Fifteen jsdom cases,
+including two dedicated focus-return cases, were green against that build.
+
+Instrumented rather than guessed: `main.tsx` wraps the app in `<StrictMode>`, so React
+double-invokes effects in dev. The two captures read
+**`["canvas-insert-0", "step-type-choice-programmatic"]`** — the first is the real `＋`,
+and the second is *the picker's own first row*, which the first invocation had just
+focused. The surviving closure was the second one, whose "opener" is removed on unmount,
+so `isConnected` was false and the restore stood down.
+
+The capture now rejects any candidate inside the panel and falls back to the previously
+captured opener. A jsdom case reproduces it — and **only** after the harness was changed
+to MOUNT and UNMOUNT the picker as both real callers do: React double-invokes on MOUNT,
+not on a dependency change, so a harness that merely toggled `open` was measured GREEN
+against the exact pre-fix capture.
+
+### The decision this took, and its stated consequence
+
+`disabled={refused}` is **gone**; refused rows carry `aria-disabled` only. The component's
+own rule required it — *"an option that vanishes teaches nothing, and an option greyed out
+mutely is worse"* — because a natively disabled button cannot take focus, so the author
+who most needs the reason read aloud could never reach it. WAI-ARIA APG says a disabled
+menu item SHOULD stay focusable for exactly this reason.
+
+⚠ **The consequence: `onClick`'s `if (refused) return` is now the ONLY thing preventing a
+refused choice, for mouse and keyboard alike.** Before, the browser swallowed the click and
+React's `shouldPreventMouseEvent` filtered `onClick` on top of that — the shipped test that
+"proved" the guard used a click that could not even dispatch. Three cases now drive it with
+positive controls proving the event genuinely reaches the row, and it is confirmed live
+above against `Enter`, `Space` and a real pointer.
+
+### jsdom's honest limit, stated because it was measured
+
+Four wrong fixes were planted, run, and reverted. Three were caught behaviourally:
+
+| plant | caught by |
+|---|---|
+| **A** keep the native `disabled` | 5 cases across two files, including the arrow-walk reachability case — and both positive-control cases, which is the vacuity trap demonstrated live |
+| **C** move focus without updating `activeIndex` | the three tabindex-ARRAY assertions only; every `activeElement` assertion stayed green |
+| **D** `preventDefault()` unconditionally | 7 cases, including the do-not-regress Escape-with-focus-inside case |
+| **B** swap the panel scroll for `row.scrollIntoView({ block: "nearest" })` | **every behavioural case stayed GREEN.** Only the `?raw` SOURCE fence caught it — a text grep, not a measurement. |
+
+Plant B is the whole reason the driven session exists, and it is stated rather than passed
+over: jsdom applies no CSS and computes no layout, so no unit test in this estate can
+observe the ancestor-scrolling cheat. The ancestor fence in reading 4 is what actually
+proves it.
+
+### Gates
+
+- `npx tsc --noEmit -p tsconfig.app.json` — **33 errors, unchanged** from the pre-change
+  measurement taken before any file was edited. (It went to 35 mid-work: importing React's
+  `KeyboardEvent` type under its own name SHADOWED the global DOM one the shipped `window`
+  Escape listener is typed against. Aliased, and back to 33.)
+- `node scripts/vitest-count-gate.cjs` — exit 0, **zero `[count-decrease]`**, 48/48 files.
+  Two pins EXTENDED, never lowered: `StepTypePicker.test.tsx` 52 → 68 and
+  `editAffordance.test.ts` 31 → 63, both read from the script's own `actual` column across
+  two agreeing runs. Pinned total 2664 → **2712**, re-derived from the script's own printed
+  `total` after the edit rather than by addition.
+- `eslint src/components/workflows/` — **5 errors, unchanged** (all pre-existing). It went
+  to 7 and then 6 mid-work — `react-hooks/set-state-in-effect`,
+  `jsx-a11y/interactive-supports-focus` and `react-hooks/refs` were each mine, each real,
+  and each fixed rather than suppressed.
+- **Two `toBeDisabled()` assertions REWRITTEN in place, never deleted** — one in
+  `StepTypePicker.test.tsx` and one in `WorkflowCanvas.editing.test.tsx`. Both sit inside
+  existing `it()` blocks and change no count; `jest-dom`'s matcher does not consult
+  `aria-disabled`, which is why they went red and had to be re-stated rather than passing
+  by accident.
+- Six suites green: **289/289** (`StepTypePicker`, `WorkflowCanvas`, `.editing`,
+  `.composition`, `FlowEdge`, `editAffordance`).
 
 ## Surface classification
 

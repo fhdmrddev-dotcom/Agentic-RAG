@@ -594,7 +594,32 @@ const BASELINE = {
   // `elementFromPoint` probe recorded on the bug report. Read from THIS SCRIPT'S OWN
   // `actual` column across two agreeing runs, 2026-08-08 (both printed
   // `StepTypePicker.test.tsx 46 52 +6`), in the SAME COMMIT as the tests.
-  "StepTypePicker.test.tsx": 52,
+  // BUG-260807-02, the KEYBOARD half (`/gsd:quick 260808-148`): 52 → 68. An EXTENSION, not
+  // a lowering. NOTHING was deleted: the file's ONE `expect(row).toBeDisabled()` was
+  // REWRITTEN IN PLACE inside its existing `it(` — the native `disabled` is gone so refused
+  // rows can take focus, and `jest-dom`'s matcher does not consult `aria-disabled` — which
+  // changes an assertion and not a count. The +16 are the APG vertical-`menu` contract:
+  // focus entering the menu on open, the roving array asserted WHOLE, the 1→7 walk with
+  // both wraps plus Home/End (each landing checked on BOTH `activeElement` and the tabindex
+  // array), the Left/Right non-move control, the `.scrollIntoView(` source fence, Escape
+  // re-stated with focus INSIDE the menu, three focus-return cases, and the four cases the
+  // dropped `disabled` makes load-bearing (reachable-by-walk, the focus indicator, and the
+  // click / Enter / Space guards, each with a positive control proving the event reached
+  // the row).
+  //
+  // ⚠ ONE OF THE SIXTEEN IS THERE BECAUSE THE OTHER FIFTEEN WERE GREEN AGAINST A BROKEN
+  // BUILD. `main.tsx` wraps the app in `<StrictMode>` and `render()` does not, so React
+  // double-invoked the focus effect in the app only; instrumented live, the two captures
+  // read `["canvas-insert-0", "step-type-choice-programmatic"]` and the surviving "opener"
+  // was the picker's own row, so `Escape` stranded focus on `document.body`. The
+  // StrictMode case reproduces it — and it only does so because the harness MOUNTS and
+  // UNMOUNTS the picker as both real callers do: a harness that toggled `open` on a
+  // mounted picker was measured green against the exact pre-fix capture, because React
+  // double-invokes on MOUNT, not on a dependency change.
+  //
+  // Read from THIS SCRIPT'S OWN `actual` column across two agreeing runs, 2026-08-08 (both
+  // printed `StepTypePicker.test.tsx 52 68 +16`), in the SAME COMMIT as the tests.
+  "StepTypePicker.test.tsx": 68,
   // BUG-260807-02 — NET-NEW: `editAffordance.ts`'s FIRST suite ever, pinned in the commit
   // that creates it. No `TARGETS` edit accompanies it, and that is measured rather than
   // assumed: `src/components/workflows` is already a DIRECTORY entry, so the file RAN the
@@ -611,7 +636,24 @@ const BASELINE = {
   // whole declaration, and since 188.2 gave these style objects `zIndex: 1002` a dropped
   // transform strands the affordance ABOVE every card (the `verticalOffsetFor` /
   // `BUG-260807-01` mechanism, asserted here rather than inherited).
-  "editAffordance.test.ts": 31,
+  // BUG-260807-02, the KEYBOARD half (`/gsd:quick 260808-148`): 31 → 63. An EXTENSION —
+  // no case was deleted, renamed or moved, and every one of the 32 was observed RED before
+  // either helper existed. They pin `nextRovingIndex` (both wraps, Home/End, totality over
+  // a degenerate count, an out-of-range index that CLAMPS rather than escaping the array,
+  // and the six-key `null` list that is the falsification control for the whole keyboard
+  // claim — `Escape` because the shipped dismissal depends on falling through, and
+  // `ArrowLeft`/`ArrowRight` because this is a vertical `menu` and NOT
+  // `ExternalActionSection`'s `radiogroup`) and `scrollTopToReveal` (reveal in both
+  // directions, the already-visible no-ops, the `clientHeight` 0 refusal that is jsdom's
+  // branch, and non-finite totality).
+  //
+  // ⚠ THE SCROLL FIXTURE IS THE SHIPPED PANEL, and it reproduces a live measurement rather
+  // than resembling one: a 41px header plus seven 48px rows is `scrollHeight` 377 against
+  // `clientHeight` 209, so row 7 reveals at exactly 168 — which is both the panel's own
+  // maximum `scrollTop` and the figure the clipping half's driven wheel recorded.
+  // Read from THIS SCRIPT'S OWN `actual` column across two agreeing runs, 2026-08-08 (both
+  // printed `editAffordance.test.ts 31 63 +32`), in the SAME COMMIT as the tests.
+  "editAffordance.test.ts": 63,
   // 189-14 Task 2 (D-04 / D-24): 42 -> 49. An EXTENSION — every shipped case is unmoved.
   // The +7 pin the arming switch's refusing state on `external_action`: it renders ON with
   // `actionRiskArmed: false` supplied (the state a freshly-placed step is in), it is
@@ -783,7 +825,17 @@ const BASELINE = {
 // today. They are left unpinned deliberately: neither file is in this fix's blast radius,
 // and re-pinning a suite this change did not author would hide the drift inside an
 // unrelated commit. Owed as its own edit.
-const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // ⚠ 2664 (BUG-260807-02)
+// ⚠ AND BY BUG-260807-02's KEYBOARD HALF (`/gsd:quick 260808-148`, 2026-08-08): 2664 →
+// 2712 (`StepTypePicker.test.tsx` 52 → 68, `editAffordance.test.ts` 31 → 63). Pinned FILE
+// count unmoved at 48 — both suites already existed and both already ran inside the
+// `src/components/workflows` DIRECTORY entry. RE-DERIVED FROM THIS SCRIPT'S OWN PRINTED
+// `total` after the two pins above were edited, never by adding 16 and 32 to 2664 — this
+// note is prose beside a `reduce` and has gone stale seven times by being computed rather
+// than read. The measured `actual` remains 2725, i.e. thirteen above the new pin: that is
+// the SAME two pre-existing under-pins recorded in the paragraph above
+// (`ExternalActionSection.test.tsx` +9, `PhaseTimeline.test.tsx` +4), unchanged by this
+// work and still owed as their own edit.
+const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // ⚠ 2712 (BUG-260807-02 keyboard half)
 
 // ── The Wave-0 blast radius (184-VALIDATION.md § "quick run command"). ──
 const TARGETS = [

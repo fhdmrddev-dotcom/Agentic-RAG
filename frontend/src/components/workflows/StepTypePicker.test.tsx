@@ -41,7 +41,7 @@ import {
 } from "vitest"
 import { fireEvent, render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
-import { useState } from "react"
+import { StrictMode, useState } from "react"
 
 import stepTypePickerSource from "./StepTypePicker?raw"
 import { StepTypePicker } from "./StepTypePicker"
@@ -983,6 +983,14 @@ describe("StepTypePicker — BUG-260807-02: focus enters the menu, and roves", (
  * `document.activeElement` at open time, which is what lets ONE design cover BOTH mount
  * sites — the `＋` doors in `PlaneEditingLayer` and the empty-state door in
  * `WorkflowCanvas` — without either caller passing a ref down.
+ *
+ * ⚠ IT MOUNTS AND UNMOUNTS THE PICKER RATHER THAN TOGGLING ITS `open` PROP, because that
+ * is what BOTH real callers do (`PlaneEditingLayer.tsx` renders it only while
+ * `pickerAt !== null`; `WorkflowCanvas.tsx` only from its empty-state door), and because
+ * the difference is load-bearing for the StrictMode case below: React double-invokes an
+ * effect on MOUNT, not on a dependency change. A harness that kept the picker mounted was
+ * measured NOT to reproduce the live focus-return defect at all — it stayed green against
+ * the exact pre-fix capture.
  */
 function OpenerHarness({
   onChoose,
@@ -997,19 +1005,21 @@ function OpenerHarness({
       <button type="button" data-testid="the-opener" onClick={() => setOpen(true)}>
         ＋
       </button>
-      <StepTypePicker
-        phases={twoSteps}
-        index={1}
-        open={open}
-        onChoose={(t) => {
-          onChoose?.(t)
-          setOpen(false)
-        }}
-        onDismiss={() => {
-          onDismiss?.()
-          setOpen(false)
-        }}
-      />
+      {open ? (
+        <StepTypePicker
+          phases={twoSteps}
+          index={1}
+          open
+          onChoose={(t) => {
+            onChoose?.(t)
+            setOpen(false)
+          }}
+          onDismiss={() => {
+            onDismiss?.()
+            setOpen(false)
+          }}
+        />
+      ) : null}
     </div>
   )
 }
@@ -1026,6 +1036,35 @@ describe("StepTypePicker — BUG-260807-02: focus comes back to the opener", () 
     await user.keyboard("{Escape}")
     // The restore lands on the NEXT animation frame, deliberately — awaited, never
     // assumed synchronous.
+    await waitFor(() => expect(document.activeElement).toBe(opener))
+    expect(document.activeElement).not.toBe(document.body)
+  })
+
+  it("returns focus under StrictMode's DOUBLE-INVOKED effect — the live defect", async () => {
+    // ⚠ THIS CASE EXISTS BECAUSE THE TWO ABOVE IT WERE GREEN AGAINST A BUILD WHERE FOCUS
+    // WAS STRANDED ON `document.body`, and the gap was measured rather than reasoned
+    // about. `main.tsx` wraps the app in `<StrictMode>`; `render()` does not. So in the
+    // app React invoked the focus effect TWICE, and instrumenting the capture live
+    // recorded `["canvas-insert-0", "step-type-choice-programmatic"]` — the second
+    // "opener" being the picker's OWN first row, which the first invocation had just
+    // focused. That node is removed on unmount, so `isConnected` was false and the
+    // restore stood down. Driven, `Escape` left focus on the body across five samples out
+    // to 1000 ms with the real `＋` still in the DOM and still the same node.
+    //
+    // Wrapping the harness in `StrictMode` reproduces the double-invoke in jsdom, so the
+    // defect now has a unit-level home instead of relying on someone driving it again.
+    const user = userEvent.setup()
+    render(
+      <StrictMode>
+        <OpenerHarness />
+      </StrictMode>,
+    )
+
+    const opener = screen.getByTestId("the-opener")
+    await user.click(opener)
+    expect(document.activeElement).toBe(screen.getByTestId("step-type-choice-programmatic"))
+
+    await user.keyboard("{Escape}")
     await waitFor(() => expect(document.activeElement).toBe(opener))
     expect(document.activeElement).not.toBe(document.body)
   })

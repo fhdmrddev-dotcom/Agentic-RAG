@@ -178,6 +178,8 @@ export function StepTypePicker({
   // contract the `role` has been announcing since 184-07 without honouring it.
   const [activeIndex, setActiveIndex] = useState(0)
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([])
+  /** Whatever had focus when this menu opened — see the ⚠⚠ on the focus effect. */
+  const openerRef = useRef<HTMLElement | null>(null)
 
   // ⚠ THE ROVING STOP RESETS DURING RENDER, NOT INSIDE THE EFFECT. React's documented
   // "adjusting state when a prop changes" pattern. A picker re-opened at the SAME mount
@@ -188,6 +190,14 @@ export function StepTypePicker({
   if (wasOpen !== open) {
     setWasOpen(open)
     if (open) setActiveIndex(0)
+    // ⚠ THE OPENER REF IS DELIBERATELY *NOT* CLEARED HERE. Writing it in the render phase
+    // is a `react-hooks/refs` error ("Cannot access refs during render"), measured as a
+    // net-new lint error against a baseline of 5 — and clearing it in the effect CLEANUP
+    // instead would break the fix outright, because StrictMode's mount-cleanup-mount would
+    // wipe the real opener before the second mount could fall back to it. It needs no
+    // clearing: a re-open always captures the control the user just pressed, and both real
+    // callers mount and unmount this component rather than toggling `open`, so the ref
+    // dies with the instance.
   }
 
   // Computed BEFORE the `open` early-return, because the keydown handler below needs the
@@ -250,10 +260,32 @@ export function StepTypePicker({
   // `canvas-add-first-step` empty-state door in `WorkflowCanvas` — so a ref threaded down
   // from one caller would cover one and strand the other. Capturing at open time covers
   // both for free and lets this plan modify NEITHER caller.
+  //
+  // ⚠⚠ THE CAPTURE MUST REJECT THE PANEL'S OWN CONTENTS, AND THAT IS A MEASUREMENT, NOT A
+  // PRECAUTION. `main.tsx` wraps the app in `<StrictMode>`, so in dev React invokes this
+  // effect TWICE — mount, cleanup, mount. Instrumented live on 2026-08-08, the two
+  // captures read `["canvas-insert-0", "step-type-choice-programmatic"]`: the first is the
+  // real `＋`, and the SECOND is the picker's own first row, which the first invocation
+  // had just focused. The surviving closure was the second one, so the "opener" was a node
+  // that gets removed on unmount, `isConnected` was false, the restore stood down — and
+  // `Escape` left `document.activeElement` on `document.body`. Measured, five samples out
+  // to 1000 ms, with the real door still in the DOM and still the same node throughout.
+  //
+  // jsdom could not see it: `render()` mounts no `StrictMode`, so the effect runs once
+  // there and the focus-return cases were green against a build where focus was stranded.
+  // Two guards, because either alone is insufficient — a candidate INSIDE the panel is
+  // rejected outright, and the previously captured opener is kept rather than overwritten.
   useEffect(() => {
     if (!open) return
     const active = document.activeElement
-    const opener = active instanceof HTMLElement && active !== document.body ? active : null
+    const candidate =
+      active instanceof HTMLElement &&
+      active !== document.body &&
+      !panelRef.current?.contains(active)
+        ? active
+        : null
+    const opener = candidate ?? openerRef.current
+    openerRef.current = opener
 
     // Refs are attached during commit, i.e. before this effect runs, so row 0 is here.
     // `preventScroll` — see the ⚠ in the docblock; the default focus scroll walks
