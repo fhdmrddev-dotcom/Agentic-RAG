@@ -799,6 +799,40 @@ async def _run_phase_with_gates(
     # disarmable") stands, and so does the boot-time resume predicate
     # ``_is_armed_action_risk`` (:2240), which stays deliberately INDEPENDENT of this
     # run-time reader — ``test_the_two_resume_predicates_are_independent`` pins that.
+    # ⚠⚠ REVIEW FINDING WR-06 — READ THIS BEFORE PHASE 190 MAKES A CAPABILITY REAL. ⚠⚠
+    #
+    # "The pause is skipped, the step still runs" is stated above as a virtue, and for the
+    # five LLM types it is one. For ``external_action`` it is the sentence that turns into a
+    # defect the moment egress exists, and the difference is that the arming on that type is
+    # NOT an author preference: ``PhaseSpec._external_action_is_always_armed`` pins it
+    # structurally, and it is the single guarantee D-04 exists to make. The branch below
+    # bypasses it UNCONDITIONALLY, with no phase-type carve-out — so once Phase 190 wires a
+    # real send, PUBLISHING a workflow would PERFORM THE EXTERNAL ACTION, with nobody asked,
+    # once per publish attempt. The publish gauntlet validates STRUCTURE; it must not
+    # acquire side effects in the world.
+    #
+    # WHY 189 DOES NOT SKIP THE BODY HERE, which is what the review proposed. The step
+    # currently sends nothing, so the risk is INERT — and the proposed carve-out (return a
+    # synthesized ``PhaseOutcome`` instead of executing) would have to FABRICATE the
+    # recorded body to keep ``test_publish_service.py``'s shipped assertions true (that the
+    # golden run's phase reaches ``recorded_not_sent`` with the real ``recorded_intent`` and
+    # a body reading "NOT SENT"). That means a SECOND composer for the one sentence
+    # ``_external_action_body`` owns — two vocabularies for one state, on the surface whose
+    # entire discipline is that there is one. Trading an inert risk for a live duplication
+    # is the wrong trade, and it would make the golden run stop exercising the real executor,
+    # which is the thing D-06 is supposed to prove works.
+    #
+    # WHAT 189 DOES INSTEAD, so this is a GUARDED decision and not a remembered one:
+    # ``test_harness_engine.py::test_a_golden_run_of_an_external_action_performs_no_egress``
+    # drives a REAL golden run with the widened no-egress transport sentinel armed (httpx +
+    # smtplib + urllib + raw sockets — WR-03). It passes today BECAUSE the step is inert.
+    # THE DAY A REAL SEND IS ADDED IT GOES RED, on the publish path specifically, naming this
+    # comment. That is the re-open trigger, expressed as a check rather than as prose.
+    #
+    # PHASE 190 OWNS THE FIX and it is one of two shapes: gate the SEND on
+    # ``ctx.is_golden_run`` inside the executor (the send is skipped, the record is not — so
+    # one composer still owns the body), or give this branch the phase-type carve-out once
+    # there is a real consequence to carve out. Recorded in ``189-DEFERRED.md`` too.
     _armed = getattr(phase, "action_risk_armed", False)
     if _armed and getattr(ctx, "is_golden_run", False):
         # The golden run's ONLY trace of the checkpoint. Deliberately a log line and

@@ -837,7 +837,7 @@ def _external_action_definition(build_workflow_definition, *, capability="send_e
     )
 
 
-def _drive_approved_external_action(wf, pool):
+def _drive_approved_external_action(wf, pool, *, is_golden_run=False, loop=None):
     """Drive the REAL ``run_workflow`` over ``wf`` with the human APPROVING.
 
     Returns ``SimpleNamespace(run_id, ids, visited, audits, emits)``.
@@ -892,7 +892,13 @@ def _drive_approved_external_action(wf, pool):
             return await real_execute(phase, accumulated, ctx)
         return await _stub(phase, accumulated, ctx)
 
-    ctx = SimpleNamespace(inputs={"kickoff_prompt": "send Sarah the renewal summary"})
+    # WR-06: ``is_golden_run`` rides the ctx bag at exactly one production site
+    # (``publish_service._drive_golden_run``). Defaulting False keeps every existing caller
+    # byte-identical; the golden-run fence below is the only drive that flips it.
+    ctx = SimpleNamespace(
+        inputs={"kickoff_prompt": "send Sarah the renewal summary"},
+        is_golden_run=is_golden_run,
+    )
 
     with (
         patch.object(harness_engine, "_execute_phase", _dispatch),
@@ -903,9 +909,19 @@ def _drive_approved_external_action(wf, pool):
             harness_engine, "_resolve_failure_with_ask_user", AsyncMock(return_value=None)
         ),
     ):
-        asyncio.run(
-            harness_engine.run_workflow(run_id, wf, ctx, pool=pool, redis=_NoopRedis())
-        )
+        coro = harness_engine.run_workflow(run_id, wf, ctx, pool=pool, redis=_NoopRedis())
+        # ``loop`` is an escape hatch for ONE caller — the WR-06 no-egress fence. It arms a
+        # sentinel that raises on ``socket.socket.connect``, and ``asyncio.run`` builds a
+        # FRESH event loop whose Windows proactor makes its self-pipe with ``socketpair()``
+        # — i.e. an unavoidable ``connect`` INSIDE the armed region, which would trip the
+        # sentinel on the harness rather than on the step (measured: the first version of
+        # that fence failed in ``proactor_events._make_self_pipe``, not in the executor).
+        # Passing a loop built BEFORE the sentinel arms keeps the raw-socket layer usable.
+        # Every other caller passes nothing and keeps ``asyncio.run`` byte-identically.
+        if loop is None:
+            asyncio.run(coro)
+        else:
+            loop.run_until_complete(coro)
 
     return SimpleNamespace(
         run_id=run_id, ids=ids, visited=visited, audits=audits,
@@ -1084,6 +1100,96 @@ def test_a_recorded_not_sent_phase_emits_its_own_live_event(
     assert "notify" not in completed, (
         f"a phase_completed SSE was emitted for a phase that recorded and sent nothing: "
         f"{r.emit_calls!r}. StreamsProvider.onPhaseCompleted maps it straight to `done`."
+    )
+
+
+def test_a_golden_run_of_an_external_action_performs_no_egress(
+    build_workflow_definition, mock_asyncpg_pool, monkeypatch
+):
+    """REVIEW WR-06 — **THE RE-OPEN TRIGGER, AS A CHECK RATHER THAN AS PROSE.**
+
+    D-19 puts ``is_golden_run`` on the ctx bag and the armed action-risk checkpoint then
+    becomes a log line: *"the pause is skipped, the step still runs"*. For the five LLM
+    types that is a virtue. For ``external_action`` the arming is not an author preference —
+    ``PhaseSpec._external_action_is_always_armed`` pins it STRUCTURALLY, and it is the one
+    guarantee D-04 exists to make. The golden-run branch bypasses it unconditionally, with
+    no phase-type carve-out. **The day Phase 190 wires a real send, PUBLISHING a workflow
+    would perform the external action, with nobody asked, once per publish attempt.**
+
+    189 does not fix that by skipping the body (see the long comment on the branch in
+    ``harness_engine._run_phase_with_gates`` for why: the carve-out would have to fabricate
+    the recorded body to keep ``test_publish_service``'s assertions true, giving the one
+    sentence a second composer). It PINS the inertness instead, so the risk cannot go live
+    unnoticed:
+
+      * the WIDENED transport sentinel is armed — httpx sync + async, ``smtplib.SMTP``,
+        ``urllib.request.urlopen`` AND raw ``socket.socket.connect`` (review WR-03) —
+        IMPORTED from the no-egress suite rather than re-typed, so a future widening there
+        strengthens this fence automatically;
+      * a REAL golden run is driven end to end (``is_golden_run=True``), not a unit call;
+      * the phase must STILL land ``recorded_not_sent`` — because a fence that passed by
+        the step silently not running would be the fail-open shape 189-05's PLANT E and
+        189-09's PLANT H both describe.
+
+    **THIS TEST PASSES TODAY BECAUSE THE STEP IS INERT. WHEN IT FAILS, READ WR-06.** The
+    fix is Phase 190's and is one of two shapes, both named on that branch comment.
+    """
+    import asyncio as _asyncio
+
+    from tests.unit.test_189_no_egress import _block_all_http
+
+    wf = _external_action_definition(build_workflow_definition)
+
+    # ⚠ THE LOOP IS BUILT BEFORE THE SENTINEL ARMS, and that ordering is load-bearing on
+    # Windows: `asyncio.run` creates a fresh proactor loop whose self-pipe is a
+    # `socketpair()`, i.e. a `socket.connect` the sentinel would catch — measured, as the
+    # first version of this fence failing in `proactor_events._make_self_pipe` rather than
+    # in the executor. Building it first keeps the raw-socket layer armed for the STEP.
+    loop = _asyncio.new_event_loop()
+    try:
+        # Armed BEFORE the drive: the golden-run branch and the executor both sit inside it.
+        _block_all_http(monkeypatch)
+        r = _drive_approved_external_action(
+            wf, mock_asyncpg_pool, is_golden_run=True, loop=loop
+        )
+    finally:
+        loop.close()
+
+    # ── the golden run really did take the D-19 branch: NOBODY was asked ─────────
+    assert not any(et == "action_risk_pending" for et, _ in r.audits), (
+        f"the golden run wrote an action_risk_pending receipt — it did NOT take the D-19 "
+        f"auto-continue branch, so this fence is measuring the ordinary path: {r.audits!r}"
+    )
+
+    # ── ANTI-VACUITY: the governed step ACTUALLY RAN and recorded ────────────────
+    recorded = [sql for sql, _ in mock_asyncpg_pool.calls if _RECORDED_SQL in sql]
+    assert len(recorded) == 1, (
+        f"the golden run's external-action phase never reached recorded_not_sent, so "
+        f"'no egress' would be satisfied by a step that never ran: {recorded!r}"
+    )
+    # `visited` records only the STUBBED executors — the external_action phase goes through
+    # the REAL `_execute_phase` (that is the point of `_dispatch`), so "notify" is
+    # deliberately absent and its evidence is the `recorded_not_sent` write above. The
+    # following phase appearing here is what proves the run CONTINUED rather than halting on
+    # the governed step, which no status assertion can distinguish (189-05 PLANT E).
+    assert r.visited == ["wrap-up"], (
+        f"the run did not continue past the governed step: {r.visited!r}"
+    )
+
+    # ── the property: it ran, it recorded, and it sent NOTHING ──────────────────
+    # `_block_all_http` raises `_EgressAttempted` on any transport touch. The engine catches
+    # a phase exception and flips the row to `failed`, so an attempted send would have
+    # produced ZERO `recorded_not_sent` writes and a `failed` one instead — which the
+    # anti-vacuity assertion above already refuses. Asserted explicitly here too, so the
+    # failure a future reader sees names egress rather than a missing status write.
+    failed = [sql for sql, _ in mock_asyncpg_pool.calls if "SET status='failed'" in sql]
+    assert failed == [], (
+        f"WR-06: a phase was flipped to `failed` during a golden run with every transport "
+        f"blocked — the external-action step attempted OUTBOUND EGRESS while publishing. "
+        f"Publishing a workflow must never act in the world: the golden run validates "
+        f"STRUCTURE, and the D-04 checkpoint that would have asked a person is exactly the "
+        f"one D-19 skips. See the WR-06 comment on the golden-run branch in "
+        f"harness_engine._run_phase_with_gates. writes={failed!r}"
     )
 
 

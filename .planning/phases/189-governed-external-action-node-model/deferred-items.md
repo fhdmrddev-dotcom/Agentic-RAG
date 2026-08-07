@@ -82,6 +82,31 @@ fourteen-file full scope all exclude `tests/test_182_extraction_parity.py`. The 
 `2 failed / N passed` baseline structurally cannot see it. **Bumping the literal without also
 adding the file to the scope command fixes the symptom and leaves the blindness.**
 
+### THE COUNT MOVED AGAIN — 7 → 8 (code-review fix round, 2026-08-07)
+
+The paragraph above says the count is *"final at **7** unless a gap round moves it"*. A round
+moved it. Review finding **CR-01** added
+`test_a_capability_on_an_llm_agent_step_still_blocks_publish` to
+`tests/unit/test_103_grounding_fidelity.py` — the negative control proving a capability on an
+`llm_agent` step still blocks the publish — so the pin now reads:
+
+```
+$ venv/Scripts/python.exe -m pytest tests/test_182_extraction_parity.py -q --no-header
+1 failed, 5 passed
+E   assert 8 == 2
+```
+
+**Same single failure, same assertion, one higher number.** Still pre-existing and still dated
+to 189-02 (`fe7bd092`) — the fix round did not create it and does not change its character.
+
+⚠ **STILL NOT FIXED, and now deliberately so rather than by scope accident.** The one-literal
+bump is trivial, but this round is a CODE-REVIEW FIX round and the finding list does not
+contain it; fixing an unrelated pre-existing failure inside a closure round is precisely the
+scope-smuggling CLAUDE.md's G-7 names. It also remains true that the count is not final while
+verification may still add tests. **Whoever bumps it should bump to the count measured at that
+moment, and must also add `tests/test_182_extraction_parity.py` to the phase-scope pytest
+command** — the blindness above is the part that survives the literal.
+
 ---
 
 ## D-189-DEF-02 — the author-facing tool rail will render a capability STRUCK THROUGH
@@ -219,3 +244,60 @@ and "recorded, not sent" stops being a wording question. The fix shape is the sh
 `phase_failed` precedent, whose own comment records why the emit-failure branch needed a new
 event rather than silence: *"the finalize sweeps skip terminal statuses, so the card is never
 repainted 'done' over the failure alert."*
+
+---
+
+## D-189-DEF-04 — the publish GOLDEN RUN executes the external-action body with the D-04 checkpoint skipped
+
+**Found during:** the standard-depth code review (finding **WR-06**, 2026-08-07). Recorded in
+the code-review fix round, which deliberately did NOT take the proposed fix.
+
+**The measurement.** D-19 puts `is_golden_run` on the ctx bag and the armed action-risk
+checkpoint then becomes a log line — `harness_engine._run_phase_with_gates`: *"the pause is
+skipped, the step still runs"*. For the five LLM types that is the right call and it is what
+closed the 7200 s publish death. For `external_action` it is different in kind: the arming is
+**not** an author preference there, it is `PhaseSpec._external_action_is_always_armed`'s
+structural pin — the single guarantee D-04 exists to make — and the golden-run branch bypasses
+it **unconditionally, with no phase-type term**.
+
+**Inert in 189, and that is measured rather than assumed:** the step records and sends nothing,
+and the phase row correctly lands `recorded_not_sent` even on a golden run
+(`test_publish_service.py`, the V20 publish case). **It stops being inert the day Phase 190
+makes a capability real: PUBLISHING a workflow would then perform the external action, with
+nobody asked, once per publish attempt.**
+
+**Why the review's proposed fix was NOT taken.** WR-06 suggested the golden-run branch return a
+synthesized `PhaseOutcome` instead of executing the body. That carve-out would have to
+**fabricate the recorded body** to keep `test_publish_service.py`'s shipped assertions true —
+the golden run's phase must reach `recorded_not_sent` carrying the real
+`recorded_intent["capability"]` and a body reading `NOT SENT`. That means a SECOND composer for
+the one sentence `_external_action_body` owns: two vocabularies for one state, on the surface
+whose whole discipline is that there is one. It would also stop the golden run exercising the
+real executor, which is the thing D-06 is supposed to prove works. Trading an inert risk for a
+live duplication is the wrong trade.
+
+**What was done instead — the trigger is a CHECK, not prose.**
+`tests/test_harness_engine.py::test_a_golden_run_of_an_external_action_performs_no_egress`
+drives a REAL golden run (`is_golden_run=True`) with the **widened** no-egress transport
+sentinel armed — httpx sync + async, `smtplib.SMTP`, `urllib.request.urlopen` and raw
+`socket.socket.connect` (review WR-03), imported from the no-egress suite rather than re-typed,
+so a future widening there strengthens this fence automatically. It carries anti-vacuity
+assertions that the governed step ACTUALLY RAN and recorded, and that the run continued past
+it. **It was driven RED against a planted `smtplib.SMTP(...)` inside `_exec_external_action`**
+and reported `_EgressAttempted: smtplib.SMTP.__init__ was called - outbound egress attempted`,
+so the fence is proved to bite rather than assumed to.
+
+⚠ One Windows-specific trap is recorded in the test: `asyncio.run` builds a fresh proactor loop
+whose self-pipe is a `socketpair()`, i.e. a `socket.connect` INSIDE the armed region. The first
+version of the fence failed in `proactor_events._make_self_pipe` rather than in the executor.
+The drive therefore accepts a loop built BEFORE the sentinel arms; every other caller keeps
+`asyncio.run` byte-identically.
+
+**Owner: Phase 190.** The fix is one of two shapes, both named on the branch comment in
+`harness_engine._run_phase_with_gates`: gate the SEND on `ctx.is_golden_run` inside the executor
+(the send is skipped, the record is not — so one composer still owns the body), or give the
+branch the phase-type carve-out once there is a real consequence to carve out.
+
+**Re-open trigger:** `test_a_golden_run_of_an_external_action_performs_no_egress` turning RED —
+which is exactly the commit that makes a capability perform real egress. No calendar date and
+no remembering required.
