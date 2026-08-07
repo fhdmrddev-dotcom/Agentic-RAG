@@ -224,7 +224,14 @@ def test_phase_dispatch_routes_each_of_5_types():
     """HARNESS-01: each phase_type literal routes to its executor.
 
     101.1 (D-04): the 6th phase type ``llm_emit`` (the SEALED FORCED EMIT) joins the
-    original 5 — the dispatch registry now resolves all 6.
+    original 5. 189 (CONN-01 / D-01): the 7th, ``external_action`` — the governed step
+    that reaches outside and, in this milestone, SENDS NOTHING. The dispatch registry
+    resolves all 7.
+
+    ⚠ The test NAME still says 5 and is deliberately left alone: it is referenced by the
+    §D15 baseline command and by two prior SUMMARYs, and renaming it would make a
+    green-to-green comparison across plans impossible to grep. The ROSTER below is the
+    contract; the name is a label that was already stale at 101.1.
     """
     import app.services.harness  # noqa: F401 — triggers register_all()
     from app.services.harness_engine import PHASE_TYPE_REGISTRY
@@ -236,10 +243,57 @@ def test_phase_dispatch_routes_each_of_5_types():
         "llm_batch_agents",
         "llm_human_input",
         "llm_emit",  # 101.1 — the 6th (forced-emit phase, D-04)
+        "external_action",  # 189 — the 7th (governed external action, D-01/SC#4)
     }
     # Every registered executor is callable (the dispatch seam resolves each).
     for executor in PHASE_TYPE_REGISTRY.values():
         assert callable(executor)
+
+
+@pytest.mark.asyncio
+async def test_external_action_dispatches_without_phase_type_not_registered():
+    """V02 (189 / SC#1) — ``_execute_phase`` resolves ``external_action``.
+
+    The registry-membership assertion above proves the KEY is present; this drives the
+    engine's OWN dispatch function, which is the thing that raises
+    ``PhaseTypeNotRegistered``. A 7th type registered under a key the engine never looks
+    up would satisfy the set assertion and still kill every run.
+
+    ANTI-VACUITY: an unregistered type is driven FIRST and observed raising, so the
+    absence of a raise below is a measurement rather than a hopeful silence.
+    """
+    import app.services.harness  # noqa: F401 — triggers register_all()
+    from app.models.harness import WorkflowDefinition
+    from app.services.harness_engine import PhaseTypeNotRegistered, _execute_phase
+
+    # The control: the dispatch really does raise for a type it does not know.
+    unknown = SimpleNamespace(
+        slug="ghost", config=SimpleNamespace(phase_type="no_such_phase_type")
+    )
+    with pytest.raises(PhaseTypeNotRegistered):
+        await _execute_phase(unknown, {}, SimpleNamespace())
+
+    wf = WorkflowDefinition.model_validate({
+        "slug": "v02-external-action-dispatch",
+        "version": 1,
+        "name": "V02 dispatch",
+        "status": "draft",
+        "phases": [{
+            "slug": "notify",
+            "phase_index": 0,
+            "config": {
+                "phase_type": "external_action",
+                "capability": "send_email",
+                "available_tools": ["send_email"],
+            },
+        }],
+    })
+
+    output = await _execute_phase(wf.phases[0], {}, SimpleNamespace(inputs={}))
+
+    assert isinstance(output, dict)
+    assert isinstance(output.get("text"), str)
+    assert output["recorded_intent"]["capability"] == "send_email"
 
 
 @pytest.mark.asyncio

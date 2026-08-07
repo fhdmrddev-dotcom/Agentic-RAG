@@ -272,6 +272,216 @@ async def test_the_external_action_executor_performs_no_network_io(monkeypatch, 
     )
 
 
+# ── Case D (189-09) — D-02: a name outside the closed set RAISES ──────────────
+
+
+async def test_a_capability_outside_the_closed_set_raises_in_the_executor():
+    """D-02 — the executor's own closed-set resolution, the SECOND line of defence.
+
+    ``ExternalActionPhaseConfig.capability`` is a ``Literal`` of exactly three, so a bad
+    name is already a ``ValidationError`` at parse time — which is precisely why this case
+    has to reach the engine ANOTHER WAY to mean anything. It builds a VALID phase, then
+    rewrites the stored value the way a hand-edited JSONB row would (Pydantic v2 does not
+    re-validate on assignment without ``validate_assignment``), and asserts the executor
+    refuses it rather than resolving it dynamically or falling back to a default.
+
+    ANTI-VACUITY: the clean capability is driven FIRST. Without that, a broken executor
+    that raised on everything would pass this test for entirely the wrong reason.
+    """
+    execute = _external_action_executor()
+    phase = _external_action_phase("send_email")
+    ctx = _run_ctx()
+
+    # 1. the clean name resolves - so the raise below is attributable to the NAME.
+    clean = await execute(phase, {}, ctx)
+    assert isinstance(clean.get("text"), str)
+
+    # 2. the hand-edited row.
+    phase.config.capability = "wire_transfer"
+
+    with pytest.raises(KeyError) as excinfo:
+        await execute(phase, {}, ctx)
+
+    message = str(excinfo.value)
+    assert "notify" in message, (
+        f"D-02: the closed-set raise must name the PHASE SLUG so an operator can find the "
+        f"offending row; got {message!r}"
+    )
+    assert "wire_transfer" in message, (
+        f"D-02: the closed-set raise must name the OFFENDING VALUE; got {message!r}"
+    )
+    assert "EXTERNAL_ACTION_CAPABILITIES" in message, (
+        f"D-02: the raise must name the CLOSED COLLECTION the name is missing from, the "
+        f"way _exec_programmatic names PROGRAMMATIC_PHASE_REGISTRY; got {message!r}"
+    )
+
+
+# ── Case E (189-09) — T-189-26: the record may NEVER read as a receipt ────────
+#
+# The Control Room's `consequence is not receipt` rule, applied to the one output body in
+# this codebase that describes something that did NOT happen. The three rules come from
+# `189-UI-SPEC.md` section 9d and they are BINDING, not stylistic.
+
+_CLOSING_NEGATIONS = {
+    "send_email": "No email was sent.",
+    "create_ticket": "No ticket was created.",
+    "post_message": "No message was posted.",
+}
+
+# Past-tense success verbs and success glyphs. ⚠ `sent` alone is NOT forbidden: the body
+# OPENS with "NOT SENT" and CLOSES with "No email was sent." - both negations. What is
+# forbidden is a claim that the action reached a destination.
+_RECEIPT_TOKENS = ("done", "delivered", "sent to", "posted to", "successfully", "complete")
+_SUCCESS_GLYPHS = ("✓", "✔", "✅", "☑")  # ✓ ✔ ✅ ☑
+
+# The ONE sanctioned occurrence of a forbidden token: the subjunctive block header. It is
+# UI-SPEC section 9d's own wording and it claims nothing - "would have done" is the
+# opposite of "done". Excised before the scan rather than special-cased inside it, so the
+# exemption is one visible string and not a widening rule.
+_SUBJUNCTIVE_HEADER = "What this step would have done"
+
+
+def _assert_reads_as_not_sent(text: str, capability: str) -> None:
+    """The three binding rules, as one reusable fence.
+
+    Driven RED by ``test_the_receipt_fence_actually_fires`` below against four
+    receipt-shaped plants - one per rule - so a green here is a measurement.
+    """
+    assert text.lstrip().upper().startswith("NOT SENT"), (
+        "T-189-26 rule 1: the body must OPEN with the negation, never with the action. "
+        f"Got: {text[:80]!r}"
+    )
+
+    negation = _CLOSING_NEGATIONS[capability]
+    assert negation in text, (
+        f"T-189-26 rule 3: the closing negation for {capability!r} must be the CLOSED "
+        f"table's {negation!r}, never improvised. Body:\n{text}"
+    )
+    for other_cap, other_negation in _CLOSING_NEGATIONS.items():
+        if other_cap != capability:
+            assert other_negation not in text, (
+                f"the body for {capability!r} carries {other_cap!r}'s negation "
+                f"{other_negation!r} - the closing sentence is not keyed off the capability"
+            )
+
+    assert "not a receipt" in text.lower(), (
+        "T-189-26 rule 3: the LAST sentence must name what the record is NOT. "
+        f"Body:\n{text}"
+    )
+
+    haystack = text.replace(_SUBJUNCTIVE_HEADER, "").lower()
+    for token in _RECEIPT_TOKENS:
+        assert token not in haystack, (
+            f"T-189-26 rule 2: the body uses the receipt word {token!r}. A recorded intent "
+            f"that reads like a receipt is the failure mode this whole phase exists to "
+            f"avoid. Body:\n{text}"
+        )
+    for glyph in _SUCCESS_GLYPHS:
+        assert glyph not in text, (
+            f"T-189-26 rule 2: the body carries the success glyph {glyph!r}. 189 spends no "
+            f"checkmark on a step that sent nothing. Body:\n{text}"
+        )
+
+
+def test_the_receipt_fence_actually_fires():
+    """T-189-26 positive control - the fence catches each receipt shape it claims to.
+
+    ⚠ Without this, `_assert_reads_as_not_sent` could be green forever while asserting
+    nothing (the same vacuity class the mcp matcher control above guards). Each plant
+    below violates exactly ONE rule, so the control proves all three halves rather than
+    one loud one.
+    """
+    plants = [
+        # rule 1 - opens with the action rather than the negation
+        ("send_email",
+         "Sends an email to sarah@acme.example.\n\nNo email was sent. "
+         "This is a record of an intention, not a receipt."),
+        # rule 3 - the closing negation is improvised, not the closed table's
+        ("send_email",
+         "NOT SENT - recorded only.\n\nNothing went out. "
+         "This is a record of an intention, not a receipt."),
+        # rule 3 - the "what this is NOT" sentence is missing
+        ("send_email", "NOT SENT - recorded only.\n\nNo email was sent."),
+        # rule 2 - a past-tense success verb about the action
+        ("send_email",
+         "NOT SENT - recorded only.\n\nEmail delivered.\n\nNo email was sent. "
+         "This is a record of an intention, not a receipt."),
+        # rule 2 - a checkmark
+        ("send_email",
+         "NOT SENT - recorded only.\n\n✓ Recorded.\n\nNo email was sent. "
+         "This is a record of an intention, not a receipt."),
+        # rule 3 - another capability's negation
+        ("create_ticket",
+         "NOT SENT - recorded only.\n\nNo email was sent. No ticket was created. "
+         "This is a record of an intention, not a receipt."),
+    ]
+    for capability, plant in plants:
+        with pytest.raises(AssertionError):
+            _assert_reads_as_not_sent(plant, capability)
+
+    # ... and the subjunctive header is NOT a violation, or the real body could never pass.
+    _assert_reads_as_not_sent(
+        "NOT SENT - recorded only.\n\nWhat this step would have done\n  Action: Sends an "
+        "email\n\nNo email was sent. This is a record of an intention, not a receipt.",
+        "send_email",
+    )
+
+
+@pytest.mark.parametrize("capability", CAPABILITIES)
+async def test_the_recorded_output_body_cannot_read_as_a_receipt(capability):
+    """T-189-26 / D-05 - the REAL executor's body, driven, against the fence above.
+
+    Not a reading of the source: the body is composed by the shipped code path with real
+    resolved inputs, and the assertion runs on what a user would actually see.
+    """
+    execute = _external_action_executor()
+    phase = _external_action_phase(capability)
+    ctx = _run_ctx()
+    ctx.inputs = {"recipient": "sarah@acme.example", "subject": "Renewal summary"}
+
+    output = await execute(
+        phase,
+        {"draft": {"text": "The Acme renewal is up on 12 September."}},
+        ctx,
+    )
+
+    _assert_reads_as_not_sent(output["text"], capability)
+
+
+@pytest.mark.parametrize("capability", CAPABILITIES)
+async def test_the_output_carries_the_recorded_intent_sentinel(capability):
+    """D-05 - the structured record: the capability, the resolved inputs, nothing else.
+
+    The sentinel-on-an-ordinary-output-dict shape is 101.1's own (``output["failure"]`` ->
+    ``fail_phase`` at the engine seam). The ENGINE branch that reads this key and writes
+    ``recorded_not_sent`` is plan 189-11's; this asserts the PRODUCER half only.
+    """
+    execute = _external_action_executor()
+    phase = _external_action_phase(capability)
+    ctx = _run_ctx()
+    ctx.inputs = {"recipient": "sarah@acme.example"}
+
+    output = await execute(phase, {"draft": {"text": "the draft body"}}, ctx)
+
+    record = output.get("recorded_intent")
+    assert isinstance(record, dict), (
+        "D-05: the executor must carry a `recorded_intent` sentinel holding the structured "
+        f"record of what it WOULD have done; got {record!r}"
+    )
+    assert record["capability"] == capability
+    assert set(record) == {"capability", "inputs"}, (
+        f"D-05: the record holds the capability and the resolved inputs and NOTHING else; "
+        f"got keys {sorted(record)}"
+    )
+    # The resolved inputs are the run inputs plus the upstream text - the two sources the
+    # neighbouring executors already read (ctx.inputs / _latest_phase_text).
+    assert record["inputs"]["recipient"] == "sarah@acme.example"
+    assert record["inputs"]["content"] == "the draft body"
+    # ⚠ The RECORD keeps values whole; only the rendered text clips them. This is the thing
+    # Phase 190 will one day actually send.
+    assert "…" not in record["inputs"]["content"]
+
+
 # ── Case C — D-22: a step the executor performs, not a tool the LLM may call ──
 
 

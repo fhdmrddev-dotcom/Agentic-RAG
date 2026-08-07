@@ -1,7 +1,7 @@
-"""The 5 phase-type executors (Phase 091 / HARNESS-01 — the ~80% composition).
+"""The 7 phase-type executors (Phase 091 / HARNESS-01 — the ~80% composition).
 
-Each of the 5 phase types maps onto already-shipped, cross-provider-tested
-substrate (RESEARCH Pattern 2). The executors here are THIN WRAPPERS: they CALL
+Each phase type maps onto already-shipped, cross-provider-tested substrate
+(RESEARCH Pattern 2). The executors here are THIN WRAPPERS: they CALL
 the substrate (``_stream_one_iteration``, ``run_task_sub_agent``, the ask_user
 pub/sub flow, the programmatic registry) — they never reimplement the agent loop
 and never edit a byte-frozen provider path.
@@ -13,6 +13,13 @@ and never edit a byte-frozen provider path.
     | llm_agent         | task_service.run_task_sub_agent (bounded sub-agent loop) |
     | llm_batch_agents  | gather(run_task_sub_agent × N) + merge_strategy          |
     | llm_human_input   | ask_user 5-step pub/sub pause/resume                     |
+    | llm_emit          | forced_emit + the emitter registry (101.1 — the 6th)     |
+    | external_action   | NONE — pure Python, ZERO I/O (189 — the 7th, SC#4)       |
+
+⚠ The count and the two bottom rows were CORRECTED at Phase 189: this docblock said
+"the 5" and listed five long after ``llm_emit`` made it six (101.1). A count in prose
+rots on every additive growth — the table is the roster, and the registration block at
+the foot of this file is the mechanism.
 
 Each executor signature is ``async def _exec_<type>(phase, accumulated_outputs,
 ctx) -> dict`` and returns a phase output dict carrying a ``text`` key — the
@@ -53,6 +60,12 @@ from app.db.workflows import write_audit
 from app.services.ask_user_service import subscribe_for_response
 from app.services.forced_emit import forced_emit
 from app.services.harness.emitters import resolve_emitter
+
+# 189 D-02/D-20 — the ONE runtime home of the closed capability set (189-04). Safe at
+# module top for the same reason ``validator_kinds`` is: ``grounding`` imports only
+# ``app.utils`` + starlette at module scope (everything heavier is function-local), so it
+# cannot close the harness_engine → harness → phase_types cycle.
+from app.services.harness.grounding import EXTERNAL_ACTION_CAPABILITIES
 from app.services.harness.programmatic import PROGRAMMATIC_PHASE_REGISTRY
 
 # BUG-260730-01 — the ONE home of the citation marker format, read here so the
@@ -1651,8 +1664,196 @@ def _latest_phase_text(accumulated_outputs: dict) -> str:
     return ""
 
 
+# ── Phase 189 (CONN-01) — the 7th executor: the governed EXTERNAL ACTION ─────
+#
+# The step that reaches outside this app and, in 189, SENDS NOTHING (SC#4). Two closed
+# tables key the copy off the capability so no sentence is ever improvised at call time —
+# an improvised negation is how "No email was sent." quietly becomes "Email delivered."
+# three refactors from now. The phrases are the SAME business words the canvas shows
+# (`189-UI-SPEC.md` §9d — one vocabulary, two surfaces); the negations are the closed
+# table that section mandates.
+_EXTERNAL_ACTION_PHRASE: dict[str, str] = {
+    "send_email": "Sends an email",
+    "create_ticket": "Creates a ticket",
+    "post_message": "Posts a message",
+}
+_EXTERNAL_ACTION_NEGATION: dict[str, str] = {
+    "send_email": "No email was sent.",
+    "create_ticket": "No ticket was created.",
+    "post_message": "No message was posted.",
+}
+# Static, data-independent — the same fence shape ``grounding.py`` puts directly under
+# EXTERNAL_ACTION_CAPABILITIES. It can only fire when someone edits one of the three
+# spellings, which is precisely when it should: a 4th capability MUST arrive with its own
+# words rather than falling back to a generic sentence.
+assert (
+    set(_EXTERNAL_ACTION_PHRASE)
+    == set(_EXTERNAL_ACTION_NEGATION)
+    == set(EXTERNAL_ACTION_CAPABILITIES)
+), (
+    "189: the external-action copy tables and EXTERNAL_ACTION_CAPABILITIES disagree — "
+    f"phrases={sorted(_EXTERNAL_ACTION_PHRASE)}, "
+    f"negations={sorted(_EXTERNAL_ACTION_NEGATION)}, "
+    f"capabilities={sorted(EXTERNAL_ACTION_CAPABILITIES)}"
+)
+
+# The sentinel key the executor puts on its ORDINARY output dict. The engine branches on
+# it to write the `recorded_not_sent` status — that branch is plan 189-11's, and this is
+# exactly the mechanism 101.1 invented for the same class of problem (``output["failure"]``
+# → ``fail_phase`` at the ``harness_engine`` seam). Naming it here so the producer and the
+# consumer cannot drift on a bare string literal.
+RECORDED_INTENT_KEY = "recorded_intent"
+
+# The rendered body is for a HUMAN; the structured record is the DATA. Long values are
+# clipped in the text only — ``recorded_intent`` keeps them whole, because that is the
+# record Phase 190 will one day actually send.
+_INTENT_TEXT_MAX_CHARS = 500
+
+
+def _clip_for_body(value) -> str:
+    """One-line, length-bounded rendering of a resolved input for the TEXT block only."""
+    text = value if isinstance(value, str) else json.dumps(value, default=str)
+    text = " ".join(text.split())
+    if len(text) > _INTENT_TEXT_MAX_CHARS:
+        text = f"{text[:_INTENT_TEXT_MAX_CHARS]}… ({len(text)} chars — kept in full in the record)"
+    return text
+
+
+def _external_action_inputs(accumulated_outputs: dict, ctx) -> dict:
+    """The inputs the action WOULD have used, resolved with the neighbouring executors'
+    shipped conventions and nothing new.
+
+    ``ExternalActionPhaseConfig`` carries no input fields of its own — deliberately
+    (`models/harness.py`: "NO SHAPE-SYMMETRY OPTIONALS, and the omission is the
+    decision"). So the material is the same two sources every other executor reads:
+
+      * the run's top-level inputs (``ctx.inputs``) — ``_exec_programmatic``'s
+        ``run_inputs`` fallback reads exactly this bag;
+      * the latest upstream phase's ``text`` — ``_latest_phase_text``, the reverse scan
+        ``_exec_llm_human_input`` uses to find the draft it asks a human to confirm.
+
+    An explicit run input named ``content`` WINS over the upstream text: the author named
+    it, so it is not silently overwritten by a derived value.
+    """
+    resolved: dict = {str(k): v for k, v in (getattr(ctx, "inputs", None) or {}).items()}
+    upstream = _latest_phase_text(accumulated_outputs)
+    if upstream.strip() and "content" not in resolved:
+        resolved["content"] = upstream
+    return resolved
+
+
+def _external_action_body(capability: str, resolved: dict) -> str:
+    """Compose the NOT-SENT body — three blocks, and the phrasing rules are BINDING
+    (`189-UI-SPEC.md` §9d):
+
+      1. it OPENS with the negation, never with the action;
+      2. a "what this step would have done" block naming the action in business words
+         plus the resolved inputs;
+      3. a closing negation drawn from the CLOSED table above, followed by a sentence
+         naming what the record is NOT.
+
+    No checkmark, and no past-tense success verb about the action itself ("done",
+    "delivered", "sent to"). **A recorded intent that reads like a receipt is the failure
+    mode this whole phase exists to avoid** — it is the Control Room's
+    ``consequence ≠ receipt`` rule, and `tests/unit/test_189_no_egress.py` fences it.
+    """
+    labels = ["Action", *(str(k) for k in resolved)]
+    width = max(len(lbl) for lbl in labels)
+    lines = [
+        "NOT SENT — recorded only.",
+        "",
+        "What this step would have done",
+        f"  {'Action'.ljust(width)}: {_EXTERNAL_ACTION_PHRASE[capability]}",
+    ]
+    lines += [f"  {str(key).ljust(width)}: {_clip_for_body(value)}" for key, value in resolved.items()]
+    lines += [
+        "",
+        f"{_EXTERNAL_ACTION_NEGATION[capability]} Nothing left this workflow. "
+        "This is a record of an intention, not a receipt.",
+    ]
+    return "\n".join(lines)
+
+
+async def _exec_external_action(phase, accumulated_outputs: dict, ctx) -> dict:
+    """Resolve a capability against the CLOSED set, RECORD what it would have done, and
+    send NOTHING (Phase 189 / CONN-01 — D-01, D-02, D-05, D-22).
+
+    ⚠ **SC#4: this executor performs NO network I/O.** It opens no HTTP client, no
+    connection of any other kind, and no remote-tool-protocol client.
+
+    ⚠ **NOTHING IN THIS FUNCTION MAY NAME A TRANSPORT, NOT EVEN TO DENY IT.** Two source
+    fences read this file rather than its behaviour: `tests/unit/test_189_no_egress.py`
+    walks every ``*.py`` under ``backend/app`` for the remote-tool protocol's three-letter
+    token, and plan 189-09's acceptance criteria grep this executor's own body for HTTP
+    client library names — both requiring ZERO. That is deliberate rather than pedantic: a
+    fence with a prose exemption is a fence somebody widens later, and "the token appears
+    zero times in the app" is a claim you can only make if it appears zero times. Both
+    fences caught an earlier draft of THIS paragraph, which is the best argument for them.
+
+    `tests/unit/test_189_no_egress.py` proves the no-egress half by
+    FALSIFICATION: every HTTP transport is patched to RAISE, this function runs, and it
+    must return normally. Live connectors are Phase 190, which swaps the no-op here for a
+    real call behind an unchanged seam — ONE function to replace.
+
+    ── D-02 · the closed-set resolution ──
+    The capability is looked up in ``EXTERNAL_ACTION_CAPABILITIES`` (the ONE runtime home,
+    `harness/grounding.py`) and an absent name RAISES — never resolved dynamically, never
+    ``eval``'d, and never falling back to a default capability. That is the rule
+    ``_TOOL_REGISTRY``, ``PROGRAMMATIC_PHASE_REGISTRY`` and ``EMITTER_REGISTRY`` all share,
+    and the raise below copies ``_exec_programmatic``'s wording deliberately.
+
+    ⚠ **DO NOT DELETE THIS CHECK AS REDUNDANT.** In practice
+    ``ExternalActionPhaseConfig.capability`` is a ``Literal`` of exactly three, so a bad
+    name is already a ``ValidationError`` at parse time. This is the SECOND line of
+    defence, for a row that reached the engine another way (a hand-edited JSONB row, a
+    future partial-update path, a caller that builds a ``PhaseSpec`` by hand), and it is
+    what D-02 asks for in as many words.
+
+    ── D-22 · a STEP the executor performs, not a tool the LLM may call ──
+    There is no agent loop here, no ``tools_override``, no streaming iteration and no
+    model call of any kind. The capability name rides ``available_tools`` as a GOVERNANCE
+    DECLARATION (D-03) — the ``render_template`` precedent MINUS layer 1 (see
+    ``_effective_tools``' two-layer docblock). Making it a callable tool would mean an LLM
+    decides *whether and how* to send, which contradicts D-05 and D-02 both, and would
+    ship most of the plumbing for the live egress SC#4 forbids.
+
+    ── The substrate this deliberately does NOT reuse ──
+    ``_exec_llm_human_input``. It times out and returns NORMALLY, so the run ADVANCES — a
+    fail-OPEN shape. The armed action-risk checkpoint 189 inherits runs through a
+    different path with an indefinite, shutdown-safe wait and is already fail-CLOSED
+    (189-05). **This executor runs AFTER approval and owns no waiting at all.**
+
+    ── D-05 · what it returns ──
+    A plain dict carrying ``text`` (the human-readable NOT-SENT body, the key
+    ``_latest_phase_text`` scans for) plus the ``recorded_intent`` sentinel holding the
+    structured record: the capability and the resolved inputs, and nothing else. The
+    ENGINE branches on that key to persist ``recorded_not_sent`` — the ``output["failure"]``
+    → ``fail_phase`` mechanism, one branch over. **That engine branch is plan 189-11's;
+    until it lands the phase simply completes, and the record is still written.**
+    """
+    capability = getattr(phase.config, "capability", None)
+    if capability not in EXTERNAL_ACTION_CAPABILITIES:
+        raise KeyError(
+            f"external_action phase {getattr(phase, 'slug', '?')!r}: capability "
+            f"{capability!r} is not registered in EXTERNAL_ACTION_CAPABILITIES "
+            f"(closed set — register it explicitly)"
+        )
+
+    resolved = _external_action_inputs(accumulated_outputs, ctx)
+    logger.info(
+        "189 D-05/SC#4: external_action phase %r RECORDED the intended %r and sent "
+        "nothing — no outbound call was made and none is possible in this phase",
+        getattr(phase, "slug", "?"),
+        capability,
+    )
+    return {
+        "text": _external_action_body(capability, resolved),
+        RECORDED_INTENT_KEY: {"capability": capability, "inputs": resolved},
+    }
+
+
 # ── registration ──────────────────────────────────────────────────────────
-# The 6 executors keyed by phase_type — the engine's PHASE_TYPE_REGISTRY dispatch
+# The 7 executors keyed by phase_type — the engine's PHASE_TYPE_REGISTRY dispatch
 # seam (Plan 02) resolves each of these. 101.1 (D-04) adds the 6th: ``llm_emit`` (the
 # SEALED FORCED EMIT — the only path that produces a typed deliverable).
 PHASE_TYPE_REGISTRY_ENTRIES: dict = {
@@ -1663,11 +1864,14 @@ PHASE_TYPE_REGISTRY_ENTRIES: dict = {
     "llm_human_input": _exec_llm_human_input,
     # 101.1 — the 6th (the forced-emit phase, D-04):
     "llm_emit": _exec_llm_emit,
+    # 189 CONN-01 — the 7th (the governed external action, D-01): resolves a closed
+    # capability, RECORDS what it would have done, and SENDS NOTHING (SC#4).
+    "external_action": _exec_external_action,
 }
 
 
 def register_all() -> None:
-    """Register the 6 executors into the engine's PHASE_TYPE_REGISTRY dispatch seam.
+    """Register the 7 executors into the engine's PHASE_TYPE_REGISTRY dispatch seam.
 
     Imported by ``harness/__init__`` so registration happens whenever the harness
     package (and therefore the engine) is used.
