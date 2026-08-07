@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio — 🚧 ACTIVE
 status: executing
-last_updated: "2026-08-07T04:50:00.000Z"
-last_activity: 2026-08-07 -- Phase 188.2 plan 07 PARTIAL, BLOCKED AT A CHECKPOINT. Task 1 done (G-5 ledger row flipped to *satisfied (188.2)* with re-derived figures; 4 stale doc pointers corrected; count-gate pins 107->124 and 58->61 from two agreeing runs; 188.2-DEFERRED.md created). Tasks 2-3 = the two UAT boards, AUTHORED BUT NOT DRIVEN -- executor has no browser tool. BUG-260806-01 stays `folded`.
-stopped_at: 188.2-07 Task 2 (blocking operator checkpoint) -- drive the 5 rows in 188.2-UAT.md
+last_updated: "2026-08-07T06:30:00.000Z"
+last_activity: 2026-08-07 -- Phase 188.2 EXECUTION COMPLETE, 7/7 plans. Plan 07 finalised: Task 1 (G-5 ledger row flipped to *satisfied (188.2)*; 4 stale doc pointers corrected; count-gate pins 107->124 and 58->61 from two agreeing runs; 188.2-DEFERRED.md created) + Tasks 2-3 -- the checkpoint was RETURNED, the operator authorised the orchestrator to drive the boards via Chrome MCP, and 4 of 5 rows are DRIVEN AND PASSED (`0492181a`). B1 passed WITH a falsification control (x at z-index 999 -> elementFromPoint returns the CARD, the bug reproduced; at 1002 -> returns the control), so BUG-260806-01 is CLOSED / verified_closed_by 188.2. ** A2 is BLOCKED (needs a live run) and A1's visual half was not performed -- both OWED, A2 first.**
+stopped_at: 188.2 execution complete (7/7 plans) -- NEXT is /gsd:verify-work 188.2 then /gsd:secure-phase 188.2. Manual debt owed: UAT row A2 (run it first), then A1's visual half.
 resume_file: .planning/phases/188.2-phasenodecard-extraction-refactor-pay-down-the-g-5-debt-on-p/188.2-UAT.md
 progress:
   total_phases: 21
   completed_phases: 9
   total_plans: 126
-  completed_plans: 124   # UNCHANGED -- 188.2-07 is NOT complete
+  completed_plans: 125   # 188.2-07 COMPLETE (188.2 is 7/7); phase not yet VERIFIED
   percent: 43
 ---
 
@@ -52,7 +52,7 @@ someone remembering.
 
 | # | Item | Why it is binding |
 |---|---|---|
-| **1** | ~~**`PhaseNodeCard.tsx` G-5 refactor recommendation, as the FIRST option**~~ — **DISCHARGED 2026-08-06: the discuss ran, the operator chose the refactor, and it is now inserted as Phase 188.2.** 189 does not re-litigate this; it simply waits behind 188.2. **⚑ AND THE LEDGER ROW IS NOW FLIPPED (2026-08-07, `188.2-07` Task 1, commit `615b2a06`): `CLAUDE.md` reads *satisfied (188.2 — 2026-08-07)* carrying the measured `797 → 274 L` / CODE `249 → 100` / BODY `427 → 169` and the honest subtree growth `797 → 1332 L (+67.1 %)`.** So a discuss-phase scan of 189's `files_modified` against the hot-file ledger no longer matches a G-5-firing row on this file. ⚠ The phase is **not** verified yet — `188.2-07`'s two UAT boards are authored but **NOT DRIVEN** and `BUG-260806-01` is still `folded`; 189 stays behind 188.2 until both close | The CLAUDE.md hot-file ledger row was hardened from *THRESHOLD CROSSED* to **G-5 FIRES** by explicit operator direction at the 188.1-05 checkpoint: **797 L, 7 plans across 4 phases, +67 % growth**. Per G-5 a dedicated refactor phase on this file is due BEFORE the next feature phase that touches it, and 189 places a governed external-action node on the canvas. |
+| **1** | ~~**`PhaseNodeCard.tsx` G-5 refactor recommendation, as the FIRST option**~~ — **DISCHARGED 2026-08-06: the discuss ran, the operator chose the refactor, and it is now inserted as Phase 188.2.** 189 does not re-litigate this; it simply waits behind 188.2. **⚑ AND THE LEDGER ROW IS NOW FLIPPED (2026-08-07, `188.2-07` Task 1, commit `615b2a06`): `CLAUDE.md` reads *satisfied (188.2 — 2026-08-07)* carrying the measured `797 → 274 L` / CODE `249 → 100` / BODY `427 → 169` and the honest subtree growth `797 → 1332 L (+67.1 %)`.** So a discuss-phase scan of 189's `files_modified` against the hot-file ledger no longer matches a G-5-firing row on this file. **⚑ AND BOTH BOARDS ARE NOW DRIVEN (2026-08-07, `0492181a`): 4 of 5 rows passed with their own disjoint evidence, and `BUG-260806-01` is `status: closed` / `verified_closed_by: 188.2` — closed on B1's driven `elementFromPoint` row PLUS a falsification control (the `✕` at `z-index 999` returns the CARD; at `1002` it returns the control), never on the stacking analysis.** ⚠ The phase's execution is complete (7/7 plans) but it is **not verified yet** — `/gsd:verify-work 188.2` and `/gsd:secure-phase 188.2` are still owed, and **UAT row A2 is ⛔ BLOCKED** (plus A1's visual half); 189 stays behind 188.2 until it is verified | The CLAUDE.md hot-file ledger row was hardened from *THRESHOLD CROSSED* to **G-5 FIRES** by explicit operator direction at the 188.1-05 checkpoint: **797 L, 7 plans across 4 phases, +67 % growth**. Per G-5 a dedicated refactor phase on this file is due BEFORE the next feature phase that touches it, and 189 places a governed external-action node on the canvas. |
 | **2** | **[[SEED-133]] / `T-187-SEED-133`** — the NL-seed grounding-degradation gap | `accept`ed at the `/gsd:secure-phase 187` gate on 2026-08-06 **with a phase-bound trigger naming 189**. Its previous trigger (*"when Phase 187 is scoped"*) fired silently and was caught months later by `/gsd:audit-milestone`. Mechanical check: while `grep -c degraded backend/app/services/workflow_authoring.py` returns **0**, the defect is live. |
 
 **Also owed, not blocking 189:** **UAT-13 / M6** — the SC#6 LIVE row (an armed action-risk checkpoint
@@ -70,7 +70,24 @@ Plan 188.2-02 COMPLETE (`7f77af44` · `fe3de624` · `30c2e66f`; summary `188.2-0
 Plan 188.2-03 COMPLETE (`99a383c7` · `1fc193b4` · `b1942579`; summary `188.2-03-SUMMARY.md`).
 Plan 188.2-04 COMPLETE (`82dd29a7` · `155b3832`; summary `188.2-04-SUMMARY.md`).
 Plan 188.2-05 COMPLETE (`7b417f71` · `53247c69` · `d6dfe716`; summary `188.2-05-SUMMARY.md`).
-Next: plan 188.2-06 — THE CUT. 11 decisions in `188.2-CONTEXT.md` (`8cbbb2d3`).
+Plan 188.2-06 COMPLETE — THE CUT (`7ca0ec1b` · `a4e60a04` · `579504de`; summary `188.2-06-SUMMARY.md`).
+Plan 188.2-07 COMPLETE (`615b2a06` · `360399b2` · `c8ac1d0e` · `0492181a`; summary `188.2-07-SUMMARY.md`).
+**PHASE 188.2 EXECUTION COMPLETE — 7/7 plans.** Next: `/gsd:verify-work 188.2`, then
+`/gsd:secure-phase 188.2`, then Phase 189 (no longer blocked by the G-5 gate on this file).
+
+**⚠ MANUAL DEBT OWED OUT OF 188.2 — two UAT rows, and A2 is the one to run first.**
+`188.2-UAT.md` reads `status: PARTIAL — 4 driven / 1 blocked` (`rows_passed: 4`, `rows_blocked: 1`,
+`rows_not_yet_driven: 0`) — that is four driven rows and one open one, not a passed board.
+· **A2 (⛔ BLOCKED — RUN THIS FIRST):** a live run's seven readings must stay distinguishable **by
+  shape alone** in greyscale, the running arc must spin, a card with no reading must be still. It
+  needs a LIVE run: both DB runs open as ordinary chat threads because `ChatLayout.tsx:344-352`
+  routes to the run surface only on an **active** run id, and `GET /workflows/runs/{id}` answers
+  **404** (the collection **405**, POST-only). Driving it costs a real model call, so it was
+  surfaced rather than spent unilaterally. Trigger (D-188.2-DEF-07): the next live run launched for
+  any reason — look while you're there.
+· **A1's SUBJECTIVE half (D-188.2-DEF-08):** the structural half passed on measured geometry
+  (`width 248px` / `radius 22px` / `padding 42px 20px 20px` / `backdrop-filter blur(4px)`), but
+  nobody looked at a card. Zero-cost trigger: the next time the Builder canvas is opened.
 
 **188.2-05 — all three presentational modules exist, and every one of the NINE moved spans diffs
 EMPTY.** `NodeCornerMarks.tsx` (**247 L**) holds `PhaseNodeCard.tsx:410-434` + `:567-656` — the
