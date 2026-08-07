@@ -76,15 +76,48 @@ normal child inside the canvas subtree instead of being portalled to `document.b
 `.react-flow` container's `overflow-y: hidden` is standard for xyflow and is not itself the bug; the
 bug is putting an overlay inside a clipping container.
 
+## ⚠ ATTEMPTED AND REVERTED — `max-height` + `overflow-y: auto` alone DOES NOT CLOSE THIS
+
+A `/gsd:fast` attempt on 2026-08-07 added `max-h-[min(46vh,340px)] overflow-y-auto
+overscroll-contain` plus an `onWheel` `stopPropagation` to the panel's own className. **It was
+driven, measured, found insufficient, and reverted** — the tree is unchanged. Recorded here so the
+next person does not spend the same hour.
+
+The CSS took effect exactly as intended — `overflowY: auto`, `maxHeight: 309.856px`,
+`scrollHeight > clientHeight` — **and the rows were still unreachable**, because bounding the
+panel's HEIGHT does nothing about where its TOP sits:
+
+```
+panelBottom 682  >  reactFlowBottom 597      (innerHeight 674)
+unreachable rows — door 1: [1,2,3,4,5,6,7] · door 2: [1,7] · door 3: [1,2,7]
+```
+
+Door 1 got **worse**: the shorter panel repositioned and all seven rows ended up clipped. The
+lesson is that the panel's top is already low enough that even a bounded panel overflows the
+container, so **no static `max-height` can be correct** — the bound has to be *the space actually
+available below the anchor*, which is a measured quantity, not a constant.
+
+⚠ **This also means the `onWheel` half is necessary but not sufficient**, and it should be kept in
+whatever the real fix turns out to be: without it the wheel bubbles to react-flow's d3-zoom and
+zooms the canvas instead of scrolling the menu, which would make any scrollbar decorative.
+
+**Consequence for routing: this is NOT `/gsd:fast` work.** Any correct fix needs a render-time
+measurement plus a re-measure on resize/zoom, which exceeds G-3's ≤1-file / ≤10-line cap. Route to
+`/gsd:quick` or fold into a phase.
+
 ## Fix sketch
 
-Any one of these closes it; the first is the standard fix:
+Any one of these closes it; the first is the standard fix — and note the second is the one that was
+tried in isolation and **failed**:
 
 - **Portal the menu to `document.body`** (a floating-ui / Radix `Portal` + `position: fixed`), so the
   canvas's `overflow: hidden` cannot clip it. This is what the rest of the app's popovers already do —
   the KB `combobox` on the same screen opens fine because it is not inside `.react-flow`.
-- **Add `max-height` + `overflow-y: auto`** to the menu so long lists scroll. Cheapest, and it also
-  survives an 8th type.
+- **~~Add `max-height` + `overflow-y: auto`~~ — TRIED IN ISOLATION, DOES NOT WORK.** See the
+  attempted-and-reverted section above: a *static* bound cannot help, because the panel's top is
+  already below the container's usable region. It only works if the max-height is computed from the
+  measured space between the anchor and `.react-flow`'s bottom edge — and if it is, the `onWheel`
+  guard must ship with it.
 - **Flip up when the menu would overflow the container**, the usual collision behaviour.
 
 ⚠ **Also fix the keyboard path** — it is a second, independent defect surfaced by the same
