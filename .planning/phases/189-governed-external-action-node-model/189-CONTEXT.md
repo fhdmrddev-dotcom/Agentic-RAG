@@ -4,7 +4,11 @@
 **Refreshed:** 2026-08-07 — the G-5 gate discharged, file pointers re-measured, three open bugs routed.
 **Discussed with the operator:** 2026-08-07 — six choices put in plain language; **four ratified
 D-01..D-13 unchanged, two closed the open wording items** (D-15..D-18 below).
-**Status:** Ready for planning — **UNBLOCKED. Phase 188.2 has shipped. Nothing is left to decide.**
+**Amended at plan-phase:** 2026-08-07 — research measured **three conflicts between locked decisions
+and shipped code**; the operator was unattended and delegated the calls. **D-19 … D-22 added; no
+prior decision re-opened.** Two of them mean **D-06 ("the workflow publishes") is FALSE at HEAD** —
+that is now this phase's headline gate, not an assumption.
+**Status:** Ready for planning — **UNBLOCKED. Phase 188.2 has shipped.**
 
 <domain>
 ## Phase Boundary
@@ -263,6 +267,74 @@ made a state-conditional badge the right call over a type-conditional one. Chose
 destination" (wire vocabulary), "Won't send yet" (duplicates what the run status already says, so
 the badge earns less) and spending no badge at all (185's precedent, but it leaves the canvas unable
 to say that this step cannot yet reach outside — the card would look identical before and after 190).
+
+### Conflict resolutions — decided at plan-phase, 2026-08-07 (D-19 … D-22)
+
+**`189-RESEARCH.md` §"⚠ CONFLICTS WITH A LOCKED DECISION" measured that TWO locked decisions are
+falsified by shipped code, and a third is contradicted by a shipped docblock.** The operator was
+unattended and delegated these ("take the decisions"). **No locked decision is re-opened — each
+resolution below is the shape that keeps D-03…D-06 ALL true simultaneously.** Each carries the
+measurement that forced it.
+
+- **D-19 — resolves CONFLICT 1: the golden run auto-records and continues; arming stays
+  undisarmable.** *Measured:* `publish_service._interactive_phase_failures` (`:500-540`) blocks a
+  publish pre-run for exactly two shapes — `phase_type == "llm_human_input"` (`:521`) and a
+  validator with `on_failure == "ask_user"` (`:531`). The armed action-risk checkpoint is **neither**:
+  D-187-01 hoisted it OUT of `phase.validators`, and `harness_engine.py:754` reads
+  `action_risk_armed` directly. So an `external_action` phase sails past stage 2.5 into the stage-3
+  golden run, hits `timeout_seconds = None if is_action_risk` (`harness_engine.py:1104`) which
+  `ask_user_service.subscribe_for_response` documents as *"wait indefinitely"*, and the publish dies
+  at `harness_publish_max_seconds = 7200` (`config.py:1184`). **D-06 is FALSE as the tree stands —
+  the phase's headline publish test fails RED today.**
+  **Decision:** thread `is_golden_run` into the run ctx and make the armed checkpoint
+  **auto-record-and-continue** on a golden run — the *pause* is skipped, the **record is not**:
+  the phase still writes `recorded_not_sent`. `is_golden_run` already exists as a `workflow_runs`
+  column (`db/workflows.py:150,194,203,811`) but is NOT threaded into ctx; **that threading is the
+  work.** Rejected: (B) naming armed phases in `_interactive_phase_failures` — that makes an
+  `external_action` workflow unpublishable, contradicting D-06 outright; (C) publishing a synthetic
+  approval onto the ask channel — it writes a `validator_ask_user_approved` receipt claiming a human
+  approved when none did, violating the Control-Room `consequence ≠ receipt` rule. **This class of
+  defect (an armed checkpoint killing a run) is `BUG-260731-02`, which is why migration 114 exists —
+  so it must be proven by a DRIVEN test, never asserted.**
+
+- **D-20 — resolves CONFLICT 2: a closed `EXTERNAL_ACTION_CAPABILITIES` frozenset that the fidelity
+  gate reads and the author-facing rail does NOT.** *Measured:* stage 2.6 rule 2
+  (`grounding.py:643-651`) requires every `available_tools` entry to be in `tool_names`, and
+  `tool_names` is built at `grounding.py:388` from `get_tools(None)` — the **LLM-facing schema list**,
+  not `_TOOL_REGISTRY` (the asymmetry is recorded in `openai_service.py:1133`: *"the inverse of
+  render_template — registered in `_TOOL_REGISTRY` but NOT advertised here"*). So the three D-15
+  capability names in `available_tools` **block publish at stage 2.6. D-06 is FALSE a second time.**
+  **⚠ And the obvious fix opens a governance hole:** `GroundingBundle.tools` (`grounding.py:111,:427`)
+  is served on `GET /workflows/grounding-bundle` and bound at `WorkflowBuilderPage.tsx:885` straight
+  into `PhaseFormPanel`'s author-facing whitelist rail (`:873`, `:925`) — adding the names to
+  `get_tools()` would let an author whitelist `send_email` on an **ordinary, unarmed `llm_agent`
+  step**, which is precisely the wire-around D-04 and SC#2 forbid.
+  **Decision:** a new closed `EXTERNAL_ACTION_CAPABILITIES: frozenset[str]` in `grounding.py`
+  **beside `KB_TOOLS` and in the same shape**, unioned into `tool_names` **for the fidelity check
+  only** and deliberately kept OUT of `GroundingBundle.tools`. One home for the closed set, read by
+  both the executor (D-02) and the gate; the author-choosable option set does not widen by one entry.
+  This mirrors `KB_TOOLS`'s own recorded argument — *"this list DEFINES which steps are governed, so
+  a second copy is a safety hole"*. **⚠ It breaks the currently-true identity
+  `tools == sorted(tool_names)` asserted in prose at `grounding.py:446-447`; that prose must be
+  corrected IN THE SAME COMMIT, with the reason recorded.** The leak itself gets its own test: the
+  three names must be absent from `GroundingBundle.tools`.
+
+- **D-21 — resolves CONFLICT 3: `canvasModel.ts:196-203` is a PROSE correction, not a feature.**
+  *Measured:* that docblock says verbatim *"`false` is Phase 189's state — an external-action step
+  whose checkpoint the author turned off"*. **D-04 makes that state unreachable forever**, and it
+  already is: `checkpointOnTarget` (`:274-276`) returns `actionRiskArmed(phase) ? true : undefined`,
+  so `false` is not producible from the projection today. **The plan MUST NOT read this docblock as a
+  requirement to wire a ghost-detour edge.** The `FlowEdge` `GhostMarks` branch (`FlowEdge.tsx:343`)
+  stays shipped and stays unreachable; the docblock simply stops naming 189 as its claimant.
+
+- **D-22 — the capability is a STEP THE EXECUTOR PERFORMS, not a tool the LLM may call.** This is the
+  one mechanical question D-03 + D-05 left genuinely open, and RESEARCH §A6 answers it decisively
+  with three independent proofs; the shipped precedent is **`render_template`** — a name registered
+  in `_TOOL_REGISTRY` and honoured by the whitelist, but never advertised in `get_tools()` and
+  executed by the phase itself (`phase_types.py:296-320`). It is the ONLY reading consistent with
+  BOTH "rides the existing per-phase tool-whitelist" (D-03) **and** "the executor records the intent"
+  (D-05) — and it is what makes D-20's keep-it-off-the-rail shape coherent rather than a special
+  case. A plan that hands the three capability names to a model as callable tools has misread this.
 
 ### Claude's Discretion
 
