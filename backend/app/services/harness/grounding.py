@@ -104,12 +104,20 @@ class GroundingBundle:
     ``tools``/``folders``/``skills``/``placeholders`` are the JSON-serializable shapes the
     ``GET /workflows/grounding-bundle`` route returns (D-182-01 — Phase 184's node-config
     dropdowns bind to these, NEVER to a frontend constant / Pitfall 1). ``tool_names`` and
-    ``skill_ids`` are the membership SETS the fidelity rules test against (the same values,
-    set-shaped for O(1) checks and for NL generation's historical tuple contract).
+    ``skill_ids`` are the membership SETS the fidelity rules test against (set-shaped for
+    O(1) checks and for NL generation's historical tuple contract).
+
+    ⚠ **``tools`` AND ``tool_names`` ARE NO LONGER THE SAME VALUES, AND THE DIFFERENCE IS A
+    GOVERNANCE BOUNDARY (Phase 189 / D-20).** ``skill_ids`` still mirrors ``skills``; the
+    tool pair does not. See ``assemble_grounding_bundle`` for the reason, stated once.
     """
 
-    tools: list[str] = field(default_factory=list)  # sorted(tool_names) — JSON-friendly
-    tool_names: set[str] = field(default_factory=set)  # membership set for fidelity
+    # THE AUTHOR-FACING OPTION LIST — the narrow, LLM-facing schema names ONLY. Anything in
+    # here is a name an author may tick on ANY agent step (D-20). NOT ``sorted(tool_names)``.
+    tools: list[str] = field(default_factory=list)
+    # THE FIDELITY MEMBERSHIP SET — a SUPERSET of ``tools``: the schema names PLUS the closed
+    # ``EXTERNAL_ACTION_CAPABILITIES`` (D-20). Never serialized to the wire.
+    tool_names: set[str] = field(default_factory=set)
     folders: list[dict] = field(default_factory=list)  # fetch_visible_folders rows
     # enabled skills visible to the caller: is_system, or in-org owned / org-shared (CR-01).
     # RAW rows — the ``/grounding-bundle`` route projects them through ``PaletteSkill`` before
@@ -385,7 +393,39 @@ async def assemble_grounding_bundle(
         folders = []
         degraded.add("folders")
 
-    tool_names = {t["function"]["name"] for t in get_tools(None)}
+    # ── THE D-20 GOVERNANCE BOUNDARY — two sets, on purpose (Phase 189 / CONN-01) ──
+    #
+    # ``schema_tool_names`` is the LLM-facing schema list and is what the AUTHOR is offered.
+    # ``fidelity_tool_names`` is what the publish gate tests MEMBERSHIP against. Until 189
+    # they were the same set, which is why ``GroundingBundle`` could carry both halves as
+    # one value. They are now deliberately different, and the difference is the whole point:
+    #
+    #   * WHY the fidelity set must be WIDER (D-06 / CONFLICT 2). D-03 puts the chosen
+    #     external-action capability into the phase's ``available_tools`` so it rides the
+    #     shipped per-phase whitelist rather than a parallel guard. Stage 2.6 rule 2
+    #     (``_unregistered_tools``) then requires every ``available_tools`` entry to be in
+    #     this set — and D-22 keeps the capabilities OUT of ``get_tools()`` (a capability is
+    #     a step the EXECUTOR performs, not a tool the model may call; the shipped
+    #     ``render_template`` asymmetry, recorded in ``openai_service.get_tools``). Without
+    #     the union, a workflow containing the node is refused at publish and D-06 is false.
+    #
+    #   * WHY the author-facing list must stay NARROW (D-04 / SC#2 — the security half).
+    #     ``tools`` is served on ``GET /workflows/grounding-bundle`` and bound straight into
+    #     ``PhaseFormPanel``'s author-facing whitelist rail. A capability in ``tools`` is a
+    #     capability an author can tick on an ORDINARY, UNARMED ``llm_agent`` step — which
+    #     wires around the ``external_action`` type's structural arming and makes
+    #     ``action_risk_armed`` decorative. That is the wire-around SC#2 forbids.
+    #
+    # THE SET IS WIDENED, THE RULE IS NOT WEAKENED. Rule 2 keeps firing on every name it
+    # ever fired on; it is admitted three REVIEWED names, from one closed frozenset, at one
+    # boundary. A ``phase_type`` exemption inside rule 2 would have been the other shape and
+    # is rejected: a type special-case inside a SHARED governance rule is how a rule stops
+    # meaning one thing. Both halves are fenced —
+    # ``tests/unit/test_103_grounding_fidelity.py`` (the capabilities pass, a hallucinated
+    # name still does not) and ``tests/test_182_grounding_bundle.py`` (V22: the three names
+    # are ABSENT from ``tools``), the latter proved non-vacuous by an observed plant.
+    schema_tool_names = {t["function"]["name"] for t in get_tools(None)}
+    fidelity_tool_names = schema_tool_names | EXTERNAL_ACTION_CAPABILITIES
 
     # CR-01 — the caller's org set gates the skill read. Resolved HERE, in the async caller,
     # because ``_skill_registry`` is sync-by-contract (D-v2.5-01) and must not do its own
@@ -424,8 +464,11 @@ async def assemble_grounding_bundle(
         template_placeholders=template_placeholders,
     )
     return GroundingBundle(
-        tools=sorted(tool_names),
-        tool_names=tool_names,
+        # NARROW — the author-facing rail. Deliberately NOT ``sorted(tool_names)``: see the
+        # two-set block above. This is the field the D-20 leak guard (V22) watches.
+        tools=sorted(schema_tool_names),
+        # WIDE — the fidelity membership set the publish gate and /validate test against.
+        tool_names=fidelity_tool_names,
         folders=list(folders or []),
         skills=list(skills or []),
         skill_ids=skill_ids,
@@ -443,8 +486,24 @@ def render_grounding_prompt(bundle: GroundingBundle, project_folder_id: str | No
 
     Lifted VERBATIM from ``workflow_authoring._assemble_grounding`` (the string-render
     half) so the NL prompt stays BYTE-IDENTICAL after the Phase 182 extraction.
-    ``", ".join(bundle.tools)`` is exactly the old ``", ".join(sorted(tool_names))``
-    (``tools == sorted(tool_names)`` by construction).
+
+    ⚠ **CORRECTED at Phase 189 (D-20), in the commit that falsified it.** This docstring
+    used to read *"``", ".join(bundle.tools)`` is exactly the old
+    ``", ".join(sorted(tool_names))`` (``tools == sorted(tool_names)`` by construction)"*.
+    That identity NO LONGER HOLDS: ``assemble_grounding_bundle`` now builds ``tool_names``
+    as a strict SUPERSET of ``tools`` — the LLM-facing schema names plus the closed
+    ``EXTERNAL_ACTION_CAPABILITIES``. ``tool_names`` is the FIDELITY membership set;
+    ``tools`` is the AUTHOR-FACING option list and deliberately excludes the capabilities,
+    because it binds into ``PhaseFormPanel``'s whitelist rail and an author must never be
+    able to whitelist an external capability on an unarmed step. A docblock that lies about
+    a governance boundary is worse than no docblock, which is why this correction is not
+    deferred.
+
+    **The BYTE-IDENTICAL guarantee this sentence exists to defend is UNCHANGED — and it is
+    unchanged precisely BECAUSE ``tools`` was not widened.** The rendered prompt reads
+    ``bundle.tools``, the narrow half, so the NL grounding prose is the same string it was
+    before 189. The capabilities are absent from it for the same reason they are absent
+    from the rail: they are not names a model may be told to whitelist freely.
     """
     folder_tree = _render_folder_tree(bundle.folders)
     skill_lines = (
@@ -798,8 +857,12 @@ KB_TOOLS: frozenset[str] = frozenset({
     "search_documents", "query_documents", "read_document",
     "analyze_document", "get_related_documents",
 })
-# The wire/JSON form, mirroring how ``GroundingBundle`` already carries ``tools: list[str]``
-# (JSON-friendly, sorted) beside ``tool_names: set[str]`` (membership) for the same values.
+# The wire/JSON form, mirroring the SHAPE of ``GroundingBundle``'s ``tools: list[str]``
+# (JSON-friendly, sorted) beside ``tool_names: set[str]`` (membership).
+# ⚠ CORRECTED at Phase 189 (D-20): this comment used to add "for the same values". That
+# pair no longer carries the same values — ``tool_names`` is a strict superset of ``tools``
+# — so the analogy is to the list/set SHAPE only. ``KB_TOOLS_SORTED`` genuinely is
+# ``sorted(KB_TOOLS)``, and this constant is unchanged.
 KB_TOOLS_SORTED: list[str] = sorted(KB_TOOLS)
 
 

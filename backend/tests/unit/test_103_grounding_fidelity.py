@@ -362,3 +362,38 @@ async def test_a_shipped_tool_is_still_accepted_alongside_a_capability():
     assert not any("search_documents" in f.get("message", "") for f in findings), (
         f"a REGISTERED tool was reported unregistered: {findings!r}"
     )
+
+
+@pytest.mark.asyncio
+async def test_the_fidelity_membership_set_contains_the_capabilities():
+    """D-20 — the union is PROVED APPLIED, not inferred from the absence of a finding.
+
+    Plan 189-04 added this. The three tests above establish that rule 2 no longer reports
+    the capabilities; NONE of them establishes WHY. An absence of findings is also what a
+    quietly-broken collector, a short-circuited rule or a helper that stopped reaching the
+    gate would produce, and each of those would be "green" while D-20's boundary was never
+    built. So the membership half is asserted DIRECTLY, on the same production set stage
+    2.6 consumes.
+
+    This is the positive half of a matched pair, and its partner is V22 in
+    ``tests/test_182_grounding_bundle.py``: the three names are IN ``bundle.tool_names``
+    (here) and OUT of ``bundle.tools`` (there). Together they pin the boundary from both
+    sides — either assertion alone is satisfiable by a fix that is wrong in the other
+    direction. Asserted on the SET so a partial union cannot pass.
+    """
+    tool_names = await _production_tool_names()
+
+    missing = EXTERNAL_ACTION_CAPABILITIES - tool_names
+    assert missing == frozenset(), (
+        f"D-20: {sorted(missing)} is absent from the production fidelity membership set, so "
+        f"stage 2.6 rule 2 is passing for some OTHER reason than the union — "
+        f"EXTERNAL_ACTION_CAPABILITIES must be unioned into tool_names inside "
+        f"assemble_grounding_bundle"
+    )
+    # And the set is still the SUPERSET it is supposed to be, not a replacement: a widening
+    # that dropped the real registry would satisfy the assertion above while breaking every
+    # shipped whitelist.
+    assert "search_documents" in tool_names, (
+        f"the widened set no longer contains a known shipped tool — tool_names was "
+        f"REPLACED rather than widened. Got {sorted(tool_names)!r}"
+    )
