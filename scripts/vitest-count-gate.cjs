@@ -577,7 +577,41 @@ const BASELINE = {
   // FALSIFIABLE placeholders: they go red the day 189-14 lands the type sentence and
   // 189-13 lands the `outbox-tray` mark, which is what forces the exclusions to be
   // emptied rather than to outlive their reason.
-  "StepTypePicker.test.tsx": 46,
+  // BUG-260807-02 (`/gsd:quick 260807-x9p`): 46 → 52. An EXTENSION, not a lowering — no
+  // `it(` was deleted, renamed or moved, and no shipped case changed its assertions. The
+  // +6 are the contract half of the clipping fix, and they are pinned knowing exactly what
+  // they can and cannot see: the two library opt-out class tokens (`nowheel` / `nopan`,
+  // which `@xyflow/system`'s `isWrappedWithClass` finds by an ANCESTOR WALK from the event
+  // target, so they must be on the panel ITSELF), the two overflow tokens, the inline
+  // `max-height` arriving from the CALLER, the two no-inline-bound rows (prop omitted and
+  // an explicit `null` — the unmeasured container), and the wheel-does-not-reach-a-parent
+  // case with its positive control in the same `it(`.
+  //
+  // ⚠ THESE ARE CONTRACT ASSERTIONS AND NOT THE ACCEPTANCE, which is why the sentence
+  // matters more than the number: jsdom applies no CSS, computes no overflow clipping and
+  // `.click()` bypasses hit-testing — this suite was GREEN while row 7 (`external_action`)
+  // was unreachable from all three insertion doors. The acceptance is the driven
+  // `elementFromPoint` probe recorded on the bug report. Read from THIS SCRIPT'S OWN
+  // `actual` column across two agreeing runs, 2026-08-08 (both printed
+  // `StepTypePicker.test.tsx 46 52 +6`), in the SAME COMMIT as the tests.
+  "StepTypePicker.test.tsx": 52,
+  // BUG-260807-02 — NET-NEW: `editAffordance.ts`'s FIRST suite ever, pinned in the commit
+  // that creates it. No `TARGETS` edit accompanies it, and that is measured rather than
+  // assumed: `src/components/workflows` is already a DIRECTORY entry, so the file RAN the
+  // moment it existed — the gate printed `editAffordance.test.ts — 31 new` before this
+  // line was written. TARGETS decides what RUNS, BASELINE what is GUARDED, and only the
+  // second was missing.
+  //
+  // What would be unguarded without it: `pickerPlacement`'s whole contract — the side
+  // choice and its tie rule, the TWO COORDINATE SPACES asserted in single calls at zoom
+  // 0.5 and 2 (the panel's net scale is 1, so the height budget is a SCREEN gap and must
+  // NOT be scaled, while `PICKER_DROP` is a FLOW offset and must be), the x clamp three
+  // ways, the `PICKER_MIN_HEIGHT` floor, and the NaN-totality block. That last one is not
+  // ceremony: every field is interpolated into `translate(...)`, one NaN invalidates the
+  // whole declaration, and since 188.2 gave these style objects `zIndex: 1002` a dropped
+  // transform strands the affordance ABOVE every card (the `verticalOffsetFor` /
+  // `BUG-260807-01` mechanism, asserted here rather than inherited).
+  "editAffordance.test.ts": 31,
   // 189-14 Task 2 (D-04 / D-24): 42 -> 49. An EXTENSION — every shipped case is unmoved.
   // The +7 pin the arming switch's refusing state on `external_action`: it renders ON with
   // `actionRiskArmed: false` supplied (the state a freshly-placed step is in), it is
@@ -736,7 +770,20 @@ const BASELINE = {
 // guard). Both guards whose WORDING 189 falsified were REWRITTEN IN PLACE, never deleted —
 // a deleted guard is coverage nobody notices losing, and the gate would have refused the
 // per-file decrease anyway.
-const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // ⚠ 2627 (189-15)
+// ⚠ AND BY BUG-260807-02 (`/gsd:quick 260807-x9p`, 2026-08-08): 2627 → 2664, and the
+// pinned FILE count 47 → 48 — the first new pinned FILE since 189-14. `StepTypePicker.test.tsx`
+// 46 → 52 and the net-new `editAffordance.test.ts` (31), both read from this script's own
+// printed columns across two agreeing runs, in the SAME COMMIT as the tests.
+// ⚠ AND A DISCREPANCY RECORDED RATHER THAN SMOOTHED, because it is exactly the drift this
+// note keeps going stale over: those same two runs printed `total 2677`, which is THIRTEEN
+// above the pinned 2664. The gap is NOT this change — it is two PRE-EXISTING files running
+// above their pins, `ExternalActionSection.test.tsx` (25 pinned / 34 actual, +9) and
+// `PhaseTimeline.test.tsx` (17 / 21, +4), both measured on the unmodified tree BEFORE any
+// file here was touched. Nine and four cases are therefore deletable with the gate green
+// today. They are left unpinned deliberately: neither file is in this fix's blast radius,
+// and re-pinning a suite this change did not author would hide the drift inside an
+// unrelated commit. Owed as its own edit.
+const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // ⚠ 2664 (BUG-260807-02)
 
 // ── The Wave-0 blast radius (184-VALIDATION.md § "quick run command"). ──
 const TARGETS = [
