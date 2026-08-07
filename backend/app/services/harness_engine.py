@@ -751,7 +751,65 @@ async def _run_phase_with_gates(
     # deletes is the THIRD reading — the string-prefix sniff over a failing gate's error
     # message. The engine no longer infers arming from a finding it parsed; it reads the
     # boolean the author set.
-    if getattr(phase, "action_risk_armed", False):
+    #
+    # ── D-19 (Phase 189, CONFLICT 1) — THE GOLDEN-RUN BRANCH ─────────────────────
+    # THE MEASURED CHAIN THIS FIXES. ``publish_service._interactive_phase_failures``
+    # blocks a publish PRE-RUN for exactly two shapes — an ``llm_human_input`` phase and
+    # a validator whose ``on_failure == "ask_user"``. The armed checkpoint is NEITHER,
+    # because D-187-01 hoisted it OUT of ``phase.validators`` and the boolean is read
+    # right here instead. So an armed phase sails past stage 2.5 into the stage-3 REAL
+    # golden run, reaches this checkpoint, and subscribes to the ask channel with
+    # ``timeout_seconds = None`` — which ``ask_user_service.subscribe_for_response``'s
+    # own docstring calls "wait indefinitely". Nobody watches a synchronous publish's
+    # ask channel, so the request burned the whole ``harness_publish_max_seconds``
+    # budget (7200 s) and died at ``blocked_stage="golden_run_timeout"``. That made D-06
+    # ("a workflow containing the external-action node PUBLISHES and RUNS") FALSE, and
+    # it is a PRE-EXISTING defect: it reproduces on ANY armed phase of a SHIPPED type.
+    #
+    # THE RESOLUTION — AUTO-RECORD-AND-CONTINUE. On a golden run the PAUSE is skipped;
+    # the RECORD is not. Nothing below runs: no approval sentence is composed, no
+    # ``action_risk_pending`` row or event is written, no ask-channel subscribe is
+    # awaited. Execution falls straight through to the retry loop so THE STEP STILL
+    # RUNS and records what it would have done. "Skip the pause" must never become
+    # "skip the step" — a silently-skipped governed step is the fail-open shape Phase
+    # 188 spent two plans closing, and it would make the arming decorative.
+    #
+    # A LIVE RUN IS BYTE-IDENTICAL. ``ctx.is_golden_run`` is set at exactly one site
+    # (``publish_service._drive_golden_run``'s ctx literal); every other ctx builder is
+    # untouched and the ``getattr`` default below IS the live-run answer. The indefinite
+    # wait, the shutdown-sentinel ``CancelledError`` and the unparseable-payload refusal
+    # all stay exactly as shipped — the armed path is already fail-closed on a live run
+    # and that is precisely what must be preserved.
+    #
+    # TWO SHAPES WERE REJECTED, each for a recorded reason, and neither is used here:
+    #   (B) naming armed phases in ``publish_service._interactive_phase_failures`` so the
+    #       gauntlet blocks pre-run — that makes an ``external_action`` workflow
+    #       UNPUBLISHABLE and contradicts D-06 outright. ``_interactive_phase_failures``
+    #       is untouched by 189 and ``test_the_armed_checkpoint_is_not_a_validator``
+    #       fences it.
+    #   (C) publishing a synthetic approval onto the ask channel — it writes a
+    #       ``validator_ask_user_approved`` receipt claiming a human approved when none
+    #       did, violating the Control-Room ``consequence ≠ receipt`` rule. Which is why
+    #       this branch writes NO approval receipt AND no ``action_risk_pending`` row:
+    #       nothing paused, so the ledger must not say something did.
+    #
+    # ARMING ITSELF IS NOT TOUCHED. ``phase.action_risk_armed`` is neither cleared in
+    # memory nor in storage — only the pause is skipped. D-04 ("structurally armed, not
+    # disarmable") stands, and so does the boot-time resume predicate
+    # ``_is_armed_action_risk`` (:2240), which stays deliberately INDEPENDENT of this
+    # run-time reader — ``test_the_two_resume_predicates_are_independent`` pins that.
+    _armed = getattr(phase, "action_risk_armed", False)
+    if _armed and getattr(ctx, "is_golden_run", False):
+        # The golden run's ONLY trace of the checkpoint. Deliberately a log line and
+        # not an audit row: ``harness_audit`` is the ledger of things that HAPPENED to
+        # a person, and on a golden run nobody was asked.
+        logger.info(
+            "publish golden run: armed action-risk checkpoint auto-continued for phase "
+            "%s (D-19 — the pause is skipped, the step still runs; no approval receipt "
+            "is written because no human approved)",
+            getattr(phase, "slug", None),
+        )
+    elif _armed:
         # The sentence is NEVER re-authored here. ``grounding._approval_sentence`` is the
         # one composer, its honesty rules (POSITION / IDENTITY / CONSEQUENCE, never
         # "approved" / "safe" / "proven") are asserted character-identically by a shipped

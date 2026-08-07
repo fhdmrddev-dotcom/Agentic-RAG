@@ -622,7 +622,16 @@ def _armed_definition_row() -> dict:
 def _drive_armed_phase(*, is_golden_run: bool):
     """Drive the REAL ``_run_phase_with_gates`` over the armed phase and record.
 
-    Returns ``SimpleNamespace(timeouts, body_invoked, wedged)``.
+    Returns ``SimpleNamespace(timeouts, body_invoked, wedged, audit_events, emits)``.
+
+    ``audit_events`` / ``emits`` are the ``event_type`` keyword of every
+    ``harness_engine.write_audit`` call and the positional event name of every
+    ``harness_engine._emit`` call. They are RECORDED FROM THE DRIVE — a golden run
+    writing no approval receipt is then a measured absence, not a reading of the
+    source. Both the ``action_risk_pending`` announce (``harness_engine`` :776) and the
+    ``validator_ask_user_approved`` receipt (:1362, inside
+    ``_resolve_failure_with_ask_user``) go through this same patched symbol, so one
+    recorder sees both.
 
     ``is_golden_run`` is written onto the run ctx. **That attribute is the D-19 work**:
     ``is_golden_run`` exists today as a ``workflow_runs`` COLUMN
@@ -644,10 +653,18 @@ def _drive_armed_phase(*, is_golden_run: bool):
 
     recorder = _SubscribeRecorder()
     body = SimpleNamespace(invoked=False)
+    audit_events: list = []
+    emits: list = []
 
     async def _body_spy(phase, accumulated, ctx):
         body.invoked = True
         return {"text": "the deliverable"}
+
+    async def _audit_spy(pool, run_id, *, user_id=None, event_type=None, metadata=None):
+        audit_events.append(event_type)
+
+    async def _emit_spy(redis, stream_run_id, event, **kw):
+        emits.append(event)
 
     raw = PhaseSpec.model_validate(_armed_phase_definition_dict()["phases"][0])
     assert raw.action_risk_armed is True, (
@@ -672,8 +689,8 @@ def _drive_armed_phase(*, is_golden_run: bool):
     wedged = False
     with (
         patch.object(harness_engine, "_execute_phase", _body_spy),
-        patch.object(harness_engine, "write_audit", AsyncMock()),
-        patch.object(harness_engine, "_emit", AsyncMock()),
+        patch.object(harness_engine, "write_audit", _audit_spy),
+        patch.object(harness_engine, "_emit", _emit_spy),
         patch("app.services.ask_user_service.subscribe_for_response", recorder),
     ):
         try:
@@ -689,7 +706,8 @@ def _drive_armed_phase(*, is_golden_run: bool):
             wedged = True
 
     return SimpleNamespace(
-        timeouts=recorder.timeouts, body_invoked=body.invoked, wedged=wedged
+        timeouts=recorder.timeouts, body_invoked=body.invoked, wedged=wedged,
+        audit_events=audit_events, emits=emits,
     )
 
 
@@ -794,6 +812,86 @@ def test_a_live_non_golden_run_still_pauses_on_an_armed_phase():
     assert live.body_invoked is False, (
         "the armed step's BODY RAN while nobody had answered — asking after the "
         "irreversible step is not a checkpoint"
+    )
+
+
+def test_a_golden_run_writes_no_approval_and_no_pending_receipt():
+    """D-19's **REJECTED OPTION C**, fenced — ``consequence ≠ receipt``.
+
+    D-19 rejected publishing a synthetic approval onto the ask channel, because it writes
+    a ``validator_ask_user_approved`` row claiming a human approved **when none did** —
+    the Control-Room rule that a receipt describes what actually happened to a person.
+    The same argument retires ``action_risk_pending``: that row records the CONSEQUENCE
+    "the run paused for someone", and on a golden run nothing paused.
+
+    So the golden run's armed checkpoint must write **neither**, at the ledger and at the
+    wire. This is DRIVEN — the audit and emit calls are recorded from the real
+    ``_run_phase_with_gates`` drive, never read off the source.
+
+    ANTI-VACUITY, and it is the whole reason this test is not one line: an "absent
+    receipt" assertion is trivially satisfied by a drive that never reached the
+    checkpoint, or by a recorder wired to the wrong symbol. The LIVE control runs first
+    and must show BOTH names present — only then is the golden run's silence a
+    measurement.
+    """
+    _FORBIDDEN = ("validator_ask_user_approved", "action_risk_pending")
+
+    # ── positive control: on a live run BOTH names are genuinely produced ────────
+    live = _drive_armed_phase(is_golden_run=False)
+    assert "action_risk_pending" in live.audit_events, (
+        f"harness broken: a LIVE armed run wrote no action_risk_pending audit row "
+        f"(events={live.audit_events!r}) — the golden-run absence below would be vacuous"
+    )
+    assert "action_risk_pending" in live.emits, (
+        f"harness broken: a LIVE armed run emitted no action_risk_pending event "
+        f"(emits={live.emits!r}) — the wire half of the assertion below would be vacuous"
+    )
+
+    # ── the property ────────────────────────────────────────────────────────────
+    golden = _drive_armed_phase(is_golden_run=True)
+
+    written = [e for e in golden.audit_events if e in _FORBIDDEN]
+    assert written == [], (
+        f"D-19 / REJECTED OPTION C: the golden run wrote {written!r} into harness_audit. "
+        "Nobody was asked and nobody approved, so neither row is true: "
+        "'validator_ask_user_approved' claims a human approved, and 'action_risk_pending' "
+        "claims the run paused for a person. The Control-Room rule is that consequence is "
+        "not receipt. The golden-run branch must skip the pause SILENTLY at the ledger."
+    )
+    emitted = [e for e in golden.emits if e in _FORBIDDEN]
+    assert emitted == [], (
+        f"D-19 / REJECTED OPTION C (the WIRE half): the golden run emitted {emitted!r}. "
+        "Phase 188's run surface is the consumer; telling it a step is awaiting a person "
+        "when the publish request is the only thing on the other end is the same lie one "
+        "layer out."
+    )
+
+
+def test_the_armed_step_still_runs_on_a_golden_run():
+    """D-19 / T-189-15 — **"skip the pause" must never become "skip the step".**
+
+    D-05 says the approved step RECORDS THE INTENDED ACTION and the run CONTINUES; the
+    golden-run branch skips only the PAUSE. If it also skipped the body, the arming would
+    be decorative and the publish would grade a workflow whose governed step never ran —
+    the fail-open shape Phase 188 spent two plans closing
+    (``finalizeAllPhasesForThread`` sweeping ``pending`` → ``done``).
+
+    The executor spy is the observable: ``_execute_phase`` MUST have been reached, and the
+    drive must NOT have wedged on the ask channel. Its counterpart is
+    ``test_a_live_non_golden_run_still_pauses_on_an_armed_phase``, which asserts the exact
+    OPPOSITE pair for a live run — so a fix that got the branch backwards fails one or the
+    other, never neither.
+    """
+    golden = _drive_armed_phase(is_golden_run=True)
+
+    assert golden.body_invoked is True, (
+        "D-19: the armed phase's EXECUTOR WAS NEVER REACHED on a golden run. Skipping the "
+        "pause is not skipping the step — a silently-skipped governed step makes the "
+        "arming decorative and lets the judge grade a deliverable that was never produced "
+        "(D-05: the step records its intended action and the run continues)."
+    )
+    assert golden.wedged is False, (
+        "the golden run wedged on the ask channel — see the sibling property test"
     )
 
 
