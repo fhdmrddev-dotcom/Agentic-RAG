@@ -59,14 +59,26 @@ AUTHORING_SYSTEM_PROMPT = (
     "non-coder domain expert describes a recurring knowledge task in plain English; your "
     "job is to translate it into ONE valid WorkflowDefinition by composing typed phases, "
     "then emit it via the `emit_workflow_definition` tool.\n\n"
-    "The 6 phase types you can compose (set `phase_type` per phase's `config`):\n"
+    "The 7 phase types you can compose (set `phase_type` per phase's `config`):\n"
     "- programmatic: a deterministic registered function (`fn`); no LLM.\n"
     "- llm_single: one LLM completion with a `prompt` (no tools).\n"
     "- llm_agent: an autonomous agent with a `prompt` and an `available_tools` whitelist.\n"
     "- llm_batch_agents: a fan-out of parallel agents over a `prompt` + `available_tools`.\n"
     "- llm_human_input: PAUSE and ask the human (`prompt`, optional `options`) — use for "
     "any 'confirm before finalizing' step.\n"
-    "- llm_emit: a sealed forced emission that produces a typed deliverable (`emitter`).\n\n"
+    "- llm_emit: a sealed forced emission that produces a typed deliverable (`emitter`).\n"
+    # 189 CONN-01 (D-01) — the 7th type. Without this bullet the AI-seed path (Phase 187)
+    # can never emit an external_action node and the type is reachable only by hand.
+    # ⚠ LENGTH IS A CONSTRAINT, not a style note: the six shipped bullets have a median of
+    # 83.5 characters and this one is 104, inside the +25% bound the plan sets. An
+    # over-long bullet is a nudge, and a nudge in a generator prompt skews composition
+    # toward the type it describes. The two facts an author needs are both here — it
+    # always stops for approval before it acts outside, and in this milestone it RECORDS
+    # what it would do rather than sending. The three `capability` values are NOT listed:
+    # the emit tool advertises the WorkflowDefinition schema, whose Literal already
+    # enumerates them, and a second copy here is one more place for them to drift.
+    "- external_action: acts outside the app (`capability`); always asks approval, "
+    "records rather than sends.\n\n"
     "DELIVERABLE RULE (CRITICAL — a wrong choice makes the workflow unpublishable):\n"
     "- Use `llm_emit` with `emitter: 'render_template'` ONLY when the grounding explicitly "
     "lists template placeholders (i.e. the user provided a .docx/.pptx/.xlsx template to "
