@@ -56,7 +56,7 @@
  * fetches nothing, holds no store reference, and its only write is one capability name
  * handed back to the caller, which patches `config` through the panel's single seam.
  */
-import { useId } from "react"
+import { useId, useRef } from "react"
 
 import {
   EXTERNAL_ACTION_HEADING,
@@ -123,11 +123,54 @@ export function ExternalActionSection({
   onPersist,
 }: ExternalActionSectionProps) {
   const headingId = useId()
+  // ── REVIEW FINDING WR-04 · THE ROLE PROMISED A WIDGET THE OPTIONS DID NOT BEHAVE LIKE ──
+  // The container declared `role="radiogroup"` and each option `role="radio"` with
+  // `aria-checked`, but they were plain buttons: no tabIndex management and no onKeyDown.
+  // The APG radio-group pattern requires ONE tab stop for the group with Arrow keys moving
+  // the selection; a keyboard user got THREE tab stops and no arrow behaviour, so the ARIA
+  // announced a widget that did not exist. `vitest-axe` cannot see this —
+  // `aria-required-children` and `aria-checked` are both satisfied — which is why the
+  // suite's a11y coverage passed straight over it.
+  //
+  // The review offered two shapes. The role is KEPT and the behaviour built, rather than
+  // retracting to `aria-pressed` buttons in a `role="group"`: this genuinely IS a
+  // single-choice group, `role="group"` would make no promise but would also describe it
+  // less well, and every existing assertion in the suite (five `getByRole("radio")` call
+  // sites plus the `radiogroup` case) stays true instead of being rewritten. This is the
+  // first real radiogroup on the surface, so the pattern debt is paid at its start.
+  const optionRefs = useRef<Array<HTMLButtonElement | null>>([])
 
   // DERIVED DURING RENDER. An unrecognised or absent stored value selects NOTHING and
   // NEVER fabricates a row — the picker half of the same rule `derivedFace` applies to
   // the node face, which falls through to the type sentence for exactly these values.
   const selected = EXTERNAL_ACTION_CAPABILITIES.includes(capability) ? capability : null
+
+  const selectedIndex = selected === null ? -1 : EXTERNAL_ACTION_CAPABILITIES.indexOf(selected)
+
+  /** Commit a row and move DOM focus onto it — APG "selection follows focus". */
+  const choose = (index: number) => {
+    const name = EXTERNAL_ACTION_CAPABILITIES[index]
+    if (name === undefined) return
+    optionRefs.current[index]?.focus()
+    if (name === selected) return
+    onChange(name)
+    onPersist()
+  }
+
+  const onOptionKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
+    const last = EXTERNAL_ACTION_CAPABILITIES.length - 1
+    // Down/Right advance, Up/Left retreat, both WRAPPING — the APG default. Home/End are
+    // the pattern's optional pair and are cheap enough to be worth having.
+    let next: number | null = null
+    if (event.key === "ArrowDown" || event.key === "ArrowRight") next = index === last ? 0 : index + 1
+    else if (event.key === "ArrowUp" || event.key === "ArrowLeft") next = index === 0 ? last : index - 1
+    else if (event.key === "Home") next = 0
+    else if (event.key === "End") next = last
+    if (next === null) return
+    // Arrow keys inside a radiogroup must not also scroll the panel behind it.
+    event.preventDefault()
+    choose(next)
+  }
 
   return (
     <section data-section="external-action" data-testid="external-action-section" className={SECTION_CLASSES}>
@@ -141,7 +184,7 @@ export function ExternalActionSection({
         data-testid="external-action-options"
         className={OPTION_LIST_CLASSES}
       >
-        {EXTERNAL_ACTION_CAPABILITIES.map((name) => {
+        {EXTERNAL_ACTION_CAPABILITIES.map((name, index) => {
           const chosen = name === selected
           return (
             <button
@@ -149,8 +192,16 @@ export function ExternalActionSection({
               type="button"
               role="radio"
               aria-checked={chosen}
+              // ROVING TABINDEX (WR-04) — the group is ONE tab stop. The chosen row owns
+              // it; with nothing chosen the FIRST row does, so the group is always
+              // reachable and never traps three stops in the panel's tab order.
+              tabIndex={chosen || (selectedIndex === -1 && index === 0) ? 0 : -1}
+              ref={(el) => {
+                optionRefs.current[index] = el
+              }}
               data-testid="external-action-option"
               data-chosen={chosen ? "true" : "false"}
+              onKeyDown={(event) => onOptionKeyDown(event, index)}
               onClick={() => {
                 if (chosen) return
                 onChange(name)

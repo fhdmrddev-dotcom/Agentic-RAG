@@ -176,6 +176,127 @@ describe("ExternalActionSection — choosing a capability", () => {
   })
 })
 
+// ── 2b. THE ROLE'S PROMISE IS KEPT (review WR-04) ─────────────────────────────────────
+//
+// THE ROLE WAS A CLAIM NOTHING CHECKED. The container declared `radiogroup` and each row
+// `radio` + `aria-checked`, but the rows were plain buttons with no tabIndex management and
+// no key handling — three tab stops and no arrow behaviour, i.e. ARIA announcing a widget
+// the DOM did not implement. `vitest-axe` is BLIND to it (`aria-required-children` and
+// `aria-checked` are both satisfied), and the case above asserts only the role and the child
+// count, so the whole a11y story passed straight over the gap. These cases are the missing
+// half: what the APG radio-group pattern actually requires, driven as behaviour.
+describe("ExternalActionSection — the radiogroup behaves like one (WR-04)", () => {
+  const tabStops = () =>
+    options().filter((el) => el.getAttribute("tabindex") === "0")
+
+  it("ONE tab stop, and it is the chosen row — not three", () => {
+    renderSection({ capability: "create_ticket" })
+    const stops = tabStops()
+    expect(stops, "an APG radiogroup is a single tab stop for the whole group").toHaveLength(1)
+    expect(stops[0].textContent).toBe(EXTERNAL_CAPABILITY_SENTENCES.create_ticket)
+    // ...and every other row is explicitly removed from the tab order rather than merely
+    // un-marked (an absent tabindex would leave a native <button> focusable).
+    for (const el of options()) {
+      if (el === stops[0]) continue
+      expect(el.getAttribute("tabindex")).toBe("-1")
+    }
+  })
+
+  it("with NOTHING chosen the group is still reachable — the first row holds the stop", () => {
+    renderSection({ capability: "" })
+    const stops = tabStops()
+    expect(stops, "a group with no selection must still be tabbable exactly once").toHaveLength(1)
+    expect(stops[0].textContent).toBe(EXTERNAL_CAPABILITY_SENTENCES.send_email)
+  })
+
+  it("an UNRECOGNISED stored value behaves like nothing chosen, not like a fourth row", () => {
+    renderSection({ capability: "wire_transfer" })
+    expect(tabStops()).toHaveLength(1)
+    expect(chosenLabels()).toEqual([])
+  })
+
+  it("ArrowDown moves the selection to the next row and writes it", () => {
+    const onChange = vi.fn()
+    const onPersist = vi.fn()
+    renderSection({ capability: "send_email", onChange, onPersist })
+
+    fireEvent.keyDown(options()[0], { key: "ArrowDown" })
+
+    expect(onChange).toHaveBeenCalledWith(EXTERNAL_ACTION_CAPABILITIES[1])
+    expect(onPersist).toHaveBeenCalledTimes(1)
+  })
+
+  it("ArrowUp from the FIRST row wraps to the last — the APG default, not a dead end", () => {
+    const onChange = vi.fn()
+    renderSection({ capability: "send_email", onChange })
+
+    fireEvent.keyDown(options()[0], { key: "ArrowUp" })
+
+    expect(onChange).toHaveBeenCalledWith(
+      EXTERNAL_ACTION_CAPABILITIES[EXTERNAL_ACTION_CAPABILITIES.length - 1],
+    )
+  })
+
+  it("ArrowRight / ArrowLeft are the same axis — a vertical list still answers both", () => {
+    const right = vi.fn()
+    const { unmount } = renderSection({ capability: "send_email", onChange: right })
+    fireEvent.keyDown(options()[0], { key: "ArrowRight" })
+    expect(right).toHaveBeenCalledWith(EXTERNAL_ACTION_CAPABILITIES[1])
+    unmount()
+
+    const left = vi.fn()
+    renderSection({ capability: "create_ticket", onChange: left })
+    fireEvent.keyDown(options()[1], { key: "ArrowLeft" })
+    expect(left).toHaveBeenCalledWith(EXTERNAL_ACTION_CAPABILITIES[0])
+  })
+
+  it("Home and End jump to the ends", () => {
+    const end = vi.fn()
+    const { unmount } = renderSection({ capability: "send_email", onChange: end })
+    fireEvent.keyDown(options()[0], { key: "End" })
+    expect(end).toHaveBeenCalledWith(
+      EXTERNAL_ACTION_CAPABILITIES[EXTERNAL_ACTION_CAPABILITIES.length - 1],
+    )
+    unmount()
+
+    const home = vi.fn()
+    renderSection({ capability: "post_message", onChange: home })
+    fireEvent.keyDown(options()[2], { key: "Home" })
+    expect(home).toHaveBeenCalledWith(EXTERNAL_ACTION_CAPABILITIES[0])
+  })
+
+  it("NEGATIVE CONTROL — an unhandled key writes nothing and is not swallowed", () => {
+    const onChange = vi.fn()
+    const onPersist = vi.fn()
+    renderSection({ capability: "send_email", onChange, onPersist })
+
+    // `Tab` must reach the browser (it is how the user LEAVES the group), and a printable
+    // key is not a selection. Without this the handler could be a catch-all that moved on
+    // anything and the arrow cases above would still be green.
+    const tab = fireEvent.keyDown(options()[0], { key: "Tab" })
+    fireEvent.keyDown(options()[0], { key: "x" })
+
+    expect(onChange).not.toHaveBeenCalled()
+    expect(onPersist).not.toHaveBeenCalled()
+    // fireEvent returns false when preventDefault() was called — Tab must NOT be.
+    expect(tab, "Tab must not be preventDefault()ed — it is how the group is exited").toBe(true)
+  })
+
+  it("arrowing onto the ALREADY-chosen row writes nothing — the click rule, by keyboard", () => {
+    const onChange = vi.fn()
+    const onPersist = vi.fn()
+    // Two rows in a three-row group: ArrowDown twice from row 0 lands on row 2; arrow ONCE
+    // from row 2 backwards lands on row 1. Drive the no-op directly instead: End from the
+    // last row is a move onto itself.
+    renderSection({ capability: "post_message", onChange, onPersist })
+
+    fireEvent.keyDown(options()[2], { key: "End" })
+
+    expect(onChange).not.toHaveBeenCalled()
+    expect(onPersist).not.toHaveBeenCalled()
+  })
+})
+
 // ── 3. THE RAW ID NEVER REACHES THE DOM (the D-20 boundary, restated) ─────────────────
 
 describe("ExternalActionSection — the author reads sentences, never wire values", () => {
