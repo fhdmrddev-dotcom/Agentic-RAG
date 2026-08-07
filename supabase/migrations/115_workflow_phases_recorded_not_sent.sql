@@ -80,8 +80,36 @@
 -- workflow_phases. Immaterial on local dev; on cloud this belongs in the standing
 -- migration-parity window (migs 099 onward land together, in order), not mid-traffic.
 -- Do NOT apply this to the cloud database during Phase 189.
+--
+-- ⚠ REVIEW FINDING WR-01 (2026-08-07) — THE APPLY SHAPE IS NOW ATOMIC AND IDEMPOTENT.
+-- This file previously shipped the two ALTERs BARE: no transaction, no IF EXISTS. Pasted
+-- into the Supabase SQL editor each ran in its OWN implicit transaction, so if the session
+-- dropped, the editor timed out, or anything interrupted the pair between them, the table
+-- was left with NO workflow_phases_status_check AT ALL — the closed vocabulary this whole
+-- migration exists to PRESERVE, gone, fail-open, and SILENTLY (nothing reads pg_constraint
+-- at boot). Re-pasting after such a partial apply then errored on the bare DROP, because
+-- the constraint was already gone. The header above argues at length that the closed
+-- vocabulary is "the property the CHECK exists for" and then shipped the one apply shape
+-- that can drop it.
+--
+--   * BEGIN/COMMIT makes the window atomic — either the constraint is the OLD five-literal
+--     one or the NEW six-literal one, never absent. DDL is transactional in Postgres, so
+--     this genuinely rolls back. (House style: migrations 108–113, the six immediately
+--     preceding this one, all wrap in BEGIN/COMMIT.)
+--   * DROP CONSTRAINT **IF EXISTS** makes a re-paste safe. (House style: 048 and 063 are
+--     the shipped CHECK-widening precedents and both use it.)
+--
+-- ⚠ THIS CHANGES NO SCHEMA AND REQUIRES NO RE-APPLY. Running the block below produces
+-- exactly the constraint the bare pair produced. Migration 115 is ALREADY APPLIED to the
+-- live LOCAL database and the operator does NOT need to paste anything again;
+-- supabase/full-schema.sql is unaffected and no regeneration is owed. The change is pure
+-- FORWARD safety, and it is worth making because the CLOUD apply is still outstanding
+-- (this file's own note above defers it to the standing parity window) — the paste this
+-- protects is the one that has not happened yet.
 
-ALTER TABLE public.workflow_phases DROP CONSTRAINT workflow_phases_status_check;
+BEGIN;
+
+ALTER TABLE public.workflow_phases DROP CONSTRAINT IF EXISTS workflow_phases_status_check;
 ALTER TABLE public.workflow_phases ADD CONSTRAINT workflow_phases_status_check CHECK (
     status = ANY (ARRAY[
         'pending'::text, 'active'::text, 'completed'::text, 'failed'::text, 'skipped'::text,
@@ -90,3 +118,5 @@ ALTER TABLE public.workflow_phases ADD CONSTRAINT workflow_phases_status_check C
         'recorded_not_sent'::text
     ])
 );
+
+COMMIT;
