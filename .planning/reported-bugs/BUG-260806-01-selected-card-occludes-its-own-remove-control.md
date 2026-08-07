@@ -4,10 +4,10 @@ title: A selected phase card occludes its own ✕ remove control on the editable
 reported: 2026-08-06
 surface: Agentic-RAG
 severity: major
-status: open
+status: closed
 affected_areas: [frontend/workflow-canvas, frontend/editing-affordances]
-folded_into: null
-verified_closed_by: null
+folded_into: 188.2
+verified_closed_by: 188.2
 related_seeds: []
 re_open_trigger: null
 reproduces_on:
@@ -107,3 +107,38 @@ Natural home: the next phase touching `PlaneEditingLayer.tsx`, the viewport
 portal, or node z-index/selection. Note that `PhaseNodeCard.tsx`'s hot-file
 ledger row now reads **G-5 fires — extraction due**, so a refactor phase on that
 file is already owed; this bug is a candidate to fold into it.
+
+---
+
+## How it was fixed and how that was verified — CLOSED by Phase 188.2
+
+**Fix (plan `188.2-02`, commit `7f77af44`).** Applied one tier lower than this report's
+hypothesis guessed. Rather than give the portal *container* a stacking context, all three
+editing-affordance groups in `PlaneEditingLayer.tsx` — the `＋` buttons, the `✕` buttons
+**and** the insert picker wrapper — now carry `zIndex: AFFORDANCE_Z` (**1002**), above
+`@xyflow/system`'s `SELECTED_NODE_Z` (**1000**, traced to
+`@xyflow/system/dist/esm/index.js:1547` in the installed package rather than assumed). The
+portal container is left untouched, so the pan/zoom behaviour this report flagged as
+load-bearing is unchanged. `PhaseNodeCard.tsx` and `WorkflowCanvas.tsx` report **0 files
+changed**.
+
+**Verified by two instruments, deliberately of different kinds:**
+
+1. **The driven row (`188.2-UAT.md` → B1), 2026-08-07** — the only instrument that can see
+   this defect class. With step 2 selected (`z-index: 1000`, the failing state from the table
+   above) and the affordance revealed by a **physical** pointer (`opacity: 1`),
+   `document.elementFromPoint` at the `✕`'s centre returned **`canvas-remove-emit`** — the
+   control, not the card. B2 repeated the identical test deselected (`z-index: 0`): also
+   reachable. The node's elevation is the only variable that moved.
+2. **A falsification control on that same row** — because a hit test that returns the `✕`
+   proves nothing unless it can return something else. Dropping the control to `z-index: 999`
+   (the pre-fix world) with the node still selected made `elementFromPoint` return
+   **`canvas-node-emit`**, *reproducing this report's exact failure*; restoring `1002` returned
+   the `✕`. The instrument was observed swinging both ways in one session.
+3. **A unit guard (`188.2-02`, commit `fe3de624`)** pins the relation, the library's own
+   constant and the rendered wiring on every build — so a regression is caught without a
+   browser, even though a browser is what proved the fix.
+
+**Closed on the strength of the driven row plus its control and the unit guard — never on the
+stacking analysis alone**, which is what this report's "Hypothesized cause" section was, and
+which turned out to name the wrong tier.
