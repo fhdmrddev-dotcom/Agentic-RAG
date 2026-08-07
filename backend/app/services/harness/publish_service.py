@@ -854,6 +854,17 @@ async def _drive_golden_run(
         scoped_folder_path=None,
         spawn=lambda coro: asyncio.create_task(coro),
         per_run_task_semaphore=asyncio.Semaphore(settings.task_per_run_concurrency),
+        # ── D-19 (189, CONFLICT 1) — the ONE ctx in the tree that IS a golden run ──
+        # READ BY ``harness_engine._run_phase_with_gates``' armed action-risk checkpoint
+        # via ``getattr(ctx, "is_golden_run", False)``: a golden run SKIPS THE PAUSE
+        # (no ask-channel subscribe) and still runs the step. The flag already existed
+        # as the ``workflow_runs`` COLUMN (step 3 above) but was never on the ctx bag,
+        # which is why the engine could not tell a publish from a live run and burned
+        # ``harness_publish_max_seconds`` waiting for a person nobody had asked.
+        # EVERY OTHER ctx BUILDER STAYS UNTOUCHED (threads.py, _build_resume_context,
+        # unit stubs): the reader's ``getattr`` default IS the live-run answer, mirroring
+        # ``create_workflow_run``'s own rule for this flag — default OFF = byte-identical.
+        is_golden_run=True,
     )
 
     # ── 5+6. drive the real run end-to-end + harvest, ALWAYS terminalizing the
