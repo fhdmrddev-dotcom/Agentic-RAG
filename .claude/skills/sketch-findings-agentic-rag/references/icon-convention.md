@@ -63,10 +63,10 @@ it.** So the shipped marks are written down here, with their source lines.
 
 | Mark | Means | Source of truth |
 |---|---|---|
-| `⛨` | governance — the "Must prove it" seal | `PhaseNodeCard.tsx:440`; `GOVERNANCE_SEAL_LABEL` at `definitionOps.ts:388`. The SAME shield as the Control Room's operator-only mark — **one authority mark, two surfaces** |
+| `⛨` | governance — the "Must prove it" seal | `NodeCornerMarks.tsx:266`; `GOVERNANCE_SEAL_LABEL` at `components/workflows/definitionOps.ts:466`. The SAME shield as the Control Room's operator-only mark — **one authority mark, two surfaces**. ⚠ Re-measured 2026-08-07 (Phase 188.2). This row read `PhaseNodeCard.tsx:440` and was **already stale by 213 lines before 188.2 moved anything** — the glyph's true home on the pre-cut tree was `PhaseNodeCard.tsx:653` (`:440` is a comment about `ringDash`), and `GOVERNANCE_SEAL_LABEL` was never in a root-level `definitionOps.ts`. 188.2-05 then moved the seal into `NodeCornerMarks.tsx`. So this is a correction of a wrong pointer, not merely a move-update. The card itself now names the glyph only in prose (`PhaseNodeCard.tsx:20`, a where-it-went pointer) |
 | `🔒` | locked / one-way | `GovernanceSection.tsx:280`, `WorkflowDoorSwitch.tsx:159` |
 | `⤳` | the on-fail (`skip_to_phase`) branch | `PhaseNode.tsx:238`, `PhaseSpineGraph.tsx:201` |
-| `＋` / `✕` | add / remove — **on the lane, never the card** | `WorkflowCanvas.tsx:637`, `:680` |
+| `＋` / `✕` | add / remove — **on the lane, never the card** | `PlaneEditingLayer.tsx:186` (`＋`), `:234` (`✕`); their `data-testid`s are `canvas-insert-{index}` (`:150`) and `canvas-remove-{slug}` (`:194`). ⚠ Re-measured 2026-08-07 (Phase 188.2). This row read `WorkflowCanvas.tsx:637, :680`, stale **twice over**: on the pre-188.1 tree the render sites were `WorkflowCanvas.tsx:641` and `:684` (off by 4 even then), and **188.1 moved both into `PlaneEditingLayer.tsx`** — the exact two elements 188.2-02 edited to close `BUG-260806-01`. Not to be confused with `WorkflowCanvas.tsx:1141`, which is the empty-state *"Add the first step"* invitation, a different control on a different surface |
 | `↶` / `↷` | undo / redo | `CanvasToolbar.tsx:192`, `:209` |
 | `◆` | a publish-gauntlet stage | `PublishGauntlet.tsx:967` |
 | phase-type marks | the 6 workflow phase types | the ONE shared 3D map — §2 above |

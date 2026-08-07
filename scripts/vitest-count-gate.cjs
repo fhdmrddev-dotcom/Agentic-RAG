@@ -291,7 +291,15 @@ const BASELINE = {
   //     timeline fixture: the fixture path is normalised by the already-guarded
   //     `phaseStatusFromDb`, so a fixture-driven site-3 test would have been GREEN against
   //     the unguarded tree — never observed RED, and therefore known to test nothing.
-  "PhaseNodeCard.test.tsx": 107,
+  // 188.2-07: 107 → 124. EXTENDED, not lowered — the whole of Phase 188.2 DELETED no `it(`,
+  // renamed no `describe(` and moved no case out of this file (the phase's own rule: moving an
+  // `it(` out would trip `[count-decrease]`, and a move is not a plan-authorised deletion). The
+  // +17 are 188.2-01's subtree-fence non-vacuity control, the D-09 third-badge `@ts-expect-error`
+  // control and the three-`it(` ESM-cycle fence (+5); 188.2-03's three whole-`innerHTML` captures,
+  // their three marker rows and the seven-reading / three-verdict / four-border geometry matrices
+  // (+12). Read from THIS SCRIPT'S OWN `actual` column across two agreeing runs, 2026-08-07
+  // (both printed `PhaseNodeCard.test.tsx 107 124 +17`) — never hand-counted.
+  "PhaseNodeCard.test.tsx": 124,
   "PhaseNode.test.tsx": 26,
   "PhaseTimeline.test.tsx": 10,
   // 188 code-review fix pass (CR-06): 12 → 17. An EXTENSION, not a lowering. The five
@@ -408,7 +416,15 @@ const BASELINE = {
   // that SC#2's "renders identically" is checked against, and it must be pinned BEFORE
   // 188.1-03 moves the code it fences, or the extraction could take the only baseline
   // with it. Read from this script's own `actual` column across two agreeing runs.
-  "WorkflowCanvas.editing.test.tsx": 58,
+  // 188.2-07: 58 → 61. EXTENDED, not lowered — 188.2-02's three-part z-index guard for
+  // BUG-260806-01 (the `AFFORDANCE_Z` > `SELECTED_NODE_Z` relation with both numbers named as
+  // literals, the library's own elevation read off a really-rendered selected node, and the
+  // rendered wiring across all three affordance groups). Nothing was deleted: the same plan
+  // RE-CAPTURED `AFFORDANCE_SHAPE_BASELINE` as its one authorised exception, which changes 12
+  // entries' `style` strings and not the case count. Read from THIS SCRIPT'S OWN `actual` column
+  // across two agreeing runs, 2026-08-07 (both printed
+  // `WorkflowCanvas.editing.test.tsx 58 61 +3`).
+  "WorkflowCanvas.editing.test.tsx": 61,
   "builderStore.test.ts": 52,
   "phaseVocabulary.corpus.test.ts": 45,
   "StepTypePicker.test.tsx": 43,
@@ -467,7 +483,17 @@ const BASELINE = {
 // `WorkflowBuilderPage.header.test.tsx` extensions above (D-184.1-03's Spine-view pin +
 // D-184.1-04's non-breach guard, both falsified and reverted before the pin moved).
 // Re-derived from this script's own printed `total` across two agreeing runs.
-const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // ⚠ 2482 (184.1 gap-closure)
+// ⚠ AND A FIFTH TIME BY 188.2-07: 2482 → 2502, the two extensions above (`PhaseNodeCard`
+// +17, `WorkflowCanvas.editing` +3). Re-derived from this script's own printed `total` across
+// two agreeing runs on 2026-08-07 (both `total 2482 2502 +20`), in the SAME commit as the pins.
+// ⚠ A finding recorded here because it bears on how this line should be read: on 2026-08-07 the
+// gate's `failed` count was observed varying between 0 and 1 across two back-to-back runs with
+// IDENTICAL per-file columns. The one failure was
+// `src/pages/WorkflowBuilderPage.canvas.test.tsx > 184-11 … POSITIVE CONTROL`, which passes
+// 128/128 in isolation, and no Phase-188.2 plan touches that file. See `188.2-DEFERRED.md`
+// D-188.2-DEF-01 — the COUNT columns are stable and remain a sound regression backstop; the
+// `failed` line is not, on this machine, today.
+const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // ⚠ 2502 (188.2-07)
 
 // ── The Wave-0 blast radius (184-VALIDATION.md § "quick run command"). ──
 const TARGETS = [
