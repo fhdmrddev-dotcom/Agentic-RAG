@@ -42,9 +42,15 @@ import {
   PHASE_TYPE_LABELS,
   SKIP_PREFIX,
   GROUNDING_DIAL_TYPES,
+  EXTERNAL_CAPABILITY_SENTENCES,
+  notConnectedOf,
   type NameContext,
   type PhaseSpecJSON,
 } from "./phaseVocabulary"
+// Phase 189-13: the placeable-type tuple, so the vocabulary's coverage is DERIVED from
+// what the picker actually offers rather than from a hand-typed list that stops covering
+// the union the moment a type is added. Its own import statement, the house convention.
+import { PHASE_TYPE_ORDER } from "./definitionOps"
 
 /** Build a minimal phase read-shape (the loose definition-JSONB shape). */
 function phase(over: Partial<PhaseSpecJSON> & { config?: Record<string, unknown> } = {}): PhaseSpecJSON {
@@ -134,21 +140,42 @@ describe("phaseVocabulary.nodeTitle — the plain-language node face (D-183-06)"
     expect(title).not.toContain("llm_emit")
   })
 
-  it("every one of the 6 known phase types has a sentence and a subtitle", () => {
-    const types = [
-      "programmatic",
-      "llm_single",
-      "llm_agent",
-      "llm_batch_agents",
-      "llm_human_input",
-      "llm_emit",
-    ]
-    for (const t of types) {
+  it("every PLACEABLE phase type has a sentence, a subtitle and a technical label", () => {
+    // Phase 189-13: DERIVED from `PHASE_TYPE_ORDER` — the tuple the step-type picker
+    // actually offers — rather than the hand-typed six this case shipped with. The
+    // property was never the number: it is that a type a person can PLACE always has
+    // words, and a hand-typed list stops covering the union the moment a type is added
+    // (which is exactly what happened to the six). 189-10 / 189-12's derive-don't-re-pin
+    // lesson, applied to a shape assertion rather than to a count.
+    for (const t of PHASE_TYPE_ORDER) {
       expect(PHASE_TYPE_SENTENCES[t]?.length ?? 0).toBeGreaterThan(0)
       expect(PHASE_TYPE_SUBTITLES[t]?.length ?? 0).toBeGreaterThan(0)
       expect(PHASE_TYPE_LABELS[t]?.length ?? 0).toBeGreaterThan(0)
     }
-    expect(Object.keys(PHASE_TYPE_SENTENCES).sort()).toEqual([...types].sort())
+    // …and no EXTRA key either: the vocabulary covers exactly the placeable set.
+    expect(Object.keys(PHASE_TYPE_SENTENCES).sort()).toEqual([...PHASE_TYPE_ORDER].sort())
+    // Non-vacuity — a derived loop over an emptied tuple would assert nothing.
+    expect(PHASE_TYPE_ORDER.length).toBeGreaterThan(6)
+  })
+
+  it("the three maps speak three DIFFERENT registers — no phrase is reused across them", () => {
+    // The 7th type's words were authored one per map (business voice / mechanism voice /
+    // terse technical noun) and this pins the rule for the whole vocabulary: one phrase
+    // reused three times would mean two of the three maps had no register of their own.
+    for (const t of PHASE_TYPE_ORDER) {
+      expect(PHASE_TYPE_SENTENCES[t]).not.toBe(PHASE_TYPE_SUBTITLES[t])
+      expect(PHASE_TYPE_SENTENCES[t]).not.toBe(PHASE_TYPE_LABELS[t])
+      expect(PHASE_TYPE_SUBTITLES[t]).not.toBe(PHASE_TYPE_LABELS[t])
+    }
+    // The 7th type's three, quoted so a silent re-word is a red test (D-13 / UI-SPEC §6b).
+    expect(PHASE_TYPE_SENTENCES.external_action).toBe("Reach outside")
+    expect(PHASE_TYPE_SUBTITLES.external_action).toBe(
+      "Stops for your approval before it acts outside",
+    )
+    expect(PHASE_TYPE_LABELS.external_action).toBe("External action")
+    // ⚠ The subtitle is worded to SURVIVE Phase 190 — it must say nothing about not
+    // sending, or it becomes a lie the day the node is wired up.
+    expect(PHASE_TYPE_SUBTITLES.external_action).not.toMatch(/not sent|nothing is sent|never sends/i)
   })
 
   it("an unknown phase_type echoes the raw type honestly and does not throw", () => {
@@ -656,9 +683,258 @@ describe("phaseVocabulary.technicalTitle — the ⌥ Technical-names reveal (D-1
 describe("phaseVocabulary.waitsForYou — slot 2 (D-183-07)", () => {
   it("is true ONLY for llm_human_input", () => {
     expect(waitsForYou(phase({ config: { phase_type: "llm_human_input" } }))).toBe(true)
-    for (const t of ["programmatic", "llm_single", "llm_agent", "llm_batch_agents", "llm_emit", "nope"]) {
+    // DERIVED from the placeable tuple (189-13) plus an unknown type, rather than the
+    // hand-typed five this loop shipped with: the claim quantifies over every OTHER type,
+    // so a hand-typed list had already stopped covering the union once.
+    const others = [...PHASE_TYPE_ORDER.filter((t) => t !== "llm_human_input"), "nope"]
+    expect(others.length).toBeGreaterThan(6)
+    for (const t of others) {
       expect(waitsForYou(phase({ config: { phase_type: t } }))).toBe(false)
     }
+  })
+})
+
+// ── Phase 189-13 (CONN-01 / D-13) — THE CAPABILITY-DERIVED LADDER TIER ───────────
+//
+// D-13 puts the middle tier of the vocabulary ladder on the CHOSEN CAPABILITY: the face
+// is computed at render from `config.capability` and written NOWHERE, falling back to
+// the generic type sentence when no capability is chosen. These cases pin the three
+// things that make that safe rather than merely present — the GATE (no other type can
+// claim it), the FLOOR (an unrecognised name never fabricates a face) and the ORDER
+// (where the new tier sits among the five it joined).
+
+/** An `external_action` phase carrying a raw stored capability value — `unknown` on
+ *  purpose, because the whole point of the own-guard is values the type system forbids. */
+const externalPhase = (capability?: unknown): PhaseSpecJSON =>
+  phase({
+    slug: "notify-owner",
+    config:
+      capability === undefined
+        ? { phase_type: "external_action" }
+        : { phase_type: "external_action", capability },
+  })
+
+describe("phaseVocabulary — the capability tier, tier (4) (D-13)", () => {
+  it("ALL THREE capabilities produce their own distinct sentence", () => {
+    expect(derivedFace({ phaseType: "external_action", capability: "send_email" })).toBe(
+      "Sends an email",
+    )
+    expect(derivedFace({ phaseType: "external_action", capability: "create_ticket" })).toBe(
+      "Creates a ticket",
+    )
+    expect(derivedFace({ phaseType: "external_action", capability: "post_message" })).toBe(
+      "Posts a message",
+    )
+    // Distinct from each other — three capabilities that rendered the same face would
+    // defeat the entire reason D-13 exists (two steps doing different work must not read
+    // letter-for-letter identically).
+    const faces = Object.values(EXTERNAL_CAPABILITY_SENTENCES)
+    expect(new Set(faces).size).toBe(faces.length)
+    expect(faces).toHaveLength(3)
+  })
+
+  it("NO capability chosen falls through to the type sentence, not to a guess", () => {
+    expect(derivedFace({ phaseType: "external_action" })).toBeNull()
+    expect(nodeTitle(externalPhase())).toBe(PHASE_TYPE_SENTENCES.external_action)
+    expect(nodeTitle(externalPhase())).toBe("Reach outside")
+  })
+
+  it("an UNRECOGNISED stored capability falls through and NEVER fabricates a face", () => {
+    // The T-189-39 spoofing mitigation, driven. A stored name the client does not know
+    // must read as the generic nature of the step — rendering a claim about an act the
+    // executor cannot perform states something false to the author.
+    expect(derivedFace({ phaseType: "external_action", capability: "wire_transfer" })).toBeNull()
+    expect(nodeTitle(externalPhase("wire_transfer"))).toBe("Reach outside")
+    // And it is not any of the three real faces, checked by exact equality.
+    for (const real of Object.values(EXTERNAL_CAPABILITY_SENTENCES)) {
+      expect(nodeTitle(externalPhase("wire_transfer"))).not.toBe(real)
+    }
+  })
+
+  it("WR-04: an INHERITED key falls through — `constructor` never reaches the face", () => {
+    // The own-property probe. `EXTERNAL_CAPABILITY_SENTENCES` is a plain object literal,
+    // so a BARE `SENTENCES[capability]` returns the `Object` FUNCTION for these names and
+    // no `??` fallback fires — the measured hard render crash of 188.1-04, one map along.
+    for (const inherited of ["constructor", "toString", "__proto__", "hasOwnProperty"]) {
+      expect(derivedFace({ phaseType: "external_action", capability: inherited })).toBeNull()
+      expect(() => nodeTitle(externalPhase(inherited))).not.toThrow()
+      expect(nodeTitle(externalPhase(inherited))).toBe("Reach outside")
+    }
+    // Positive control: the guard is not simply refusing everything.
+    expect(derivedFace({ phaseType: "external_action", capability: "send_email" })).toBe(
+      "Sends an email",
+    )
+  })
+
+  it("TOTALITY: a non-string capability in the loose JSONB resolves rather than throwing", () => {
+    for (const junk of [42, null, true, { send_email: "x" }, ["send_email"]]) {
+      expect(() => nodeTitle(externalPhase(junk))).not.toThrow()
+      expect(nodeTitle(externalPhase(junk))).toBe("Reach outside")
+    }
+  })
+
+  it("THE GATE: no OTHER phase type can claim a capability face", () => {
+    // The mirror of WR-02's folder gate. `capability` is not carried by the six shipped
+    // config members at all, but a hand-edited JSONB row can spell anything, and a face
+    // saying "Sends an email" on an `llm_single` step would be a fabricated capability.
+    //
+    // ⚠ THE CLAIM IS "never a CAPABILITY face", NOT "always null" — and the difference was
+    // MEASURED, not assumed. Written as `toBeNull()` this case failed on
+    // `llm_human_input`, which takes tier (5) and correctly answers "Wait for your
+    // approval". A gate test that demands null would have been asserting the absence of
+    // the tier BELOW it as well, which is not this gate's subject.
+    const capabilityFaces = Object.values(EXTERNAL_CAPABILITY_SENTENCES)
+    const others = PHASE_TYPE_ORDER.filter((x) => x !== "external_action")
+    for (const t of others) {
+      expect(capabilityFaces).not.toContain(derivedFace({ phaseType: t, capability: "send_email" }))
+      expect(capabilityFaces).not.toContain(
+        derivedFaceOf(phase({ config: { phase_type: t, capability: "send_email" } })),
+      )
+      // And the five types with no tier of their own still reach the honest floor.
+      if (t !== "llm_human_input") {
+        expect(derivedFace({ phaseType: t, capability: "send_email" })).toBeNull()
+      }
+    }
+    expect(others).toHaveLength(6)
+    // Positive control: the gated type DOES produce one of those faces, so the
+    // `not.toContain` above is a measurement rather than a vacuous truth.
+    expect(capabilityFaces).toContain(
+      derivedFace({ phaseType: "external_action", capability: "send_email" }),
+    )
+  })
+
+  it("THE ORDER: a bound skill (tier 1) still beats the capability tier", () => {
+    // The ladder is MOST-SPECIFIC-FIRST and the numbering IS the decision record. A phase
+    // matching BOTH tiers must take the higher one; without this, inserting a tier is a
+    // silent re-ordering of everything below it.
+    expect(
+      derivedFace({
+        phaseType: "external_action",
+        skillName: "pricing policy check",
+        capability: "send_email",
+      }),
+    ).toBe("Run the pricing policy check")
+    // …and through the phase-shaped adapter real callers use.
+    const withSkill = phase({
+      config: { phase_type: "external_action", capability: "send_email", skill_ref: SKILL_ID },
+    })
+    expect(derivedFaceOf(withSkill, CTX)).toBe("Run the pricing policy check")
+    // The control: without the skill binding the SAME phase takes the capability tier, so
+    // the assertion above measures precedence rather than an inert branch.
+    expect(derivedFaceOf(externalPhase("send_email"), CTX)).toBe("Sends an email")
+  })
+
+  it("THE ORDER: the capability tier beats the type sentence, and sits ABOVE human input", () => {
+    // Tier (4) fires where tier (6)'s floor would otherwise be reached…
+    expect(nodeTitle(externalPhase("create_ticket"))).toBe("Creates a ticket")
+    expect(nodeTitle(externalPhase("create_ticket"))).not.toBe(
+      PHASE_TYPE_SENTENCES.external_action,
+    )
+    // …and tier (5) is untouched by its insertion — the one case a renumbering could break.
+    expect(derivedFace({ phaseType: "llm_human_input" })).toBe("Wait for your approval")
+  })
+
+  it("the sentence map is EXPORTED as ONE constant (plan 189-14's picker reads it)", () => {
+    // D-23: the picker's three option labels and the node face's three sentences are one
+    // constant read twice, never two copies. Exported, closed at three, and declared
+    // exactly once in this module.
+    expect(Object.keys(EXTERNAL_CAPABILITY_SENTENCES).sort()).toEqual([
+      "create_ticket",
+      "post_message",
+      "send_email",
+    ])
+    const decls = phaseVocabularySource.match(/export const EXTERNAL_CAPABILITY_SENTENCES/g) ?? []
+    expect(decls).toHaveLength(1)
+  })
+
+  it("the ladder is numbered with INTEGERS and gated on NAMED constants, not literals", () => {
+    // The numbering exists to force the most-specific-first ordering test; a decimal tier
+    // defeats it and invites another. Asserted on the SOURCE because the numbering is a
+    // comment convention, which is precisely the kind of claim nothing else checks.
+    for (const tier of ["(1)", "(2)", "(3)", "(4)", "(5)", "(6)"]) {
+      expect(phaseVocabularySource).toContain(`// ${tier} `)
+    }
+    expect(phaseVocabularySource).not.toMatch(/\/\/\s*\(\d+\.\d+\)/)
+    // Positive control: the decimal regex really does match a decimal tier.
+    expect("  // (3.5) SOMETHING").toMatch(/\/\/\s*\(\d+\.\d+\)/)
+    // The gate is a named module-scope constant, following HUMAN_INPUT_PHASE_TYPE's form.
+    expect(phaseVocabularySource).toMatch(/const EXTERNAL_ACTION_PHASE_TYPE = "external_action"/)
+    expect(phaseVocabularySource).toMatch(/inputs\.phaseType === EXTERNAL_ACTION_PHASE_TYPE/)
+  })
+
+  it("the WR-04 guard is the INLINE form — this module still has ZERO imports", () => {
+    // `phaseVocabulary.ts` has never imported anything, and importing the shared
+    // `ownProperty` helper would have made this change the file's first import ever. The
+    // `runVocabulary.ts` inline precedent is copied instead.
+    expect(phaseVocabularySource).not.toMatch(/^import\s/m)
+    expect(phaseVocabularySource).toMatch(
+      /Object\.prototype\.hasOwnProperty\.call\(EXTERNAL_CAPABILITY_SENTENCES,/,
+    )
+    // Positive control: the zero-import regex really does match an import line.
+    expect('import { own } from "./ownProperty"\n').toMatch(/^import\s/m)
+  })
+
+  it("GROUNDING_DIAL_TYPES is UNCHANGED — external_action must never join it", () => {
+    // A D-185-15 red line, pinned by membership rather than by a comment. The gate stays
+    // correct for this type: its three capabilities are disjoint from the KB tools, so the
+    // step reads no knowledge base, carries no ⛨ seal, and is free to think BY
+    // CONSTRUCTION — correct, not a gap.
+    expect([...GROUNDING_DIAL_TYPES]).toEqual(["llm_agent", "llm_batch_agents"])
+    expect(GROUNDING_DIAL_TYPES).not.toContain("external_action")
+    // …and the consequence, driven rather than asserted about: a folder bound on an
+    // external-action step still faces nothing.
+    expect(
+      derivedFace({ phaseType: "external_action", folderName: "Supplier Contracts" }),
+    ).toBeNull()
+  })
+})
+
+// ── Phase 189-13 (CONN-01 / D-12 / D-18) — the badge slot-1 predicate ────────────
+
+describe("phaseVocabulary.notConnectedOf — badge slot 1 (D-12 / D-18)", () => {
+  it("is true for external_action and FALSE for all six shipped types, each asserted", () => {
+    expect(notConnectedOf(externalPhase("send_email"))).toBe(true)
+    expect(notConnectedOf(externalPhase())).toBe(true)
+    // ⚠ THE FALSIFIABLE HALF AVAILABLE TODAY IS THE TYPE TEST, and that is stated rather
+    // than left to be discovered: nothing in this app can be CONNECTED to anything until
+    // Phase 190 (no connection mechanism exists), so the state test's false branch is
+    // unreachable and the badge is *de facto* type-conditional. The six shipped types are
+    // what makes "the badge is absent unless the step is an external action" a measurement.
+    expect(notConnectedOf(phase({ config: { phase_type: "programmatic" } }))).toBe(false)
+    expect(notConnectedOf(phase({ config: { phase_type: "llm_single" } }))).toBe(false)
+    expect(notConnectedOf(phase({ config: { phase_type: "llm_agent" } }))).toBe(false)
+    expect(notConnectedOf(phase({ config: { phase_type: "llm_batch_agents" } }))).toBe(false)
+    expect(notConnectedOf(phase({ config: { phase_type: "llm_human_input" } }))).toBe(false)
+    expect(notConnectedOf(phase({ config: { phase_type: "llm_emit" } }))).toBe(false)
+    // And derived, so a shipped type renamed or an EIGHTH type added cannot slip past the
+    // six literals above.
+    for (const t of PHASE_TYPE_ORDER.filter((x) => x !== "external_action")) {
+      expect(notConnectedOf(phase({ config: { phase_type: t } }))).toBe(false)
+    }
+  })
+
+  it("is TOTAL — an unknown type and a malformed config resolve to false, never throw", () => {
+    expect(notConnectedOf(phase({ config: { phase_type: "llm_future_type" } }))).toBe(false)
+    const malformed = { slug: "x", phase_index: 0 } as unknown as PhaseSpecJSON
+    expect(() => notConnectedOf(malformed)).not.toThrow()
+    expect(notConnectedOf(malformed)).toBe(false)
+  })
+
+  it("the TYPE test and the STATE test are on SEPARATE LINES (the Phase-190 seam)", () => {
+    // D-12 chose a STATE-conditional badge over a TYPE-conditional one so that 190 edits
+    // ONE line and the adapter, `PhaseNode.tsx` and the card are all untouched. A fused
+    // single-expression predicate would force 190 to re-open all of them, so the shape is
+    // asserted rather than described — the numbered-ladder argument, applied to a
+    // two-line function.
+    const body = phaseVocabularySource
+      .slice(phaseVocabularySource.indexOf("export function notConnectedOf"))
+      .split("\n}")[0]
+    expect(body).toMatch(/!== EXTERNAL_ACTION_PHASE_TYPE\) return false/)
+    expect(body).toMatch(/\n\s+return true/)
+    // Positive control: a fused one-liner would NOT match the two-line shape above.
+    expect("return phase.config?.phase_type === EXTERNAL_ACTION_PHASE_TYPE").not.toMatch(
+      /!== EXTERNAL_ACTION_PHASE_TYPE\) return false/,
+    )
   })
 })
 

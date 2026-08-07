@@ -152,7 +152,16 @@ const BASELINE = {
   // 185-08: 42 → 33. Req 6 deleted the slot-1 grounding word-badge; the 9 `it()`
   // blocks over its three faces went with it. Measured, not computed.
   // 188-12: 33 → 96. The suite has grown by 63 since; de-slacked, not lowered.
-  "phaseVocabulary.test.ts": 96,
+  // 189-13 (CONN-01 / D-13): 96 → 112. An EXTENSION, not a lowering — no `it(` was deleted
+  // or renamed; two shipped cases were WIDENED in place (their hand-typed six-type lists
+  // became `PHASE_TYPE_ORDER` derivations) without changing the count. The +16 are the
+  // capability tier's own block (all three sentences, the no-capability floor, the
+  // unrecognised-name floor, the `constructor` own-guard probe, non-string totality, the
+  // type gate, two ordering cases, the one-constant export, the integer-numbering source
+  // assertion, the zero-imports source assertion, the GROUNDING_DIAL_TYPES pin), the
+  // three-register word check, and `notConnectedOf`'s three cases. Read from THIS SCRIPT'S
+  // OWN `actual` column, never hand-counted.
+  "phaseVocabulary.test.ts": 112,
   // 188-12: 31 → 46. GREW IN THIS PHASE — 188-06 added the seven-readings and ring-spec
   // cases, 188-07 the derives-nothing property and the type-only-import fence that is the
   // mechanical half of the G-5 diff cap. It began this phase pinned at 31 while running 35.
@@ -217,7 +226,11 @@ const BASELINE = {
   "ProblemsTray.test.tsx": 30,
   "verdictModel.test.ts": 29,
   // 188-12 de-slacking, both inherited stale-low pins (26/49 and 24/46).
-  "canvasModel.test.ts": 49,
+  // 189-13 (CONN-01 / D-12 / WR-04): 49 → 51. An EXTENSION. The +2 are the WR-04 probe on
+  // the subtitles read this plan GUARDED (an inherited `phase_type` must yield the same
+  // empty subtitle a table MISS yields — the case above it cannot see the difference,
+  // which is why it is a separate case) and the `notConnected` projection case.
+  "canvasModel.test.ts": 51,
   "PublishGauntlet.test.tsx": 46,
   "WorkflowBuilderPage.canvas.test.tsx": 128,
   "WorkflowBuilderPage.describe.test.tsx": 19,
@@ -630,9 +643,18 @@ const BASELINE = {
 // exclusion DISCHARGED in the same commit and its pin was deliberately NOT moved — the case was
 // REWRITTEN in place rather than deleted, so its count is unchanged at 46 and moving the pin
 // would make the gate disagree with reality.
+// ⚠ AND BY 189-13's SECOND TASK: 2564 → 2582 (`phaseVocabulary.test.ts` +16, the D-13
+// capability tier and `notConnectedOf`; `canvasModel.test.ts` +2, the WR-04 subtitles probe
+// and the `notConnected` projection). ⚠ FOUR further suites changed ASSERTIONS but not
+// COUNTS and their pins were deliberately NOT moved — `StepTypePicker.test.tsx` (46, two
+// exclusion cases rewritten in place), `phaseVocabulary.corpus.test.ts` (45, its derived
+// token count moved 6 → a ≥ 7 floor), `panel/__tests__/PhaseTimeline.test.tsx` (17, its
+// declined-panel-label case narrowed once the 7th type gained a 3D MARK — a different table)
+// and `canvasModel.fixtures.test.ts` (100, 14 snapshots regenerated: the diff is 36 additions
+// of `"notConnected": false` and NOTHING else).
 // ⚠ The note below is prose beside a DERIVED value and has now drifted twice; it is
 // updated here for the reader, and `BASELINE_TOTAL` itself remains the `reduce`.
-const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // ⚠ 2564 (189-13)
+const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // ⚠ 2582 (189-13)
 
 // ── The Wave-0 blast radius (184-VALIDATION.md § "quick run command"). ──
 const TARGETS = [

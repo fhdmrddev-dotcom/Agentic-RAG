@@ -53,6 +53,8 @@ import {
 import {
   PHASE_TYPE_SENTENCES,
   PHASE_TYPE_SUBTITLES,
+  EXTERNAL_CAPABILITY_SENTENCES,
+  derivedFaceOf,
   nodeTitle,
   type PhaseSpecJSON,
 } from "./phaseVocabulary"
@@ -138,8 +140,17 @@ const cardFaceFor = (type: PhaseTypeId): string =>
 // step does. The same shape 189-08 shipped when `CanvasReading` grew a member the canvas
 // vocabulary had not yet worded.
 
-/** Owed by plan 189-14: `PHASE_TYPE_SENTENCES` + `PHASE_TYPE_SUBTITLES` entries. */
-const TYPES_AWAITING_A_VOCABULARY_ENTRY: readonly PhaseTypeId[] = ["external_action"]
+/**
+ * ⚠ DISCHARGED by plan 189-13 — kept EMPTY rather than deleted, for the same reason as
+ * its sibling below.
+ *
+ * 189-12 recorded this debt as *"owed by plan 189-14"*. Measured, it was **189-13's**:
+ * that plan owns all three per-type vocabulary maps (`PHASE_TYPE_SENTENCES` /
+ * `_SUBTITLES` / `_LABELS`) and 189-14 owns the capability PICKER. Both cases that read
+ * this list went RED the moment the sentence landed, exactly as their comments promised,
+ * and both are rewritten to the finished claim.
+ */
+const TYPES_AWAITING_A_VOCABULARY_ENTRY: readonly PhaseTypeId[] = []
 
 /**
  * ⚠ DISCHARGED by plan 189-13 — kept EMPTY rather than deleted, and that is deliberate.
@@ -278,23 +289,32 @@ describe("StepTypePicker — WR-03: the row is a preview of the card it creates"
   // control silently under-covering. This is what proves the fix moved one row and
   // nothing else, and it is the assertion that catches a future derived tier leaking
   // into the picker unintentionally.
+  // ⚠ REWRITTEN AT 189-13, from a hand-named exclusion to a DERIVED one. The rows that do
+  // NOT read their type sentence are exactly the rows whose CONFIG-DERIVED tier fires on a
+  // freshly-placed step — `llm_human_input` (the tier the WR-03 repair added) and, since
+  // 189-13, `external_action` (D-13's capability tier, which fires because
+  // `minimalPhaseFor` emits a real `capability`). Deriving it from the resolver itself is
+  // what stops a THIRD such type from silently escaping this control, and the derivation
+  // is pinned to its expected members below so it cannot quietly widen either.
+  const typesWithADerivedFace = PHASE_TYPE_ORDER.filter(
+    (type) => derivedFaceOf(minimalPhaseFor(type, PREVIEW_SLUG, 0)) !== null,
+  )
   const unchangedTypes = PHASE_TYPE_ORDER.filter(
-    (type) =>
-      type !== "llm_human_input" && !TYPES_AWAITING_A_VOCABULARY_ENTRY.includes(type),
+    (type) => !typesWithADerivedFace.includes(type),
   )
 
   it("leaves every other shipped row byte-identical to its D-183-06 type sentence", () => {
-    // DERIVED: the whole order, minus the one row the WR-03 repair moved, minus the ones
-    // whose sentence has not shipped yet. Re-pinning a literal here is what would let a
-    // future type silently escape the control.
-    expect(unchangedTypes).toHaveLength(
-      PHASE_TYPE_ORDER.length - 1 - TYPES_AWAITING_A_VOCABULARY_ENTRY.length,
-    )
-    // ⚠ THE EXCLUSION IS FALSIFIABLE. Each excluded type must genuinely have NO sentence;
-    // the day plan 189-14 writes one, this line goes RED and the exclusion list has to be
-    // emptied rather than quietly outliving its reason.
-    for (const type of TYPES_AWAITING_A_VOCABULARY_ENTRY) {
-      expect(PHASE_TYPE_SENTENCES[type]).toBeUndefined()
+    // The exclusion is PINNED, not merely derived: a new type whose derived tier fires
+    // must be a deliberate change to this line rather than a silent shrinking of the
+    // blast-radius control below.
+    expect(typesWithADerivedFace).toEqual(["llm_human_input", "external_action"])
+    expect(unchangedTypes).toHaveLength(PHASE_TYPE_ORDER.length - 2)
+    expect(TYPES_AWAITING_A_VOCABULARY_ENTRY).toHaveLength(0)
+    // ⚠ THE EXCLUSION IS STILL FALSIFIABLE, in the other direction now: every excluded
+    // type must genuinely HAVE a sentence (the gap 189-12 pinned is closed), so a
+    // regression that deleted one would fail here rather than hide inside the filter.
+    for (const type of typesWithADerivedFace) {
+      expect(PHASE_TYPE_SENTENCES[type]?.length ?? 0).toBeGreaterThan(0)
     }
     renderPicker(twoSteps, 1)
     for (const type of unchangedTypes) {
@@ -302,20 +322,29 @@ describe("StepTypePicker — WR-03: the row is a preview of the card it creates"
     }
   })
 
-  it("previews the 7th row from the resolver, never from a fabricated sentence", () => {
-    // Phase 189's honest intermediate state, PINNED so it is a decision rather than an
-    // oversight. `PHASE_TYPE_SENTENCES` has no `external_action` entry until 189-14, and
-    // `nodeTitle`'s floor echoes the raw discriminator. The row therefore previews
-    // exactly what the CARD will say — which is the WR-03 property this whole describe
-    // exists for — and says nothing about the step that is not true.
+  it("previews the 7th row from the resolver — the face a placed step really carries", () => {
+    // ⚠ THIS CASE WENT RED WHEN 189-13 LANDED THE VOCABULARY, exactly as its previous
+    // comment promised, and the new claim is a DECISION recorded rather than a drift
+    // accepted. Its old text asserted the row was NOT any of the three capability
+    // sentences, on the reasoning that "a picker row is keyed by TYPE". Measured, a step
+    // placed from this row arrives with `capability: "send_email"` — 189-12's
+    // `requiredConfigFor` emits a REAL capability because the backend `Literal` is closed
+    // and an empty placeholder would 422 the whole definition on first save — so D-13's
+    // tier-4 face fires and the row reads "Sends an email".
+    //
+    // UI-SPEC §6d predicted "Reach outside" here. That prediction PREDATES 189-12's
+    // decision, and the property that actually binds is WR-03, the one this whole describe
+    // exists for: THE ROW PREVIEWS THE CARD THAT LANDS. Making the row say "Reach outside"
+    // while the placed card says "Sends an email" would break it.
     renderPicker(twoSteps, 1)
     expect(rowTitle("external_action")).toBe(cardFaceFor("external_action"))
-    // Not a promise the client cannot keep: no invented verb, no capability named. The
-    // three capability sentences are 189-14's, and a picker row is the wrong home for a
-    // per-capability claim anyway (the row is keyed by TYPE).
-    for (const invented of ["Sends an email", "Creates a ticket", "Posts a message"]) {
-      expect(rowTitle("external_action")).not.toBe(invented)
-    }
+    expect(rowTitle("external_action")).toBe("Sends an email")
+    // Never a FABRICATED verb: whatever the row says is a member of the closed set the
+    // node face and the 189-14 picker both read — one constant, never an invented phrase.
+    expect(Object.values(EXTERNAL_CAPABILITY_SENTENCES)).toContain(rowTitle("external_action"))
+    // The tier-3 floor is NOT retired and is still the honest face of a step with no
+    // recognised capability — driven from stored data in `phaseVocabulary.test.ts`.
+    expect(PHASE_TYPE_SENTENCES.external_action).toBe("Reach outside")
   })
 
   it("the human-input row waits for your approval, and no longer says 'Check with you'", () => {

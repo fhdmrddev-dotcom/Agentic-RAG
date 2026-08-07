@@ -156,6 +156,13 @@ export const PHASE_TYPE_SENTENCES: Record<string, string> = {
   llm_batch_agents: "Work on the parts together",
   llm_human_input: "Check with you",
   llm_emit: "Produce the deliverable",
+  // Phase 189-13 (CONN-01 / D-13 / UI-SPEC §6b) — the 7th type's FLOOR. It says the
+  // step's NATURE without claiming a specific act, which is exactly what a floor is for:
+  // it is what renders when no capability is chosen, or when a stored capability is one
+  // this client does not recognise. The capability-derived sentences ("Sends an email"
+  // …) live one tier ABOVE this, in `EXTERNAL_CAPABILITY_SENTENCES`, and are computed at
+  // render — never stored, and never fabricated for a name the closed set lacks.
+  external_action: "Reach outside",
 }
 
 /** The ONE supporting line 137-D allows beneath the title. */
@@ -166,6 +173,13 @@ export const PHASE_TYPE_SUBTITLES: Record<string, string> = {
   llm_batch_agents: "Several assistants work in parallel",
   llm_human_input: "Pauses here until you answer",
   llm_emit: "Fills your template and produces the file",
+  // Phase 189-13 — carries the type's ONE invariant fact (D-04): the run stops here.
+  // ⚠ WORDED TO SURVIVE PHASE 190, deliberately. It says nothing about NOT SENDING, so
+  // it does not become a lie the day the node is wired to a real destination and starts
+  // sending. The not-sent fact is carried by the "Not connected" badge at design time
+  // (D-12) and by the "Not sent — recorded" run word at run time (D-16) — which is where
+  // those decisions put it, and neither of them is this line's job.
+  external_action: "Stops for your approval before it acts outside",
 }
 
 /**
@@ -180,6 +194,12 @@ export const PHASE_TYPE_LABELS: Record<string, string> = {
   llm_batch_agents: "Parallel agents",
   llm_human_input: "Needs you",
   llm_emit: "Deliverable",
+  // Phase 189-13 — the ⌥ reveal renders `${label} · ${slug}` → "External action ·
+  // notify-owner". A terse technical noun, matching this map's register (the reveal is
+  // the TECHNICAL vocabulary; the business voice is `PHASE_TYPE_SENTENCES` above and the
+  // mechanism voice is `PHASE_TYPE_SUBTITLES`). One phrase reused across all three maps
+  // would be wrong — each map answers a different question.
+  external_action: "External action",
 }
 
 /**
@@ -460,14 +480,55 @@ export function actionRiskArmed(phase: PhaseSpecJSON): boolean {
 // type sentence. An id-shaped face is worse than a generic one.
 //
 // AND NEVER FABRICATE A CAPABILITY (187-17 / WR-02). The floor is not only about
-// NAMES. Two of the five tiers are TYPE-GATED, because the fields they read ride the
+// NAMES. Several tiers are TYPE-GATED, because the fields they read ride the
 // config family for shape symmetry rather than behaviour: rendering `Search {folder}`
 // on a step whose executor performs no retrieval states something the step cannot do.
 // A gated-out binding falls through to the plain type sentence by the same rule — a
 // generic face is always better than a false one.
+//
+// Phase 189-13 (D-13) inserts tier (4), the EXTERNAL CAPABILITY, and it obeys BOTH
+// floors at once: it is gated on `external_action` so no other type can claim it, and
+// its lookup is own-property guarded against a closed set so a capability name the
+// client does not recognise falls through rather than inventing a face for it.
 
 /** The one type that pauses for a person — the literal `waitsForYou` also reads. */
 const HUMAN_INPUT_PHASE_TYPE = "llm_human_input"
+
+/** The one type that reaches outside the workspace — the literal `notConnectedOf` and
+ *  the capability tier both read. A NAMED module-scope gate, following the form
+ *  `HUMAN_INPUT_PHASE_TYPE` above sets, never an inline literal in a branch. */
+const EXTERNAL_ACTION_PHASE_TYPE = "external_action"
+
+/**
+ * THE THREE CAPABILITIES AND WHAT EACH STEP DOES (D-13 / D-23 · Phase 189-13).
+ *
+ * ⚠ ONE CONSTANT, READ TWICE — here for the node face, and by the capability picker
+ * (`ExternalActionSection`, plan 189-14) for its three option labels. Never a second
+ * copy: UI-SPEC §7b requires the picker's labels to be character-identical to the face
+ * the canvas will show, and two copies agree only until one of them is edited. That is
+ * why it is EXPORTED from a module the picker can import rather than kept private.
+ *
+ * CLOSED SET, AND IT MIRRORS THE SERVER. The backend's `ExternalActionPhaseConfig`
+ * declares `capability` as a closed `Literal` of exactly these three (D-15); the client
+ * mirror is licensed for the same reason `PhaseTypeId` is — D-20 deliberately keeps
+ * these names OUT of the author-facing tool rail's server-supplied option source, and a
+ * route serving three constants is one refactor away from being reused as one, which is
+ * the governance hole 189-04 closed. The cross-language agreement is fenced
+ * MECHANICALLY (a `?raw` read of `harness.py`), not by this docblock.
+ *
+ * ⚠ NEVER FABRICATE. A capability name this set does not own falls THROUGH to the type
+ * sentence — it never renders a made-up face. The lookup is therefore OWN-PROPERTY
+ * GUARDED at the tier below (WR-04): this is a plain object literal, so it inherits
+ * `constructor`, `toString` and `__proto__`, and a bare read for one of those names
+ * hands back a FUNCTION rather than firing any `??` fallback. That is not theoretical
+ * in this codebase — it is the measured `[Function Object]` React child that hard-crashed
+ * a whole node face before 188.1-04.
+ */
+export const EXTERNAL_CAPABILITY_SENTENCES: Record<string, string> = {
+  send_email: "Sends an email",
+  create_ticket: "Creates a ticket",
+  post_message: "Posts a message",
+}
 
 /**
  * The id→name lookups the derived face needs, injected by whoever holds them.
@@ -501,7 +562,7 @@ const NO_NAME_CONTEXT: NameContext = Object.freeze({})
  * phase-shaped adapter and BOTH consumers reach this one body.
  */
 export interface DerivedFaceInputs {
-  /** The step's `phase_type`. Gates tiers 2, 3 and 4. */
+  /** The step's `phase_type`. Gates tiers 2, 3, 4 and 5. */
   phaseType: string
   /** The bound skill's display name, already resolved. */
   skillName?: string
@@ -512,6 +573,13 @@ export interface DerivedFaceInputs {
    *  member for shape symmetry and is INERT on the ones that carry no tools, so a
    *  face claiming a search there would be claiming a capability the step lacks. */
   folderName?: string
+  /** The chosen external capability, RAW as stored (D-13). Unlike the three fields
+   *  above this is NOT a resolved display name — it is an author-supplied JSONB value
+   *  that keys a closed sentence map, which is why the tier that reads it is
+   *  own-property guarded. Absent, or a name the closed set does not own, falls
+   *  through. IGNORED outside `external_action` for the same reason `folderName` is
+   *  ignored outside the retrieval types. */
+  capability?: string
 }
 
 /**
@@ -523,11 +591,15 @@ export interface DerivedFaceInputs {
  * taste. SPEC Req 1's "folder scope → bound skill → template" is a drafting slip and
  * is OVERRIDDEN by D-187-04.
  *
- * TWO of the five tiers are TYPE-GATED, and `null` therefore means "no tier this step
- * can honestly claim", not merely "no field set": tier (2) fires only on `llm_emit`
- * (the template is definition-level) and tier (3) only on `GROUNDING_DIAL_TYPES`
- * (`folder_scope` is inert on the types with no tools — 187-17 / WR-02). A gated-out
- * binding falls THROUGH to the plain type sentence; it never produces a face.
+ * THREE tiers are TYPE-GATED, and `null` therefore means "no tier this step can honestly
+ * claim", not merely "no field set": tier (2) fires only on `llm_emit` (the template is
+ * definition-level), tier (3) only on `GROUNDING_DIAL_TYPES` (`folder_scope` is inert on
+ * the types with no tools — 187-17 / WR-02), and tier (4) only on `external_action`. A
+ * gated-out binding falls THROUGH to the plain type sentence; it never produces a face.
+ *
+ * ⚠ The tier COUNT is deliberately not spelled in this sentence any more. It read "five"
+ * until Phase 189-13 made it six, and a number in prose beside a numbered ladder is a
+ * claim nothing typechecks — the ladder itself is the record.
  */
 export function derivedFace(inputs: DerivedFaceInputs): string | null {
   // (1) BOUND SKILL — a bound skill states what *this* step does, so it wins over
@@ -587,10 +659,42 @@ export function derivedFace(inputs: DerivedFaceInputs): string | null {
     return `Search ${inputs.folderName}`
   }
 
-  // (4) HUMAN INPUT — nothing is bound, but the type alone says what happens.
+  // (4) EXTERNAL CAPABILITY — GATED on `external_action` (D-13, Phase 189-13). The
+  //     chosen capability is what THAT step does, so it names the step.
+  //
+  //     WHY (4) AND NOT A DECIMAL BETWEEN (3) AND (4). Tiers (1)-(3) all read a NAME out
+  //     of the injected `NameContext` and can therefore fabricate — which is the whole
+  //     reason they carry a never-fabricate floor. This tier and HUMAN INPUT below read
+  //     the CONFIG ALONE and cannot. So the capability tier is a sibling of HUMAN INPUT,
+  //     not of the three name-reading tiers, and it belongs immediately above it. A
+  //     decimal tier number would also defeat the ordering test the numbering exists to
+  //     force (a `3.5` invites a `3.75`), so the tiers below were RENUMBERED instead.
+  //
+  //     ⚠ THE LOOKUP IS A WR-04 SINK AND IS OWN-PROPERTY GUARDED, in the INLINE form.
+  //     `capability` reaches here from author-supplied definition JSONB and
+  //     `EXTERNAL_CAPABILITY_SENTENCES` is a plain object literal, so
+  //     `SENTENCES[capability]` for `"constructor"` returns the `Object` FUNCTION rather
+  //     than firing any fallback — the measured hard render crash of 188.1-04. The
+  //     `runVocabulary.ts` `own()` precedent is copied INLINE and NOT imported: this
+  //     module has ZERO import statements today and this is not the change that should
+  //     give a shared-vocabulary leaf its first one.
+  //
+  //     ⚠ NEVER FABRICATE A FACE. An unrecognised stored capability falls THROUGH to the
+  //     type sentence ("Reach outside"), which is the same floor tiers (2) and (3) obey:
+  //     rendering a claim about a step whose executor cannot perform it states something
+  //     false to the author, and a generic face is always better than a false one.
+  if (
+    inputs.phaseType === EXTERNAL_ACTION_PHASE_TYPE &&
+    typeof inputs.capability === "string" &&
+    Object.prototype.hasOwnProperty.call(EXTERNAL_CAPABILITY_SENTENCES, inputs.capability)
+  ) {
+    return EXTERNAL_CAPABILITY_SENTENCES[inputs.capability]
+  }
+
+  // (5) HUMAN INPUT — nothing is bound, but the type alone says what happens.
   if (inputs.phaseType === HUMAN_INPUT_PHASE_TYPE) return "Wait for your approval"
 
-  // (5) otherwise NULL — the honest floor. Never fabricate; the caller falls through
+  // (6) otherwise NULL — the honest floor. Never fabricate; the caller falls through
   //     to the plain-language type sentence.
   return null
 }
@@ -628,24 +732,39 @@ export function derivedFaceOf(
       : undefined
   const folderName = soleFolderId !== undefined ? ctx.folderNames?.[soleFolderId] : undefined
 
+  // `capability` is a bare stored string (D-13), NOT an id needing a lookup, so it is
+  // read behind a `typeof` guard exactly as its siblings are and handed straight through.
+  // The `external_action` gate AND the own-property guard on the closed sentence map both
+  // live in the CORE, so this adapter declares no branch of its own — which is what stops
+  // the panel and the canvas from drifting apart.
+  const rawCapability = config.capability
+  const capability = typeof rawCapability === "string" ? rawCapability : undefined
+
   return derivedFace({
     phaseType: typeof config.phase_type === "string" ? config.phase_type : "",
     skillName,
     // The `llm_emit` gate lives in the core so both callers inherit it.
     templateFilename: ctx.templateFilename,
     folderName,
+    capability,
   })
 }
 
-// ── The badge slots (D-183-07 — Phase 185 leaves slot 1 EMPTY) ──────────────────
+// ── The badge slots (D-183-07 — and Phase 189 SPENDS slot 1) ────────────────────
 //
 // Slot 1 carried a three-face grounding word-badge until Phase 185. SPEC Req 6
 // DELETES it: governance renders as shape (the corner seal), spends no colour and
-// spends no badge slot, and the freed slot belongs to 188 (run state) / 189
+// spends no badge slot, and the freed slot belonged to 188 (run state) / 189
 // (external actions). `PhaseNodeCard`'s max-2 tuple union is what enforces that
-// budget; nothing here reserves the slot, because a reserved slot is a slot spent.
-// The signal itself still reaches the face — as `PhaseNodeData.grounded`, resolved
-// from the section above.
+// budget. The grounding signal itself still reaches the face — as
+// `PhaseNodeData.grounded`, resolved from the section above.
+//
+// ⚠ CORRECTED at Phase 189-13, in the commit that falsified it. This block used to end
+// *"nothing here reserves the slot, because a reserved slot is a slot spent"*. The slot
+// is now genuinely SPENT: 188 declined its claim, and 189 fills it with the
+// state-conditional "Not connected" badge fed by `notConnectedOf` below. The budget is
+// therefore FULL — a third badge is a typecheck error against `BadgeSlots`, which is
+// mechanically controlled by an `@ts-expect-error` case in `PhaseNodeCard.test.tsx`.
 
 /**
  * D-183-07 slot 2 — "Waits for you", true ONLY on `llm_human_input`. Every other
@@ -654,4 +773,31 @@ export function derivedFaceOf(
  */
 export function waitsForYou(phase: PhaseSpecJSON): boolean {
   return phase.config.phase_type === HUMAN_INPUT_PHASE_TYPE
+}
+
+/**
+ * D-12 / D-18 slot 1 (Phase 189-13) — this step cannot reach anything yet.
+ *
+ * A NAMED TOTAL PREDICATE, sitting beside `waitsForYou` above and `actionRiskArmed`, so
+ * every boolean on the node face has a name to argue with rather than an inline ternary.
+ * `canvasModel.buildPhaseData` calls it and `PhaseNode` renders the badge from the
+ * resulting `data.notConnected`; the card itself is not edited.
+ *
+ * ⚠ THE TYPE TEST AND THE STATE TEST ARE ON SEPARATE LINES, ON PURPOSE, and that is the
+ * whole reason D-12 chose a STATE-conditional badge over a TYPE-conditional one. When
+ * Phase 190 binds a real destination, it edits the SECOND line only — `return
+ * <no destination bound>` — the badge stops rendering because the DATA changed, and
+ * `PhaseNode.tsx` and `PhaseNodeCard.tsx` are both untouched. A single fused condition
+ * would force 190 to re-open the adapter and the card.
+ *
+ * ⚠ THE FALSE BRANCH OF THE STATE TEST IS UNREACHABLE TODAY, and that is stated rather
+ * than hidden: no connection mechanism exists anywhere in this app in 189, so every
+ * `external_action` step genuinely IS not-connected and the badge is *de facto*
+ * type-conditional until 190. The falsifiable half available NOW is the TYPE test — this
+ * returns `false` for every one of the six shipped types — and that is what the suite
+ * drives, over all six individually.
+ */
+export function notConnectedOf(phase: PhaseSpecJSON): boolean {
+  if (phase.config?.phase_type !== EXTERNAL_ACTION_PHASE_TYPE) return false
+  return true
 }

@@ -41,6 +41,7 @@ import {
   actionRiskArmed,
   groundingCauseOf,
   nodeTitle,
+  notConnectedOf,
   parseSkipTarget,
   technicalTitle,
   waitsForYou,
@@ -135,8 +136,13 @@ export interface PhaseNodeData {
    *
    * The canvas RENDERS this as SHAPE (the corner seal, plan 185-09), never as
    * colour and never as a word-badge: SPEC Req 6 says governance spends neither,
-   * and both badge slots are committed to 188/189. Badge slot 1 is deliberately
-   * EMPTY from this plan onward — see `PhaseNode.tsx`'s `badges` assembly.
+   * and both badge slots are committed to 188/189.
+   *
+   * ⚠ CORRECTED at Phase 189-13, in the commit that falsified it. This sentence used to
+   * end *"Badge slot 1 is deliberately EMPTY from this plan onward"*. It is no longer:
+   * 188 declined its claim and 189 SPENDS the slot on `notConnected` below. Governance's
+   * own argument — that it spends no colour and no badge slot — is unchanged and is the
+   * half of this paragraph that had to survive the edit.
    */
   grounded: boolean
   /**
@@ -149,6 +155,21 @@ export interface PhaseNodeData {
   armed: boolean
   /** Badge slot 2 — true ONLY on `llm_human_input`. */
   waitsForYou: boolean
+  /**
+   * Badge slot 1 (D-12 / D-18, Phase 189-13) — this step cannot reach anything yet.
+   *
+   * Resolved ONCE here through `phaseVocabulary.notConnectedOf`, the same shape every
+   * sibling boolean on this face uses, and rendered by `PhaseNode.tsx` as the muted
+   * "Not connected" word-badge. It is DESIGN-TIME data and is emitted regardless of run
+   * mode, so the badge persists while the step runs and after it has recorded — which is
+   * honest (the step genuinely is not connected) and is why D-16's run word had to be
+   * worded so the two never read as a duplication.
+   *
+   * ⚠ IT RETIRES BY DATA, NOT BY EDIT. When Phase 190 binds a destination,
+   * `notConnectedOf` returns false, the badge tuple falls to its existing branch, and
+   * neither this file nor `PhaseNode.tsx` nor the card is touched.
+   */
+  notConnected: boolean
   [k: string]: unknown
 }
 
@@ -261,6 +282,14 @@ function isArmed(phase: PhaseSpecJSON): boolean {
   return actionRiskArmed(phase)
 }
 
+/** D-12 / D-18 (189-13) — can this step reach anything yet? Delegated for the same
+ *  reason: the rule (a type test and a state test on separate lines, so Phase 190 edits
+ *  ONE line) lives in `phaseVocabulary.notConnectedOf`, and this file declares no branch
+ *  of its own. */
+function isNotConnected(phase: PhaseSpecJSON): boolean {
+  return notConnectedOf(phase)
+}
+
 /**
  * GOVERN-03 — the checkpoint state to carry on the edge running INTO `phase`, as the
  * THREE states `CanvasEdgeData.armed` documents rather than a plain boolean.
@@ -294,10 +323,24 @@ function buildPhaseData(
     phaseType,
     title: nodeTitle(phase, nameContext),
     technicalTitle: technicalTitle(phase),
-    subtitle: PHASE_TYPE_SUBTITLES[phaseType] ?? "",
+    // ⚠ OWN-PROPERTY GUARDED (WR-04, fixed at 189-13 while the 7th key was being added).
+    // This read shipped as a bare `PHASE_TYPE_SUBTITLES[phaseType] ?? ""` and was the ONLY
+    // read of that map outside its own declaration. A bare table lookup does NOT fire its
+    // `??` fallback for an INHERITED name: the map is a plain object literal, so
+    // `PHASE_TYPE_SUBTITLES["constructor"]` is the `Object` FUNCTION — never nullish — and
+    // the measured consequence in this codebase was a function object reaching the node
+    // render and crashing it outright (`lib/phaseGlyph.tsx`, 188.1-04). `phase_type` is
+    // author-supplied definition JSONB and this is a projection, so totality is a property
+    // of the lookup rather than of its current callers. The INLINE form is used rather
+    // than an import so the guard reads identically to its two shipped siblings
+    // (`nodePresentation.ts` and `runVocabulary.ts`).
+    subtitle: Object.prototype.hasOwnProperty.call(PHASE_TYPE_SUBTITLES, phaseType)
+      ? PHASE_TYPE_SUBTITLES[phaseType]
+      : "",
     grounded: isGrounded(phase, kbTools),
     armed: isArmed(phase),
     waitsForYou: waitsForYou(phase),
+    notConnected: isNotConnected(phase),
   }
 }
 

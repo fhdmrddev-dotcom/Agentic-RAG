@@ -392,7 +392,26 @@ describe("panel/PhaseCard 189-08 — the not-sent terminal has its OWN word and 
     // POSITIVE CONTROL: the generic row really does render the declared unknown meta.
     expect(ordinaryText).toContain("Step")
     expect(ordinaryText).toContain("•")
-    expect(seventhText).toBe(ordinaryText)
+
+    // ⚠ THIS CASE ASSERTED `seventhText === ordinaryText` AND WENT RED AT 189-13, and the
+    // divergence is CORRECT rather than a regression — so the claim is narrowed to its
+    // real subject instead of the byte-identity that happened to hold for one plan.
+    //
+    // TWO DIFFERENT TABLES answer here. `PHASE_TYPE_LABEL` is the PANEL's own vocabulary
+    // and 189 DECLINED a row in it (the table already declined `llm_emit`, and adding a
+    // seventh would invent a panel vocabulary for a type the panel never gained one for);
+    // that declination still holds and is what this case exists to pin. The 3D MARK is the
+    // shared canvas glyph vocabulary — `soulData.PHASE_GLYPHS` — and 189-13 DID land a row
+    // there (`outbox-tray`). So the 7th type now renders a real mark beside the generic
+    // "Step" label, while a genuinely unknown type still renders the "•" fallback.
+    //
+    // Byte-identity to an unknown type was therefore never the property; it was a
+    // coincidence of the two tables being empty at the same time.
+    expect(seventhText).toContain("Step")
+    expect(seventhText).not.toContain("External action")
+    // The ONLY difference is the leading fallback glyph the unknown type still renders —
+    // asserted exactly, so a second divergence (a leaked label, a changed ordinal) fails.
+    expect(ordinaryText).toBe(`•${seventhText}`)
   })
 })
 

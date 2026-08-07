@@ -54,6 +54,7 @@ exports[`toCanvas sweep — 'branching (synthetic skip_to_phase)' > matches its 
       "data": {
         "armed": false,
         "grounded": false,
+        "notConnected": false,
         "phaseIndex": 0,
         "phaseType": "llm_agent",
         "slug": "gather",
@@ -76,6 +77,7 @@ exports[`toCanvas sweep — 'branching (synthetic skip_to_phase)' > matches its 
       "data": {
         "armed": false,
         "grounded": false,
+        "notConnected": false,
         "phaseIndex": 1,
         "phaseType": "llm_single",
         "slug": "assess",
@@ -98,6 +100,7 @@ exports[`toCanvas sweep — 'branching (synthetic skip_to_phase)' > matches its 
       "data": {
         "armed": false,
         "grounded": false,
+        "notConnected": false,
         "phaseIndex": 2,
         "phaseType": "llm_single",
         "slug": "draft",
@@ -120,6 +123,7 @@ exports[`toCanvas sweep — 'branching (synthetic skip_to_phase)' > matches its 
       "data": {
         "armed": false,
         "grounded": false,
+        "notConnected": false,
         "phaseIndex": 3,
         "phaseType": "llm_human_input",
         "slug": "escalate",
@@ -183,6 +187,7 @@ exports[`toCanvas sweep — 'compliance-gap-report (Starter Librar…' > matches
       "data": {
         "armed": false,
         "grounded": false,
+        "notConnected": false,
         "phaseIndex": 0,
         "phaseType": "llm_agent",
         "slug": "retrieve",
@@ -205,6 +210,7 @@ exports[`toCanvas sweep — 'compliance-gap-report (Starter Librar…' > matches
       "data": {
         "armed": false,
         "grounded": true,
+        "notConnected": false,
         "phaseIndex": 1,
         "phaseType": "llm_emit",
         "slug": "emit",
@@ -277,6 +283,7 @@ exports[`toCanvas sweep — 'doc_qa_human (canonical seed 4)' > matches its comm
       "data": {
         "armed": false,
         "grounded": false,
+        "notConnected": false,
         "phaseIndex": 0,
         "phaseType": "llm_agent",
         "slug": "draft",
@@ -299,6 +306,7 @@ exports[`toCanvas sweep — 'doc_qa_human (canonical seed 4)' > matches its comm
       "data": {
         "armed": false,
         "grounded": false,
+        "notConnected": false,
         "phaseIndex": 1,
         "phaseType": "llm_human_input",
         "slug": "confirm",
@@ -321,6 +329,7 @@ exports[`toCanvas sweep — 'doc_qa_human (canonical seed 4)' > matches its comm
       "data": {
         "armed": false,
         "grounded": false,
+        "notConnected": false,
         "phaseIndex": 2,
         "phaseType": "llm_single",
         "slug": "finalize",
@@ -418,6 +427,7 @@ exports[`toCanvas sweep — 'eval_coverage (the 5-phase maximum)' > matches its 
       "data": {
         "armed": false,
         "grounded": false,
+        "notConnected": false,
         "phaseIndex": 0,
         "phaseType": "programmatic",
         "slug": "split",
@@ -440,6 +450,7 @@ exports[`toCanvas sweep — 'eval_coverage (the 5-phase maximum)' > matches its 
       "data": {
         "armed": false,
         "grounded": false,
+        "notConnected": false,
         "phaseIndex": 1,
         "phaseType": "llm_batch_agents",
         "slug": "fanout",
@@ -462,6 +473,7 @@ exports[`toCanvas sweep — 'eval_coverage (the 5-phase maximum)' > matches its 
       "data": {
         "armed": false,
         "grounded": false,
+        "notConnected": false,
         "phaseIndex": 2,
         "phaseType": "llm_agent",
         "slug": "deep_dive",
@@ -484,6 +496,7 @@ exports[`toCanvas sweep — 'eval_coverage (the 5-phase maximum)' > matches its 
       "data": {
         "armed": false,
         "grounded": false,
+        "notConnected": false,
         "phaseIndex": 3,
         "phaseType": "llm_human_input",
         "slug": "confirm",
@@ -506,6 +519,7 @@ exports[`toCanvas sweep — 'eval_coverage (the 5-phase maximum)' > matches its 
       "data": {
         "armed": false,
         "grounded": false,
+        "notConnected": false,
         "phaseIndex": 4,
         "phaseType": "llm_single",
         "slug": "summarize",
@@ -578,6 +592,7 @@ exports[`toCanvas sweep — 'literature_review (canonical seed 3)' > matches its
       "data": {
         "armed": false,
         "grounded": false,
+        "notConnected": false,
         "phaseIndex": 0,
         "phaseType": "programmatic",
         "slug": "split",
@@ -600,6 +615,7 @@ exports[`toCanvas sweep — 'literature_review (canonical seed 3)' > matches its
       "data": {
         "armed": false,
         "grounded": false,
+        "notConnected": false,
         "phaseIndex": 1,
         "phaseType": "llm_batch_agents",
         "slug": "review",
@@ -622,6 +638,7 @@ exports[`toCanvas sweep — 'literature_review (canonical seed 3)' > matches its
       "data": {
         "armed": false,
         "grounded": false,
+        "notConnected": false,
         "phaseIndex": 2,
         "phaseType": "llm_single",
         "slug": "merge",
@@ -685,6 +702,7 @@ exports[`toCanvas sweep — 'non-contiguous phase_index [0,1,3]' > matches its c
       "data": {
         "armed": false,
         "grounded": false,
+        "notConnected": false,
         "phaseIndex": 0,
         "phaseType": "llm_agent",
         "slug": "first",
@@ -707,6 +725,7 @@ exports[`toCanvas sweep — 'non-contiguous phase_index [0,1,3]' > matches its c
       "data": {
         "armed": false,
         "grounded": false,
+        "notConnected": false,
         "phaseIndex": 1,
         "phaseType": "llm_single",
         "slug": "second",
@@ -729,6 +748,7 @@ exports[`toCanvas sweep — 'non-contiguous phase_index [0,1,3]' > matches its c
       "data": {
         "armed": false,
         "grounded": false,
+        "notConnected": false,
         "phaseIndex": 3,
         "phaseType": "llm_single",
         "slug": "stranded",
@@ -801,6 +821,7 @@ exports[`toCanvas sweep — 'plan_execute_verify (canonical seed 2)' > matches i
       "data": {
         "armed": false,
         "grounded": false,
+        "notConnected": false,
         "phaseIndex": 0,
         "phaseType": "llm_single",
         "slug": "plan",
@@ -823,6 +844,7 @@ exports[`toCanvas sweep — 'plan_execute_verify (canonical seed 2)' > matches i
       "data": {
         "armed": false,
         "grounded": false,
+        "notConnected": false,
         "phaseIndex": 1,
         "phaseType": "llm_agent",
         "slug": "execute",
@@ -845,6 +867,7 @@ exports[`toCanvas sweep — 'plan_execute_verify (canonical seed 2)' > matches i
       "data": {
         "armed": false,
         "grounded": false,
+        "notConnected": false,
         "phaseIndex": 2,
         "phaseType": "llm_single",
         "slug": "verify",
@@ -908,6 +931,7 @@ exports[`toCanvas sweep — 'pm-risk-register (PM pack 2)' > matches its committ
       "data": {
         "armed": false,
         "grounded": false,
+        "notConnected": false,
         "phaseIndex": 0,
         "phaseType": "llm_agent",
         "slug": "retrieve",
@@ -930,6 +954,7 @@ exports[`toCanvas sweep — 'pm-risk-register (PM pack 2)' > matches its committ
       "data": {
         "armed": false,
         "grounded": true,
+        "notConnected": false,
         "phaseIndex": 1,
         "phaseType": "llm_emit",
         "slug": "emit",
@@ -993,6 +1018,7 @@ exports[`toCanvas sweep — 'pm-weekly-status-report (PM pack 1)' > matches its 
       "data": {
         "armed": false,
         "grounded": false,
+        "notConnected": false,
         "phaseIndex": 0,
         "phaseType": "llm_agent",
         "slug": "retrieve",
@@ -1015,6 +1041,7 @@ exports[`toCanvas sweep — 'pm-weekly-status-report (PM pack 1)' > matches its 
       "data": {
         "armed": false,
         "grounded": true,
+        "notConnected": false,
         "phaseIndex": 1,
         "phaseType": "llm_emit",
         "slug": "emit",
@@ -1078,6 +1105,7 @@ exports[`toCanvas sweep — 'research_summarize (canonical seed 1)' > matches it
       "data": {
         "armed": false,
         "grounded": false,
+        "notConnected": false,
         "phaseIndex": 0,
         "phaseType": "llm_agent",
         "slug": "research",
@@ -1100,6 +1128,7 @@ exports[`toCanvas sweep — 'research_summarize (canonical seed 1)' > matches it
       "data": {
         "armed": false,
         "grounded": false,
+        "notConnected": false,
         "phaseIndex": 1,
         "phaseType": "llm_single",
         "slug": "summarize",
@@ -1163,6 +1192,7 @@ exports[`toCanvas sweep — 'risk-register (Starter Library 1)' > matches its co
       "data": {
         "armed": false,
         "grounded": false,
+        "notConnected": false,
         "phaseIndex": 0,
         "phaseType": "llm_agent",
         "slug": "retrieve",
@@ -1185,6 +1215,7 @@ exports[`toCanvas sweep — 'risk-register (Starter Library 1)' > matches its co
       "data": {
         "armed": false,
         "grounded": true,
+        "notConnected": false,
         "phaseIndex": 1,
         "phaseType": "llm_emit",
         "slug": "emit",
@@ -1239,6 +1270,7 @@ exports[`toCanvas sweep — 'single phase (1 phase)' > matches its committed sna
       "data": {
         "armed": false,
         "grounded": false,
+        "notConnected": false,
         "phaseIndex": 0,
         "phaseType": "llm_single",
         "slug": "answer",
@@ -1310,6 +1342,7 @@ exports[`toCanvas sweep — 'unresolvable skip (broken reference)' > matches its
       "data": {
         "armed": false,
         "grounded": false,
+        "notConnected": false,
         "phaseIndex": 0,
         "phaseType": "llm_agent",
         "slug": "start",
@@ -1332,6 +1365,7 @@ exports[`toCanvas sweep — 'unresolvable skip (broken reference)' > matches its
       "data": {
         "armed": false,
         "grounded": false,
+        "notConnected": false,
         "phaseIndex": 1,
         "phaseType": "llm_single",
         "slug": "check",
@@ -1413,6 +1447,7 @@ exports[`toCanvas sweep — 'weekly-status-report (Starter Library…' > matches
       "data": {
         "armed": false,
         "grounded": false,
+        "notConnected": false,
         "phaseIndex": 0,
         "phaseType": "llm_agent",
         "slug": "retrieve",
@@ -1435,6 +1470,7 @@ exports[`toCanvas sweep — 'weekly-status-report (Starter Library…' > matches
       "data": {
         "armed": false,
         "grounded": true,
+        "notConnected": false,
         "phaseIndex": 1,
         "phaseType": "llm_emit",
         "slug": "emit",

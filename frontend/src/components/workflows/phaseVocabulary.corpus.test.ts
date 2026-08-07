@@ -217,9 +217,16 @@ describe("SC#5 corpus — the sweep covers what it claims to", () => {
     expect(outsideGate.map(typeOf)).toContain("llm_single")
   })
 
-  it("derives the six forbidden type tokens from the shipped vocabulary", () => {
-    expect(RAW_PHASE_TYPE_TOKENS).toHaveLength(6)
+  it("derives the forbidden type tokens from the shipped vocabulary", () => {
+    // Phase 189-13: 6 → 7, moved in the SAME COMMIT as the 7th `PHASE_TYPE_SENTENCES`
+    // entry that made it 7. ⚠ 189-12's SUMMARY recorded this pin as 189-14's debt;
+    // MEASURED, it is 189-13's — this constant is `Object.keys(PHASE_TYPE_SENTENCES)`,
+    // and 189-13 is the plan that writes the sentence. The count is asserted as a FLOOR
+    // plus the derivation's own subject, so the EIGHTH type does not read as a regression
+    // while the non-vacuity (a token list that emptied would assert nothing) still holds.
+    expect(RAW_PHASE_TYPE_TOKENS.length).toBeGreaterThanOrEqual(7)
     expect(RAW_PHASE_TYPE_TOKENS).toContain("llm_emit")
+    expect(RAW_PHASE_TYPE_TOKENS).toContain("external_action")
   })
 })
 

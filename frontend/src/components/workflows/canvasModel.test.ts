@@ -334,6 +334,9 @@ describe("canvasModel.toCanvas — node data (both title forms, always)", () => 
       expect(typeof n.data.armed).toBe("boolean")
       expect(n.data.grounding).toBeUndefined()
       expect(typeof n.data.waitsForYou).toBe("boolean")
+      // Phase 189-13 — badge slot 1. Same rule as the two above: FLAT and always
+      // present, so "not connected" and "not resolved" cannot look alike on the face.
+      expect(typeof n.data.notConnected).toBe("boolean")
     }
     const human = phaseNodes(nodes).find((n) => n.data.phaseType === "llm_human_input")
     expect(human?.data.waitsForYou).toBe(true)
@@ -347,6 +350,53 @@ describe("canvasModel.toCanvas — node data (both title forms, always)", () => 
     const { nodes } = toCanvas(unknown)
     expect(phaseNodes(nodes)[0].data.subtitle).toBe("")
     expect(phaseNodes(nodes)[0].data.title).toBe("future_type")
+  })
+
+  it("WR-04: an INHERITED phase_type gets the same empty subtitle, not a function", () => {
+    // ⚠ THIS SUBTITLE READ WAS UNGUARDED UNTIL 189-13 and was the ONLY read of
+    // `PHASE_TYPE_SUBTITLES` outside its own declaration. The map is a plain object
+    // literal, so `PHASE_TYPE_SUBTITLES["constructor"]` is the `Object` FUNCTION — never
+    // nullish, so the shipped `?? ""` did NOT fire — and the measured consequence of the
+    // identical defect one module along (`lib/phaseGlyph.tsx`, 188.1-04) was a function
+    // object reaching `createElement` and hard-crashing the whole node face.
+    //
+    // The case above cannot see it: a table MISS behaves correctly and always did. Only an
+    // inherited key distinguishes the guard from its absence, which is why this is a
+    // separate case rather than another line in that one.
+    for (const inherited of ["constructor", "toString", "__proto__", "valueOf"]) {
+      const rows: PhaseSpecJSON[] = [
+        { slug: "probe", phase_index: 0, config: { phase_type: inherited } },
+      ]
+      expect(() => toCanvas(rows)).not.toThrow()
+      const data = phaseNodes(toCanvas(rows).nodes)[0].data
+      expect(typeof data.subtitle).toBe("string")
+      expect(data.subtitle).toBe("")
+    }
+    // Positive control: a REAL type still gets its real subtitle, so the guard narrowed
+    // nothing it was not meant to.
+    expect(phaseNodes(toCanvas(threePhase).nodes)[0].data.subtitle).toBe(
+      "Searches and decides its own next move",
+    )
+  })
+
+  it("notConnected lands on the face for external_action, and false everywhere else", () => {
+    // D-12 / D-18 badge slot 1, through the projection real callers use. `buildPhaseData`
+    // adds ONE delegating line; the rule itself lives in `phaseVocabulary.notConnectedOf`
+    // so the panel and the canvas cannot drift apart.
+    const external: PhaseSpecJSON[] = [
+      { slug: "notify", phase_index: 0, config: { phase_type: "external_action", capability: "send_email" } },
+    ]
+    const data = phaseNodes(toCanvas(external).nodes)[0].data
+    expect(data.notConnected).toBe(true)
+    // The capability-derived face rides along on the same projection (D-13) — computed at
+    // render, stored nowhere.
+    expect(data.title).toBe("Sends an email")
+    expect(data.subtitle).toBe("Stops for your approval before it acts outside")
+    expect(data.technicalTitle).toBe("External action · notify")
+    // …and every shipped type is untouched.
+    for (const n of phaseNodes(toCanvas(threePhase).nodes)) {
+      expect(n.data.notConnected).toBe(false)
+    }
   })
 
   it("an llm_emit at citation_policy 'strict' is grounded; a plain agent is not", () => {
