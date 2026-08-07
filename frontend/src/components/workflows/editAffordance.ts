@@ -53,6 +53,7 @@
 import type { XYPosition } from "@xyflow/react"
 
 import { CANVAS_LAYOUT } from "@/components/workflows/canvasModel"
+import { own } from "@/components/workflows/ownProperty"
 
 /**
  * MODULE SCOPE for the same Pattern-4 reason as `nodeTypes` (`:99-104`) — every
@@ -210,6 +211,28 @@ export const SELECTED_NODE_Z_FROM_LIBRARY = 1000
  *
  * Reads the live overlay first so the affordances track the card DURING a drag, not
  * only after it lands.
+ *
+ * ⚠ BOTH LOOKUPS GO THROUGH `own()` — WR-04, and it is NOT ceremony here (BUG-260807-01).
+ * `overlay` and `nudges` are plain object literals keyed by an AUTHOR-SUPPLIED phase slug,
+ * and that slug is unconstrained end-to-end: `harness.py:202` declares a bare `slug: str`
+ * with no pattern, no enum and no reserved-word list, and `058_workflow_phases.sql:18` is a
+ * bare `text NOT NULL`. So a slug naming an `Object.prototype` member resolved the INHERITED
+ * member, which is never nullish — the `!== undefined` guard PASSED and `live.y` read
+ * `undefined`, returning **NaN** (measured: `constructor`, `toString`, `valueOf`, `__proto__`
+ * all returned NaN against the pre-fix body; an ordinary slug correctly returned 0).
+ *
+ * The consequence is why this is worth a guard rather than a note: this number is
+ * interpolated straight into `translate(…)` at `PlaneEditingLayer.tsx:176-177`, `:225` and
+ * `:256-262`. A NaN term makes the whole declaration invalid, so the browser drops the
+ * ENTIRE transform and the element renders untransformed — and since 188.2 gave those exact
+ * three style objects `zIndex: AFFORDANCE_Z` (1002) to fix BUG-260806-01, a mispositioned
+ * affordance now lands ABOVE every card instead of behind it. That fix was correct and
+ * stays; it simply raised the cost of this latent defect.
+ *
+ * Totality is a property of the function, not of its current callers — the house argument
+ * at `lib/phaseState.ts:65-75`. This is WR-04 sink SIX; it was missed because it moved here
+ * VERBATIM out of `WorkflowCanvas.tsx` at 188.1-03, and a verbatim move carries forward
+ * whatever guard the original had, which was none.
  */
 export function verticalOffsetFor(
   slug: string | undefined,
@@ -218,9 +241,10 @@ export function verticalOffsetFor(
   laneY: number,
 ): number {
   if (slug === undefined) return 0
-  const live = overlay[slug]
+  const live = own(overlay, slug)
   if (live !== undefined) return live.y - laneY
-  return nudges?.[slug] ?? 0
+  if (nudges === undefined) return 0
+  return own(nudges, slug) ?? 0
 }
 
 export function insertPointX(lanes: readonly number[], index: number): number {

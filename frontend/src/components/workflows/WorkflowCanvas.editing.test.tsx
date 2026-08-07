@@ -59,6 +59,9 @@ import { VERDICT_DESTRUCTIVE_TOKEN, VERDICT_MARK } from "./nodePresentation"
 // retyped, so lowering either constant turns the guard red instead of the guard agreeing
 // with whatever the source now says.
 import { AFFORDANCE_Z, SELECTED_NODE_Z_FROM_LIBRARY } from "./editAffordance"
+// BUG-260807-01, on its OWN line so this file's diff stays 0-deletion: the sixth WR-04
+// sink, imported so the guard below reads the SHIPPED function rather than a copy of it.
+import { verticalOffsetFor } from "./editAffordance"
 import { evalCoverage, unresolvableSkip } from "./__fixtures__/canvasFixtures"
 // Plan 186-07 (F12), on their OWN lines so this file's diff stays 0-deletion: the write
 // loop, the store it watches, the browser-local nudge module the gesture really writes to,
@@ -1492,6 +1495,52 @@ describe("WorkflowCanvas 188.1-02 — the editing affordances' pre-move rendered
     expect(captured.filter((e) => e.testid === "canvas-insert-picker")).toHaveLength(1)
 
     expect(captured).toEqual(AFFORDANCE_SHAPE_BASELINE)
+  })
+})
+
+// ── BUG-260807-01 — `verticalOffsetFor` is total over a prototype-key slug ──────────
+//
+// The SIXTH WR-04 sink, and the one `188.2-DEF-02` explicitly does NOT cover (that entry
+// defers CONSOLIDATING four guards that are each already correct; this was a site with no
+// guard at all). Guarded here at the FUNCTION rather than at the render, deliberately:
+// jsdom applies no CSS and computes no stacking contexts, so the rendered consequence — an
+// invalid `translate()` dropped by the browser, leaving the affordance untransformed at the
+// `zIndex: AFFORDANCE_Z` 188.2 gave it, i.e. ABOVE the cards — is INVISIBLE to this estate.
+// What IS checkable here is the cause, and breaking the chain at the cause is what makes
+// the consequence unreachable. The driven browser row remains the only instrument that can
+// see the rendered half; this guard is not a substitute for it and does not claim to be.
+describe("editAffordance BUG-260807-01 — verticalOffsetFor is total over any slug", () => {
+  // The exact four names measured NaN against the pre-fix body, plus the ordinary slug
+  // that always answered correctly — so a regression is distinguishable from a rewrite
+  // that simply returns 0 for everything.
+  const PROTOTYPE_KEYS = ["constructor", "toString", "valueOf", "__proto__"] as const
+
+  it("returns a FINITE number for every prototype-member slug, both tables empty", () => {
+    // Positive control FIRST: the ordinary slug is the answer the function must keep.
+    expect(verticalOffsetFor("normal-slug", {}, {}, 0)).toBe(0)
+
+    for (const key of PROTOTYPE_KEYS) {
+      const offset = verticalOffsetFor(key, {}, {}, 0)
+      // `toBe(0)` alone would pass on NaN under neither — state the property that failed.
+      expect(Number.isFinite(offset), `slug "${key}" returned ${offset}`).toBe(true)
+      expect(offset).toBe(0)
+    }
+  })
+
+  it("does not read an INHERITED member out of either table", () => {
+    // The overlay branch and the nudge branch are separate returns, so each needs its own
+    // row: the pre-fix overlay branch passed its `!== undefined` check on an inherited
+    // function and then read `.y` off it, while the nudge branch returned the function.
+    for (const key of PROTOTYPE_KEYS) {
+      expect(verticalOffsetFor(key, undefined, {}, 100)).toBe(0)
+      expect(verticalOffsetFor(key, {}, {}, 100)).toBe(0)
+    }
+    // Non-vacuity: OWN entries in each table are still read, so the guard rejects
+    // inherited members rather than rejecting everything.
+    expect(verticalOffsetFor("a", { a: 12 }, {}, 0)).toBe(12)
+    expect(verticalOffsetFor("a", {}, { a: { x: 0, y: 90 } }, 30)).toBe(60)
+    // …and the overlay still WINS over the nudge, the pre-existing precedence.
+    expect(verticalOffsetFor("a", { a: 12 }, { a: { x: 0, y: 90 } }, 30)).toBe(60)
   })
 })
 

@@ -104,8 +104,22 @@ const MARKS: Record<string, ProviderMark> = {
  *   provider (`unknown` / undefined) so the caller renders `Bot`.
  */
 export function providerLogo(provider: string | undefined): ProviderMark | null {
-  // The `?? null` mirrors fileIcon's `?? DEFAULT_SPEC` — total over any key.
-  return provider ? (MARKS[provider] ?? null) : null
+  // ⚠ WR-04 (BUG-260807-01, the second sink found in the same sweep). The `?? null` was
+  // NOT total over any key, despite the comment that used to claim it was: `MARKS` is a
+  // plain object literal, so it inherits `constructor`, `toString`, `valueOf` and
+  // `__proto__`, and for those names the lookup resolved the INHERITED member — a
+  // function, never nullish — so `?? null` did not fire and this returned
+  // `[Function Object]` typed as a `ProviderMark`. The caller then renders it as a
+  // component. Totality is a property of the function, not of its current callers
+  // (`lib/phaseState.ts:65-75`, the house argument).
+  //
+  // Guarded INLINE rather than through `components/workflows/ownProperty`, matching the
+  // two other `lib/` guards (`phaseState.ts:77`, `phaseGlyph.tsx:92`): a `lib/` module
+  // does not import from `components/`, and this tree ships exactly ONE own-guard
+  // spelling — the ES2022 static alternative occurs zero times, measured.
+  if (!provider) return null
+  if (!Object.prototype.hasOwnProperty.call(MARKS, provider)) return null
+  return MARKS[provider]
 }
 
 /**

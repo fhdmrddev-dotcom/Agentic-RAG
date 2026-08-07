@@ -132,6 +132,39 @@ Also in scope for the same fast run: the second unguarded sink this sweep found,
 It flips to `closed` when the `/gsd:fast` run lands **and** the driven browser row below passes;
 a green unit suite may not close it (see the jsdom warning under "Fix sketch").
 
+### CODE FIX LANDED 2026-08-07 — `status` DELIBERATELY STILL `open`, one row owed
+
+Both sinks are guarded and the cause is closed. **This entry does NOT flip to `closed`, because the
+condition written directly above says a green unit suite may not close it, and the driven browser
+row has not been run.** Relaxing a closing condition an hour after writing it — on the strength of
+the very evidence it names as insufficient — is the failure mode the condition exists to prevent.
+
+**What shipped:**
+
+- `editAffordance.ts:214-224` → both lookups go through `own()` from the zero-import leaf
+  `ownProperty.ts`. ⚠ **The LEAF fence was RE-READ, not assumed**, as this report demanded:
+  `WorkflowCanvas.test.tsx:686-703` bans `/@\/components\/workflows\/[A-Z]/`, and `ownProperty` is
+  camelCase, so the import is permitted by construction rather than by luck. The fence suite is
+  green at 52/52 after the change.
+- `lib/providerLogo.tsx:107-108` → guarded **INLINE** in the tree's one spelling, NOT by importing
+  `ownProperty`. A `lib/` module does not import from `components/`, and this matches the two
+  sibling `lib/` guards the `ownProperty.ts` docblock names (`phaseState.ts:77`,
+  `phaseGlyph.tsx:92`). Its own comment previously claimed the `?? null` was "total over any key";
+  it was not, and the claim is corrected in place.
+- Two guard rows in `WorkflowCanvas.editing.test.tsx`, **observed RED against the pre-fix body
+  before the pin moved**, reproducing this report's own measurement exactly
+  (`AssertionError: expected NaN to be +0`). Count-gate pin extended 61 → 63.
+
+**THE ONE THING OWED — the driven row.** Author a phase slugged `constructor`, then read the
+affordance's computed `transform` and confirm it is not `none`, plus an `elementFromPoint`
+reachability check on a neighbouring card. The unit guard closes the CAUSE (the function can no
+longer return `NaN`); only the driven row can confirm no other path produces the same rendered
+symptom, and this estate cannot see the rendered half at all.
+
+**Flip to `closed` + `verified_closed_by:` when that row passes.** Cheapest moment: Phase 189
+launches live runs under its D-06, and 188.2's owed UAT row A2 needs the same live run — drive all
+three together.
+
 ## Fix sketch
 
 One import of the zero-import leaf Phase 188.2 just created:

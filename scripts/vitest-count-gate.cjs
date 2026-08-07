@@ -432,7 +432,12 @@ const BASELINE = {
   // entries' `style` strings and not the case count. Read from THIS SCRIPT'S OWN `actual` column
   // across two agreeing runs, 2026-08-07 (both printed
   // `WorkflowCanvas.editing.test.tsx 58 61 +3`).
-  "WorkflowCanvas.editing.test.tsx": 61,
+  // BUG-260807-01 (`/gsd:fast`, 2026-08-07): 61 → 63. EXTENDED, not lowered — two rows
+  // guarding `verticalOffsetFor`'s totality over a prototype-member slug (the SIXTH WR-04
+  // sink, and the one `188.2-DEF-02` does NOT cover). Nothing was deleted and no other pin
+  // moved. Both rows were observed RED against the pre-fix body before the pin moved, and
+  // the RED reproduced the report's own measurement exactly (`expected NaN to be +0`).
+  "WorkflowCanvas.editing.test.tsx": 63,
   "builderStore.test.ts": 52,
   "phaseVocabulary.corpus.test.ts": 45,
   "StepTypePicker.test.tsx": 43,
@@ -501,7 +506,22 @@ const BASELINE = {
 // 128/128 in isolation, and no Phase-188.2 plan touches that file. See `188.2-DEFERRED.md`
 // D-188.2-DEF-01 — the COUNT columns are stable and remain a sound regression backstop; the
 // `failed` line is not, on this machine, today.
-const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // ⚠ 2502 (188.2-07)
+// ⚠ AND A SIXTH TIME BY BUG-260807-01 (`/gsd:fast`, 2026-08-07): 2506 → 2508, the one
+// extension above (`WorkflowCanvas.editing` +2).
+// ⚠ TWO CORRECTIONS ON MEASUREMENT, both pre-existing and stated rather than smoothed:
+//   1. The trailing marker on this line read `2502 (188.2-07)` while the gate itself printed
+//      `pinned total 2506` on an UNMODIFIED tree — the sum drifted 4 above its own note. The
+//      note is not what the gate reads (`BASELINE_TOTAL` is computed from `Object.values`),
+//      which is exactly why nothing caught it; a hand-written total beside a derived one is a
+//      claim, not a check.
+//   2. The `failed` variance recorded above as "between 0 and 1" is measured WIDER today:
+//      **9 on a clean, unmodified tree** and 19 on a second sample of the same tree state.
+//      The nine were named and attributed rather than waved through — `WorkflowCanvas.test.tsx`
+//      axe rows ("Axe is already running"), `PhaseNode.test.tsx`, `StepTypePicker.test.tsx`,
+//      `WorkflowCanvas.composition.test.tsx` and `WorkflowBuilderPage.canvas.test.tsx` — and
+//      every one passes in isolation. NONE is in a file this fix touches. D-188.2-DEF-01
+//      stands and is if anything understated.
+const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // ⚠ 2508 (BUG-260807-01)
 
 // ── The Wave-0 blast radius (184-VALIDATION.md § "quick run command"). ──
 const TARGETS = [
