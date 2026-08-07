@@ -803,6 +803,58 @@ KB_TOOLS: frozenset[str] = frozenset({
 KB_TOOLS_SORTED: list[str] = sorted(KB_TOOLS)
 
 
+# ── Phase 189 (CONN-01 / D-15 / D-20) — the external-action capabilities ───────
+#
+# THE ONE HOME for the closed capability set, and the argument is the KB_TOOLS block's
+# own, restated because it transfers verbatim: this set DEFINES which names the publish
+# gate will admit outside the LLM-facing schema list, so a second copy is a safety hole,
+# not a duplication smell. It has exactly TWO readers and they must never disagree —
+#   * the PHASE EXECUTOR (D-02 closed-registry discipline: a capability name not present
+#     RAISES, never resolved dynamically, never eval'd), and
+#   * the PUBLISH FIDELITY GATE (D-20: unioned into ``tool_names`` inside
+#     ``assemble_grounding_bundle`` so stage 2.6 rule 2 stops refusing a workflow that
+#     merely declares one — see that function for the boundary and its reason).
+# A capability admitted by one reader and unknown to the other is either an unpublishable
+# node or an unenforced one.
+#
+# DISJOINT FROM ``KB_TOOLS`` BY CONSTRUCTION, and that is deliberate rather than
+# incidental: grounding detection is ``available_tools ∩ KB_TOOLS`` (``grounding_cause``
+# below), so a collision would silently arm the *must prove it* grounding dial on a step
+# that reads no knowledge base at all. The module-level assertion under the constant is a
+# static check over two literals in this file; the authoritative fence is
+# ``tests/unit/test_189_external_action_model.py`` (D-15), which asserts the same
+# disjointness against the model's own ``Literal`` rather than against this copy.
+#
+# THERE IS NO SORTED WIRE TWIN, and the omission is the decision. ``KB_TOOLS_SORTED``
+# exists because the client RECEIVES ``KB_TOOLS`` as data on
+# ``GET /workflows/grounding-bundle``. D-20 says the opposite for capabilities: they stay
+# OFF the wire and OFF ``GroundingBundle.tools``, because that field binds straight into
+# the author-facing whitelist rail and an author must never be able to tick ``send_email``
+# on an ordinary, UNARMED ``llm_agent`` step. A ``…_SORTED`` twin of the constant below
+# would be the first step into exactly the leak this decision exists to prevent — and it
+# is deliberately not spelled out here, because an acceptance grep asserts that name's
+# ABSENCE from this file and a comment that typed it would make the check vacuous (the
+# same fence discipline ``runVocabulary.ts`` states for the 187-24 badge words).
+#
+# NO ``_TOOL_REGISTRY`` ENTRY AND NO ``get_tools()`` SCHEMA accompanies it (D-22): a
+# capability is a STEP THE EXECUTOR PERFORMS, not a tool the LLM may call. The shipped
+# precedent is ``render_template`` — a name honoured by the per-phase whitelist while
+# being invisible to the model (``openai_service.get_tools``' own comment records that
+# asymmetry). Both of those belong to Phase 190, which makes the three real.
+
+
+EXTERNAL_ACTION_CAPABILITIES: frozenset[str] = frozenset({
+    "send_email", "create_ticket", "post_message",
+})
+# Static, data-independent: both operands are literal frozensets declared in this file, so
+# this can only fire when someone edits one of them — which is precisely when it should.
+assert EXTERNAL_ACTION_CAPABILITIES & KB_TOOLS == frozenset(), (
+    "D-03: an external-action capability collides with KB_TOOLS "
+    f"({sorted(EXTERNAL_ACTION_CAPABILITIES & KB_TOOLS)}), which would make every "
+    "external_action step read as grounding-`detected`"
+)
+
+
 def grounding_cause(phase) -> str | None:
     """Why this phase is locked to *must prove it* — ``"detected"`` / ``"already-set"`` /
     ``"escalated"``, or ``None`` when it is free to think.
