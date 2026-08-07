@@ -54,6 +54,7 @@
  * than outside the tests: the parent owns the selection, this header owns the ask.
  */
 import { useId } from "react"
+import { ExternalActionSection } from "./ExternalActionSection"
 import { GovernanceSection } from "./GovernanceSection"
 import type { PhaseSpecJSON } from "./phaseVocabulary"
 
@@ -172,6 +173,11 @@ const PHASE_TYPE_FRIENDLY: Record<string, string> = {
   llm_batch_agents: "Parallel agents",
   llm_human_input: "Needs a person",
   llm_emit: "Deliverable",
+  // Phase 189-14 — the SAME word the shared `PHASE_TYPE_LABELS` map uses. This map is a
+  // LOCAL duplicate and it already carries one shipped divergence ("Needs a person" vs
+  // the shared "Needs you"); that is a fact about the past, never a licence to invent a
+  // second one.
+  external_action: "External action",
 }
 
 /** A small ⓘ hint. WR-03: the guidance is exposed two honest ways — the native
@@ -1040,6 +1046,11 @@ export function PhaseFormPanel({
                 full
               />
             </>
+          )}
+
+          {/* ── external_action: the capability picker — its OWN component, ONE gated line (189 / §7a) ── */}
+          {pt === "external_action" && (
+            <ExternalActionSection capability={asStr(cfg.capability)} onChange={set("capability")} onPersist={onPersist} />
           )}
         </div>
 

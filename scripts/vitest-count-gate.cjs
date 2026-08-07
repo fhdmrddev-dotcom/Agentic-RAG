@@ -554,6 +554,17 @@ const BASELINE = {
   // (giving the type the generic rail and widening its options with the three capability
   // names), which is the D-20 hole 189-04 closed.
   "PhaseFormPanel.rails.test.tsx": 32,
+  // 189-14 — NET-NEW: the capability picker's suite, pinned in THE COMMIT THAT CREATED IT.
+  // ⚠ NO `TARGETS` EDIT ACCOMPANIES THIS PIN, and the omission is measured rather than
+  // assumed: `src/components/workflows` is already a TARGETS **directory** entry, so the
+  // file RUNS the moment it exists (the gate printed it as `new` before this line was
+  // written, which is how the claim was checked). TARGETS and BASELINE are two knobs —
+  // TARGETS decides what RUNS, BASELINE what is PINNED — and only the second one was
+  // missing. Adding a redundant file-level entry beside a directory that already covers it
+  // would state a dependency that is not real. 188-12's correction still applies in full:
+  // an unpinned file is not lightly guarded, it is UNGUARDED, so the pin is not deferred
+  // "while the count grows".
+  "ExternalActionSection.test.tsx": 25,
   // 184.1 pinned NOTHING here on purpose ("it postdates the 424 pin, so it reports as `new`
   // and its own count is free to grow"). Four phases later it is still the ONLY guard on the
   // flag-off Builder header — D-181-01's byte-identity promise — and it has stopped growing.
@@ -664,7 +675,12 @@ const BASELINE = {
 // updated here for the reader, and `BASELINE_TOTAL` itself remains the `reduce`.
 // ⚠ AND BY 189-13's THIRD (deviation) TASK: 2582 → 2587 (`PhaseFormPanel.rails.test.tsx`
 // +5, the D-189-DEF-02 closure guard).
-const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // ⚠ 2587 (189-13)
+// ⚠ AND BY 189-14 TASK 1: 2587 → 2612, and the PINNED FILE COUNT 46 → 47 — the first
+// new pinned FILE since 188-01. `ExternalActionSection.test.tsx` (25) is the capability
+// picker's net-new suite; it neither absorbs nor replaces `PhaseFormPanel.test.tsx` (19)
+// or `PhaseFormPanel.rails.test.tsx` (32), both of which are unmoved beside it — the
+// Phase-177 coverage-loss shape this per-file pinning exists to make impossible.
+const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // ⚠ 2612 (189-14)
 
 // ── The Wave-0 blast radius (184-VALIDATION.md § "quick run command"). ──
 const TARGETS = [

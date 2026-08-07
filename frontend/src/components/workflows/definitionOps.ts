@@ -540,6 +540,34 @@ export const ACTION_RISK_ARM_LABEL = "Stop and ask me first"
 export const ACTION_RISK_ARMED_NOTE =
   "When this step is reached the run stops and waits for your answer. It will not continue on its own."
 
+// ── Phase 189 (CONN-01 / D-02 / D-15) — the external-action authoring vocabulary ──
+//
+// TWO sentences, sited HERE rather than in `ExternalActionSection.tsx`, for the reason
+// the block above states in full: a sentence that lives inside a component is a sentence
+// nobody can test for drift. The section imports both and authors none.
+//
+// ⚠ THE THREE CAPABILITY LABELS ARE NOT HERE, AND THAT IS DELIBERATE (D-23). They are
+// `phaseVocabulary.EXTERNAL_CAPABILITY_SENTENCES` — the SAME constant the node face
+// reads — so the picker row and the card it previews are ONE string read twice rather
+// than two copies that can disagree. Re-typing them here would be the drift this whole
+// idiom exists to prevent, one file further along.
+
+/** The capability picker's heading (UI-SPEC §7b/§9d). */
+export const EXTERNAL_ACTION_HEADING = "What this step does outside"
+
+/**
+ * The honest note printed when NO capability row is selected.
+ *
+ * ⚠ It says what this step does NOT do, and it is the empty/no-capability note by name
+ * (UI-SPEC §9d) — not a running commentary on the type. Phase 190 makes the node send
+ * for real; a note that claimed "nothing is ever sent" on a chosen capability would
+ * become a lie that day. The not-sent fact at design time is carried by the canvas
+ * badge (D-12) and at run time by the run word (D-16), which is where those decisions
+ * put it.
+ */
+export const EXTERNAL_ACTION_NOTHING_CHOSEN_NOTE =
+  "Nothing is sent yet — this step records what it would do."
+
 // ── Phase 187 (VOCAB-02 / Req 5) — the seed receipt (sketch 150-B) ─────────────
 //
 // WHY THE RECEIPT EXISTS. A seeded draft arrives with steps already carrying a
