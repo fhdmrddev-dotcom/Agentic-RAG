@@ -615,7 +615,25 @@ Plans:
   3. The milestone records the own-framework-vs-Open-Platform decision durably (research verdict: MCP-first, first-party-thin, broad catalog sequenced with Open Platform SEED-013/014) (CONN-01).
   4. No live outbound egress ships in this phase — CORE delivers the governed node vocabulary + the recorded decision only (live connectors are Phase 190, STRETCH).
 
-**Plans**: TBD
+**Plans**: 16 plans in 9 waves
+
+Plans:
+- [ ] 189-01-PLAN.md — Wave 0: the three new backend falsification suites (V06/V09/V10/V11/V13), every one observed RED (wave 1)
+- [ ] 189-02-PLAN.md — Wave 0: capture BOTH publish-gauntlet conflicts RED at HEAD using SHIPPED types, plus the D-20 leak guard (wave 1)
+- [ ] 189-03-PLAN.md — SC#3: `docs/CONNECTOR-ARCHITECTURE.md` + the `D-v3.6-01` pointer entry + the CLAUDE.md line (D-10, D-11) (wave 1)
+- [ ] 189-04-PLAN.md — D-20: `EXTERNAL_ACTION_CAPABILITIES` + the fidelity-only union + the falsified identity prose (wave 2)
+- [ ] 189-05-PLAN.md — D-19: thread `is_golden_run`; the armed checkpoint stops killing publishes, live runs still pause (wave 2)
+- [ ] 189-06-PLAN.md — Migration 115: author, **OPERATOR applies via the SQL editor**, regenerate `full-schema.sql` (D-08, D-17) (wave 2, checkpoint)
+- [ ] 189-07-PLAN.md — The 7th `phase_type` + the D-04 structural arming pin + the D-26 docblock corrections (wave 3)
+- [ ] 189-08-PLAN.md — The client derivation layer + the developer panel's own honest word (D-07) (wave 3)
+- [ ] 189-09-PLAN.md — `_exec_external_action`: the closed-set step that records and sends nothing (D-02, D-05, D-22) (wave 4)
+- [ ] 189-10-PLAN.md — The canvas run vocabulary + the 8th ring reading, four arcs and still (D-16, D-07) (wave 4)
+- [ ] 189-11-PLAN.md — The D-05 seam: `record_phase_not_sent`, the run that continues, and **V20, the headline gate** (wave 5)
+- [ ] 189-12-PLAN.md — The client 7th type: `definitionOps` + the ~16 silent count-6 pins (wave 5)
+- [ ] 189-13-PLAN.md — The node's face: the 7th glyph (same commit), its tint, and the D-13 capability ladder (wave 6)
+- [ ] 189-14-PLAN.md — `ExternalActionSection` + one gated panel line + the refusing arming switch (D-23, D-24) (wave 7)
+- [ ] 189-15-PLAN.md — The badge: slot 1 spent on "Not connected" + six prose flips + D-21 (D-12, D-18) (wave 8)
+- [ ] 189-16-PLAN.md — Close: the ROADMAP migration-head fix, the validation coverage map, and ONE driven live session (D-14, D-25) (wave 9, checkpoint)
 **UI hint**: yes
 **Flags**: HARD gate #3 (CORE half) — governed node vocabulary + recorded own-vs-Open-Platform decision (MCP-first, first-party-thin, Open-Platform-sequenced SEED-013/014; note SEED-031 is the LLM-provider seed, NOT connectors — the real track is SEED-013 + sibling SEED-014); NO live egress (→ 190, STRETCH); MCP-backed node rides the EXISTING per-phase tool whitelist + reuses the 185 action-risk (GOVERN-03) checkpoint (zero new governance concept); red line D-14; no SC#10 (design / vocabulary, no live stream); no threat model (no outbound egress yet — the threat model lands WITH Phase 190); ~~no migration~~ **AMENDED 2026-08-06 (operator decision, at discuss-phase → D-08 in `189-CONTEXT.md`) → EXACTLY ONE migration: `115_workflow_phases_recorded_not_sent.sql`**, adding one literal to the `workflow_phases_status_check` CHECK (measured: it caps `status` at 5 values — `pending, active, completed, failed, skipped`) and nothing else. The superseded wording is preserved, not deleted. **Reason — the Phase-185 / migration-114 precedent, whose recorded reasoning transfers verbatim: the zero-migration promise was a scoping convenience; the honest word for "recorded, not sent" is a correctness property.** The alternative (deriving the word at render while the row stays `completed`) leaves anything querying the table directly reading a step that says it finished. The node's config itself remains additive-optional JSONB, not a column; no new `harness_audit` event type (D-09 defers that receipt to 190, where it would describe a real consequence).
 

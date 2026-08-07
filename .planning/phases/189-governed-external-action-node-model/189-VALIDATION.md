@@ -144,3 +144,58 @@ stream).
 - [ ] `nyquist_compliant: true` set in frontmatter
 
 **Approval:** pending
+
+---
+
+## Plan coverage map — authored at plan-phase 2026-08-07
+
+> Every row below names the plan and task that OWNS it. Statuses are filled in by each plan's SUMMARY
+> and consolidated by **189-16 Task 2**. A row whose RED was never observed is recorded as such, not
+> as a pass.
+
+### Automated rows
+
+| # | Owning plan · task | Note |
+|---|---|---|
+| V01 | **189-01 T1** (authored RED) → **189-07 T1** (green) | the 7th union member; unknown key still 422s; a pre-189 row still validates |
+| V02 | **189-01 T2** (authored) → **189-09 T1** (green) | `PHASE_TYPE_REGISTRY` resolves the type |
+| V03 | **189-12 T1 + T2** | the picker offers SEVEN, the 7th LAST, the shipped six unmoved |
+| V04 | **189-09 T2** | the capability rides `phase_whitelist`; `dispatch_tool` refuses an off-list name |
+| V05 | **189-01 T1** (set assertion) → **189-07 T2** (`grounding_cause` is None) | assert the SET, never one name |
+| V06 | **189-01 T1** (RED) → **189-07 T2** (green) | ⚠ **T2 — the D-04 disarm paths.** Round-trip `armed: false`, assert True, with an `llm_single` negative control |
+| V07 | **189-05 T2** | the run-time checkpoint fires on an armed phase (live, non-golden) |
+| V08 | **189-14 T2** | the arming switch renders ON and non-interactive, driven by a real click |
+| V09 | **189-01 T1** (RED) → **189-07 T1** (green) | cannot be wired around: `available_tools` carries the capability |
+| V10 | **189-01 T2** (RED) → **189-09 T1** (green) | SC#4's only mechanical proof — patched transport, plus an inertness control |
+| V11 | **189-01 T2** | the `mcp` source fence over `backend/app`, with a POSITIVE CONTROL |
+| V12 | **189-11 T2** | ⚠ assert **the NEXT phase ran**, not merely the status |
+| V13 | **189-01 T3** (green-skip) → **189-06 T2/T3** (PASS after the operator applies) | positive AND negative CHECK controls — D-17 as a test |
+| V14 | **189-08 T1** + **189-10 T1** | ⚠ exact-match assertions only — the new word shares a prefix with a shipped one |
+| V15 | canvas **189-10 T1** · panel **189-08 T2** · phase output **189-09 T1** | D-07's three surfaces |
+| V16 | **189-11 T1** (guard confirmed unchanged) | D-09 — the shipped registration test already guards it |
+| V17 | **189-15 T1 + T2** | badge slot 1 conditional; the third-badge control RE-OBSERVED swinging |
+| V18 | **189-13 T2** | all three capabilities, plus an unknown value falling through without fabricating |
+| V19 | **189-13 T1** | the split-brain fence as a KEY-SET property, observed RED |
+| V20 | **189-02 T1** (RED captured) → **189-05 T2** + **189-04 T2** (fixes) → **189-11 T2** (green) | **the phase's headline gate** — RED at HEAD for TWO independent reasons |
+| V21 | **189-02 T2** (RED) → **189-04 T2** (green) | with a control forbidding a fix that weakens rule 2 |
+| V22 | **189-02 T3** (guard + observed plant) → **189-04 T2** (stays green) | ⚠ **T1 — the D-20 governance hole** |
+| V23 | **189-03 T1 + T2** | the doc exists; the D-entry points at it without restating it |
+
+### Driven rows — jsdom cannot reach any of these
+
+| # | Owning plan · task | Note |
+|---|---|---|
+| U1 | **189-16 T3** | glyph luminance against the other six on one canvas |
+| U2 | **189-16 T3** | occlusion, **with a falsification control observed swinging BOTH ways** |
+| U3 | **189-16 T3** | eight dash-arrays; the new reading is the only FOUR-arc one; greyscale pass |
+| U4 | **189-16 T3** | card height + the spine's edge baseline unmoved; neighbours do not reflow |
+| U5 | **189-16 T3** | **OWED from 188.2** — rides the SAME live run |
+| U6 | **189-16 T3** | **OWED from 188.2** — one glance, zero cost, same session |
+| U7 | **189-06 T2** | the operator applies migration 115 via the Supabase SQL editor |
+
+**Also ridden on the same live session (189-16 T3):** D-25's accepted band-versus-node pairing, and the
+driven reachability row the separately-tracked WR-04 bug is still open for.
+
+**Wave-0 gap ownership:** the three new backend suites are **189-01**; the new frontend suite
+(`ExternalActionSection.test.tsx`) is **189-14 T1**, and its `TARGETS` entry lands in the commit that
+creates it.
