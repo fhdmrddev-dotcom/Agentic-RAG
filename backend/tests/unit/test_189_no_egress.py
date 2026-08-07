@@ -482,6 +482,66 @@ async def test_the_output_carries_the_recorded_intent_sentinel(capability):
     assert "…" not in record["inputs"]["content"]
 
 
+@pytest.mark.parametrize("capability", CAPABILITIES)
+async def test_the_kickoff_prompt_is_not_recorded_as_an_action_input(capability):
+    """REVIEW WR-02 — the user's CHAT QUESTION is not a parameter of the send.
+
+    ``ctx.inputs`` is the run's LAUNCH bag, and on EVERY live run it carries
+    ``kickoff_prompt`` (SEED-047 — the question the user typed). The executor swept the bag
+    in whole, so the rendered body printed
+
+        What this step would have done
+          Action        : Sends an email
+          kickoff_prompt: send Sarah the renewal summary
+
+    under a heading that asserts these ARE the action's inputs, and persisted it into
+    ``recorded_intent["inputs"]`` → ``workflow_phases.output``. Over-claiming, on the one
+    surface in this phase whose whole discipline is not over-claiming.
+
+    WHY NO EXISTING CASE CAUGHT IT: ``_run_ctx()`` starts from ``inputs={}`` and every case
+    above then assigns only hand-picked keys, so the production bag was never driven. This
+    case drives it — the bag as `threads.py` / the resume builders really hand it over.
+
+    BOTH SURFACES, because they fail separately: the RECORD is what Phase 190 would send,
+    the BODY is what a human reads. And two positive controls, so a green here can never be
+    an executor that dropped its inputs altogether.
+    """
+    execute = _external_action_executor()
+    phase = _external_action_phase(capability)
+    ctx = _run_ctx()
+    # The production shape: scaffolding the RUN put there, beside a real action input.
+    ctx.inputs = {
+        "kickoff_prompt": "send Sarah the renewal summary",
+        "recipient": "sarah@acme.example",
+    }
+
+    output = await execute(phase, {"draft": {"text": "the draft body"}}, ctx)
+    record = output["recorded_intent"]
+
+    # ── positive controls FIRST: the real inputs still resolve ───────────────────
+    assert record["inputs"]["recipient"] == "sarah@acme.example", (
+        f"the executor dropped a REAL action input — every absence below would be "
+        f"vacuous. Got {record['inputs']!r}"
+    )
+    assert record["inputs"]["content"] == "the draft body"
+
+    # ── the finding: the chat question is neither recorded nor rendered ──────────
+    assert "kickoff_prompt" not in record["inputs"], (
+        f"WR-02: the user's original chat question is recorded as an input to "
+        f"{capability!r} and persisted onto workflow_phases.output. It is run "
+        f"scaffolding, not a parameter of the action. Got {record['inputs']!r}"
+    )
+    assert "kickoff_prompt" not in output["text"], (
+        f"WR-02: the NOT-SENT body prints `kickoff_prompt` under 'What this step would "
+        f"have done', asserting the user's chat question is an input to the send:\n"
+        f"{output['text']}"
+    )
+    assert "send Sarah the renewal summary" not in output["text"], (
+        f"WR-02: the kickoff VALUE reached the body even though its key did not:\n"
+        f"{output['text']}"
+    )
+
+
 # ── Case C — D-22: a step the executor performs, not a tool the LLM may call ──
 
 

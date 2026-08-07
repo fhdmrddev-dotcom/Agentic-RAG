@@ -1719,6 +1719,13 @@ def _clip_for_body(value) -> str:
     return text
 
 
+# WR-02 — keys the RUN puts on ``ctx.inputs`` that are not parameters of any action.
+# ``kickoff_prompt`` is the user's original chat question (SEED-047), present on every live
+# run; rendering it under "What this step would have done" asserts it is an input to the
+# send. Closed and named, for the reason spelled out in ``_external_action_inputs``.
+_NON_ACTION_RUN_INPUTS: frozenset[str] = frozenset({"kickoff_prompt"})
+
+
 def _external_action_inputs(accumulated_outputs: dict, ctx) -> dict:
     """The inputs the action WOULD have used, resolved with the neighbouring executors'
     shipped conventions and nothing new.
@@ -1734,8 +1741,34 @@ def _external_action_inputs(accumulated_outputs: dict, ctx) -> dict:
 
     An explicit run input named ``content`` WINS over the upstream text: the author named
     it, so it is not silently overwritten by a derived value.
+
+    ── REVIEW FINDING WR-02 · RUN SCAFFOLDING IS NOT AN ACTION INPUT ──
+    ``ctx.inputs`` is the run's LAUNCH bag, not a parameter list, and on every live run it
+    carries ``kickoff_prompt`` — the user's original CHAT QUESTION (SEED-047, threaded by
+    ``_kickoff_prompt`` above). Sweeping it in whole meant the NOT-SENT body rendered
+
+        What this step would have done
+          Action        : Sends an email
+          kickoff_prompt: send Sarah the renewal summary
+
+    under a heading that ASSERTS these are the action's inputs — claiming the user's chat
+    question is a parameter of an email, which it is not. It was persisted too, into
+    ``recorded_intent["inputs"]`` and thence ``workflow_phases.output``. On the one surface
+    in this phase whose entire discipline is not over-claiming, that is the wrong direction
+    to be wrong in. The three no-egress tests never saw it because ``_run_ctx()`` starts
+    from ``inputs={}`` and assigns only hand-picked keys; the ENGINE drive
+    (``test_harness_engine.py``) does set ``kickoff_prompt``, which is what the review read.
+
+    Excluded by NAME, never by heuristic. A prefix rule or a type test would silently eat a
+    real action input the day someone names one badly; this frozenset is a list of keys the
+    RUN puts on the bag, and a future scaffolding key belongs in it rather than in a
+    cleverer filter.
     """
-    resolved: dict = {str(k): v for k, v in (getattr(ctx, "inputs", None) or {}).items()}
+    resolved: dict = {
+        str(k): v
+        for k, v in (getattr(ctx, "inputs", None) or {}).items()
+        if str(k) not in _NON_ACTION_RUN_INPUTS
+    }
     upstream = _latest_phase_text(accumulated_outputs)
     if upstream.strip() and "content" not in resolved:
         resolved["content"] = upstream
