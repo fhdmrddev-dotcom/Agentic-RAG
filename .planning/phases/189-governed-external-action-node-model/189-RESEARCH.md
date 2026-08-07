@@ -1567,30 +1567,66 @@ Fix `canvasModel.ts:201-203` (Conflict 3), the ROADMAP migrations bullet (113→
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+> **All five were closed at plan-phase, 2026-08-07.** Each carries its resolution, the decision id that
+> made it, and the plan that implements it. Nothing below is still open — this heading is kept rather
+> than deleted so the reasoning that produced each answer stays readable beside the question.
+
 
 1. **How should the armed checkpoint behave on a publish golden run? (⚠ Conflict 1)**
    - *Known:* it currently waits indefinitely and times the publish out at 7200 s; `is_golden_run` exists as a column but is not threaded into ctx.
    - *Unclear:* whether the operator prefers auto-record-and-continue (Option A) or accepts that an `external_action` workflow is publish-blocked (Option B, which contradicts D-06).
    - *Recommendation:* **surface at plan time as the phase's first decision.** Option A preserves all locked decisions; Option B does not.
+   - ✅ **RESOLVED — `D-19`, implemented by plan `189-05`.** Option A was taken: `is_golden_run` is
+     threaded onto the stage-3 ctx (a `SimpleNamespace` literal — the threading is four characters of
+     signature and one `getattr` read) and the armed checkpoint SKIPS THE PAUSE while still running the
+     step. Option B was rejected for contradicting D-06 outright; Option C for writing an approval
+     receipt no human earned. Plan `189-02` captures the failure RED first, using a SHIPPED phase type,
+     which additionally establishes that the 7200 s hang is a PRE-EXISTING defect rather than one 189
+     introduces.
 
 2. **Should the three capabilities appear anywhere in `GroundingBundle`? (⚠ Conflict 2)**
    - *Known:* `tools` and `tool_names` are separate `GroundingBundle` fields (`:111-112`) that are equal today by construction, and `tools` binds directly to the author-facing whitelist rail.
    - *Unclear:* whether a future surface needs the capabilities listed to the client at all.
    - *Recommendation:* keep them OUT of `tools` in 189; 190 can add a separate `capabilities` field if the connector UI needs one.
+   - ✅ **RESOLVED — `D-20`, implemented by plan `189-04`.** They stay OUT of `GroundingBundle.tools`.
+     The union is applied to the FIDELITY membership set only; `tools` — which binds into the
+     author-facing whitelist rail — stays narrow. Plan `189-02` Task 3 authors the leak guard BEFORE the
+     change that could break it and proves it non-vacuous with an observed plant. A future connector UI
+     may add a separate field at 190; it must not widen this one.
 
 3. **Does the `render_template` fidelity hole reproduce?**
    - *Known:* `render_template` is in `_TOOL_REGISTRY` but **not** in `get_tools()`, so a fill phase declaring it in `available_tools` should fail stage 2.6 rule 2.
    - *Unclear:* whether any `llm_emit` workflow has ever published with it declared — the executor resolves the template server-side, so it may never appear in `available_tools` in practice.
    - *Recommendation:* **out of scope for 189**, but the Conflict-2 fix may close it for free. If the plan adds a `HARNESS_ONLY_TOOLS` union rather than an `EXTERNAL_ACTION_CAPABILITIES` one, note the widened blast radius explicitly.
+   - ✅ **RESOLVED — out of scope, and closed for free.** Plan `189-04` adds a narrowly-scoped
+     `EXTERNAL_ACTION_CAPABILITIES` frozenset, NOT a broader harness-only union, so the blast radius is
+     exactly three reviewed names and the `render_template` question is untouched. Plan `189-02` Task 2's
+     negative control (a genuinely unknown tool STILL produces the finding) is what keeps the fix a
+     WIDENING of rule 2 rather than a weakening of it — which is precisely why the neighbouring hole is
+     not reopened here.
 
 4. **Is the capability picker its own component or a `PhaseFormPanel` branch?**
    - *Known:* G-5 fired on `PhaseFormPanel.tsx` at 185 and was honoured by construction — 4 insertions reached the render body; everything else lived in `GovernanceSection.tsx`.
    - *Recommendation:* **own component + one gated line.** The ledger row says *"Keep this shape — the next surface that needs the panel gets its own component and one gated line."* 189 is that next surface.
+   - ✅ **RESOLVED — `D-23` / `D-24`, implemented by plan `189-14`.** Its own component
+     (`ExternalActionSection.tsx`) plus ONE gated line in the panel, honouring the hot-file ledger row by
+     construction. The option-source tension the recommendation did not settle is closed by D-23: a
+     CLIENT MIRROR of the backend `Literal`, licensed as a union mirror rather than as an options source
+     (the shipped `PhaseTypeId` precedent), with the anti-drift guarantee made MECHANICAL — a
+     cross-language test reads the Python `Literal` from raw source and asserts the client tuple matches,
+     observed RED against a planted mismatch.
 
 5. **Does `components/panel/PhaseCard.tsx` need a 7th `PHASE_TYPE_LABEL` entry?**
    - *Known:* it has only **5** (no `llm_emit`) and degrades unknown types to `UNKNOWN_PHASE_META` = *"Step"*.
-   - *Recommendation:* **decline it, and record the declination** (declining a slot is a decision, `PhaseNode.tsx:231` makes exactly that argument). The developer panel already treats an unmapped type honestly.
+   - *Recommendation:* **decline it, and record the declination** (declining a slot is a decision, `PhaseNode.tsx:231` makes exactly that argument).
+   - ✅ **RESOLVED — DECLINED, and the declination is recorded in code by plan `189-08` Task 2.** The
+     shipped table already declines `llm_emit` and degrades an unmapped type honestly, so a seventh entry
+     would invent a panel vocabulary for a type the panel never gained one for. The declination is
+     PINNED by a test on the table's entry count, not merely commented — declining a slot is a decision,
+     and an uncommitted decision is indistinguishable from an oversight. ⚠ `STATUS_META` is a DIFFERENT
+     table in the same file and is NOT declinable: it is typecheck-forced, and `189-08` fills it. The developer panel already treats an unmapped type honestly.
 
 ---
 
