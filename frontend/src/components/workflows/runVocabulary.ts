@@ -343,6 +343,44 @@ export type RingSpec =
  *   • `failed`      — the only ring snapped into TWO arcs
  *   • `skipped`     — evenly dashed all the way round, coarse
  *   • `unknown`     — the only DOTTED ring, fine and sparse; deliberately not closed
+ *   • `recorded-not-sent` — the only ring drawn in FOUR arcs (189 / D-16). Added with
+ *                     the eighth reading so this list stays a complete enumeration
+ *                     rather than becoming seven-of-eight: the criterion above is only
+ *                     a criterion while every row it covers is named in it.
+ *
+ * THE EIGHTH SHAPE, AND WHY EACH CLAUSE OF IT IS LOAD-BEARING (UI-SPEC §4b):
+ *
+ *   • FOUR arcs is its assertable unique property. Every other `fraction` row names one
+ *     or two dash/gap pairs, `solid` emits none, and the two `length` rows emit an
+ *     unbounded texture — so a test COUNTS the pairs rather than eyeballing the ring.
+ *   • It does NOT spin. The run is over for this phase; a moving terminal would claim
+ *     work still in flight. Movement is `running`'s own uniqueness property, which is
+ *     precisely why the separation from `running` here is by arc COUNT — a distinction
+ *     that survives `prefers-reduced-motion`, when the spin is off and running's
+ *     property is unavailable. A length-based distinction would have failed that case.
+ *   • `repeats: 4` and not 3, because every row tiles the circle EXACTLY (repeats ×
+ *     (dash + gap) === 1) so no seam appears where the pattern wraps at the path start.
+ *     Three repeats need a dash-plus-gap of one third, which is not expressible in the
+ *     two-decimal style this table uses. `4 × (0.15 + 0.10) = 1.00` exactly.
+ *   • `gapCentre: 0.125` because it is unclaimed (`null`, 0.375 and 0.75 are taken), it
+ *     puts the four gaps on the 45° diagonals so none lands on a cardinal point — in
+ *     particular none at 12 o'clock, which is the waiting reading's signature and the
+ *     pause chip's home — and it keeps the computed dashoffset POSITIVE like every
+ *     shipped row.
+ *   • 40 % of the ring is missing, in four visible gaps. A near-closed ring with one
+ *     small notch was REJECTED for exactly this reason: it maximises confusability with
+ *     `done`, and `done` is the one reading this must be most distinct from. A step that
+ *     deliberately sent nothing reading as one that succeeded is the confusion this
+ *     whole phase exists to prevent.
+ *
+ * ⚠ Note two of the four gap centres (.375, .875) coincide with `failed`'s two. That is
+ * a value coincidence on the same 45° lattice, not a shape collision: the COUNT (4 vs 2)
+ * and the arc length (32 px vs 89.7 px, 2.8×) carry the distinction, and both are
+ * asserted.
+ *
+ * ⚠ jsdom CANNOT prove greyscale distinguishability — it applies no CSS and paints
+ * nothing. The suites prove the ATTRIBUTE-level distinction; the VISUAL half is a driven
+ * Chrome MCP row (U3, plan 189-16) and is not discharged by a green unit run.
  *
  * `skipped` and `unknown` are both fully patterned and are separated by their dash/gap
  * RATIO — coarse dashes against fine dots — which is why they are `length` specs: they
@@ -368,6 +406,11 @@ export const RING_GEOMETRY: Record<CanvasReading, RingSpec> = {
     spinning: false,
   },
   unknown: { kind: "length", dash: 1.5, gap: 6 },
+  "recorded-not-sent": {
+    kind: "fraction",
+    arc: { dash: 0.15, gap: 0.1, repeats: 4, gapCentre: 0.125 },
+    spinning: false,
+  },
 }
 
 /** TOTAL ring lookup — an unowned reading falls back to the unknown ring rather than to

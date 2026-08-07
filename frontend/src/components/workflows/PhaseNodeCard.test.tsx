@@ -183,6 +183,10 @@ const ALL_READINGS_TABLE: Record<CanvasReading, true> = {
   skipped: true,
   "waiting-for-you": true,
   unknown: true,
+  // 189-10 (CONN-01 / D-16). The mechanism the docblock above describes, FIRING: 189-08
+  // widened `CanvasReading` and this table stopped typechecking, which is how the eighth
+  // reading reached every loop below without a list being updated by hand.
+  "recorded-not-sent": true,
 }
 const ALL_READINGS = Object.keys(ALL_READINGS_TABLE) as CanvasReading[]
 
@@ -1481,8 +1485,12 @@ describe("PhaseNodeCard — the seal cannot READ run state (props fence, criteri
       return rendered
     })
 
-    expect(seals).toHaveLength(7)
+    // 189-10: DERIVED, not the literal `7` this loop shipped with. The paragraph above
+    // promises "an eighth reading cannot be added without this loop growing with it" —
+    // and the eighth arrived. A hard count would have made that growth read as a failure.
+    expect(seals).toHaveLength(ALL_READINGS.length)
     expect(ALL_READINGS).toContain("unknown")
+    expect(ALL_READINGS).toContain("recorded-not-sent")
     for (const seal of seals) expect(seal).toBe(seals[0])
     // Non-vacuity: the value being compared is a real seal, not an empty string.
     expect(seals[0].length).toBeGreaterThan(0)
@@ -1498,7 +1506,7 @@ describe("PhaseNodeCard — the seal cannot READ run state (props fence, criteri
       unmount()
       return html
     })
-    expect(new Set(cards).size).toBe(7)
+    expect(new Set(cards).size).toBe(ALL_READINGS.length)
   })
 })
 
@@ -1820,13 +1828,20 @@ function dashNumbers(dasharray: string | null): number[] {
   return dasharray === null ? [] : dasharray.trim().split(/\s+/).map(Number)
 }
 
-describe("188-06 — seven readings, seven ring SHAPES (the greyscale acceptance clause)", () => {
-  it("the seven signatures are PAIRWISE DISTINCT with colour excluded from the compare", () => {
+describe("188-06 — one ring SHAPE per reading (the greyscale acceptance clause)", () => {
+  it("the signatures are PAIRWISE DISTINCT with colour excluded from the compare", () => {
     const signatures = ALL_READINGS.map(ringSignature)
-    expect(signatures).toHaveLength(7)
+    // 189-10: DERIVED from `ALL_READINGS` rather than pinned at the literal `7` this
+    // block shipped with. The count is not the property — one distinct shape PER READING
+    // is — and a literal makes every future reading look like a regression until someone
+    // remembers to move it. The floor below keeps the derived form non-vacuous.
+    expect(signatures).toHaveLength(ALL_READINGS.length)
     // The compare below reads only shape attributes; `stroke` is not a member of the
     // signature type at all, so this distinctness cannot be borrowed from colour.
-    expect(new Set(signatures.map((s) => JSON.stringify(s))).size).toBe(7)
+    expect(new Set(signatures.map((s) => JSON.stringify(s))).size).toBe(ALL_READINGS.length)
+    // NON-VACUITY: a derived count is satisfied by an empty union. There are 8 readings
+    // as this line is written (189 added the eighth), and there can never be fewer.
+    expect(ALL_READINGS.length).toBeGreaterThanOrEqual(8)
   })
 
   it("`not-started` is the ONLY reading with no arc — the track, untravelled", () => {
@@ -1897,6 +1912,39 @@ describe("188-06 — seven readings, seven ring SHAPES (the greyscale acceptance
     expect(d1).toBeGreaterThan(g1) // two long arcs separated by two short gaps
   })
 
+  it("`recorded-not-sent` is the ONLY ring drawn in FOUR arcs (189 / D-16)", () => {
+    // THE EIGHTH UNIQUENESS PROPERTY, rendered — joining the seven this block already
+    // states, so the build criterion stays a complete enumeration instead of becoming
+    // seven-of-eight. Eight dash numbers is four dash/gap PAIRS; `failed` above is the
+    // two-arc case and is asserted at four numbers, so the two cannot be confused.
+    const fourArcs = ALL_READINGS.filter(
+      (r) => dashNumbers(ringSignature(r).dasharray).length === 8,
+    )
+    expect(fourArcs).toEqual(["recorded-not-sent"])
+
+    // Four EQUAL arcs separated by four EQUAL gaps, and the arcs are the longer element.
+    const numbers = dashNumbers(ringSignature("recorded-not-sent").dasharray)
+    const dashes = numbers.filter((_, i) => i % 2 === 0)
+    const gaps = numbers.filter((_, i) => i % 2 === 1)
+    expect(new Set(dashes).size).toBe(1)
+    expect(new Set(gaps).size).toBe(1)
+    expect(dashes[0]).toBeGreaterThan(gaps[0])
+
+    // 40% OF THE RING IS MISSING — the separation from `done`, the reading this one must
+    // be most distinct from, and the reason a near-closed ring with one notch was
+    // rejected. Computed from the DOM's own numbers, not from the table's fractions.
+    const circumference = 2 * Math.PI * 34
+    const drawn = dashes.reduce((a, b) => a + b, 0)
+    expect(drawn / circumference).toBeCloseTo(0.6, 2)
+
+    // IT DOES NOT MOVE. The run is over for this phase, so the separation from `running`
+    // is by arc COUNT — which is what makes it survive `prefers-reduced-motion`, when the
+    // spin is off and `running`'s own uniqueness property is unavailable.
+    expect(ringSignature("recorded-not-sent").spins).toBe(false)
+    // …and it is not the waiting reading either: no chip, and its gaps avoid 12 o'clock.
+    expect(ringSignature("recorded-not-sent").hasChip).toBe(false)
+  })
+
   it("`skipped` and `unknown` are both fully patterned, at DIFFERENT dash/gap ratios", () => {
     const skipped = dashNumbers(ringSignature("skipped").dasharray)
     const unknown = dashNumbers(ringSignature("unknown").dasharray)
@@ -1928,7 +1976,15 @@ describe("188-06 — seven readings, seven ring SHAPES (the greyscale acceptance
     // the dash ratio asserted above, and spending an alarm colour on "we can't tell"
     // would make it look like a warning the run has not actually raised.
     expect(arcStroke("skipped")).toBe(arcStroke("unknown"))
+    // 189-10: and `recorded-not-sent` joins them on the SAME token, which is the assertion
+    // that 189 SPENT NO NEW COLOUR. Every other token would have made a false claim —
+    // success would claim the send happened, destructive would claim failure, warning
+    // would say the person is still needed after they have already answered. The count
+    // below is therefore UNMOVED at 5 while the reading set grew to 8, and that unmoved
+    // number IS the evidence: the shape channel carries the eighth reading alone.
+    expect(arcStroke("recorded-not-sent")).toBe(arcStroke("skipped"))
     expect(new Set(strokes).size).toBe(5)
+    expect(strokes).toHaveLength(ALL_READINGS.length - 1) // every reading but `not-started`
   })
 
   it("EVERY reading also carries the word as REAL TEXT — three carriers, colour fourth", () => {
@@ -1976,6 +2032,15 @@ const EXPECTED_RING = {
   "waiting-for-you": { dasharray: "158.085 55.543", dashoffset: "25.635" },
   /** d1 g1 d1 g1 with d1 = 0.42C, g1 = 0.08C, first gap centred at p = 0.375C. */
   failed: { dasharray: "89.724 17.090 89.724 17.090", dashoffset: "18.158" },
+  /**
+   * 189 / D-16 — FOUR pairs, with d = 0.15C, g = 0.10C and the first gap centred at
+   * p = 0.125C. The eighth reading's numbers, falsifying the same formula at a repeat
+   * count no shipped row uses: `offset = (D + G/2) − p` = 32.044 + 10.681 − 26.704.
+   */
+  "recorded-not-sent": {
+    dasharray: "32.044 21.363 32.044 21.363 32.044 21.363 32.044 21.363",
+    dashoffset: "16.022",
+  },
 } as const
 
 describe("188-06 — the ring's geometry is COMPUTED, and these decimals falsify it", () => {
@@ -3301,6 +3366,109 @@ const CARD_READING_SHAPES: Record<CanvasReading, ReturnType<typeof CARD_SHAPE>> 
       strokeDashoffset: null,
     },
   ],
+  /**
+   * 189-10 — THE EIGHTH ROW, CAPTURED. Every value below was READ OUT of the rendered
+   * DOM by running `CARD_SHAPE` and substituting what it printed; not one number was
+   * typed from the source, computed by hand or reasoned about. The capture was OBSERVED
+   * TWICE and the two dumps compared byte for byte (md5 134b86c8…, identical) BEFORE
+   * either was written here. The capture rule stated above applies to it in full.
+   *
+   * The dasharray names FOUR dash/gap pairs and the offset is positive — the whole
+   * eighth shape, reaching the DOM. Both numbers are falsified independently against
+   * the formula by the `EXPECTED_RING` block above; this row is the element-for-element
+   * record. The two instruments fail differently, on purpose.
+   *
+   * ⚠ THREE THINGS THIS ROW PINS THAT NOTHING ELSE REACHES, each an ABSENCE — the kind
+   * neither the compiler nor a presence-only fence can see:
+   *   • the card div ends `border-border/50`, the DEFAULT branch. That is
+   *     `RUN_READING_BORDER` declining to claim the border, RENDERED. The omission is
+   *     an editorial decision recorded in that table's docblock; here it is measured.
+   *   • the arc carries NO class at all, so it carries no spin utility. `spinning:
+   *     false` reaches the DOM as the ABSENCE of an attribute — precisely what a fence
+   *     that only checked for presence would miss.
+   *   • there is no `canvas-node-pause-chip` entry: the chip stays the waiting
+   *     reading's alone, and this reading does not borrow it.
+   */
+  "recorded-not-sent": [
+    {
+      key: "(card-div — the 137-B card, no data-testid)",
+      class: "mx-auto block w-[248px] rounded-[22px] border pb-5 pt-[42px] px-5 text-center bg-card/30 backdrop-blur-sm shadow-[0_1px_0_hsl(var(--foreground)/0.06)_inset,0_18px_36px_-22px_rgba(0,0,0,0.95)] border-border/50",
+      style: "min-height: 120px;",
+      ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
+      key: "canvas-node-ring",
+      class: "pointer-events-none absolute left-1/2 top-[-31px] z-[5] h-[72px] w-[72px] -translate-x-1/2",
+      style: null,
+      ariaHidden: "true",
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
+      key: "canvas-node-ring-arc",
+      class: null,
+      style: null,
+      ariaHidden: null,
+      ariaLabel: null,
+      r: "34",
+      stroke: "hsl(var(--muted-foreground))",
+      strokeWidth: "3.5",
+      strokeLinecap: "round",
+      strokeDasharray: "32.044 21.363 32.044 21.363 32.044 21.363 32.044 21.363",
+      strokeDashoffset: "16.022",
+    },
+    {
+      key: "canvas-node-run-line",
+      class: "mt-1 line-clamp-2 text-[11px] leading-snug text-foreground/90",
+      style: null,
+      ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
+      key: "canvas-node-summarize",
+      class: "relative",
+      style: "width: 260px; min-height: 120px;",
+      ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
+      key: "probe-icon",
+      class: null,
+      style: null,
+      ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+  ],
 }
 
 /** `CARD_VERDICT_SHAPES` — the verdict mark's three states, captured the same way and total
@@ -3747,14 +3915,17 @@ describe("PhaseNodeCard 188.2-03 — the pre-move geometry matrix", () => {
     }
   })
 
-  it("the seven readings capture SEVEN DISTINCT arc signatures", () => {
+  it("every reading captures a DISTINCT arc signature", () => {
     // If two readings captured identically this matrix would not be pinning what it claims:
     // a ring whose shape IS its meaning would have two readings it cannot tell apart.
     const signatures = ALL_READINGS.map((reading) =>
       JSON.stringify(CARD_READING_SHAPES[reading].find((e) => e.key === ARC_TEST_ID) ?? null),
     )
     expect(new Set(signatures).size).toBe(ALL_READINGS.length)
-    expect(ALL_READINGS.length).toBe(7)
+    // 189-10: 7 → 8. This is a FLOOR rather than an equality now, for the reason the
+    // sibling assertions above were derived: the property is "one signature per reading",
+    // and an exact count turns the next reading into a red test instead of a covered one.
+    expect(ALL_READINGS.length).toBeGreaterThanOrEqual(8)
 
     // ⚠ MEASURED, AND IT IS WHY `CARD_SHAPE` CAPTURES THE SVG ATTRIBUTES. On `class` and
     // `style` ALONE — the field set the plan named — the seven collapse to THREE: the

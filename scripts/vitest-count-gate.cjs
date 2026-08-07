@@ -307,7 +307,21 @@ const BASELINE = {
   // somewhere in the subtree". +4 `it(` blocks, one per claim, each reading `CARD_MODULES` by
   // its own destination path. Read from `actual` across two agreeing runs, 2026-08-07 (both
   // printed `PhaseNodeCard.test.tsx 124 128 +4`).
-  "PhaseNodeCard.test.tsx": 128,
+  // 189-10 (CONN-01 / D-16): 128 → 130. An EXTENSION, not a lowering — no `it(` was
+  // deleted or renamed. The +2 are the eighth reading's RENDERED uniqueness ("the ONLY
+  // ring drawn in FOUR arcs", joining the seven ONLY-assertions this block already makes
+  // so the build criterion stays a complete enumeration) and the `EXPECTED_RING` row that
+  // falsifies the dash formula at a repeat count no shipped row uses.
+  //
+  // ⚠ THE CAPTURED `CARD_READING_SHAPES` ROW ADDS NO CASE, and that is worth stating: it
+  // is a table the EXISTING loops read, so the eighth reading is covered by tests that
+  // were already counted. Its absence from this delta is not an under-count.
+  //
+  // FIVE literal `7`s in this file were DERIVED from `ALL_READINGS.length` rather than
+  // re-pinned at 8 (the seal loop, the card-distinctness set, the signature set, the word
+  // set, the matrix total). None changes the count; all five stop the NINTH reading from
+  // reading as a regression.
+  "PhaseNodeCard.test.tsx": 130,
   "PhaseNode.test.tsx": 26,
   // 189-10 (CONN-01 / D-16 / D-07) — a NEW FILE, pinned in the SAME COMMIT that creates it.
   //
@@ -325,7 +339,15 @@ const BASELINE = {
   // `null`, and that it claims no card border. The border case is an ABSENCE assertion over a
   // `Partial<>` table, which the compiler cannot see at all and is the easiest kind to delete
   // unnoticed.
-  "runVocabulary.test.ts": 12,
+  //
+  // 189-10 TASK 2: 12 → 23. The ring half, same plan but a later commit, pinned from
+  // `actual` across two agreeing runs. The +11 carry three WHOLE-TABLE invariants that
+  // existed NOWHERE before this plan — exact tiling (`repeats × (dash + gap) === 1`, true
+  // of all seven shipped rows and asserted by nothing), FOUR-ARC uniqueness, and
+  // pairwise-distinct rendered geometry — plus the WR-04 `"constructor"` probe on
+  // `ringSpecFor` and the fail-closed direction: an unowned reading floors on the DOTTED
+  // unknown ring and NEVER on the closed circle `done` owns.
+  "runVocabulary.test.ts": 23,
   // 189-08 (CONN-01 / D-07): 10 → 17. An EXTENSION, not a lowering — no `it(` was deleted,
   // renamed or moved. The +7 are the panel half of the governed not-sent terminal: the new
   // STATUS_META row rendering its own glyph and exact text, the D-07 non-collision case
@@ -567,8 +589,11 @@ const BASELINE = {
 // available argument that a hand-written total beside a derived one is a claim and not a
 // check. Corrected to the measured figure rather than silently rewritten.
 // ⚠ AND AN EIGHTH TIME BY 189-10: 2521 → 2533, the new `runVocabulary.test.ts` (+12) pinned
-// above. Read from THIS SCRIPT'S OWN printed `total` column, in the SAME COMMIT as the pin.
-const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // ⚠ 2533 (189-10)
+// above — and a NINTH by the SAME PLAN'S Task 2: 2533 → 2546 (`runVocabulary` +11, the three
+// whole-table ring invariants; `PhaseNodeCard` +2, the rendered four-arc uniqueness and the
+// `EXPECTED_RING` falsification row). Both read from THIS SCRIPT'S OWN printed `total` column
+// across two agreeing runs, each in the SAME COMMIT as its own pins.
+const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // ⚠ 2546 (189-10)
 
 // ── The Wave-0 blast radius (184-VALIDATION.md § "quick run command"). ──
 const TARGETS = [

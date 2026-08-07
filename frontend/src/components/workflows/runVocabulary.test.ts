@@ -48,8 +48,11 @@ import { describe, expect, it } from "vitest"
 import type { CanvasReading } from "@/lib/phaseState"
 
 import {
+  RING_GEOMETRY,
   RUN_READING_BORDER,
   RUN_READING_WORD,
+  ringDash,
+  ringSpecFor,
   runReadingClause,
   runReadingLabel,
   runReadingWord,
@@ -226,3 +229,192 @@ describe("runVocabulary 189-10 — the clause is null, and the border is unclaim
   })
 })
 
+
+// ── THE RING TABLE — whole-table invariants nobody had asserted ────────────────────────
+//
+// Everything below is Task 2's half. It is sited in this file rather than in the card
+// suite because each is a property of `RING_GEOMETRY` itself: they hold whether or not a
+// card is ever rendered, and asserting them over the table is what makes them survive a
+// reading whose card the suite never asks for.
+//
+// ⚠ jsdom CANNOT PROVE GREYSCALE DISTINGUISHABILITY. It applies no CSS and paints
+// nothing, so nothing in this file — or in any unit test — is evidence that a person can
+// tell two rings apart by looking. These assertions prove the ATTRIBUTE-level distinction:
+// that the emitted geometry differs, and differs in a property that is nameable. The
+// VISUAL half is U3, a driven Chrome MCP row in plan 189-16, and it is not optional
+// merely because this file is green.
+
+/** The ring's shipped radius (`NodeRunOverlay.RING_RADIUS`) and the circumference every
+ *  dash pattern is computed from. Re-derived here rather than imported: the overlay does
+ *  not export it, and a test that recomputed it from the source it is checking would be
+ *  agreeing with itself. Pinned against the DOM in `PhaseNodeCard.test.tsx`. */
+const RING_RADIUS = 34
+const CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS
+
+/** The number of dash/gap PAIRS a reading's rendered pattern names. `0` ⇒ it emits no
+ *  dasharray at all (the closed ring, and the reading with no arc). */
+function pairCountOf(reading: CanvasReading): number {
+  const dash = ringDash(ringSpecFor(reading), CIRCUMFERENCE)
+  if (dash === null || dash.dasharray === null) return 0
+  return dash.dasharray.trim().split(/\s+/).length / 2
+}
+
+describe("runVocabulary 189-10 — the whole ring table tiles the circle EXACTLY", () => {
+  it("every fraction row satisfies repeats × (dash + gap) === 1", () => {
+    // TRUE OF ALL SEVEN SHIPPED ROWS AND ASSERTED NOWHERE UNTIL NOW. It is what stops a
+    // seam appearing where the pattern wraps at the path start, and it is precisely the
+    // kind of property that gets broken by a plausible-looking row (`repeats: 3` with a
+    // two-decimal dash+gap cannot satisfy it) because nobody ever wrote it down.
+    const fractionRows = ALL_READINGS.map((reading) => [reading, RING_GEOMETRY[reading]] as const)
+      .filter(([, spec]) => spec.kind === "fraction")
+
+    for (const [reading, spec] of fractionRows) {
+      if (spec.kind !== "fraction") continue // narrowing only; filtered above
+      const { dash, gap, repeats } = spec.arc
+      expect(repeats * (dash + gap), `${reading} does not tile the circle`).toBeCloseTo(1, 10)
+    }
+
+    // NON-VACUITY: an empty filter satisfies a for-loop forever. There are four fraction
+    // rows as this is written, and the floor is stated so a table that lost them all
+    // cannot pass.
+    expect(fractionRows.length).toBeGreaterThanOrEqual(4)
+  })
+
+  it("…and the rendered pattern really does sum to the circumference, per repeat", () => {
+    // The tiling invariant restated on the OUTPUT rather than the input, so it also
+    // catches `ringDash` mis-multiplying rather than only the table being mis-authored.
+    for (const reading of ALL_READINGS) {
+      const spec = RING_GEOMETRY[reading]
+      if (spec.kind !== "fraction") continue
+      const dash = ringDash(spec, CIRCUMFERENCE)!
+      const numbers = dash.dasharray!.trim().split(/\s+/).map(Number)
+      const total = numbers.reduce((a, b) => a + b, 0)
+      expect(total, `${reading}'s pattern does not close on the circle`).toBeCloseTo(
+        CIRCUMFERENCE,
+        1,
+      )
+    }
+  })
+})
+
+describe("runVocabulary 189-10 — the eighth ring is the ONLY one drawn in FOUR arcs", () => {
+  it("counts the dash/gap pairs — a machine check, never an eyeball", () => {
+    // THE ASSERTABLE UNIQUE PROPERTY, and the reason `repeats: 4` was chosen over any
+    // other shape. Every other fraction row names one or two pairs, `solid` emits none,
+    // and the two `length` rows emit an unbounded texture (one authored pair, repeated by
+    // the renderer). Four is unclaimed, and the count is what a test can assert.
+    const fourArc = ALL_READINGS.filter((reading) => pairCountOf(reading) === 4)
+    expect(fourArc).toEqual([NEW_READING])
+  })
+
+  it("POSITIVE CONTROLS — the counter really counts, at every other row", () => {
+    // Without these the assertion above passes on a counter that returns 4 for one input
+    // and throws away the rest.
+    expect(pairCountOf("running")).toBe(1)
+    expect(pairCountOf("waiting-for-you")).toBe(1)
+    expect(pairCountOf("failed")).toBe(2)
+    expect(pairCountOf("done")).toBe(0) // the closed ring emits no dasharray
+    expect(pairCountOf("not-started")).toBe(0) // no arc element at all
+    expect(pairCountOf(NEW_READING)).toBe(4)
+  })
+
+  it("does NOT animate — motion stays `running`'s own uniqueness property", () => {
+    // ⚠ LOAD-BEARING, AND THE REASON THE SEPARATION IS BY COUNT. The run is OVER for this
+    // phase; a spinning terminal would claim work still in flight. And because `running`
+    // is the only reading that moves, a distinction that leaned on motion would evaporate
+    // under `prefers-reduced-motion` — the arc COUNT survives it.
+    const spec = RING_GEOMETRY[NEW_READING]
+    expect(spec.kind).toBe("fraction")
+    if (spec.kind !== "fraction") throw new Error("unreachable — pinned above")
+    expect(spec.spinning).toBe(false)
+    expect(ringDash(spec, CIRCUMFERENCE)!.spinning).toBe(false)
+
+    // …and `running` really is the ONLY row that spins, asserted over the whole table so
+    // a second spinner cannot be added in silence.
+    const spinning = ALL_READINGS.filter(
+      (reading) => ringDash(ringSpecFor(reading), CIRCUMFERENCE)?.spinning === true,
+    )
+    expect(spinning).toEqual(["running"])
+  })
+
+  it("places NO gap at 12 o'clock — the waiting reading's signature stays its own", () => {
+    // An SVG circle starts at 3 o'clock and runs clockwise, so 12 o'clock is 0.75C.
+    // `gapCentre: 0.125` puts the four gaps on the 45° diagonals — 0.125, 0.375, 0.625,
+    // 0.875 — so none lands on a cardinal point, and the pause chip's quadrant is
+    // untouched. Computed from the row, never from the four numbers just quoted.
+    const spec = RING_GEOMETRY[NEW_READING]
+    if (spec.kind !== "fraction") throw new Error("unreachable")
+    const { repeats, gapCentre } = spec.arc
+    expect(gapCentre).not.toBeNull()
+    const centres = Array.from({ length: repeats }, (_, i) => (gapCentre! + i / repeats) % 1)
+    expect(centres).toHaveLength(4)
+    for (const centre of centres) {
+      expect(Math.abs(centre - 0.75), `a gap sits at 12 o'clock`).toBeGreaterThan(0.05)
+    }
+
+    // POSITIVE CONTROL — the waiting reading's gap IS at 12 o'clock, so the check above is
+    // capable of finding one. Without it the assertion passes on any arithmetic at all.
+    const waiting = RING_GEOMETRY["waiting-for-you"]
+    if (waiting.kind !== "fraction") throw new Error("unreachable")
+    expect(waiting.arc.gapCentre).toBe(0.75)
+  })
+
+  it("keeps the computed dashoffset POSITIVE, like every shipped row", () => {
+    // Not a correctness property — a negative offset renders identically — but a
+    // consistency one the whole table has held so far, and the reason `0.125` was chosen
+    // over `0` or `0.25`. Asserted over the table so it stays a table property.
+    for (const reading of ALL_READINGS) {
+      const dash = ringDash(ringSpecFor(reading), CIRCUMFERENCE)
+      if (dash === null) continue
+      expect(dash.dashoffset, `${reading} has a negative dashoffset`).toBeGreaterThanOrEqual(0)
+    }
+  })
+
+  it("the EIGHT rendered geometries are pairwise DISTINCT", () => {
+    // The shape channel separates every reading from every other, with colour excluded by
+    // construction: `ringDash` returns no stroke and knows no colour token, so this
+    // distinctness cannot be borrowed from paint. (The RENDERED equivalent, read off the
+    // DOM, lives in `PhaseNodeCard.test.tsx`; this is the table's own half.)
+    const signatures = ALL_READINGS.map((reading) =>
+      JSON.stringify({
+        reading: null, // deliberately excluded — the KEY must not make rows distinct
+        dash: ringDash(ringSpecFor(reading), CIRCUMFERENCE),
+      }),
+    )
+    expect(new Set(signatures).size).toBe(ALL_READINGS.length)
+    expect(ALL_READINGS.length).toBe(8)
+  })
+})
+
+describe("runVocabulary 189-10 — WR-04: the lookups stay own-guarded as the table grows", () => {
+  it("`ringSpecFor` returns the UNKNOWN ring for an inherited member, never a function", () => {
+    // T-189-24. `RING_GEOMETRY` is a plain object literal, so it INHERITS `constructor`,
+    // `toString` and `__proto__`. None of them is nullish, so a bare `TABLE[key] ?? fallback`
+    // does NOT fire its fallback for them — it hands back a FUNCTION typed as `RingSpec`.
+    // The guard is shipped; this pins it while the table grows by a row.
+    const inherited = ringSpecFor("constructor" as CanvasReading)
+    expect(inherited).toBe(RING_GEOMETRY.unknown)
+    expect(typeof inherited).toBe("object")
+
+    // POSITIVE CONTROL — the inherited member really IS reachable by index, so the guard
+    // is doing work rather than the property being absent.
+    expect(typeof (RING_GEOMETRY as Record<string, unknown>)["constructor"]).toBe("function")
+  })
+
+  it("…and it never falls back to the CLOSED ring — an unknown state cannot read as done", () => {
+    // The fail-closed direction that matters: the floor is the dotted unknown ring, and
+    // `done`'s unbroken circle is the one thing it must never be.
+    for (const key of ["constructor", "toString", "__proto__", "hasOwnProperty"]) {
+      expect(ringSpecFor(key as CanvasReading)).not.toBe(RING_GEOMETRY.done)
+      expect(ringSpecFor(key as CanvasReading).kind).not.toBe("solid")
+    }
+  })
+
+  it("the WORD lookup is own-guarded too, and floors on the honest word", () => {
+    expect(runReadingWord("constructor" as CanvasReading)).toBe(RUN_READING_WORD.unknown)
+    // ⚠ and specifically NOT the new word: an unrecognised reading must not be reported
+    // as a deliberate not-send, which would be a claim about a step nobody made.
+    expect(runReadingWord("constructor" as CanvasReading)).not.toBe(D16_WORD)
+    expect(runReadingWord("constructor" as CanvasReading)).not.toBe(RUN_READING_WORD.done)
+  })
+})

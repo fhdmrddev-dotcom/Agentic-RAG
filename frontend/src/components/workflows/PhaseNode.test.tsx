@@ -361,9 +361,15 @@ describe("PhaseNode — an omitted name context is the SAFE direction (D-187-05)
 // reading through this adapter. Appended rather than woven into the blocks above, so a
 // reader can still see exactly what 187-09 asserted.
 
-/** The seven readings, DERIVED from a compiler-forced exhaustive table rather than
- *  hand-listed — the 188-06 discipline. An eighth `CanvasReading` member cannot be added
- *  without this list growing, so no loop below can silently under-cover the union. */
+/** The readings, DERIVED from a compiler-forced exhaustive table rather than hand-listed
+ *  — the 188-06 discipline. An eighth `CanvasReading` member cannot be added without this
+ *  list growing, so no loop below can silently under-cover the union.
+ *
+ *  ⚠ AND IT WORKED, WHICH IS WORTH RECORDING RATHER THAN ASSUMING. 189-08 widened the
+ *  union and this table became a TYPECHECK ERROR — one of seven the widening armed. The
+ *  loops below (no database word at any reading; the run line byte-equal to the announced
+ *  label at any reading) therefore cover the new terminal because the compiler refused to
+ *  let them not, not because anyone remembered them. */
 const ALL_READINGS: Record<CanvasReading, true> = {
   "not-started": true,
   running: true,
@@ -372,6 +378,7 @@ const ALL_READINGS: Record<CanvasReading, true> = {
   skipped: true,
   "waiting-for-you": true,
   unknown: true,
+  "recorded-not-sent": true,
 }
 const READINGS = Object.keys(ALL_READINGS) as CanvasReading[]
 

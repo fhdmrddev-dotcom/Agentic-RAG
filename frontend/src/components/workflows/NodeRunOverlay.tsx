@@ -139,6 +139,12 @@ const RING_STROKE: Record<CanvasReading, string> = {
   skipped: "hsl(var(--muted-foreground))",
   "waiting-for-you": "hsl(var(--warning))",
   unknown: "hsl(var(--muted-foreground))",
+  // 189 / D-16 — the calm terminal token, DUPLICATED from `skipped` and `unknown` on
+  // purpose. Every other token would claim something untrue: success (the confusion this
+  // reading exists to prevent), destructive (nothing failed), warning (the person has
+  // already answered), primary (the run has moved on). Precedent, not laziness — the
+  // SHAPE carries it, and this is the only ring drawn in four arcs.
+  "recorded-not-sent": "hsl(var(--muted-foreground))",
 }
 
 /** The track every reading shares — the path the arc has or has not travelled. */
