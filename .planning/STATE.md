@@ -3,16 +3,22 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio — 🚧 ACTIVE
 status: executing
-last_updated: "2026-08-07T06:30:00.000Z"
-last_activity: 2026-08-07 -- Phase 188.2 EXECUTION COMPLETE, 7/7 plans. Plan 07 finalised: Task 1 (G-5 ledger row flipped to *satisfied (188.2)*; 4 stale doc pointers corrected; count-gate pins 107->124 and 58->61 from two agreeing runs; 188.2-DEFERRED.md created) + Tasks 2-3 -- the checkpoint was RETURNED, the operator authorised the orchestrator to drive the boards via Chrome MCP, and 4 of 5 rows are DRIVEN AND PASSED (`0492181a`). B1 passed WITH a falsification control (x at z-index 999 -> elementFromPoint returns the CARD, the bug reproduced; at 1002 -> returns the control), so BUG-260806-01 is CLOSED / verified_closed_by 188.2. ** A2 is BLOCKED (needs a live run) and A1's visual half was not performed -- both OWED, A2 first.**
-stopped_at: 188.2 execution complete (7/7 plans) -- NEXT is /gsd:verify-work 188.2 then /gsd:secure-phase 188.2. Manual debt owed: UAT row A2 (run it first), then A1's visual half.
+last_updated: "2026-08-07T11:40:00.000Z"
+last_activity: 2026-08-07 -- **Phase 188.2 ALL GATES CLOSED.** verify-work 7/7 must-haves (`d6cfe63b`, status human_needed); secure-phase 34/34 threats (`6ff2ef83`); validate-phase 12 green / 7 partial across 19 rows (`b07d1a07` tests + `d9963d03` doc). secure-phase found the ESM-cycle fences claimed "ANY import form" but missed the `.tsx`-suffixed specifier -- legal here under allowImportingTsExtensions -- fixed in BOTH the card and the 188.1 WorkflowCanvas sibling and driven RED against a real plant. validate-phase closed 4 per-file claims the row map made but nothing asserted. Filed BUG-260807-01 (a sixth UNGUARDED WR-04 sink at editAffordance.ts:214-224; a prototype-key slug returns NaN, collapsing the translate() on the three elements Plan 02 just gave zIndex 1002 -- so a mispositioned affordance now lands ABOVE the cards). **Still owed: UAT row A2 (needs a live run) and A1's visual half. Phase 189 is UNBLOCKED.**
+stopped_at: 188.2 COMPLETE -- executed 7/7, verified 7/7, secured 34/34, validated 12/7. NEXT is Phase 189 (/gsd:discuss-phase 189 -- its CONTEXT is already locked). The only 188.2 residue is the two manual UAT rows, which are look-while-you-are-there triggers, not blockers.
 resume_file: .planning/phases/188.2-phasenodecard-extraction-refactor-pay-down-the-g-5-debt-on-p/188.2-UAT.md
 progress:
   total_phases: 21
-  completed_phases: 9
+  completed_phases: 10
   total_plans: 126
-  completed_plans: 125   # 188.2-07 COMPLETE (188.2 is 7/7); phase not yet VERIFIED
-  percent: 43
+  completed_plans: 125   # UNCHANGED by 188.2's gate closures -- verify/secure/validate write no plan.
+                         # Measured 2026-08-07: 126 *-PLAN.md vs 125 *-SUMMARY.md; the single
+                         # unsummarised file is `184-HEADER-PLAN.md`, a Phase 184 artifact, NOT a
+                         # 188.2 plan. 188.2 is genuinely 7/7. Re-derive:
+                         #   find .planning/phases -name "*-PLAN.md" | wc -l
+                         #   for p in $(find .planning/phases -name "*-PLAN.md"); do
+                         #     [ -f "${p%-PLAN.md}-SUMMARY.md" ] || echo "$p"; done
+  percent: 48
 ---
 
 # Project State
@@ -52,7 +58,7 @@ someone remembering.
 
 | # | Item | Why it is binding |
 |---|---|---|
-| **1** | ~~**`PhaseNodeCard.tsx` G-5 refactor recommendation, as the FIRST option**~~ — **DISCHARGED 2026-08-06: the discuss ran, the operator chose the refactor, and it is now inserted as Phase 188.2.** 189 does not re-litigate this; it simply waits behind 188.2. **⚑ AND THE LEDGER ROW IS NOW FLIPPED (2026-08-07, `188.2-07` Task 1, commit `615b2a06`): `CLAUDE.md` reads *satisfied (188.2 — 2026-08-07)* carrying the measured `797 → 274 L` / CODE `249 → 100` / BODY `427 → 169` and the honest subtree growth `797 → 1332 L (+67.1 %)`.** So a discuss-phase scan of 189's `files_modified` against the hot-file ledger no longer matches a G-5-firing row on this file. **⚑ AND BOTH BOARDS ARE NOW DRIVEN (2026-08-07, `0492181a`): 4 of 5 rows passed with their own disjoint evidence, and `BUG-260806-01` is `status: closed` / `verified_closed_by: 188.2` — closed on B1's driven `elementFromPoint` row PLUS a falsification control (the `✕` at `z-index 999` returns the CARD; at `1002` it returns the control), never on the stacking analysis.** ⚠ The phase's execution is complete (7/7 plans) but it is **not verified yet** — `/gsd:verify-work 188.2` and `/gsd:secure-phase 188.2` are still owed, and **UAT row A2 is ⛔ BLOCKED** (plus A1's visual half); 189 stays behind 188.2 until it is verified | The CLAUDE.md hot-file ledger row was hardened from *THRESHOLD CROSSED* to **G-5 FIRES** by explicit operator direction at the 188.1-05 checkpoint: **797 L, 7 plans across 4 phases, +67 % growth**. Per G-5 a dedicated refactor phase on this file is due BEFORE the next feature phase that touches it, and 189 places a governed external-action node on the canvas. |
+| **1** | ~~**`PhaseNodeCard.tsx` G-5 refactor recommendation, as the FIRST option**~~ — **DISCHARGED 2026-08-06: the discuss ran, the operator chose the refactor, and it is now inserted as Phase 188.2.** 189 does not re-litigate this; it simply waits behind 188.2. **⚑ AND THE LEDGER ROW IS NOW FLIPPED (2026-08-07, `188.2-07` Task 1, commit `615b2a06`): `CLAUDE.md` reads *satisfied (188.2 — 2026-08-07)* carrying the measured `797 → 274 L` / CODE `249 → 100` / BODY `427 → 169` and the honest subtree growth `797 → 1332 L (+67.1 %)`.** So a discuss-phase scan of 189's `files_modified` against the hot-file ledger no longer matches a G-5-firing row on this file. **⚑ AND BOTH BOARDS ARE NOW DRIVEN (2026-08-07, `0492181a`): 4 of 5 rows passed with their own disjoint evidence, and `BUG-260806-01` is `status: closed` / `verified_closed_by: 188.2` — closed on B1's driven `elementFromPoint` row PLUS a falsification control (the `✕` at `z-index 999` returns the CARD; at `1002` it returns the control), never on the stacking analysis.** **⚑ AND 188.2 IS NOW COMPLETE ON ALL FOUR GATES (2026-08-07) — 189 NO LONGER WAITS ON ANYTHING.** Executed 7/7 · verified **7/7 must-haves** (`d6cfe63b`, `status: human_needed`) · secured **34/34 threats** (`6ff2ef83`) · validated **12 green / 7 PARTIAL** over 19 rows (`b07d1a07` + `d9963d03`). *(This cell read "not verified yet — verify-work and secure-phase are still owed" until 2026-08-07, while `188.2-VERIFICATION.md` had existed since `d6cfe63b`.)* **Two items ride into 189's discuss-phase, neither blocking:** `BUG-260807-01` — the sixth, **unguarded** WR-04 sink at `editAffordance.ts:214-224`, whose `NaN` now collapses the `translate()` on the three elements carrying `zIndex: AFFORDANCE_Z`, so a mispositioned affordance lands **above** the cards (filed by 188.2's secure-phase; **not** covered by `D-188.2-DEF-02`) — and 188.2's two owed manual UAT rows (**A2 ⛔** needs a live run; A1's visual half) | The CLAUDE.md hot-file ledger row was hardened from *THRESHOLD CROSSED* to **G-5 FIRES** by explicit operator direction at the 188.1-05 checkpoint: **797 L, 7 plans across 4 phases, +67 % growth**. Per G-5 a dedicated refactor phase on this file is due BEFORE the next feature phase that touches it, and 189 places a governed external-action node on the canvas. |
 | **2** | **[[SEED-133]] / `T-187-SEED-133`** — the NL-seed grounding-degradation gap | `accept`ed at the `/gsd:secure-phase 187` gate on 2026-08-06 **with a phase-bound trigger naming 189**. Its previous trigger (*"when Phase 187 is scoped"*) fired silently and was caught months later by `/gsd:audit-milestone`. Mechanical check: while `grep -c degraded backend/app/services/workflow_authoring.py` returns **0**, the defect is live. |
 
 **Also owed, not blocking 189:** **UAT-13 / M6** — the SC#6 LIVE row (an armed action-risk checkpoint
@@ -64,7 +70,7 @@ next picked up.
 
 ## Current Position
 
-Phase: 188.2 (phasenodecard-extraction-refactor-pay-down-the-g-5-debt-on-p) — EXECUTING
+Phase: 188.2 (phasenodecard-extraction-refactor-pay-down-the-g-5-debt-on-p) — **COMPLETE, ALL FOUR GATES CLOSED**
 Plan 188.2-01 COMPLETE (`471104d4` · `28f7ee64` · `8cb82a6b`; summary `188.2-01-SUMMARY.md`).
 Plan 188.2-02 COMPLETE (`7f77af44` · `fe3de624` · `30c2e66f`; summary `188.2-02-SUMMARY.md`).
 Plan 188.2-03 COMPLETE (`99a383c7` · `1fc193b4` · `b1942579`; summary `188.2-03-SUMMARY.md`).
@@ -72,10 +78,57 @@ Plan 188.2-04 COMPLETE (`82dd29a7` · `155b3832`; summary `188.2-04-SUMMARY.md`)
 Plan 188.2-05 COMPLETE (`7b417f71` · `53247c69` · `d6dfe716`; summary `188.2-05-SUMMARY.md`).
 Plan 188.2-06 COMPLETE — THE CUT (`7ca0ec1b` · `a4e60a04` · `579504de`; summary `188.2-06-SUMMARY.md`).
 Plan 188.2-07 COMPLETE (`615b2a06` · `360399b2` · `c8ac1d0e` · `0492181a`; summary `188.2-07-SUMMARY.md`).
-**PHASE 188.2 EXECUTION COMPLETE — 7/7 plans.** Next: `/gsd:verify-work 188.2`, then
-`/gsd:secure-phase 188.2`, then Phase 189 (no longer blocked by the G-5 gate on this file).
+**PHASE 188.2 COMPLETE — 7/7 plans and ALL FOUR GATES CLOSED. Next: Phase 189** (no longer blocked
+by the G-5 gate on this file — the ledger row reads *satisfied (188.2)*).
+
+| Gate | Result | Commit |
+|---|---|---|
+| execute-phase | 7/7 plans | `615b2a06` … `0492181a` |
+| **verify-work** | **7/7 must-haves verified**, `status: human_needed` (the 2 UAT rows below) | `d6cfe63b` |
+| **secure-phase** | **34/34 threats closed** · 2 ACCEPT dispositioned · 1 unregistered flag filed | `6ff2ef83` |
+| **validate-phase** | **12 green / 7 PARTIAL** across 19 rows · `nyquist_compliant: true`, argued not asserted | `b07d1a07` (tests) · `d9963d03` (doc) |
+
+⚠ **This block previously read *"NOT YET VERIFIED — verify-work and secure-phase are still owed"*
+while `188.2-VERIFICATION.md` had been sitting next to it since `d6cfe63b`.** It was corrected on
+2026-08-07 only because the operator questioned a routing line that had been generated from this
+stale text rather than from the artifact. The lesson is the standing one
+(`feedback_dont_echo_canned_routing_blocks`): **read the phase's own VERIFICATION/SECURITY/VALIDATION
+frontmatter before emitting any `▶ /gsd:` routing — a stale STATE row will happily route you to
+re-run a gate that already passed.**
+
+**What secure-phase and validate-phase actually found** (neither was a rubber stamp):
+· **secure-phase — a measurably false coverage claim.** The ESM-cycle fences in
+  `PhaseNodeCard.test.tsx` AND the 188.1 sibling in `WorkflowCanvas.test.tsx` both declared they
+  forbade "ANY import form" and both missed the `.tsx`-suffixed specifier — legal in this repo under
+  `moduleResolution: bundler` + `allowImportingTsExtensions: true`, so a real TDZ cycle could land
+  under a green fence, green `tsc` and green `eslint`. Widened with an optional `(\.[jt]sx?)?` group,
+  proven as a PROPERTY (old needle EVADES / new CAUGHT on all four forms, no false positive on
+  `?raw` under either branch) and driven RED end-to-end against a real back-import planted in
+  `NodeRunOverlay.tsx`. The two ASVS V5 rows — the WR-04 `own<T>()` move and the
+  `dangerouslySetInnerHTML` fence — were verified individually, not on the summaries' word.
+· **validate-phase — 4 per-file claims nothing asserted.** The row map claimed per-FILE properties
+  that only the joined `cardSubtreeSource` haystack backed, and a joined haystack cannot tell "true
+  in this file" from "true somewhere in the subtree". Closed with 4 new `it()` blocks (124 → 128,
+  pin extended, `TARGETS` untouched); 05-T2 observed RED against a real planted `export const
+  RING_LEAK`. **Two of the auditor's OWN claims were refuted on re-check** — its `15/19` headline
+  disagreed with the Status column it wrote in the same pass (the real figure is 12/7/19), and its
+  "`runVocabulary` is unguarded" rested on the absence of a same-named test file when the source is
+  in fact fenced `?raw` from two suites.
+
+**⚠ NEW BUG FILED OUT OF secure-phase — `BUG-260807-01`** (`surface: Agentic-RAG`, `severity: minor`,
+`status: open`). `verticalOffsetFor` (`editAffordance.ts:214-224`) is a **sixth, UNGUARDED** WR-04
+prototype-pollution sink: `overlay[slug]` on a plain `Record` with an author-supplied slug returns
+the inherited `Object` member for `constructor`/`toString`/`valueOf`/`__proto__`, so the
+`!== undefined` guard passes, `live.y` is `undefined`, and the function returns **`NaN`**. That `NaN`
+invalidates the whole `translate(…)` on the three elements **Plan 02 just gave `zIndex: AFFORDANCE_Z`
+(1002)** — so a mispositioned affordance now lands **above** the cards instead of behind them. The
+slug is unconstrained end-to-end (`harness.py:202` bare `slug: str`). **Not covered by
+`D-188.2-DEF-02`**, which names four sites that are each already correct. Routes at Phase 189's
+discuss-phase; jsdom is structurally blind to it, so its check is a driven Chrome MCP row.
 
 **⚠ MANUAL DEBT OWED OUT OF 188.2 — two UAT rows, and A2 is the one to run first.**
+These are the ONLY 188.2 residue and they do **not** block 189 — they are look-while-you're-there
+triggers, recorded as a decision rather than as a claim that everything ran.
 `188.2-UAT.md` reads `status: PARTIAL — 4 driven / 1 blocked` (`rows_passed: 4`, `rows_blocked: 1`,
 `rows_not_yet_driven: 0`) — that is four driven rows and one open one, not a passed board.
 · **A2 (⛔ BLOCKED — RUN THIS FIRST):** a live run's seven readings must stay distinguishable **by
