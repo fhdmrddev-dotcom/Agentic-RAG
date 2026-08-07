@@ -3,21 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio — 🚧 ACTIVE
 status: executing
-last_updated: "2026-08-07T11:40:00.000Z"
-last_activity: 2026-08-07 -- **Phase 188.2 ALL GATES CLOSED.** verify-work 7/7 must-haves (`d6cfe63b`, status human_needed); secure-phase 34/34 threats (`6ff2ef83`); validate-phase 12 green / 7 partial across 19 rows (`b07d1a07` tests + `d9963d03` doc). secure-phase found the ESM-cycle fences claimed "ANY import form" but missed the `.tsx`-suffixed specifier -- legal here under allowImportingTsExtensions -- fixed in BOTH the card and the 188.1 WorkflowCanvas sibling and driven RED against a real plant. validate-phase closed 4 per-file claims the row map made but nothing asserted. Filed BUG-260807-01 (a sixth UNGUARDED WR-04 sink at editAffordance.ts:214-224; a prototype-key slug returns NaN, collapsing the translate() on the three elements Plan 02 just gave zIndex 1002 -- so a mispositioned affordance now lands ABOVE the cards). **Still owed: UAT row A2 (needs a live run) and A1's visual half. Phase 189 is UNBLOCKED.**
-stopped_at: 188.2 COMPLETE -- executed 7/7, verified 7/7, secured 34/34, validated 12/7. NEXT is Phase 189 (/gsd:discuss-phase 189 -- its CONTEXT is already locked). The only 188.2 residue is the two manual UAT rows, which are look-while-you-are-there triggers, not blockers.
-resume_file: .planning/phases/188.2-phasenodecard-extraction-refactor-pay-down-the-g-5-debt-on-p/188.2-UAT.md
+last_updated: "2026-08-07T08:09:49.151Z"
+last_activity: 2026-08-06 -- Phase 188.2 execution started
 progress:
   total_phases: 21
   completed_phases: 10
   total_plans: 126
-  completed_plans: 125   # UNCHANGED by 188.2's gate closures -- verify/secure/validate write no plan.
-                         # Measured 2026-08-07: 126 *-PLAN.md vs 125 *-SUMMARY.md; the single
-                         # unsummarised file is `184-HEADER-PLAN.md`, a Phase 184 artifact, NOT a
-                         # 188.2 plan. 188.2 is genuinely 7/7. Re-derive:
-                         #   find .planning/phases -name "*-PLAN.md" | wc -l
-                         #   for p in $(find .planning/phases -name "*-PLAN.md"); do
-                         #     [ -f "${p%-PLAN.md}-SUMMARY.md" ] || echo "$p"; done
+  completed_plans: 125
   percent: 48
 ---
 
@@ -194,19 +186,23 @@ eslint **5/0**, `count gate OK` **failed 0** (total **2502**, pin untouched).
   inside each new file, the named guard observed RED — N5 `@xyflow` in `phaseNodeCardContract.ts`,
   N10 `dangerouslySetInnerHTML=` in `ownProperty.ts` — then reverted from byte-copy backups.
   **These are the first 2 of the 5 destination paths to resolve to a real file.**
+
 - **D-05 recorded IN PLACE rather than deleted:** the superseded *"two small private copies"*
   paragraph is quoted, and what changed is named as arithmetic — 188.2 splits the card's two sinks
   across two destination modules, so two copies would have become three. `runVocabulary.ts:84-88`
   keeps its differently-signed private copy, its four call sites and its fences, untouched.
+
 - **⚠ Deviation Rule 1 — the plan's literal STATE-OF-THE-EXTRACTION wording would have shipped a
   FALSE docblock.** It instructs both headers to say the code "were CUT out … it is a HARD CUT",
   but this plan is ADDITIVE BY DESIGN and the card still declares every moved item. Both headers
   state the additive position in bold and attribute the hard cut to `188.2-06` as its contract.
+
 - **⚠ THREE inherited claims measured FALSE (16 of 19 held).** (1) `grep -c "import type"` reads
   **6**, not 5 — five statements plus the header sentence explaining them; `^import type` is 5.
   (2) The WR-04 falsifications are at `PhaseNodeCard.test.tsx:2214-2288`, **not `:2000-2063`** —
   the plan's figure was measured against the pre-188.2-01 file, which was 2063 lines TOTAL.
   (3) The sentence that goes stale in `nodePresentation.ts` is at **`:144-145`**, not `:145-146`.
+
 - **OWED TO PLAN 06:** `nodePresentation.ts:144-145` still reads *"`PhaseNodeCard.NodeVerdictMark`
   is an alias of this type, kept so every existing caller's name still resolves."* It is still true
   at this commit (the card also still declares the alias) and goes false only at the cut. Plan 06
@@ -226,12 +222,15 @@ eslint **5/0**, `count gate OK` **failed 0** (2482 → **2502**, pin untouched).
 - **Every literal was captured by SCRIPT SUBSTITUTION from two byte-identical dumps** (`cmp` clean
   both times, temp harness stripped — `grep -c` for its markers reads 0). No string was hand-typed
   or hand-edited, which is the only thing that keeps a capture from decaying into an expectation.
+
 - **C-6 RED observed on TWO instruments under two different one-value edits.** `RING_RADIUS` 34 → 35
   fails the reading matrix with a diff naming `canvas-node-ring-arc` (`r` 34→35, dasharray
   55.543→57.177); the seal's `right-[17px]` → `right-[16px]` fails `MAXIMAL_RUNNING`'s `innerHTML`.
   Both reverted; `git status -- frontend/` clean.
+
 - **Totality proven both ways:** deleting one reading key moved `tsc` **33 → 34** (`TS2741 Property
   '"not-started"' is missing`) → **33** on restore.
+
 - **⚠ THREE plan claims measured FALSE, each of which changed the instrument.** (1) `RING_RADIUS` is
   at `:315`, not `:313` — the same stale figure Plan 01 already corrected once. (2) MAXIMAL_RUNNING
   does **not** exercise the grounded-and-selected border branch: `runReadingBorder("running")`
@@ -240,6 +239,7 @@ eslint **5/0**, `count gate OK` **failed 0** (2482 → **2502**, pin untouched).
   readings are **not** distinct on the arc's `class`/`style` — measured **3**, because the arc's
   whole geometry rides SVG PRESENTATION attributes; `CARD_SHAPE` therefore captures **eleven**
   attributes, not the five the plan named, and that finding is itself now a pinned assertion.
+
 - **Owed forward:** Plan 06 must keep both instruments green with **zero** re-capture (188.2-02's
   `AFFORDANCE_SHAPE_BASELINE` exception does not extend here); Plan 07's pin move now covers
   **three** files (`PhaseNodeCard.test.tsx` 107 → **124**, `WorkflowCanvas.editing.test.tsx`
@@ -261,19 +261,23 @@ vitest `61 passed (61)` (58 → 61, exit 0), `tsc -p tsconfig.app.json` **33** w
   context where it can be ranked against the nodes. 1002 not 1001 avoids
   `.react-flow__connectionline` (`base.css:170`). Versions `@xyflow/react 12.11.2` /
   `@xyflow/system 0.0.79`.
+
 - **The library control ships in the RENDERED form, chosen from a printed measurement** —
   a selected node's wrapper reads `"1000"` and its unselected sibling reads `"0"`, reproducing the
   bug report's table. The `node_modules` `?raw` fallback (no precedent in this repo, RESEARCH A4)
   was NOT taken; no new house style was introduced.
+
 - **Guard observed RED twice.** `AFFORDANCE_Z = 999` fails the relation AND the wiring assertion;
   removing the `✕` group's property fails the wiring assertion ALONE (`expected '' to be '1002'`)
   while the other two stay green — which is what separates *"the constants are consistent"* from
   *"the constants reach the DOM"*.
+
 - **The `AFFORDANCE_SHAPE_BASELINE` re-capture is the ONE authorised exception** to that literal's
   own rule, and it is proven rather than asserted: two byte-identical dumps of the reducer's own
   output, plus a parse of the OLD literal out of `HEAD` showing **12 of 72 fields differ, ALL of
   them `style`, each by exactly the appended ` z-index: 1002;`** — no `class`, no `aria-*`, no
   geometry. The docblock quotes the rule, names D-10/D-11 as authority, and re-arms it.
+
 - **⚠ TWO ACCEPTANCE CRITERIA WERE UNSATISFIABLE AS WRITTEN** (every line reference and baseline
   in the plan held exactly — only these two): (1) *"`git diff --name-only` lists exactly two
   files"* — the tree carries ~230 pre-existing unrelated `.claude/` GSD-update modifications, so it
@@ -282,12 +286,15 @@ vitest `61 passed (61)` (58 → 61, exit 0), `tsc -p tsconfig.app.json` **33** w
   for any edit**, because every REMOVED line carries the old string and can never contain the new
   term; met instead by the added-lines-only form (**0**) plus the strictly stronger field-by-field
   parse above.
+
 - **⚠ BOARD B's DRIVEN ROW IS STILL OWED — this plan closed the UNIT half only.** No test written
   here can see the defect it fixes: jsdom applies no CSS and `.click()` bypasses hit-testing, which
   is exactly why this bug survived from 184-12 with all 58 tests green. **Plan 07 owes the driven
   `document.elementFromPoint` row at the `✕`'s centre with the card SELECTED.**
+
 - **Plan 01's count-gate flake did NOT recur** (clean first run, `failed 0`). Still worth watching
   in 188.2-03..07 rather than declared closed on one observation.
+
 - **Plan 07's pin move now covers TWO files:** `PhaseNodeCard.test.tsx` 107 → 112 AND
   `WorkflowCanvas.editing.test.tsx` 58 → 61; total 2482 → **2490**.
 
@@ -302,15 +309,19 @@ increase over a pin is legal — the pin move is Plan 07's).
   observed RED at exactly **34** (`TS2578: Unused '@ts-expect-error' directive`) against a widened
   `readonly BadgeSlot[]`, back to **33** on revert. Measured first: `BadgeSlot2Tuple` had ZERO
   callers and `@ts-expect-error` occurred **0 times** in the whole workflows directory.
+
 - **The SUBSTITUTION asymmetry is now observed, not argued.** Swapping one destination path for
   another real file keeps `toHaveLength(6)` green AND keeps all six move-invariant `toContain`s
   green — only the individual-name loop fires. A length pin catches truncation, never substitution.
+
 - **Owed to later plans, each annotated inline in the test file:** C-5 + C-2/N10 RED plants →
   Plan 05; the one-direction fence's `import` assertions → Plan 06; the count-gate pin move
   (`PhaseNodeCard.test.tsx` 107 → 112, total 2482 → 2487) → Plan 07.
+
 - **Two inherited claims measured FALSE** (12 of 14 held): `const RING_RADIUS` is at
   `PhaseNodeCard.tsx:315`, not `:313`; and `grep -n phaseNodeCardSource` returns **3** code lines
   after Task 2, not 4 — P6's two operands share one line. No fence was missed.
+
 - **⚠ Watch item:** the count gate reported a **non-reproducible `failed 1`** on its first run
   after Task 3, naming no test. All 12 TARGETS were then executed (2487 tests, 0 failures) and the
   gate re-run clean. A flake outside this plan's file — if it recurs in 188.2-02..07 it needs naming.
@@ -1803,7 +1814,7 @@ Manual-Only rows still unrun, row 4 still ⛔, `.planning/REQUIREMENTS.md` unmod
 and `CONCUR-02` stay **Pending** until the operator runs the board. **Phase 186 is now ready for
 `/gsd:verify-work 186`, with SC#4 the only thing no automated evidence can close.**
 
-Resume file: .planning/phases/188.2-phasenodecard-extraction-refactor-pay-down-the-g-5-debt-on-p/188.2-CONTEXT.md
+Resume file: .planning/phases/189-governed-external-action-node-model/189-CONTEXT.md
 
 Both owed items are now ROUTED at the discuss-phase touchpoint:
 
