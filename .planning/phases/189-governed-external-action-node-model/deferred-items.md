@@ -99,6 +99,35 @@ E   assert 8 == 2
 **Same single failure, same assertion, one higher number.** Still pre-existing and still dated
 to 189-02 (`fe7bd092`) — the fix round did not create it and does not change its character.
 
+### ✅ CLOSED — `/gsd:fast`, 2026-08-07 (`1b4599fb`)
+
+`== 2` → `== 8`. Measured RED before (`assert 8 == 2`, `1 failed / 5 passed`) and GREEN after
+(`6 passed`), and every step of the movement is dated **inside the test's own docstring** rather
+than only here, re-derived with `git show <ref>:<path> | grep -cE '^(async )?def test_'`:
+`fe7bd092~1` = 2 → `fe7bd092` = 6 (189-02, where it broke) → `b6225aec~1` = 7 (189-04) →
+`b6225aec` = 8 (CR-01's negative control). The sibling `test_103_nl_generate.py` pin (`== 6`) was
+re-measured at 6 and left untouched, as this entry required.
+
+**Kept as an exact `==`, deliberately not relaxed to `>=`.** A floor answers a different question
+than the Phase-177 lesson asked: the exact count is what catches a silent SWAP of one test for
+another, which is the failure the backstop exists for. Relaxing it would have closed this entry
+by deleting the guard's reason to exist.
+
+⚠ **THE BLINDNESS IS NOT FIXED, AND SAYING SO IS THE POINT.** This entry warned that *"bumping the
+literal without also adding the file to the scope command fixes the symptom and leaves the
+blindness"* — that warning stands. **There was no scope command to edit.** `backend/pytest.ini` is
+three lines (`testpaths = tests`), so this file is already in the DEFAULT collection; what excluded
+it was a per-plan hand-typed file list living in `189-RESEARCH.md` §D15 and its two variants —
+archived phase artifacts that no future phase reads. Editing those would have changed nothing for
+the next phase. So the blindness is addressed the only durable way available: a ⚠ block at the top
+of `test_nl_gen_regression_test_count_unchanged`'s own docstring naming the three scopes that
+exclude it and telling whoever narrows a scope next that this file belongs in it. That is a
+mitigation sited where it will actually be read, **not** a claim that the class of defect is gone.
+
+**Re-open trigger:** the next phase that hand-types a narrowed backend pytest scope and omits
+`tests/test_182_extraction_parity.py` — or any future RED on this pin that a phase gate reports
+as green.
+
 ⚠ **STILL NOT FIXED, and now deliberately so rather than by scope accident.** The one-literal
 bump is trivial, but this round is a CODE-REVIEW FIX round and the finding list does not
 contain it; fixing an unrelated pre-existing failure inside a closure round is precisely the
