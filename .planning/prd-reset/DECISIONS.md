@@ -1408,6 +1408,19 @@ The standalone Tenancy-Model ADR at `.planning/phases/160-tenancy-model-adr/160-
 
 ---
 
+## D-v3.6-01 — Connector-Architecture verdict (records CONN-01's decision half)
+
+**Status:** Ratified 2026-08-07
+**Type:** Per-milestone architectural decision (v3.6). The second `D-vX.Y-NN` entry recorded in this file, following `D-v3.4-01`'s precedent — Phase 189's locked decision D-10 places the connector verdict itself in `docs/` (where the long-lived architecture docs live, and where it survives milestone archiving) and its citable pointer HERE, so the decision is reachable by D-number from the register `CLAUDE.md` points at.
+
+The connector-architecture doc at `docs/CONNECTOR-ARCHITECTURE.md` records the own-framework-vs-Open-Platform verdict for external integrations: **MCP-first, first-party-thin, broad catalog sequenced with Open Platform (SEED-013/014)**. The verdict was reached by the 2026-07-24 competitor crawl and is RECORDED by Phase 189, not re-opened or re-validated (Phase 189 decision D-11); it carries a dated re-open trigger in the doc.
+
+This entry discharges the *recorded-decision* half of requirement **CONN-01** and Phase 189's success criterion #3 ("the milestone records the own-framework-vs-Open-Platform decision durably"). CONN-01's other half — the governed `external_action` node on the canvas — is code and remains open until it ships. Live outbound egress is CONN-02 / CONN-03 (Phase 190, STRETCH), and no MCP client exists in the backend today.
+
+The basis, what the verdict deliberately does NOT decide, and the dated re-open trigger are not restated here. This is a pointer; the full text lives in `docs/CONNECTOR-ARCHITECTURE.md`.
+
+---
+
 ## Cross-references
 
 - Synthesis (full): `.planning/research/milestone-shaping-2026-05-09.md`
@@ -1416,6 +1429,7 @@ The standalone Tenancy-Model ADR at `.planning/phases/160-tenancy-model-adr/160-
 - PRD template (Plan 02 output, downstream of this file): `.planning/prd-reset/PRD-TEMPLATE.md`
 - 6 milestone PRDs (Plans 03-08 outputs): `.planning/PRDs/v2.6.md`, `.planning/PRDs/v3.0.md`, `.planning/PRDs/v3.1.md`, `.planning/PRDs/v3.2.md`, `.planning/PRDs/v3.3.md`, `.planning/PRDs/v3.4.md`
 - Cross-PRD consistency report (Plan 09 output): `.planning/prd-reset/SUMMARY.md`
+- Connector architecture (the `D-v3.6-01` pointer target — the full MCP-first verdict, its basis and its dated re-open trigger): `docs/CONNECTOR-ARCHITECTURE.md`
 - Project state: `.planning/PROJECT.md` (Key Decisions table — the per-milestone D-vN.N-NN ADRs live there; this file is for cross-milestone D-PRD-NN ADRs)
 - Project memory cross-refs cited inline above:
   - `project_target_scale.md` (D-PRD-01)
