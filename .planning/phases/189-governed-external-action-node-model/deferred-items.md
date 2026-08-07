@@ -53,6 +53,35 @@ assertion on `test_103_nl_generate.py` (`== 6`) is still correct and must not be
 whichever comes first. Whoever bumps it should also add `tests/test_182_extraction_parity.py`
 to the phase-scope pytest command so the next drift is visible the day it happens.
 
+### ⚠ THE TRIGGER HAS FIRED — recorded at phase close, 189-16 Task 2 (2026-08-07)
+
+**Re-measured, not inherited:**
+
+```
+$ venv/Scripts/python.exe -m pytest tests/test_182_extraction_parity.py -q --no-header
+1 failed, 5 passed
+FAILED tests/test_182_extraction_parity.py::test_nl_gen_regression_test_count_unchanged
+
+$ grep -c "^def test_\|^async def test_" tests/unit/test_103_grounding_fidelity.py
+7
+```
+
+**Still RED. The pin expects 2; the file now holds 7.** Both branches of the trigger are now
+satisfied: 189-16 is the LAST plan of the phase and it adds no test to that file, so the count
+is final at **7** unless a gap round moves it; and `/gsd:verify-work 189` is the next command.
+
+⚠ **It was NOT fixed here**, and the reason is the scope boundary rather than an oversight:
+`189-16-PLAN.md` declares `files_modified` as `.planning/ROADMAP.md` and `189-VALIDATION.md`
+only, and this is a pre-existing failure dated to **189-02** (`fe7bd092`) — not one this plan's
+changes caused. Fixing it inside a documentation plan would also make the phase's final commit
+touch backend test source for a reason no task asked for.
+
+⚠ **The genuinely dangerous property, restated because it survives the fix:** this failure is
+invisible to EVERY phase-scope command — the canonical nine, the ten-file variant, and the
+fourteen-file full scope all exclude `tests/test_182_extraction_parity.py`. The phase's standing
+`2 failed / N passed` baseline structurally cannot see it. **Bumping the literal without also
+adding the file to the scope command fixes the symptom and leaves the blindness.**
+
 ---
 
 ## D-189-DEF-02 — the author-facing tool rail will render a capability STRUCK THROUGH

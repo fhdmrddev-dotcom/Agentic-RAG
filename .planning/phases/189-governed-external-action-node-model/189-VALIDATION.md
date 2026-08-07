@@ -1,11 +1,38 @@
 ---
 phase: 189
 slug: governed-external-action-node-model
-status: draft
+status: coverage-consolidated-driven-rows-owed
 nyquist_compliant: false
-wave_0_complete: false
+wave_0_complete: true
 created: 2026-08-07
+consolidated: 2026-08-07
+consolidated_by: 189-16 Task 2
 ---
+
+<!--
+FLAG EVIDENCE — both flags below are set from measurement, and the one that stayed false
+stayed false deliberately.
+
+wave_0_complete: true
+  All three Wave-0 backend suites exist and run, and the migration gate is no longer skipping:
+    backend/tests/unit/test_189_external_action_model.py   (189-01, 8 REDs observed at HEAD)
+    backend/tests/unit/test_189_no_egress.py               (189-01, 3 REDs observed at HEAD)
+    backend/tests/test_migration_115.py                    (189-01 green-skip -> 189-06, 3 passed)
+  The fourth Wave-0 item (a picker component suite) landed as
+    frontend/src/components/workflows/ExternalActionSection.test.tsx (189-14 T1, 25 cases).
+
+nyquist_compliant: false  <-- NOT an oversight. It is the honest reading.
+  Every V row has an automated command and a verdict (all 23 green). But SIX of the seven U
+  rows have NEVER BEEN DRIVEN, and they are precisely the rows no automated command can
+  reach: jsdom applies no CSS, computes no stacking contexts, and .click() bypasses
+  hit-testing entirely. Setting this true on the strength of "an explicit owed note" would
+  make the flag mean "we wrote down that we did not look", which is the scoreboard-that-lists-
+  only-what-passed failure this file exists to prevent.
+
+  FLIPS TO true WHEN: the 189-16 Task 3 live session records PASS/FAIL verdicts for U1-U6
+  plus the D-25 pairing and BUG-260807-01's reachability row, with U2's falsification control
+  observed swinging BOTH ways. Nothing else is outstanding.
+-->
 
 # Phase 189 — Validation Strategy
 
@@ -87,16 +114,36 @@ SEED-056 rot). **The COUNT columns are the backstop. Never read `failed 0` as "n
 
 ## Wave 0 Requirements
 
-- [ ] `backend/tests/unit/test_189_external_action_model.py` — **NEW.** D-04's stored-false coercion
+- [x] `backend/tests/unit/test_189_external_action_model.py` — **NEW.** D-04's stored-false coercion
       (V06), D-02's closed-set raise, the emptied-`available_tools` refusal (V09).
-- [ ] `backend/tests/unit/test_189_no_egress.py` — **NEW.** SC#4: the `grep mcp → 0` source fence
+      **DONE — 189-01 (`d8926830`), 8 failed / 2 passed at HEAD.** All 8 flipped by 189-07.
+- [x] `backend/tests/unit/test_189_no_egress.py` — **NEW.** SC#4: the `grep mcp → 0` source fence
       (V11) + the patched-transport falsification (V10).
-- [ ] `backend/tests/test_migration_115.py` — **NEW.** The positive/negative CHECK controls (V13);
-      runs only after the operator applies the migration via the Supabase SQL editor.
-- [ ] A capability-picker component test file **if** the picker becomes its own component
-      (`ExternalActionSection.tsx` — RESEARCH recommends it should, to honour 185's PhaseFormPanel shape).
-- [ ] **No framework install needed** — vitest and pytest are both present and green at baseline.
-- [ ] ⚠ **Every new frontend suite needs its `TARGETS` entry IN THE COMMIT THAT CREATES IT.**
+      **DONE — 189-01 (`47d0a988`), 3 failed / 5 passed at HEAD.** All 3 flipped by 189-09; 16 passed now.
+      ⚠ **The mandated positive control FALSIFIED ITS OWN PLAN'S REGEX**: `\bmcp\b` does not match
+      `MCPClient`, so the fence was strengthened to fire on camel/Pascal segment starts too.
+- [x] `backend/tests/test_migration_115.py` — **NEW.** The positive/negative CHECK controls (V13);
+      runs only after the operator applies the migration.
+      **DONE — 189-01 (`41e289f8`) 3 skipped → 189-06 3 passed.** ⚠ **The apply method DEVIATED from
+      the plan's stated one** and 189-06 recorded it rather than smoothing it: operator-AUTHORISED,
+      but executed verbatim in ONE psycopg2 transaction against `127.0.0.1:54322`, not pasted into
+      the Supabase SQL editor. The prohibition the rule exists to enforce HELD — no `supabase db push`,
+      no `db reset` — and that is proved by DATA, not asserted: `workflow_phases` reads **439 rows**
+      before and after, `workflow_runs` 197, `threads` 711.
+- [x] A capability-picker component test file **if** the picker becomes its own component.
+      **DONE — the picker DID become its own component.** `ExternalActionSection.tsx` (185 L) +
+      `ExternalActionSection.test.tsx` (25 cases), 189-14 T1 (`0024e03e`).
+- [x] **No framework install needed** — vitest and pytest are both present and green at baseline.
+      **CONFIRMED — Phase 189 installed NOTHING.** No `npm install`, no `pip install`, no
+      package-legitimacy checkpoint was owed (`T-189-SC`).
+- [x] ⚠ **Every new frontend suite needs its `TARGETS` entry IN THE COMMIT THAT CREATES IT.**
+      **SATISFIED — but the RULE AS WRITTEN WAS MEASURED FALSE, twice, and the correction is the
+      useful part.** `src/components/workflows` is a **DIRECTORY** entry in the gate's `TARGETS`, so
+      both new suites (`runVocabulary.test.ts`, 189-10; `ExternalActionSection.test.tsx`, 189-14) RAN
+      THE MOMENT THEY EXISTED and `TARGETS` was never edited — only `BASELINE` was owed. The gate
+      printed `runVocabulary.test.ts — 12 new` before any pin was written. The rule's INTENT (a new
+      suite must not be able to hide from the gate) held both times; its LETTER applies only to
+      `src/lib/` and `src/pages/`, which are named-file-only.
 
 **RED-first is mandatory on every one of these.** The standing project lesson (185, 186, 188.1,
 188.2) is: *observe the falsification RED before trusting the green.* V20 in particular already
@@ -134,16 +181,38 @@ stream).
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or a Wave 0 dependency
-- [ ] Sampling continuity: no 3 consecutive tasks without an automated verify
-- [ ] Wave 0 covers all ❌ MISSING references above (V06, V09, V10, V11, V13, V23)
-- [ ] Every new frontend suite has its `TARGETS` entry in the same commit
-- [ ] No watch-mode flags anywhere
-- [ ] Feedback latency < 15 s per task
+- [x] All tasks have `<automated>` verify or a Wave 0 dependency — **MEASURED, not assumed:**
+      `grep -c "<task type=" ` vs `grep -c "<automated>"` over all sixteen plans reads
+      **34 tasks / 34 `<automated>` blocks**, a per-plan exact match on every one.
+- [x] Sampling continuity: no 3 consecutive tasks without an automated verify — **follows from the
+      line above**: the count matches per plan, so there is no run of even ONE unverified task,
+      let alone three.
+- [x] Wave 0 covers all ❌ MISSING references above (V06, V09, V10, V11, V13, V23) — **five of six
+      by Wave-0 suite; V23 by the alternative this file already offered.** V06/V09 →
+      `test_189_external_action_model.py`; V10/V11 → `test_189_no_egress.py`; V13 →
+      `test_migration_115.py`. **V23 took the `grep fence` branch of its own "doc-fence test **or**
+      `checkpoint:human-verify`" spec**, in 189-03: thirteen greps whose expected values would change
+      if the content were wrong. See the V23 row for why neither guard is vacuous — and for the one
+      thing that is honestly weaker about it.
+- [x] Every new frontend suite has its `TARGETS` entry in the same commit — ⚠ **ticked WITH A
+      CORRECTION, not as written.** Neither new suite needed a `TARGETS` entry: both live under a
+      DIRECTORY target and ran on creation. See the Wave-0 item above.
+- [x] No watch-mode flags anywhere — **MEASURED:** `grep -c -- "--watch\|vitest watch"` over all
+      sixteen `189-NN-PLAN.md` returns **0** in every file.
+- [x] Feedback latency < 15 s per task — the per-task targeted commands ran in **0.28 s – 5.04 s**
+      (backend) and seconds (frontend targeted). The count gate (~2–3 min) is a per-WAVE gate, as
+      specified, not a per-task one.
 - [ ] Driven rows U1–U4 executed via Chrome MCP; U5/U6 ridden on the first live run
-- [ ] `nyquist_compliant: true` set in frontmatter
+      — ⚠ **UNTICKED. NOT DONE. NOT PARTLY DONE.** 189-16 Task 3 is a BLOCKING human-verify
+      checkpoint and it has not been run. This box is the whole reason `nyquist_compliant`
+      stays `false`. **An unticked box with a reason is information; a ticked box without
+      evidence is not.**
+- [ ] `nyquist_compliant: true` set in frontmatter — ⚠ **UNTICKED**, and deliberately. See the
+      flag-evidence comment in the frontmatter for the exact condition that flips it.
 
-**Approval:** pending
+**Approval:** ⚠ **PENDING — and specifically pending ONE live session, not pending more code.**
+All 23 automated rows are green and all three full-suite gates are at or above baseline. What is
+owed is the set of claims a green unit suite structurally cannot make.
 
 ---
 
@@ -199,3 +268,158 @@ driven reachability row the separately-tracked WR-04 bug is still open for.
 **Wave-0 gap ownership:** the three new backend suites are **189-01**; the new frontend suite
 (`ExternalActionSection.test.tsx`) is **189-14 T1**, and its `TARGETS` entry lands in the commit that
 creates it.
+
+
+---
+
+## ⚠ CONSOLIDATED COVERAGE MAP — closed out at 189-16 Task 2, 2026-08-07
+
+> The plan-time map above records what was PROMISED. This one records what was DELIVERED, and the
+> two are meant to be read against each other. Every figure here was **re-derived by running the
+> command**, never carried from a plan or a prior SUMMARY — twenty-plus pointer-drift catches in
+> this phase are why.
+>
+> **The RED column is the point of this table.** A green whose RED was never observed is recorded
+> as such, not as a pass. Four distinct grades appear, and they are not interchangeable:
+>
+> | Grade | Meaning |
+> |---|---|
+> | **RED→GREEN** | The assertion was observed FAILING at HEAD in one plan and PASSING in a later one. The strongest grade. |
+> | **PLANT RED** | Authored green, but a deliberate wrong fix was driven into PRODUCTION source and observed turning it red, then restored (md5-verified). Non-vacuity is proved. |
+> | **CONTROL** | Authored green with a matched positive/negative control in the same suite, so the assertion cannot pass for the wrong reason. No falsification observed. |
+> | **GREEN-ONLY** | Authored green in the same plan as the source change, with no observed falsification. Weakest. Named explicitly wherever it applies. |
+
+### Automated rows — V01 … V23
+
+| # | Owning plan · task | Status | Command (re-run at phase close) | RED evidence |
+|---|---|---|---|---|
+| **V01** | **189-01 T1** (behaviour) → **189-07 T1** (assertions) | ✅ green | `pytest tests/unit/test_harness_models.py -q` | ⚠ **MIXED, and the distinction is recorded rather than rounded up.** The BEHAVIOUR was RED at HEAD — 189-01 observed 8 failures in `test_189_external_action_model.py`. But V01's own assertions in `test_harness_models.py` were **authored GREEN by 189-07 in the same plan as the union member**, and could not have been red. Grade: RED→GREEN for the behaviour, **GREEN-ONLY for the row as written**. |
+| **V02** | **189-09 T1** | ✅ green | `pytest tests/test_harness_engine.py -q` → **44 passed** | **CONTROL.** Authored green beside the executor (+1 case, 40→41 at 189-09). Non-vacuity carried by an **unregistered-type control** in the same test, not by an observed RED. |
+| **V03** | **189-12 T1 + T2** (ONE commit — the type reds five suites the instant it lands) | ✅ green | `npx vitest run src/components/workflows/definitionOps.test.ts src/components/workflows/StepTypePicker.test.tsx` → **243 / 46** | **RED→GREEN + PLANT RED.** `tsc` moved **33 → 37 → 33**: the 7th type raised four real errors, one of them a `TS7053` at `slugForType` **that no planning document lists**. Plants **V / W / X** each observed RED — and only the D-23 cross-language fence can see V (a client member the server lacks). ⚠ RESEARCH's *"sixteen six-count pins"* was **WRONG BOTH WAYS — 5 missing, 6 that do not move**; four of the five were SHAPE assertions a grep cannot see, found by RUNNING the suite. |
+| **V04** | **189-09 T2** | ✅ green | `pytest tests/test_harness_whitelist.py -q` → **12 passed** (was 8) | **CONTROL.** Four DRIVEN proofs that D-03 rides the **shipped** `phase_whitelist` refusal with no second guard added. No observed RED. |
+| **V05** | **189-01 T1** → **189-07 T2** | ✅ green | `pytest tests/unit/test_185_detection.py -q` | **RED→GREEN.** The D-15 assertion is on the **SET** (`{send_email, create_ticket, post_message} ∩ KB_TOOLS == ∅`), never one name, exactly as the row demands. 185's L-2 fence was NARROWED and the reason recorded. |
+| **V06** | **189-01 T1** (RED) → **189-07 T2** (green) | ✅ green | `pytest tests/unit/test_189_external_action_model.py -q` | **RED→GREEN.** One of 189-01's 8 observed REDs. The D-04 pin lives on **`PhaseSpec`, not `WorkflowDefinition`** — a definition-level validator only fires when a WHOLE definition is parsed, so a `PhaseSpec` parsed alone would have read unarmed. Carries an `llm_single` negative control. |
+| **V07** | **189-05 T2** | ✅ green | `pytest tests/unit/test_187_armed_checkpoint_property.py -q` → **30 passed** | **PLANT RED.** Four wrong-fix plants driven into production source, each observed RED. The **preservation** half is the load-bearing one: `test_a_live_non_golden_run_still_pauses_on_an_armed_phase` had to STAY green while the golden-run branch landed, and it did. |
+| **V08** | **189-14 T2** | ✅ green | `npx vitest run src/components/workflows/GovernanceSection.test.tsx` → **49 passed** (was 42) | **CONTROL (negative-first) + PLANT RED.** The negative control was written **FIRST**, because the "renders ON and non-interactive" pin is otherwise satisfiable by disabling the control everywhere. Six plants. The switch is rendered ON, `disabled`, `aria-disabled`, explained in text, and **not struck through** (185's "remove a dead control" does not apply — the control is pinned, not dead). |
+| **V09** | **189-01 T1** (RED) → **189-07 T1** (green) | ✅ green | `pytest tests/unit/test_189_external_action_model.py -q` | **RED→GREEN.** `available_tools` is **TOTAL REPLACEMENT** by `[capability]`, not a merge — a merge would let an author park `search_documents` on the step and silently arm the grounding dial, since detection is `available_tools ∩ KB_TOOLS`. Replacement is fail-CLOSED. |
+| **V10** | **189-01 T2** (3 REDs) → **189-09 T1** (green) | ✅ green | `pytest tests/unit/test_189_no_egress.py -q` → **16 passed** (was 3 failed / 5 passed) | **RED→GREEN + PLANT RED.** SC#4's **only mechanical proof**: the HTTP transport is patched to RAISE, the executor runs, and it does not raise. Three wrong-fix plants each observed RED. |
+| **V11** | **189-01 T2** | ✅ green | `pytest tests/unit/test_189_no_egress.py -q` · `grep -rni "\bmcp\b" backend/app --include=*.py` → **0** | ⚠ **CONTROL — and the strongest single control in the phase, because it falsified the plan that mandated it.** The plan specified `\bmcp\b`; the positive control proved that regex **does not match `MCPClient`**, so the fence would have passed over a real MCP client. Strengthened to fire on word AND camel/Pascal segment starts. **A control that never fires is a control nobody has tested.** |
+| **V12** | **189-11 T2** | ✅ green | `pytest tests/test_harness_engine.py -q` → **44 passed** | **PLANT RED — and the plants found what the assertions could not.** Plants **J / K / L / M** each observed RED. ⚠ Under **J** the receipt fence stayed GREEN, and under **L** BOTH V20 and the D-05 core test stayed GREEN — the fourth time this phase that the headline proof was blind to a real defect and exactly one test could see it. "The run CONTINUES" is bought **by placement** and proven **by the next phase running**, never by the status alone. |
+| **V13** | **189-01 T3** (green-skip) → **189-06 T2/T3** (PASS) | ✅ green | `pytest tests/test_migration_115.py -q` → **3 passed** (live `:54322`) | **CONTROL, both directions driven.** V13a: `recorded_not_sent` is ADMITTED. V13b: the rendered sentence `'Not sent — recorded'` is **REJECTED** with SQLSTATE **23514** naming `workflow_phases_status_check`. D-17 is now an executable test, not a comment. Every write rolls back — `workflow_phases` reads 439 before and after. |
+| **V14** | **189-08 T1** + **189-10 T1** | ✅ green | `npx vitest run src/lib/phaseState.test.ts src/components/workflows/PhaseNodeCard.test.tsx` → **40 / 132** | **CONTROL + PLANT RED.** Exact-match **inequality** against every word the surface ships (`Locked`, `Running`, `Complete`, `Failed`, `Attempt`, `Skipped`, `Unknown`), never `toContain` — the new word shares a prefix with a shipped one. A positive control renders a `done` card and confirms the comparison **can** find equality, so seven inequalities are seven measurements rather than seven no-ops. |
+| **V15** | canvas **189-10 T1** · panel **189-08 T2** · phase output **189-09 T1** | ✅ green | `npx vitest run src/pages/WorkflowRunPage.test.tsx src/components/workflows/PhaseNode.test.tsx` + `pytest tests/unit/test_189_no_egress.py -q` | **PLANT RED (canvas half).** Six wrong fixes planted into production source in 189-10, each observed RED, each restored by md5. ⚠ The **intermediate state was MEASURED rather than argued**: with 189-08 shipped and 189-10 not yet, the canvas rendered the reading as `State unknown` with the DOTTED unknown ring — **never `Complete`**, never the closed circle. |
+| **V16** | **189-11 T1** | ✅ green | `pytest tests/unit/test_audit_event_registration.py -q` → **6 passed** | ⚠ **NO RED IS POSSIBLE, and that is the row's meaning.** The guard PREDATES 189; its value is that it **did not move**. D-09 declines a new `harness_audit` event type, so the recorded terminal rides the EXISTING `phase_transition` kind (`via: recorded_not_sent`) and the Python literal set carries a **zero-line diff**. A `recorded_not_sent` phase writes **no** `phase_completed` receipt — consequence is not receipt. |
+| **V17** | **189-15 T1 + T2** | ✅ green | `npx vitest run src/components/workflows/PhaseNodeCard.test.tsx src/components/workflows/WorkflowCanvas.test.tsx` → **132 / 53** + `tsc -p tsconfig.app.json` = **33** | ⚠ **THE ONE ROW WITH A CONTROL OBSERVED SWINGING BOTH WAYS IN THE AUTOMATED SET: the `@ts-expect-error` third-badge control moved 33 → 34 → 33, planted and restored.** A third badge is a **typecheck error**, not a convention. **AND the phase's most valuable negative finding lives here:** under **PLANT 1** (a type-conditional gate instead of D-12's state-conditional one) **all four RENDER cases stayed GREEN** and only the SOURCE fence went red — because nothing can be connected to anything until Phase 190, so the two gates render byte-identically. **A DOM-only suite would have shipped the coupling D-12 exists to prevent.** |
+| **V18** | **189-13 T2** | ✅ green | `npx vitest run src/components/workflows/phaseVocabulary.test.ts` → **112 passed** (was 96) | **PLANT RED.** **Z2** (an ungated tier let `llm_single` claim *Sends an email*) and **Z3** (a FABRICATED face for an unknown capability) each observed RED. All three capabilities covered; an unrecognised value falls to the tier-3 sentence **without fabricating**. |
+| **V19** | **189-13 T1** | ✅ green | `npx vitest run src/components/workflows/soulData.test.ts` → **17 passed** (was 14) | **PLANT RED.** **PLANT Y** — the key added to ONE map only — produced **3 failures**. The split-brain rule is now a **KEY-SET property** via `PHASE_GLYPH_MARK_KEYS`, so a **NINTH** type inherits the guard. ⚠ The **KEYS** are exported and the **MAP** is not, deliberately: handing out the map would let a caller bypass `phaseGlyph()`'s own-property guard — the `[Function Object]` React child that hard-crashed a node face at 188.1-04. |
+| **V20** | **189-02 T1** (RED CAPTURED) → **189-05 T2** + **189-04 T2** (the two fixes) → **189-11 T2** (GREEN) | ✅ green — **the phase's headline gate** | `pytest tests/unit/test_publish_service.py -q` → **28 passed** ⚠ **NOT `tests/test_publish_gate.py`** | ⚠ **RED→GREEN, AND THE STRONGEST RESULT IN THE PHASE: both original REDs were RE-OBSERVED THROUGH V20 ITSELF.** Quoting a prior plan's RED beside a green proves two things happened, not that they are connected — so each upstream fix was **UNDONE in production source** and V20 re-run: reverting 189-05 → `blocked_stage='golden_run_error'`; reverting 189-04 → `blocked_stage='grounding_fidelity'` with `{'code': 'unregistered_tool', … 'send_email'}`. Both restored md5-identical, `grep -c REVERTPLANT` → 0. Four more plants (J/K/L/M) each RED. ⚠ **AND ONE DEFECT FOUND BY ACCIDENT:** V20's first run passed every publish assertion **over an EMPTY phase spine** (`load_run_phases → []`, `published: True`) — a publish test asserting only the verdict cannot tell a workflow that ran from one that did not. |
+| **V21** | **189-02 T2** (RED CAPTURED) → **189-04 T2** (green) | ✅ green | `pytest tests/unit/test_103_grounding_fidelity.py -q` | **RED→GREEN, with a control forbidding the wrong fix.** RED at HEAD across **all three** capabilities. The green had to arrive by widening `tool_names` ONLY — `test_a_genuinely_unknown_tool_still_produces_the_finding` stays green, so rule 2 cannot be weakened into a pass. ⚠ `tool_names` is read **off the production `assemble_grounding_bundle`**, never recomputed: a re-typed set would have had to be EDITED to go green, which is a test that measures the patch. |
+| **V22** | **189-02 T3** (authored green, **PLANT OBSERVED RED**) → re-run green at 189-04 / 07 / 09 / 11 / 13 / 14 | ✅ green — **the phase's single net-new security property** | `pytest tests/test_182_grounding_bundle.py -k "author_facing or external_action"` → **1 passed** | **PLANT RED — and it is the ONLY thing that can see the D-20 hole.** 189-04's PLANT 2 showed the entire fidelity suite stays **GREEN** while the governance hole is open. 189-13's **PLANT Z5** (the exact D-20 wrong fix — give the type the generic rail and widen its options) went RED on four of five guards. ⚠ **189-04 deliberately REFUSED to edit this file** though the plan listed it: editing the only guard between a change and a governance hole, in the commit that could open that hole, is the one edit worth refusing. |
+| **V23** | **189-03 T1 + T2** | ✅ green | `grep -c "MCP-first" docs/CONNECTOR-ARCHITECTURE.md` → **3** · `grep -c "^\|" …` → **0** · `grep -c "D-v3.6-01" .planning/prd-reset/DECISIONS.md` → **2** · `grep -c '^### '` inside the new section → **0** | ⚠ **GREEN-ONLY — the weakest grade in the table, and it is named rather than dressed up.** No RED was observed and none was possible: this is a doc-existence fence, and it took the `grep fence` branch of its own "doc-fence test **or** checkpoint" spec. What keeps it non-vacuous is that the two guards count things the **REJECTED** shapes would produce: `^\|` = 0 is the D-11 no-competitor-scoring-table guard, `^### ` = 0 is the D-10 not-a-full-ADR guard. What it still cannot tell you is whether the doc is any GOOD — SC#3 is satisfied structurally, not editorially. |
+
+**Automated total: 23 / 23 green.** Grades: **8 RED→GREEN · 8 PLANT RED · 5 CONTROL · 2 GREEN-ONLY (V01-as-written, V23).**
+
+### Driven rows — U1 … U7. jsdom reaches NONE of U1–U6.
+
+**jsdom applies no CSS, computes no stacking contexts, and `.click()` bypasses hit-testing entirely.
+That is how `BUG-260806-01` survived from 184-12 and how `BUG-260807-01` survived until 2026-08-07.
+A green unit suite is not evidence for any row below.**
+
+| # | Owning plan · task | Status | What is owed | Blocking condition |
+|---|---|---|---|---|
+| **U1** — 7th glyph VISIBLE, not ~4× dimmer than the other six | **189-16 T3** | ⛔ **NOT DRIVEN — OWED** | Seven computed fill/luminance figures read off ONE canvas showing all seven types, the seventh compared against the other six | Live stack (backend + local DB + Redis, **operator-started**) + a Chrome MCP session. ⚠ 189-13 recorded, IN THE TEST'S OWN COMMENT, that **presence is not visibility**: the slug `outbox-tray` was verified present in the INSTALLED `@iconify-json/fluent-emoji@1.2.7` (3174 icons) and a missing slug was PROVED to fail the build — but **168.4 is an unweighted palette estimate**, and the `llm_batch_agents` luminance-34.5 defect was a present, in-band, plausible value that still disappeared on screen. |
+| **U2** — the "Not connected" badge neither occludes nor is occluded | **189-16 T3** | ⛔ **NOT DRIVEN — OWED** | `document.elementFromPoint(x,y)` at the badge's own centre AND at the ⛨ seal, the verdict mark and the ✕/＋ lane affordances — **with a falsification control observed swinging BOTH ways** | Same. ⚠ **An unfalsified pass proves nothing here.** This is exactly how `BUG-260806-01` was closed: move or resize something so the check FAILS, confirm it fails, restore, confirm it passes. |
+| **U3** — the 8th ring distinguishable **by shape alone in greyscale** | attribute half **189-10 T1** ✅ · **visual half 189-16 T3** | ⚠ **HALF DONE.** Attribute half ✅ green; **greyscale half ⛔ NOT DRIVEN** | The eight `stroke-dasharray` / `stroke-dashoffset` strings read off the LIVE DOM, then the canvas viewed with `filter: grayscale(1)` | Same. **What 189-10 DID prove, mechanically:** the new reading is the **only FOUR-arc** one, captured from the rendered DOM twice and md5-identical, with an `EXPECTED_RING` falsification row and six plants each RED. Every number UI-SPEC §4b predicted was independently recomputed and matched — including dashoffset **16.022** and the four gap centres **.125 / .375 / .625 / .875**, none of which is 0.75. **What no unit test can say is whether eight shapes are still eight shapes to a human eye with the colour taken out.** |
+| **U4** — the badge does not push the card out of its height budget | **189-16 T3** | ⛔ **NOT DRIVEN — OWED** | `getBoundingClientRect()` on the card with and without the badge, **and** an adjacent node's position both times | Same. ⚠ **The acceptance is that the spine's edge baseline does not move and no neighbour reflows — NOT that all cards are the same height.** This card is legitimately taller than its neighbours. |
+| **U5** — **OWED SINCE 188.2** (`D-188.2-DEF-07`, row A2) | **189-16 T3** | ⛔ **NOT DRIVEN — OWED (a debt older than this phase)** | On a live run: the seven shipped readings stay distinguishable by shape · the running arc actually **spins** · a card with no reading is **still** | Same session. It has been owed since Phase 188.2 **because it needs a live run**, and this phase launches live runs — which is the entire reason all three debts were routed onto ONE session rather than three. |
+| **U6** — **OWED SINCE 188.2** (`D-188.2-DEF-08`, row A1's visual half) | **189-16 T3** | ⛔ **NOT DRIVEN — OWED (a debt older than this phase)** | One glance at a Builder card | Same session. **Zero marginal cost** — pair with U5. |
+| **U7** — migration 115 APPLIED to the live local DB | **189-06 T2** | ✅ **DONE** | — | ⚠ **Applied by a method the plan did not name, and 189-06 recorded the deviation rather than smoothing it.** Operator-AUTHORISED, executed verbatim in ONE psycopg2 transaction against `127.0.0.1:54322`, **not** pasted into the Supabase SQL editor. **The prohibition the rule exists to enforce held completely** — no `supabase db push`, no `db reset` — and that is proved by DATA: `workflow_phases` **439 rows** before and after. `full-schema.sql` was regenerated by `scripts/regenerate-full-schema.sh` in DEFAULT mode (**no `--reset`**), never hand-edited, and the diff is **ONE line**. |
+
+### Also owed on the SAME live session (189-16 T3) — neither is a U row, and neither may be dropped
+
+| Item | Status | What is owed |
+|---|---|---|
+| **D-25** — the run band's RUN-level verdict above a node's PHASE-level *"Not sent — recorded"* | ⛔ **NOT DRIVEN — OWED** | Confirm on screen that the pairing reads as **intended**, not as a contradiction. ⚠ **This is a RECORDED DECISION, not a defect found in testing** — the band is a RUN-level verdict, the node a PHASE-level one, and the run genuinely did complete. It is listed because *an accepted divergence nobody wrote down is indistinguishable from a bug when someone meets it on screen.* |
+| **`BUG-260807-01`** — the WR-04 driven reachability row | ⛔ **NOT DRIVEN — OWED**; the report stays `status: open` for this row **only** | Create a phase whose slug is an INHERITED PROPERTY NAME (e.g. `constructor`) and confirm its affordances remain reachable **at their own coordinates** via `document.elementFromPoint`. The code fix already shipped standalone (`267f6347`) — see D-14 below. **jsdom cannot see this defect**, so a green unit suite is not evidence. |
+| **`D-189-DEF-03`** — the latency-of-honesty gap | ⛔ **NOT DRIVEN — and it is the single thing this session is most likely to catch that no unit test will** | The `recorded_not_sent` branch emits **NO SSE**, deliberately (`phase_completed` maps to a *"✓ Complete"* card in `StreamsProvider.onPhaseCompleted`, so emitting it would paint the exact lie the branch exists to prevent). But emitting nothing lets `finalizeAllPhasesForThread` sweep the card to `done` at `run_completed`, **so a live viewer sees "Complete" until a reconcile fetch.** Watch for it during the run. Phase 190 owns the fix (a new SSE + a client handler + a sweep exclusion, in ONE commit — a plan, not a deviation). |
+
+**Driven total: 1 done (U7) · 1 half (U3) · 5 not driven · 3 further items owed on the same session.**
+**No driven row was silently dropped, and none is recorded as passing on a unit suite's evidence.**
+
+---
+
+## Standing debts recorded at phase close — not V/U rows, and not to be lost
+
+| Item | State at close | Trigger |
+|---|---|---|
+| **`D-189-DEF-01`** — `test_182_extraction_parity.py::test_nl_gen_regression_test_count_unchanged` | ⚠ **STILL RED. Re-measured at close, not inherited:** `1 failed, 5 passed`; the pin expects **2** and `test_103_grounding_fidelity.py` now holds **7** `def test_`. Broken by **189-02** (`fe7bd092`), not by any later plan. ⚠ **It is invisible to every phase-scope command** — it is in neither the 9-file nor the 10-file nor the 14-file set, so the phase's standing baseline structurally cannot see it. | Its own re-open trigger has **NOW FIRED**: 189 has stopped adding tests to that file and this is the last plan. The fix is ONE literal at `backend/tests/test_182_extraction_parity.py:303` (`== 2` → the then-current count). ⚠ Whoever bumps it must ALSO add `tests/test_182_extraction_parity.py` to the phase-scope command, so the next drift is visible the day it happens. The sibling `test_103_nl_generate.py` pin (`== 6`) is still correct and **must not be touched**. |
+| **`D-189-DEF-02`** — the author-facing tool rail | ✅ **CLOSED at 189-13** (`5963ba4b`) — ⚠ **and its PREMISE was measured FALSE first.** `PhaseFormPanel.tsx` has six mutually exclusive `pt === …` branches and **no default arm**, so `external_action` never reached the generic rail and **no render code changed**. What was missing was the MECHANICAL guard: five cases now fence it, four went RED under PLANT Z5. | None. Closed. |
+| **`D-189-DEF-03`** — the live run surface has no honest wire signal | ⛔ **OPEN.** Recorded in full above. | **Phase 190**, which MUST close it — or `/gsd:verify-work 189` if the owed live session observes it first. |
+| **Cloud parity for migration 115** | ⛔ **OWED — UNAPPLIED to cloud.** 115 joins the standing queue at **migs 099 onward**, plus `SECRETS_ENCRYPTION_KEY`. | The next **operator-gated** production push. Order matters; apply in sequence via the cloud Supabase SQL editor. **Code deploying ≠ cloud configured.** |
+| **`BUG-260807-01`** | ⛔ **OPEN — for its driven browser row ONLY.** The code fix shipped standalone. | The owed live session (above). |
+
+---
+
+## D-14 — the boundary, PROVEN BY A DIFF rather than asserted
+
+`BUG-260807-01` was routed **OUT** of this phase by the operator (D-14): its own report proposed
+folding it in as *"a natural, cheap rider"*, and the sizing said otherwise — one file, one import,
+two call sites, no schema, no API surface, squarely G-3 `/gsd:fast` territory. It is **188.2's own
+residue** and it degrades a fix 188.2 had just shipped, so it does not belong on 189's ledger.
+
+**Measured at phase close, over the WHOLE phase (`eef887bf..HEAD`, where `eef887bf` is the parent of
+`d8926830`, the first 189-01 commit):**
+
+```
+$ git diff --stat eef887bf..HEAD -- frontend/ backend/ supabase/ docs/ CLAUDE.md
+  60 files changed, 7757 insertions(+), 228 deletions(-)
+
+$ git diff --name-only eef887bf..HEAD | grep -ci "editAffordance\|providerLogo"
+  0                     <-- NEITHER D-14 file appears anywhere in the phase
+
+$ git diff --name-only eef887bf..HEAD | grep -ci "PhaseNode.tsx"
+  1                     <-- POSITIVE CONTROL: the grep CAN find a file that IS in the diff
+
+$ git diff --diff-filter=D --name-only eef887bf..HEAD | wc -l
+  0                     <-- no tracked file deleted anywhere in the phase
+
+$ git merge-base --is-ancestor 267f6347 eef887bf   ->  true
+  267f6347 2026-08-07 fix(WR-04): guard the sixth and seventh prototype-pollution sinks (BUG-260807-01)
+```
+
+**D-14 HELD.** The WR-04 fix landed in a standalone commit that is an **ancestor of the phase base**,
+and no 189 commit touched `editAffordance.ts` or `providerLogo.tsx`. The bug stays OPEN for its
+driven browser row only.
+
+## The reported-bugs cross-check — re-run at close, and the result is "none"
+
+```
+$ grep -ln "folded_into: *189" .planning/reported-bugs/*.md
+  (no match)
+```
+
+**NO report carries a `folded_into` value naming 189.** There is therefore nothing this phase owed a
+reported bug, and **that is the finding, not an omission** — the project rule requires the check to
+be RUN and its result RECORDED, including when the result is empty. (`BUG-260807-01` reads
+`folded_into: null` by D-14's design, not by oversight.)
+
+---
+
+## Full-suite gates — re-run at phase close, 2026-08-07, every figure re-derived
+
+| Gate | Baseline in this file | **Measured at close** | Reconciliation |
+|---|---|---|---|
+| `npx tsc --noEmit -p tsconfig.app.json` | 33 | **33** ✅ | Unmoved across all fifteen code plans. It excursioned **33 → 41 → 40** (189-08 armed seven exhaustive tables as a compiler-generated worklist) and **40 → 33** (189-10 consumed them to exhaustion), and **33 → 37 → 33** at 189-12. ⚠ A bare `tsc --noEmit` checks **ZERO** files — the `-p tsconfig.app.json` is load-bearing. |
+| `node scripts/vitest-count-gate.cjs` | 2508 / 45 files | **2627 / 47 of 47 pinned, 0 failing** ✅ | **+119 tests, +2 files.** Attribution: 189-08 +13 (2508→2521) · 189-10 +25 (→2546, `runVocabulary.test.ts` NEW) · 189-12 +14 (→2560) · 189-13 +27 (→2587) · 189-14 +32 (→2619, `ExternalActionSection.test.tsx` NEW) · 189-15 +8 (→2627). **No per-file DECREASE at any point.** ⚠ Per `D-188.2-DEF-01` the gate's `failed` column is **NOT** a regression backstop on this machine (it varied 1→21→50→10→0→0 at an identical total). **The COUNT columns are.** ⚠ The script's own `BASELINE_TOTAL` prose comment drifted for **six consecutive plans** — trust the PRINTED value, never the comment. |
+| backend — **the canonical NINE** (RESEARCH §D15) | 166 passed / 2 failed | **181 passed / 2 failed** ✅ | **+15 passed**; the two failures are the two NAMED pre-existing `asyncpg … pool is closing` live-DB rows in `test_182_grounding_bundle.py`, unmoved. **No third.** |
+| backend — **the TEN** (nine + `tests/unit/test_publish_service.py`) | — | **209 passed / 2 failed** ✅ | ⚠ **THE NINE-FILE COMMAND CANNOT SEE THE D-19 FALSIFICATION OR V20 — the phase's headline gate.** V20 lives in `tests/unit/test_publish_service.py`, which is in NO §D15 set. **Append it.** (+28 = that file entire.) |
+| backend — **the FULL 189 scope** (the ten + `test_189_external_action_model.py` + `test_189_no_egress.py` + `test_migration_115.py` + `test_harness_whitelist.py`) | — | **251 passed / 2 failed** ✅ | The honest whole-phase picture. Same two pre-existing failures, nothing else. |
+
+⚠ **`tests/test_publish_gate.py` is the Phase-136 SKILL gate and does not import `publish_service`.**
+**THREE consecutive plans (189-02, 189-05, 189-11) were sent to it by their own `files_modified`.**
+It was RUN and left unedited every time — 11 passed, unchanged. **V20 lives in
+`tests/unit/test_publish_service.py`.** This is written here rather than in a SUMMARY because a
+SUMMARY is read once and this file is read by whoever comes next.
+
+⚠ **No SC#10 cross-provider scoreboard is owed for this phase, and none was manufactured** — the
+ROADMAP exempts 189 as design/vocabulary work with no live stream.
