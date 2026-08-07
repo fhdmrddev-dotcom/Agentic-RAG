@@ -293,6 +293,29 @@ def test_nl_gen_regression_test_count_unchanged():
     The Phase-103 NL-gen + grounding-fidelity suites are THE extraction regression backstop.
     A failures-only differential cannot see a silently DELETED test, so pin the exact counts.
     Bump these literals only when a Phase-103 test is deliberately added/removed.
+
+    ⚠ THIS FILE IS INVISIBLE TO EVERY PHASE-SCOPE PYTEST COMMAND (D-189-DEF-01). It is not in
+    the nine-file 189-scope command from ``189-RESEARCH.md`` §D15, nor in the ten-file variant
+    189-02 introduced, so a phase whose standing baseline is those scopes cannot see this pin
+    go RED. That is exactly how it stayed RED for the whole of Phase 189 while every reported
+    gate read green. Whoever narrows a scope command next: this file belongs in it.
+
+    ⚠ THE FIDELITY PIN MOVED 2 → 8 ACROSS PHASE 189, and every step is dated rather than
+    asserted (``git show <ref>:<path> | grep -cE '^(async )?def test_'``):
+
+    | Ref             | defs | What added them                                        |
+    |-----------------|------|--------------------------------------------------------|
+    | ``fe7bd092~1``  | 2    | the pre-189 baseline this literal used to hold           |
+    | ``fe7bd092``    | 6    | 189-02 Task 2 — the D-20 leak guards (pin went RED HERE) |
+    | ``b6225aec~1``  | 7    | 189-04 — the ``EXTERNAL_ACTION_CAPABILITIES`` union case |
+    | ``b6225aec``    | 8    | review finding CR-01 — the negative control proving a    |
+    |                 |      | capability on an ``llm_agent`` step STILL blocks         |
+
+    All six additions are deliberate and none replaced a deleted test, so the guard's own
+    contract ("bump only on a deliberate add/remove") is satisfied by bumping, not by relaxing
+    the assertion to ``>=``. A floor would answer a different question than the one the
+    Phase-177 lesson asked: an exact count is what catches a silent swap of one test for
+    another, and that is the failure this backstop exists for.
     """
     fidelity = _TESTS_DIR / "unit" / "test_103_grounding_fidelity.py"
     nl_generate = _TESTS_DIR / "unit" / "test_103_nl_generate.py"
@@ -300,8 +323,8 @@ def test_nl_gen_regression_test_count_unchanged():
     assert fidelity.exists(), f"the grounding-fidelity backstop is GONE: {fidelity}"
     assert nl_generate.exists(), f"the NL-gen backstop is GONE: {nl_generate}"
 
-    assert _count_test_defs(fidelity) == 2, (
-        "test_103_grounding_fidelity.py must hold exactly 2 tests — a dropped grounding "
+    assert _count_test_defs(fidelity) == 8, (
+        "test_103_grounding_fidelity.py must hold exactly 8 tests — a dropped grounding "
         "test silently removes the extraction backstop (Phase-177 lesson)"
     )
     assert _count_test_defs(nl_generate) == 6, (
