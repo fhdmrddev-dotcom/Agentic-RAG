@@ -85,7 +85,13 @@ class WorkflowRunPhaseRead(BaseModel):
     slug: str
     phase_index: int
     status: str = Field(
-        description="pending | active | completed | failed | skipped (the DB-native vocabulary)"
+        description=(
+            "pending | active | completed | failed | skipped | recorded_not_sent "
+            "(the DB-native vocabulary). ``recorded_not_sent`` is migration 115's sixth "
+            "literal (189 / D-05): an approved governed external action that RECORDED "
+            "what it would have done and sent nothing. The wire carries the SLUG (D-17) "
+            "— the sentence a person reads is rendered by the client's vocabulary layer."
+        )
     )
     phase_type: str | None = None
 

@@ -791,3 +791,253 @@ class TestPhaseExecutors:
             out = await phase_types._exec_llm_human_input(phase, {}, _exec_ctx())
         assert captured["timeout"] == settings.ask_user_max_timeout_seconds
         assert out["answer"] == ""  # no response on timeout
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# 189 (CONN-01 / D-05) — THE THIRD BRANCH AT THE STATUS-WRITE SEAM
+#
+# An approved external action RECORDS what it would have done and THE RUN
+# CONTINUES. The status write is a THIRD branch beside the 101.1 emit-failure
+# sentinel, inside the same if/else — so "the run continues" is bought by
+# PLACEMENT (the unconditional advance_current_phase sits just below), never by
+# new control flow.
+#
+# ⚠ WHY EVERY TEST HERE ASSERTS THE NEXT PHASE RAN. A status assertion alone
+# cannot tell "continued" from "halted here": a branch that wrote the row and
+# then returned would satisfy it completely. That is the fail-open shape Phase
+# 188 spent two plans closing, and 189-05's PLANT E / 189-09's PLANT H both
+# proved it passes a headline test unnoticed. The subsequent phase's executor
+# running is the only thing that distinguishes them.
+# ═══════════════════════════════════════════════════════════════════════
+
+_RECORDED_SQL = "SET status='recorded_not_sent'"
+_COMPLETED_SQL = "SET status='completed'"
+
+
+def _external_action_definition(build_workflow_definition, *, capability="send_email"):
+    """A 2-phase workflow: the governed external action, then an ordinary step.
+
+    The SECOND phase exists solely so "the run continues" is observable. Its type is
+    a shipped one (``llm_single``) whose executor is stubbed in the drive below, so no
+    provider is ever called.
+    """
+    return build_workflow_definition(
+        [
+            {
+                "slug": "notify",
+                "phase_index": 0,
+                "config": {"phase_type": "external_action", "capability": capability},
+            },
+            {
+                "slug": "wrap-up",
+                "phase_index": 1,
+                "config": {"phase_type": "llm_single", "prompt": "Summarise what happened."},
+            },
+        ]
+    )
+
+
+def _drive_approved_external_action(wf, pool):
+    """Drive the REAL ``run_workflow`` over ``wf`` with the human APPROVING.
+
+    Returns ``SimpleNamespace(run_id, ids, visited, audits, emits)``.
+
+    ``_resolve_failure_with_ask_user`` returning ``None`` IS an approval — that is the
+    shipped contract of the armed action-risk checkpoint ("Only an approval returns None
+    and falls through"). Patching it here is the cheapest honest way to stand a person's
+    YES up in a unit test: the checkpoint itself, the arming read and everything after it
+    stay real, and the test can never hang on an ask channel.
+
+    ``audits`` records ``(event_type, metadata)`` for EVERY ``write_audit`` the drive
+    performs, so "no completion receipt for this phase" is a measured absence rather than
+    a reading of the source.
+    """
+    import asyncio
+
+    from app.services import harness_engine
+
+    run_id = uuid.uuid4()
+    ids = [uuid.uuid4() for _ in wf.phases]
+    pool.set_fetch_result(
+        [
+            {"id": ids[i], "slug": p.slug, "phase_index": p.phase_index,
+             "status": "pending", "output": {}}
+            for i, p in enumerate(wf.phases)
+        ]
+    )
+
+    visited: list[str] = []
+    audits: list[tuple] = []
+    emits: list[str] = []
+
+    async def _stub(phase, accumulated, ctx):
+        visited.append(phase.slug)
+        return {"text": f"output of {phase.slug}"}
+
+    async def _audit_spy(pool_, run_id_, *, user_id=None, event_type=None, metadata=None):
+        audits.append((event_type, metadata))
+
+    async def _emit_spy(redis_, stream_run_id_, event, **kw):
+        emits.append(event)
+
+    real_execute = harness_engine._execute_phase
+
+    async def _dispatch(phase, accumulated, ctx):
+        """Real dispatch for external_action; the stub for every other type."""
+        if getattr(phase.config, "phase_type", None) == "external_action":
+            return await real_execute(phase, accumulated, ctx)
+        return await _stub(phase, accumulated, ctx)
+
+    ctx = SimpleNamespace(inputs={"kickoff_prompt": "send Sarah the renewal summary"})
+
+    with (
+        patch.object(harness_engine, "_execute_phase", _dispatch),
+        patch.object(harness_engine, "write_audit", _audit_spy),
+        patch.object(harness_engine, "_emit", _emit_spy),
+        # the person said YES (None == approved; see the docstring above)
+        patch.object(
+            harness_engine, "_resolve_failure_with_ask_user", AsyncMock(return_value=None)
+        ),
+    ):
+        asyncio.run(
+            harness_engine.run_workflow(run_id, wf, ctx, pool=pool, redis=_NoopRedis())
+        )
+
+    return SimpleNamespace(run_id=run_id, ids=ids, visited=visited, audits=audits, emits=emits)
+
+
+def test_an_approved_external_action_records_not_sent_and_the_run_continues(
+    build_workflow_definition, mock_asyncpg_pool
+):
+    """D-05 — the row says ``recorded_not_sent`` AND THE NEXT PHASE RAN.
+
+    Two assertions, and the second is the one that cannot be satisfied by a status write:
+      1. the external-action phase's row is flipped to ``recorded_not_sent`` (never
+         ``completed`` — the lie D-08 declined to ship when it rejected deriving the word
+         at render while the column stayed ``completed``);
+      2. the SUBSEQUENT phase's executor ran and ``advance_current_phase`` was reached —
+         D-05's "the run CONTINUES", proven by the run continuing.
+    """
+    import json as _json
+
+    wf = _external_action_definition(build_workflow_definition)
+    r = _drive_approved_external_action(wf, mock_asyncpg_pool)
+
+    recorded = [
+        (sql, args) for sql, args in mock_asyncpg_pool.calls if _RECORDED_SQL in sql
+    ]
+    assert len(recorded) == 1, (
+        f"D-05: expected exactly ONE recorded_not_sent write, saw {len(recorded)}. "
+        f"UPDATEs on workflow_phases: "
+        f"{[s for s, _ in mock_asyncpg_pool.calls if 'workflow_phases' in s]!r}"
+    )
+    assert recorded[0][1][0] == r.ids[0], "the write landed on the wrong phase row"
+    persisted = _json.loads(recorded[0][1][1])
+    assert persisted["recorded_intent"]["capability"] == "send_email", (
+        "the recorded intent must be durable on the row — the record IS the outcome"
+    )
+
+    # ── the external action was NOT written as completed ─────────────────────────
+    completed_ids = [
+        args[0] for sql, args in mock_asyncpg_pool.calls if _COMPLETED_SQL in sql
+    ]
+    assert r.ids[0] not in completed_ids, (
+        "the governed external action was written 'completed' — the row would read as a "
+        "successful send forever to anything querying workflow_phases directly (D-08)"
+    )
+
+    # ── THE RUN CONTINUES — the next phase RAN ───────────────────────────────────
+    assert r.visited == ["wrap-up"], (
+        f"D-05: the run did not continue past the external action. Phases whose executor "
+        f"ran after it: {r.visited!r} (the external action's own executor is dispatched "
+        f"for real and is not recorded there). A branch that returned or continued out of "
+        f"the loop satisfies the status assertion above and still halts the run — that is "
+        f"the whole reason this assertion exists."
+    )
+    assert r.ids[1] in completed_ids, "the following phase never reached its own write"
+    advanced = [
+        args for sql, args in mock_asyncpg_pool.calls
+        if "UPDATE workflow_runs SET current_phase_id" in sql
+    ]
+    assert any(a[1] == r.ids[1] for a in advanced), (
+        f"advance_current_phase never pointed at the next phase; cursor writes={advanced!r}"
+    )
+
+
+def test_a_recorded_not_sent_phase_writes_no_phase_completed_receipt(
+    build_workflow_definition, mock_asyncpg_pool
+):
+    """T-189-31 — ``consequence is not receipt``, driven from the ledger.
+
+    A ``phase_completed`` row for a phase that RECORDED rather than completed tells the
+    audit ledger (which Phase 107 / GOV-02 reads as receipts) that the step completed. It
+    did not. The branch suppresses it, exactly as the shipped emit-failure branch
+    suppresses it for a phase it just flipped to ``failed``.
+
+    D-09 is why no NEW event type replaces it: a new kind means a CHECK migration PLUS the
+    Python literal set, and the shipped ``action_risk_pending`` receipt already records
+    that a human was asked. The receipt for the recorded intent is Phase 190's, when it
+    would describe a real consequence.
+
+    ANTI-VACUITY: the ORDINARY phase in the same run must have its ``phase_completed``
+    receipt — otherwise the absence below would be satisfied by a recorder wired to the
+    wrong symbol or a drive that never reached the audit call at all.
+    """
+    wf = _external_action_definition(build_workflow_definition)
+    r = _drive_approved_external_action(wf, mock_asyncpg_pool)
+
+    completed_for = [
+        (md or {}).get("phase") for et, md in r.audits if et == "phase_completed"
+    ]
+
+    # ── positive control: the ordinary phase DID get its receipt ─────────────────
+    assert "wrap-up" in completed_for, (
+        f"harness broken: no phase_completed receipt for the ORDINARY phase either "
+        f"(receipts={completed_for!r}) — the absence asserted below would be vacuous"
+    )
+
+    assert "notify" not in completed_for, (
+        "a phase_completed receipt was written for a phase that recorded and sent "
+        "nothing. The ledger would say the step completed; consequence is not receipt."
+    )
+    # And no new audit KIND was invented to replace it (D-09).
+    _SHIPPED_KINDS = {
+        "run_started", "run_completed", "run_failed", "phase_started",
+        "phase_completed", "phase_transition", "gate_passed", "gate_failed",
+        "tool_refused", "action_risk_pending",
+    }
+    assert {et for et, _ in r.audits} <= _SHIPPED_KINDS, (
+        f"D-09: an unregistered harness_audit event kind was written: "
+        f"{sorted({et for et, _ in r.audits} - _SHIPPED_KINDS)!r}. A new kind needs a "
+        f"CHECK migration AND the Python literal set; 189 introduces neither."
+    )
+
+
+def test_an_output_with_no_sentinel_still_routes_to_complete_phase(
+    build_workflow_definition, mock_asyncpg_pool
+):
+    """THE SHARED PATH IS A LITERAL NO-OP (the D-14 red line this phase inherits).
+
+    A Deep / ordinary success output carries no sentinel key, so the third branch cannot
+    see it and the phase still routes to ``complete_phase``. Driven as a real assertion:
+    the ordinary two-phase run writes TWO ``completed`` rows and ZERO
+    ``recorded_not_sent`` rows.
+    """
+    wf = build_workflow_definition(
+        [
+            {"config": {"phase_type": "llm_single", "prompt": "first"}},
+            {"config": {"phase_type": "llm_single", "prompt": "second"}},
+        ]
+    )
+    r = _drive_approved_external_action(wf, mock_asyncpg_pool)
+
+    completed = [sql for sql, _ in mock_asyncpg_pool.calls if _COMPLETED_SQL in sql]
+    recorded = [sql for sql, _ in mock_asyncpg_pool.calls if _RECORDED_SQL in sql]
+    assert len(completed) == 2, (
+        f"the ordinary path must still complete both phases: {completed!r}"
+    )
+    assert recorded == [], (
+        f"an output with NO sentinel key was routed to the 189 branch: {recorded!r}. "
+        f"The shared path must be byte-identical."
+    )
+    assert r.visited == ["p0", "p1"]

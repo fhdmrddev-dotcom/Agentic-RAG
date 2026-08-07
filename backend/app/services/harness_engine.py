@@ -60,6 +60,7 @@ from app.db.workflows import (
     get_pending_ask_user,
     load_run_phases,
     mark_phase_active,
+    record_phase_not_sent,
     skip_phase,
     write_audit,
 )
@@ -1671,11 +1672,51 @@ async def run_workflow(
         # deliverable was never produced. Additive + harness-only: a Deep success output
         # has no ``failure`` key, so this is a literal no-op on the shared path.
         _emit_failure = output.get("failure") if isinstance(output, dict) else None
+        # Phase 189 (CONN-01 / D-05) — THE THIRD BRANCH, same mechanism, one over.
+        # An ``external_action`` phase that a human APPROVED returns a normal output
+        # dict carrying ``phase_types.RECORDED_INTENT_KEY``: it RECORDED the action it
+        # would have taken and SENT NOTHING (SC#4 — nothing leaves this app in 189).
+        #
+        # WHY THE BRANCH EXISTS. Without it the row reads ``completed``, and
+        # ``completed`` means the send happened. That is precisely the lie D-08 declined
+        # to ship when it rejected deriving the honest word at render while the COLUMN
+        # stayed ``completed`` — anything querying ``workflow_phases`` directly (the
+        # status-repair scripts, the operator ledger, a future 190 reconciliation) would
+        # read a successful send forever. The status is its own persisted word,
+        # ``recorded_not_sent`` (migration 115 / D-17: the column stores the SLUG; the
+        # sentence a person reads is rendered by the client's vocabulary layer).
+        #
+        # THE KEY IS IMPORTED, NEVER RE-TYPED. ``RECORDED_INTENT_KEY`` is exported by
+        # the producer (``harness/phase_types.py``) exactly so the two ends of this seam
+        # cannot drift on a bare string literal.
+        #
+        # A LITERAL NO-OP ON THE SHARED PATH. A Deep success output has no sentinel key,
+        # so this branch cannot see it — the same additive + harness-only property the
+        # emit-failure branch above states, and the red line (D-14) this phase inherits.
+        #
+        # PLACEMENT IS WHAT MAKES "THE RUN CONTINUES" TRUE (D-05). This branch sits
+        # INSIDE the same if/else, after the ``outcome.kind`` checks have passed, and
+        # that block falls through to the unconditional ``advance_current_phase`` just
+        # below — the ``fail_run`` and ``skip_to`` branches return/continue out of the
+        # loop long before here. A branch that returned instead would be "skip the
+        # step", the fail-open shape Phase 188 spent two plans closing, and it would make
+        # the arming decorative. The ORDER matters too: the failure sentinel keeps
+        # precedence, because a recorded intent that ALSO carries a failure is a failure.
+        # Lazy import (breaks the harness-package import cycle — the same rule the
+        # ``run_gates`` import above follows; ``phase_types`` pulls the provider
+        # services in, and nothing here may reach them at module import time).
+        from app.services.harness.phase_types import RECORDED_INTENT_KEY
+
+        _recorded_intent = (
+            output.get(RECORDED_INTENT_KEY) if isinstance(output, dict) else None
+        )
         if _emit_failure:
             # 101.1 review WR-02: persist the FULL failure output (incl. the cited
             # field_map states b/c/d carry) on the phase row — fail_phase merges it
             # under _failure_reason, so the extracted data survives durably (D-08).
             await fail_phase(pool, phase_id, str(_emit_failure), output=durable_output)
+        elif _recorded_intent:
+            await record_phase_not_sent(pool, phase_id, durable_output)
         else:
             await complete_phase(pool, phase_id, durable_output)
         accumulated_outputs[phase.slug] = output
@@ -1720,6 +1761,43 @@ async def run_workflow(
                 phase_index=phase.phase_index,
                 failure=str(_emit_failure),
             )
+        elif _recorded_intent:
+            # 189 (T-189-31) — THE RECEIPT QUESTION, ANSWERED: a phase that RECORDED
+            # rather than completed gets NO ``phase_completed`` receipt. This is a
+            # DECISION, not an omission. Phase 107 / GOV-02 reads harness_audit rows as
+            # receipts, and a completion receipt here would tell the ledger the step
+            # completed — the ``consequence is not receipt`` rule the Control Room binds
+            # this codebase to, and the same reasoning D-09 used when it declined to add
+            # a new event type at all (a NEW kind needs a CHECK migration PLUS the
+            # Python literal set in ``db/workflows.py``; the shipped
+            # ``action_risk_pending`` row already records that a human was asked and
+            # approved, and the receipt for the recorded INTENT is Phase 190's, when it
+            # would describe a real consequence).
+            #
+            # The row that IS written rides the EXISTING ``phase_transition`` kind —
+            # the same choice the emit-failure branch above made for the same reason —
+            # so the ledger records the phase's TRUE terminal without inventing
+            # vocabulary. ``via`` names the status, never a rendered sentence (D-17).
+            await write_audit(
+                pool,
+                run_id,
+                user_id=_audit_user_id,
+                event_type="phase_transition",
+                metadata={
+                    "phase": phase.slug,
+                    "phase_index": phase.phase_index,
+                    "via": "recorded_not_sent",
+                },
+            )
+            # ⚠ NO SSE IS EMITTED HERE, and that is also a decision. The shipped
+            # ``phase_completed`` event maps to a "✓ Complete" card in
+            # ``StreamsProvider.onPhaseCompleted`` — emitting it would paint the exact
+            # lie this branch exists to prevent, on the live run surface. A new event
+            # would need a client handler, and no plan in this phase builds one; the
+            # client's honest reading of this terminal comes from the DB status through
+            # ``phaseStatusFromDb`` on reconcile (189-08/189-10). The live-wire gap
+            # (``finalizeAllPhasesForThread`` sweeping a non-terminal card to done at
+            # ``run_completed``) is recorded in this phase's deferred-items.md.
         else:
             await write_audit(
                 pool,

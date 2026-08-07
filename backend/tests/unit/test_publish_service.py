@@ -1063,3 +1063,252 @@ async def test_route_judge_block_returns_200_structured_verdict():
     assert result.blocked_stage == "judge"
     assert result.golden_run_id == golden_run_id
     assert result.named_failures
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# V20 — THE PHASE'S HEADLINE GATE (189 / D-06): AN external_action WORKFLOW PUBLISHES
+#
+# ⚠ FILE PLACEMENT, AGAIN. `189-11-PLAN.md` names `backend/tests/test_publish_gate.py`
+# for this test, as `189-02-PLAN.md` and `189-05-PLAN.md` did before it. Re-measured
+# 2026-08-07 (third time): that file is the Phase-136 SKILL publish gate
+# (`compute_publish_gate` over `eval_runs`) — it does not import `publish_service`,
+# has no judge mock and no publish-driving fixture. `189-VALIDATION.md`'s V20 row was
+# corrected in Wave 0 and points HERE.
+#
+# WHY THIS DRIVES THE REAL GAUNTLET RATHER THAN MOCKING TO GREEN. V20 failed RED at
+# HEAD for TWO INDEPENDENT REASONS, and a test that patched either of them out would
+# be green for the wrong reason:
+#
+#   RED 1 — stage 2.6 (CONFLICT 2, fixed by 189-04). The capability in
+#     `available_tools` was refused as an unregistered tool. So `_grounding_fidelity_failures`
+#     is NOT patched here: the REAL stage runs, the REAL `assemble_grounding_bundle`
+#     computes the REAL `tool_names` union, and only the leaf REGISTRY READS (folders /
+#     skills / org) are faked — the same "fake the read, never the rule" posture
+#     `test_182_publish_grounding_stage.py` documents, pushed one level deeper so the
+#     union itself is real.
+#
+#   RED 2 — stage 3 (CONFLICT 1, fixed by 189-05). The armed checkpoint subscribed to
+#     the ask channel with an indefinite wait and the publish died at
+#     `harness_publish_max_seconds`. So `_drive_golden_run` is NOT patched either: the
+#     REAL engine drives the REAL phase through the REAL armed checkpoint on a golden
+#     ctx. Only its DB edges are faked. `subscribe_for_response` is the raising recorder
+#     from the CONFLICT-1 block above, so this test can NEVER hang — reaching the ask
+#     channel raises instantly and fails the publish loudly.
+#
+# What IS mocked is what the shipped suite mocks: the judge (`_judge_golden_output`),
+# the DB writes, and the service-role client.
+# ══════════════════════════════════════════════════════════════════════════════
+
+_V20_SLUG = "notify-the-customer"
+
+
+def _external_action_definition_dict() -> dict:
+    """A lint-clean, single-phase workflow whose ONE phase is the governed external action.
+
+    Single-phase on purpose: every phase in a publish golden run really executes, and a
+    second `llm_single` step would make a real provider call. The external action's own
+    executor calls nothing — that is the point of the type in this milestone.
+
+    `available_tools` is deliberately NOT written here: D-03 DERIVES it from `capability`
+    by total replacement, so the value stage 2.6 tests membership on is the one the
+    production validator produced.
+    """
+    return {
+        "slug": "v20-external-action",
+        "version": 1,
+        "name": "V20 External Action Workflow",
+        "status": "draft",
+        "phases": [
+            {
+                "slug": _V20_SLUG,
+                "phase_index": 0,
+                "name": "Notify the customer",
+                "config": {"phase_type": "external_action", "capability": "send_email"},
+                "validators": [],
+            }
+        ],
+        "business_requirement": "Tell the customer their renewal is due.",
+    }
+
+
+class _V20Redis:
+    """Records the engine's XADDs; satisfies `_emit`."""
+
+    def __init__(self):
+        self.xadds: list = []
+
+    async def xadd(self, stream, fields, *args, **kwargs):
+        self.xadds.append((stream, fields))
+        return "0-0"
+
+
+class _V20Supabase:
+    """The ephemeral-validation-thread INSERT, and nothing else.
+
+    `_drive_golden_run` performs exactly one supabase call before the engine takes over:
+    `supabase.table("threads").insert({...}).execute()`. Anything else this stand-in is
+    asked for raises, so a future edit that adds a silent second read is loud rather than
+    mysterious.
+    """
+
+    def __init__(self):
+        self.thread_id = str(uuid4())
+        self.inserts: list = []
+
+    def table(self, name):
+        assert name == "threads", f"the golden-run drive touched an unexpected table: {name!r}"
+        return self
+
+    def insert(self, payload):
+        self.inserts.append(payload)
+        return self
+
+    def execute(self):
+        return SimpleNamespace(data=[{"id": self.thread_id}])
+
+
+def _drive_v20_publish(pool):
+    """Run the REAL publish gauntlet over the external-action definition.
+
+    Returns `SimpleNamespace(result, subscribe_timeouts, supabase, redis)`.
+
+    Everything patched here is a DB edge, a registry READ or the judge. Every RULE —
+    lint, the interactive-phase check, stage 2.6's fidelity rules, the engine's armed
+    checkpoint, the phase executor and the status-write seam — is the shipped code.
+    """
+    import asyncio
+
+    from app.services.harness import grounding as g
+    from app.services.harness import publish_service
+
+    supabase = _V20Supabase()
+    redis = _V20Redis()
+    recorder = _SubscribeRecorder()
+    run_id = uuid4()
+    phase_id = uuid4()
+    # The run's phase spine, as `load_run_phases` reads it back. WITHOUT this the engine
+    # loops over ZERO phases and the publish still returns `published: True` — which is
+    # precisely why this test asserts the recorded_not_sent WRITE and not only the
+    # verdict. (Observed: the first run of this test passed every publish assertion with
+    # an empty spine.)
+    pool.set_fetch_result(
+        [{"id": phase_id, "slug": _V20_SLUG, "phase_index": 0,
+          "status": "pending", "output": {}}]
+    )
+
+    judge = AsyncMock(
+        return_value={
+            "overall_passed": True,
+            "overall_score": 94,
+            "summary": "Records the intended notification; nothing was sent.",
+            "criteria": [],
+        }
+    )
+
+    with (
+        patch("app.db.workflows.get_definition", AsyncMock(return_value=_v20_row())),
+        patch("app.db.workflows.write_audit", AsyncMock()),
+        patch("app.db.workflows.publish_definition", AsyncMock(return_value=2)),
+        # the golden run's DB edges (the ONLY thing faked inside _drive_golden_run)
+        patch("app.db.workflows.create_workflow_run", AsyncMock(return_value=run_id)),
+        patch("app.db.runs.insert_run", AsyncMock()),
+        patch("app.db.runs.finalize_run", AsyncMock()),
+        patch("app.models.user_settings.load_user_settings", lambda _uid: None),
+        # no real service-role client is ever constructed (the 182 posture)
+        patch.object(
+            publish_service,
+            "_resolve_publish_supabase",
+            AsyncMock(return_value=(supabase, str(uuid4()))),
+        ),
+        # the REGISTRY READS behind assemble_grounding_bundle — never the rules, and
+        # never the tool-name union, which is 189-04's fix and must be exercised.
+        patch("app.utils.folder_utils.fetch_visible_folders", AsyncMock(return_value=[])),
+        patch("app.utils.folder_utils._resolve_caller_org_ids", AsyncMock(return_value=set())),
+        patch.object(g, "_skill_registry", lambda *a, **k: []),
+        # the judge, exactly as the shipped tests mock it
+        patch.object(publish_service, "_judge_golden_output", judge),
+        # the ask channel RAISES instead of waiting — this test cannot hang
+        patch("app.services.ask_user_service.subscribe_for_response", recorder),
+    ):
+        result = asyncio.run(
+            publish_service.publish(
+                definition_id=_DEF_ID,
+                golden_input="the Acme renewal is due on 12 September",
+                user=_USER,
+                pool=pool,
+                redis=redis,
+            )
+        )
+
+    return SimpleNamespace(
+        result=result, subscribe_timeouts=recorder.timeouts, supabase=supabase, redis=redis,
+        phase_id=phase_id, run_id=run_id,
+    )
+
+
+def _v20_row() -> dict:
+    """`_definition_row`'s shape, carrying the external-action definition."""
+    definition = _external_action_definition_dict()
+    return {
+        "id": _DEF_ID,
+        "slug": definition["slug"],
+        "version": definition["version"],
+        "name": definition["name"],
+        "status": "draft",
+        "definition": definition,
+        "created_by": UUID(_USER["id"]),
+    }
+
+
+def test_v20_an_external_action_workflow_publishes(mock_asyncpg_pool):
+    """**V20 — THE PHASE'S HEADLINE GATE. RED AT HEAD FOR TWO INDEPENDENT REASONS.**
+
+    D-06: "a workflow containing the node PUBLISHES and RUNS". 189 is a shippable slice,
+    not a drawer of unpublishable drafts, and 190 needs a live workflow to upgrade in
+    place.
+
+    The two REDs, quoted from `189-02-SUMMARY.md`, are in this plan's SUMMARY beside the
+    green. Both are re-exercised here rather than patched away — see the block comment
+    above this test for exactly which seams are real and which are faked.
+
+    The last assertion is the one that stops this being a publish test that skipped the
+    thing it was about: the golden run's external-action phase must have REACHED
+    `recorded_not_sent`. A publish that green-lit a workflow whose governed step never
+    ran would satisfy `published is True` completely — that is 189-05's PLANT E and
+    189-09's PLANT H, one layer out.
+    """
+    run = _drive_v20_publish(mock_asyncpg_pool)
+
+    assert run.result["published"] is True, (
+        f"D-06 / V20: an external_action workflow did NOT publish. "
+        f"blocked_stage={run.result.get('blocked_stage')!r} "
+        f"named_failures={run.result.get('named_failures')!r}"
+    )
+    assert run.result.get("blocked_stage") is None, (
+        f"V20: the publish carried a blocked_stage: {run.result.get('blocked_stage')!r}"
+    )
+    assert run.result["version"] == 2
+
+    # ── CONFLICT 1 is really gone: nobody was asked, on a run nobody was watching ──
+    assert run.subscribe_timeouts == [], (
+        f"the golden run subscribed to the ask channel ({run.subscribe_timeouts!r}) — "
+        f"that is the 7200 s publish death 189-05 closed"
+    )
+
+    # ── the publish exercised the REAL path: the governed step ran and recorded ───
+    recorded = [
+        (sql, args) for sql, args in mock_asyncpg_pool.calls
+        if "SET status='recorded_not_sent'" in sql
+    ]
+    assert len(recorded) == 1, (
+        f"the golden run's external-action phase never reached recorded_not_sent. "
+        f"workflow_phases writes: "
+        f"{[s for s, _ in mock_asyncpg_pool.calls if 'UPDATE workflow_phases' in s]!r}"
+    )
+    import json as _json
+
+    persisted = _json.loads(recorded[0][1][1])
+    assert persisted["recorded_intent"]["capability"] == "send_email"
+    assert "NOT SENT" in persisted["text"], (
+        f"the recorded body must read as NOT SENT, never as a receipt: {persisted['text']!r}"
+    )
