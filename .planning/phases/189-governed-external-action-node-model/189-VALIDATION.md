@@ -25,7 +25,7 @@ created: 2026-08-07
 | **Quick run (backend)** | `cd backend && venv/Scripts/python.exe -m pytest tests/unit/<file>.py -q` |
 | **Full suite (frontend)** | `node scripts/vitest-count-gate.cjs` — **baseline 2508 tests / 45 files / 0 failing at HEAD** |
 | **Frontend typecheck** | `cd frontend && npx tsc --noEmit -p tsconfig.app.json` — **baseline 33** (bare `--noEmit` checks ZERO files) |
-| **Full suite (backend, 189 scope)** | the 9-file command in RESEARCH §D15 — **baseline 166 passed / 2 pre-existing failures** (named there) |
+| **Full suite (backend, 189 scope)** | the 9-file command in RESEARCH §D15 — **baseline 166 passed / 2 pre-existing failures** (named there). ⚠ **189-02 added a TENTH file, `tests/unit/test_publish_service.py`** (baseline 20 passed, now 23 passed / 2 intentional CONFLICT-1 REDs) — the 9-file command does NOT cover the D-19 falsification. Append it. |
 | **Estimated runtime** | quick < 15 s · count gate ~2–3 min · backend 189-scope ~40 s |
 
 ⚠ **The count gate has TWO knobs.** `TARGETS` selects which files RUN; `BASELINE` is the pinned
@@ -76,7 +76,7 @@ SEED-056 rot). **The COUNT columns are the backstop. Never read `failed 0` as "n
 | V17 | D-12 / D-18 | Badge slot 1 carries "Not connected" **only when not connected**; slot 2 unchanged; **a third badge is a typecheck error** (`@ts-expect-error` control) | unit + tsc | `npx vitest run src/components/workflows/PhaseNodeCard.test.tsx src/components/workflows/WorkflowCanvas.test.tsx` + `tsc -p tsconfig.app.json` | ✅ **rewrite the two slot-1-reserved pins** |
 | V18 | D-13 | The derived face is capability-specific for **all three** capabilities and falls to the type sentence when none is chosen | unit | `npx vitest run src/components/workflows/phaseVocabulary.test.ts` | ✅ extend |
 | V19 | glyph | `PHASE_GLYPHS` and `PHASE_GLYPH_MARKS` agree (7 = 7, same keys) — the split-brain fence | unit | `npx vitest run src/components/workflows/soulData.test.ts` | ✅ extend |
-| V20 | D-06 · **D-19** | **An `external_action` workflow PUBLISHES** — mock the judge, assert `published: true`, `blocked_stage` absent. **This test fails RED at HEAD and is the phase's headline gate.** | unit | `pytest tests/test_publish_gate.py -q` | ✅ extend |
+| V20 | D-06 · **D-19** | **An `external_action` workflow PUBLISHES** — mock the judge, assert `published: true`, `blocked_stage` absent. **This test fails RED at HEAD and is the phase's headline gate.** | unit | `pytest tests/unit/test_publish_service.py -q` | ✅ extend ⚠ **POINTER CORRECTED 2026-08-07 (189-02)** |
 | V21 | D-06 · **D-20** | Stage 2.6 emits **no** `unregistered_tool` finding for the three capabilities | unit | `pytest tests/unit/test_103_grounding_fidelity.py -q` | ✅ extend |
 | V22 | **D-20** leak | The three capabilities are **NOT** in `GroundingBundle.tools` — so no `llm_agent` can whitelist one | unit | `pytest tests/test_182_grounding_bundle.py -q` | ✅ extend ⚠ 2 pre-existing DB failures in this file |
 | V23 | SC#3 · D-10 | The `docs/` doc exists and the `DECISIONS.md` entry **points at it without restating it** | grep fence | doc-fence test **or** `checkpoint:human-verify` | ❌ **Wave 0 or checkpoint** |
@@ -176,9 +176,9 @@ stream).
 | V17 | **189-15 T1 + T2** | badge slot 1 conditional; the third-badge control RE-OBSERVED swinging |
 | V18 | **189-13 T2** | all three capabilities, plus an unknown value falling through without fabricating |
 | V19 | **189-13 T1** | the split-brain fence as a KEY-SET property, observed RED |
-| V20 | **189-02 T1** (RED captured) → **189-05 T2** + **189-04 T2** (fixes) → **189-11 T2** (green) | **the phase's headline gate** — RED at HEAD for TWO independent reasons |
-| V21 | **189-02 T2** (RED) → **189-04 T2** (green) | with a control forbidding a fix that weakens rule 2 |
-| V22 | **189-02 T3** (guard + observed plant) → **189-04 T2** (stays green) | ⚠ **T1 — the D-20 governance hole** |
+| V20 | **189-02 T1 ✅ RED CAPTURED** → **189-05 T2** + **189-04 T2** (fixes) → **189-11 T2** (green) | **the phase's headline gate** — RED at HEAD for TWO independent reasons. ⚠ Lives in `tests/unit/test_publish_service.py`, NOT `tests/test_publish_gate.py` (which is the Phase-136 SKILL gate — see `189-02-SUMMARY.md` Deviation 1). **189-05 must turn `test_an_armed_phase_does_not_subscribe_to_the_ask_channel_on_a_golden_run` and `test_the_armed_golden_run_subscribe_carries_the_indefinite_wait` green WITHOUT breaking `test_a_live_non_golden_run_still_pauses_on_an_armed_phase` or `test_the_armed_checkpoint_is_not_a_validator`.** |
+| V21 | **189-02 T2 ✅ RED CAPTURED** → **189-04 T2** (green) | with a control forbidding a fix that weakens rule 2. **189-04 must turn `test_an_external_capability_in_available_tools_produces_no_unregistered_tool_finding` green while `test_a_genuinely_unknown_tool_still_produces_the_finding` stays green.** |
+| V22 | **189-02 T3 ✅ AUTHORED + PLANT OBSERVED RED** → **189-04 T2** (stays green) | ⚠ **T1 — the D-20 governance hole.** `test_external_action_capabilities_are_absent_from_the_author_facing_tool_options` PASSES today and must never go red. |
 | V23 | **189-03 T1 + T2** | the doc exists; the D-entry points at it without restating it |
 
 ### Driven rows — jsdom cannot reach any of these
