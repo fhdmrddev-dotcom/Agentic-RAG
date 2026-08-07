@@ -1007,6 +1007,21 @@ export function makeStreamCallbacks(opts: {
       useStreamsStore
         .getState()
         .actions.setPhaseStatusForThread(threadId, phase, "failed", { error: failure }),
+    // 189 review CR-02: a governed external-action phase RECORDED its intent and sent
+    // nothing. Flip the card to its OWN terminal, for the same reason onPhaseFailed
+    // above does: both sweeps (finalizeEarlierPhasesForThread from the NEXT phase's
+    // onPhaseStarted, finalizeAllPhasesForThread from onRunCompleted) act on exactly
+    // {running, retrying} and skip every terminal — so leaving this card `running` was
+    // not "unresolved until reconcile", it was "✓ Complete within milliseconds", mid-run,
+    // for any step that is not the last. `"recorded-not-sent"` is an existing
+    // Phase["status"] member with its STATUS_META row ("↛ Not sent"), its canvasReading
+    // arm ("Not sent — recorded") and its milestoneFor sentence already shipped; this
+    // handler is the only thing that was missing between the DB truth and the live view.
+    // Closure threadId (PANEL-09); phasesByThread only.
+    onPhaseRecordedNotSent: (phase) =>
+      useStreamsStore
+        .getState()
+        .actions.setPhaseStatusForThread(threadId, phase, "recorded-not-sent"),
     onPhaseTransition: (from, _to, via) => {
       // A skip_to_phase routing marks the FROM phase skipped (it was bypassed by
       // a gate's on_failure='skip_to_phase'). A normal advance is a no-op on

@@ -869,6 +869,9 @@ def _drive_approved_external_action(wf, pool):
     visited: list[str] = []
     audits: list[tuple] = []
     emits: list[str] = []
+    # CR-02: the SSE half, with its payload. ``emits`` (names only) is kept beside it
+    # unchanged so nothing that reads it has to care about the wider capture.
+    emit_calls: list[tuple] = []
 
     async def _stub(phase, accumulated, ctx):
         visited.append(phase.slug)
@@ -879,6 +882,7 @@ def _drive_approved_external_action(wf, pool):
 
     async def _emit_spy(redis_, stream_run_id_, event, **kw):
         emits.append(event)
+        emit_calls.append((event, kw))
 
     real_execute = harness_engine._execute_phase
 
@@ -903,7 +907,10 @@ def _drive_approved_external_action(wf, pool):
             harness_engine.run_workflow(run_id, wf, ctx, pool=pool, redis=_NoopRedis())
         )
 
-    return SimpleNamespace(run_id=run_id, ids=ids, visited=visited, audits=audits, emits=emits)
+    return SimpleNamespace(
+        run_id=run_id, ids=ids, visited=visited, audits=audits,
+        emits=emits, emit_calls=emit_calls,
+    )
 
 
 def test_an_approved_external_action_records_not_sent_and_the_run_continues(
@@ -1010,6 +1017,73 @@ def test_a_recorded_not_sent_phase_writes_no_phase_completed_receipt(
         f"D-09: an unregistered harness_audit event kind was written: "
         f"{sorted({et for et, _ in r.audits} - _SHIPPED_KINDS)!r}. A new kind needs a "
         f"CHECK migration AND the Python literal set; 189 introduces neither."
+    )
+
+
+def test_a_recorded_not_sent_phase_emits_its_own_live_event(
+    build_workflow_definition, mock_asyncpg_pool
+):
+    """REVIEW CR-02 — the PRODUCER half of "the live surface must not say Complete".
+
+    The branch used to emit NO SSE at all, on the argument that the client learns the
+    truth from ``phaseStatusFromDb`` on reconcile. It does — on RELOAD. Live, the card
+    never left ``running``, and BOTH client sweeps act on exactly ``{running, retrying}``:
+    ``finalizeEarlierPhasesForThread`` (fired when the NEXT phase starts) repainted it
+    "✓ Complete" mid-run within milliseconds, and ``finalizeAllPhasesForThread`` (fired at
+    ``run_completed``) caught the last-phase case. Emitting nothing did not leave the card
+    unresolved; it handed the sweeps a straggler to tidy.
+
+    ⚠ THIS IS NOT A NEW AUDIT KIND, and the sibling
+    ``test_a_recorded_not_sent_phase_writes_no_phase_completed_receipt`` still binds:
+    D-09's "no new kind" argument is about ``harness_audit`` (a CHECK migration plus the
+    Python literal set), and its ``_SHIPPED_KINDS`` assertion runs on the same drive as
+    this one and is untouched. This is WIRE-ONLY — additive, and inert for any older
+    client, because ``api.ts`` dispatches on an else-if chain and an unmatched type simply
+    advances the cursor.
+
+    THREE ASSERTIONS, because the first two are each satisfiable by a wrong fix:
+      1. the recorded phase emits ``phase_recorded_not_sent`` carrying its own slug;
+      2. it emits NO ``phase_completed`` — the lie the client maps to "✓ Complete";
+      3. ANTI-VACUITY: the ordinary phase in the same run DOES emit ``phase_completed``
+         and does NOT emit the new event, so neither absence above can be produced by a
+         spy that never fired or by an emitter wired to the wrong branch.
+    """
+    wf = _external_action_definition(build_workflow_definition)
+    r = _drive_approved_external_action(wf, mock_asyncpg_pool)
+
+    def _phases_for(event: str) -> list:
+        return [kw.get("phase") for et, kw in r.emit_calls if et == event]
+
+    recorded = _phases_for("phase_recorded_not_sent")
+    completed = _phases_for("phase_completed")
+
+    # ── 3. anti-vacuity FIRST: the ordinary phase's live event still lands ───────
+    assert "wrap-up" in completed, (
+        f"harness broken: the ORDINARY phase emitted no phase_completed either "
+        f"(emits={r.emit_calls!r}) — every absence asserted below would be vacuous"
+    )
+    assert "wrap-up" not in recorded, (
+        f"the ordinary phase emitted the recorded-not-sent event: {r.emit_calls!r}"
+    )
+
+    # ── 1. the recorded phase announces its OWN terminal ─────────────────────────
+    assert recorded == ["notify"], (
+        f"CR-02: the recorded phase emitted no live event of its own "
+        f"(phase_recorded_not_sent frames={recorded!r}, all emits={r.emits!r}). The card "
+        f"then stays `running`, and both client sweeps upgrade `running` to `done` — so "
+        f"the live surface prints '✓ Complete' for the one step whose entire reason for "
+        f"existing is that it did not complete, while a reload shows 'Not sent'."
+    )
+    # The client keys the store row by slug, so the payload must carry it (and the index,
+    # which the sweeps and the positional floor both read).
+    payload = next(kw for et, kw in r.emit_calls if et == "phase_recorded_not_sent")
+    assert payload.get("phase") == "notify"
+    assert payload.get("phase_index") == 0
+
+    # ── 2. and never the event that maps to "✓ Complete" ─────────────────────────
+    assert "notify" not in completed, (
+        f"a phase_completed SSE was emitted for a phase that recorded and sent nothing: "
+        f"{r.emit_calls!r}. StreamsProvider.onPhaseCompleted maps it straight to `done`."
     )
 
 

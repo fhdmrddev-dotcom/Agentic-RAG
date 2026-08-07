@@ -213,3 +213,98 @@ describe("Phase 094 — phasesByThread demux (real SSE -> store)  [owner: Plan 0
     expect(afterB?.[0].slug).toBe("b-phase")
   })
 })
+
+// ══════════════════════════════════════════════════════════════════════════════
+// PHASE 189 REVIEW — CR-02: A `recorded_not_sent` PHASE MUST NOT PAINT "COMPLETE"
+// ══════════════════════════════════════════════════════════════════════════════
+//
+// THE DEFECT, END TO END. The engine's `elif _recorded_intent:` branch deliberately
+// emitted NO SSE at all, on the reasoning that the client would learn the truth from
+// `phaseStatusFromDb` on reconcile. It does — on RELOAD. In the LIVE session the card
+// never left `running`, and TWO store sweeps then upgraded it to `done` unprompted:
+//
+//   · `finalizeEarlierPhasesForThread`, fired from `onPhaseStarted` when the NEXT phase
+//     goes live — so any external-action step that is not the last is repainted
+//     "✓ Complete" MID-RUN, within milliseconds;
+//   · `finalizeAllPhasesForThread`, fired from `onRunCompleted` at `status==="completed"`
+//     — which catches the last-phase case.
+//
+// Downstream the card renders `STATUS_META.done` → "✓ Complete", `milestoneFor`
+// announces "Phase N of M, notify, complete" to a screen reader, and the canvas prints
+// "Complete" instead of "Not sent — recorded". A reload of the same run then shows
+// "Not sent": the live view and the reload disagreeing about whether work happened is
+// exactly the failure shape SPEC Req 4 forbids — here on the ONE step in the product
+// whose entire reason for existing is that it did not complete.
+//
+// THIS BLOCK DRIVES THE WHOLE CHAIN, not a reducer in isolation: raw SSE bytes → the
+// REAL `subscribeToRun` demux → the REAL `makeStreamCallbacks` handler → the REAL
+// provider action bodies → the store. That is deliberate, because BOTH halves of the
+// fix are new (the `phase_recorded_not_sent` wire branch in `api.ts` and the
+// `onPhaseRecordedNotSent` handler in `StreamsProvider`) and a test that stopped at
+// either seam would be green while the other was missing.
+//
+// The first case is the falsification and BOTH sweeps run inside it. The second is its
+// positive control: an ordinary phase in the same wire still finalises to `done`, so a
+// green here can never be a disabled sweep.
+describe("Phase 189 review CR-02 — a recorded-not-sent phase survives both live sweeps", () => {
+  function mountProvider() {
+    return renderHook(() => useTodos(null), {
+      wrapper: ({ children }: { children: ReactNode }) => (
+        <StreamsProvider>{children}</StreamsProvider>
+      ),
+    })
+  }
+
+  // The live wire of a two-step run whose FIRST step is the governed external action:
+  // it starts, records-and-sends-nothing, the next step goes live (⇒ the mid-run
+  // earlier-sweep fires), that step completes, and the run terminalises `completed`
+  // (⇒ the terminal sweep fires). Every frame is one the engine really emits.
+  const RECORDED_RUN_WIRE =
+    'data: {"type":"phase_started","phase":"notify","phase_index":0,"phase_type":"external_action"}\n\n' +
+    'data: {"type":"phase_recorded_not_sent","phase":"notify","phase_index":0}\n\n' +
+    'data: {"type":"phase_started","phase":"wrapup","phase_index":1,"phase_type":"llm_single"}\n\n' +
+    'data: {"type":"phase_completed","phase":"wrapup","phase_index":1}\n\n' +
+    'data: {"type":"run_completed","status":"completed"}\n\n' +
+    'data: {"type":"stream_end"}\n\n'
+
+  it("THE FALSIFICATION — the external-action step reads `recorded-not-sent` after a later phase starts AND after the run completes", async () => {
+    mountProvider()
+    const cbs = phaseCallbacks(THREAD_A)
+    vi.stubGlobal("fetch", mockSseFetch([RECORDED_RUN_WIRE]))
+    await act(async () => {
+      await subscribeToRun("run-recorded", "0", cbs)
+    })
+
+    const phases = useStreamsStore.getState().phasesByThread.get(THREAD_A) ?? []
+    expect(phases).toHaveLength(2)
+    const notify = phases.find((p) => p.slug === "notify")
+    expect(notify, "the external-action phase is missing from the live slice").toBeDefined()
+
+    // Asserted as NOT-`done` first, because `done` is the exact value the unfixed tree
+    // produces and the message is what a future reader needs to see.
+    expect(
+      notify?.status,
+      "CR-02: the live surface painted the recorded step Complete. A step that RECORDED " +
+        "its intent and sent NOTHING must never read as success — a reload of this same " +
+        "run shows 'Not sent', and the live view disagreeing with the reload about whether " +
+        "work happened is the failure shape SPEC Req 4 forbids.",
+    ).not.toBe("done")
+    expect(notify?.status).toBe("recorded-not-sent")
+  })
+
+  it("POSITIVE CONTROL — the ordinary phase in the same wire still finalises to `done`, so the sweeps are narrowed and not disabled", async () => {
+    mountProvider()
+    const cbs = phaseCallbacks(THREAD_A)
+    vi.stubGlobal("fetch", mockSseFetch([RECORDED_RUN_WIRE]))
+    await act(async () => {
+      await subscribeToRun("run-recorded", "0", cbs)
+    })
+
+    const phases = useStreamsStore.getState().phasesByThread.get(THREAD_A) ?? []
+    const wrapup = phases.find((p) => p.slug === "wrapup")
+    expect(wrapup?.status, "the ordinary step must still reach its own terminal").toBe("done")
+    // And the new event is genuinely CARRIED by the wire rather than inferred from the
+    // phase type: the external-action row is the one the event named, keyed by slug.
+    expect(phases.map((p) => p.slug)).toEqual(["notify", "wrapup"])
+  })
+})

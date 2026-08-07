@@ -1789,15 +1789,41 @@ async def run_workflow(
                     "via": "recorded_not_sent",
                 },
             )
-            # ⚠ NO SSE IS EMITTED HERE, and that is also a decision. The shipped
-            # ``phase_completed`` event maps to a "✓ Complete" card in
-            # ``StreamsProvider.onPhaseCompleted`` — emitting it would paint the exact
-            # lie this branch exists to prevent, on the live run surface. A new event
-            # would need a client handler, and no plan in this phase builds one; the
-            # client's honest reading of this terminal comes from the DB status through
-            # ``phaseStatusFromDb`` on reconcile (189-08/189-10). The live-wire gap
-            # (``finalizeAllPhasesForThread`` sweeping a non-terminal card to done at
-            # ``run_completed``) is recorded in this phase's deferred-items.md.
+            # ⚠ REVIEW FINDING CR-02 — THE "NO SSE" DECISION IS REVERSED HERE, and the
+            # paragraph that stood in its place is kept below because being wrong for a
+            # stated reason is worth reading. It said: emitting ``phase_completed`` would
+            # paint the exact lie this branch prevents (TRUE, and still true — that event
+            # is NOT what is emitted); a new event would need a client handler and no plan
+            # in this phase built one (TRUE at the time); the client's honest reading comes
+            # from ``phaseStatusFromDb`` on reconcile (TRUE — but only on RECONNECT).
+            #
+            # WHAT IT MISSED: emitting NOTHING does not leave the card unresolved, it
+            # leaves it ``running`` — and TWO store sweeps then upgrade ``running`` to
+            # ``done`` all on their own. ``finalizeEarlierPhasesForThread`` fires from
+            # ``onPhaseStarted`` when the NEXT phase goes live, so any external-action step
+            # that is not the last phase is repainted "✓ Complete" MID-RUN, within
+            # milliseconds; ``finalizeAllPhasesForThread`` fires from ``onRunCompleted``
+            # and catches the last-phase case. The live surface then announces
+            # "Phase N of M, notify, complete" to a screen reader and prints ✓ Complete on
+            # the card, while a RELOAD of the same run shows "Not sent" — the live view and
+            # the reload disagreeing about whether work happened is exactly the failure
+            # shape SPEC Req 4 forbids, on the one step in the product whose entire reason
+            # for existing is that it did not complete.
+            #
+            # The sweeps must not be able to INVENT a terminal they were never told, so the
+            # producer tells them. ``phase_recorded_not_sent`` is ADDITIVE and inert for any
+            # older client (``api.ts`` dispatches on an else-if chain; an unmatched type
+            # falls through and only advances the cursor). It is NOT a new audit kind — the
+            # receipt argument above is untouched and no CHECK migration is implied; this is
+            # wire-only, and the client maps it onto ``"recorded-not-sent"``, a
+            # ``Phase["status"]`` member that ALREADY has its ``STATUS_META`` row, its
+            # ``canvasReading`` arm and its ``milestoneFor`` sentence. Every consumer was
+            # already built; only the event was missing.
+            await _emit(redis, stream_run_id,
+                "phase_recorded_not_sent",
+                phase=phase.slug,
+                phase_index=phase.phase_index,
+            )
         else:
             await write_audit(
                 pool,

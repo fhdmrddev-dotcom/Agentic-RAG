@@ -491,6 +491,15 @@ export interface StreamCallbacks {
    *  phase_completed for it). FLAT phase/phase_index/failure. Panel-only — the
    *  handler writes phasesByThread, never bucketsBySurface. */
   onPhaseFailed?: (phase: string, phaseIndex: number, failure?: string) => void
+  /** 189 review CR-02: phase_recorded_not_sent SSE — a governed external-action phase
+   *  RECORDED the action it intended to take and sent nothing
+   *  (`workflow_phases.status='recorded_not_sent'`; the engine emits no phase_completed
+   *  for it). Without this event the card never left `running` and BOTH store sweeps
+   *  upgraded it to `done`, so the live surface printed "✓ Complete" for the one step
+   *  whose whole point is that it did not complete — while a reload showed "Not sent".
+   *  FLAT phase/phase_index. Panel-only — the handler writes phasesByThread, never
+   *  bucketsBySurface. */
+  onPhaseRecordedNotSent?: (phase: string, phaseIndex: number) => void
   /** phase_transition SSE — moved between phases (FLAT from_phase/to_phase/via;
    *  via==="skip_to_phase" marks the from-phase skipped). */
   onPhaseTransition?: (from: string, to: string, via: string) => void
@@ -926,6 +935,15 @@ export async function subscribeToRun(
             parsed.phase as string,
             parsed.phase_index as number,
             parsed.failure as string | undefined,
+          )
+        // 189 review CR-02: a governed external-action phase that RECORDED and sent
+        // nothing gets its own event (the engine emits no phase_completed for it, and
+        // emitting nothing left the card `running` for both sweeps to paint `done`).
+        // NO return (cursor still advances, exactly like phase_failed). Panel-only.
+        else if (t === "phase_recorded_not_sent" && callbacks.onPhaseRecordedNotSent)
+          callbacks.onPhaseRecordedNotSent(
+            parsed.phase as string,
+            parsed.phase_index as number,
           )
         else if (t === "phase_transition" && callbacks.onPhaseTransition)
           callbacks.onPhaseTransition(

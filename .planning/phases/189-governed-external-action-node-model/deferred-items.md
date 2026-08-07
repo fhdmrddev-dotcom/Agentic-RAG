@@ -148,6 +148,42 @@ four named frontend tests *plus* V22, rather than passing silently.
 
 ## D-189-DEF-03 — the LIVE RUN SURFACE has no honest wire signal for `recorded_not_sent`
 
+> ### ✅ CLOSED by review finding CR-02 (code-review fix round, 2026-08-07)
+>
+> Re-open trigger (a) fired early: the standard-depth review read the branch rather than a
+> UAT row. **Two claims below were measured WRONG and are corrected here rather than
+> quietly overwritten**, because the difference is what made this look deferrable:
+>
+> * The table names ONE sweep. There are **two**. `finalizeEarlierPhasesForThread` fires
+>   from `onPhaseStarted` when the **next** phase goes live — so any external-action step
+>   that is not the last was repainted "✓ Complete" **MID-RUN, within milliseconds**, not
+>   at run completion.
+> * *"a latency-of-honesty gap, not a persistent lie"* — false for the whole live session.
+>   The card was `done` from the next `phase_started` until the tab was reloaded, and
+>   `milestoneFor` announced *"Phase N of M, notify, complete"* to a screen reader
+>   throughout. The live view and the reload disagreed about whether work happened, which
+>   is SPEC Req 4's own failure shape.
+>
+> **What it actually cost — TWO files, not three.** The predicted
+> `finalizeAllPhasesForThread` exclusion was **not needed**: both sweeps already act on
+> exactly `{running, retrying}` and skip every terminal, so giving the card its own
+> terminal was sufficient. The fix is the additive `phase_recorded_not_sent` SSE
+> (`harness_engine.py`) + its `api.ts` wire branch and `StreamsProvider`
+> `onPhaseRecordedNotSent` handler — the `phase_failed` precedent this section already
+> named. No new `harness_audit` kind, so D-09 and the "consequence is not receipt"
+> argument are untouched; wire-only, and inert for an older client.
+>
+> Fenced end-to-end: `tests/test_harness_engine.py::
+> test_a_recorded_not_sent_phase_emits_its_own_live_event` (producer) and
+> `providers/__tests__/phaseHooks.test.tsx` "Phase 189 review CR-02" (raw SSE → real
+> `subscribeToRun` → real handler → store, with BOTH sweeps firing in the drive). Both
+> observed RED against the unfixed tree; the frontend one received exactly `'done'`.
+>
+> **Phase 190 no longer inherits this.** `189-RESEARCH.md` §A3's owed
+> `PhaseReconcile.test.tsx:235` row is superseded by the `phaseHooks.test.tsx` block,
+> which drives the live wire rather than the reducer.
+
+
 **Found during:** plan 189-11, Task 2 B (deciding what the third branch emits, having read
 `StreamsProvider.tsx` / `streamsStore.ts` as the plan instructed — read-only, both untouched).
 
