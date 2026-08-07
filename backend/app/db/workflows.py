@@ -1015,6 +1015,38 @@ async def skip_phase(pool: asyncpg.Pool, phase_id: UUID) -> None:
     )
 
 
+async def record_phase_not_sent(pool: asyncpg.Pool, phase_id: UUID, output: dict) -> None:
+    """Flip to ``recorded_not_sent`` AND write ``output`` in ONE atomic UPDATE (189 / D-05).
+
+    WHAT THIS STATUS MEANS. The phase is a governed EXTERNAL ACTION (the 7th
+    ``phase_type``): a human was asked and approved, the step RAN, and it RECORDED
+    the action it would have taken — it SENT NOTHING (D-05). None of the five shipped
+    statuses is true of that outcome: ``completed`` says the send happened,
+    ``failed`` says something went wrong (nothing did), and ``skipped`` says the step
+    never ran (it did, and a person approved it). Phase 190 swaps the no-op for a real
+    call behind an unchanged seam, and only then does this row become ``completed``.
+
+    ⚠ THE COLUMN STORES THE SLUG (D-17). ``recorded_not_sent`` is the literal in
+    ``workflow_phases_status_check`` (migration 115). The sentence a person reads —
+    "Not sent — recorded" (D-16) — is RENDERED by the client's vocabulary layer from
+    this slug and appears in no query and no constraint.
+
+    Called ONLY after the output is durable. The status flip and the output
+    write are a single statement (never two) so a crash between them is
+    impossible — the resumability invariant (HARNESS-03). Copies
+    ``complete_phase``; NOT ``fail_phase`` — there is no failure reason to merge
+    (D-08), so no failure-reason key is written here. The identifier itself is
+    deliberately not spelled in this body: the plan's check is a grep, and a
+    denial and a use read identically to one (the 189-09 fence lesson).
+    PHASE-KEYED write → ``WHERE id=$1``.
+    """
+    await pool.execute(
+        "UPDATE workflow_phases SET status='recorded_not_sent', output=$2::jsonb, updated_at=now() WHERE id = $1",
+        phase_id,
+        json.dumps(output),
+    )
+
+
 # ── workflow_runs writes (keyed by the runs table's own id) ──────────────────
 async def advance_current_phase(
     pool: asyncpg.Pool, run_id: UUID, next_phase_id: UUID | None
