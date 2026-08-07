@@ -545,7 +545,15 @@ const BASELINE = {
   "StarterTemplatePicker.test.tsx": 40,
   "canvasNudge.test.ts": 31,
   "governanceVocabulary.test.ts": 30,
-  "PhaseFormPanel.rails.test.tsx": 27,
+  // 189-13 (D-189-DEF-02): 27 → 32. An EXTENSION. The +5 close the deferred item that
+  // 189-04 opened and 189-12 left untouched — the author-facing tool rail would have
+  // painted a STRUCTURALLY REQUIRED capability struck through and pressable. The rail was
+  // already unreachable for `external_action` BY CONSTRUCTION (two mutually exclusive
+  // `pt === …` branches, no default arm), so no render code changed; what was missing was
+  // a MECHANICAL guard. Four of the five went RED against PLANT Z5 — the exact wrong fix
+  // (giving the type the generic rail and widening its options with the three capability
+  // names), which is the D-20 hole 189-04 closed.
+  "PhaseFormPanel.rails.test.tsx": 32,
   // 184.1 pinned NOTHING here on purpose ("it postdates the 424 pin, so it reports as `new`
   // and its own count is free to grow"). Four phases later it is still the ONLY guard on the
   // flag-off Builder header — D-181-01's byte-identity promise — and it has stopped growing.
@@ -654,7 +662,9 @@ const BASELINE = {
 // of `"notConnected": false` and NOTHING else).
 // ⚠ The note below is prose beside a DERIVED value and has now drifted twice; it is
 // updated here for the reader, and `BASELINE_TOTAL` itself remains the `reduce`.
-const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // ⚠ 2582 (189-13)
+// ⚠ AND BY 189-13's THIRD (deviation) TASK: 2582 → 2587 (`PhaseFormPanel.rails.test.tsx`
+// +5, the D-189-DEF-02 closure guard).
+const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // ⚠ 2587 (189-13)
 
 // ── The Wave-0 blast radius (184-VALIDATION.md § "quick run command"). ──
 const TARGETS = [

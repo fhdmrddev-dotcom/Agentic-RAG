@@ -26,7 +26,7 @@ import { fireEvent, render, screen, within } from "@testing-library/react"
 import phaseFormPanelSource from "./PhaseFormPanel?raw"
 import { PhaseFormPanel, type PhaseFormRails, type PhaseGateRow } from "./PhaseFormPanel"
 import { GOVERNANCE_GATE_ROW_LABEL, minimalPhaseFor, PHASE_TYPE_ORDER } from "./definitionOps"
-import type { PhaseSpecJSON } from "./phaseVocabulary"
+import { EXTERNAL_CAPABILITY_SENTENCES, type PhaseSpecJSON } from "./phaseVocabulary"
 
 function phaseOf(config: Record<string, unknown>): PhaseSpecJSON {
   return {
@@ -366,8 +366,8 @@ describe("PhaseFormPanel rails — the per-type conditioning is unchanged WITH r
     // "ONLY on the deliverable" is a claim about every other type, so the 7th belongs in
     // the subset, and `minimalPhaseFor` keeps each config valid without an `if` ladder.
     // ⚠ `toolOptions` is passed UNCHANGED and is NOT widened: the three capability names
-    // must never reach an author-facing tool rail (D-20/D-22), and scoping that rail away
-    // from `external_action` is plan 189-13's job (`D-189-DEF-02`), not this loop's.
+    // must never reach an author-facing tool rail (D-20/D-22). `D-189-DEF-02` is CLOSED by
+    // the dedicated describe below, not by this loop.
     const nonEmit = PHASE_TYPE_ORDER.filter((type) => type !== "llm_emit")
     expect(nonEmit).toHaveLength(PHASE_TYPE_ORDER.length - 1)
     for (const pt of nonEmit) {
@@ -413,6 +413,97 @@ describe("PhaseFormPanel rails — the per-type conditioning is unchanged WITH r
     )
     expect(within(container).getByTestId("phase-form-rail")).toBeInTheDocument()
     expect(container.querySelectorAll("[data-rail]")).toHaveLength(0)
+  })
+})
+
+// ── 9b. D-189-DEF-02 — the generic tool rail is SCOPED AWAY from external_action ──────
+//
+// THE DEFERRED ITEM, IN ITS OWN WORDS: *"the author-facing tool rail will render a
+// capability STRUCK THROUGH."* `ToolOptionSet` shows a name the registry lacks struck
+// through and STILL PRESSABLE — the fixable form, and the right behaviour for a tool the
+// author chose by mistake. D-20 deliberately keeps the three capabilities OUT of
+// `GroundingBundle.tools`, which is `toolOptions`' only source, so an `external_action`
+// step whose `available_tools` the SERVER derives from its capability (D-03) would have a
+// STRUCTURALLY REQUIRED value painted as an author-fixable error — and one click would
+// delete a value the author may not author in the first place.
+//
+// ⚠ THE FIX IS SCOPE, NEVER WIDTH. Widening `toolOptions` to admit the capabilities would
+// make the strike-through disappear and re-open the exact governance hole 189-04 closed:
+// PLANT 2 in that plan proved the whole fidelity suite stays GREEN while the leak is open,
+// and `test_182_grounding_bundle.py`'s V22 is the only guard that can see it.
+//
+// MEASURED, then GUARDED. The rail is already unreachable for this type BY CONSTRUCTION —
+// `PhaseFormPanel.tsx` renders `ToolsField` inside two mutually exclusive `pt === …`
+// branches (`llm_agent`, `llm_batch_agents`) and has no default arm — so this plan changes
+// no render code. What it adds is the thing that was missing: a MECHANICAL guard, because
+// "true today by construction" is exactly the claim a later branch silently falsifies.
+
+describe("PhaseFormPanel — D-189-DEF-02: no capability reaches the author-facing rail", () => {
+  it("external_action renders NO tool rail at all — not even the degraded one", () => {
+    const { container, unmount } = renderPanel(
+      minimalPhaseFor("external_action", "notify-owner", 0).config,
+      railsOf({ toolOptions: ["search_documents", "execute_code"] }),
+    )
+    expect(screen.queryByTestId("tools-rail")).not.toBeInTheDocument()
+    expect(screen.queryByTestId("tools-degraded")).not.toBeInTheDocument()
+    expect(screen.queryAllByTestId("tool-option")).toHaveLength(0)
+    // NON-VACUITY: the panel DID render — the absence above is a scope decision, not an
+    // empty component. The rails' other surfaces are present on this very step.
+    expect(screen.getByTestId("phase-form-close")).toBeInTheDocument()
+    expect(container.querySelectorAll("[data-rail]").length).toBeGreaterThan(0)
+    unmount()
+  })
+
+  it("POSITIVE CONTROL — the identical rails DO render the rail on llm_agent", () => {
+    const { unmount } = renderPanel(
+      AGENT,
+      railsOf({ toolOptions: ["search_documents", "execute_code"] }),
+    )
+    expect(screen.getByTestId("tools-rail")).toBeInTheDocument()
+    expect(screen.getAllByTestId("tool-option").length).toBeGreaterThan(0)
+    unmount()
+  })
+
+  it("no capability NAME appears anywhere in the external_action panel", () => {
+    // The strike-through hazard restated as its observable: a capability rendered as a
+    // pressable chip. Asserted over the whole panel HTML, and over the DEGRADED read too,
+    // because the degraded branch PRINTS what the step already names.
+    for (const options of [["search_documents"], [] as string[], "degraded" as const]) {
+      const { container, unmount } = renderPanel(
+        minimalPhaseFor("external_action", "notify-owner", 0).config,
+        railsOf({ toolOptions: options }),
+      )
+      for (const capability of Object.keys(EXTERNAL_CAPABILITY_SENTENCES)) {
+        expect(container.innerHTML).not.toContain(capability)
+      }
+      expect(container.innerHTML).not.toContain("line-through")
+      unmount()
+    }
+  })
+
+  it("`toolOptions` was NOT widened — the three capabilities are absent from the source", () => {
+    // The other half of the boundary, and the one a render test cannot see: the client
+    // must not carry a capability name into any tool-option list. V22
+    // (`backend/tests/test_182_grounding_bundle.py`) guards the SERVER half; this guards
+    // the client's.
+    for (const capability of Object.keys(EXTERNAL_CAPABILITY_SENTENCES)) {
+      expect(phaseFormPanelSource).not.toContain(capability)
+    }
+    // POSITIVE CONTROL — the haystack is the real source and does name tool ids.
+    expect(phaseFormPanelSource.length).toBeGreaterThan(1000)
+    expect(phaseFormPanelSource).toContain("search_documents")
+  })
+
+  it("the rail is reachable ONLY from the two tool-carrying branches, asserted on source", () => {
+    // A source fence, because the render cases above can only prove the types they render.
+    // `ToolsField` must appear exactly twice, and `external_action` must never gate it.
+    const mounts = phaseFormPanelSource.match(/<ToolsField/g) ?? []
+    expect(mounts).toHaveLength(2)
+    expect(phaseFormPanelSource).not.toMatch(/pt === "external_action"[\s\S]{0,600}<ToolsField/)
+    // POSITIVE CONTROL — the gate-then-rail regex really does match that shape.
+    expect('{pt === "external_action" && (<><ToolsField /></>)}').toMatch(
+      /pt === "external_action"[\s\S]{0,600}<ToolsField/,
+    )
   })
 })
 
