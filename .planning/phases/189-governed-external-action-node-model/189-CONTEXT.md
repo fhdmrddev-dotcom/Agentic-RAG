@@ -336,6 +336,55 @@ measurement that forced it.
   (D-05) — and it is what makes D-20's keep-it-off-the-rail shape coherent rather than a special
   case. A plan that hands the three capability names to a model as callable tools has misread this.
 
+### Surface decisions — decided at plan-phase from UI-SPEC + PATTERNS, 2026-08-07 (D-23 … D-26)
+
+**`189-UI-SPEC.md` and `189-PATTERNS.md` each surfaced an item neither CONTEXT nor RESEARCH had
+named. Decided here so no executor has to invent one.**
+
+- **D-23 — the three capability names are a CLIENT MIRROR of the backend `Literal`, fenced by a
+  cross-language agreement test. Not a server-supplied option list, and never a second copy.**
+  *The tension:* `PhaseFormPanel.tsx:483` states *"THE OPTION SET IS THE SERVER'S… there is no
+  frontend source"*, while **D-20 deliberately keeps the three names OUT of `GroundingBundle.tools`**
+  — so no shipped surface sources these options a third way. **Decision:** take the `PhaseTypeId`
+  exit (`definitionOps.ts:63-69`), which is the shipped precedent for exactly this — a client mirror
+  of a backend `Literal`, licensed as a *union mirror* rather than as an options source. The seven
+  phase types are every bit as server-owned as the three capabilities, and they are mirrored.
+  **The `:483` rule's PURPOSE is anti-drift, and a fence satisfies it more cheaply than a fetch:**
+  a new route + field for three constants is infrastructure this phase does not need, and any
+  server-supplied capability list is one refactor away from being reused as an author-facing options
+  source — which is the D-20 leak shape all over again. **The anti-drift guarantee must be
+  MECHANICAL, not editorial:** a test reads the backend `Literal` from Python source (the `?raw`
+  source-fence idiom this repo already uses) and asserts the client tuple matches exactly —
+  **observed RED against a planted mismatch before it is trusted.** The mirror and the three
+  sentences are ONE constant read twice (picker + node face), never two.
+
+- **D-24 — exactly ONE new refusal sentence is authored; the 185 refusal SHAPE is reused verbatim.**
+  D-04 says "reuse the 185 refusal vocabulary rather than authoring new copy", and UI-SPEC measured
+  that this is **not literally satisfiable**: the only shipped refusal sentence
+  (`GROUNDING_LOCK_REFUSAL`, `definitionOps.ts:490`) is about KB tools in every clause and would be
+  simply false beside the arming switch. **Decision:** honour D-04's intent — copy the refusal
+  shape, tone and placement exactly, and author **one** new constant beside the existing one in
+  `definitionOps.ts`. One new sentence, imported not inlined, character-asserted by its suite.
+  Related and decided the same way: the switch renders **ON and non-interactive**, and is **NOT**
+  struck through — strike-through is 142-B's treatment for a *refused* option, not an *enforced* one
+  (185's "remove a dead control, don't disable it" does not apply: the control is not dead, it is
+  pinned).
+
+- **D-25 — the run band reading "✓ Complete" above a node reading "Not sent — recorded" is ACCEPTED,
+  and becomes a UAT observable rather than a latent defect.** The band is a RUN-level verdict; the
+  node is a PHASE-level one, and the run genuinely did complete. This is the shipped F3 argument.
+  **Recording it as a decision is the point:** an accepted divergence that nobody wrote down is
+  indistinguishable from a bug when someone meets it on screen. A `189-VALIDATION.md` row must
+  observe the two words co-existing and confirm the pairing reads as intended.
+
+- **D-26 — two shipped docblocks go FALSE the moment D-03 lands, and are corrected IN THE SAME
+  COMMIT.** `phaseVocabulary.ts:271-276` and `GovernanceSection.tsx:86-89` both justify the grounding
+  gate with *"`available_tools` exists only on `LlmAgentPhaseConfig` and `LlmBatchAgentsPhaseConfig`"*.
+  D-03 puts `available_tools` on `ExternalActionPhaseConfig` too. **The CONSTANT stays correct; its
+  stated REASON does not.** ⚠ **Neither CONTEXT nor RESEARCH found these — UI-SPEC did**, which is
+  the same drift class 188.2 found four times in `icon-convention.md` and PATTERNS found three more
+  times today. A stale reason is how the next phase inherits a false claim.
+
 ### Claude's Discretion
 
 - The 7th `PHASE_GLYPHS` entry — mechanical under the icon convention (see `<code_context>`).
