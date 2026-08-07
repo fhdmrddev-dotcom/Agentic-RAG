@@ -82,12 +82,44 @@ def _app_python_files() -> list[Path]:
 
 
 def _block_all_http(monkeypatch) -> None:
-    """Patch every HTTP transport this backend can reach so any call RAISES.
+    """Patch every outbound transport a plausible regression would use, so any call RAISES.
 
-    ``httpx`` is the ONLY declared HTTP client dependency (requirements.txt). Both the sync
-    and async client bottleneck on ``send``, so patching those two methods covers
-    ``get``/``post``/``request``/``stream`` and anything built on them.
+    ── REVIEW FINDING WR-03 · WHY THIS IS NO LONGER httpx-ONLY ──
+    This helper used to patch ``httpx.Client.send`` / ``httpx.AsyncClient.send`` and nothing
+    else, and its docstring claimed to cover "every HTTP transport this backend can reach".
+    The justification was that ``requirements.txt`` names only ``httpx`` — which is true, and
+    which is exactly why the scope was wrong: ``smtplib``, ``socket`` and ``urllib.request``
+    are STANDARD LIBRARY and need no requirement entry. For a capability literally named
+    ``send_email``, ``smtplib`` is the single most plausible way a future edit would actually
+    send something, and the executor would have returned normally with the suite reporting
+    green over it. Case A's source fence does not cover it either — it looks for the ``mcp``
+    token only.
+
+    The four transports, and what each bottlenecks:
+      * ``httpx.Client.send`` / ``httpx.AsyncClient.send`` — every ``get``/``post``/
+        ``request``/``stream`` on the one declared HTTP dependency;
+      * ``smtplib.SMTP.__init__`` — the ``send_email`` route. Patching the CONSTRUCTOR
+        rather than ``sendmail`` catches the connection attempt too, and ``SMTP_SSL`` /
+        ``LMTP`` inherit it through ``super().__init__``;
+      * ``urllib.request.urlopen`` — the stdlib HTTP client that needs no dependency;
+      * ``socket.socket.connect`` — the floor under all of the above, and the only thing
+        that catches a hand-rolled client.
+
+    ⚠ WHAT IS DELIBERATELY **NOT** PATCHED, so the docstring stops over-claiming a second
+    time: ``subprocess`` (a shell-out to ``curl``) and ``os.system``. Both are plausible in
+    principle, and patching them is not: pytest, coverage and the import machinery all reach
+    for them, so a process-wide patch would break the harness rather than the test. That
+    route is covered by the executor being pure Python with a source fence over the module,
+    not by this sentinel — stated rather than left as an implied guarantee.
+
+    ⚠ ORDER MATTERS: ``socket.socket.connect`` goes on LAST. Anything the surrounding test
+    harness builds before this call (the asyncio event loop and its self-pipe on Windows) is
+    already constructed; ``monkeypatch`` unwinds it at teardown.
     """
+    import smtplib
+    import socket
+    import urllib.request
+
     import httpx
 
     def _sync_send(self, *args, **kwargs):
@@ -96,8 +128,20 @@ def _block_all_http(monkeypatch) -> None:
     async def _async_send(self, *args, **kwargs):
         raise _EgressAttempted("httpx.AsyncClient.send was called - outbound egress attempted")
 
+    def _blocked(name: str):
+        def _raise(*args, **kwargs):
+            raise _EgressAttempted(f"{name} was called - outbound egress attempted")
+        return _raise
+
     monkeypatch.setattr(httpx.Client, "send", _sync_send, raising=True)
     monkeypatch.setattr(httpx.AsyncClient, "send", _async_send, raising=True)
+    monkeypatch.setattr(smtplib.SMTP, "__init__", _blocked("smtplib.SMTP.__init__"), raising=True)
+    monkeypatch.setattr(
+        urllib.request, "urlopen", _blocked("urllib.request.urlopen"), raising=True
+    )
+    monkeypatch.setattr(
+        socket.socket, "connect", _blocked("socket.socket.connect"), raising=True
+    )
 
 
 def _external_action_executor():
@@ -243,6 +287,53 @@ async def test_the_transport_patch_is_not_inert_async(monkeypatch):
     with pytest.raises(_EgressAttempted):
         async with httpx.AsyncClient(timeout=0.01) as client:
             await client.get("http://127.0.0.1:9/phase-189-should-never-reach-this")
+
+
+def test_the_smtp_patch_is_not_inert(monkeypatch):
+    """WR-03 inertness control — `smtplib` is intercepted.
+
+    ONE CONTROL PER TRANSPORT, in the shape the two httpx controls already use, because a
+    widening nobody has watched fire is decoration. `smtplib` is the one that matters most
+    here: the capability is named `send_email`, and it needs no requirements.txt entry, so
+    a regression that reached for it would have returned normally under the old
+    httpx-only sentinel and reported green.
+    """
+    import smtplib
+
+    _block_all_http(monkeypatch)
+
+    with pytest.raises(_EgressAttempted):
+        smtplib.SMTP("127.0.0.1", 9, timeout=0.01)
+
+
+def test_the_urllib_patch_is_not_inert(monkeypatch):
+    """WR-03 inertness control — `urllib.request.urlopen` is intercepted."""
+    import urllib.request
+
+    _block_all_http(monkeypatch)
+
+    with pytest.raises(_EgressAttempted):
+        urllib.request.urlopen("http://127.0.0.1:9/phase-189-should-never-reach-this")
+
+
+def test_the_socket_patch_is_not_inert(monkeypatch):
+    """WR-03 inertness control — raw `socket.socket.connect` is intercepted.
+
+    The floor under every other transport, and the only one that catches a hand-rolled
+    client. Driven on a plain TCP socket to a closed local port: without the patch this
+    raises `ConnectionRefusedError`/`OSError`, so `_EgressAttempted` specifically is what
+    proves the patch bound.
+    """
+    import socket
+
+    _block_all_http(monkeypatch)
+
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        with pytest.raises(_EgressAttempted):
+            s.connect(("127.0.0.1", 9))
+    finally:
+        s.close()
 
 
 @pytest.mark.parametrize("capability", CAPABILITIES)
