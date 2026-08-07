@@ -192,6 +192,152 @@ export const AFFORDANCE_Z = 1002
  */
 export const SELECTED_NODE_Z_FROM_LIBRARY = 1000
 
+/**
+ * `BUG-260807-02` (the CLIPPING half) — BREATHING ROOM BETWEEN THE PANEL AND THE
+ * CONTAINER EDGE, in screen px.
+ *
+ * NOT A KEY OF `EDIT_AFFORDANCE`, for the identical reason `AFFORDANCE_Z` is not one:
+ * that table's docblock (`:57-61`) defines itself as *"every placement number the editing
+ * affordances use, derived from `CANVAS_LAYOUT` and from nothing else"*, and this number
+ * is derived from neither `CANVAS_LAYOUT` nor anything else in the drawing — it is a
+ * comfort margin against a clipping ancestor. Putting it there would make that sentence
+ * false. `AFFORDANCE_Z` is in this file for exactly this reason and is the precedent.
+ */
+export const PICKER_MARGIN = 8
+
+/**
+ * The floor the panel is never bounded below, in screen px. A 30px menu is not a menu:
+ * on a very short canvas the honest outcome is a panel that overflows a little and
+ * scrolls, not one collapsed to a sliver with its own scrollbar taller than its content.
+ * Standalone beside `PICKER_MARGIN`, for the same reason.
+ */
+export const PICKER_MIN_HEIGHT = 120
+
+/** What `pickerPlacement` needs to place the menu. Every field is already in the caller's
+ *  hand — nothing here is measured off the panel itself, which is what makes the result
+ *  free of any settle-and-remeasure feedback loop. */
+export interface PickerPlacementInput {
+  /** Flow y of the `＋` this picker belongs to: `EDIT_AFFORDANCE.INSERT_Y + slant`. */
+  anchorFlowY: number
+  /** Flow x of the panel's LEFT edge as shipped: `insertPointX(...) - PICKER_WIDTH / 2`. */
+  panelFlowX: number
+  /** The live viewport transform, `[tx, ty, zoom]` (`@xyflow` store `transform`). */
+  transform: readonly [number, number, number]
+  /** `.react-flow`'s own size in screen px (`@xyflow` store `width` / `height`). */
+  container: { width: number; height: number }
+}
+
+/** Where the menu opens, how tall it may be, and how far it must slide to stay on screen. */
+export interface PickerPlacement {
+  /** Which side of the `＋` the panel opens on. */
+  side: "below" | "above"
+  /** The flow y the wrapper translates to. */
+  flowY: number
+  /** Screen-px x correction, applied INSIDE the counter-scale. 0 when it already fits. */
+  offsetXPx: number
+  /** The panel's height budget in its own CSS px (== screen px, net scale 1).
+   *  `null` = DO NOT BOUND — the container has not been measured yet (jsdom, first paint). */
+  maxHeightPx: number | null
+}
+
+/**
+ * `BUG-260807-02`, the CLIPPING half — WHERE THE STEP-TYPE MENU OPENS AND HOW TALL IT
+ * MAY BE, measured from the live container and viewport transform on every render.
+ *
+ * ⚠ A STATIC `max-height` WAS TRIED FIRST AND IT DOES NOT WORK. That is why this is a
+ * function and not a constant, and it is a measurement rather than an opinion: a
+ * `/gsd:fast` attempt on 2026-08-07 added `max-h-[min(46vh,340px)] overflow-y-auto`, the
+ * CSS applied exactly as written (`overflowY: auto`, `maxHeight: 309.856px`,
+ * `scrollHeight > clientHeight`), and the rows were STILL unreachable — because bounding
+ * the panel's HEIGHT says nothing about where its TOP sits. Measured: `panelBottom 682 >
+ * reactFlowBottom 597`. Door 1 got WORSE, 2 clipped rows becoming 7. It was reverted.
+ * The bound has to be THE SPACE ACTUALLY AVAILABLE between the anchor and `.react-flow`'s
+ * edge, and when the smaller side is below, the panel has to open UPWARD. Either half
+ * alone leaves a door failing.
+ *
+ * ── THE TWO COORDINATE SPACES, AND WHY ONLY ONE OF THEM SCALES ────────────────
+ *
+ * The wrapper lives inside `.react-flow__viewport` (`scale(zoom)`) and carries
+ * `scale(1/zoom)` itself, so the NET SCALE ON THE PANEL'S CONTENT IS `zoom × 1/zoom = 1`:
+ * one panel CSS px is one screen px at every zoom, and **`maxHeightPx` therefore needs no
+ * zoom conversion at all**. It is a screen-px gap handed to a surface whose own px happen
+ * to be screen px.
+ *
+ * The wrapper's `translate(...)`, by contrast, is applied in the wrapper's PARENT space
+ * — flow coordinates — and so IS multiplied by zoom. `EDIT_AFFORDANCE.PICKER_DROP` is
+ * consequently 22 FLOW px, which is 11 screen px at zoom 0.5. That asymmetry is the
+ * obvious trap in this file, so `editAffordance.test.ts` pins BOTH spaces inside single
+ * calls at zoom 0.5 and 2, over fixtures where a height that had been multiplied or
+ * divided by zoom would read a visibly different number.
+ *
+ * ── THE DEGENERATE BRANCH RETURNS THE SHIPPED GEOMETRY, DELIBERATELY ──────────
+ *
+ * An unmeasured container (`width`/`height` of 0 — jsdom always, and a browser's very
+ * first paint) returns `side: "below"`, `offsetXPx: 0` and `maxHeightPx: null`, which is
+ * byte-for-byte what shipped before this function existed. `null` means DO NOT BOUND, so
+ * no inline `max-height` reaches the DOM and every existing suite keeps seeing exactly
+ * the panel it was written against.
+ *
+ * ── TOTAL, and that is not ceremony here ──────────────────────────────────────
+ *
+ * `anchorFlowY` arrives from `verticalOffsetFor`, whose inputs are keyed by an
+ * AUTHOR-SUPPLIED phase slug (WR-04 / `BUG-260807-01`). Every number this returns is
+ * interpolated straight into `translate(...)`: one NaN term invalidates the whole
+ * declaration, the browser drops the entire transform, and — since 188.2 gave these style
+ * objects `zIndex: AFFORDANCE_Z` (1002) — the affordance lands ABOVE every card rather
+ * than merely in the wrong place. So a non-finite input is answered, never propagated.
+ */
+export function pickerPlacement(input: PickerPlacementInput): PickerPlacement {
+  const [tx, ty, rawZoom] = input.transform
+  // The same floor `PlaneEditingLayer` has always written as `scale(1 / (zoom || 1))` —
+  // NaN and 0 are both falsy there, so both already resolved to 1. Mirrored rather than
+  // re-invented, so the two can never disagree about what a degenerate zoom means.
+  const zoom = Number.isFinite(rawZoom) && rawZoom > 0 ? rawZoom : 1
+
+  const anchorFlowY = Number.isFinite(input.anchorFlowY) ? input.anchorFlowY : 0
+  const belowFlowY = anchorFlowY + EDIT_AFFORDANCE.PICKER_DROP
+  const aboveFlowY = anchorFlowY - EDIT_AFFORDANCE.PICKER_DROP
+
+  const { width, height } = input.container
+  const unmeasured =
+    !(height > 0) ||
+    !(width > 0) ||
+    !Number.isFinite(tx) ||
+    !Number.isFinite(ty) ||
+    !Number.isFinite(input.panelFlowX)
+
+  // THE SHIPPED GEOMETRY, byte-for-byte. Not a fallback that approximates the real
+  // answer — the literal placement this canvas used before the bound existed.
+  if (unmeasured) {
+    return { side: "below", flowY: belowFlowY, offsetXPx: 0, maxHeightPx: null }
+  }
+
+  // Flow → screen. `* zoom + t` is the viewport transform itself, which is why nothing
+  // has to be read back off the DOM.
+  const belowTopPx = belowFlowY * zoom + ty
+  const aboveBottomPx = aboveFlowY * zoom + ty
+  const spaceBelow = height - belowTopPx - PICKER_MARGIN
+  const spaceAbove = aboveBottomPx - PICKER_MARGIN
+
+  // STRICTLY greater, so a tie keeps the side that shipped. "Below" is where authors have
+  // learned to look for this menu; flipping it on an exact tie would be a coin toss made
+  // visible.
+  const side = spaceAbove > spaceBelow ? "above" : "below"
+  const flowY = side === "above" ? aboveFlowY : belowFlowY
+  const maxHeightPx = Math.max(PICKER_MIN_HEIGHT, side === "above" ? spaceAbove : spaceBelow)
+
+  const leftPx = input.panelFlowX * zoom + tx
+  const maxLeft = width - EDIT_AFFORDANCE.PICKER_WIDTH - PICKER_MARGIN
+  // The upper bound is held at or above the lower one, so a container NARROWER than the
+  // panel pins its left edge at the margin instead of inverting the clamp.
+  const clampedLeft = Math.min(Math.max(leftPx, PICKER_MARGIN), Math.max(PICKER_MARGIN, maxLeft))
+  // A correction, not a position: the wrapper still translates to `panelFlowX` in flow
+  // space, and this slides it afterwards in post-counter-scale local px.
+  const offsetXPx = clampedLeft - leftPx
+
+  return { side, flowY, offsetXPx, maxHeightPx }
+}
+
 /** The flow x of insertion boundary `index`: 0 = before the first card, `lanes.length`
  *  = after the last one, anything between = the midpoint of that connector. */
 /**
