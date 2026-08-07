@@ -192,23 +192,31 @@ function PhaseNodeImpl({ data, selected }: NodeProps<PhaseCanvasNode>) {
   // which is typed to this exact interface.
   const run = data.run as NodeRunState | undefined
 
-  // BADGE SLOT 1 IS DELIBERATELY EMPTY, AND IT IS SPOKEN FOR (Phase 185, SPEC Req 6).
+  // BADGE SLOT 1 IS NOW SPENT, AND THE BUDGET IS FULL (Phase 189-15 · D-12 / D-18).
   //
   // Until 185-08 slot 1 carried the three-face grounding word-badge. That badge is
   // DELETED, not moved: governance renders as SHAPE — the corner seal 185-09 places at
   // the card's top-right, passed below as `grounded` — and SPEC Req 6 states that
   // governance spends no colour and no word-badge slot. Its inputs still reach this
   // component, as `data.grounded` and `data.armed`; what is gone is the chip that spoke
-  // them, and what replaced it costs neither a slot nor a colour.
+  // them, and what replaced it costs neither a slot nor a colour. THAT ARGUMENT IS
+  // UNCHANGED by 189: the badge below is not a governance mark, and governance still
+  // spends neither colour nor a slot.
   //
-  // DO NOT FILL THE FREED SLOT with a governance mark. `BadgeSlots` is a max-2 tuple
-  // union, so a third badge is a typecheck error rather than a review comment — which is
-  // exactly the budget `PhaseNodeCard`'s own docblock says it enforces.
+  // ⚠ CORRECTED at Phase 189-15, IN THE COMMIT THAT FALSIFIED IT. This paragraph used to
+  // end *"Slot 1 is therefore still empty and now belongs to Phase 189 alone."* Both
+  // claimants have now answered. Phase 188 paints run state on this card (see `run`
+  // above) and spends ZERO badge slots — its channel is the ring's geometry plus a
+  // sentence in the body, which is exactly why sketch 153-A won — and Phase 189 SPENDS
+  // the slot, here, on the muted "Not connected" word-badge below.
   //
-  // THE FIRST OF THE TWO CLAIMANTS HAS NOW LANDED AND DECLINED IT. Phase 188 paints run
-  // state on this card (see `run` above) and spends ZERO badge slots: its channel is the
-  // ring's geometry plus a sentence in the body, which is exactly why sketch 153-A won.
-  // Slot 1 is therefore still empty and now belongs to Phase 189 alone.
+  // THERE IS NO THIRD SLOT TO ADD ONE TO. `BadgeSlots` is a max-2 tuple union, so a third
+  // badge is a typecheck error rather than a review comment — the budget
+  // `PhaseNodeCard`'s own docblock says it enforces. It is control-tested, not asserted:
+  // `PhaseNodeCard.test.tsx`'s `@ts-expect-error` case reads 34 type errors with the
+  // union widened and 33 with it narrow, and that swing was RE-OBSERVED at 189-15 after
+  // the slot was spent, because a guard nobody re-ran after changing its subject is a
+  // guard on trust.
   //
   // Slot 2 is unchanged: `Waits for you`, on `llm_human_input` only (D-183-07).
   const waitsForYou: BadgeSlot = {
@@ -217,7 +225,49 @@ function PhaseNodeImpl({ data, selected }: NodeProps<PhaseCanvasNode>) {
     label: "Waits for you",
     dataAttr: { "data-waits-for-you": "true" },
   }
-  const badges: BadgeSlots = data.waitsForYou ? [waitsForYou] : []
+
+  // SLOT 1 (D-12 / D-18, CONN-01) — this step reaches outside and is wired to nothing yet.
+  //
+  // CONDITIONAL ON THE STATE, NOT ON THE TYPE. `data.notConnected` is resolved ONCE at
+  // projection time by `phaseVocabulary.notConnectedOf` (189-13), whose type test and
+  // state test sit on separate lines on purpose. When Phase 190 binds a real destination
+  // that predicate returns false, the tuple below falls to its existing branch, the badge
+  // stops rendering — and THIS FILE IS NOT TOUCHED. The badge RETIRES BY DATA, NOT BY
+  // EDIT, which is the whole reason D-12 chose a state-conditional badge over a
+  // type-conditional one: the invariant fact (this type is always armed for approval) is
+  // really part of the type, and 185 set the precedent by spending no badge at all on it.
+  //
+  // MUTED, AND NO GLYPH. `primary` is the live/waiting indigo and is spoken for by slot 2;
+  // `success` would read as good news; the strong tokens are banked for 188's run status.
+  // "Not connected" is a calm design-time fact, not an alarm, and `muted` is `StatusChip`'s
+  // own calm-terminal tone. The WORD carries the meaning either way (WCAG 1.4.1) — tone is
+  // decoration — and `icon-convention.md` §4 is explicit that a word-badge carries NO glyph.
+  const notConnected: BadgeSlot = {
+    testId: "canvas-not-connected",
+    tone: "muted",
+    label: "Not connected",
+    dataAttr: { "data-not-connected": "true" },
+  }
+
+  // EXPLICIT BRANCHES, NEVER A SPREAD. `[...a, ...b]` widens `BadgeSlots` to
+  // `BadgeSlot[]` and SILENTLY RETIRES the max-2 typecheck guard — the one budget on this
+  // face that no review reliably catches, which is why the guard exists at all.
+  //
+  // ORDER IS A TUPLE POSITION, NOT A PREFERENCE. Position 0 IS slot 1, so the new badge
+  // comes FIRST in every branch that carries it; the shipped one is documented as slot 2
+  // in three separate places.
+  //
+  // ⚠ THE TWO-BADGE BRANCH IS UNREACHABLE FROM REAL DATA IN 189 — `external_action` and
+  // `llm_human_input` are different phase types, so no projected node sets both booleans —
+  // and it must STILL be written: `BadgeSlots` demands the two-badge case be
+  // representable, and the positive control for the max-2 guard renders exactly it.
+  const badges: BadgeSlots = data.notConnected
+    ? data.waitsForYou
+      ? [notConnected, waitsForYou]
+      : [notConnected]
+    : data.waitsForYou
+      ? [waitsForYou]
+      : []
 
   // `technicalLine` and `stepNumber` are still deliberately NOT passed. `status` WAS in
   // that list until 188-07 — this plan fills it, below, together with `emitFailure` —
@@ -256,7 +306,10 @@ function PhaseNodeImpl({ data, selected }: NodeProps<PhaseCanvasNode>) {
   // `data.armed` IS DELIBERATELY UNCONSUMED HERE, and it is not an oversight: the armed
   // action-risk mark is an EDGE, not a node change (plan 185-10 — the detour arc, sketch
   // 147). Do not look for it on the card, and do not add it: a second mark on the face
-  // would spend the corner the seal claims or a badge slot 188/189 owns.
+  // would spend the corner the seal claims — and, since 189-15, THERE IS NO BADGE SLOT
+  // LEFT TO SPEND. Both are taken (slot 1 "Not connected", slot 2 "Waits for you") and a
+  // third is a typecheck error against `BadgeSlots`. A face that wants to say more than
+  // this now has to argue for a slot, not merely find one.
   return (
     <PhaseNodeCard
       slug={data.slug}

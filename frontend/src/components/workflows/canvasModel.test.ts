@@ -18,6 +18,9 @@ import {
   CANVAS_LAYOUT,
   type CanvasNode,
 } from "./canvasModel"
+// 189-15: the badge-slot-1 roster case derives its coverage from the shipped type order
+// rather than hand-listing six names (the 189-10 / 189-12 lesson).
+import { PHASE_TYPE_ORDER, minimalPhaseFor } from "./definitionOps"
 import type { PhaseSpecJSON } from "./phaseVocabulary"
 
 // ── Local fixtures (module-level consts — the house style for a unit spec) ──────
@@ -397,6 +400,32 @@ describe("canvasModel.toCanvas — node data (both title forms, always)", () => 
     for (const n of phaseNodes(toCanvas(threePhase).nodes)) {
       expect(n.data.notConnected).toBe(false)
     }
+  })
+
+  it("189-15: notConnected is false on EVERY shipped type, each named individually", () => {
+    // The badge slot 1 spends is state-conditional, and the falsifiable half available
+    // before Phase 190 is the TYPE half — so it is driven over the whole roster rather
+    // than over the three types `threePhase` happens to contain. DERIVED from
+    // `PHASE_TYPE_ORDER` through the app's own `minimalPhaseFor`, so the EIGHTH type joins
+    // this assertion without anyone remembering to extend a list, and a RECORD comparison
+    // is used rather than a loop so a failure names the offending type in the diff.
+    const roster = PHASE_TYPE_ORDER.map((type, index) =>
+      minimalPhaseFor(type, type.replace(/_/g, "-"), index),
+    )
+    const seen = Object.fromEntries(
+      phaseNodes(toCanvas(roster).nodes).map((n) => [n.data.phaseType, n.data.notConnected]),
+    )
+    expect(seen).toEqual({
+      programmatic: false,
+      llm_single: false,
+      llm_agent: false,
+      llm_batch_agents: false,
+      llm_human_input: false,
+      llm_emit: false,
+      external_action: true,
+    })
+    // Non-vacuity: the roster really did project one node per declared type.
+    expect(Object.keys(seen)).toHaveLength(PHASE_TYPE_ORDER.length)
   })
 
   it("an llm_emit at citation_policy 'strict' is grounded; a plain agent is not", () => {

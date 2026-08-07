@@ -230,7 +230,12 @@ const BASELINE = {
   // the subtitles read this plan GUARDED (an inherited `phase_type` must yield the same
   // empty subtitle a table MISS yields — the case above it cannot see the difference,
   // which is why it is a separate case) and the `notConnected` projection case.
-  "canvasModel.test.ts": 51,
+  // 189-15 (CONN-01 / D-12 / D-18): 51 → 52. An EXTENSION. The +1 asserts `notConnected` at
+  // the PROJECTION level across the whole shipped roster rather than the three types
+  // `threePhase` happens to contain — derived from `PHASE_TYPE_ORDER` via `minimalPhaseFor`
+  // and compared as a RECORD, so a failure names the offending type and the eighth type
+  // joins the coverage without anyone remembering to extend a list.
+  "canvasModel.test.ts": 52,
   "PublishGauntlet.test.tsx": 46,
   "WorkflowBuilderPage.canvas.test.tsx": 128,
   "WorkflowBuilderPage.describe.test.tsx": 19,
@@ -355,7 +360,24 @@ const BASELINE = {
   // than added to: its `toHaveLength(6)` is now `Object.keys(PHASE_GLYPHS).length` (derived,
   // so the EIGHTH type does not read as a regression) plus the new tint's exact value.
   "PhaseNodeCard.test.tsx": 131,
-  "PhaseNode.test.tsx": 26,
+  // 189-15 (CONN-01 / D-12 / D-18): 26 → 31. An EXTENSION, not a lowering — no `it(` was
+  // deleted, renamed or moved out. The +5 are badge slot 1, the LAST free word-badge on the
+  // card, and every one of them was driven RED against a planted wrong fix before it was
+  // trusted: the badge present on `external_action` and absent on all six shipped types
+  // (a RECORD comparison derived from `PHASE_TYPE_ORDER`, so the eighth type joins it
+  // automatically); the two-badge ORDER (slot 1 first — PLANT: the tuple written
+  // `[waitsForYou, notConnected]`, RED, exactly one failure); the design-time badge word and
+  // the run-time word coexisting on one card and asserted NOT EQUAL by exact match (they
+  // share the leading token "Not", so a `toContain` would be ambiguous); the badge as a
+  // plain span with the no-focusable-control leaf walk re-driven over a two-badge card; and
+  // the source fence for the no-spread + state-conditional shape.
+  //
+  // ⚠ THE SOURCE FENCE IS THE ONLY THING THAT CAN SEE THE D-12 DEFECT, and that was
+  // MEASURED, not assumed. A TYPE-conditional gate (`data.phaseType === "…"`) renders
+  // BYTE-IDENTICALLY today — nothing in the app can be connected to anything until Phase
+  // 190 — so under that plant all four RENDER cases stayed green and only the fence went
+  // red. A DOM-only suite would have shipped the coupling D-12 exists to prevent.
+  "PhaseNode.test.tsx": 31,
   // 189-10 (CONN-01 / D-16 / D-07) — a NEW FILE, pinned in the SAME COMMIT that creates it.
   //
   // ⚠ THIS ONE DID NOT HIT THE TWO-KNOB TRAP, and the reason is worth recording because it
@@ -690,7 +712,11 @@ const BASELINE = {
 // or `PhaseFormPanel.rails.test.tsx` (32), both of which are unmoved beside it — the
 // Phase-177 coverage-loss shape this per-file pinning exists to make impossible.
 // ⚠ AND BY 189-14 TASK 2: 2612 → 2619 (`GovernanceSection.test.tsx` 42 → 49).
-const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // ⚠ 2619 (189-14)
+// ⚠ AND BY 189-15 TASK 1: 2619 → 2625 (`PhaseNode.test.tsx` 26 → 31, `canvasModel.test.ts`
+// 51 → 52) — badge slot 1, the last free word-badge on the card. Pinned FILE count unmoved
+// at 47: both suites already existed and both already ran inside the
+// `src/components/workflows` DIRECTORY entry.
+const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // ⚠ 2625 (189-15)
 
 // ── The Wave-0 blast radius (184-VALIDATION.md § "quick run command"). ──
 const TARGETS = [

@@ -50,6 +50,10 @@ import phaseNodeSource from "./PhaseNode?raw"
 import runVocabularySource from "./runVocabulary?raw"
 import { EndCapNode, PhaseNode, UnresolvedSkipNode } from "./PhaseNode"
 import { CANVAS_NODE_TYPES, toCanvas } from "./canvasModel"
+// 189-15: the badge-slot-1 block at the foot of this file derives its per-type coverage
+// from `PHASE_TYPE_ORDER` rather than hand-listing six names — the 189-10 / 189-12 lesson,
+// so the EIGHTH phase type joins the loop without anybody remembering to extend it.
+import { PHASE_TYPE_ORDER, minimalPhaseFor } from "./definitionOps"
 import { PHASE_TYPE_SUBTITLES, type NameContext, type PhaseSpecJSON } from "./phaseVocabulary"
 import { runReadingLabel, type NodeRunState } from "./runVocabulary"
 import type { CanvasReading } from "@/lib/phaseState"
@@ -724,5 +728,196 @@ describe("PhaseNode 188.1-04 — WR-04 site 1: the phase-type face is total", ()
 
     expect(protoStyle).toBe(ordinaryStyle)
     expect(protoText).toBe(ordinaryText)
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 189-15 · CONN-01 / D-12 / D-18 — BADGE SLOT 1, THE LAST FREE WORD-BADGE
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+// This adapter is the ONLY place in the tree that constructs a `BadgeSlots` tuple, so it
+// is the only place these claims can be driven. `PhaseNodeCard` is NOT edited by 189: it
+// already renders whatever tuple arrives on its existing `badges` prop, which is exactly
+// what the 188.2 extraction cut the slot contract out for.
+//
+// ⚠ WHAT THIS BLOCK CANNOT SEE. jsdom applies no CSS, paints nothing and hit-tests
+// nothing. Whether the badge is LEGIBLE on Deep Midnight, whether it occludes or is
+// occluded by its neighbours, and whether a two-badge row pushes the card past its height
+// budget are rendered questions — UAT rows U2 and U4, driven through Chrome MCP in plan
+// 189-16. Nothing below is evidence for any of them.
+
+/** One phase per SHIPPED type, built through the app's own `minimalPhaseFor` so each
+ *  config carries whatever `requiredConfigFor` says that type needs (for
+ *  `external_action` that is `capability: "send_email"`, 189-12). Derived from
+ *  `PHASE_TYPE_ORDER`, never hand-listed. */
+const everyType: PhaseSpecJSON[] = PHASE_TYPE_ORDER.map((type, index) =>
+  minimalPhaseFor(type, type.replace(/_/g, "-"), index),
+)
+
+const EXTERNAL_SLUG = "external-action"
+const NOT_CONNECTED = "Not connected"
+
+/** Render a projection with each node's `data` patched by a caller-supplied function —
+ *  the same merge shape `renderNodes` uses for `technical` and `run`, because `data` is
+ *  what the adapter actually reads. */
+async function renderPatched(
+  phases: PhaseSpecJSON[],
+  patch: (data: Record<string, unknown>) => Record<string, unknown> = (d) => d,
+) {
+  const projection = toCanvas(phases)
+  const nodes: Node[] = projection.nodes.map((node) => ({
+    ...node,
+    data: patch({ ...node.data }),
+  }))
+  const view = render(
+    <div style={{ width: 1200, height: 900 }}>
+      <ReactFlow nodes={nodes} edges={projection.edges} nodeTypes={nodeTypes} fitView={false} />
+    </div>,
+  )
+  await waitFor(() => {
+    expect(view.container.querySelectorAll("[data-testid^='canvas-node-']").length).toBeGreaterThan(
+      0,
+    )
+  })
+  return view
+}
+
+/** Every badge on one card, as `[testId, label]` pairs IN DOM ORDER — so a claim about
+ *  slot ORDER is a claim about the array, not about membership. */
+function badgesOn(container: HTMLElement, slug: string): [string | null, string | null][] {
+  const card = container.querySelector(`[data-testid="canvas-node-${slug}"]`)
+  if (!card) throw new Error(`no card rendered for ${slug}`)
+  return Array.from(card.querySelectorAll("[data-tone]")).map((el) => [
+    el.getAttribute("data-testid"),
+    el.textContent,
+  ])
+}
+
+describe("PhaseNode 189-15 — badge slot 1 is SPENT on 'Not connected' (D-12 / D-18)", () => {
+  it("renders on external_action and on NO other type — every shipped type named individually", async () => {
+    // ⚠ THE FALSIFIABLE HALF AVAILABLE TODAY IS THE TYPE TEST, and that is stated rather
+    // than discovered: nothing in this app can be CONNECTED to anything until Phase 190,
+    // so `notConnectedOf`'s false-by-state branch is unreachable in 189. What IS drivable
+    // now is that the badge stays OFF every one of the six shipped types — and a record
+    // comparison names each of them in the diff, where a loop would report "iteration 4".
+    const { container } = await renderPatched(everyType)
+    const seen = Object.fromEntries(
+      everyType.map((phase) => [
+        phase.config.phase_type,
+        badgesOn(container, phase.slug).some(([testId]) => testId === "canvas-not-connected"),
+      ]),
+    )
+    expect(seen).toEqual({
+      programmatic: false,
+      llm_single: false,
+      llm_agent: false,
+      llm_batch_agents: false,
+      llm_human_input: false,
+      llm_emit: false,
+      external_action: true,
+    })
+    // …and it really is the WORD that carries it (WCAG 1.4.1 — never colour alone), on a
+    // muted chip rather than the indigo slot 2 owns.
+    const badge = container
+      .querySelector(`[data-testid="canvas-node-${EXTERNAL_SLUG}"]`)!
+      .querySelector('[data-testid="canvas-not-connected"]')!
+    expect(badge.textContent).toBe(NOT_CONNECTED)
+    expect(badge.getAttribute("data-tone")).toBe("muted")
+    // The dataAttr lands on the WRAPPER, the shipped slot-2 convention.
+    expect(badge.closest("[data-not-connected]")?.getAttribute("data-not-connected")).toBe("true")
+    // Non-vacuity: slot 2 still works, on its own type, unchanged by this plan.
+    expect(badgesOn(container, "llm-human-input")).toEqual([["canvas-waits-for-you", "Waits for you"]])
+  })
+
+  it("is FIRST when both badges are present — the tuple is ORDERED, not a set", async () => {
+    // ⚠ THIS BRANCH IS UNREACHABLE FROM REAL DATA IN 189 — `external_action` and
+    // `llm_human_input` are different phase types, so no projection sets both booleans.
+    // It is driven here by patching `data` directly, which is honest about what is being
+    // tested: the adapter's tuple EXPRESSION, not a state the app can reach. The branch
+    // must exist anyway (`BadgeSlots` demands the two-badge case be representable), and
+    // an unwritten branch is the one that gets the order wrong when 190 makes it real.
+    const { container } = await renderPatched(everyType, (data) =>
+      data.phaseType === "external_action" ? { ...data, waitsForYou: true } : data,
+    )
+    expect(badgesOn(container, EXTERNAL_SLUG)).toEqual([
+      ["canvas-not-connected", NOT_CONNECTED],
+      ["canvas-waits-for-you", "Waits for you"],
+    ])
+    // …and still exactly two. A third would not compile, but a duplicated render would.
+    expect(badgesOn(container, EXTERNAL_SLUG)).toHaveLength(2)
+  })
+
+  it("the design-time word and the RUN word both render on one card and are NOT equal", async () => {
+    // D-16's run word and D-12's badge share the leading token "Not", they sit on the same
+    // card at the same time, and they must not read as one fact said twice: the badge is a
+    // DESIGN-TIME property (this step can reach nothing yet) and the run word is a RUN-TIME
+    // state (this run did not send). ⚠ EXACT-MATCH ASSERTIONS THROUGHOUT — a `toContain`
+    // on "Not" would pass on either string and prove nothing.
+    const run = runFor("recorded-not-sent")
+    const { container } = await renderPatched(everyType, (data) => ({ ...data, run }))
+    const card = container.querySelector(`[data-testid="canvas-node-${EXTERNAL_SLUG}"]`)!
+    const badgeText = card.querySelector('[data-testid="canvas-not-connected"]')!.textContent
+    const runText = card.querySelector('[data-testid="canvas-node-run-line"]')!.textContent
+
+    expect(badgeText).toBe(NOT_CONNECTED)
+    // Derived, never hand-typed — the word has ONE home (`runVocabulary`).
+    expect(runText).toBe(runReadingLabel("recorded-not-sent"))
+    expect(badgeText).not.toBe(runText)
+    // The badge is DESIGN-TIME data and survives run mode: it is emitted regardless of
+    // reading, so it does not blink out the moment the step starts.
+    expect(badgesOn(container, EXTERNAL_SLUG)).toEqual([["canvas-not-connected", NOT_CONNECTED]])
+  })
+
+  it("the badge is a plain span — no role, no tabindex, no handler, no focusable control", async () => {
+    // ONE TAB STOP PER NODE. 188.2 drove this leaf walk RED against a `<button>` planted
+    // in a real destination module; spending a badge slot must not be the change that
+    // quietly re-opens it. Driven over the seven-type fixture, including the two-badge
+    // card, because that is the row this plan created.
+    const { container } = await renderPatched(everyType, (data) =>
+      data.phaseType === "external_action" ? { ...data, waitsForYou: true } : data,
+    )
+    const cards = Array.from(container.querySelectorAll("[data-testid^='canvas-node-']"))
+    expect(cards.length).toBeGreaterThanOrEqual(everyType.length)
+    for (const card of cards) {
+      expect(card.querySelectorAll("button, a, [tabindex], [onclick]")).toHaveLength(0)
+    }
+    const badge = container.querySelector('[data-testid="canvas-not-connected"]')!
+    expect(badge.tagName).toBe("SPAN")
+    expect(badge.getAttribute("role")).toBeNull()
+    expect(badge.getAttribute("tabindex")).toBeNull()
+    expect(badge.closest("[data-not-connected]")!.tagName).toBe("SPAN")
+  })
+
+  it("the tuple is built with EXPLICIT BRANCHES — no spread reaches `badges`", async () => {
+    // ⚠ A SPREAD IS THE SILENT FAILURE MODE, not a style question: `[...a, ...b]` widens
+    // `BadgeSlots` to `BadgeSlot[]` and retires the max-2 typecheck guard without a single
+    // test going red. This fence reads the SOURCE because the consequence it prevents is
+    // invisible at runtime.
+    const code = stripComments(phaseNodeSource)
+    const start = code.indexOf("const badges: BadgeSlots =")
+    const end = code.indexOf("return (", start)
+    expect(start).toBeGreaterThan(-1)
+    expect(end).toBeGreaterThan(start)
+    const tuple = code.slice(start, end)
+    expect(tuple).not.toContain("...")
+    // Non-vacuity: this really is the tuple expression, carrying BOTH slots.
+    expect(tuple).toContain("notConnected")
+    expect(tuple).toContain("waitsForYou")
+    // POSITIVE CONTROL: the same needle matches the wrong fix it exists to forbid.
+    expect("const badges: BadgeSlots = [...ones, ...twos]").toContain("...")
+
+    // ⚠ D-12 — THE GATE IS THE PROJECTION BOOLEAN, NEVER THE TYPE DISCRIMINATOR, and this
+    // is the ONE claim of this plan that the DOM cannot decide. A type-conditional gate
+    // (`data.phaseType === "external_action"`) renders BYTE-IDENTICALLY today, because
+    // nothing in this app can be connected to anything until Phase 190 — so every render
+    // assertion above would stay green while the badge quietly stopped retiring by data
+    // and started requiring an edit to this adapter. It is therefore fenced on SOURCE,
+    // where the difference is visible. The needle is assembled from parts (the 187-24
+    // lesson) so this suite's own text can never satisfy a later wider grep.
+    const EXTERNAL_TYPE = ["external", "action"].join("_")
+    expect(tuple).toMatch(/data\.notConnected/)
+    expect(code).not.toContain(EXTERNAL_TYPE)
+    // POSITIVE CONTROL: the needle really does match the wrong fix.
+    expect(`if (data.phaseType === "${EXTERNAL_TYPE}")`).toContain(EXTERNAL_TYPE)
   })
 })
