@@ -423,3 +423,157 @@ SUMMARY is read once and this file is read by whoever comes next.
 
 ⚠ **No SC#10 cross-provider scoreboard is owed for this phase, and none was manufactured** — the
 ROADMAP exempts 189 as design/vocabulary work with no live stream.
+
+---
+
+## ⚠ DRIVEN SESSION — 189-16 Task 3, executed 2026-08-07 (Chrome MCP, operator-started stack)
+
+**Stack confirmed up before starting:** backend `:8000` → 200, frontend `:5173` → 200, Supabase
+`:54321` → 200, Redis reachable via `REDIS_URL`. Navigation was by CLICKING throughout (the app has
+no URL router); every figure below is a script-evaluated DOM/geometry read or a live DB/Redis query —
+`take_screenshot` was never used, per the estate's known timeout.
+
+**What was built, by clicking:** the `Compliance Gap Report` draft was opened, switched to the Canvas
+tab, and an `external_action` step was inserted **between** `retrieve` and `emit` — deliberately NOT
+last, because that is the only arrangement in which the CR-02 mid-run sweep can fire. A second
+workflow (`KB Cited Answer`) was built the same way, giving two independent observations of the
+picker defect below.
+
+### ⛔ NEW BLOCKER FOUND — the 7th step type is unreachable by mouse
+
+**This is the phase's own headline capability, and it cannot be placed with a mouse.** Found by the
+first action of the session; it is why two rows below are recorded as driven-by-workaround.
+
+The `StepTypePicker` menu renders INSIDE the `.react-flow` container, which has `overflow-y: hidden`.
+The menu is `position: static`, `z-index: auto`, `maxHeight: none`, and **is not scrollable**
+(`scrollHeight === clientHeight`); the document does not scroll either
+(`scrollHeight === clientHeight === 666`). Rows extending past the container's bottom edge are
+therefore clipped away with **no scroll path to them at all**.
+
+Measured at the default window (`innerHeight` 666, `.react-flow` bottom **656**):
+
+| Row | Label | y range | `elementFromPoint` reachable |
+|---|---|---|---|
+| 1 | Prepare the inputs | 404..452 | ✅ |
+| 2 | Write it up | 452..500 | ✅ |
+| 3 | Work out how to do it | 500..548 | ✅ |
+| 4 | Work on the parts together | 548..596 | ✅ |
+| 5 | Wait for your approval | 596..644 | ✅ |
+| 6 | Produce the deliverable | 644..692 | ⛔ |
+| **7** | **Sends an email** ← *this phase's type* | **692..740** | ⛔ |
+
+**All three insertion doors fail identically** — `Add a step before step 1`, `before step 2`, and
+`at the end` (the last is worst: 3 rows clipped). **Four independent user actions were tried; all
+four fail:**
+
+1. **Window resize** — the estate caps `innerHeight` at 732; row 7 still clipped.
+2. **Browser zoom** at `0.67` and `0.5` — the anchor sits at a fixed fraction of the container, so the
+   overflow is **scale-invariant**. At 0.67 row 6 came back; row 7 never did.
+3. **Keyboard** — `ArrowDown` and `Tab` both leave focus on the `＋` button. Focus never enters the
+   menu, so there is no keyboard path either.
+4. **React Flow's own Zoom Out control** — moves the affordance *down* (306 → 325), making it worse.
+
+**Reproduced on a second, independent workflow** (`KB Cited Answer`), so it is not fixture-specific.
+
+⚠ **Both placements in this session were therefore made with a synthetic `element.click()`, which
+bypasses hit-testing.** Recorded rather than smoothed over: the steps below were driven on a workflow
+a real user could not have built with a mouse at this viewport.
+
+### Rows driven
+
+| Row | Verdict | Evidence |
+|---|---|---|
+| **U1** — 7th glyph visible, not ~4× dimmer | ✅ **PASS** | Marks are **identical**, not merely in-band. All seven picker rows: fill `rgb(243,245,252)`, opacity 1, 32×32. On the canvas, all three placed types: fill `rgb(243,245,252)`, **luminance 91.39**, 48×48. Only the tint WELLS differ; the 7th's is `rgba(242,95,217,0.38)` = 189-13's `hsl(310 85% 66% / 0.38)`, luminance **32.07**, mid-range against the other six (21.62 / 24.45 / 32.07 / 42.95 / 53.66 / 62.56 / 100). **The `llm_batch_agents` luminance-34.5 defect does not repeat** — that was a dim MARK; this mark is the same colour as its six siblings. |
+| **U2** — badge occlusion | ✅ **PASS, control observed swinging BOTH ways** | Badge rect `747,460 142×33`. `elementFromPoint` at its own centre returns the badge (`SPAN "Not connected"`). Probes at the ⛨ seal position (card top-right), the verdict-mark edge, and both badge corners all resolve to the expected element — the badge occludes nothing and is occluded by nothing. **Falsification control:** a `zIndex 99999` div planted over the badge centre → `badgeReachable` **true → false**; removed → **false → true**. Both observations recorded. |
+| **U4** — badge does not break the height budget | ✅ **PASS** | All three cards share **`y=302`** — the spine's top baseline does not move — and are spaced uniformly **478 px** apart, so no neighbour reflows. `act` is **222 h** vs **172 h** for both neighbours: 50 px taller, growing **downward only**. That is the documented acceptance (*"NOT that all cards are the same height"*). ⚠ The *without-badge* half could not be measured on the same card: the badge is state-conditional on `notConnected`, and nothing can connect a capability while zero MCP code exists. The neighbour-reflow half — the part the row actually protects — is fully measured. |
+| **U3** — 8th ring distinguishable in greyscale | ⛔ **STILL NOT DRIVEN** | Unchanged. The ring readings live on `NodeRunOverlay`, which paints only on a **run surface**; reaching one needs a PUBLISHED external-action workflow (see the publish blocker below). |
+| **U5** — 188.2 debt: seven readings on a live run | ⛔ **STILL NOT DRIVEN** | Same blocker. |
+| **U6** — 188.2 debt: one glance at a Builder card | ✅ **PASS** | Builder cards were on screen throughout. Type name, subtitle sentence and badge render in the intended hierarchy; the ⛨ *"Must prove it"* seal sits top-right on `retrieve`/`emit` and is correctly **absent** on `act`. No layout break at any of the three window sizes exercised. |
+| **D-25** — run-level verdict over a phase-level "not sent" | ✅ **PASS (on the wire)** | Observed in the run's own event stream: `run_completed status=completed` while `act` sits at `recorded_not_sent`. The pairing is real and exactly as recorded — the run genuinely completed. Its *rendered* half rides the same blocked run surface. |
+| **BUG-260807-01** — `constructor`-slug reachability | ⛔ **NOT DRIVEN** | Deprioritised behind the new blocker above. Its code fix is confirmed present at HEAD (`own()` at `editAffordance.ts:244-247`, `providerLogo.tsx:107`); the report stays `open` for this row only. |
+
+### The two headline governance rows — DRIVEN, and they pass
+
+Three real golden runs were executed against the live KB (each a full harness run + independent judge).
+
+**SC#4 — no egress, OBSERVED not assumed.** The `act` phase output, read straight from
+`workflow_phases.output`:
+
+> `NOT SENT — recorded only.` / `What this step would have done` / `Action : Sends an email` / …
+> **`No email was sent. Nothing left this workflow. This is a record of an intention, not a receipt.`**
+
+with `recorded_intent.capability = "send_email"`.
+
+**WR-02's fix verified live:** `recorded_intent.inputs` keys are **`['content']`** —
+`kickoff_prompt` is **absent**. Before the fix the user's chat question was swept into the record.
+
+**D-19 verified live — the armed checkpoint auto-continues on a golden run.** Two full runs went
+straight through without hanging (the pre-fix behaviour died at 7200 s):
+
+```
+[   0s] run=active     retrieve=active    | act=pending           | emit=pending
+[  69s] run=active     retrieve=completed | act=recorded_not_sent | emit=active
+[ 150s] run=completed  retrieve=completed | act=recorded_not_sent | emit=completed
+```
+
+**Migration 115 proven in production use:** `act` persisted as **`recorded_not_sent`** on every run —
+the widened CHECK admits the new literal against the live DB, not just in a test.
+
+**CR-02 — the code-review fix — PROVEN ON THE WIRE, twice.** The full ordered event stream for run
+`45bfe74d`, read from the Redis run buffer:
+
+```
+ 0. phase_started            phase=retrieve  phase_index=0
+ 1. gate_failed              phase=retrieve
+ 2. phase_completed          phase=retrieve  phase_index=0
+ 3. phase_transition
+ 4. phase_started            phase=act       phase_index=1
+ 5. phase_recorded_not_sent  phase=act       phase_index=1   <-- THE FIX
+ 6. phase_transition
+ 7. phase_started            phase=emit      phase_index=2   <-- the sweep trigger
+ 8. phase_completed          phase=emit      phase_index=2
+ …
+13. run_completed            status=completed
+```
+
+**Event 5 arrives BEFORE event 7**, and event 7 is what fires `finalizeEarlierPhasesForThread`. The
+sweep acts on exactly `{running, retrying}` and skips every terminal, so by the time it runs the card
+is already `"recorded-not-sent"`. **Before the fix event 5 did not exist**, so the card was still
+`running` when event 7 arrived and was repainted *"✓ Complete"* mid-run, within milliseconds. The
+ordering is the proof that the fix closes the gap at the right moment. Same event observed on run
+`f744de07`.
+
+### ⛔ Why the *rendered* run surface is still owed — a real blocker, named
+
+**No external-action workflow could be published**, so no run surface could be opened. Three publish
+attempts, three honest blocks, **none caused by the external-action step** — it cleared the
+`Golden run` and `Citations` gauntlet stages every time:
+
+| # | Workflow · KB | Blocked at | Why |
+|---|---|---|---|
+| 1 | Compliance Gap Report · Weekly reports | **Judge** | the KB holds weekly status updates, not compliance obligations |
+| 2 | Compliance Gap Report · SOPs | **Judge** | an SOP deck defines the ideal procedure, not deviations from it |
+| 3 | KB Cited Answer · Weekly reports | **Golden run** | `gather-evidence` failed a structural gate |
+
+This is the publish gauntlet working as designed (186's hard wall — *"no override · publish anyway"*),
+and it is a **content** mismatch, not a defect. Worth recording: the pip strip rendered ✓ for the eight
+passed stages with `Judge`/`Commit` unticked — **the Phase-186 `findIndex → -1` bug, which painted an
+unknown `blocked_stage` as 8/8 GREEN, does not reproduce.**
+
+**Blocking condition for U3 / U5 / the D-25 render / BUG-260807-01:** a PUBLISHED workflow containing
+an `external_action` step. **Run this first when it clears:** author a workflow whose deliverable the
+judge will pass against a matching KB (a simple cited-answer shape bound to `Weekly reports` is the
+closest attempt so far), publish it, launch it, and watch the panel spine — U3, U5, D-25's render and
+the `constructor`-slug row all ride that one run.
+
+### Rows driven incidentally, outside the U set
+
+| Item | Verdict | Evidence |
+|---|---|---|
+| **WR-04** — capability picker is a real radiogroup | ✅ **PASS** | Roving tabindex `0,-1,-1`. A real `ArrowDown` moved focus 0 → 1, selection followed (`aria-checked` `false,true,false`), and the roving tabindex moved with it (`-1,0,-1`). `ArrowUp` restored. Correct APG behaviour. |
+| **189-14** — the arming switch renders ON and refuses | ✅ **PASS** | `role="switch"`, `aria-checked="true"`, `aria-disabled="true"`, copy *"This step reaches outside your workspace, so it always stops and asks you first. That cannot be switched off."* A real click left it `true` — it visibly refuses, the Phase-185 shape. |
+| **Card invariant** — no focusable control inside the card | ✅ **PASS** | `act.querySelectorAll('button,a[href],input,select,textarea,[tabindex]:not([tabindex="-1"])')` → **0**. The ✕ and ＋ live on the lane, as designed. |
+| **WR-03** — the picker row previews the card that lands | ✅ **PASS** | Row 7 reads *"Sends an email / Stops for your approval before it acts outside"*; the placed card reads the same two lines plus the `Not connected` badge. |
+| **D-13 tier 4 / D-12 badge slot 1** | ✅ **PASS** | The placed card's face is capability-derived, and the `Not connected` badge occupies slot 1 — the slot 188.2 was forbidden from spending and 189-15 spent. |
+
+**Session total: 8 PASS · 3 still not driven (all behind ONE named blocker) · 1 NEW BLOCKER FOUND.**
