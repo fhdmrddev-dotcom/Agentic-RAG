@@ -82,6 +82,39 @@ mount). That plan must either scope the generic tool rail away from `external_ac
 render the capability through its own section — it must NOT widen `toolOptions`, which is
 the D-20 leak this phase's single net-new security property (V22) exists to prevent.
 
+### ✅ CLOSED by plan 189-13 (`5963ba4b`, 2026-08-07) — and the PREMISE was measured FALSE
+
+⚠ **The re-open trigger named plan 189-09; the surface actually landed in 189-13/189-14** after
+the wave numbering shifted. 189-13 closed it.
+
+**The premise was checked before anything was written, and it does not hold at HEAD.**
+`PhaseFormPanel.tsx` renders `ToolsField` inside **two mutually exclusive `pt === …` branches**
+(`llm_agent`, `llm_batch_agents`) and its render body has **no default arm** — six `pt ===`
+branches, no fallback. So `external_action` never reaches the generic rail, no capability is
+painted struck through, and **no render code needed to change.**
+
+**What WAS missing is the whole point of the closure: a MECHANICAL guard.** "True today by
+construction" is exactly the claim a later branch silently falsifies — and this phase's own
+history is the argument, since 189-04's PLANT 2 showed the entire fidelity suite stays GREEN
+while the D-20 hole is open (V22 is the only thing that can see it).
+
+**Five cases added to `PhaseFormPanel.rails.test.tsx`** (pin 27 → 32, moved in-commit):
+`external_action` renders no tool rail *nor the degraded one* (with a non-vacuity floor proving
+the panel DID render); a positive control that the identical rails DO produce a rail on
+`llm_agent`; no capability NAME anywhere in the panel HTML under three `toolOptions` shapes
+**including `"degraded"`** (which prints what the step already names); `toolOptions` NOT widened,
+asserted on source; and `<ToolsField` mounted **exactly twice** with no `external_action`-gated
+mount.
+
+**PLANT Z5 — the exact wrong fix D-20 rejects** (give the type the generic rail and widen its
+options with `send_email` / `create_ticket` / `post_message`) — driven into `PhaseFormPanel.tsx`
+and **observed RED on four of the five**, then restored md5-identical (`8c740775…`,
+`grep -c "PLANT"` → 0). **V22 re-run: `1 passed`.** No backend file was touched by 189-13.
+
+**Standing constraint for 189-14**, which builds `ExternalActionSection`: it must render the
+capability through its OWN section and **must not widen `toolOptions`** — doing so now fails
+four named frontend tests *plus* V22, rather than passing silently.
+
 ---
 
 ## D-189-DEF-03 — the LIVE RUN SURFACE has no honest wire signal for `recorded_not_sent`
