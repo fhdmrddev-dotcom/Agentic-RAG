@@ -706,6 +706,61 @@ describe("PhaseNodeCard 188.2 — the extracted modules cannot import back (SC#3
   })
 })
 
+// ── 188.2-VALIDATION AUDIT (2026-08-07) — four per-file claims the row map made but
+// no assertion in this suite covered. Each was TRUE at HEAD when found (read directly
+// off the destination file), but "true today" and "guarded against tomorrow" are two
+// different statements, and only the shared `cardSubtreeSource` haystack — never a
+// PER-FILE one — backed any of them before this block existed. Filed under the audit
+// rather than folded into the fences above so the diff reads as what it is: four new
+// regression locks on already-shipped, already-true behaviour, not a re-scope of an
+// existing guard.
+describe("PhaseNodeCard 188.2 — per-file claims the row map made and nothing asserted", () => {
+  it("04-T1 (D-04): phaseNodeCardContract.ts emits NO runtime value export — types only", () => {
+    const contract = CARD_MODULES["./phaseNodeCardContract.ts"]
+    expect(contract.length).toBeGreaterThan(0)
+    expect(contract).not.toMatch(/export\s+(const|function|let|var|class)\b/)
+    // POSITIVE CONTROL: the regex catches a real runtime export in the same shape.
+    expect("export const X = 1").toMatch(/export\s+(const|function|let|var|class)\b/)
+    expect("export function f() {}").toMatch(/export\s+(const|function|let|var|class)\b/)
+    // …and the file is not simply empty of exports altogether — six type/interface
+    // exports are the whole point of the leaf.
+    expect((contract.match(/export\s+(interface|type)\b/g) ?? []).length).toBe(6)
+  })
+
+  it("04-T2 (D-05): ownProperty.ts takes ZERO imports — its own docblock's contract", () => {
+    const ownFile = CARD_MODULES["./ownProperty.ts"]
+    expect(ownFile.length).toBeGreaterThan(0)
+    expect(ownFile).not.toMatch(/^import\s/m)
+    // POSITIVE CONTROL, same multiline anchor.
+    expect("import { x } from \"y\"\nexport const z = 1").toMatch(/^import\s/m)
+    expect(ownFile).toContain("export function own<T>(")
+  })
+
+  it("05-T2 (D-14): NodeRunOverlay.tsx's RING_* constants stay MODULE-PRIVATE", () => {
+    const overlay = CARD_MODULES["./NodeRunOverlay.tsx"]
+    expect(overlay.length).toBeGreaterThan(0)
+    // Declared (the 188.2-01 move-invariant control above already pins `const RING_RADIUS`
+    // exists somewhere in the subtree) but never with the `export` keyword in front of it.
+    expect(overlay).toContain("const RING_RADIUS")
+    expect(overlay).not.toMatch(/export\s+const\s+RING_/)
+    // POSITIVE CONTROL: the regex catches the exact shape it forbids.
+    expect("export const RING_RADIUS = 34").toMatch(/export\s+const\s+RING_/)
+  })
+
+  it("02-T1 (D-11): PhaseNodeCard.tsx names no z-index tier — the fix lives one file away", () => {
+    // The bug fix (D-10/D-11) is scoped to `editAffordance.ts` + `PlaneEditingLayer.tsx`;
+    // the card itself is not a party to the affordance z-index tier at all. That is a
+    // claim about a FILE, so it has to be checked against that file alone — the joined
+    // `cardSubtreeSource` used everywhere else in this suite would hide a violation
+    // planted in any of the other five files behind this one's silence.
+    const card = CARD_MODULES["./PhaseNodeCard.tsx"]
+    expect(card.length).toBeGreaterThan(0)
+    expect(card).not.toMatch(/zIndex|AFFORDANCE_Z|z-index/)
+    // POSITIVE CONTROL.
+    expect("style={{ zIndex: AFFORDANCE_Z }}").toMatch(/zIndex|AFFORDANCE_Z|z-index/)
+  })
+})
+
 describe("nodePresentation — the 184-03 hard cut (source guard)", () => {
   // `GROUNDING_TONE` stays in the regex below even though Phase 185 deleted it: the
   // guard's job flips from "no second copy" to "no resurrection" and the assertion is

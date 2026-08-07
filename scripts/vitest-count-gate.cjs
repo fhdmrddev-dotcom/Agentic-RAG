@@ -299,7 +299,15 @@ const BASELINE = {
   // their three marker rows and the seven-reading / three-verdict / four-border geometry matrices
   // (+12). Read from THIS SCRIPT'S OWN `actual` column across two agreeing runs, 2026-08-07
   // (both printed `PhaseNodeCard.test.tsx 107 124 +17`) — never hand-counted.
-  "PhaseNodeCard.test.tsx": 124,
+  // 188.2-VALIDATION AUDIT (2026-08-07): 124 → 128. EXTENDED again, not lowered — the audit's
+  // own gap-closure round found 4 per-task claims in the 188.2 map (04-T1 zero-runtime-export,
+  // 04-T2 zero-import, 05-T2 RING_* module-private, 02-T1 card-untouched-by-the-z-index-tier)
+  // that were TRUE at HEAD but backed by no PER-FILE assertion — only the joined
+  // `cardSubtreeSource` haystack, which cannot distinguish "true in this file" from "true
+  // somewhere in the subtree". +4 `it(` blocks, one per claim, each reading `CARD_MODULES` by
+  // its own destination path. Read from `actual` across two agreeing runs, 2026-08-07 (both
+  // printed `PhaseNodeCard.test.tsx 124 128 +4`).
+  "PhaseNodeCard.test.tsx": 128,
   "PhaseNode.test.tsx": 26,
   "PhaseTimeline.test.tsx": 10,
   // 188 code-review fix pass (CR-06): 12 → 17. An EXTENSION, not a lowering. The five
