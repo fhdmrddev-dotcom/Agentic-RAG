@@ -37,8 +37,13 @@
  *                  and the undo affordance disappears regardless of it (SPEC Req 3).
  *
  * ── WHICH STEPS CARRY A DIAL (D-185-15) ──
- * Only `llm_agent` and `llm_batch_agents`. They are the only configs with
- * `available_tools`, i.e. the only steps that can ever SATISFY the gate. The trap this
+ * Only `llm_agent` and `llm_batch_agents`. They are the only configs whose tools can ever
+ * INTERSECT the server's `KB_TOOLS`, i.e. the only steps that can ever SATISFY the gate.
+ * (⚠ CORRECTED at Phase 189 / D-03 / D-26, in the commit that falsified it: this sentence
+ * used to say they were the only configs WITH `available_tools`. The 7th type,
+ * `external_action`, carries one too — but its list is derived from a capability set that
+ * is disjoint from `KB_TOOLS`, so it can neither satisfy nor be detected by this gate, and
+ * `DIAL_TYPES` below stays the same two names.) The trap this
  * closes: an escalated `llm_single` has no retrieval path at all, so the engine gate
  * would fail it on every single run — an author-reachable, permanently-failing step.
  * Restricting the control makes that state unrepresentable rather than documented.
@@ -84,8 +89,17 @@ const SECTION_HEADING = "How strictly this step is held"
 
 /**
  * The two step types that carry a dial (D-185-15). Mirrors the backend rule exactly:
- * `available_tools` exists only on `LlmAgentPhaseConfig` and `LlmBatchAgentsPhaseConfig`,
- * so these are the only types `grounding_cause` can ever report `detected` for.
+ * these are the only types whose tools can ever INTERSECT the server's `KB_TOOLS`, which
+ * is the one thing `grounding_cause` reports `detected` for.
+ *
+ * ⚠ CORRECTED at Phase 189 (D-03 / D-26), in the commit that falsified it. The reason
+ * used to read *"`available_tools` exists only on `LlmAgentPhaseConfig` and
+ * `LlmBatchAgentsPhaseConfig`"*, and the 7th phase type `external_action` now carries
+ * `available_tools` too (D-03). THE CONSTANT IS UNCHANGED AND STILL CORRECT: that step's
+ * list is DERIVED from its `capability` and the three capabilities are disjoint from
+ * `KB_TOOLS` by construction, so it can never read as `detected`. Do not add
+ * `external_action` here — see `phaseVocabulary.GROUNDING_DIAL_TYPES`, whose docblock
+ * carries the same correction and the same red line.
  */
 const DIAL_TYPES: readonly string[] = ["llm_agent", "llm_batch_agents"]
 

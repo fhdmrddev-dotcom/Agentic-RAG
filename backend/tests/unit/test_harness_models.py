@@ -11,8 +11,15 @@ so RLS / immutability / DELETE-RESTRICT SCs live in ``supabase/verify_090.sql``)
       ValidationError (D-07 extra='forbid', threat T-090-01)
   (c) test_wrong_phase_type_rejected — phase_type:"not_a_phase" raises
       ValidationError (no discriminator match, threat T-090-02)
-  (d) test_each_phase_config_validates — each of the 5 minimal phase-config dicts
-      validates via PhaseSpec.model_validate() and selects the expected class
+  (d) test_each_phase_config_validates — each minimal phase-config dict validates
+      via PhaseSpec.model_validate() and selects the expected class. ⚠ The count in
+      this bullet used to read "the 5" and the list itself held 5 of the 6 shipped
+      members (`llm_emit` was never added at 101.1). Phase 189 adds BOTH the missing
+      6th and its own 7th, and states the rule instead of a number: this list holds
+      one entry per member of the ``PhaseConfig`` union, and (e) pins that.
+  (e) test_the_phase_config_union_is_exactly_the_declared_members — 189 (D-01): the
+      union's members, in order, with ``external_action`` LAST. Additive growth is
+      safe; reordering or renaming a member orphans every stored row that uses it.
 
 This file does NOT import the Supabase client or any conftest fixture — these are
 pure-Python Pydantic validations.
@@ -26,8 +33,10 @@ import pytest
 from pydantic import ValidationError
 
 from app.models.harness import (
+    ExternalActionPhaseConfig,
     LlmAgentPhaseConfig,
     LlmBatchAgentsPhaseConfig,
+    LlmEmitPhaseConfig,
     LlmHumanInputPhaseConfig,
     LlmSinglePhaseConfig,
     PhaseSpec,
@@ -106,6 +115,16 @@ _MINIMAL_CONFIGS = [
         LlmBatchAgentsPhaseConfig,
     ),
     ({"phase_type": "llm_human_input", "prompt": "p"}, LlmHumanInputPhaseConfig),
+    # ── Phase 101.1 (D-04) — the 6th member. Measured 2026-08-07 while adding the 7th:
+    # `llm_emit` was NEVER added to this list, so the shipped contract suite has been
+    # proving 5 of 6 members since 101.1. Added here rather than left, because a list
+    # that silently omits a member is how the next one gets omitted too.
+    ({"phase_type": "llm_emit", "prompt": "p"}, LlmEmitPhaseConfig),
+    # ── Phase 189 (CONN-01 / D-01) — the 7th member, appended.
+    (
+        {"phase_type": "external_action", "capability": "send_email"},
+        ExternalActionPhaseConfig,
+    ),
 ]
 
 
@@ -148,6 +167,63 @@ def test_each_phase_config_validates(config_dict, expected_cls):
         {"slug": "s", "phase_index": 0, "config": config_dict}
     )
     assert type(spec.config) is expected_cls
+
+
+def test_the_phase_config_union_is_exactly_the_declared_members():
+    """189 (D-01) — the union GREW ADDITIVELY: 7 members, `external_action` LAST.
+
+    Read off the annotation itself rather than eyeballed in a diff. Two properties, and
+    the ORDER one is the load-bearing half: the module docblock's growth contract says
+    what must not change is an existing member's SPELLING — renaming one orphans every
+    stored row that uses it — so pinning the sequence catches a rename or a reorder that
+    a membership-only assertion would sail past.
+    """
+    import typing
+
+    from app.models.harness import PhaseConfig
+
+    # PhaseConfig is Annotated[Union[...], Field(discriminator=...)]; the Union is arg 0.
+    members = typing.get_args(typing.get_args(PhaseConfig)[0])
+    assert [m.__name__ for m in members] == [
+        "ProgrammaticPhaseConfig",
+        "LlmSinglePhaseConfig",
+        "LlmAgentPhaseConfig",
+        "LlmBatchAgentsPhaseConfig",
+        "LlmHumanInputPhaseConfig",
+        "LlmEmitPhaseConfig",
+        "ExternalActionPhaseConfig",
+    ]
+    # Every member is covered by the minimal-config parametrize above, so a member added
+    # without a row there fails HERE rather than going silently untested.
+    assert {c[1].__name__ for c in _MINIMAL_CONFIGS} == {m.__name__ for m in members}
+
+
+def test_the_discriminated_union_mechanism_is_untouched_by_the_seventh_member():
+    """189 (D-01) — `extra='forbid'` and the discriminator are LOCKED mechanism.
+
+    The 7th member is additive INSIDE that mechanism, never a change to it. Asserted on
+    the 7th member itself and on a shipped one, so "still forbids" cannot be true of only
+    the old members.
+    """
+    for cls in (ExternalActionPhaseConfig, LlmSinglePhaseConfig):
+        assert cls.model_config.get("extra") == "forbid", (
+            f"{cls.__name__} does not reject unknown keys — D-07 / T-090-01"
+        )
+
+    bad = copy.deepcopy(VALID_SEED)
+    bad["phases"].append(
+        {
+            "slug": "notify",
+            "phase_index": 5,
+            "config": {
+                "phase_type": "external_action",
+                "capability": "send_email",
+                "bogus_field": 1,
+            },
+        }
+    )
+    with pytest.raises(ValidationError):
+        WorkflowDefinition.model_validate(bad)
 
 
 # ── Phase 185 (GOVERN-01 / GOVERN-03, D-185-06/07/08) — the two governance intents ──

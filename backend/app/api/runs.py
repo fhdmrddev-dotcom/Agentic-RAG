@@ -674,8 +674,17 @@ def resolve_phase_available_tools(definition, active_slug: str) -> list:
     available_tools lives in the definition JSONB (per-phase config), NOT a
     workflow_phases column — so a Harness Continue MUST re-read it from the parsed
     WorkflowDefinition before resuming, never trust a stale row. Tool-bearing
-    phase configs (llm_agent / llm_batch_agents) carry the whitelist; other phase
-    types (llm_single / programmatic / llm_human_input) have none → empty list.
+    phase configs carry the whitelist; the rest have none → empty list, which is
+    why the read is a defensive getattr over the discriminated union.
+
+    ⚠ CORRECTED at Phase 189 (D-03 / D-26), in the commit that falsified it. The two
+    lists above used to be spelled out as "(llm_agent / llm_batch_agents)" and
+    "(llm_single / programmatic / llm_human_input)". Both were already incomplete
+    (llm_emit, added at 101.1, appears in neither) and 189 makes the first one wrong:
+    the 7th type, external_action, carries available_tools too, because D-03 puts its
+    chosen capability there so the step rides this very re-read and the phase_whitelist
+    dispatch backstop behind it. Enumerating union members in prose rots on every
+    additive growth, so the rule is stated instead of the roster.
     """
     for ps in definition.phases:
         if ps.slug == active_slug:

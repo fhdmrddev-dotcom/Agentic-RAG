@@ -8,9 +8,12 @@ phase config raises ``pydantic.ValidationError`` BEFORE the Phase 091 engine
 consumes it (threat T-090-01 / V5 input validation).
 
 The two Literal sets GROW ADDITIVELY, and always have. ``phase_type`` went 5 -> 6
-at Phase 101.1 (the ``llm_emit`` member); the validator ``kind`` set went 4 -> 9 at
+at Phase 101.1 (the ``llm_emit`` member) and 6 -> 7 at Phase 189 (CONN-01 / D-01 —
+the ``external_action`` member); the validator ``kind`` set went 4 -> 9 at
 Phase 102 (GATE-01 / D-12) and 9 -> 10 at Phase 185 (GOVERN-03 —
-``action_risk_approval``). Growth is SAFE because every value a stored JSONB row
+``action_risk_approval``) and is UNCHANGED by 189, which REUSES
+``action_risk_approval`` rather than growing a second kind. Growth is SAFE
+because every value a stored JSONB row
 can already carry still validates: an old row never names the new member, and an
 unrecognized kind fails CLOSED downstream in ``run_gates``. What must NOT change is
 an EXISTING member's spelling — renaming one orphans every stored row that uses it
@@ -23,10 +26,13 @@ engine is the consumer and these are the fields it reads.
 
 from __future__ import annotations
 
+import logging
 from typing import Annotated, Literal, Union
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+logger = logging.getLogger(__name__)
 
 
 class _StrictBase(BaseModel):
@@ -53,7 +59,11 @@ class SkillSnapshot(_StrictBase):
     storage_prefix: str                  # the snapshot Storage prefix the copies live under (D-02)
 
 
-# ── 5 phase-type configs (HARNESS-01 / 091 SC#1) ────────────────────────────
+# ── the phase-type configs (HARNESS-01 / 091 SC#1) ──────────────────────────
+# This header read "5 phase-type configs" until Phase 189. It was already false at
+# 101.1 (the 6th member landed below it) and 189 makes it a 7. A count in a header
+# is a claim that rots on every additive growth, so it is stated as a rule instead:
+# the members below ARE the ``PhaseConfig`` union, in the union's own order.
 class ProgrammaticPhaseConfig(_StrictBase):
     phase_type: Literal["programmatic"]
     fn: str  # PROGRAMMATIC_PHASE_REGISTRY key
@@ -159,6 +169,122 @@ class LlmEmitPhaseConfig(_StrictBase):
     integrity_policy: Literal["strict", "documented_limit"] = "strict"  # F3 sibling (pptx/xlsx)
 
 
+class ExternalActionPhaseConfig(_StrictBase):
+    """Phase 189 (CONN-01 / D-01) — the 7th phase type: a GOVERNED EXTERNAL ACTION.
+
+    The step that reaches OUTSIDE this app — and, in 189, sends NOTHING. The author picks
+    one named ``capability`` from a CLOSED SET of three (D-15, ratified 2026-08-07); the
+    executor RECORDS the action it would have taken and the phase lands
+    ``recorded_not_sent`` (D-05). Phase 190 swaps the no-op for a real call behind an
+    unchanged seam. Nothing here opens a socket, and nothing here is meant to.
+
+    Additive-optional / ZERO-MIGRATION: appended to the ``PhaseConfig`` union as the 7th
+    discriminated member — the standard extension, which is the phrase
+    ``LlmEmitPhaseConfig`` above uses for the 6th and which this module's docblock records
+    as the way all of them arrived. ``_StrictBase`` rejects unknown keys (D-07); old JSONB
+    phase rows without ``external_action`` still ``model_validate()``, because an old row
+    never names the new member. The discriminator, ``extra='forbid'`` and the union
+    structure are UNTOUCHED — the module docblock calls that mechanism LOCKED, and a 7th
+    member is additive INSIDE it, never a change to it.
+
+    ── D-22 · THE CAPABILITY IS A STEP THE EXECUTOR PERFORMS, NOT A TOOL THE LLM CALLS ──
+    The shipped precedent is ``render_template``: a name honoured by the per-phase
+    whitelist while being INVISIBLE to the model — registered for dispatch, never
+    advertised in ``openai_service.get_tools()``, and executed by the phase itself
+    (``phase_types.py``'s 101-06 WR-01 correction states the two layers). The name that
+    ``available_tools`` carries below is therefore a GOVERNANCE DECLARATION, not a
+    dispatchable schema. Phase 189 adds NO ``_TOOL_REGISTRY`` entry and NO ``get_tools()``
+    schema for these three names; both belong to Phase 190. The tool reading would require
+    an agent loop, i.e. an LLM deciding WHETHER and HOW to send — which contradicts D-05
+    outright and would ship most of the plumbing for live egress that SC#4 forbids.
+
+    ── D-03 · ``available_tools`` IS DERIVED FROM ``capability``, NEVER AUTHORED ──
+    The capability IS an entry in ``available_tools``, so it flows through the SAME
+    per-phase whitelist every other tool does — ``phase_types._build_phase_tool_context``
+    builds ``ToolContext.phase_whitelist`` from this list and ``tool_dispatcher.dispatch_tool``
+    is where it is ENFORCED (``api/runs.py:resolve_phase_available_tools`` is the *Continue*
+    re-read of the same list, not the main run's builder). SC#1's claim that this rides the
+    guard that already exists is then literally true rather than aspirational.
+
+    The validator below DERIVES the list rather than trusting it, and the derivation is
+    total replacement — after validation ``available_tools == [capability]``, whatever was
+    submitted. One fact, one derivation, no drift. Two consequences, both deliberate:
+      * an author-supplied list is DISCARDED rather than merged. Merging would let an
+        author park ``search_documents`` on this step, and grounding detection is
+        ``available_tools ∩ KB_TOOLS`` — the step would silently arm the *must prove it*
+        dial while reading no knowledge base. Replacement makes that unrepresentable
+        rather than documented, and it is fail-CLOSED in the only direction that matters:
+        the whitelist can only ever get NARROWER than what was asked for.
+      * the derived value IS persisted (the draft path saves ``model_dump(mode="json")``).
+        That is the requirement here, not a hazard: D-03 needs the name in the STORED row
+        so the run-time re-read finds it. Contrast ``PhaseSpec``'s grounding block below,
+        where baking a derived value is forbidden precisely because that one must be able
+        to change when the row changes. This one cannot: it is a function of ``capability``
+        alone, and ``capability`` cannot change without rewriting this config.
+
+    ── D-03 · DISJOINT FROM ``KB_TOOLS`` BY CONSTRUCTION ──
+    None of the three names is a KB tool (``grounding.KB_TOOLS``), so ``grounding_cause``
+    returns ``None`` for this step and it is *free to think* — it carries NO ⛨ governance
+    seal. That is CORRECT, not a missing feature: an external-action step reads no
+    knowledge base. The membership is fenced two ways: a module-level assertion beside
+    ``EXTERNAL_ACTION_CAPABILITIES`` in ``grounding.py``, and
+    ``tests/unit/test_189_external_action_model.py``, which asserts the SET of this
+    ``Literal``'s own members equals that frozenset and is disjoint from ``KB_TOOLS``.
+    Two spellings of one closed set are unavoidable (Pydantic needs a literal; the
+    frozenset is the runtime home and this module must not import a service), so the
+    agreement is MECHANICAL rather than remembered.
+
+    ⚠ THE ARMING IS NOT HERE. ``action_risk_armed`` lives on ``PhaseSpec``, shared by all
+    seven types, and D-04's pin is the ``model_validator`` on THAT class. Do not add a
+    second home for it here — see that validator's docblock for why.
+    """
+
+    phase_type: Literal["external_action"]
+    # D-15 / D-02 — the CLOSED vocabulary, ratified by the operator on 2026-08-07 over
+    # email-only (too thin a canvas vocabulary) and over a fourth name (Phase 190 has no
+    # plan to make a fourth real, so it would ship a node that can never be connected).
+    # A fourth name is a ``ValidationError`` at parse time, never a dynamic lookup and
+    # never an ``eval`` — the same closed-registry rule ``_TOOL_REGISTRY``,
+    # ``PROGRAMMATIC_PHASE_REGISTRY`` and ``EMITTER_REGISTRY`` all share. The executor
+    # (189-09) re-resolves the name against ``EXTERNAL_ACTION_CAPABILITIES`` and raises;
+    # that is the second line of defence for a row that reached the engine another way.
+    capability: Literal["send_email", "create_ticket", "post_message"]
+    # DERIVED, never authored — see the D-03 block above. Defaulted rather than required
+    # so a client that does not send it cannot 422 a whole definition; the validator
+    # supplies the only admissible value either way.
+    available_tools: list[str] = Field(default_factory=list)
+
+    # NO SHAPE-SYMMETRY OPTIONALS, and the omission is the decision. The five LLM members
+    # share ``model`` / ``folder_scope`` / ``skill_ref`` / ``skill_snapshot`` because each
+    # of them drives a model; this one drives none (D-22), so all four would be inert —
+    # and two would be actively wrong. A ``folder_scope`` would claim a retrieval path
+    # this step does not have, and a ``citation_policy="strict"`` would make
+    # ``grounding_cause`` report ``already-set`` for a step that reads nothing. Nothing
+    # speculative is carried; a later phase that needs one adds it additively, as this
+    # member itself was added.
+
+    @model_validator(mode="after")
+    def _available_tools_is_the_capability(self) -> "ExternalActionPhaseConfig":
+        # D-03 — ONE fact, ONE derivation. The capability is the whitelist, so the two can
+        # never disagree: there is no representable ``external_action`` config whose
+        # ``available_tools`` omits its own capability, which is what SC#2's "cannot be
+        # wired around a gate" means at the model layer. COERCES rather than raises, for
+        # the same fail-closed reason the D-04 pin does (see ``PhaseSpec`` below): a stale
+        # client that sends an empty list must not brick the definition it is saving.
+        derived = [self.capability]
+        if self.available_tools != derived:
+            if self.available_tools:
+                logger.info(
+                    "189 D-03: external_action available_tools %r replaced by the "
+                    "capability-derived %r (the whitelist is derived from `capability`, "
+                    "never authored)",
+                    self.available_tools,
+                    derived,
+                )
+            self.available_tools = derived
+        return self
+
+
 PhaseConfig = Annotated[
     Union[
         ProgrammaticPhaseConfig,
@@ -167,6 +293,7 @@ PhaseConfig = Annotated[
         LlmBatchAgentsPhaseConfig,
         LlmHumanInputPhaseConfig,
         LlmEmitPhaseConfig,
+        ExternalActionPhaseConfig,  # 189 CONN-01 (D-01) — the 7th, appended
     ],
     Field(discriminator="phase_type"),
 ]

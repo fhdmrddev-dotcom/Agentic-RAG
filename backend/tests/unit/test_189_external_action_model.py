@@ -334,6 +334,44 @@ def test_the_capability_set_is_exactly_three_and_disjoint_from_kb_tools():
     )
 
 
+def test_the_literal_and_the_runtime_frozenset_are_the_same_closed_set():
+    """T-189-11 / plan 189-07 — THE CROSS-MODULE AGREEMENT FENCE.
+
+    The closed set has TWO spellings and that is unavoidable: Pydantic needs a `Literal`
+    in `app.models.harness`, while `EXTERNAL_ACTION_CAPABILITIES` is the runtime home in
+    `app.services.harness.grounding` (a model module must not import a service, and the
+    frozenset is what the publish fidelity gate and the executor read). Two spellings of
+    ONE set is the drift shape this project keeps getting bitten by, so the agreement is
+    MECHANICAL rather than remembered.
+
+    A capability admitted by one reader and unknown to the other is either an
+    unpublishable node (in the Literal, absent from the gate's membership set) or an
+    unenforced one (in the frozenset, refused at parse) — the constant's own header block
+    in `grounding.py` states exactly that. Neither state is detectable by any other test:
+    `test_the_capability_set_is_exactly_three_and_disjoint_from_kb_tools` above reads only
+    the Literal, and `test_103_grounding_fidelity.py` reads only the frozenset.
+
+    OBSERVED RED before it was trusted: a fourth name (`wire_transfer`) planted in the
+    Literal alone drove this assertion, and only this assertion, to failure.
+    """
+    from app.services.harness.grounding import EXTERNAL_ACTION_CAPABILITIES
+
+    cls = _external_action_config_cls()
+    literal_members = set(typing.get_args(cls.model_fields["capability"].annotation))
+
+    assert literal_members == set(EXTERNAL_ACTION_CAPABILITIES), (
+        "the `capability` Literal and grounding.EXTERNAL_ACTION_CAPABILITIES have "
+        f"DRIFTED: only in the Literal {sorted(literal_members - set(EXTERNAL_ACTION_CAPABILITIES))!r}, "
+        f"only in the frozenset {sorted(set(EXTERNAL_ACTION_CAPABILITIES) - literal_members)!r}. "
+        "One closed set, two spellings — they must agree exactly (D-15 / D-20)."
+    )
+    # Anti-vacuity: two empty sets are also equal. The set under test is the D-15 three.
+    assert literal_members == set(EXPECTED_CAPABILITIES)
+    assert isinstance(EXTERNAL_ACTION_CAPABILITIES, frozenset), (
+        "the runtime membership set must not be mutable"
+    )
+
+
 def test_a_capability_outside_the_closed_set_is_refused():
     """D-02 — closed-registry discipline: *a name not present RAISES.*
 

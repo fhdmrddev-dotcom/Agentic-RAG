@@ -269,10 +269,26 @@ export type GroundingCause = "detected" | "already-set" | "escalated" | null
 
 /**
  * The two step types that can carry a grounding dial (D-185-15). Mirrors the
- * backend rule exactly: `available_tools` exists only on `LlmAgentPhaseConfig`
- * and `LlmBatchAgentsPhaseConfig`, so these are the only types the server's
- * `grounding_cause` can ever report `detected` for — and the only types on which
- * a stored `grounding_escalated` bit means anything.
+ * backend rule exactly: these are the only types whose tools can ever INTERSECT
+ * the server's `KB_TOOLS`, which is the one thing `grounding_cause` reports
+ * `detected` for — and so the only types on which a stored `grounding_escalated`
+ * bit means anything.
+ *
+ * ⚠ CORRECTED at Phase 189 (D-03 / D-26), in the commit that falsified it. This
+ * block used to give the reason as *"`available_tools` exists only on
+ * `LlmAgentPhaseConfig` and `LlmBatchAgentsPhaseConfig`"*. That is no longer true:
+ * the 7th phase type, `external_action`, carries `available_tools` too, because
+ * D-03 puts its chosen capability THERE so the step rides the per-phase whitelist
+ * guard that already exists.
+ *
+ * THE CONSTANT IS UNCHANGED AND STILL CORRECT — only its stated reason moved. A
+ * third type carrying `available_tools` does not make it grounding-capable: an
+ * `external_action` step's list is DERIVED from its `capability`, and the three
+ * capabilities are disjoint from `KB_TOOLS` by construction (fenced in
+ * `grounding.py` beside the constant and in the model's own suite). So that step
+ * reads no knowledge base, `grounding_cause` returns null for it, and it carries
+ * no ⛨ seal — correct, not a gap. `GROUNDING_DIAL_TYPES` is READ here and NEVER
+ * edited (a D-185-15 red line); `external_action` must not be added to it.
  */
 export const GROUNDING_DIAL_TYPES: readonly string[] = ["llm_agent", "llm_batch_agents"]
 
