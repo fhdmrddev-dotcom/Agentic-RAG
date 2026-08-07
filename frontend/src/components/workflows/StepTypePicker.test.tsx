@@ -701,6 +701,111 @@ describe("StepTypePicker — source purity (the ?raw grep, the shipped house idi
   })
 })
 
+// ── 8b. BUG-260807-02 — the measured bound, and the wheel that makes it real ───
+//
+// ⚠ EVERY ASSERTION IN THIS BLOCK IS ABOUT THE CONTRACT, NEVER ABOUT THE DEFECT.
+// jsdom applies no CSS, computes no overflow clipping and no stacking contexts, and
+// `.click()` bypasses hit-testing — which is precisely why this suite was green while
+// row 7 (`external_action`, the type Phase 189 exists to ship) was unreachable from all
+// three insertion doors. So what is pinned here is what a renderer with no layout CAN
+// see: the two library opt-out class tokens, the two overflow tokens, the inline bound
+// arriving from the CALLER, and the wheel not escaping to a parent. The acceptance is a
+// DRIVEN `elementFromPoint` probe at a small viewport, recorded on the bug report.
+//
+// The panel measures NOTHING itself and must not start: it is a leaf that renders with no
+// `ReactFlowProvider`, imports nothing from `@xyflow/react` and reads no DOM. The budget
+// is a NUMBER computed by `PlaneEditingLayer` from `pickerPlacement`.
+
+describe("StepTypePicker — BUG-260807-02: the caller's bound and the wheel opt-out", () => {
+  const panel = () => screen.getByTestId("step-type-picker")
+
+  it("carries the library's OWN opt-out classes, on the panel element itself", () => {
+    renderPicker(twoSteps, 1)
+    // `nowheel` is the half that actually works. `@xyflow/system`'s
+    // `createZoomOnScrollHandler` short-circuits with `return null` — no `preventDefault`,
+    // so the native scroll proceeds on the scrollable element — whenever
+    // `isWrappedWithClass(event, noWheelClassName)` is true, and that helper is an
+    // ANCESTOR WALK from the event target (`event.target.closest('.' + className)`).
+    // `nopan` ships beside it so dragging the panel's own scrollbar cannot pan the canvas.
+    // Asserted on the panel ITSELF rather than on any ancestor: the walk starts at the
+    // event target and an ancestor of the canvas is not on that path.
+    expect(panel().classList.contains("nowheel")).toBe(true)
+    expect(panel().classList.contains("nopan")).toBe(true)
+  })
+
+  it("scrolls its own overflow rather than clipping it away", () => {
+    renderPicker(twoSteps, 1)
+    expect(panel().classList.contains("overflow-y-auto")).toBe(true)
+    // `overscroll-contain` so reaching the menu's end does not hand the gesture onward.
+    expect(panel().classList.contains("overscroll-contain")).toBe(true)
+  })
+
+  it("renders the CALLER's budget as an inline max-height", () => {
+    render(
+      <StepTypePicker
+        phases={twoSteps}
+        index={1}
+        open
+        maxHeightPx={240}
+        onChoose={noop}
+        onDismiss={noop}
+      />,
+    )
+    expect(panel().style.maxHeight).toBe("240px")
+  })
+
+  it.each([
+    ["the prop omitted", {}],
+    ["an explicit null — the unmeasured container", { maxHeightPx: null }],
+  ])("renders NO inline max-height at all with %s", (_name, extra) => {
+    // The shipped, unbounded panel is what jsdom keeps seeing, which is what keeps every
+    // case above this one measuring the component it was written against. `null` is
+    // `pickerPlacement`'s DO-NOT-BOUND answer for a container the library has not
+    // measured yet — jsdom always, and a browser's very first paint.
+    render(
+      <StepTypePicker
+        phases={twoSteps}
+        index={1}
+        open
+        onChoose={noop}
+        onDismiss={noop}
+        {...extra}
+      />,
+    )
+    expect(panel().style.maxHeight).toBe("")
+    expect(panel().getAttribute("style") ?? "").not.toContain("max-height")
+  })
+
+  it("swallows a wheel before it reaches a parent — WITH the control that says so", () => {
+    const onParentWheel = vi.fn()
+    render(
+      // Stands in for `.react-flow`, which is itself a static element carrying a wheel
+      // listener. It draws no `jsx-a11y/no-static-element-interactions` error — that rule
+      // fires on pointer/key handlers, not on `onWheel`, which is why the shipped `pane`
+      // stand-in below (an `onMouseDown`) does and this one does not.
+      <div role="presentation" onWheel={onParentWheel}>
+        <div data-testid="outside-the-panel" />
+        <StepTypePicker
+          phases={twoSteps}
+          index={1}
+          open
+          onChoose={noop}
+          onDismiss={noop}
+        />
+      </div>,
+    )
+
+    fireEvent.wheel(panel())
+    expect(onParentWheel).not.toHaveBeenCalled()
+
+    // ⚠ THE POSITIVE CONTROL, in the SAME case so it cannot drift away from the claim it
+    // props up: without it, "the wheel does not reach the parent" is equally satisfied by
+    // a harness where no wheel reaches anything.
+    fireEvent.wheel(screen.getByTestId("outside-the-panel"))
+    expect(onParentWheel).toHaveBeenCalledTimes(1)
+  })
+})
+
 // ── 9. The whole-suite network tripwire (must run LAST) ───────────────────────
 
 describe("StepTypePicker — zero network calls across the entire suite", () => {

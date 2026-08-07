@@ -237,12 +237,12 @@ describe("editAffordance — pickerPlacement clamps the panel horizontally", () 
     expect(Object.is(placement.offsetXPx, 0)).toBe(true)
   })
 
-  it("pins the left edge at the margin when the panel is WIDER than the container", () => {
-    // maxLeft = 200 − 300 − 8 = −108, i.e. below the margin. The clamp's upper bound is
-    // held at PICKER_MARGIN rather than allowed to invert, so a narrow canvas shows the
+  it("pins the left edge at the margin when the MARGINS no longer fit", () => {
+    // maxLeft = 300 − 300 − 8 = −8, i.e. below the margin. The clamp's upper bound is
+    // held at PICKER_MARGIN rather than allowed to invert, so a tight canvas shows the
     // panel from its left edge instead of from an arbitrary negative offset.
     const placement = pickerPlacement(
-      at({ panelFlowX: 400, container: { width: 200, height: 800 } }),
+      at({ panelFlowX: 400, container: { width: 300, height: 800 } }),
     )
     expect(placement.offsetXPx).toBe(PICKER_MARGIN - 400)
   })
@@ -269,11 +269,55 @@ describe("editAffordance — pickerPlacement is unmeasured-safe and total", () =
     })
   })
 
-  it("does the same for an unmeasured WIDTH", () => {
+  it("does the same for an unmeasured WIDTH — an incoherent box is no measurement", () => {
     const placement = pickerPlacement(at({ container: { width: 0, height: 800 } }))
     expect(placement.maxHeightPx).toBeNull()
     expect(placement.side).toBe("below")
     expect(placement.offsetXPx).toBe(0)
+  })
+
+  it("treats THE JSDOM MOCK'S 1×1 CONTAINER as unmeasured — `=== 0` would not have", () => {
+    // ⚠ THE CASE THAT WAS MISSING FROM THIS PLAN'S OWN ARITHMETIC, and it was found by
+    // the estate rather than reasoned about: `test-utils/mockReactFlow.ts:92-105` defines
+    // `offsetWidth`/`offsetHeight` as `parseFloat(this.style.width) || 1`, and
+    // `.react-flow` carries no inline size — so `@xyflow`'s `useResizeHandler` reads
+    // 1 × 1 and writes it to the store as a perfectly POSITIVE measurement. A `<= 0` gate
+    // does not catch it, and the first draft of this function duly computed a placement
+    // against a one-pixel canvas: flipped upward, slid 452px left. That is not a fallback,
+    // it is nonsense — and it is what `WorkflowCanvas.editing.test.tsx`'s
+    // `AFFORDANCE_SHAPE_BASELINE` refused, correctly.
+    const placement = pickerPlacement(at({ container: { width: 1, height: 1 } }))
+
+    expect(placement).toEqual({
+      side: "below",
+      flowY: 122,
+      offsetXPx: 0,
+      maxHeightPx: null,
+    })
+  })
+
+  it("declines the VERTICAL bound below the panel's own floor, and says so as null", () => {
+    // 119 is one px under `PICKER_MIN_HEIGHT`: the budget could only ever BE the floor, so
+    // the measurement carries no information and the shipped panel is the honest answer.
+    const under = pickerPlacement(at({ container: { width: 1200, height: 119 } }))
+    expect(under.maxHeightPx).toBeNull()
+    expect(under.side).toBe("below")
+
+    // …and one px the other side of the threshold it is a real budget again, so the
+    // boundary is asserted rather than assumed.
+    const over = pickerPlacement(at({ anchorFlowY: 0, container: { width: 1200, height: 120 } }))
+    expect(over.maxHeightPx).toBe(PICKER_MIN_HEIGHT)
+  })
+
+  it("keeps the VERTICAL bound on a container too narrow to correct horizontally", () => {
+    // ⚠ THE TWO AXES ARE DECIDED SEPARATELY, and this is why. A canvas narrower than the
+    // panel can only ever pin it at the margin — but it can still CLIP it vertically,
+    // which is the entire defect. Folding the two decisions together would have thrown
+    // the fix away on exactly the small viewports the bug reproduces at.
+    const placement = pickerPlacement(at({ container: { width: 100, height: 800 } }))
+    expect(placement.offsetXPx).toBe(0)
+    expect(placement.maxHeightPx).toBe(670)
+    expect(placement.side).toBe("below")
   })
 
   it.each([

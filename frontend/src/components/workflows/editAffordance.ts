@@ -270,13 +270,37 @@ export interface PickerPlacement {
  * calls at zoom 0.5 and 2, over fixtures where a height that had been multiplied or
  * divided by zoom would read a visibly different number.
  *
- * ── THE DEGENERATE BRANCH RETURNS THE SHIPPED GEOMETRY, DELIBERATELY ──────────
+ * ── THE DEGENERATE BRANCHES RETURN THE SHIPPED GEOMETRY, DELIBERATELY ─────────
  *
- * An unmeasured container (`width`/`height` of 0 — jsdom always, and a browser's very
- * first paint) returns `side: "below"`, `offsetXPx: 0` and `maxHeightPx: null`, which is
- * byte-for-byte what shipped before this function existed. `null` means DO NOT BOUND, so
- * no inline `max-height` reaches the DOM and every existing suite keeps seeing exactly
- * the panel it was written against.
+ * An unmeasured container returns `side: "below"`, `offsetXPx: 0` and `maxHeightPx: null`,
+ * which is byte-for-byte what shipped before this function existed. `null` means DO NOT
+ * BOUND, so no inline `max-height` reaches the DOM and every existing suite keeps seeing
+ * exactly the panel it was written against.
+ *
+ * ⚠ "UNMEASURED" IS NOT `=== 0`, AND THAT WAS MEASURED RATHER THAN ASSUMED. This estate's
+ * canvas mock (`test-utils/mockReactFlow.ts:92-105`) defines `offsetWidth`/`offsetHeight`
+ * as `parseFloat(this.style.width) || 1`, and `.react-flow` carries no inline size — so
+ * `@xyflow`'s `useResizeHandler` reads **1 × 1** and writes it to the store as a perfectly
+ * positive measurement. A `<= 0` test therefore does NOT catch jsdom, and a placement
+ * computed against a one-pixel canvas is not a fallback, it is nonsense: driven against
+ * the first draft of this function it flipped the panel upward and slid it 452px left,
+ * which `WorkflowCanvas.editing.test.tsx`'s `AFFORDANCE_SHAPE_BASELINE` caught. So the
+ * gate is TWO-TIERED, and the second tier's thresholds are the panel's own dimensions
+ * rather than invented numbers:
+ *
+ *   1. NOTHING MEASURED — a non-positive width or height, or a non-finite `tx` / `ty` /
+ *      `panelFlowX`. An incoherent measurement is no measurement: the whole placement
+ *      falls back.
+ *   2. MEASURED, BUT TOO SMALL TO CARRY INFORMATION — the two axes decided SEPARATELY,
+ *      so a narrow container does not cost the vertical fix this function exists for. A
+ *      container shorter than `PICKER_MIN_HEIGHT` can only ever produce the floor, so the
+ *      budget is `null` and the side stays "below"; a container narrower than the panel
+ *      itself can only ever pin it at the margin, so there is no x correction to make.
+ *
+ * Tier 2 is what keeps jsdom — and the ~200 canvas cases rendering through it — on the
+ * shipped geometry, which is why `AFFORDANCE_SHAPE_BASELINE` did not have to be
+ * re-captured for this fix. A characterization baseline re-captured against a one-pixel
+ * container would have pinned an artifact instead of the surface.
  *
  * ── TOTAL, and that is not ceremony here ──────────────────────────────────────
  *
@@ -312,6 +336,19 @@ export function pickerPlacement(input: PickerPlacementInput): PickerPlacement {
     return { side: "below", flowY: belowFlowY, offsetXPx: 0, maxHeightPx: null }
   }
 
+  // TIER 2, the vertical axis. A container that cannot host the menu at its own floor
+  // yields no information — the budget would be `PICKER_MIN_HEIGHT` whichever side won —
+  // so the shipped, unbounded panel is the honest answer. This is the branch jsdom's
+  // 1×1 container takes.
+  if (height < PICKER_MIN_HEIGHT) {
+    return {
+      side: "below",
+      flowY: belowFlowY,
+      offsetXPx: 0,
+      maxHeightPx: null,
+    }
+  }
+
   // Flow → screen. `* zoom + t` is the viewport transform itself, which is why nothing
   // has to be read back off the DOM.
   const belowTopPx = belowFlowY * zoom + ty
@@ -326,14 +363,19 @@ export function pickerPlacement(input: PickerPlacementInput): PickerPlacement {
   const flowY = side === "above" ? aboveFlowY : belowFlowY
   const maxHeightPx = Math.max(PICKER_MIN_HEIGHT, side === "above" ? spaceAbove : spaceBelow)
 
+  // TIER 2, the horizontal axis, decided SEPARATELY from the vertical one above: a
+  // container narrower than the panel can only ever pin it at the margin, and a canvas
+  // that narrow is already unusable for reasons this function cannot fix. Deciding the
+  // two axes together would have cost the vertical bound — the whole point of the fix —
+  // on any narrow container.
   const leftPx = input.panelFlowX * zoom + tx
   const maxLeft = width - EDIT_AFFORDANCE.PICKER_WIDTH - PICKER_MARGIN
-  // The upper bound is held at or above the lower one, so a container NARROWER than the
-  // panel pins its left edge at the margin instead of inverting the clamp.
+  // The upper bound is held at or above the lower one, so a container narrower than the
+  // panel PLUS its margins pins the left edge at the margin instead of inverting the clamp.
   const clampedLeft = Math.min(Math.max(leftPx, PICKER_MARGIN), Math.max(PICKER_MARGIN, maxLeft))
   // A correction, not a position: the wrapper still translates to `panelFlowX` in flow
   // space, and this slides it afterwards in post-counter-scale local px.
-  const offsetXPx = clampedLeft - leftPx
+  const offsetXPx = width < EDIT_AFFORDANCE.PICKER_WIDTH ? 0 : clampedLeft - leftPx
 
   return { side, flowY, offsetXPx, maxHeightPx }
 }

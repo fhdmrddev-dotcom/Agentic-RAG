@@ -98,6 +98,18 @@ export interface StepTypePickerProps {
   onDismiss: () => void
   /** Closed renders nothing at all: no hidden DOM, no stale focus trap. */
   open: boolean
+  /**
+   * `BUG-260807-02` — THE MEASURED BUDGET THE CALLER COMPUTED. **This leaf measures
+   * nothing**, and must not start: it renders with no `ReactFlowProvider`, imports
+   * nothing from `@xyflow/react`, holds no store reference and reads no DOM. The number
+   * comes from `pickerPlacement`, which derives it from the live container size and
+   * viewport transform in `PlaneEditingLayer`.
+   *
+   * Omitted or `null` = DO NOT BOUND, which is byte-for-byte the panel that shipped —
+   * the answer for a container the library has not measured yet (jsdom always, and a
+   * browser's first paint).
+   */
+  maxHeightPx?: number | null
 }
 
 export function StepTypePicker({
@@ -106,6 +118,7 @@ export function StepTypePicker({
   onChoose,
   onDismiss,
   open,
+  maxHeightPx,
 }: StepTypePickerProps) {
   const baseId = useId()
   const panelRef = useRef<HTMLDivElement | null>(null)
@@ -167,7 +180,42 @@ export function StepTypePicker({
       className={[
         "w-[300px] rounded-[14px] border border-border bg-card p-[7px] shadow-lg",
         "animate-in fade-in-0 slide-in-from-bottom-1 duration-100 motion-reduce:animate-none",
+        // `BUG-260807-02` — the menu renders INSIDE `.react-flow`, which is
+        // `overflow-y: hidden`, so before this line any row past the container's bottom
+        // edge was clipped away WITH NO SCROLL PATH TO IT. Row 7 is `external_action`,
+        // the type Phase 189 exists to ship, and it was unreachable from all three
+        // insertion doors. The bound itself arrives as `maxHeightPx` below; these two
+        // tokens are what turn the overflow into a scroll instead of a clip.
+        "overflow-y-auto overscroll-contain",
+        // ⚠ BOTH WHEEL GUARDS SHIP, AND ONLY ONE OF THEM ACTUALLY WORKS. `nowheel` is the
+        // real one: `@xyflow/system`'s `createZoomOnScrollHandler`
+        // (dist/esm/index.js:2764) short-circuits with `return null` — notably WITHOUT
+        // calling `preventDefault`, so the native scroll proceeds on the scrollable
+        // element — whenever `isWrappedWithClass(event, noWheelClassName)` is true, and
+        // that helper (:2693) is an ANCESTOR WALK from the event target
+        // (`event.target.closest('.' + className)`). `createFilter` (:2861) and
+        // `createPanOnScrollHandler` (:2711) consult the same class, and `ReactFlow`'s
+        // default `noWheelClassName` is `'nowheel'`.
+        //
+        // The `onWheel` `stopPropagation` below is belt-and-braces ONLY: React's
+        // synthetic wheel is delegated to the ROOT container, so it fires AFTER the
+        // native event has already bubbled through `.react-flow`'s d3-zoom listener and
+        // cannot stop that listener. A previous attempt shipped it alone; the wheel still
+        // zoomed the canvas, which would have made any scrollbar here decorative.
+        //
+        // `nopan` rides along so dragging the panel's own scrollbar cannot pan the plane.
+        // MEASURED PACKAGE VERSIONS (the same pair `AFFORDANCE_Z`'s docblock records):
+        // `@xyflow/react 12.11.2`, `@xyflow/system 0.0.79`.
+        "nowheel nopan",
       ].join(" ")}
+      // A NUMBER FROM THE CALLER, never a constant and never a measurement taken here. A
+      // static `max-h-[min(46vh,340px)]` was tried on 2026-08-07 and reverted: the CSS
+      // applied exactly as written and the rows were still unreachable, because bounding
+      // the HEIGHT says nothing about where the panel's TOP sits (`panelBottom 682 >
+      // reactFlowBottom 597`). `undefined` emits no inline `max-height` at all, which is
+      // the shipped unbounded panel.
+      style={{ maxHeight: typeof maxHeightPx === "number" ? `${maxHeightPx}px` : undefined }}
+      onWheel={(event) => event.stopPropagation()}
     >
       <div className="px-2 pb-[7px] pt-[5px] font-mono text-[10px] uppercase tracking-[0.09em] text-muted-foreground">
         {atEnd ? "Add a step at the end" : `Add a step before step ${index + 1}`}

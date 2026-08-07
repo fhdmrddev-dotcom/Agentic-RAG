@@ -59,6 +59,7 @@ import {
   EDIT_AFFORDANCE,
   REVEAL_ON_HOVER,
   insertPointX,
+  pickerPlacement,
   verticalOffsetFor,
 } from "@/components/workflows/editAffordance"
 import type { PhaseSpecJSON } from "@/components/workflows/phaseVocabulary"
@@ -122,7 +123,19 @@ export function PlaneEditingLayer({
   // The live viewport zoom. The menu is COUNTER-SCALED by it so a person reading six
   // sentences at 0.3× is not handed 4px type; the ＋ and ✕ deliberately do scale, since
   // they are glued to the cards and read as part of the drawing.
+  //
+  // ⚠ `BUG-260807-02` widened this from `state.transform[2]` to the WHOLE tuple, plus the
+  // container's own box. The three reads below are all the placement needs, and reading
+  // them in a selector IS the "re-measure on resize and on zoom" requirement — for free,
+  // with no listener of ours: `width`/`height` are `.react-flow`'s own size, kept current
+  // by the LIBRARY'S ResizeObserver, and `transform` changes on every pan and zoom.
+  // Nothing here is measured off the panel we are adjusting, so there is no feedback loop
+  // to converge and no settle frame to watch for.
+  const tx = useFlowStore((state) => state.transform[0])
+  const ty = useFlowStore((state) => state.transform[1])
   const zoom = useFlowStore((state) => state.transform[2])
+  const containerWidth = useFlowStore((state) => state.width)
+  const containerHeight = useFlowStore((state) => state.height)
 
   // Measured card heights, joined into ONE primitive so the selector's result is
   // reference-stable and zustand does not re-render on every unrelated store write. A
@@ -140,6 +153,53 @@ export function PlaneEditingLayer({
   }
 
   const boundaries = lanes.length + 1
+
+  // ── `BUG-260807-02`, the CLIPPING half — the picker's MEASURED placement ─────
+  //
+  // Computed exactly as the shipped code computed it, then handed to `pickerPlacement`
+  // rather than used directly: the slant is the same mean of the two neighbouring cards,
+  // and `panelFlowX` is the same `insertPointX(...) - PICKER_WIDTH / 2`. What changes is
+  // that the panel's SIDE, its height budget and its horizontal position are now derived
+  // from the live container box and viewport transform on every render, instead of being
+  // an unbounded drop of a constant 22 flow px.
+  const pickerSlant =
+    pickerAt === null
+      ? 0
+      : (verticalOffsetFor(phaseOrder[pickerAt - 1], nudges, dragOverlay, CANVAS_LAYOUT.LANE_Y) +
+          verticalOffsetFor(phaseOrder[pickerAt], nudges, dragOverlay, CANVAS_LAYOUT.LANE_Y)) /
+        (pickerAt > 0 && pickerAt < phaseOrder.length ? 2 : 1)
+  const pickerPanelFlowX =
+    pickerAt === null ? 0 : insertPointX(lanes, pickerAt) - EDIT_AFFORDANCE.PICKER_WIDTH / 2
+  const placement = pickerPlacement({
+    // The `＋`'s OWN flow y. `pickerPlacement` adds `PICKER_DROP` on the side it picks,
+    // which is why this is the anchor and not the panel's top.
+    anchorFlowY: EDIT_AFFORDANCE.INSERT_Y + pickerSlant,
+    panelFlowX: pickerPanelFlowX,
+    transform: [tx, ty, zoom],
+    container: { width: containerWidth, height: containerHeight },
+  })
+  // ⚠ THE TWO CORRECTIONS SIT AFTER `scale(1/zoom)` IN THE LIST, AND THAT IS LOAD-BEARING.
+  // CSS transforms apply RIGHT-TO-LEFT, so a trailing function runs in POST-scale local
+  // space — where one local px is one screen px, which is the space `offsetXPx` is
+  // measured in. Written before the scale it would be multiplied by `1/zoom` and drift at
+  // every zoom but 1. Both are pure translations, so they commute with each other.
+  //
+  // `translateY(-100%)` resolves against the WRAPPER'S OWN border box, which shrink-wraps
+  // the panel — so the flip up needs no height measurement, no ref and no second render
+  // pass. That is the whole reason `pickerPlacement` can stay a pure function.
+  //
+  // Each part is appended ONLY when it is not the identity, so an unmeasured container
+  // (jsdom, and a browser's first paint) emits the shipped string byte-for-byte — which
+  // is what keeps `AFFORDANCE_SHAPE_BASELINE`'s characterization capture a real guard
+  // rather than something this change had to re-capture.
+  const pickerTransform = [
+    `translate(${pickerPanelFlowX}px, ${placement.flowY}px)`,
+    `scale(${1 / (zoom || 1)})`,
+    placement.offsetXPx === 0 ? "" : `translate(${placement.offsetXPx}px, 0px)`,
+    placement.side === "above" ? "translateY(-100%)" : "",
+  ]
+    .filter((part) => part !== "")
+    .join(" ")
 
   return (
     <ViewportPortal>
@@ -247,21 +307,10 @@ export function PlaneEditingLayer({
             left: 0,
             top: 0,
             transformOrigin: "top left",
-            transform: `translate(${
-              insertPointX(lanes, pickerAt) - EDIT_AFFORDANCE.PICKER_WIDTH / 2
-            }px, ${
-              EDIT_AFFORDANCE.INSERT_Y +
-              EDIT_AFFORDANCE.PICKER_DROP +
-              // Opens under the `＋` it belongs to, so it tracks the same slant.
-              (verticalOffsetFor(
-                phaseOrder[pickerAt - 1],
-                nudges,
-                dragOverlay,
-                CANVAS_LAYOUT.LANE_Y,
-              ) +
-                verticalOffsetFor(phaseOrder[pickerAt], nudges, dragOverlay, CANVAS_LAYOUT.LANE_Y)) /
-                (pickerAt > 0 && pickerAt < phaseOrder.length ? 2 : 1)
-            }px) scale(${1 / (zoom || 1)})`,
+            // Opens beside the `＋` it belongs to and tracks the same slant — but on the
+            // side with the room for it, and no further than the container's own edge.
+            // See `pickerTransform` above.
+            transform: pickerTransform,
             // The menu opens 22px BELOW its `＋`, i.e. straight across the cards it sits
             // between, so it is the group with the most card to lose to. Same tier for the
             // same reason — `pointer-events-auto` above only restores hit-testing, it does
@@ -275,6 +324,10 @@ export function PlaneEditingLayer({
             open
             onChoose={(type) => onChooseType(pickerAt, type)}
             onDismiss={onDismissPicker}
+            // The measured budget. `null` when the container has not been measured yet,
+            // which the panel renders as NO inline `max-height` — the shipped, unbounded
+            // menu. The leaf measures nothing itself; it receives a number.
+            maxHeightPx={placement.maxHeightPx}
           />
         </div>
       ) : null}
