@@ -380,6 +380,114 @@ export function pickerPlacement(input: PickerPlacementInput): PickerPlacement {
   return { side, flowY, offsetXPx, maxHeightPx }
 }
 
+/**
+ * `BUG-260807-02`, the KEYBOARD half — THE APG **VERTICAL-`menu`** KEY MAP.
+ *
+ * Returns the next roving index, or `null` when the key is not one this pattern owns.
+ *
+ * ⚠ `ArrowLeft` AND `ArrowRight` ARE UNMAPPED, DELIBERATELY, AND THE OMISSION IS THE
+ * DESIGN. `ExternalActionSection.tsx:160-168` maps them — correctly, for itself — because
+ * it declares `role="radiogroup"`, and APG makes Right/Left synonyms of Down/Up inside a
+ * radio group. This map serves a `role="menu"` whose items are `role="menuitem"`, where
+ * Right and Left belong to SUBMENUS and MENUBARS. This picker has neither. Copying the
+ * radiogroup's key map into a menu would announce a widget that does not exist, which is
+ * the very mistake review finding WR-04 was raised about — in the other direction. The
+ * two ARIA patterns differ, the difference is load-bearing, and `editAffordance.test.ts`
+ * asserts both keys return `null` as the falsification control for the whole claim.
+ *
+ * ⚠ THE `null` RETURN IS WHAT KEEPS `Escape` WORKING. `StepTypePicker` dismisses through
+ * a GATED `window` keydown listener; its container handler consults this function and,
+ * on `null`, returns without touching the event — no `preventDefault`, no
+ * `stopPropagation`. So `Escape` still reaches the window, and `Enter` / `" "` still
+ * reach the button's own native activation. A handler that called `preventDefault`
+ * unconditionally would make the menu inescapable again, which is a defect the operator
+ * has already hit once from the other side.
+ *
+ * TOTAL, and not as ceremony: the answer is fed straight to `itemRefs[next]?.focus()`. A
+ * NaN or out-of-range index focuses `undefined` and strands the keyboard user mid-menu
+ * with no visible cause — a silent nothing, which is exactly what the live RED measured
+ * before this existed (a real `ArrowDown` moved `document.activeElement` not at all).
+ */
+export function nextRovingIndex(key: string, index: number, count: number): number | null {
+  if (!Number.isFinite(index) || !Number.isInteger(count) || count <= 0) return null
+  const last = count - 1
+  const i = Math.min(Math.max(Math.trunc(index), 0), last)
+  switch (key) {
+    case "ArrowDown":
+      return i === last ? 0 : i + 1
+    case "ArrowUp":
+      return i === 0 ? last : i - 1
+    case "Home":
+      return 0
+    case "End":
+      return last
+    default:
+      return null
+  }
+}
+
+/** What `scrollTopToReveal` needs. FOUR NUMBERS — never an Element, which is the whole
+ *  point (see the docblock below, and this module's own reads-no-DOM rule). */
+export interface RevealInput {
+  /** The panel's current `scrollTop`. */
+  scrollTop: number
+  /** The panel's `clientHeight`. `0` (jsdom, first paint) means DO NOT MOVE. */
+  clientHeight: number
+  /** The row's top, ALREADY relative to the panel's scrolled content box. */
+  rowTop: number
+  /** The row's height. */
+  rowHeight: number
+}
+
+/**
+ * `BUG-260807-02`, the KEYBOARD half — THE PANEL'S NEXT `scrollTop`, AND NOTHING ELSE'S.
+ *
+ * ⚠ THIS FUNCTION EXISTS BECAUSE `scrollIntoView` AND THE DEFAULT `focus()` SCROLL BOTH
+ * CHEAT, and that is a MEASUREMENT rather than a caution. Both walk up and scroll the
+ * NEAREST SCROLLABLE ANCESTOR — and `.react-flow` is `overflow: hidden`, which makes it
+ * *programmatically* scrollable even though it has no scrollbar and **no user gesture can
+ * move it**. The clipping half's first probe used `row.scrollIntoView({ block: "nearest" })`
+ * on 2026-08-07 and manufactured a FALSE 7/7 reachability reading; the tell was that its
+ * falsification control refused to swing. Reachability a real user cannot get is not
+ * reachability. `StepTypePicker` therefore calls `focus({ preventScroll: true })` and then
+ * assigns THIS number to its own panel's `scrollTop`, and `scrollIntoView` appears neither
+ * in the fix nor in the driven probe.
+ *
+ * The panel-only property is a consequence of the SIGNATURE, not of this paragraph: there
+ * is no element in it, so there is no ancestor this could reach.
+ *
+ * ⚠ `clientHeight <= 0` MEANS DO NOT MOVE, and it is not a rounding guard. With a
+ * `clientHeight` of 0 every row is "below the fold", so the reveal-downward arm would slam
+ * the panel to the bottom of its content on the very first arrow press — before layout
+ * exists. jsdom reports 0 for every box, so that is the branch the entire component suite
+ * takes, and it must be the one that changes nothing.
+ *
+ * TOTAL for the same reason `pickerPlacement` is: a NaN reaching `panel.scrollTop` is
+ * COERCED TO 0 by the DOM, silently, so the menu would jump to the top on every arrow
+ * press with no error anywhere and nothing to blame but the animation.
+ */
+export function scrollTopToReveal(input: RevealInput): number {
+  const { scrollTop, clientHeight, rowTop, rowHeight } = input
+  const safeTop = Number.isFinite(scrollTop) ? Math.max(0, scrollTop) : 0
+  if (
+    !Number.isFinite(scrollTop) ||
+    !Number.isFinite(clientHeight) ||
+    !Number.isFinite(rowTop) ||
+    !Number.isFinite(rowHeight)
+  ) {
+    return safeTop
+  }
+  // Unmeasured: never move. See the ⚠ above — this is jsdom's branch, and a browser's
+  // very first paint.
+  if (clientHeight <= 0) return safeTop
+
+  const top = rowTop
+  const bottom = rowTop + Math.max(rowHeight, 0)
+  if (top < scrollTop) return Math.max(0, top)
+  if (bottom > scrollTop + clientHeight) return Math.max(0, bottom - clientHeight)
+  return safeTop
+}
+
 /** The flow x of insertion boundary `index`: 0 = before the first card, `lanes.length`
  *  = after the last one, anything between = the midpoint of that connector. */
 /**

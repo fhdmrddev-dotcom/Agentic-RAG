@@ -43,7 +43,9 @@ import {
   EDIT_AFFORDANCE,
   PICKER_MARGIN,
   PICKER_MIN_HEIGHT,
+  nextRovingIndex,
   pickerPlacement,
+  scrollTopToReveal,
   type PickerPlacementInput,
 } from "./editAffordance"
 
@@ -365,6 +367,259 @@ describe("editAffordance — pickerPlacement is unmeasured-safe and total", () =
     const input = at({})
     const frozen = JSON.stringify(input)
     pickerPlacement(input)
+    expect(JSON.stringify(input)).toBe(frozen)
+  })
+})
+
+// ── `BUG-260807-02`, the KEYBOARD half — the roving key map ────────────────────
+//
+// Measured RED on the live app before a line of this was written (2026-08-08, the
+// `Compliance Gap Report` draft at 1280 × 666, door `canvas-insert-0`): opening the menu
+// left `document.activeElement` on the `＋` (`canvas-insert-0`), a REAL `ArrowDown` moved
+// it NOWHERE, and a REAL `Tab` jumped straight PAST the open menu to the next door
+// (`canvas-insert-1`). All seven `[role=menuitem]`s carried `tabindex: null`. So focus
+// never entered a `role="menu"` whose ARIA contract requires arrow-key roving focus.
+//
+// THE COUNT IS SEVEN because the seventh row is `external_action` — the capability Phase
+// 189 exists to ship — so the wrap cases below are not abstract: `ArrowDown` × 6 is the
+// only route a keyboard user has to it.
+
+const KEY_COUNT = 7
+const LAST = KEY_COUNT - 1
+
+describe("editAffordance — nextRovingIndex walks a VERTICAL menu, and wraps", () => {
+  it("ArrowDown advances, and WRAPS off the last row back to the first", () => {
+    expect(nextRovingIndex("ArrowDown", 0, KEY_COUNT)).toBe(1)
+    expect(nextRovingIndex("ArrowDown", 5, KEY_COUNT)).toBe(6)
+    // The wrap the driven row walks: row 7 (`external_action`) → row 1.
+    expect(nextRovingIndex("ArrowDown", LAST, KEY_COUNT)).toBe(0)
+  })
+
+  it("ArrowUp retreats, and WRAPS off the first row to the last", () => {
+    expect(nextRovingIndex("ArrowUp", 3, KEY_COUNT)).toBe(2)
+    // The other wrap — and the CHEAPEST route to row 7 for a keyboard user, which is why
+    // it is worth having rather than merely symmetric.
+    expect(nextRovingIndex("ArrowUp", 0, KEY_COUNT)).toBe(LAST)
+  })
+
+  it("Home lands on the first row and End on the last, from the middle", () => {
+    expect(nextRovingIndex("Home", 3, KEY_COUNT)).toBe(0)
+    expect(nextRovingIndex("End", 3, KEY_COUNT)).toBe(LAST)
+  })
+
+  // ⚠ THE FALSIFICATION CONTROL FOR THE WHOLE KEYBOARD CLAIM, and it is a LIST rather
+  // than a spot check on purpose. Two of these six are load-bearing for reasons that have
+  // nothing to do with symmetry:
+  //
+  //   · `Escape` — the shipped dismissal is a GATED `window` keydown listener
+  //     (`StepTypePicker.tsx`). The picker's container handler must fall through on this
+  //     key WITHOUT calling `preventDefault`, or the menu becomes inescapable again — the
+  //     defect the operator already hit once, from the other direction.
+  //   · `ArrowLeft` / `ArrowRight` — UNMAPPED DELIBERATELY. `ExternalActionSection` maps
+  //     them because it is a `radiogroup`, where APG makes Right/Left synonyms of Down/Up.
+  //     This is a vertical `menu`, where Right/Left belong to submenus and menubars —
+  //     neither of which exists here. The two ARIA patterns genuinely differ, and this is
+  //     the assertion that keeps the difference deliberate rather than accidental.
+  //
+  // `Enter` and `" "` fall through so the button's own NATIVE activation still fires, and
+  // `Tab` so the roving stop still hands the tab order onward.
+  it.each(["Escape", "Enter", " ", "Tab", "ArrowLeft", "ArrowRight"])(
+    "returns null for %j — a key this pattern does not own",
+    (key) => {
+      expect(nextRovingIndex(key, 3, KEY_COUNT)).toBeNull()
+    },
+  )
+
+  it("owns no key it was not asked to — an unrecognised name is null, never 0", () => {
+    // Non-vacuity for the block above: `null` must mean "not mine", not "index 0".
+    expect(nextRovingIndex("PageDown", 3, KEY_COUNT)).toBeNull()
+    expect(nextRovingIndex("", 3, KEY_COUNT)).toBeNull()
+    expect(nextRovingIndex("arrowdown", 3, KEY_COUNT)).toBeNull()
+  })
+})
+
+describe("editAffordance — nextRovingIndex is TOTAL over a degenerate menu", () => {
+  // Why totality is not ceremony here: the answer is fed straight to
+  // `itemRefs[next]?.focus()`. A NaN or out-of-range index focuses `undefined`, which
+  // strands the keyboard user mid-menu with no visible cause and no way back in — the
+  // same class of silent-nothing failure the live RED above measured.
+  it.each([
+    ["count 0", 0],
+    ["count negative", -3],
+    ["count non-integer", 6.5],
+    ["count NaN", Number.NaN],
+  ])("returns null rather than a number for %s", (_name, count) => {
+    expect(nextRovingIndex("ArrowDown", 0, count)).toBeNull()
+    expect(nextRovingIndex("Home", 0, count)).toBeNull()
+    expect(nextRovingIndex("End", 0, count)).toBeNull()
+  })
+
+  it("returns null for a NaN or infinite index", () => {
+    expect(nextRovingIndex("ArrowDown", Number.NaN, KEY_COUNT)).toBeNull()
+    expect(nextRovingIndex("ArrowDown", Number.POSITIVE_INFINITY, KEY_COUNT)).toBeNull()
+  })
+
+  it("CLAMPS an out-of-range index instead of escaping the array", () => {
+    // A `-1` index is what an unmeasured/reset menu can hold for one frame, and a `99`
+    // is what a shrinking `choices` array leaves behind. Both must still produce an
+    // in-range answer rather than focusing nothing.
+    expect(nextRovingIndex("ArrowDown", -1, KEY_COUNT)).toBe(1)
+    expect(nextRovingIndex("ArrowDown", 99, KEY_COUNT)).toBe(0)
+    expect(nextRovingIndex("ArrowUp", -1, KEY_COUNT)).toBe(LAST)
+    expect(nextRovingIndex("ArrowUp", 99, KEY_COUNT)).toBe(LAST - 1)
+    expect(nextRovingIndex("ArrowDown", 2.7, KEY_COUNT)).toBe(3)
+  })
+
+  it("answers in range for EVERY index the menu can hold, on every owned key", () => {
+    for (const key of ["ArrowDown", "ArrowUp", "Home", "End"]) {
+      for (let i = 0; i < KEY_COUNT; i++) {
+        const next = nextRovingIndex(key, i, KEY_COUNT)
+        expect(Number.isInteger(next)).toBe(true)
+        expect(next).toBeGreaterThanOrEqual(0)
+        expect(next).toBeLessThanOrEqual(LAST)
+      }
+    }
+  })
+
+  it("degenerates to a single-row menu without wrapping off it", () => {
+    expect(nextRovingIndex("ArrowDown", 0, 1)).toBe(0)
+    expect(nextRovingIndex("ArrowUp", 0, 1)).toBe(0)
+    expect(nextRovingIndex("End", 0, 1)).toBe(0)
+  })
+})
+
+// ── `scrollTopToReveal` — THE PANEL, AND NOTHING BUT THE PANEL ────────────────
+//
+// ⚠ THIS FUNCTION EXISTS BECAUSE `scrollIntoView` AND THE DEFAULT `focus()` SCROLL BOTH
+// CHEAT, and that is a measurement rather than a worry. Both walk up and scroll the
+// NEAREST SCROLLABLE ANCESTOR — and `.react-flow` is `overflow: hidden`, i.e.
+// PROGRAMMATICALLY scrollable while no user gesture can move it. The clipping half's own
+// probe used `scrollIntoView` on 2026-08-07 and manufactured a false 7/7; the tell was
+// that its falsification control refused to swing.
+//
+// So the answer is a NUMBER for ONE element's `scrollTop`. There is no ancestor it could
+// move, because there is no element in its signature at all — the panel-only property is
+// a consequence of the TYPE, not of a promise in a comment.
+//
+// THE FIXTURE IS THE SHIPPED PANEL, not an invented one. The clipping half measured
+// `max-height: 210.612px`, `scrollHeight 377 > clientHeight 209`, seven ~48px rows: a
+// 41px header band plus 7 × 48 = 377. Row i therefore opens at `41 + 48i`.
+const PANEL = { clientHeight: 209, scrollHeight: 377, header: 41, rowHeight: 48 }
+const rowTopAt = (i: number) => PANEL.header + i * PANEL.rowHeight
+
+describe("editAffordance — scrollTopToReveal moves the PANEL and nothing else", () => {
+  it("leaves a row that is already fully visible exactly where it is", () => {
+    // Row 1 at the top of an unscrolled panel: 41..89, inside 0..209.
+    expect(
+      scrollTopToReveal({
+        scrollTop: 0,
+        clientHeight: PANEL.clientHeight,
+        rowTop: rowTopAt(0),
+        rowHeight: PANEL.rowHeight,
+      }),
+    ).toBe(0)
+  })
+
+  it("reveals a row BELOW the fold by exactly `bottom − clientHeight`", () => {
+    // Row 7 — `external_action`, the row this bug is named for: 329..377.
+    // 377 − 209 = 168, which is ALSO the panel's own maximum scrollTop
+    // (`scrollHeight − clientHeight`) and the exact figure the clipping half's driven
+    // wheel measured (`scrollTop 0 → 168`). The fixture reproducing a live measurement
+    // is what makes this an arithmetic pin rather than a plausible-looking one.
+    expect(
+      scrollTopToReveal({
+        scrollTop: 0,
+        clientHeight: PANEL.clientHeight,
+        rowTop: rowTopAt(6),
+        rowHeight: PANEL.rowHeight,
+      }),
+    ).toBe(168)
+    expect(168).toBe(PANEL.scrollHeight - PANEL.clientHeight)
+  })
+
+  it("reveals a row ABOVE the fold by landing on the row's own top", () => {
+    // Walking back up from row 7 (panel scrolled to 168) to row 1 at 41.
+    expect(
+      scrollTopToReveal({
+        scrollTop: 168,
+        clientHeight: PANEL.clientHeight,
+        rowTop: rowTopAt(0),
+        rowHeight: PANEL.rowHeight,
+      }),
+    ).toBe(41)
+  })
+
+  it("does not move for a row already visible in a SCROLLED panel", () => {
+    // Row 5 (233..281) with the panel at 168 spans 65..113 of the visible box.
+    expect(
+      scrollTopToReveal({
+        scrollTop: 168,
+        clientHeight: PANEL.clientHeight,
+        rowTop: rowTopAt(4),
+        rowHeight: PANEL.rowHeight,
+      }),
+    ).toBe(168)
+  })
+
+  it("REFUSES TO MOVE an unmeasured panel — clientHeight 0 is jsdom and first paint", () => {
+    // ⚠ NOT a rounding concern: with `clientHeight` 0 every row is "below the fold", so a
+    // naive `bottom − clientHeight` would slam the panel to the bottom of its content on
+    // the very first arrow press, before layout exists. jsdom reports 0 for every box, so
+    // this branch is the one the whole component suite takes.
+    expect(
+      scrollTopToReveal({ scrollTop: 12, clientHeight: 0, rowTop: 329, rowHeight: 48 }),
+    ).toBe(12)
+    expect(
+      scrollTopToReveal({ scrollTop: 0, clientHeight: 0, rowTop: 329, rowHeight: 48 }),
+    ).toBe(0)
+  })
+
+  it("never returns a negative scrollTop, even for a row above the content box", () => {
+    // A negative `rowTop` is what a mid-animation rect delta can produce. `scrollTop` is
+    // clamped by the DOM anyway, but a negative here would silently mean "top" on one
+    // browser and throw off any arithmetic layered on it later.
+    expect(
+      scrollTopToReveal({ scrollTop: 100, clientHeight: 209, rowTop: -40, rowHeight: 48 }),
+    ).toBe(0)
+    expect(
+      scrollTopToReveal({ scrollTop: -50, clientHeight: 209, rowTop: 41, rowHeight: 48 }),
+    ).toBe(0)
+  })
+
+  it("treats a negative row height as zero rather than as a reveal upward", () => {
+    // `rowHeight` comes from a rect delta too. A negative one would make `bottom < top`
+    // and could scroll the panel PAST the row it was asked to reveal.
+    expect(
+      scrollTopToReveal({ scrollTop: 0, clientHeight: 209, rowTop: 100, rowHeight: -80 }),
+    ).toBe(0)
+  })
+
+  it.each([
+    ["scrollTop NaN", { scrollTop: Number.NaN }],
+    ["clientHeight NaN", { clientHeight: Number.NaN }],
+    ["rowTop NaN", { rowTop: Number.NaN }],
+    ["rowHeight NaN", { rowHeight: Number.NaN }],
+    ["clientHeight Infinity", { clientHeight: Number.POSITIVE_INFINITY }],
+    ["rowTop -Infinity", { rowTop: Number.NEGATIVE_INFINITY }],
+  ])("returns a finite, non-negative number for %s", (_name, over) => {
+    // ⚠ A NaN reaching `panel.scrollTop` is COERCED TO 0 by the DOM, silently — so the
+    // menu would jump to the top on every single arrow press with no error anywhere. That
+    // is a defect nothing would report and everything would blame on the animation.
+    const out = scrollTopToReveal({
+      scrollTop: 100,
+      clientHeight: 209,
+      rowTop: 329,
+      rowHeight: 48,
+      ...over,
+    })
+    expect(Number.isFinite(out)).toBe(true)
+    expect(out).toBeGreaterThanOrEqual(0)
+  })
+
+  it("mutates nothing it is handed", () => {
+    const input = { scrollTop: 0, clientHeight: 209, rowTop: 329, rowHeight: 48 }
+    const frozen = JSON.stringify(input)
+    scrollTopToReveal(input)
     expect(JSON.stringify(input)).toBe(frozen)
   })
 })
