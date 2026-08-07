@@ -81,3 +81,43 @@ one.
 mount). That plan must either scope the generic tool rail away from `external_action`, or
 render the capability through its own section — it must NOT widen `toolOptions`, which is
 the D-20 leak this phase's single net-new security property (V22) exists to prevent.
+
+---
+
+## D-189-DEF-03 — the LIVE RUN SURFACE has no honest wire signal for `recorded_not_sent`
+
+**Found during:** plan 189-11, Task 2 B (deciding what the third branch emits, having read
+`StreamsProvider.tsx` / `streamsStore.ts` as the plan instructed — read-only, both untouched).
+
+**The measurement, at three sites, re-derived by symbol search:**
+
+| Site | What it does |
+|---|---|
+| `StreamsProvider.onPhaseCompleted` | `phase_completed` → `setPhaseStatusForThread(..., "done")` — a "✓ Complete" card |
+| `StreamsProvider.onRunCompleted` | on `status === "completed"` fires `finalizeAllPhasesForThread` |
+| `streamsStore.finalizeAllPhasesForThread` | sweeps every `running` / `retrying` / `pending` phase → `"done"` |
+
+**The gap.** The engine branch this plan added deliberately emits NO SSE for a
+`recorded_not_sent` phase — emitting `phase_completed` would paint the exact lie the branch
+exists to prevent, on the live surface. But emitting nothing leaves the card non-terminal, and
+`finalizeAllPhasesForThread` then sweeps it to `done` when the run completes. **So a live
+viewer sees the governed step as "Complete" until a reconcile fetch replaces it with the DB
+status**, which `phaseStatusFromDb` (189-08) correctly derives as `recorded-not-sent` and
+189-10 renders as *"Not sent — recorded"*. CLAUDE.md's own rule covers the class — Realtime is
+a best-effort HINT and the fetch is the source of truth — so this is a latency-of-honesty gap,
+not a persistent lie.
+
+**Why it was not fixed here.** `189-11-PLAN.md` names both files as READ-ONLY (`git diff` must
+show NO edit to either) and no plan in this phase touches them: 189-12 through 189-15 are the
+canvas/panel rollout, and 189-16 is documentation. Closing it properly needs an additive SSE
+event **plus** a client handler **plus** a `finalizeAllPhasesForThread` exclusion — three files
+in one commit, which is a plan, not a deviation. `189-RESEARCH.md` §A3 flagged exactly this
+("189 owes `PhaseReconcile.test.tsx:235` a row for the new status") and it stayed unplanned.
+
+**Re-open trigger:** whichever comes first — (a) `/gsd:verify-work 189` if a UAT row observes
+the run surface during an `external_action` run and sees "Complete" before reconcile, or
+(b) **Phase 190**, which MUST close it: once the send is real, the difference between "sent"
+and "recorded, not sent" stops being a wording question. The fix shape is the shipped
+`phase_failed` precedent, whose own comment records why the emit-failure branch needed a new
+event rather than silence: *"the finalize sweeps skip terminal statuses, so the card is never
+repainted 'done' over the failure alert."*
