@@ -321,7 +321,12 @@ describe("PhaseNode — the card invariants survive the reveal", () => {
     // Non-vacuity: the human-input step really does carry slot 2, so "unchanged" is a
     // statement about a badge that exists rather than about an empty set.
     expect(badgesOff).toEqual([["canvas-waits-for-you", "Waits for you"]])
-    // Slot 1 stays EMPTY — it belongs to 188 (run state) / 189 (external actions).
+    // ⚠ CORRECTED at 189-15 — a TENTH reservation site, and no document lists it. The
+    // comment used to read *"Slot 1 stays EMPTY — it belongs to 188 (run state) / 189
+    // (external actions)"*. Slot 1 is SPENT now; the assertion below is unaffected, because
+    // this fixture contains no `external_action` step, so the human-input node still carries
+    // exactly the one shipped badge. What the line pins is the CEILING, which 189 filled but
+    // did not raise.
     expect(badgesOff.length).toBeLessThanOrEqual(2)
   })
 

@@ -36,8 +36,14 @@
  * `verdict`, `technicalLine` and `stepNumber` are the declared slots, and every optional
  * one renders NOTHING when absent. Three are filled (`verdict` 184-08, `grounded` 185-09,
  * `status` 188-06), each costing a change to this body and to nobody else's contract;
- * `technicalLine` is DECLINED and `stepNumber` declared-and-unread. Badge slot 1 stays
- * EMPTY and RESERVED FOR PHASE 189 (D-12) — governance spends no colour and no word-badge.
+ * `technicalLine` is DECLINED and `stepNumber` declared-and-unread. ⚠ CORRECTED at 189-15:
+ * this sentence used to end *"Badge slot 1 stays EMPTY and RESERVED FOR PHASE 189"*, and
+ * 189 has now SPENT it — on the state-conditional "Not connected" word-badge (D-12 / D-18).
+ * The badge budget is therefore FULL and a third is a typecheck error. **Nothing in this
+ * FILE changed to make that happen**, which is the seam working exactly as designed: the
+ * adapter builds the tuple and passes it through the existing `badges` prop, and this
+ * component renders whatever arrives. Governance's own claim is unchanged and still holds —
+ * it spends no colour and no word-badge; the badge 189 added is not a governance mark.
  *
  * ONE TAB STOP PER NODE (Pattern 3 Option A) — carried here verbatim with the code it
  * constrains. The canvas keeps `nodesFocusable` at its `true` default and the node

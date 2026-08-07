@@ -24,8 +24,19 @@
  * 185-09 added ONE slot, `grounded`, and renders it as the corner seal at top-right
  * plus a border reinforcement — no new layout constant, no new badge. Badge slot 1
  * stayed EMPTY on purpose: SPEC Req 6 says governance spends no colour and no
- * word-badge slot, so the freed slot belongs to 188 / 189 and the governance reading is
+ * word-badge slot, so the freed slot went to 188 / 189 and the governance reading is
  * made of SHAPE instead.
+ *
+ * ⚠ AND THE FREED SLOT IS NOW SPENT (189-15). 188 declined its claim — its channel is the
+ * ring's geometry plus a sentence in the body — and 189 filled slot 1 with the
+ * state-conditional "Not connected" word-badge (D-12 / D-18). **THE ARGUMENT ABOVE IS
+ * UNCHANGED, AND IT IS THE HALF THAT HAD TO SURVIVE THIS EDIT:** governance still spends NO
+ * colour and NO badge slot, and the badge 189 added is not a governance mark — it says a
+ * step is wired to nothing yet, not that a step must prove itself. Nothing in this module
+ * changed to carry it: the tuple is built by the `PhaseNode` adapter and arrives through the
+ * card's existing `badges` prop. What HAS changed is that there is no spare slot left to
+ * reach for — both are taken and a third is a typecheck error against `BadgeSlots` — so a
+ * future governance reading cannot become a chip even by accident.
  *
  * WHAT 184-08 CHANGED, stated literally so this docblock does not drift: the `verdict`
  * slot is now RENDERED — a corner mark on the card's left edge (it landed on the right
@@ -215,12 +226,15 @@ export function NodeCornerMarks({ verdict, grounded }: NodeCornerMarksProps) {
           THE CORNER IS CLAIMED. Top-right of the card belongs to governance and to
           nothing else. 185-01 moved the verdict mark to the card's LEFT precisely to
           free it, and Phases 188 (run state) and 189 (external actions) may not take
-          it back. See the verdict mark's block above for why the PERMANENT mark keeps
-          a corner and the TRANSIENT one moves.
+          it back. ⚠ BOTH HAVE NOW SHIPPED AND NEITHER TOOK IT: 188 spends the ring and
+          the run line, 189 spends badge slot 1 — the corner is still governance's, and
+          this file is byte-unchanged in code by either of them. See the verdict mark's
+          block above for why the PERMANENT mark keeps a corner and the TRANSIENT one moves.
 
           THE SEAL IS LOAD-BEARING; THE EDGE IS REINFORCEMENT. Governance may spend
           neither colour (137-B banks all of it for Phase 188's run status) nor a
-          word-badge (both slots are committed to 188/189), so the mark is made of
+          word-badge (both slots are now SPENT — slot 2 "Waits for you", slot 1 "Not
+          connected" since 189-15, and a third is a typecheck error), so the mark is made of
           SHAPE. It carries its OWN background and its OWN border, which is the whole
           reason it works: when a step goes running / needs-you / failed the status
           colour overwrites the card border, and the seal stays legible anyway. The

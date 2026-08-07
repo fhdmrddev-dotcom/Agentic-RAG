@@ -136,13 +136,16 @@ export interface PhaseNodeData {
    *
    * The canvas RENDERS this as SHAPE (the corner seal, plan 185-09), never as
    * colour and never as a word-badge: SPEC Req 6 says governance spends neither,
-   * and both badge slots are committed to 188/189.
+   * and both badge slots are now SPENT.
    *
-   * ⚠ CORRECTED at Phase 189-13, in the commit that falsified it. This sentence used to
-   * end *"Badge slot 1 is deliberately EMPTY from this plan onward"*. It is no longer:
-   * 188 declined its claim and 189 SPENDS the slot on `notConnected` below. Governance's
-   * own argument — that it spends no colour and no badge slot — is unchanged and is the
-   * half of this paragraph that had to survive the edit.
+   * ⚠ CORRECTED at Phase 189-13, in the commit that falsified it, and TIGHTENED at 189-15
+   * once the badge actually landed. This sentence used to end *"Badge slot 1 is
+   * deliberately EMPTY from this plan onward"*, then *"both badge slots are committed to
+   * 188/189"*. Neither is true now: 188 DECLINED its claim (its channel is the run ring)
+   * and 189-15 SPENT slot 1 on the state-conditional "Not connected" badge fed by
+   * `notConnected` below. Governance's own argument — that it spends no colour and no
+   * badge slot — is unchanged and is the half of this paragraph that had to survive both
+   * edits.
    */
   grounded: boolean
   /**
@@ -217,11 +220,24 @@ export interface CanvasEdgeData extends Record<string, unknown> {
    *           nobody watching cannot look identical to one that reads a file.
    *   true    ARMED. The arc IS the path and no straight line runs past it.
    *
-   * Today only `true` and ABSENT are producible: SPEC Req 8 arms nothing by default
-   * in 185 and no shipped step type performs outbound egress, so no step is
-   * inherently risky yet. `false` is Phase 189's state — an external-action step
-   * whose checkpoint the author turned off — and `FlowEdge` carries it now so the
-   * unarmed reading is a shipped, tested behaviour rather than a promise.
+   * Only `true` and ABSENT are producible: SPEC Req 8 arms nothing by default in 185, and
+   * `checkpointOnTarget` below returns `actionRiskArmed(phase) ? true : undefined`, so
+   * `false` is not expressible by this projection at all.
+   *
+   * ⚠ CORRECTED at 189-15 (D-21). This paragraph used to end *"`false` is Phase 189's
+   * state — an external-action step whose checkpoint the author turned off"*. **189 IS NOT
+   * THAT CLAIMANT AND NOBODY IS**, because D-04 pins `action_risk_armed` to `true` at the
+   * Pydantic level for `external_action` (189-07) and the panel's arming switch renders ON
+   * and REFUSES TO MOVE (189-14). A step of this type whose checkpoint the author turned
+   * off is therefore not a state this product has — it is unreachable FOREVER, not merely
+   * unreached today, and naming a future phase as its claimant is what would eventually
+   * turn a stale comment into a work item.
+   *
+   * ⚠ AND THIS IS A PROSE CORRECTION, NOT A DELETION OF BEHAVIOUR. `FlowEdge`'s ghost-marks
+   * branch stays shipped and stays tested; it is simply unreachable, which is the honest
+   * state for a rendering whose input no producer emits. **A plan that reads this docblock
+   * as a requirement to build a ghost-detour edge has misread it** — 189-15's diff over
+   * `FlowEdge.tsx` is empty, deliberately.
    */
   armed?: boolean
 }

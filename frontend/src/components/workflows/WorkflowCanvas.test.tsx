@@ -37,6 +37,10 @@ import planeEditingLayerSource from "./PlaneEditingLayer?raw"
 import editAffordanceSource from "./editAffordance?raw"
 import { WorkflowCanvas } from "./WorkflowCanvas"
 import { toCanvas } from "./canvasModel"
+// 189-15: the badge-slot-1 guard builds its own seven-type roster from the shipped type
+// order rather than adding an eighth entry to the shared fixture corpus — which would move
+// the committed `canvasModel.fixtures` snapshots for a claim that is about ONE badge.
+import { PHASE_TYPE_ORDER, minimalPhaseFor } from "./definitionOps"
 import {
   docQaHuman,
   evalCoverage,
@@ -419,12 +423,19 @@ describe("WorkflowCanvas — the ⌥ Technical-names reveal (D-183-08)", () => {
   })
 })
 
-describe("WorkflowCanvas — the badge slots (D-183-07, Phase 185 frees slot 1)", () => {
-  it("NO phase node carries a grounding chip — slot 1 is empty and reserved", () => {
-    // Phase 185 / SPEC Req 6: the three-face word-badge is DELETED, not moved.
-    // Governance renders as shape (the corner seal, 185-09); the freed slot belongs
-    // to 188/189. Asserted as an absence on every node, so a resurrected chip fails
-    // here rather than being noticed in a screenshot.
+describe("WorkflowCanvas — the badge slots (D-183-07; 185 freed slot 1, 189 SPENT it)", () => {
+  it("NO phase node carries a GROUNDING chip — the retired badge stays retired", () => {
+    // ⚠ REWORDED AT 189-15, AND THE ASSERTION IS UNCHANGED — measured, not assumed. The
+    // title used to read *"slot 1 is empty and reserved"*, which 189 falsified; but what
+    // this case actually selects on is `[data-grounding]` and `canvas-grounding`
+    // SPECIFICALLY, not "any badge", so it never broke mechanically. Only its WORDING
+    // misled, and a misleading title on a passing test is how a guard gets deleted by
+    // someone who thinks it asserts something it does not.
+    //
+    // Phase 185 / SPEC Req 6: the three-face word-badge is DELETED, not moved. Governance
+    // renders as shape (the corner seal, 185-09). Asserted as an absence on every node, so
+    // a resurrected chip fails here rather than being noticed in a screenshot — and that
+    // is still exactly as true now that slot 1 carries a DIFFERENT badge.
     renderCanvas(docQaHuman)
     const nodes = screen.getAllByTestId(/^canvas-node-/)
     expect(nodes).toHaveLength(docQaHuman.length)
@@ -462,6 +473,46 @@ describe("WorkflowCanvas — the badge slots (D-183-07, Phase 185 frees slot 1)"
     expect(
       draft.querySelectorAll('[data-testid="canvas-waits-for-you"], [data-testid="canvas-grounding"]'),
     ).toHaveLength(0)
+  })
+
+  it("189-15: the 'Not connected' badge is on external_action and on NO other type", () => {
+    // THE REAL 189 GUARD, added beside the reworded one above rather than replacing it —
+    // the two assert different things and both are worth keeping. This is the badge slot 1
+    // now carries, driven through the whole canvas shell rather than through the adapter in
+    // isolation, over a roster DERIVED from `PHASE_TYPE_ORDER` so the eighth phase type
+    // inherits the coverage.
+    //
+    // ⚠ THE NEGATIVE BRANCH IS THE FALSIFIABLE HALF AVAILABLE TODAY. `notConnectedOf`'s
+    // state test cannot yet return false for an `external_action` step, because nothing in
+    // this app can be CONNECTED to anything until Phase 190 — so what is drivable now is
+    // that the badge stays off all six shipped types. Stated here rather than left for the
+    // next reader to work out from a green run.
+    const roster = PHASE_TYPE_ORDER.map((type, index) =>
+      minimalPhaseFor(type, type.replace(/_/g, "-"), index),
+    )
+    renderCanvas(roster)
+    const seen = Object.fromEntries(
+      roster.map((phase) => [
+        phase.config.phase_type,
+        screen.getByTestId(`canvas-node-${phase.slug}`).querySelectorAll("[data-not-connected]")
+          .length,
+      ]),
+    )
+    expect(seen).toEqual({
+      programmatic: 0,
+      llm_single: 0,
+      llm_agent: 0,
+      llm_batch_agents: 0,
+      llm_human_input: 0,
+      llm_emit: 0,
+      external_action: 1,
+    })
+    // …and it says its meaning in WORDS, on exactly one node in the whole canvas.
+    expect(screen.getAllByText("Not connected")).toHaveLength(1)
+    // Non-vacuity: the roster really did render a node per declared type, and the shipped
+    // slot-2 badge is still there beside it — so this is not a canvas that rendered nothing.
+    expect(screen.getAllByTestId(/^canvas-node-/)).toHaveLength(roster.length)
+    expect(screen.getAllByText("Waits for you")).toHaveLength(1)
   })
 })
 

@@ -767,9 +767,19 @@ export function derivedFaceOf(
 // mechanically controlled by an `@ts-expect-error` case in `PhaseNodeCard.test.tsx`.
 
 /**
- * D-183-07 slot 2 — "Waits for you", true ONLY on `llm_human_input`. Every other
- * node face now carries NO badge at all (137-B allows at most two, and slot 1 is
- * deliberately unspent).
+ * D-183-07 slot 2 — "Waits for you", true ONLY on `llm_human_input`.
+ *
+ * ⚠ CORRECTED at 189-15. This docblock used to end *"Every other node face now carries NO
+ * badge at all (137-B allows at most two, and slot 1 is deliberately unspent)"* — and it is
+ * an EIGHTH reservation site, fourteen lines below the section header 189-13 corrected in
+ * the very same file. It is recorded rather than quietly fixed, because the pattern by now
+ * IS the finding: every list of these sites written so far (CONTEXT's five, UI-SPEC's six,
+ * 189-13's seventh) has been short by at least one, so the only safe method is to re-grep.
+ *
+ * WHAT IS TRUE NOW: slot 1 is SPENT — `notConnectedOf` below feeds the "Not connected"
+ * badge (D-12 / D-18) — so an `external_action` face carries one badge and a face that is
+ * neither that type nor `llm_human_input` still carries none. 137-B's at-most-two is
+ * unchanged and is now FULL.
  */
 export function waitsForYou(phase: PhaseSpecJSON): boolean {
   return phase.config.phase_type === HUMAN_INPUT_PHASE_TYPE

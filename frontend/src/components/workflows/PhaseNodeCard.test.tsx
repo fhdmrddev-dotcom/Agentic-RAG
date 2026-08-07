@@ -1597,7 +1597,11 @@ describe("PhaseNodeCard — the seal is made of SHAPE, and the edge only reinfor
 
   it("costs NO badge slot — a grounded card renders no extra chip (SPEC Req 6)", () => {
     // The three-face word-badge 185-08 deleted must not come back through this door.
-    // Slot 1 stays empty for 188 / 189; the seal is not a badge and does not become one.
+    // ⚠ CORRECTED at 189-15 — a NINTH reservation site that no planning document lists.
+    // The comment used to read *"Slot 1 stays empty for 188 / 189"*; slot 1 is now SPENT on
+    // the "Not connected" badge, and that changes NOTHING about this claim, which is that
+    // `grounded` COSTS no badge. The card is handed exactly one badge and renders exactly
+    // one chip: the seal is not a badge and does not become one by 189 filling the slot.
     const { container } = renderCard({ grounded: true, badges: [waitsBadge] })
     expect(container.querySelectorAll("[data-tone]")).toHaveLength(1)
     expect(container.querySelector('[data-testid="canvas-grounding"]')).toBeNull()
@@ -2253,9 +2257,31 @@ describe("188-06 — the card body budget, and the three slots 188 does NOT spen
       return row
     })
     for (const row of rows) expect(row).toBe(rows[0])
-    // Non-vacuity: it is a real badge row, and slot 1 is still empty and still reserved.
+    // ⚠ THE COMMENT HERE WAS FALSIFIED BY 189-15, THE ASSERTION WAS NOT, and the difference
+    // is why this case was rewritten rather than replaced. It used to read *"Non-vacuity: it
+    // is a real badge row, and slot 1 is still empty and still reserved."* Slot 1 is now
+    // SPENT (D-12 / D-18, the "Not connected" badge) — but this case passes its badge list
+    // EXPLICITLY, so what it measures is the CARD's own budget under a fixed input: one
+    // badge in, one chip out, byte-identical at every run reading. 188's claim to spend zero
+    // badge slots is untouched by 189 spending one.
     expect(rows[0]).toContain("Waits for you")
     expect(rows[0].length).toBeGreaterThan(0)
+  })
+
+  it("189-15 POSITIVE CONTROL: the same row renders TWO chips when two are passed", () => {
+    // The case above asserts ONE chip for ONE badge. On its own that is satisfiable by a
+    // card that renders at most one badge no matter what — which is exactly the regression
+    // 189 could have introduced by filling slot 1 and is precisely what nothing checked
+    // before this line. Two badges in, two chips out, IN TUPLE ORDER.
+    const { container } = renderCard({ badges: [groundingBadge, waitsBadge], status: "running" })
+    const chips = Array.from(container.querySelectorAll("[data-tone]"))
+    expect(chips).toHaveLength(2)
+    expect(chips.map((c) => c.getAttribute("data-testid"))).toEqual([
+      "canvas-grounding",
+      "canvas-waits-for-you",
+    ])
+    // …and both live in the SAME row, so a second badge does not grow a second line.
+    expect(chips[0].closest("div")).toBe(chips[1].closest("div"))
   })
 
   it("DECLINES technicalLine — run mode alone never produces it", () => {

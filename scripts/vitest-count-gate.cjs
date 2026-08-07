@@ -178,7 +178,15 @@ const BASELINE = {
   // rather than declare it. A cycle there typechecks clean, lints clean and fails only at
   // RUNTIME, so nothing else in the battery can see it. Extension only — no test was
   // relocated by that plan and no pin was lowered.
-  "WorkflowCanvas.test.tsx": 52,
+  // 189-15 (CONN-01 / D-12 / D-18): 52 → 53. An EXTENSION, and specifically NOT a
+  // replacement — the shipped grounding-chip absence guard was REWORDED IN PLACE and kept,
+  // because its title was misleading (*"slot 1 is empty and reserved"*) while its assertion
+  // was still true (it selects on `[data-grounding]` SPECIFICALLY, so 189 filling the slot
+  // never broke it). Deleting it would have dropped the only canvas-level guard that the
+  // retired 185 chip stays retired. The +1 is the real 189 guard beside it: the
+  // `[data-not-connected]` attribute present on an `external_action` node and absent on all
+  // six other types, over a roster derived from `PHASE_TYPE_ORDER`.
+  "WorkflowCanvas.test.tsx": 53,
   // 187-29: gap-closure round 5's three suites, pinned for exactly the reason
   // 187-25 pinned its two — each now carries a guard that a failures-only
   // differential cannot see the deletion of:
@@ -359,7 +367,14 @@ const BASELINE = {
   // look like an unknown one. The existing tint case was EDITED in the same commit rather
   // than added to: its `toHaveLength(6)` is now `Object.keys(PHASE_GLYPHS).length` (derived,
   // so the EIGHTH type does not read as a regression) plus the new tint's exact value.
-  "PhaseNodeCard.test.tsx": 131,
+  // 189-15 (CONN-01 / D-12 / D-18): 131 → 132. An EXTENSION. The falsified card-suite
+  // comment ("slot 1 is still empty and still reserved") was REWRITTEN IN PLACE and its
+  // assertion kept — it passes an explicit one-badge list and counts one chip, which is the
+  // CARD's own budget test and is unaffected by the ADAPTER spending a slot. The +1 is that
+  // case's missing POSITIVE CONTROL: two badges in, two chips out, in tuple order, in the
+  // SAME row. Without it, "one badge → one chip" was equally satisfiable by a card that
+  // renders at most one badge whatever it is handed — the regression 189 could have caused.
+  "PhaseNodeCard.test.tsx": 132,
   // 189-15 (CONN-01 / D-12 / D-18): 26 → 31. An EXTENSION, not a lowering — no `it(` was
   // deleted, renamed or moved out. The +5 are badge slot 1, the LAST free word-badge on the
   // card, and every one of them was driven RED against a planted wrong fix before it was
@@ -716,7 +731,12 @@ const BASELINE = {
 // 51 → 52) — badge slot 1, the last free word-badge on the card. Pinned FILE count unmoved
 // at 47: both suites already existed and both already ran inside the
 // `src/components/workflows` DIRECTORY entry.
-const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // ⚠ 2625 (189-15)
+// ⚠ AND BY 189-15 TASK 2: 2625 → 2627 (`PhaseNodeCard.test.tsx` 131 → 132, the two-badge
+// positive control; `WorkflowCanvas.test.tsx` 52 → 53, the canvas-level not-connected
+// guard). Both guards whose WORDING 189 falsified were REWRITTEN IN PLACE, never deleted —
+// a deleted guard is coverage nobody notices losing, and the gate would have refused the
+// per-file decrease anyway.
+const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // ⚠ 2627 (189-15)
 
 // ── The Wave-0 blast radius (184-VALIDATION.md § "quick run command"). ──
 const TARGETS = [

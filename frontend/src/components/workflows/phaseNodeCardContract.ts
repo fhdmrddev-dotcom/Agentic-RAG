@@ -3,8 +3,17 @@
  *
  * THE PHASE CARD'S SLOT CONTRACT, AND NOTHING ELSE. The fourteen slots `PhaseNodeCard`
  * paints, plus the badge budget and the two aliases its callers name. This is the surface
- * 185 / 188 / 189 add DATA to, so it is cut out on its own: 189 adds a slot to a contract
- * of this size rather than to a 797-line component.
+ * 185 / 188 / 189 add DATA to, so it is cut out on its own: 189 was to add a slot to a
+ * contract of this size rather than to a 797-line component.
+ *
+ * ⚠ UPDATED AT 189-15, AND THE SENTENCE ABOVE IS KEPT BECAUSE IT IS THE RECORD OF WHY
+ * 188.2 CUT WHERE IT DID — put into the past tense rather than deleted. The prediction has
+ * now been tested and it came in UNDER budget: 189 spent badge slot 1 on the
+ * state-conditional "Not connected" label (D-12 / D-18) and added NO slot at all. Not one
+ * line of this file, of `PhaseNodeCard.tsx`, or of the other four fenced modules changed to
+ * carry it — the whole feature is a second `BadgeSlot` object and an explicit-branch tuple
+ * in the ADAPTER, arriving through the `badges` prop that already existed. The badge budget
+ * is now FULL: both slots are taken and a third is a typecheck error (see `BadgeSlots`).
  *
  * A LEAF, AND A TYPES-ONLY ONE. It emits no runtime code whatsoever — six exported type
  * names, five type-only imports, zero values — so nothing in it can be called, mutated or
