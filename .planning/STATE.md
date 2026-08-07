@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio — 🚧 ACTIVE
 status: executing
-last_updated: "2026-08-07T23:05:00.000Z"
-last_activity: 2026-08-07 -- **Plan 189-08 COMPLETE — the client's ONE derivation carries the sixth slug, and the developer panel names it in its own words.** `Phase["status"]` and `CanvasReading` each gained `"recorded-not-sent"`; `DB_PHASE_STATUS` gained the sixth KEY (the snake_case DB slug) mapping to the kebab client member — **D-17 made mechanical rather than commented**; `canvasReading` gained a one-line identity arm with the `default:` floor and the WR-04 own-property guard **UNTOUCHED**. The panel says `↛ Not sent` in its own harness vocabulary (glyph chosen by MEASUREMENT — 0 prior uses in `frontend/src`), the a11y announcer says `…, not sent`, and `PHASE_TYPE_LABEL` was **DECLINED a 7th entry with the declination PINNED by a test**, not merely commented. ✅ **The fail-closed baseline was MEASURED before it was superseded** — a driven probe confirmed `phaseStatusFromDb("recorded_not_sent")` returned `unknown` at HEAD, never `done`; both negatives are now asserted explicitly. **Six wrong fixes planted into production source, every one observed RED** (J the slug aliased to `done` · K the arm folded into the done branch · L the `default:` floor deleted · N the row reading `✓ Complete` — *"the not-sent word must not be Complete"*, this phase's stated failure mode · M the announcer arm deleted · O a 7th `PHASE_TYPE_LABEL` entry); all removed, md5-verified, `grep -c PLANT` → 0. ⚠ **THE FINDING: `tsc` reads **40**, not the plan's asserted 33, and that is BY DESIGN — the `CanvasReading` widening ARMS SEVEN exhaustive `Record` tables as 189-10's compiler-generated worklist.** The plan's acceptance number accounted for ONE of eight while its own objective mandates the forcing; **RESEARCH §B9 undercounts the forced sites as 4 — it omits the two canvas TEST files**, which `tsconfig.app.json` does typecheck. **The intermediate state was MEASURED honest, not argued**: the canvas renders word `State unknown`, clause `null`, ring `{kind:"length",dash:1.5,gap:6}` (the DOTTED unknown ring) — never `Complete`, never the closed circle, because every canvas lookup is own-guarded. Count gate **2508 → 2521**, both pins moved IN-COMMIT (`phaseState.test.ts` 34→40, `PhaseTimeline.test.tsx` 10→17), no per-file decrease. 2 commits (`4b3e3136` the derivation · `a42dbf96` the panel); 7 files (the 6 declared plus `PhaseTimeline.test.tsx`, which `files_modified` omitted while the `<action>` required it). **CONN-01 stays `Pending` — 7 plans still owed.** Full detail: `189-08-SUMMARY.md`; the prior record (189-06, migration 115 applied and `full-schema.sql` regenerated, ⚠ **cloud parity OWED**) and every earlier plan's detail live in their own SUMMARYs, in Current Position and in the ROADMAP progress cell.
-stopped_at: **Plan 189-08 is COMPLETE; wave 3 is CLOSED.** 9 of 16 plans done. **Next: `189-10`** — the canvas vocabulary half, whose worklist 189-08 deliberately GENERATED: seven exhaustive `Record<CanvasReading, …>` tables are typecheck errors right now (`RUN_READING_WORD` :61 ⇐ D-16's home · `STATIC_CLAUSE` :170 · `RING_GEOMETRY` :313 · `NodeRunOverlay RING_STROKE` :134 · `PhaseNode.test ALL_READINGS` :367 · `PhaseNodeCard.test ALL_READINGS_TABLE` :178 and `CARD_READING_SHAPES` :2733). ⚠ **189-10's `tsc` target is 33, NOT the 40 it inherits** — 40 = 33 baseline + those 7, and treating 40 as a baseline would silently accept a real regression. ⚠ `RING_GEOMETRY` is NOT a table fill: its docblock states a BUILD CRITERION (*the arc geometry IS the state*), so the 8th reading owes a shape unique in an assertable property IN GREYSCALE — UI-SPEC §4b decides it. `189-11` (wave 5) is also runnable. Remaining: 189-10/11/12/13/14/15/16 (7 plans). ⚠ Carry forward: **cloud parity on migration 115 is OWED** (standing queue, migs 099 onward, applied in order at the next operator-driven production push — NOT during this phase; brief ACCESS EXCLUSIVE lock, T-189-20).
-resume_file: .planning/phases/189-governed-external-action-node-model/189-10-PLAN.md
+last_updated: "2026-08-08T00:40:00.000Z"
+last_activity: 2026-08-07 -- **Plan 189-10 COMPLETE — the canvas has its eighth word and its eighth ring, and the compiler-generated worklist is CONSUMED TO EXHAUSTION.** `tsc -p tsconfig.app.json` **40 → 38 → 33 — the baseline**; all seven armed `TS2741` are closed and every one of 189-08's cited line numbers was re-derived by symbol and **HELD**. The word is **`Not sent — recorded`** (D-16, byte-exact, em dash asserted by **CODEPOINT** — a hyphen or en dash is invisible in a diff), the clause is `null` with its reason at the table, and `RUN_READING_BORDER`'s **FIFTH deliberate absence** is recorded in the docblock AND pinned by a test. The ring is **UI-SPEC §4b IMPLEMENTED, not re-designed** — dash .15 / gap .10 / **repeats 4** / gapCentre .125 / **spinning FALSE** — and every number it predicted was independently recomputed before it was trusted: `4 × (.15 + .10) = 1` exactly, gaps at .125/.375/.625/.875 so **NONE at 12 o'clock**, dashoffset **16.022** and positive. **THREE WHOLE-TABLE INVARIANTS THAT EXISTED NOWHERE NOW DO** — exact tiling, four-arc uniqueness, pairwise-distinct geometry — each stated over the table so the **NINTH** reading inherits it, and **five literal `7`s were DERIVED from `ALL_READINGS.length` rather than re-pinned at 8** (a literal makes growth read as regression). **Colour spent NOTHING**: the stroke-set size is unmoved at **5** while the reading set grew to 8, and that unmoved number is now an assertion. **Six wrong fixes planted into production source, every one observed RED** (P the word reads `Complete` — *"the not-sent word must not be the success word"* · Q an EN dash · R the ring SPINS · S a gap at 12 o'clock, which also produced the negative dashoffset the UI-SPEC predicted · T `repeats: 2` colliding with `failed`, which fired the brand-new tiling invariant · U a stroke claiming success); all reverted, md5-verified, `grep -c PLANT` → 0. `CARD_READING_SHAPES`' 8th row is **CAPTURED** from the rendered DOM (observed TWICE, both dumps md5-identical) and spliced programmatically so no value was retyped; it pins three **ABSENCES** nothing else reaches — the DEFAULT border branch (`RUN_READING_BORDER` declining, rendered), the arc's missing spin class (`spinning: false` as an absent attribute), and no pause chip. ⚠ **A REAL DEFECT the plants did not find, the tests did**: the captured row first spliced into `CARD_BORDER_SHAPES`, because the three shape matrices declare readings → verdicts → **borders** and my anchor matched the last object before the target `describe`. Caught by `to deeply equal undefined`, relocated with a guard on the destination. ⚠ **`CARD_SUBTREE_PATHS` UNMOVED at 6** with a zero-line diff; only `NodeRunOverlay.tsx` touched inside the fence, at **6 insertions**. ⚠ **jsdom CANNOT prove greyscale distinguishability — U3 (189-16) is still OWED**; this plan proves the ATTRIBUTE half only. New suite `runVocabulary.test.ts` (the module's first, 23 cases); count gate **2521 → 2546**, all pins moved IN-COMMIT, no per-file decrease, `TARGETS` NOT edited (`src/components/workflows` is a DIRECTORY entry, so the new suite ran on creation — measured, not assumed). 2 commits (`d240836f` the word · `5b2cc2e1` the ring); 6 files, 1 of them new. Deviations, all recorded: `runVocabulary.test.ts` **did not exist** (a NEW file listed as modified); `PhaseNode.test.tsx` is a **7th file absent from `files_modified`** yet non-optional (one of the seven `TS2741`); `WorkflowRunPage.test.tsx` **was listed and needed NO edit** (it has no `Record<CanvasReading, …>`); an **unmeasured `tsc` claim reached commit 1's message and was amended** with the correction stated rather than smoothed; and the `BASELINE_TOTAL` note was found **stale at 2508 vs the gate's own 2521** — the very drift its own comment block already records, recurring one plan later. **CONN-01 stays `Pending` — 6 plans still owed.** Full detail: `189-10-SUMMARY.md`; every earlier plan's detail lives in its own SUMMARY, in Current Position and in the ROADMAP progress cell.
+stopped_at: **Plan 189-10 is COMPLETE.** 10 of 16 plans done. **Next: `189-11`** (wave 5) — the D-05 seam: `record_phase_not_sent`, the run that continues, and **V20, the headline gate**. It is the plan that WRITES the slug this plan now words and draws. ✅ **`tsc` is back to 33 — treat 33 as the baseline again**; the seven-table worklist 189-08 armed is fully discharged, so a rise above 33 from here is a real regression rather than an armed reminder. ⚠ **`runVocabulary.test.ts` now EXISTS and is pinned at 23** — it is the canvas vocabulary's only suite; extend it rather than re-asserting table properties through a jsdom render. ⚠ **U3 (the DRIVEN greyscale row, 189-16) is OWED and is NOT discharged by any green unit run** — jsdom applies no CSS and paints nothing. ⚠ Five `ALL_READINGS.length` derivations now exist where literal `7`s were; a ninth reading will be covered by them automatically, but `EXPECTED_RING`, `CARD_READING_SHAPES` and the `RING_STROKE`/`RUN_READING_WORD`/`STATIC_CLAUSE`/`RING_GEOMETRY` tables will each force again — by design. Remaining: 189-11/12/13/14/15/16 (6 plans). ⚠ Carry forward: **cloud parity on migration 115 is OWED** (standing queue, migs 099 onward, applied in order at the next operator-driven production push — NOT during this phase; brief ACCESS EXCLUSIVE lock, T-189-20).
+resume_file: .planning/phases/189-governed-external-action-node-model/189-11-PLAN.md
 progress:
   total_phases: 21
   completed_phases: 10
   total_plans: 142
-  completed_plans: 134
+  completed_plans: 135
   percent: 48
 ---
 
@@ -64,26 +64,35 @@ next picked up.
 
 ## Current Position
 
-Phase: 189 (governed-external-action-node-model) — **EXECUTING, UNBLOCKED** (9 of 16 plans complete;
-**WAVES 0-3 DONE, WAVE 4 PARTIAL**; the `189-06` operator gate is DISCHARGED)
+Phase: 189 (governed-external-action-node-model) — **EXECUTING, UNBLOCKED** (10 of 16 plans complete;
+**WAVES 0-3 DONE, WAVE 4 CLOSED**; the `189-06` operator gate is DISCHARGED)
 
-✅ **WAVE 3 IS CLOSED.** `189-08` shipped the client's ONE status derivation for the sixth
-`workflow_phases.status` slug plus the developer panel's own word for it (`↛ Not sent`). Remaining:
-`189-10` / `189-11` / `189-12` / `189-13` / `189-14` / `189-15` / `189-16` (7 plans).
-**Next: `189-10`** (wave 4 — the canvas vocabulary half).
+✅ **WAVE 4 IS CLOSED.** `189-09` shipped the executor that records and sends nothing; `189-10`
+shipped the canvas's word and ring for the terminal it produces. Remaining:
+`189-11` / `189-12` / `189-13` / `189-14` / `189-15` / `189-16` (6 plans).
+**Next: `189-11`** (wave 5 — the D-05 seam and **V20, the headline gate**).
 
-⚠ **`tsc -p tsconfig.app.json` reads 40, NOT the long-standing 33, and that is DELIBERATE.**
-`189-08` widened `CanvasReading`, which ARMS seven exhaustive `Record<CanvasReading, …>` tables as
-typecheck errors — 189-10's worklist, generated by the compiler instead of by a checklist:
-`runVocabulary.ts` `RUN_READING_WORD` (:61, D-16's home) / `STATIC_CLAUSE` (:170) / `RING_GEOMETRY`
-(:313); `NodeRunOverlay.tsx` `RING_STROKE` (:134); and three in canvas TEST files —
-`PhaseNode.test.tsx` `ALL_READINGS` (:367), `PhaseNodeCard.test.tsx` `ALL_READINGS_TABLE` (:178) and
-`CARD_READING_SHAPES` (:2733). **189-10's target is 33, not 40** — inheriting 40 as a baseline would
-silently absorb a real regression. ⚠ RESEARCH §B9 lists only FOUR forced sites; it omits the two
-canvas TEST files, which `tsconfig.app.json` (`include: ["src"]`) does typecheck.
-**The intermediate state is HONEST and was measured, not argued**: every canvas lookup is
-own-guarded, so the new reading currently renders `State unknown` with the DOTTED unknown ring —
-never `Complete`, never the closed circle.
+✅ **`tsc -p tsconfig.app.json` IS BACK TO 33 — treat 33 as the baseline again.** The seven-table
+worklist `189-08` armed by widening `CanvasReading` is **fully discharged** by `189-10`, measured
+40 → 38 → 33, and every one of the seven cited line numbers was re-derived by symbol and HELD.
+**A rise above 33 from here is a real regression, not an armed reminder.**
+⚠ The correction `189-08` recorded still stands for the record: **RESEARCH §B9 lists only FOUR
+forced sites and there were SEVEN** — it omits the two canvas TEST files, which
+`tsconfig.app.json` (`include: ["src"]`) does typecheck. A plan that had followed §B9 could not
+have reached 33.
+
+⚠ **THE GREYSCALE CLAIM IS NOT PROVED AND IS OWED.** `189-10`'s suites prove the ATTRIBUTE-level
+distinction between the eight ring readings — jsdom applies no CSS and paints nothing, so no unit
+run is evidence that a person can tell them apart with colour off. That is **U3, a DRIVEN Chrome
+MCP row in `189-16`**, and a green suite must not be mistaken for it.
+
+⚠ **`runVocabulary.test.ts` now EXISTS** (the canvas vocabulary's first suite, pinned at 23) and
+carries three whole-table invariants that existed nowhere before — exact tiling, four-arc
+uniqueness, pairwise-distinct geometry. **Extend it rather than re-asserting table properties
+through a jsdom render.** Five literal `7`s across the canvas suites were also DERIVED from
+`ALL_READINGS.length`, so a ninth reading is covered by them automatically; `EXPECTED_RING`,
+`CARD_READING_SHAPES` and the four `Record<CanvasReading, …>` tables will each force again — by
+design, and that forcing is the mechanism, not a defect.
 ⚠ **Carry forward: cloud parity on migration 115 is OWED.** It joins the standing queue (migs 099
 onward) and is applied to cloud only in the operator-driven parity window, **in order**, at the next
 production push — deliberately NOT during this phase (T-189-20: brief ACCESS EXCLUSIVE lock).
@@ -148,6 +157,37 @@ a receipt-shaped body; PLANT H, the record silently skipped) the three V10 cases
 is 189-05's PLANT E finding reproduced: the headline SC#4 test cannot tell "recorded" from "recorded
 nothing", or from "✓ Delivered successfully". Zero regressions tree-wide (`tests/unit` 65→62 failed /
 1733→1744 passed, reconciled EXACTLY: −3 flipped, +11 = those 3 plus 8 new tests).
+Plan 189-10 COMPLETE (`d240836f` · `5b2cc2e1`; summary `189-10-SUMMARY.md`) — **the canvas's
+eighth word and eighth ring, and the compiler-generated worklist CONSUMED TO EXHAUSTION.** `tsc`
+**40 → 38 → 33**; all seven armed `TS2741` closed and every cited line number re-derived by symbol
+and HELD. The word is **`Not sent — recorded`** (D-16), asserted byte-exact with the em dash checked
+by **CODEPOINT**, and NOT-EQUAL to all seven shipped words — whole-string compares throughout,
+because it shares the prefix `Not ` with `Not started` and a substring check is ambiguous. The
+clause is `null` with its reason at the table; `RUN_READING_BORDER`'s **fifth deliberate absence**
+is recorded AND pinned. The ring is **UI-SPEC §4b implemented, never re-derived** — dash .15 /
+gap .10 / **repeats 4** / gapCentre .125 / **spinning FALSE** — with every predicted number
+recomputed first: `4 × (.15 + .10) = 1` exactly, gaps at .125/.375/.625/.875 so **none at 12
+o'clock**, dashoffset 16.022 and positive. **Three whole-table invariants that existed NOWHERE now
+do** (exact tiling, four-arc uniqueness, pairwise-distinct geometry), each stated over the table so
+the NINTH reading inherits it; **five literal `7`s DERIVED from `ALL_READINGS.length`** rather than
+re-pinned. **Colour spent nothing** — the stroke-set size is unmoved at 5 while the readings grew
+to 8. **Six plants, every one RED** (P `Complete` · Q an EN dash · R a spinning ring · S a gap at 12
+o'clock, which also produced the negative offset the spec predicted · T `repeats: 2`, which fired
+the brand-new tiling invariant · U a success-claiming stroke); all reverted, md5-verified.
+`CARD_READING_SHAPES`' 8th row is **CAPTURED** (observed twice, md5-identical, spliced
+programmatically so nothing was retyped) and pins three ABSENCES nothing else reaches: the DEFAULT
+border branch, the arc's missing spin class, and no pause chip. ⚠ **A real defect the plants did
+not find, the tests did** — that capture first landed in `CARD_BORDER_SHAPES`, because the three
+matrices declare readings → verdicts → borders and the anchor matched the last object before the
+target `describe`. ⚠ **`CARD_SUBTREE_PATHS` UNMOVED at 6** (zero-line diff); only
+`NodeRunOverlay.tsx` touched inside the fence, at 6 insertions. ⚠ **jsdom cannot prove greyscale —
+U3 (189-16) is OWED.** New suite `runVocabulary.test.ts` (23); gate 2521 → 2546, pins moved
+in-commit, `TARGETS` NOT edited (the directory entry already ran it — measured). Deviations
+recorded: the suite **did not exist** (a NEW file listed as modified); `PhaseNode.test.tsx` is a
+**7th file absent from `files_modified`** yet non-optional; `WorkflowRunPage.test.tsx` **was listed
+and needed no edit**; an **unmeasured `tsc` claim reached commit 1's message and was amended**; and
+the `BASELINE_TOTAL` note was **stale at 2508 against the gate's own 2521** — the exact drift its
+own comment block already records, recurring one plan later.
 
 *(Historical — the 188.2 plan ledger below is retained:)*
 Plan 188.2-01 COMPLETE (`471104d4` · `28f7ee64` · `8cb82a6b`; summary `188.2-01-SUMMARY.md`).
