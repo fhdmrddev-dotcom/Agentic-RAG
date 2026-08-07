@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v3.6
 milestone_name: Visual / No-Code Workflow Studio — 🚧 ACTIVE
 status: executing
-last_updated: "2026-08-07T10:50:04.598Z"
-last_activity: 2026-08-07 -- **Phase 189 PLANNED — 16 plans / 9 waves, plan-checker VERIFICATION PASSED (0 blockers).** Full chain ran unattended: RESEARCH (1684 L, `d5ce9e20`) -> CONTEXT amendment -> VALIDATION -> UI-SPEC + PATTERNS -> 16 plans (`046faba5`) -> checker -> revision (`2bc94c3a`). **⚠ RESEARCH MEASURED TWO LOCKED DECISIONS FALSE AT HEAD, and the operator had delegated the calls, so EIGHT new decisions were taken and recorded: D-19..D-26** (`5ad827f4`, `9f876e7b`). **D-06 ("a workflow containing the node publishes") is FALSE twice over** — (1) the always-armed checkpoint is NOT a validator (D-187-01 hoisted it out of `phase.validators`), so it sails past `_interactive_phase_failures` into the stage-3 golden run, hits `timeout_seconds=None` ("wait indefinitely") and dies at `harness_publish_max_seconds`=7200 -> **D-19** threads `is_golden_run` into ctx and auto-records-and-continues; (2) the three capability names in `available_tools` trip stage 2.6's `unregistered_tool` rule because `tool_names` is built from `get_tools(None)`, the LLM-facing list, NOT `_TOOL_REGISTRY` -> **D-20** adds a closed `EXTERNAL_ACTION_CAPABILITIES` frozenset unioned into `tool_names` for the FIDELITY CHECK ONLY and kept OUT of `GroundingBundle.tools` — **because the obvious fix would let an author whitelist `send_email` on an ordinary UNARMED `llm_agent` step, the exact wire-around SC#2 forbids.** **The golden-run hang is PRE-EXISTING, not introduced: an armed `llm_single` reproduces it today**, which is why `189-02` captures it RED using SHIPPED types. **⚠ FOUR SEPARATE POINTER-DRIFT CATCHES IN ONE PHASE** — RESEARCH corrected 3 CONTEXT pointers, PATTERNS corrected 3 of RESEARCH's, UI-SPEC corrected 7 more (one off by ~160 lines) AND found **two shipped docblocks that go FALSE the moment D-03 lands** (`phaseVocabulary.ts:271-276`, `GovernanceSection.tsx:86-89`) which NEITHER CONTEXT NOR RESEARCH had named -> **D-26**, same-commit fix. **⚠ `.planning/ROADMAP.md` lines 36 + 680 still read "live head = 113; next free slot = 114" — STALE (114 shipped with 185); an executor trusting it authors a COLLIDING migration. `189-16` fixes both lines.** ⚠ **`state.planned-phase` REGRESSED this frontmatter** — it reported `updated: ["Status","Last Activity"]` while silently DELETING `stopped_at` AND `resume_file`; repaired here. (`last_updated` is NOT a regression: 10:50Z is true UTC and the prior 12:40Z was local time stored as UTC.) That is now a SIXTH GSD verb observed writing a false completion record.
-stopped_at: Phase 189 is PLANNED and READY TO EXECUTE — 16 plans / 9 waves, 0 executed. **Decision coverage verified INDEPENDENTLY at 26/26** with word-boundary grep, because `check.decision-coverage-plan` returned `passed: true, skipped: true, "no trackable decisions"` — **a VACUOUS pass: it parsed ZERO decisions from a CONTEXT.md holding 26.** Do not read that gate as coverage proof on this phase. **NEXT is `/gsd:execute-phase 189`.** ⚠ **TWO WAVES NEED THE OPERATOR:** wave 2's `189-06` is `autonomous: false` — migration `115_workflow_phases_recorded_not_sent.sql` is applied by PASTING INTO THE SUPABASE SQL EDITOR (CLAUDE.md forbids `db push`/`db reset`), then `bash scripts/regenerate-full-schema.sh` with NO `--reset`; and wave 9's `189-16` drives ONE live browser session that discharges ALL THREE owed manual rows at once (BUG-260807-01's `elementFromPoint` row, 188.2 UAT A2 greyscale/arc distinguishability, A1's visual half) — it needs a running stack. **D-17 remains the trap to watch: the CHECK stores the SLUG `recorded_not_sent`; "Not sent — recorded" is a CLIENT-RENDERED word.**
-resume_file: .planning/phases/189-governed-external-action-node-model/189-01-PLAN.md
+last_updated: "2026-08-07T11:05:49.824Z"
+last_activity: 2026-08-07 -- **Phase 189 EXECUTING — plan 189-01 (Wave 0) COMPLETE: the three backend falsification suites exist and every assertion in them was OBSERVED RED before any 189 source landed.** 3 commits (`d8926830` · `47d0a988` · `41e289f8`), 964 insertions, **zero source files touched** (`git diff --stat -- backend/app frontend/src supabase` is EMPTY). Combined: **11 failed / 7 passed / 3 skipped** — the 11 REDs are V06, V09, D-02's closed-set raise, D-15's set+KB_TOOLS disjointness (all `ExternalActionPhaseConfig does not exist … plan 189-07`) and V10 ×3 (`_exec_external_action does not exist … plan 189-09`); the 7 greens are every control the plan required to pass TODAY (the pre-189 row still validates, an `llm_single` may still be unarmed, the `mcp` fence + its positive control, both httpx transport-inertness controls, and D-22's `_TOOL_REGISTRY`/`get_tools()` exclusion). The 189-scope backend baseline is UNMOVED at **166 passed / 2 pre-existing `test_182_grounding_bundle.py` failures** (re-derived, not inherited). **⚠ THE HEADLINE FINDING: the plan's own `mcp` fence regex was FALSIFIED BY ITS OWN MANDATED POSITIVE CONTROL** — `\bmcp\b` does not match `MCPClient`, so SC#4's only mechanical proof would have reported green while missing the most likely shape of the thing it exists to forbid; matcher strengthened, `backend/app` still 0. Two further Rule-2 additions: anti-vacuity guards (at HEAD *every* `external_action` payload already raises, so two plan cases would have passed for the wrong reason forever) and V10 parametrised over all three capabilities. `test_migration_115.py` green-skips with a reason naming **189-06**, and its FK seed harness was DRIVEN against the live DB today (439 rows before and after, 0 leaks) so 189-06 is not the first time it runs.
+stopped_at: Plan 189-01 (Wave 0) COMPLETE — summary `189-01-SUMMARY.md`. **NEXT is wave 1's `189-02`** (capture V20/V21/V22 RED — the headline publish gate, which fails at HEAD for TWO independent reasons per D-19 + D-20). ⚠ **TWO WAVES STILL NEED THE OPERATOR:** `189-06` is `autonomous: false` — migration `115_workflow_phases_recorded_not_sent.sql` is applied by PASTING INTO THE SUPABASE SQL EDITOR (CLAUDE.md forbids `db push`/`db reset`), then `bash scripts/regenerate-full-schema.sh` with NO `--reset`; and `189-16` drives ONE live browser session discharging all three owed manual rows. **D-17 remains the trap: the CHECK stores the SLUG `recorded_not_sent`; "Not sent — recorded" is a CLIENT-RENDERED word — `test_migration_115.py`'s negative control is what catches a plan that misreads it.** ⚠ `state.advance-plan` again DELETED `stopped_at` + `resume_file` and gutted `last_activity` while reporting success — repaired here; that verb stays on the false-completion list.
+resume_file: .planning/phases/189-governed-external-action-node-model/189-02-PLAN.md
 progress:
   total_phases: 21
   completed_phases: 10
   total_plans: 142
-  completed_plans: 125
+  completed_plans: 126
   percent: 48
 ---
 
@@ -24,7 +24,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-20 — Phase 163 THE ATOMIC CRUX complete; membership RLS enforced)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
-**Current focus:** Phase 188.2 — phasenodecard-extraction-refactor-pay-down-the-g-5-debt-on-p
+**Current focus:** Phase 189 — governed-external-action-node-model
 
 ## Deferred Items
 
@@ -64,7 +64,13 @@ next picked up.
 
 ## Current Position
 
-Phase: 188.2 (phasenodecard-extraction-refactor-pay-down-the-g-5-debt-on-p) — **COMPLETE, ALL FOUR GATES CLOSED**
+Phase: 189 (governed-external-action-node-model) — EXECUTING (plan 2 of 16)
+Plan 189-01 COMPLETE (`d8926830` · `47d0a988` · `41e289f8`; summary `189-01-SUMMARY.md`) —
+Wave 0: the three backend falsification suites, **11 assertions observed RED before any 189
+source existed**, 7 controls green today, 3 green-skipping until the operator applies
+migration 115. Zero source files touched.
+
+*(Historical — the 188.2 plan ledger below is retained:)*
 Plan 188.2-01 COMPLETE (`471104d4` · `28f7ee64` · `8cb82a6b`; summary `188.2-01-SUMMARY.md`).
 Plan 188.2-02 COMPLETE (`7f77af44` · `fe3de624` · `30c2e66f`; summary `188.2-02-SUMMARY.md`).
 Plan 188.2-03 COMPLETE (`99a383c7` · `1fc193b4` · `b1942579`; summary `188.2-03-SUMMARY.md`).
@@ -1845,7 +1851,7 @@ existing `updated_at` column, and the new `blocked_stage` is free-form metadata 
 already-registered `publish_blocked` event type (unlike 185-13's `action_risk_pending`).
 
 *(Historical, superseded — the 185 execution detail below was accurate when written:)*
-Plan: 1 of 7
+Plan: 2 of 16
 (Summaries on disk: 01, 02, 03, 04, 05, 06, 07, 08, 09, 10, 11, 12.)
 
 **⚑ WAVE 7 / PLAN 185-12 LANDED (2026-07-30) — BUG-260730-01 IS CLOSED IN CODE, AND IT WAS A
@@ -2439,7 +2445,7 @@ Status: Ready to execute
 
 **G-2 sketch gate for Phase 183: SATISFIED (2026-07-25).** Sketches 134-137 committed (`01bb4c64`, `7b74d2b5`, `01d50bba`, `86f866c5`, `e35c7489`). Winners: **136-B** (horizontal left->right flow) + **137-D** (frosted-glass step cards, 3D icon floating at the left edge, plain language with technical names behind the Alt reveal, Alive-by-default motion). Locked rules the canvas phases inherit: **colour budget** (step-type colour is a tint behind the icon only — the strong colours belong to Phase 188 run status) and **motion keys off run state, never selection**. New reusable asset `.planning/sketches/themes/phase-icons-3d.js` (verified 3D fluent-emoji marks; NEVER text glyphs). Icon choices: `llm_agent` -> `compass`; `llm_batch_agents` gets a lighter icon well in-scope, with the cross-cutting `handshake` swap left open. **Two findings that must reach the 183 plan: (1) `skip_to_phase` is used ZERO times in all 95 live definitions — SC#1's branch edge needs a fixture; (2) 40 of 95 definitions have zero phases — the empty projection is the most common canvas state.**
 
-Last activity: 2026-08-07 -- Phase 189 planning complete
+Last activity: 2026-08-07 -- Phase 189 plan 189-01 (Wave 0) executed: three RED-first backend falsification suites
 
 ### Quick Tasks Completed
 
@@ -3273,6 +3279,9 @@ Research brief: `.planning/research/v2.9-EXPLORATION.md` (+ 6 dimension reports 
 - [Phase 186]: 186-17 (WR-09): **a state resolution belongs above every gate that only decides whether to WRITE.** The review proposed clearing the held reading inside the `!enabled` arm; the halt gate and the nothing-pending gate carry the identical hazard, so the fix would have been true in one third of the cases. And the resolution must be FUNCTIONAL (`s.kind === "held" ? {kind:"idle"} : s`) — a bare reset would erase a `conflict`, the only reading that carries Reload/Overwrite, reintroducing GAP-4 by a second door. F20h falsifies that wrong shape rather than trusting the comment.
 - [Phase 186]: 186-17: **make a flag AGREE WITH THE TRUTH instead of choosing between two failure modes.** 186-13 left `heldPendingRef` armed on the flag-off path (so work would not be lost) and the review wanted it cleared (so a stale arming could not write later). `heldPendingRef.current = store.getState().dirty` satisfies both: it stops being a memory of a press and becomes a statement about the document. RED was a PATCH carrying the untouched 2-phase draft and the session's original token — a write against a document nobody had edited.
 - [Phase 186]: 186-17 (measurement lesson, the fourth in four plans): **a falsification's STRENGTH is a parameter, and the parameter must be chosen by measurement.** F22a at the plan's typing cadence (250 ms against a 200 ms server) showed 5 calls — real, but the storm self-terminates when the typist is slower than the round trip. At 125 ms it is sustained and shows 11. Both are recorded in the test's own docblock so the choice is auditable. Also refuted here: the "three `pendingRef` arming sites" (one statement + three call paths since 186-12) and the plan's "233 passed + 1 failed" consumer-set baseline (270/270 at the real base commit). Re-measure before quoting any count in this phase — this is now unanimous across 186-14..17.
+- [Phase 189]: 189-01: **the plan-specified `mcp` source fence was falsified by its own mandated positive control.** `re.compile(r"\bmcp\b", re.IGNORECASE)` does NOT match `MCPClient` — `\b` needs a non-word char after `mcp` and the next char is `C` — so the single most likely shape MCP code would ever take (a PascalCase class) would have sailed through SC#4's ONLY mechanical proof while it reported green. Matcher strengthened to `(?:(?<![A-Za-z0-9])[Mm]|(?<=[a-z0-9])M)[Cc][Pp](?![a-z0-9])` (fires on word AND camel/Pascal segment starts; still refuses `mcpherson`/`dmcpx`/`McPherson`; deliberately NOT `IGNORECASE`, which would make the `[a-z0-9]` guards match uppercase and collapse the rule). `backend/app` is still **0** under the stronger fence. **The lesson generalises: a fence's positive control is not ceremony — it is the only thing that can tell you the fence is the wrong shape.**
+- [Phase 189]: 189-01: **at HEAD every `external_action` payload already raises `ValidationError`** (the discriminator has no such member), so the plan's "an unknown key still 422s" and "a capability outside the closed set raises" cases would have PASSED TODAY for entirely the wrong reason and stayed green forever. Every absent-code case now asserts the symbol EXISTS first (an `assert`, not a bare import, so the RED is a failure and not a collection error), and both rejection cases assert the CLEAN payload parses before asserting the bad one raises.
+- [Phase 189]: 189-01: **a file that only ever green-skips is a file whose machinery has never run.** `test_migration_115.py` skips until the operator applies 115, so its FK seed chain (auth.users → threads → workflow_definitions → workflow_runs → workflow_phases) and both control mechanics were driven against the LIVE local DB today from the scratchpad: seed OK, five shipped statuses admitted, and BOTH the display sentence AND `recorded_not_sent` rejected `23514` with `constraint_name=workflow_phases_status_check` — which also proves the positive control will genuinely SWING when 115 lands rather than having always been green. 439 rows before and after; 0 leaked seed users.
 
 ## Operator Next Steps
 
