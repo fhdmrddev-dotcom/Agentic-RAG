@@ -493,47 +493,38 @@ Plans:
 - [x] 188-02-PLAN.md — **TWO fail-opens, both observed RED first**: the SPEC named `?? "done"` (unreachable); RESEARCH found the REACHABLE one — `finalizeAllPhasesForThread` sweeps `pending` → `done`, and `skip_to_phase` leaves jumped-over phases `pending` forever, so a step that never ran paints Complete live and Not started after a refresh. Narrows the predicate, widens `Phase["status"]` with `"unknown"` and takes the compiler-forced `STATUS_META` entry (wave 2)
 - [x] 188-03-PLAN.md — `GET /workflow-runs/{workflow_run_id}` (D-188-15, NOT `/runs/{id}`): ownership-gated FIRST with 404-on-miss through the user-JWT client, `require_canvas()` alone, the path template added to `CANVAS_GATED_PATHS`, and BOTH shipped gate fences updated in the same commit (wave 2)
 
-
 **Wave 3** *(blocked on 188-02 — same reducer)*
 
 - [x] 188-04-PLAN.md — **BUG-260609-04 closed at its root**: `reconcilePhases`' live branch overlays real `slug` + `phaseType` from `wf.phases` by `phase_index` (measured: the rows are fully populated at run creation). Identity ONLY — the positional status derivation stays byte-identical so the shipped forward-only floor cannot move backward (wave 3)
-
 
 **Wave 4** *(blocked on 188-04)*
 
 - [x] 188-05-PLAN.md — **the G-5 extraction the milestone's own ledger names**: `frontend/src/lib/phaseState.ts` holds the ONE derivation (`phaseStatusFromDb` total, `canvasReading` collapsing `retrying` in one named place, `TERMINAL_RUN_STATUSES` carried forward with the `timed_out` measurement recorded). Both shipped views rewired; a `?raw` fence with positive controls proves zero local re-derivations (wave 4)
 
-
 **Wave 5** *(blocked on 188-05 — needs `CanvasReading`)*
 
 - [x] 188-06-PLAN.md — the canvas business-word table (`runVocabulary.ts`) and the status ring: seven readings as seven distinct arc geometries, gaps placed with `stroke-dashoffset` and every number computed from `offset = (D + G/2) − p`, zero net-new glyphs, the run line as one budget with `technicalLine` DECLINED, and the ⛨ seal guard widened from four run states to seven (wave 5)
-
 
 **Wave 6** *(blocked on 188-06)*
 
 - [x] 188-07-PLAN.md — the `PhaseNode` adapter and the **capped** `WorkflowCanvas` pass-through: a prop mirroring the shipped `marks?:` plus one `ariaLabel` append, inside a pinned **≤ 15 insertions / ≤ 4 deletions** `git diff --numstat`. Req 2's no-harness-vocabulary fence and Req 5's string separation land here (wave 6)
 
-
 **Wave 7** *(blocked on 188-03 + 188-05 + 188-07)*
 
 - [x] 188-08-PLAN.md — `getWorkflowRun` and `WorkflowRunPage`: the header, the one-line run band (total over `workflow_runs.status` — an unrecognised value reads *State unknown*, never *Complete*), the `claimed_at`-anchored elapsed label with no clock at all when it is null, and the **page-owned `phase_index` join** that keeps `phase_index` out of the canvas (wave 7)
-
 
 **Wave 8** *(blocked on 188-08)*
 
 - [x] 188-09-PLAN.md — the fourth home: `ActiveView` 11 → 12, a render branch immediately BEFORE the trailing positional-fallback `<KnowledgeHealthPage />`, and `doRun`'s tail retargeted to the run — resolved via `active_workflow_run_id`, never `PostMessageResponse.run_id`. `createThread` / `postMessage` / the WR-04 cleanup all survive verbatim; `threads.py` is not touched (wave 8)
 
-
 **Wave 9** *(blocked on 188-09)*
 
 - [x] 188-10-PLAN.md — the deliverable region (`useWorkspaceFiles(run.thread_id)` + `downloadWorkspaceFile`, zero net-new backend wire, no promised preview) and the reciprocal `Open the run` seam on the thread — D-188-13's other half, and the only route back to a finished run while `GET /runs` is deferred (wave 9)
-
 
 **Wave 10** *(blocked on 188-10; the two plans share no files and run in parallel)*
 
 - [x] 188-11-PLAN.md — the SC#10 board: `scripts/sc10_188_run_board.py` derives the 8-provider roster by executing `MODEL_CAPABILITIES`, probes API keys FIRST (a keyless row silently looks like a pass), reads the EFFECTIVE provider back from `runs`, and `188-UAT.md` is authored with every row present and none pre-marked (wave 10)
 - [x] 188-12-PLAN.md — final pins + phase gates: every suite this phase authored moves from `TARGETS` into `BASELINE` at its measured count, one pin is watched producing `[count-decrease]`, and nine gates are recorded — including the WHOLE-PHASE `WorkflowCanvas.tsx` numstat, zero migrations, and backend non-attribution proved by DIFFING the failure set (wave 10)
-
 
 **Wave 11** *(blocked on 188-11 + 188-12 — the operator gate)*
 
@@ -564,6 +555,7 @@ Plans:
 **Flags**: **G-5 debt from Phase 188** (`WorkflowCanvas.tsx` — 183 ×3 plans / 184 ×3 / 185 ×3 / 188, 1574 L). Refactor phase — **behaviour-preserving by definition**, so UAT is lean per the efficiency calibration (prove *unchanged*, don't re-drive the 188 board). No migration; no schema; no new endpoint; no new glyph. `WorkflowRunPage.tsx` imports `WorkflowCanvas` **statically**, defeating the lazy split — recorded against 188 with a re-open trigger and a natural candidate to fix while the imports are already being moved. Red line **D-14** still holds: the canvas is a projection and must not acquire run-state derivation during the move.
 
 Plans:
+
 - [x] 188.1-01-PLAN.md — Wave 0: re-scope the twelve narrowed `?raw` negative fences to a subtree source that self-includes the two D-01 modules, and make SC#4's no-focusable-control walk non-vacuous (measured: both shipped renders are non-editable, so the layer never mounts) (wave 1)
 - [x] 188.1-02-PLAN.md — Wave 0: capture the `AFFORDANCE_SHAPE` geometry baseline from the SHIPPED tree, twice-agreed and order-independent, so SC#2 has something to be identical to (wave 2)
 - [x] 188.1-03-PLAN.md — The extraction (D-01): `editAffordance.ts` + `PlaneEditingLayer.tsx`, verbatim move of the two contiguous regions (311 L), exactly three import removals, the ESM-cycle fence with a positive control, both fences observed RED (wave 3)
@@ -595,6 +587,7 @@ Plans:
 **Flags**: **G-5 debt** (`PhaseNodeCard.tsx` — 184 ×2 plans / 185 ×3 / 188 ×1 / 188.1 ×1 = 7 plans across 4 phases, 797 L, +67 % since the ledger's last figure). Behaviour-preserving by definition ⇒ **lean prove-unchanged UAT** per the efficiency calibration (do not re-drive the 188 board). Two shipped invariants are **type/test-enforced and must survive the move**: a **third badge is a typecheck error** (the max-2 `BadgeSlots` tuple) and **no focusable control may live inside the card** (the ✕ and ＋ live on the lane). **Badge slot 1 stays empty — it is reserved for Phase 189 (D-12) and this phase must not spend it.** The 185 governance corner seal keeps the card's top-right. No migration; no schema; no new endpoint; no new glyph. Red line **D-14** holds: the card is a projection and must not acquire run-state derivation during the move.
 
 Plans:
+
 - [x] 188.2-01-PLAN.md — Wave 0: re-scope all 17 negative fences + 4 haystacks to a six-file subtree source, add the D-09 third-badge `@ts-expect-error` control (asserted NOWHERE before this phase) and the ESM-cycle fence; C-1/C-3/C-4/C-7 observed RED (wave 1, test-only)
 - [x] 188.2-02-PLAN.md — BUG-260806-01, its own plan as the NAMED exception to the prove-unchanged contract: `AFFORDANCE_Z = 1002` on all three affordance groups, a three-part unit guard, and the one authorised `AFFORDANCE_SHAPE_BASELINE` re-capture (wave 1, parallel — disjoint files)
 - [x] 188.2-03-PLAN.md — Capture `CARD_HTML_BASELINE` + the reading/verdict geometry matrices on the **UNMOVED** tree, twice-agreeing, C-6 RED on two instruments (wave 2, test-only)
@@ -618,22 +611,49 @@ Plans:
 **Plans**: 16 plans in 9 waves
 
 Plans:
+**Wave 1**
+
 - [ ] 189-01-PLAN.md — Wave 0: the three new backend falsification suites (V06/V09/V10/V11/V13), every one observed RED (wave 1)
 - [ ] 189-02-PLAN.md — Wave 0: capture BOTH publish-gauntlet conflicts RED at HEAD using SHIPPED types, plus the D-20 leak guard (wave 1)
 - [ ] 189-03-PLAN.md — SC#3: `docs/CONNECTOR-ARCHITECTURE.md` + the `D-v3.6-01` pointer entry + the CLAUDE.md line (D-10, D-11) (wave 1)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 189-04-PLAN.md — D-20: `EXTERNAL_ACTION_CAPABILITIES` + the fidelity-only union + the falsified identity prose (wave 2)
 - [ ] 189-05-PLAN.md — D-19: thread `is_golden_run`; the armed checkpoint stops killing publishes, live runs still pause (wave 2)
 - [ ] 189-06-PLAN.md — Migration 115: author, **OPERATOR applies via the SQL editor**, regenerate `full-schema.sql` (D-08, D-17) (wave 2, checkpoint)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 189-07-PLAN.md — The 7th `phase_type` + the D-04 structural arming pin + the D-26 docblock corrections (wave 3)
 - [ ] 189-08-PLAN.md — The client derivation layer + the developer panel's own honest word (D-07) (wave 3)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
 - [ ] 189-09-PLAN.md — `_exec_external_action`: the closed-set step that records and sends nothing (D-02, D-05, D-22) (wave 4)
 - [ ] 189-10-PLAN.md — The canvas run vocabulary + the 8th ring reading, four arcs and still (D-16, D-07) (wave 4)
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
 - [ ] 189-11-PLAN.md — The D-05 seam: `record_phase_not_sent`, the run that continues, and **V20, the headline gate** (wave 5)
 - [ ] 189-12-PLAN.md — The client 7th type: `definitionOps` + the ~16 silent count-6 pins (wave 5)
+
+**Wave 6** *(blocked on Wave 5 completion)*
+
 - [ ] 189-13-PLAN.md — The node's face: the 7th glyph (same commit), its tint, and the D-13 capability ladder (wave 6)
+
+**Wave 7** *(blocked on Wave 6 completion)*
+
 - [ ] 189-14-PLAN.md — `ExternalActionSection` + one gated panel line + the refusing arming switch (D-23, D-24) (wave 7)
+
+**Wave 8** *(blocked on Wave 7 completion)*
+
 - [ ] 189-15-PLAN.md — The badge: slot 1 spent on "Not connected" + six prose flips + D-21 (D-12, D-18) (wave 8)
+
+**Wave 9** *(blocked on Wave 8 completion)*
+
 - [ ] 189-16-PLAN.md — Close: the ROADMAP migration-head fix, the validation coverage map, and ONE driven live session (D-14, D-25) (wave 9, checkpoint)
+
 **UI hint**: yes
 **Flags**: HARD gate #3 (CORE half) — governed node vocabulary + recorded own-vs-Open-Platform decision (MCP-first, first-party-thin, Open-Platform-sequenced SEED-013/014; note SEED-031 is the LLM-provider seed, NOT connectors — the real track is SEED-013 + sibling SEED-014); NO live egress (→ 190, STRETCH); MCP-backed node rides the EXISTING per-phase tool whitelist + reuses the 185 action-risk (GOVERN-03) checkpoint (zero new governance concept); red line D-14; no SC#10 (design / vocabulary, no live stream); no threat model (no outbound egress yet — the threat model lands WITH Phase 190); ~~no migration~~ **AMENDED 2026-08-06 (operator decision, at discuss-phase → D-08 in `189-CONTEXT.md`) → EXACTLY ONE migration: `115_workflow_phases_recorded_not_sent.sql`**, adding one literal to the `workflow_phases_status_check` CHECK (measured: it caps `status` at 5 values — `pending, active, completed, failed, skipped`) and nothing else. The superseded wording is preserved, not deleted. **Reason — the Phase-185 / migration-114 precedent, whose recorded reasoning transfers verbatim: the zero-migration promise was a scoping convenience; the honest word for "recorded, not sent" is a correctness property.** The alternative (deriving the word at render while the row stays `completed`) leaves anything querying the table directly reading a step that says it finished. The node's config itself remains additive-optional JSONB, not a column; no new `harness_audit` event type (D-09 defers that receipt to 190, where it would describe a real consequence).
 
