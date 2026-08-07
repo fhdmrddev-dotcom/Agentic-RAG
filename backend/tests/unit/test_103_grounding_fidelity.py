@@ -211,10 +211,50 @@ _UID = "00000000-0000-0000-0000-0000000000a1"
 
 
 def _definition_with_tools(tools: list[str]) -> dict:
-    """``_definition_with_tool``'s shape, taking the whole whitelist at once."""
+    """``_definition_with_tool``'s shape, taking the whole whitelist at once.
+
+    The phase is an **``llm_agent``** — see ``_definition_with_external_actions`` for the
+    ``external_action`` shape and CR-01 for why the difference is now load-bearing.
+    """
     d = _definition_with_tool("__placeholder__")
     d["phases"][0]["config"]["available_tools"] = list(tools)
     return d
+
+
+def _definition_with_external_actions(capabilities: list[str], *, extra_phases=()) -> dict:
+    """One ``external_action`` phase PER capability, plus any extra phase dicts.
+
+    ONE PHASE PER NAME IS FORCED BY THE MODEL, not a stylistic choice.
+    ``ExternalActionPhaseConfig``'s D-03 validator totally replaces ``available_tools``
+    with ``[capability]``, and ``capability`` is a single-valued ``Literal`` — so there is
+    no representable ``external_action`` phase carrying two capabilities. Fanning the
+    closed set across N phases keeps the assertion below on the **SET** (a per-name test
+    would still pass if only ``send_email`` were admitted) while driving the shape that
+    actually ships.
+    """
+    phases = [
+        {
+            "slug": f"act-{i}",
+            "phase_index": i,
+            "config": {
+                "phase_type": "external_action",
+                "capability": name,
+                "available_tools": [name],
+            },
+            "validators": [],
+        }
+        for i, name in enumerate(capabilities)
+    ]
+    phases.extend(extra_phases)
+    for i, p in enumerate(phases):
+        p["phase_index"] = i
+    return {
+        "slug": "external-action-wf",
+        "version": 1,
+        "name": "External Action Workflow",
+        "status": "draft",
+        "phases": phases,
+    }
 
 
 async def _production_tool_names() -> set[str]:
@@ -255,10 +295,22 @@ async def _unregistered_tool_findings(tools: list[str]) -> list[dict]:
     1's ⊆ walk short-circuits to ``[]`` without any DB read, and ``skill_ids`` is
     irrelevant because no phase carries a ``skill_ref``.
     """
+    return await _unregistered_tool_findings_for(_definition_with_tools(tools))
+
+
+async def _unregistered_tool_findings_for(definition: dict) -> list[dict]:
+    """``_unregistered_tool_findings`` over an ARBITRARY definition dict.
+
+    Extracted at CR-01 so the same drive — same collector, same production
+    ``tool_names``, same ``skill_ids`` — can be pointed at an ``external_action``
+    definition as well as the ``llm_agent`` fixture. The two callers differing ONLY in
+    ``phase_type`` is what makes the pair below a measurement of the type boundary rather
+    than of two unrelated code paths.
+    """
     from app.services.harness.grounding import grounding_verdicts
 
     verdicts = await grounding_verdicts(
-        _wd(_definition_with_tools(tools)),
+        _wd(definition),
         supabase=object(),
         user_id=_UID,
         tool_names=await _production_tool_names(),
@@ -305,8 +357,20 @@ async def test_an_external_capability_in_available_tools_produces_no_unregistere
     two shapes that are forbidden, and
     ``test_a_genuinely_unknown_tool_still_produces_the_finding`` for the fence around the
     cheapest wrong one.
+
+    ⚠ **RE-POINTED AT REVIEW FINDING CR-01.** This case used to drive
+    ``_definition_with_tools`` — an **``llm_agent``** phase — and assert zero findings, and
+    that green was the review's PROOF of the wire-around: the design's own test certified
+    that an ordinary, unarmed agent step could whitelist ``send_email`` and publish. What
+    D-06 actually needs is that an ``external_action`` WORKFLOW publishes, so the drive now
+    uses the type that owns the capability, one phase per name. The assertion is UNCHANGED
+    and still on the SET; only the shape under test was corrected to the one that ships.
+    Its new partner is ``test_a_capability_on_an_llm_agent_step_still_blocks_publish``,
+    which pins what the old drive was accidentally certifying as safe.
     """
-    findings = await _unregistered_tool_findings(sorted(EXTERNAL_ACTION_CAPABILITIES))
+    findings = await _unregistered_tool_findings_for(
+        _definition_with_external_actions(sorted(EXTERNAL_ACTION_CAPABILITIES))
+    )
     offenders = {
         t for t in EXTERNAL_ACTION_CAPABILITIES
         if any(repr(t) in f.get("message", "") for f in findings)
@@ -314,13 +378,54 @@ async def test_an_external_capability_in_available_tools_produces_no_unregistere
 
     assert offenders == set(), (
         f"D-20 / CONFLICT 2: stage 2.6 rule 2 refuses {sorted(offenders)} — the "
-        f"external-action capabilities D-03 puts in available_tools. Findings emitted: "
-        f"{findings!r}. tool_names is built from get_tools(None) (the LLM-facing SCHEMA "
-        f"list) and D-22 keeps these three OFF it, so a workflow containing the node "
-        f"BLOCKS at stage 2.6 and D-06 is FALSE. Fix: union EXTERNAL_ACTION_CAPABILITIES "
-        f"into tool_names for the fidelity check ONLY — never into GroundingBundle.tools "
-        f"(the D-20 leak, fenced by V22), never as a phase_type exemption inside rule 2."
+        f"external-action capabilities D-03 puts in available_tools, on the "
+        f"external_action phases that DERIVE them. Findings emitted: {findings!r}. "
+        f"tool_names is built from get_tools(None) (the LLM-facing SCHEMA list) and D-22 "
+        f"keeps these three OFF it, so a workflow containing the node BLOCKS at stage 2.6 "
+        f"and D-06 is FALSE. Fix: admit EXTERNAL_ACTION_CAPABILITIES for the fidelity "
+        f"check ONLY, and only on the type that derives them — never into "
+        f"GroundingBundle.tools (the D-20 leak, fenced by V22)."
     )
+
+
+@pytest.mark.asyncio
+async def test_a_capability_on_an_llm_agent_step_still_blocks_publish():
+    """CR-01 / SC#2 — **the capability is admissible on ``external_action`` and NOWHERE else.**
+
+    THE MISSING NEGATIVE CONTROL. Its sibling above proves the capability PASSES on the
+    type that derives it; nothing proved it still BLOCKS anywhere else, and until this
+    case existed it did not: the D-20 widening was unconditional, so a definition reaching
+    ``POST /workflows`` / the draft PATCH / the NL generator as
+
+        {"phase_type": "llm_agent", "prompt": "…", "available_tools": ["send_email"]}
+
+    parsed, passed stage 2.6 and published — on a step with ``action_risk_armed: false``
+    and no D-04 checkpoint. The author-facing rail (V22 in
+    ``tests/test_182_grounding_bundle.py``) fences what the CLIENT is OFFERED; it fences
+    nothing about what the SERVER ACCEPTS, and none of those three write paths is the rail.
+
+    Driven on the SET, and per-name in the message assertion, so a partial fix that scoped
+    only ``send_email`` cannot pass. Same collector and same ``tool_names`` source as its
+    sibling — the ONLY difference between the two drives is ``phase_type``, which is what
+    makes the pair a measurement of the boundary itself.
+    """
+    capabilities = sorted(EXTERNAL_ACTION_CAPABILITIES)
+    findings = await _unregistered_tool_findings(capabilities)
+
+    blocked = {
+        t for t in capabilities
+        if any(repr(t) in f.get("message", "") for f in findings)
+    }
+    assert blocked == set(capabilities), (
+        f"CR-01 / SC#2: an ORDINARY, UNARMED llm_agent step may whitelist "
+        f"{sorted(set(capabilities) - blocked)} and publish clean. That is the wire-around "
+        f"SC#2 forbids — it makes action_risk_armed decorative and skips the D-04 "
+        f"checkpoint entirely. Latent only while D-22 keeps the names out of "
+        f"_TOOL_REGISTRY; live egress on an unarmed step the day Phase 190 registers a "
+        f"handler. Findings emitted: {findings!r}"
+    )
+    assert all(f["code"] == "unregistered_tool" for f in findings), findings
+    assert all(f["phase"] == "research" for f in findings), findings
 
 
 @pytest.mark.asyncio
@@ -352,15 +457,43 @@ async def test_a_shipped_tool_is_still_accepted_alongside_a_capability():
     """V21's SECOND CONTROL — the widening must not turn rule 2 into a pass-through.
 
     A phase whitelisting a REAL registered tool has always been clean, and must stay clean.
-    Driven in the same call as the three capabilities so the mixed list — the shape a real
-    ``external_action`` workflow beside an ``llm_agent`` step produces — is the thing
+    Driven in the same call as the three capabilities so the mixed definition — the shape a
+    real ``external_action`` workflow beside an ``llm_agent`` step produces — is the thing
     measured, rather than two separately-clean halves.
+
+    ⚠ **CORRECTED AT CR-01, because the sentence above used to be false.** The drive was a
+    single ``llm_agent`` phase whitelisting ``search_documents`` AND all three
+    capabilities, which is not "an external_action workflow beside an llm_agent step" —
+    it is the wire-around itself, described as the legitimate shape. The definition now
+    genuinely is one ``llm_agent`` carrying the registered tool plus one
+    ``external_action`` per capability, and the whole thing must come back CLEAN.
     """
-    findings = await _unregistered_tool_findings(
-        ["search_documents", *sorted(EXTERNAL_ACTION_CAPABILITIES)]
+    definition = _definition_with_external_actions(
+        sorted(EXTERNAL_ACTION_CAPABILITIES),
+        extra_phases=[
+            {
+                "slug": "research",
+                "phase_index": 99,
+                "config": {
+                    "phase_type": "llm_agent",
+                    "prompt": "Research the topic.",
+                    "available_tools": ["search_documents"],
+                },
+                "validators": [],
+            }
+        ],
     )
+    findings = await _unregistered_tool_findings_for(definition)
+
     assert not any("search_documents" in f.get("message", "") for f in findings), (
         f"a REGISTERED tool was reported unregistered: {findings!r}"
+    )
+    # The legitimate mixed workflow is clean END TO END — the capabilities on their own
+    # type and the shipped tool on the agent step. Anything else here would mean the CR-01
+    # narrowing leaked into a shape D-06 has to publish.
+    assert findings == [], (
+        f"the legitimate mixed workflow (llm_agent + one external_action per capability) "
+        f"no longer publishes clean: {findings!r}"
     )
 
 

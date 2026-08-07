@@ -416,14 +416,26 @@ async def assemble_grounding_bundle(
     #     wires around the ``external_action`` type's structural arming and makes
     #     ``action_risk_armed`` decorative. That is the wire-around SC#2 forbids.
     #
-    # THE SET IS WIDENED, THE RULE IS NOT WEAKENED. Rule 2 keeps firing on every name it
-    # ever fired on; it is admitted three REVIEWED names, from one closed frozenset, at one
-    # boundary. A ``phase_type`` exemption inside rule 2 would have been the other shape and
-    # is rejected: a type special-case inside a SHARED governance rule is how a rule stops
-    # meaning one thing. Both halves are fenced —
-    # ``tests/unit/test_103_grounding_fidelity.py`` (the capabilities pass, a hallucinated
-    # name still does not) and ``tests/test_182_grounding_bundle.py`` (V22: the three names
-    # are ABSENT from ``tools``), the latter proved non-vacuous by an observed plant.
+    # ⚠ CORRECTED BY REVIEW FINDING CR-01, in the commit that closed it. THE PARAGRAPH THAT
+    # STOOD HERE WAS A FALSE SAFETY CLAIM. It read "THE SET IS WIDENED, THE RULE IS NOT
+    # WEAKENED … a ``phase_type`` exemption inside rule 2 … is rejected", and the second half
+    # of the bullet above still describes the wire-around as forbidden. Both were true of the
+    # AUTHOR-FACING RAIL and false of the SERVER. The union built on the next line was
+    # unconditional and ``_unregistered_tools`` carried no ``phase_type`` term, so a
+    # definition reaching ``POST /workflows`` / the draft PATCH / the NL generator with
+    # ``{"phase_type": "llm_agent", "available_tools": ["send_email"]}`` published clean. The
+    # boundary was enforced by a UI option list, and this comment asserted otherwise.
+    #
+    # WHERE THE BOUNDARY ACTUALLY LIVES NOW: ``tool_names`` is still the WIDE set (its
+    # matched-pair fences are unchanged), and the ADMISSION is scoped to the owning type at
+    # the ONE membership site — see ``_unregistered_tools`` below for why that is a
+    # conditional WIDENING and not the type exemption this block rejected. Rule 2 keeps
+    # firing on every name it ever fired on, and now fires on three MORE for the other six
+    # types. Three fences, all live: ``tests/unit/test_103_grounding_fidelity.py`` (the
+    # capabilities pass on ``external_action``, a hallucinated name still does not, and — the
+    # CR-01 negative control — a capability on an ``llm_agent`` step STILL BLOCKS) and
+    # ``tests/test_182_grounding_bundle.py`` (V22: the three names are ABSENT from
+    # ``tools``), the latter proved non-vacuous by an observed plant.
     schema_tool_names = {t["function"]["name"] for t in get_tools(None)}
     fidelity_tool_names = schema_tool_names | EXTERNAL_ACTION_CAPABILITIES
 
@@ -702,11 +714,51 @@ async def _folder_scope_violations(
 def _unregistered_tools(phase, tool_names: set[str]) -> list[str]:
     """Rule 2 — the ``available_tools`` entries of one phase that are NOT in the registry
     (order-preserving, so the short-circuit presentation reports the same first offender
-    the pre-extraction code did)."""
+    the pre-extraction code did).
+
+    ── CR-01 (Phase 189 review) · THE CAPABILITY IS ADMISSIBLE ON ONE TYPE ONLY ──
+    The D-20 widening used to be UNCONDITIONAL: ``assemble_grounding_bundle`` unioned
+    ``EXTERNAL_ACTION_CAPABILITIES`` into ``tool_names`` and this function tested every
+    phase against that union, with no ``phase_type`` term anywhere. The consequence was
+    measured by the review and is the exact wire-around SC#2 forbids: a definition
+    carrying ``{"phase_type": "llm_agent", "available_tools": ["send_email"]}`` reached
+    the server through ``POST /workflows`` / the draft PATCH / the NL generator — none of
+    which is the author-facing rail — parsed, passed stage 2.6 and PUBLISHED, on a step
+    with ``action_risk_armed: false`` and no D-04 checkpoint. The only barrier was a UI
+    option list. Latent while D-22 keeps the names out of ``_TOOL_REGISTRY``; live egress
+    on an unarmed step the day Phase 190 registers a handler.
+
+    THE RULE IS STILL ONE RULE — the WIDENING is what became conditional, not the rule.
+    Rule 2 fires on every name it ever fired on, and it now fires on three MORE names for
+    six of the seven types. The ``grounding.py`` two-set block above (and this file's
+    189-era prose) rejected "a ``phase_type`` exemption inside rule 2"; that objection is
+    honoured, because this is not an exemption — nothing is let THROUGH by the type test,
+    the type test only decides which of two closed sets is admissible, and the strictly
+    NARROWER one is the default.
+
+    IT COSTS ``external_action`` NOTHING. ``ExternalActionPhaseConfig``'s D-03 validator
+    (``models/harness.py``) totally replaces ``available_tools`` with ``[capability]`` and
+    ``capability`` is a ``Literal`` over the same three names — so on this type the list is
+    always exactly one member of the closed set, and rule 2 can never flag it. D-06 ("a
+    workflow containing the external-action node PUBLISHES") stays true by construction.
+
+    ``tool_names`` stays the WIDE fidelity set the assembler builds, so
+    ``GroundingBundle.tool_names``' documented contract (and the matched-pair assertion in
+    ``tests/unit/test_103_grounding_fidelity.py``) is untouched; the narrowing happens
+    HERE, at the ONE membership site both presentations share.
+    """
+    # Subtracting first (rather than only adding for external_action) makes the answer
+    # independent of what the caller passed: a caller handing in a set that already
+    # contains the capabilities cannot widen a non-external type by accident. If a
+    # capability name ever DID become a real ``get_tools()`` schema name, D-22 is already
+    # broken and blocking it on an unarmed step is still the behaviour SC#2 wants.
+    allowed = set(tool_names) - EXTERNAL_ACTION_CAPABILITIES
+    if getattr(phase.config, "phase_type", None) == "external_action":
+        allowed |= EXTERNAL_ACTION_CAPABILITIES
     return [
         tool
         for tool in (getattr(phase.config, "available_tools", None) or [])
-        if tool not in tool_names
+        if tool not in allowed
     ]
 
 
