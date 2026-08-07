@@ -22,6 +22,7 @@ import { fireEvent, render, screen } from "@testing-library/react"
 // Read the component SOURCE via Vite's ?raw loader (typechecks under `vite/client`).
 import phaseFormPanelSource from "./PhaseFormPanel?raw"
 import { PhaseFormPanel } from "./PhaseFormPanel"
+import { minimalPhaseFor, PHASE_TYPE_ORDER } from "./definitionOps"
 import type { PhaseSpecJSON } from "./phaseVocabulary"
 
 function phaseOf(config: Record<string, unknown>, extra: Partial<PhaseSpecJSON> = {}): PhaseSpecJSON {
@@ -232,12 +233,18 @@ describe("PhaseFormPanel — 6 phase_type-conditioned forms (friendly labels)", 
   })
 
   it("the file-check / sourcing-strictness controls are ABSENT on every non-llm_emit type", () => {
-    const nonEmit = ["programmatic", "llm_single", "llm_agent", "llm_batch_agents", "llm_human_input"]
+    // ⚠ DERIVED FROM THE SHIPPED ORDER (Phase 189), and the decision is recorded rather
+    // than left to a hand-typed list. This claim is "these controls belong to the
+    // DELIVERABLE and to nothing else", which quantifies over every OTHER type — so a
+    // 7th type belongs in the subset by the claim's own words, and a literal five-element
+    // array had silently stopped covering the union the moment `llm_emit` was not the
+    // only thing that could be added. `minimalPhaseFor` builds each config, so every arm
+    // (including `external_action`'s required `capability`) stays correct by construction
+    // instead of by an `if` ladder that has to be remembered.
+    const nonEmit = PHASE_TYPE_ORDER.filter((type) => type !== "llm_emit")
+    expect(nonEmit).toHaveLength(PHASE_TYPE_ORDER.length - 1)
     for (const pt of nonEmit) {
-      const config: Record<string, unknown> = { phase_type: pt }
-      if (pt !== "programmatic") config.prompt = "x"
-      if (pt === "programmatic") config.fn = "f"
-      if (pt === "llm_agent" || pt === "llm_batch_agents") config.available_tools = []
+      const config = minimalPhaseFor(pt, "some-slug", 0).config
       const { unmount } = render(
         <PhaseFormPanel phase={phaseOf(config)} open onChange={noop} onPersist={noop} onClose={noop} />,
       )

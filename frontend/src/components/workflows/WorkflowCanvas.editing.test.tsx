@@ -52,7 +52,7 @@ import type { CanvasNode } from "./canvasModel"
 // union the appended block renders, and the ONE stranding sentence, so the R10b
 // assertion is character-identical to the pure module's constant rather than a copy.
 import type { CanvasNotice } from "./WorkflowCanvas"
-import { STRANDING_REASON, type PhaseTypeId } from "./definitionOps"
+import { PHASE_TYPE_ORDER, STRANDING_REASON, type PhaseTypeId } from "./definitionOps"
 import { VERDICT_DESTRUCTIVE_TOKEN, VERDICT_MARK } from "./nodePresentation"
 // Plan 188.2-02 (D-11), on their OWN line so this file's diff stays 0-deletion: the
 // affordance stacking tier and the library elevation it has to beat — IMPORTED, never
@@ -850,7 +850,10 @@ describe("WorkflowCanvas 184-12 — R10b: a stranding choice is offered DISABLED
     fireEvent.click(screen.getByTestId("canvas-insert-2"))
 
     const rows = screen.getAllByRole("menuitem")
-    expect(rows).toHaveLength(6)
+    // DERIVED from the shipped order, not re-pinned (Phase 189): the claim is
+    // every-choice-still-offered, and a literal count makes the next phase type read as a
+    // regression here. The order tuple is the one home for how many there are.
+    expect(rows).toHaveLength(PHASE_TYPE_ORDER.length)
     for (const row of rows) expect(row).not.toBeDisabled()
     expect(screen.queryAllByTestId(/^step-type-reason-/)).toHaveLength(0)
   })
@@ -861,8 +864,10 @@ describe("WorkflowCanvas 184-12 — R10b: a stranding choice is offered DISABLED
     fireEvent.click(screen.getByTestId("canvas-insert-3"))
 
     const rows = screen.getAllByRole("menuitem")
-    // Never fewer than six: a refusal that hides the option teaches nothing (139-C).
-    expect(rows).toHaveLength(6)
+    // Never fewer than the whole order: a refusal that hides the option teaches nothing
+    // (139-C). It read "never fewer than six" until the 7th type landed — the rule was
+    // never the number.
+    expect(rows).toHaveLength(PHASE_TYPE_ORDER.length)
     for (const row of rows) {
       expect(row).toBeDisabled()
       expect(row).toHaveAttribute("aria-disabled", "true")
@@ -870,7 +875,7 @@ describe("WorkflowCanvas 184-12 — R10b: a stranding choice is offered DISABLED
     // CHARACTER-IDENTICAL to the pure module's constant — which is what proves the
     // canvas authored no reason of its own.
     const reasons = screen.getAllByTestId(/^step-type-reason-/)
-    expect(reasons).toHaveLength(6)
+    expect(reasons).toHaveLength(PHASE_TYPE_ORDER.length)
     for (const reason of reasons) expect(reason.textContent).toBe(STRANDING_REASON)
   })
 

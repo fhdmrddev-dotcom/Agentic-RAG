@@ -137,7 +137,13 @@ const BASELINE = {
   // never hand-counted, never taken from a planning document. Each was then
   // observed catching a deletion: one `it(` block removed per file reds the gate
   // with `[count-decrease]` naming that file.
-  "definitionOps.test.ts": 232,
+  // 189-12: 232 → 243. The 7th `phase_type` (`external_action`, CONN-01) — five cases
+  // pinning that it is APPENDED LAST with the shipped six unmoved, that its slug base and
+  // its required-config arm answer, and that its config round-trips; plus a four-case
+  // D-23 CROSS-LANGUAGE agreement block that reads `backend/app/models/harness.py` through
+  // the `?raw` loader and asserts the client mirror equals the backend union in order.
+  // Read from this script's own `actual` column, in the same commit as the tests.
+  "definitionOps.test.ts": 243,
   "canvasModel.fixtures.test.ts": 100,
   // 188-12: 69 → 143. A stale-low pin inherited from 187-25 and flagged as owed by
   // five 188 plans. The 74 cases in the slack were deletable with the gate green.
@@ -501,7 +507,13 @@ const BASELINE = {
   "WorkflowCanvas.editing.test.tsx": 63,
   "builderStore.test.ts": 52,
   "phaseVocabulary.corpus.test.ts": 45,
-  "StepTypePicker.test.tsx": 43,
+  // 189-12: 43 → 46. The 7th row — one case pinning it is offered LAST (a bare count
+  // passes an insert), one pinning its title comes from the resolver rather than from a
+  // fabricated sentence, and one pinning the "•" fallback mark. The last two are
+  // FALSIFIABLE placeholders: they go red the day 189-14 lands the type sentence and
+  // 189-13 lands the `outbox-tray` mark, which is what forces the exclusions to be
+  // emptied rather than to outlive their reason.
+  "StepTypePicker.test.tsx": 46,
   "GovernanceSection.test.tsx": 42,
   "StarterTemplatePicker.test.tsx": 40,
   "canvasNudge.test.ts": 31,
@@ -593,7 +605,13 @@ const BASELINE = {
 // whole-table ring invariants; `PhaseNodeCard` +2, the rendered four-arc uniqueness and the
 // `EXPECTED_RING` falsification row). Both read from THIS SCRIPT'S OWN printed `total` column
 // across two agreeing runs, each in the SAME COMMIT as its own pins.
-const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // ⚠ 2546 (189-10)
+// ⚠ AND A TENTH TIME BY 189-12: 2546 → 2560 (`definitionOps.test.ts` +11, the 7th phase
+// type and the D-23 cross-language mirror fence; `StepTypePicker.test.tsx` +3, the 7th
+// row's position, its resolver-sourced title and its fallback mark). Both read from THIS
+// SCRIPT'S OWN printed `actual` column, in the SAME COMMIT as the tests that moved them.
+// ⚠ The note below is prose beside a DERIVED value and has now drifted twice; it is
+// updated here for the reader, and `BASELINE_TOTAL` itself remains the `reduce`.
+const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // ⚠ 2560 (189-12)
 
 // ── The Wave-0 blast radius (184-VALIDATION.md § "quick run command"). ──
 const TARGETS = [

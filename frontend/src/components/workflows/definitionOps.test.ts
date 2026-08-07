@@ -17,6 +17,16 @@
 import { describe, it, expect, beforeAll, afterAll, vi, type MockInstance } from "vitest"
 
 import definitionOpsSource from "./definitionOps?raw"
+// Phase 189 (D-23) — the CROSS-LANGUAGE agreement fence reads the SERVER's own source
+// rather than trusting a transcribed list, via the SAME `?raw` loader the module source
+// is read with one line above. The precedent is `PublishGauntlet.test.tsx:46`, which
+// reads `publish_service.py` this way, and its docblock records why the obvious
+// `node:fs` spelling is wrong here: `tsconfig.app.json` sets `types: ["vite/client"]`
+// and nothing else on purpose, so a `node:*` import would add NEW `tsc` errors to a
+// baseline every plan in this phase measures against — and the `new URL(…,
+// import.meta.url)` path spelling that pairs with it is STATICALLY REWRITTEN by Vite
+// into an asset reference, so it throws before a single test runs.
+import harnessModelsSource from "../../../../backend/app/models/harness.py?raw"
 import {
   addPhase,
   allowedTypesAt,
@@ -1473,10 +1483,17 @@ describe("definitionOps — allowedTypesAt (R10b: disabled with its reason, neve
     { slug: "emit", phase_index: 2, config: { phase_type: "llm_emit" } },
   ]
 
-  it("returns exactly 6 entries, in the fixed order, at EVERY index", () => {
+  // ⚠ THE COUNTS BELOW ARE DERIVED FROM `PHASE_TYPE_ORDER`, NOT RE-PINNED (Phase 189).
+  // They read a literal `6` until the 7th type landed. A literal makes the NEXT member
+  // read as a regression until somebody remembers to move it, and the property here was
+  // never the number six — it is "every choice in the order is returned, none omitted".
+  // Same reasoning as 189-10's five `ALL_READINGS.length` derivations. The order itself
+  // is still asserted element-by-element below, so a derived length is not a weakening:
+  // it cannot be satisfied by returning the wrong seven.
+  it("returns one entry per step type, in the fixed order, at EVERY index", () => {
     for (const index of [-5, 0, 1, 2, 3, 4, 99]) {
       const choices = allowedTypesAt(withEmit, index)
-      expect(choices).toHaveLength(6)
+      expect(choices).toHaveLength(PHASE_TYPE_ORDER.length)
       expect(choices.map((c) => c.type)).toEqual([...PHASE_TYPE_ORDER])
     }
   })
@@ -1494,7 +1511,7 @@ describe("definitionOps — allowedTypesAt (R10b: disabled with its reason, neve
   it("marks every choice disabled, with a non-empty reason, AFTER the deliverable", () => {
     for (const index of [3, 4, 99]) {
       const choices = allowedTypesAt(withEmit, index)
-      expect(choices).toHaveLength(6)
+      expect(choices).toHaveLength(PHASE_TYPE_ORDER.length)
       for (const choice of choices) {
         expect(choice.disabledReason).toBe(STRANDING_REASON)
         expect(choice.disabledReason?.length).toBeGreaterThan(0)
@@ -1505,11 +1522,11 @@ describe("definitionOps — allowedTypesAt (R10b: disabled with its reason, neve
   it("disables nothing when the definition carries no deliverable", () => {
     for (const index of [0, 1, 2, 3, 4, 5]) {
       const choices = allowedTypesAt(fixture("eval_coverage"), index)
-      expect(choices).toHaveLength(6)
+      expect(choices).toHaveLength(PHASE_TYPE_ORDER.length)
       expect(choices.filter((c) => c.disabledReason !== undefined)).toEqual([])
     }
     const empty = allowedTypesAt([], 0)
-    expect(empty).toHaveLength(6)
+    expect(empty).toHaveLength(PHASE_TYPE_ORDER.length)
     expect(empty.filter((c) => c.disabledReason !== undefined)).toEqual([])
   })
 
@@ -1521,7 +1538,7 @@ describe("definitionOps — allowedTypesAt (R10b: disabled with its reason, neve
     ]
     expect(allowedTypesAt(twoEmits, 1).filter((c) => c.disabledReason)).toEqual([])
     expect(allowedTypesAt(twoEmits, 2).filter((c) => c.disabledReason)).toEqual([])
-    expect(allowedTypesAt(twoEmits, 3)).toHaveLength(6)
+    expect(allowedTypesAt(twoEmits, 3)).toHaveLength(PHASE_TYPE_ORDER.length)
     expect(allowedTypesAt(twoEmits, 3).every((c) => c.disabledReason)).toBe(true)
   })
 
@@ -1535,9 +1552,15 @@ describe("definitionOps — allowedTypesAt (R10b: disabled with its reason, neve
 // ── D-184-11 — slug generation and the minimal phase ──────────────────────────
 
 describe("definitionOps — slugForType (D-184-11: derived from the closed set, never user text)", () => {
-  it("yields six distinct base slugs, all matching /^[a-z0-9-]+$/", () => {
+  // DERIVED, not re-pinned (Phase 189): the property is ONE DISTINCT BASE PER TYPE, so a
+  // collision between two types is what this must catch — never the number six. ⚠ This
+  // case is NOT in `189-RESEARCH.md`'s enumerated pin list; it was found by running the
+  // suite after the 7th type landed, which is why the plan says to re-derive the list
+  // rather than trust it.
+  it("yields one distinct base slug per step type, all matching /^[a-z0-9-]+$/", () => {
     const slugs = PHASE_TYPE_ORDER.map((type) => slugForType([], type))
-    expect(new Set(slugs).size).toBe(6)
+    expect(new Set(slugs).size).toBe(PHASE_TYPE_ORDER.length)
+    expect(slugs.length).toBeGreaterThan(1) // non-vacuity: an emptied order proves nothing
     for (const slug of slugs) expect(slug).toMatch(/^[a-z0-9-]+$/)
   })
 
@@ -1594,6 +1617,12 @@ describe("definitionOps — minimalPhaseFor (extra=\"forbid\": required keys and
     llm_batch_agents: ["phase_type", "prompt", "available_tools"],
     llm_human_input: ["phase_type", "prompt"],
     llm_emit: ["phase_type", "prompt"],
+    // Phase 189 (CONN-01). `capability` is required (a `Literal` with no default);
+    // `available_tools` is NOT, because `ExternalActionPhaseConfig` gives it
+    // `Field(default_factory=list)` AND derives it from `capability` server-side (D-03).
+    // This table is `Record<PhaseTypeId, …>`, so it is one of the TYPECHECK-FORCED sites
+    // — it was `TS2741` the moment the union grew, and that is the whole design.
+    external_action: ["phase_type", "capability"],
   }
 
   it.each(PHASE_TYPE_ORDER)("%s emits exactly the union-required config keys", (type) => {
@@ -1650,6 +1679,194 @@ describe("definitionOps — minimalPhaseFor (extra=\"forbid\": required keys and
     expect(out).toHaveLength(6)
     expect(indicesOf(out)).toEqual([0, 1, 2, 3, 4, 5])
     expect(out[5].slug).toBe(slug)
+  })
+})
+
+// ── Phase 189 (CONN-01 / D-01) — the 7th type is PLACEABLE ────────────────────
+
+describe("definitionOps — the 7th phase type, external_action (Phase 189 / SC#1)", () => {
+  /** The six as they shipped, transcribed ONCE here so the prefix claim below is a
+   *  comparison against a fixed list rather than against the tuple explaining itself. */
+  const SHIPPED_SIX = [
+    "programmatic",
+    "llm_single",
+    "llm_agent",
+    "llm_batch_agents",
+    "llm_human_input",
+    "llm_emit",
+  ] as const
+
+  it("is APPENDED LAST — the shipped six keep their positions, byte for byte", () => {
+    // ⚠ THE PREFIX, not merely the length. A bare count passes an INSERT, and "the
+    // picker's third option moved" is exactly the UX regression `PHASE_TYPE_ORDER`
+    // exists as a tuple to catch (D-184-11). Both halves are asserted so neither an
+    // insert nor an omission can hide behind the other.
+    expect(PHASE_TYPE_ORDER.slice(0, SHIPPED_SIX.length)).toEqual([...SHIPPED_SIX])
+    expect(PHASE_TYPE_ORDER[PHASE_TYPE_ORDER.length - 1]).toBe("external_action")
+    expect(PHASE_TYPE_ORDER).toHaveLength(SHIPPED_SIX.length + 1)
+    // The order carries no duplicate — a member appended twice would satisfy both of
+    // the assertions above.
+    expect(new Set(PHASE_TYPE_ORDER).size).toBe(PHASE_TYPE_ORDER.length)
+  })
+
+  it("has a slug base of its own that is neither the type id nor a claim of a send", () => {
+    const slug = slugForType([], "external_action")
+    expect(slug).toMatch(/^[a-z0-9-]+$/)
+    // Not the discriminator: the slug is user-visible identity (`node.id === phase.slug`,
+    // a `skip_to_phase` target, and the ⌥ Technical-names line renders it), and a raw
+    // union token there is the jargon leak SC#5 forbids everywhere else.
+    expect(slug).not.toBe("external_action")
+    expect(slug).not.toContain("_")
+    // ⚠ And it does not say "send". Nothing is sent in Phase 189 (D-05), the run-time
+    // word is chosen so it CANNOT read as success (D-16), and the base token is keyed by
+    // PHASE TYPE — one token for all three capabilities — so a `send-` slug would be
+    // simply false on a `create_ticket` or `post_message` step.
+    expect(slug).not.toContain("send")
+
+    // It collides with no shipped base, which is the property `slugForType` needs to be
+    // able to hand back the bare base on a fresh definition.
+    const shippedBases = SHIPPED_SIX.map((type) => slugForType([], type))
+    expect(shippedBases).not.toContain(slug)
+  })
+
+  it("builds a phase carrying the union-REQUIRED key and not one key more", () => {
+    const phase = minimalPhaseFor("external_action", slugForType([], "external_action"), 0)
+
+    expect(Object.keys(phase.config).sort()).toEqual(["capability", "phase_type"])
+    expect(phase.config.phase_type).toBe("external_action")
+
+    // ⚠ NO `available_tools`. It has a backend default AND is DERIVED from `capability`
+    // by a server-side total-replacement validator (D-03), so emitting it here would
+    // both re-materialise a default (the drift R2's round-trip property catches) and
+    // state a whitelist the client may not author. This is the one member of the union
+    // whose tool list the client must never write.
+    expect(phase.config).not.toHaveProperty("available_tools")
+    // None of the five LLM shape-symmetry optionals belongs to this member either.
+    for (const absent of ["prompt", "model", "folder_scope", "skill_ref", "citation_policy"]) {
+      expect(phase.config).not.toHaveProperty(absent)
+    }
+  })
+
+  it("carries a capability that is REAL rather than an empty placeholder", () => {
+    const capability = minimalPhaseFor("external_action", "act", 0).config.capability
+
+    // The empty-string placeholders the other six arms emit are honest because `prompt`
+    // and `fn` are plain `str` — an empty one PARSES and only the SERVER decides whether
+    // it publishes. `capability` is a closed `Literal` of exactly three (D-15), so an
+    // empty one is a `ValidationError` that 422s the whole definition on the first save:
+    // the step would be placeable and then unstorable. The agreement fence below is what
+    // proves the emitted value is one the server actually admits.
+    expect(typeof capability).toBe("string")
+    expect(capability).not.toBe("")
+  })
+
+  it("composes with the structural ops and round-trips through renumber", () => {
+    const before = fixture("eval_coverage")
+    const slug = slugForType(before, "external_action")
+    const placed = insertPhaseAt(before, 5, minimalPhaseFor("external_action", slug, 5))
+
+    expect(placed).toHaveLength(before.length + 1)
+    expect(indicesOf(placed)).toEqual([0, 1, 2, 3, 4, 5])
+    expect(placed[5].slug).toBe(slug)
+    // Identity through the one renumbering op: no key gained, none lost.
+    expect(renumber(placed)[5]).toEqual(placed[5])
+    // And it can be taken back out again — R10a does not refuse a step nothing points at.
+    expect(canRemovePhase(placed, slug)).toEqual({ ok: true })
+    expect(removePhase(placed, slug)).toEqual(before)
+  })
+})
+
+// ── Phase 189 (D-23) — the CROSS-LANGUAGE agreement fence ─────────────────────
+//
+// `PhaseTypeId` is a CLIENT MIRROR of a server-owned closed set, and D-23's rule is that
+// the anti-drift guarantee must be MECHANICAL, NOT EDITORIAL. A docblock saying "this
+// mirrors `harness.py`" is a claim; the block below is a check. It reads the server's own
+// source through the `?raw` loader and asserts the two sides name the same members, in
+// the same order — so a `phase_type` renamed, reordered, added or dropped on the server
+// is a RED TEST HERE rather than a 422 in the running app.
+//
+// ⚠ WHY A MIRROR AND NOT A FETCH. `PhaseFormPanel.tsx:~483` says option sets belong to
+// the server, but D-20 deliberately keeps this phase's names OUT of `GroundingBundle`:
+// a new route serving a handful of constants is one refactor away from being reused as
+// an author-facing option source, which is the leak shape 189-04 closed. A fence buys the
+// same anti-drift guarantee for no infrastructure, and `PhaseTypeId` is the shipped
+// precedent for exactly this trade.
+//
+// ⚠ IT WAS OBSERVED RED BEFORE IT WAS TRUSTED. Two wrong fixes were planted into
+// production source and each drove this block red (189-12-SUMMARY.md records both, with
+// their output): an eighth client-only member, and an emitted capability the server's
+// `Literal` does not admit. The positive controls below keep the READER honest in the
+// other direction — an extractor that silently returns nothing would make every
+// assertion here vacuous.
+
+describe("definitionOps — the client mirror agrees with the backend union (D-23)", () => {
+  /** The `PhaseConfig = Annotated[Union[...]]` member classes, in the union's own order. */
+  const unionMemberClasses = (source: string): string[] => {
+    const block = source.match(/PhaseConfig\s*=\s*Annotated\[\s*Union\[([\s\S]*?)\n\s*\],/)
+    if (!block) return []
+    return [...block[1].matchAll(/^\s*([A-Z][A-Za-z0-9_]*)\s*,/gm)].map((m) => m[1])
+  }
+
+  /** The `phase_type: Literal["…"]` a given config class declares. */
+  const discriminatorOf = (source: string, className: string): string | null => {
+    const start = source.indexOf(`class ${className}(`)
+    if (start === -1) return null
+    const body = source.slice(start)
+    const match = body.match(/phase_type:\s*Literal\[\s*"([^"]+)"\s*\]/)
+    return match ? match[1] : null
+  }
+
+  /** The closed `capability` Literal `ExternalActionPhaseConfig` declares. */
+  const backendCapabilities = (source: string): string[] => {
+    const match = source.match(/^\s*capability:\s*Literal\[([^\]]*)\]/m)
+    if (!match) return []
+    return [...match[1].matchAll(/"([^"]+)"/g)].map((m) => m[1])
+  }
+
+  it("reads the server source at all — the fence is not measuring an empty string", () => {
+    // Non-vacuity first. Every assertion below is a comparison against something parsed
+    // out of this string; if the import silently resolved to nothing, all of them would
+    // pass by being empty on both sides.
+    expect(typeof harnessModelsSource).toBe("string")
+    expect(harnessModelsSource.length).toBeGreaterThan(1000)
+    expect(harnessModelsSource).toContain("class ExternalActionPhaseConfig(_StrictBase):")
+  })
+
+  it("carries exactly the backend union's phase_type literals, in the union's order", () => {
+    const classes = unionMemberClasses(harnessModelsSource)
+    const backendTypes = classes.map((cls) => discriminatorOf(harnessModelsSource, cls))
+
+    // The extractor found real members and every one resolved a discriminator — an
+    // unparsed class would otherwise arrive as `null` and quietly weaken the compare.
+    expect(classes.length).toBeGreaterThan(1)
+    expect(backendTypes).not.toContain(null)
+
+    expect(backendTypes).toEqual([...PHASE_TYPE_ORDER])
+  })
+
+  it("its readers are falsifiable — the parsers return nothing on a source without them", () => {
+    // POSITIVE CONTROLS for the two extractors. Without these, a regex that stopped
+    // matching would make the case above green forever.
+    expect(unionMemberClasses("nothing to see here")).toEqual([])
+    expect(discriminatorOf("nothing to see here", "ExternalActionPhaseConfig")).toBeNull()
+    expect(backendCapabilities("nothing to see here")).toEqual([])
+    // And each really does find the shipped thing, so "empty" means absent rather than
+    // broken.
+    expect(unionMemberClasses(harnessModelsSource)).toContain("ExternalActionPhaseConfig")
+    expect(discriminatorOf(harnessModelsSource, "LlmEmitPhaseConfig")).toBe("llm_emit")
+  })
+
+  it("emits a capability the server's closed Literal actually admits", () => {
+    const capabilities = backendCapabilities(harnessModelsSource)
+    const emitted = minimalPhaseFor("external_action", "act", 0).config.capability
+
+    // D-15: the set is EXACTLY THREE, and the client spells ONE of them (the default the
+    // picker then lets the author change). A rename on the server is red here.
+    expect(capabilities).toHaveLength(3)
+    expect(capabilities).toContain(emitted)
+    // ⚠ NOT a substring or a regex: `send_email` and `send_emails` would both pass a
+    // loose compare, and the whole point of a closed set is that near-misses are refused.
+    expect(capabilities.some((name) => name === emitted)).toBe(true)
   })
 })
 

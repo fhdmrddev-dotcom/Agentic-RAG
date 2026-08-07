@@ -117,6 +117,33 @@ const PREVIEW_SLUG = "preview"
 const cardFaceFor = (type: PhaseTypeId): string =>
   nodeTitle(minimalPhaseFor(type, PREVIEW_SLUG, 0))
 
+// ── Phase 189 — the two vocabulary entries the 7th type does not have YET ──────
+//
+// `external_action` became PLACEABLE in plan 189-12 (it joined `PHASE_TYPE_ORDER`, so the
+// picker offers it), while its plain-language vocabulary and its 3D mark belong to LATER
+// plans in the same phase. This file therefore renders a row that is deliberately
+// unfinished, and the two lists below are how that is stated OUT LOUD instead of being
+// papered over with a `?? ""` nobody notices.
+//
+// ⚠ EACH LIST IS FALSIFIABLE, WHICH IS THE ONLY REASON IT IS ALLOWED TO EXIST. The cases
+// that exclude these types also ASSERT that the entry really is missing — so the day the
+// owing plan lands its vocabulary, the exclusion goes RED and has to be emptied. An
+// exclusion nothing re-checks is how a temporary gap becomes permanent (189-08's
+// declined-`PHASE_TYPE_LABEL` slot is pinned by a behavioural test for the same reason).
+//
+// The intermediate state is HONEST rather than wrong, and that was measured, not argued:
+// the picker's own resolvers floor to `?? ""` and `?? DEFAULT_TINT`, and `nodeTitle`
+// echoes the raw discriminator rather than fabricating a sentence, so the row reads
+// `external_action` with the "•" fallback mark — never a made-up promise about what the
+// step does. The same shape 189-08 shipped when `CanvasReading` grew a member the canvas
+// vocabulary had not yet worded.
+
+/** Owed by plan 189-14: `PHASE_TYPE_SENTENCES` + `PHASE_TYPE_SUBTITLES` entries. */
+const TYPES_AWAITING_A_VOCABULARY_ENTRY: readonly PhaseTypeId[] = ["external_action"]
+
+/** Owed by plan 189-13: the `outbox-tray` 3D mark (UI-SPEC §5a). */
+const TYPES_AWAITING_A_3D_MARK: readonly PhaseTypeId[] = ["external_action"]
+
 /**
  * The row's TITLE line, isolated from its subtitle.
  *
@@ -135,14 +162,37 @@ const rowTitle = (type: string): string => {
   return title.textContent ?? ""
 }
 
-// ── 1. Six rows, fixed order, plain language ──────────────────────────────────
+// ── 1. One row per type, fixed order, plain language ──────────────────────────
 
-describe("StepTypePicker — the six choices", () => {
+describe("StepTypePicker — the step-type choices", () => {
   it("renders one row per step type, in the fixed PHASE_TYPE_ORDER", () => {
     renderPicker(twoSteps, 1)
     const order = rows().map((r) => r.getAttribute("data-phase-type"))
-    expect(order).toHaveLength(6)
+    // DERIVED from the order, not re-pinned at 7 (Phase 189): the property is
+    // one-row-per-type, and a literal makes the NEXT type read as a regression. The
+    // element-by-element compare below is what stops a derived length from being weaker.
+    expect(order).toHaveLength(PHASE_TYPE_ORDER.length)
     expect(order).toEqual([...PHASE_TYPE_ORDER])
+  })
+
+  it("offers the 7th type LAST — a bare count would pass an insert (Phase 189)", () => {
+    renderPicker(twoSteps, 1)
+    const order = rows().map((r) => r.getAttribute("data-phase-type"))
+    // POSITION, not presence. `PHASE_TYPE_ORDER` is a fixed presentation tuple precisely
+    // because "the picker's third option moved" is a UX regression, so the row that
+    // arrived must be at the END and every shipped row must still be where it was.
+    expect(order[order.length - 1]).toBe("external_action")
+    expect(order.slice(0, order.length - 1)).toEqual([
+      "programmatic",
+      "llm_single",
+      "llm_agent",
+      "llm_batch_agents",
+      "llm_human_input",
+      "llm_emit",
+    ])
+    // It is a real, pressable row rather than a placeholder: offered, not disabled, in a
+    // definition that strands nothing.
+    expect(screen.getByTestId("step-type-choice-external_action")).not.toBeDisabled()
   })
 
   // RE-DERIVED for WR-03, not deleted. This case previously expected
@@ -219,13 +269,43 @@ describe("StepTypePicker — WR-03: the row is a preview of the card it creates"
   // control silently under-covering. This is what proves the fix moved one row and
   // nothing else, and it is the assertion that catches a future derived tier leaking
   // into the picker unintentionally.
-  const unchangedTypes = PHASE_TYPE_ORDER.filter((type) => type !== "llm_human_input")
+  const unchangedTypes = PHASE_TYPE_ORDER.filter(
+    (type) =>
+      type !== "llm_human_input" && !TYPES_AWAITING_A_VOCABULARY_ENTRY.includes(type),
+  )
 
-  it("leaves the other five rows byte-identical to their D-183-06 type sentence", () => {
-    expect(unchangedTypes).toHaveLength(5)
+  it("leaves every other shipped row byte-identical to its D-183-06 type sentence", () => {
+    // DERIVED: the whole order, minus the one row the WR-03 repair moved, minus the ones
+    // whose sentence has not shipped yet. Re-pinning a literal here is what would let a
+    // future type silently escape the control.
+    expect(unchangedTypes).toHaveLength(
+      PHASE_TYPE_ORDER.length - 1 - TYPES_AWAITING_A_VOCABULARY_ENTRY.length,
+    )
+    // ⚠ THE EXCLUSION IS FALSIFIABLE. Each excluded type must genuinely have NO sentence;
+    // the day plan 189-14 writes one, this line goes RED and the exclusion list has to be
+    // emptied rather than quietly outliving its reason.
+    for (const type of TYPES_AWAITING_A_VOCABULARY_ENTRY) {
+      expect(PHASE_TYPE_SENTENCES[type]).toBeUndefined()
+    }
     renderPicker(twoSteps, 1)
     for (const type of unchangedTypes) {
       expect(rowTitle(type)).toBe(PHASE_TYPE_SENTENCES[type])
+    }
+  })
+
+  it("previews the 7th row from the resolver, never from a fabricated sentence", () => {
+    // Phase 189's honest intermediate state, PINNED so it is a decision rather than an
+    // oversight. `PHASE_TYPE_SENTENCES` has no `external_action` entry until 189-14, and
+    // `nodeTitle`'s floor echoes the raw discriminator. The row therefore previews
+    // exactly what the CARD will say — which is the WR-03 property this whole describe
+    // exists for — and says nothing about the step that is not true.
+    renderPicker(twoSteps, 1)
+    expect(rowTitle("external_action")).toBe(cardFaceFor("external_action"))
+    // Not a promise the client cannot keep: no invented verb, no capability named. The
+    // three capability sentences are 189-14's, and a picker row is the wrong home for a
+    // per-capability claim anyway (the row is keyed by TYPE).
+    for (const invented of ["Sends an email", "Creates a ticket", "Posts a message"]) {
+      expect(rowTitle("external_action")).not.toBe(invented)
     }
   })
 
@@ -250,10 +330,19 @@ describe("StepTypePicker — WR-03: the row is a preview of the card it creates"
     for (const type of PHASE_TYPE_ORDER) {
       const title = rowTitle(type)
       expect(title.length).toBeGreaterThan(0)
-      // The mark slot carries no text (section 7 asserts that separately), and the ⌥
-      // reveal is off with no provider mounted, so the row's whole text is these two.
+      // The mark slot carries no text FOR A TYPE THAT HAS A 3D MARK (section 7 asserts
+      // that, and its own exclusion), and the ⌥ reveal is off with no provider mounted,
+      // so the row's whole text is these two — plus the "•" fallback for a type whose
+      // mark has not shipped.
+      //
+      // ⚠ `?? ""` MIRRORS THE SHIPPED RESOLVER, it is not a test-side patch: the picker
+      // renders `PHASE_TYPE_SUBTITLES[choice.type] ?? ""` (StepTypePicker.tsx), so an
+      // absent subtitle is an EMPTY subtitle line by construction. Writing the lookup
+      // bare here asserted a `undefined` string into the expectation and failed with
+      // `'external_actionundefined'` — a test asserting the resolver's floor is wrong.
+      const mark = TYPES_AWAITING_A_3D_MARK.includes(type) ? "•" : ""
       expect(screen.getByTestId(`step-type-choice-${type}`).textContent).toBe(
-        `${title}${PHASE_TYPE_SUBTITLES[type]}`,
+        `${mark}${title}${PHASE_TYPE_SUBTITLES[type] ?? ""}`,
       )
     }
   })
@@ -261,6 +350,14 @@ describe("StepTypePicker — WR-03: the row is a preview of the card it creates"
   it("the subtitle line is untouched — still PHASE_TYPE_SUBTITLES, still beaten by a refusal", () => {
     const enabled = renderPicker(twoSteps, 1)
     for (const type of PHASE_TYPE_ORDER) {
+      // A type whose subtitle has not shipped renders an EMPTY subtitle line — the
+      // shipped `?? ""` floor. `toHaveTextContent("")` is vacuous, so that case is
+      // asserted as an absence instead, and the absence is re-checked so 189-14's
+      // arrival turns this red rather than sliding past it.
+      if (TYPES_AWAITING_A_VOCABULARY_ENTRY.includes(type)) {
+        expect(PHASE_TYPE_SUBTITLES[type]).toBeUndefined()
+        continue
+      }
       expect(screen.getByTestId(`step-type-choice-${type}`)).toHaveTextContent(
         PHASE_TYPE_SUBTITLES[type],
       )
@@ -367,9 +464,12 @@ describe("StepTypePicker — nothing is ever omitted", () => {
     ["with deliverable, after it", withDeliverable, 3],
     ["out of range", withDeliverable, 99],
     ["negative", withDeliverable, -4],
-  ])("renders exactly six rows: %s", (_name, phases, index) => {
+  ])("renders one row per step type, never fewer: %s", (_name, phases, index) => {
     renderPicker(phases, index)
-    expect(rows()).toHaveLength(6)
+    // DERIVED (Phase 189). The rule R10b states is "nothing is ever hidden" — a refused
+    // choice is disabled WITH its reason, never omitted (139-C). That rule is about the
+    // WHOLE order, not about the number six, and it read `6` until the 7th type landed.
+    expect(rows()).toHaveLength(PHASE_TYPE_ORDER.length)
   })
 })
 
@@ -459,10 +559,29 @@ describe("StepTypePicker — the 3D mark (the locked sketch rule)", () => {
   it("renders an SVG element per row, not a unicode character", () => {
     renderPicker(twoSteps, 1)
     for (const type of PHASE_TYPE_ORDER) {
+      if (TYPES_AWAITING_A_3D_MARK.includes(type)) continue
       const mark = screen.getByTestId(`step-type-mark-${type}`)
       expect(mark.querySelector("svg")).not.toBeNull()
       // No bare glyph fell through: the mark slot carries no text at all.
       expect(mark.textContent).toBe("")
+    }
+    // Non-vacuity: the loop above must still be measuring most of the order.
+    expect(PHASE_TYPE_ORDER.length - TYPES_AWAITING_A_3D_MARK.length).toBeGreaterThan(1)
+  })
+
+  it("falls back to the shipped '•' for a type whose mark has not landed yet", () => {
+    // ⚠ Phase 189's honest intermediate state, PINNED — and falsifiable. `renderPhaseMark`
+    // is TOTAL: an unmapped `phase_type` resolves to the "•" mark rather than throwing or
+    // painting a wrong icon, and 188.1-04 made that a property rather than a claim. The
+    // `outbox-tray` slug is plan 189-13's (UI-SPEC §5a), so the day it lands this case
+    // goes RED and `TYPES_AWAITING_A_3D_MARK` must be emptied with it.
+    renderPicker(twoSteps, 1)
+    for (const type of TYPES_AWAITING_A_3D_MARK) {
+      const mark = screen.getByTestId(`step-type-mark-${type}`)
+      expect(mark.querySelector("svg")).toBeNull()
+      expect(mark.textContent).toBe("•")
+      // Still decorative, and still no wrong icon borrowed from another type.
+      expect(mark).toHaveAttribute("aria-hidden", "true")
     }
   })
 

@@ -40,11 +40,15 @@
  *     so nothing structural was "lifted". Saying otherwise would be the comment that
  *     lies which D-ITEM-183-02 forbids.
  *
- * Mirror of the backend shapes:
- *  - `PhaseSpec` / `PhaseConfig` discriminated union: `backend/app/models/harness.py:52-193`.
- *  - The 6-member closed `phase_type` set is that union's discriminator, and
- *    `WorkflowDefinition` is `extra="forbid"` — which is why `minimalPhaseFor` emits
- *    only the keys its union member REQUIRES.
+ * Mirror of the backend shapes — pointers RE-DERIVED by symbol at Phase 189 (see the
+ * `PhaseTypeId` block below for why they had to be):
+ *  - `PhaseSpec`: `backend/app/models/harness.py:328`.
+ *  - `PhaseConfig` discriminated union: `backend/app/models/harness.py:288-299`.
+ *  - The closed `phase_type` set is that union's discriminator, and `WorkflowDefinition`
+ *    is `extra="forbid"` — which is why `minimalPhaseFor` emits only the keys its union
+ *    member REQUIRES. The member COUNT is deliberately not restated here: it has grown
+ *    twice (5 → 6 at 101.1, 6 → 7 at 189) and a count in prose rots on every additive
+ *    growth, while the rule does not.
  */
 import {
   nodeTitle,
@@ -56,9 +60,28 @@ import {
 // ── The closed phase-type set ──────────────────────────────────────────────────
 
 /**
- * The 6 members of the backend's `PhaseConfig` discriminated union
- * (`harness.py:157-167`). CLOSED: a slug and a minimal phase are only ever derived
+ * The 7 members of the backend's `PhaseConfig` discriminated union
+ * (`harness.py:288-299`). CLOSED: a slug and a minimal phase are only ever derived
  * from this set, never from user text.
+ *
+ * ⚠ THIS IS A MIRROR. The client MIRRORS the server's closed set and never defines it —
+ * the union in `harness.py` is the contract, this is a restatement of its discriminator
+ * so the picker has something to iterate. Two consequences, both deliberate:
+ *
+ *  - A member added here that the server does not carry is a definition the server will
+ *    422. That drift is not left to review: `definitionOps.test.ts` reads
+ *    `harness.py` itself through the same `?raw` loader `PublishGauntlet.test.tsx:46`
+ *    uses for `publish_service.py`, and asserts this union's members are exactly the
+ *    union's `phase_type` literals, IN ORDER. It was observed RED against a planted
+ *    mismatch before it was trusted (Phase 189, D-23's mechanical-not-editorial rule).
+ *  - The line pointer above is re-derived, not inherited. It read `harness.py:157-167`
+ *    from Phase 184 until Phase 189 — stale twice over by then (the union had moved to
+ *    `:162-172` before 189-07's insertions pushed it to `:288-299`). A pointer nothing
+ *    typechecks is a claim, and this one had already rotted; the `?raw` fence is what
+ *    makes the RELATIONSHIP machine-checked even when the LINE NUMBER rots again.
+ *
+ * The 7th member (`external_action`, Phase 189 / CONN-01 / D-01) is APPENDED LAST, the
+ * same additive growth `llm_emit` arrived by at 101.1.
  */
 export type PhaseTypeId =
   | "programmatic"
@@ -67,11 +90,19 @@ export type PhaseTypeId =
   | "llm_batch_agents"
   | "llm_human_input"
   | "llm_emit"
+  | "external_action"
 
 /**
  * The FIXED presentation order of the step-type picker (D-184-11). It is a `readonly`
  * tuple, not a set, because "the picker's third option moved" is a UX regression a
  * test should catch.
+ *
+ * ⚠ IT IS `satisfies`, SO A SUBSET SATISFIES IT. Omitting a member compiles cleanly and
+ * the picker simply never offers that type — the one silent site in this block, and the
+ * reason Phase 189 appended here deliberately rather than waiting to be told. New members
+ * are APPENDED, never inserted: a shipped option changing position is the regression this
+ * tuple exists to catch, and `definitionOps.test.ts` asserts the shipped PREFIX, not just
+ * the length.
  */
 export const PHASE_TYPE_ORDER = [
   "programmatic",
@@ -80,6 +111,7 @@ export const PHASE_TYPE_ORDER = [
   "llm_batch_agents",
   "llm_human_input",
   "llm_emit",
+  "external_action",
 ] as const satisfies readonly PhaseTypeId[]
 
 // ── Internal ordering primitives (both pure, both non-mutating) ─────────────────
@@ -379,9 +411,16 @@ export const STRANDING_REASON =
   "This would come after the deliverable, so the workflow would no longer end with it."
 
 /**
- * R10b — the six choices offered at render position `index`, in the fixed
- * `PHASE_TYPE_ORDER`. **Never fewer than six**: a stranding choice is returned
+ * R10b — EVERY choice in `PHASE_TYPE_ORDER` is offered at render position `index`, in
+ * that fixed order. **Never fewer than the whole set**: a stranding choice is returned
  * DISABLED WITH ITS REASON, never omitted.
+ *
+ * ⚠ This sentence counted — *"the six choices … never fewer than six"* — until Phase 189
+ * appended the 7th type and falsified it, in the commit that falsified it (D-26's
+ * same-commit rule). The PROPERTY is unchanged and is now stated WITHOUT a number,
+ * because the rule is "nothing is ever hidden", not "six": the set has grown twice
+ * (5 → 6 at 101.1, 6 → 7 at 189) and a count in prose rots on every additive growth. The
+ * suite asserts `PHASE_TYPE_ORDER.length` for the same reason.
  *
  * The rule: when the definition already carries an `llm_emit` and `index` lands
  * strictly AFTER the last one's render position, the new step would follow the
@@ -832,6 +871,13 @@ const SLUG_BASE = {
   llm_batch_agents: "parallel",
   llm_human_input: "ask",
   llm_emit: "deliver",
+  // Phase 189 (CONN-01). `act`, not `send`: the base token is keyed by PHASE TYPE, so it
+  // is ONE token for all three capabilities — a `send-` slug would be simply wrong on a
+  // step whose capability is `create_ticket` or `post_message`, the same argument
+  // UI-SPEC §5a used to reject an envelope glyph for this type. It is also the verb the
+  // type's own shipped subtitle uses ("…before it acts outside"), and it claims no send —
+  // which matters in a phase whose whole point (D-05 / D-16) is that nothing is sent yet.
+  external_action: "act",
 } as const satisfies Record<PhaseTypeId, string>
 
 /** The base used for a type outside the closed set (TOTALITY — never user text). */
@@ -865,8 +911,9 @@ export function slugForType(
  * verdicts belong to the server.
  *
  * The `default` arm is the `deriveTier.ts:119-127` runtime-safe exhaustiveness guard:
- * a 7th union member must be handled here, and at runtime an unmodelled type yields
- * the bare discriminator rather than throwing.
+ * the NEXT union member must be handled here (it forced the 7th, at Phase 189, exactly
+ * as intended), and at runtime an unmodelled type yields the bare discriminator rather
+ * than throwing.
  */
 function requiredConfigFor(type: PhaseTypeId): Record<string, unknown> {
   switch (type) {
@@ -882,6 +929,35 @@ function requiredConfigFor(type: PhaseTypeId): Record<string, unknown> {
       return { prompt: "" }
     case "llm_emit":
       return { prompt: "" }
+    case "external_action":
+      // Phase 189 (CONN-01 / D-01). `capability` is the ONE required key. Measured from
+      // `ExternalActionPhaseConfig` rather than remembered: `available_tools` carries
+      // `Field(default_factory=list)` AND is DERIVED from `capability` server-side by a
+      // total-replacement validator (D-03), so emitting it here would re-materialise a
+      // backend default — the drift R2's round-trip property exists to catch — and would
+      // state a whitelist the client is not permitted to author. `phase_type` is the
+      // discriminator `minimalPhaseFor` adds; there is no third field, by decision (the
+      // member deliberately carries none of the five LLM shape-symmetry optionals).
+      //
+      // ⚠ AND IT CARRIES A REAL VALUE, unlike the empty-string placeholders above — the
+      // one place this switch departs from its own register, so the reason is stated
+      // rather than left to be re-derived. `prompt` and `fn` are plain `str`: an empty
+      // one PARSES, and whether it PUBLISHES is a verdict the server owns. `capability`
+      // is a closed `Literal` of exactly three (D-15), so `""` is not an unfilled
+      // placeholder — it is a `ValidationError` that 422s the WHOLE definition the moment
+      // the draft is saved, i.e. the step could be placed and then never stored, which
+      // would falsify SC#1 ("a user can place the node") in the same breath as satisfying
+      // it. The FIRST member of the backend `Literal` is emitted instead, so a placed
+      // step is a VALID step.
+      //
+      // The name is not trusted, it is FENCED: `definitionOps.test.ts` reads the
+      // `capability` Literal out of `harness.py` and asserts this value is a member of
+      // it, so a rename on the server is a red test here rather than a 422 in the app.
+      // Which capability an author actually wants is the picker's question (189-13); the
+      // node face reads the stored value and falls through honestly when it does not
+      // recognise it (UI-SPEC §7b), so nothing downstream depends on this being the
+      // author's intent.
+      return { capability: "send_email" }
     default: {
       const _never: never = type
       void _never

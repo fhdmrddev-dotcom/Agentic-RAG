@@ -25,7 +25,7 @@ import { fireEvent, render, screen, within } from "@testing-library/react"
 
 import phaseFormPanelSource from "./PhaseFormPanel?raw"
 import { PhaseFormPanel, type PhaseFormRails, type PhaseGateRow } from "./PhaseFormPanel"
-import { GOVERNANCE_GATE_ROW_LABEL } from "./definitionOps"
+import { GOVERNANCE_GATE_ROW_LABEL, minimalPhaseFor, PHASE_TYPE_ORDER } from "./definitionOps"
 import type { PhaseSpecJSON } from "./phaseVocabulary"
 
 function phaseOf(config: Record<string, unknown>): PhaseSpecJSON {
@@ -362,12 +362,16 @@ describe("PhaseFormPanel rails — the per-type conditioning is unchanged WITH r
   })
 
   it("citation_policy still appears ONLY on the deliverable", () => {
-    const nonEmit = ["programmatic", "llm_single", "llm_agent", "llm_batch_agents", "llm_human_input"]
+    // DERIVED (Phase 189) — same decision as the sibling case in `PhaseFormPanel.test.tsx`:
+    // "ONLY on the deliverable" is a claim about every other type, so the 7th belongs in
+    // the subset, and `minimalPhaseFor` keeps each config valid without an `if` ladder.
+    // ⚠ `toolOptions` is passed UNCHANGED and is NOT widened: the three capability names
+    // must never reach an author-facing tool rail (D-20/D-22), and scoping that rail away
+    // from `external_action` is plan 189-13's job (`D-189-DEF-02`), not this loop's.
+    const nonEmit = PHASE_TYPE_ORDER.filter((type) => type !== "llm_emit")
+    expect(nonEmit).toHaveLength(PHASE_TYPE_ORDER.length - 1)
     for (const pt of nonEmit) {
-      const config: Record<string, unknown> = { phase_type: pt }
-      if (pt === "programmatic") config.fn = "f"
-      else config.prompt = "x"
-      if (pt === "llm_agent" || pt === "llm_batch_agents") config.available_tools = []
+      const config = minimalPhaseFor(pt, "some-slug", 0).config
       const { unmount } = renderPanel(config, railsOf({ toolOptions: ["search_documents"] }))
       expect(screen.queryByLabelText(/sourcing strictness/i)).not.toBeInTheDocument()
       expect(screen.queryByLabelText(/file check/i)).not.toBeInTheDocument()
