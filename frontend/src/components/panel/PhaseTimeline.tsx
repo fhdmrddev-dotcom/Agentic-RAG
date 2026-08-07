@@ -53,7 +53,19 @@ function activePhaseIndex(phases: Phase[]): number {
   return 0
 }
 
-/** Plain-language milestone for the announcer (one sentence per transition edge). */
+/**
+ * Plain-language milestone for the announcer (one sentence per transition edge).
+ *
+ * ⚠ THIS SWITCH IS SILENT TO A WIDENED `Phase["status"]`. It carries a `default:` arm, so
+ * a new member does NOT become a typecheck error here the way it does in `PhaseCard`'s
+ * `STATUS_META` — it simply announces nothing, and a screen-reader user is told a step
+ * reached a terminal by hearing nothing at all. That is why 189's arm below was added from
+ * a written list of consumers rather than from a compiler run: only the list finds it.
+ * Recorded so the next widening does not have to rediscover it.
+ *
+ * The `default:` arm STAYS. Silence is the correct announcement for a state this component
+ * has no sentence for; inventing one would be the announcer's version of a fail-open.
+ */
 function milestoneFor(phase: Phase | undefined, total: number): string {
   if (!phase) return ""
   const ordinal = `Phase ${phase.phaseIndex + 1} of ${total}`
@@ -68,6 +80,12 @@ function milestoneFor(phase: Phase | undefined, total: number): string {
       return `${ordinal}, ${phase.slug}, retrying`
     case "skipped":
       return `${ordinal}, ${phase.slug}, skipped`
+    // Phase 189 Plan 08 (CONN-01 / D-07) — the governed external action's terminal, in the
+    // shipped pattern: ordinal, slug, then the state. It ends in the panel's own harness
+    // words and must not be spoken as `complete`; announcing a step that deliberately sent
+    // nothing as finished is the same fail-open one language layer up.
+    case "recorded-not-sent":
+      return `${ordinal}, ${phase.slug}, not sent`
     default:
       return ""
   }

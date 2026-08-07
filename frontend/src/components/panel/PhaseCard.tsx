@@ -49,6 +49,26 @@ const PHASE_TYPE_LABEL: Record<string, PhaseTypeMeta> = {
 }
 const UNKNOWN_PHASE_META: PhaseTypeMeta = { label: "Step", glyph: "•", oneLiner: "A workflow step ran." }
 
+// ⚠ DECLINED AT PHASE 189, AND THE DECLINATION IS RECORDED HERE RATHER THAN LEFT TO BE
+// DISCOVERED LATER (CONN-01). Phase 189 added a SEVENTH `phase_type` — the governed
+// external action — and deliberately did NOT add a seventh entry to this table.
+//
+// The table already declines one: `llm_emit` shipped at Phase 101.1 and was never given a
+// row, so an emit step has always degraded to the honest generic `UNKNOWN_PHASE_META`
+// ("Step") above. That degradation is the table's DESIGN, stated in its own header — this
+// map owns five labels and everything else reads as a generic step, which is why the
+// renderer never crashes on an unrecognised discriminator. Adding 189's type here would
+// invent a panel vocabulary for a type the panel never gained one for, and would leave the
+// table declining exactly one type for no stated reason — worse than declining two for a
+// reason anyone can read. The step's real vocabulary lives on the canvas, which is where
+// D-13's naming ladder renders it.
+//
+// ⚠ `STATUS_META` below is a DIFFERENT TABLE and is NOT declinable: it is declared
+// `Record<Phase["status"], StatusMeta>`, so the compiler forces a row. Declining a slot is
+// a decision that is only available where the compiler leaves one open. This one is keyed
+// by `Record<string, …>` and pinned by a test asserting its entry COUNT, so the declination
+// is mechanical rather than merely commented.
+
 /**
  * The phase-type row. TOTAL: anything this table does not OWN reads as the generic
  * unknown meta.
@@ -98,6 +118,38 @@ const STATUS_META: Record<Phase["status"], StatusMeta> = {
   // (≥3:1) and stays on the glyph + the card border below (UI-SPEC §Color).
   retrying: { glyph: "↻", text: "Attempt", textClass: "text-accent-violet-text" },
   skipped: { glyph: "⤳", text: "Skipped", textClass: "text-panel-muted-foreground" },
+  // Phase 189 Plan 08 (CONN-01 / D-07) — ADDED, nothing above changed.
+  // This row exists because the compiler demanded it: `Phase["status"]` gained
+  // `"recorded-not-sent"` so the governed external-action step's terminal could stop being
+  // absorbed by `done`, and `Record<Phase["status"], …>` then forced the developer panel to
+  // state that honestly too. That forcing is the mechanism, not collateral damage — it was
+  // observed as a real TS2741 on this table before this row was written.
+  //
+  // WHY NOT REUSE A SHIPPED WORD: none of the six above is true of this state. `Complete`
+  // claims the send happened, `Failed` claims something went wrong, `Skipped` claims the
+  // step did not run — and it DID run, and a person DID approve it. D-07 requires the
+  // not-sent state be distinct from passed and done at every surface it renders.
+  //
+  // The glyph below is INHERITED from the unicode arrow set rather than invented, and it was
+  // CHOSEN BY MEASUREMENT: it appears ZERO times across `frontend/src` today, so it arrives
+  // carrying no other meaning. The obvious alternative — the circled-slash mark — was
+  // rejected although it reads well, because it already means CANCELLED on the run band
+  // (`pages/WorkflowRunPage.tsx`) and *no longer offered* in the admin model-discovery
+  // panel, and one glyph carrying two meanings is what the icon convention forbids. That
+  // rejected mark is NOT re-spelled in this comment on purpose: its occurrence COUNT in
+  // this file is the evidence for the claim, and prose that spells it makes the count
+  // unreadable (the 187-24 lesson). It is asserted against by name in the suite instead.
+  // `text-panel-muted-foreground` is the same AA-cleared muted token
+  // `pending`/`skipped`/`unknown` already use: this is a quiet terminal, not an alarm, and
+  // spending a warning colour on a step that behaved exactly as designed would read as a
+  // fault the run never raised.
+  //
+  // ⚠ THE PANEL KEEPS ITS OWN VOCABULARY. `Not sent` here and the canvas's business
+  // sentence for the same state are two words for one state, which is CORRECT and is a
+  // shipped rule (`lib/phaseState.ts` — the panel has harness words, the canvas has
+  // business words, and only the DERIVATION is shared). The canvas sentence is deliberately
+  // not repeated in this file.
+  "recorded-not-sent": { glyph: "↛", text: "Not sent", textClass: "text-panel-muted-foreground" },
   // Phase 188 Plan 02 (RUNVIZ-02 / D-188-08 / D-188-06) — ADDED, nothing above changed.
   // This row exists because the compiler demanded it: `Phase["status"]` gained
   // `"unknown"` so `reconcilePhases` could stop resolving an unrecognised

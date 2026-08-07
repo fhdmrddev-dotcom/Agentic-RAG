@@ -309,7 +309,18 @@ const BASELINE = {
   // printed `PhaseNodeCard.test.tsx 124 128 +4`).
   "PhaseNodeCard.test.tsx": 128,
   "PhaseNode.test.tsx": 26,
-  "PhaseTimeline.test.tsx": 10,
+  // 189-08 (CONN-01 / D-07): 10 → 17. An EXTENSION, not a lowering — no `it(` was deleted,
+  // renamed or moved. The +7 are the panel half of the governed not-sent terminal: the new
+  // STATUS_META row rendering its own glyph and exact text, the D-07 non-collision case
+  // (string INEQUALITY against all seven shipped panel words — never `toContain("Not")`,
+  // which is ambiguous across surfaces), the WR-04 floor re-pinned now that the table has
+  // grown, the PHASE_TYPE_LABEL DECLINATION pinned rather than merely commented, and three
+  // announcer cases (the new sentence, a `complete` positive control, and the `default:`
+  // silence for a status the switch cannot name). Four wrong fixes were planted and each
+  // observed RED — most sharply PLANT N ("the not-sent word must not be Complete"), which
+  // is this phase's stated failure mode. Read from this script's own `actual` column.
+  // ⚠ Moved in the SAME COMMIT as the tests (S2).
+  "PhaseTimeline.test.tsx": 17,
   // 188 code-review fix pass (CR-06): 12 → 17. An EXTENSION, not a lowering. The five
   // added cases falsify the fail-open that survived ONE FUNCTION AWAY from the one 188-02
   // closed: the live branch's `i < current ? "done"` painted a `skipped` row Complete (or

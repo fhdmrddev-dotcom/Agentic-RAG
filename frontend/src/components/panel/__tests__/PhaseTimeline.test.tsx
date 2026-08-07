@@ -60,7 +60,12 @@ vi.mock("@/lib/api", async () => {
   }
 })
 
-import { replayFixture } from "./replayHarness"
+import { replayFixture, resetStore } from "./replayHarness"
+// 189-08: the store the timeline reads, seeded directly for the announcer cases. The
+// fixture wire path cannot carry the new status without a producer that emits it, and the
+// announcer is a property of the RENDER, not of the demux. Its own import line — the same
+// ADDED-lines rule the 188.1-04 import above records.
+import { useStreamsStore } from "@/stores/streamsStore"
 import { PhaseTimeline } from "../PhaseTimeline"
 // 188.1-04: the ROW the timeline renders, imported directly for the WR-04 site-2/3
 // falsifications. Its own import statement rather than a widening of the line above —
@@ -274,5 +279,181 @@ describe("panel/PhaseCard 188.1-04 — WR-04 sites 2 and 3: the lookups are tota
     expect(declaredText).toContain("Unknown")
     expect(declaredText).toContain("?")
     expect(protoText).toBe(declaredText)
+  })
+})
+
+// ── 189-08 · CONN-01 / D-07 — the panel's own word for the governed not-sent terminal ──
+
+/**
+ * D-07 requires the not-sent state to be distinct from passed and done AT EVERY SURFACE it
+ * renders. This is the DEVELOPER PANEL's surface, and it speaks the panel's own harness
+ * vocabulary (`Not sent`), not the canvas's business sentence — two vocabularies, one
+ * derivation, which is `lib/phaseState.ts`'s shipped rule and not a slip.
+ *
+ * ⚠ EXACT-MATCH ASSERTIONS THROUGHOUT, deliberately. The canvas's word for this state
+ * shares the prefix `"Not "` with a shipped reading, so a `toContain("Not")` here would be
+ * ambiguous the moment anyone reads across surfaces. Non-collision is asserted as string
+ * INEQUALITY against every word this panel already ships.
+ *
+ * The status atom is read out of the header rather than by importing `STATUS_META`, which
+ * is module-private — the same constraint `lib/phaseState.test.ts:80-85` records. Reading
+ * the rendered DOM also measures the thing that matters: what a person is actually told.
+ */
+/** The status atom's [glyph, text] as rendered — the `ml-auto` span in the header. */
+function statusAtomOf(container: HTMLElement): [string, string] {
+  const atom = container.querySelector("button span.ml-auto")
+  const parts = Array.from(atom?.children ?? []).map((el) => el.textContent ?? "")
+  return [parts[0] ?? "", parts[1] ?? ""]
+}
+
+/** Every status word this panel already ships, for the D-07 non-collision assertion. */
+const SHIPPED_PANEL_WORDS = [
+  "Locked",
+  "Running",
+  "Complete",
+  "Failed",
+  "Attempt",
+  "Skipped",
+  "Unknown",
+]
+
+describe("panel/PhaseCard 189-08 — the not-sent terminal has its OWN word and glyph", () => {
+  it("renders the declared row: the ↛ glyph and the exact text `Not sent`", () => {
+    const { container } = render(
+      <PhaseCard phase={basePhase({ status: "recorded-not-sent" })} position={0} />,
+    )
+    const [glyph, text] = statusAtomOf(container)
+    expect(text).toBe("Not sent")
+    expect(glyph).toBe("↛")
+    // POSITIVE CONTROL for the reader itself — a shipped row is read the same way, so the
+    // two assertions above are measuring the atom and not an empty selector.
+    const done = render(<PhaseCard phase={basePhase({ status: "done" })} position={0} />)
+    expect(statusAtomOf(done.container)).toStrictEqual(["✓", "Complete"])
+  })
+
+  it("collides with NO shipped panel word — D-07's binding constraint, asserted exactly", () => {
+    const { container } = render(
+      <PhaseCard phase={basePhase({ status: "recorded-not-sent" })} position={0} />,
+    )
+    const [glyph, text] = statusAtomOf(container)
+    for (const word of SHIPPED_PANEL_WORDS) {
+      expect(text, `the not-sent word must not be ${word}`).not.toBe(word)
+    }
+    // …and specifically not the two D-07 names: it must not read as success, and it must
+    // not be confusable with the state that is still under way.
+    expect(text).not.toBe("Complete")
+    expect(text).not.toBe("Running")
+    // The GLYPH is distinct too — a shared glyph would re-collide what the words separate.
+    // `⊘` is the one it would plausibly have reused; it already means CANCELLED elsewhere.
+    expect(glyph).not.toBe("⊘")
+    expect(glyph).not.toBe("✓")
+    // POSITIVE CONTROL — the comparison really can find equality, so seven inequalities
+    // above are seven measurements.
+    const doneCard = render(<PhaseCard phase={basePhase({ status: "done" })} position={0} />)
+    expect(SHIPPED_PANEL_WORDS).toContain(statusAtomOf(doneCard.container)[1])
+  })
+
+  it("keeps the fail-closed floor: an INHERITED key still reads Unknown, not Not sent", () => {
+    // The growth must not have widened what the WR-04 guard lets through. `STATUS_META`
+    // gained a key; its own-property guard is what stops an inherited name resolving to a
+    // FUNCTION, and the fallback is still the declared `unknown` row — never the new one,
+    // and never a claim of success.
+    const proto = render(
+      <PhaseCard
+        phase={basePhase({ status: "constructor" as unknown as Phase["status"] })}
+        position={0}
+      />,
+    )
+    const [protoGlyph, protoText] = statusAtomOf(proto.container)
+    expect(protoText).toBe("Unknown")
+    expect(protoText).not.toBe("Not sent")
+    expect(protoGlyph).not.toBe("↛")
+  })
+
+  it("DECLINES a seventh PHASE_TYPE_LABEL entry — the 7th phase_type reads as the generic Step", () => {
+    // Phase 189 deliberately added no row for its new `phase_type`. The declination is
+    // PINNED here rather than merely commented: adding a seventh entry makes this RED.
+    // `running` so the type label renders — the panel shows it on the active step only.
+    const seventh = render(
+      <PhaseCard
+        phase={basePhase({ phaseType: "external_action", status: "running" })}
+        position={0}
+      />,
+    )
+    const seventhText = headerTextOf(seventh.container)
+    seventh.unmount()
+
+    const ordinary = render(
+      <PhaseCard phase={basePhase({ phaseType: "llm_time_travel", status: "running" })} position={0} />,
+    )
+    const ordinaryText = headerTextOf(ordinary.container)
+    ordinary.unmount()
+
+    // POSITIVE CONTROL: the generic row really does render the declared unknown meta.
+    expect(ordinaryText).toContain("Step")
+    expect(ordinaryText).toContain("•")
+    expect(seventhText).toBe(ordinaryText)
+  })
+})
+
+/**
+ * The announcer is the SILENT consumer — `milestoneFor` is a switch with a `default:` arm,
+ * so a widened `Phase["status"]` produces no typecheck error there and a screen-reader user
+ * would simply be told nothing when the step reached its terminal. It was found from a
+ * written list of consumers, not from a compiler run, and it is pinned here for that reason.
+ *
+ * Driven through the REAL `PhaseTimeline` over the REAL store rather than by calling the
+ * private switch: the announcer only writes on a transition EDGE for the ACTIVE phase, so a
+ * unit call would have proved the sentence exists without proving it is ever spoken.
+ */
+describe("panel/PhaseTimeline 189-08 — the announcer states the not-sent terminal", () => {
+  it("announces `not sent` for the new terminal, and never `complete`", async () => {
+    resetStore()
+    useStreamsStore.getState().actions.replacePhasesForThread(THREAD, [
+      { slug: "draft", phaseIndex: 0, phaseType: "llm_single", status: "done", subAgents: [], pendingAsk: null },
+      { slug: "notify", phaseIndex: 1, phaseType: "external_action", status: "recorded-not-sent", subAgents: [], pendingAsk: null },
+    ])
+    render(<PhaseTimeline threadId={THREAD} />)
+
+    const announcer = await screen.findByRole("status")
+    expect(announcer.textContent).toBe("Phase 2 of 2, notify, not sent")
+    expect(announcer.textContent).not.toContain("complete")
+  })
+
+  it("POSITIVE CONTROL — the same seam announces `complete` for a done terminal", async () => {
+    // Without this, the case above is consistent with an announcer that says whatever the
+    // last arm returns. The two sentences must differ, in the same shipped pattern.
+    resetStore()
+    useStreamsStore.getState().actions.replacePhasesForThread(THREAD, [
+      { slug: "draft", phaseIndex: 0, phaseType: "llm_single", status: "done", subAgents: [], pendingAsk: null },
+      { slug: "notify", phaseIndex: 1, phaseType: "external_action", status: "done", subAgents: [], pendingAsk: null },
+    ])
+    render(<PhaseTimeline threadId={THREAD} />)
+
+    const announcer = await screen.findByRole("status")
+    expect(announcer.textContent).toBe("Phase 2 of 2, notify, complete")
+  })
+
+  it("stays SILENT for a status it has no sentence for — the default: arm is the floor", async () => {
+    resetStore()
+    useStreamsStore.getState().actions.replacePhasesForThread(THREAD, [
+      {
+        slug: "notify",
+        phaseIndex: 0,
+        phaseType: "external_action",
+        status: "constructor" as unknown as Phase["status"],
+        subAgents: [],
+        pendingAsk: null,
+      },
+    ])
+    render(<PhaseTimeline threadId={THREAD} />)
+
+    // Silence, not an invented sentence. The announcer element is still PRESENT (the
+    // shipped a11y contract) and simply carries nothing — which is the correct claim to
+    // make about a state this component cannot name.
+    const announcer = await screen.findByRole("status")
+    expect(announcer.textContent).toBe("")
+    expect(announcer.textContent).not.toContain("complete")
+    expect(announcer.textContent).not.toContain("not sent")
   })
 })
