@@ -1016,8 +1016,31 @@ export interface Phase {
    *  never inferred from an unrecognised value (`reconcilePhases` resolved it to `done`
    *  until this member existed). Widening this union is the MECHANISM, not a side
    *  effect: `STATUS_META` is `Record<Phase["status"], StatusMeta>`, so the compiler
-   *  forces every reader to state the honest unknown too. */
-  status: "pending" | "running" | "done" | "failed" | "retrying" | "skipped" | "unknown"
+   *  forces every reader to state the honest unknown too.
+   *
+   *  Phase 189 Plan 08 (CONN-01 / D-07 / D-17) — `"recorded-not-sent"` is ADDITIVE by the
+   *  same mechanism and for the same reason. The governed external-action step reaches a
+   *  terminal the six members above cannot state: it is not `done` (nothing was sent), not
+   *  `failed` (nothing went wrong) and not `skipped` (the step DID run and a person DID
+   *  approve it). Giving it its own member is what stops it being absorbed by one of those
+   *  three, and widening the union is again the MECHANISM — the exhaustive
+   *  `Record<Phase["status"], …>` in the developer panel becomes a typecheck error until
+   *  the panel states the new terminal in its own words.
+   *
+   *  ⚠ D-17 — THE SPELLING HERE IS THE CLIENT'S, NOT THE DATABASE'S. Postgres stores the
+   *  snake_case SLUG (migration 115 widened `workflow_phases_status_check`); this union
+   *  carries the kebab-case client member, exactly as `active`/`completed` already map to
+   *  `running`/`done`. The rendered sentence a person reads is a third spelling again and
+   *  lives in the vocabulary layers, never here. */
+  status:
+    | "pending"
+    | "running"
+    | "done"
+    | "failed"
+    | "retrying"
+    | "skipped"
+    | "recorded-not-sent"
+    | "unknown"
   attempt?: number
   error?: string
   subAgents: TaskRunIndexItem[]

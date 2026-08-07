@@ -59,9 +59,14 @@ function mkPhase(overrides: Partial<Phase> = {}): Phase {
 }
 
 /**
- * The seven paintable readings, declared as an EXHAUSTIVE `Record<CanvasReading, …>`
- * so the compiler — not this comment — is what keeps the list in step with the union.
- * Adding an eighth reading without touching this file is a typecheck error.
+ * The paintable readings, declared as an EXHAUSTIVE `Record<CanvasReading, …>` so the
+ * compiler — not this comment — is what keeps the list in step with the union. Adding a
+ * reading without touching this file is a typecheck error.
+ *
+ * 189-08 (CONN-01 / D-07): the forcing FIRED. `"recorded-not-sent"` was added to
+ * `CanvasReading` and this table stopped typechecking until the row below landed —
+ * recorded here because that is the mechanism the union widening exists for, and an
+ * unrecorded forcing looks identical to a table someone remembered to update.
  */
 const PAINTABLE_TABLE: Record<CanvasReading, true> = {
   "not-started": true,
@@ -70,6 +75,7 @@ const PAINTABLE_TABLE: Record<CanvasReading, true> = {
   failed: true,
   skipped: true,
   "waiting-for-you": true,
+  "recorded-not-sent": true,
   unknown: true,
 }
 const PAINTABLE = new Set<string>(Object.keys(PAINTABLE_TABLE))
@@ -91,6 +97,7 @@ const ALL_PHASE_STATUSES: Record<Phase["status"], true> = {
   failed: true,
   retrying: true,
   skipped: true,
+  "recorded-not-sent": true,
   unknown: true,
 }
 const PHASE_STATUSES = Object.keys(ALL_PHASE_STATUSES) as Phase["status"][]
@@ -103,13 +110,20 @@ const EXPECTED_READING: Record<Phase["status"], CanvasReading> = {
   done: "done",
   failed: "failed",
   skipped: "skipped",
+  // 189-08 (D-07): its own reading, spelled identically to its status. NOT `done`.
+  "recorded-not-sent": "recorded-not-sent",
   unknown: "unknown",
 }
 
 /**
- * The five `workflow_phases_status_check` values, each with the client status it maps
- * to and the reading the canvas then paints. One table drives totality AND parity, so
- * the two blocks cannot disagree about what the server can send.
+ * The `workflow_phases_status_check` values, each with the client status it maps to and
+ * the reading the canvas then paints. One table drives totality AND parity, so the two
+ * blocks cannot disagree about what the server can send.
+ *
+ * The sixth row arrived with migration 115 (189-06). ⚠ Its first column is the SNAKE_CASE
+ * DATABASE SLUG and its second is the KEBAB CLIENT MEMBER — D-17, and they are different
+ * spellings on purpose. A row that used one spelling for both would be testing a map that
+ * does not exist.
  */
 const DB_TABLE = [
   ["pending", "pending", "not-started"],
@@ -117,6 +131,7 @@ const DB_TABLE = [
   ["completed", "done", "done"],
   ["failed", "failed", "failed"],
   ["skipped", "skipped", "skipped"],
+  ["recorded_not_sent", "recorded-not-sent", "recorded-not-sent"],
 ] as const satisfies ReadonlyArray<readonly [string, Phase["status"], CanvasReading]>
 
 // Unmapped inputs, ASSEMBLED so this file's source carries no bare status literal a
@@ -186,6 +201,74 @@ describe("phaseStatusFromDb — total over every string, and never claims succes
   })
 })
 
+// ── 1b. THE SIXTH SLUG (Phase 189 Plan 08 — CONN-01 / D-07 / D-17) ──────────────
+//
+// ⚠ THE BASELINE THIS BLOCK SUPERSEDES, MEASURED BEFORE IT WAS WRITTEN. At HEAD, the
+// slug missed `phaseStatusFromDb`'s own-property guard, resolved to `unknown`, fell
+// through `canvasReading`'s `default:` to `unknown`, and rendered as the canvas's honest
+// unknown word — NEVER as success. That is why migration 115 was free to land a wave
+// ahead of any client vocabulary, and it is the floor these cases must not regress into a
+// claim of success. The observation was driven (a temporary probe asserting
+// `phaseStatusFromDb("recorded_not_sent") === "unknown"` PASSED against this tree) and is
+// recorded in `189-08-SUMMARY.md`.
+//
+// Both NEGATIVES are asserted explicitly. Asserting only the positive would still pass if
+// the value were ALSO aliased to `done` somewhere — which is exactly this phase's stated
+// failure mode: a governed step that sent nothing reading as one that succeeded.
+
+describe("the sixth DB slug — its OWN status, neither success nor unreadable", () => {
+  it("resolves to its own client member, and explicitly NOT to done or unknown", () => {
+    expect(phaseStatusFromDb("recorded_not_sent")).toBe("recorded-not-sent")
+    expect(
+      phaseStatusFromDb("recorded_not_sent"),
+      "a step that deliberately sent nothing must never read as one that succeeded",
+    ).not.toBe("done")
+    expect(
+      phaseStatusFromDb("recorded_not_sent"),
+      "the slug is now RECOGNISED — leaving it on the unknown floor would lose D-07",
+    ).not.toBe("unknown")
+  })
+
+  it("keeps the unknown FLOOR intact for a status nobody ships", () => {
+    // The floor is the half of D-07 that a widening is likeliest to quietly delete: it is
+    // tempting to read "the map is now complete" as "the fallback is now dead code".
+    expect(phaseStatusFromDb("a_status_nobody_ships")).toBe("unknown")
+    expect(phaseStatusFromDb("a_status_nobody_ships")).not.toBe("done")
+    expect(phaseStatusFromDb("a_status_nobody_ships")).not.toBe("recorded-not-sent")
+    // …and the same floor one derivation further on: an unrecognised status still paints
+    // as the unknown reading, never as the new one and never as success.
+    const unrecognised = canvasReading(
+      mkPhase({ status: "a_status_nobody_ships" as unknown as Phase["status"] }),
+    )
+    expect(unrecognised).toBe("unknown")
+    expect(unrecognised).not.toBe("done")
+    expect(unrecognised).not.toBe("recorded-not-sent")
+  })
+
+  it("paints its OWN reading — and a pending ask still outranks it", () => {
+    expect(canvasReading(mkPhase({ status: "recorded-not-sent" }))).toBe("recorded-not-sent")
+    expect(canvasReading(mkPhase({ status: "recorded-not-sent" }))).not.toBe("done")
+    // The precedence ABOVE the switch is unchanged by the new arm. A step blocked on the
+    // user is blocked on the user whatever its row says — including this row.
+    expect(
+      canvasReading(mkPhase({ status: "recorded-not-sent", pendingAsk: "Which supplier?" })),
+    ).toBe("waiting-for-you")
+  })
+
+  it("still refuses an INHERITED prototype key now that the map has grown", () => {
+    // Pinned again HERE, beside the growth, rather than trusted from the block above: the
+    // own-property guard is what makes `DB_PHASE_STATUS` safe to enlarge at all, and a
+    // future widening that "simplifies" it back to `TABLE[raw] ?? "unknown"` would pass
+    // every positive case in this file and hand back `[Function Object]` for this one.
+    expect(phaseStatusFromDb(PROTOTYPE_KEY)).toBe("unknown")
+    expect(phaseStatusFromDb(PROTOTYPE_KEY)).not.toBe("recorded-not-sent")
+    expect(typeof phaseStatusFromDb(PROTOTYPE_KEY)).toBe("string")
+    // POSITIVE CONTROL — the inherited member really is reachable by index on a plain
+    // object literal, so the refusal above is a measurement.
+    expect((DB_PHASE_STATUS as Record<string, unknown>)[PROTOTYPE_KEY]).toBeDefined()
+  })
+})
+
 // ── 2. THE Req-4 SUBSET PROPERTY (D-188-03) ─────────────────────────────────────
 
 describe("canvasReading — the canvas can only paint what a reconcile can restore", () => {
@@ -196,7 +279,9 @@ describe("canvasReading — the canvas can only paint what a reconcile can resto
       ...(Object.values(DB_PHASE_STATUS) as Phase["status"][]),
       "unknown",
     ])
-    expect(RECONCILABLE.size).toBe(6)
+    // 6 → 7 at 189-08: the sixth CHECK literal maps to a sixth distinct client status,
+    // plus the honest fallback. Derived from the shipped map, so it moves with it.
+    expect(RECONCILABLE.size).toBe(7)
     for (const status of RECONCILABLE) {
       expect(PAINTABLE.has(canvasReading(mkPhase({ status })))).toBe(true)
     }
@@ -207,7 +292,7 @@ describe("canvasReading — the canvas can only paint what a reconcile can resto
     // POSITIVE CONTROL — the membership check does find a reading that IS in the set,
     // so the absence above is a measurement and not a broken assertion.
     expect([...PAINTABLE]).toContain("running")
-    expect(PAINTABLE.size).toBe(7)
+    expect(PAINTABLE.size).toBe(8) // 7 → 8 at 189-08 (D-07)
   })
 
   it("makes retrying INDISTINGUISHABLE from running by construction (D-188-03)", () => {
@@ -297,18 +382,20 @@ describe("parity — two vocabularies, ONE derivation", () => {
     })
   }
 
-  it("keeps the panel's union and the canvas's readings the same SIZE, seven each", () => {
+  it("keeps the panel's union and the canvas's readings the same SIZE, eight each", () => {
     // Not the same VALUES — that is the point of D-188-02. The panel says one thing
     // about a step the engine has not unlocked and the canvas says another; both are
     // functions of one derivation. Equal cardinality is the shape of that mapping.
-    expect(PHASE_STATUSES).toHaveLength(7)
-    expect(PAINTABLE.size).toBe(7)
+    // 7 → 8 at 189-08: BOTH unions grew by exactly one, together, which is what keeps
+    // the mapping a mapping rather than letting the canvas quietly lose a state.
+    expect(PHASE_STATUSES).toHaveLength(8)
+    expect(PAINTABLE.size).toBe(8)
     // …and the mapping is NOT the identity: two statuses collapse into one reading,
     // so one reading has no status of its own.
-    expect(new Set(Object.values(EXPECTED_READING)).size).toBe(6)
+    expect(new Set(Object.values(EXPECTED_READING)).size).toBe(7)
   })
 
-  it("exposes exactly the five workflow_phases_status_check keys, no more", () => {
+  it("exposes exactly the workflow_phases_status_check keys, no more", () => {
     expect(Object.keys(DB_PHASE_STATUS).sort()).toStrictEqual(
       DB_TABLE.map((r) => r[0])
         .slice()

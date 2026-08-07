@@ -32,11 +32,29 @@ import type { Phase } from "@/types"
  * B): map a DB-native `workflow_phases.status` to the client `Phase["status"]` union
  * the developer panel renders (active → running, completed → done).
  *
- * Phase 188 Plan 05 move note — nothing about the map changed, only its address. Its
- * five keys are exactly `workflow_phases_status_check`
- * (`pending | active | completed | failed | skipped`), which is what makes the Req-4
- * subset property below PROVABLE rather than merely asserted: the set of statuses a
- * reconcile can produce is closed and known.
+ * Phase 188 Plan 05 move note — nothing about the map changed, only its address.
+ *
+ * ⚠ CORRECTED at Phase 189 Plan 08 (CONN-01 / D-08 / D-17), in the commit that falsified
+ * it. This docblock used to say its FIVE keys "are exactly `workflow_phases_status_check`
+ * (`pending | active | completed | failed | skipped`)". Migration 115 widened that CHECK
+ * constraint to SIX literals, so the sentence became false the moment the migration
+ * applied. The PROPERTY it was defending is unchanged and still holds — the keys of this
+ * map are exactly the constraint's literals, which is what makes the Req-4 subset property
+ * below PROVABLE rather than merely asserted: the set of statuses a reconcile can produce
+ * is closed and known. Only the COUNT moved, so the count is no longer written down here;
+ * a number in prose rots on every additive widening, and the rule does not.
+ *
+ * ⚠ D-17 — THE KEYS ARE DATABASE SLUGS, THE VALUES ARE CLIENT MEMBERS, AND THEY ARE
+ * DIFFERENT SPELLINGS ON PURPOSE. The sixth key below is the snake_case literal Postgres
+ * stores; its value is the kebab member this client's union carries, exactly as
+ * `active`/`completed` have always mapped to `running`/`done`. The SENTENCE a person
+ * eventually reads is a third spelling again and belongs to the vocabulary layers — this
+ * module holds no words at all, per THE RULE at the top of the file.
+ *
+ * (The slug is NOT re-spelled in this prose, deliberately. 189-08's acceptance is a grep
+ * proving the snake_case literal appears exactly ONCE outside the tests — a second
+ * derivation is what that grep is looking for, and a docblock repeating the string would
+ * make the count unreadable. The rule is stated; the string is written once, below.)
  */
 export const DB_PHASE_STATUS: Record<string, Phase["status"]> = {
   pending: "pending",
@@ -44,6 +62,11 @@ export const DB_PHASE_STATUS: Record<string, Phase["status"]> = {
   completed: "done",
   failed: "failed",
   skipped: "skipped",
+  // Phase 189 Plan 08 (CONN-01 / D-07) — the sixth literal, added by migration 115. The
+  // governed external-action step's terminal: recorded, not transmitted. It maps to its
+  // OWN client member rather than to any of the five above, because none of them is true
+  // of it — see the `Phase["status"]` docblock in `@/types` for that argument in full.
+  recorded_not_sent: "recorded-not-sent",
 }
 
 /**
@@ -79,10 +102,23 @@ export function phaseStatusFromDb(raw: string): Phase["status"] {
 }
 
 /**
- * The seven readings the canvas can paint (D-188-04): the six normal readings plus the
- * explicit unknown Req 3 mandates — the one a fail-open would otherwise hide behind.
+ * The readings the canvas can paint (D-188-04): the normal readings plus the explicit
+ * unknown Req 3 mandates — the one a fail-open would otherwise hide behind.
  *
  * `retrying` is deliberately NOT a member. See the collapse rule below.
+ *
+ * Phase 189 Plan 08 (CONN-01 / D-07) — `"recorded-not-sent"` is the 8th member, and it is
+ * SPELLED IDENTICALLY to its `Phase["status"]` member, exactly as `failed` and `skipped`
+ * already are. That is deliberate twice over: it makes the switch arm below a one-line
+ * identity, and it removes the one place where the two unions could drift apart.
+ *
+ * ⚠ WIDENING THIS UNION IS THE MECHANISM, NOT A SIDE EFFECT. Every downstream table keyed
+ * by it is declared as an exhaustive `Record<CanvasReading, …>` precisely so that an added
+ * member is a TYPECHECK ERROR at each of them until someone states what the new state
+ * looks like. The compiler is the reminder; this member arms it. Until those tables are
+ * filled, each of their own-property-guarded readers falls back to the unknown row — so
+ * the intermediate state is honest rather than wrong, which is the whole point of a
+ * fail-CLOSED floor.
  */
 export type CanvasReading =
   | "not-started"
@@ -91,6 +127,7 @@ export type CanvasReading =
   | "failed"
   | "skipped"
   | "waiting-for-you"
+  | "recorded-not-sent"
   | "unknown"
 
 /**
@@ -134,6 +171,13 @@ export function canvasReading(phase: Phase | undefined): CanvasReading {
       return "failed"
     case "skipped":
       return "skipped"
+    // Phase 189 Plan 08 (CONN-01 / D-07) — a one-line identity, and it must NOT be folded
+    // into the `done` arm above. The two states differ in the only way that matters here:
+    // one asserts the step's work reached the outside, the other asserts it deliberately
+    // did not. Sharing an arm would make that difference unrepresentable downstream, which
+    // is the fail-open this whole module exists to refuse.
+    case "recorded-not-sent":
+      return "recorded-not-sent"
     default:
       return "unknown"
   }

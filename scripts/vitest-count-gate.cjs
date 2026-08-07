@@ -399,7 +399,18 @@ const BASELINE = {
   // way — the guard against the fix drifting into "always the latest row". Both numbers
   // read from this script's own `actual` column.
   "WorkspacePanel.test.tsx": 41,
-  "phaseState.test.ts": 34,
+  // 189-08 (CONN-01 / D-07 / D-17): 34 → 40. An EXTENSION, not a lowering — nothing was
+  // deleted or renamed. The +6 are the sixth `workflow_phases_status_check` slug arriving
+  // in the ONE derivation: +2 from the shipped `DB_TABLE` gaining a row (it drives both the
+  // totality loop and the parity loop, so one row is two cases), and +4 from the dedicated
+  // block — the double negative (`!== "done"` AND `!== "unknown"`, because asserting only
+  // the positive would still pass if the value were ALSO aliased to done), the unknown
+  // FLOOR surviving at both derivations, the new reading with the pending-ask precedence
+  // above it unchanged, and the own-property guard re-pinned now that the map has grown.
+  // Read from this script's own `actual` column, never a hand count of `it(` literals.
+  // ⚠ Moved in the SAME COMMIT as the tests (S2): a pin edited without the test leaves the
+  // gate blind, a test added without the pin leaves HEAD red.
+  "phaseState.test.ts": 40,
   // 188 code-review fix pass (CR-05): 12 → 17. An EXTENSION, not a lowering. The run home
   // shipped UNGATED while `WorkflowBuilderPage` gates its canvas on the identical
   // expression, so an operator flipping `visual_workflow_canvas` off produced a launch that
