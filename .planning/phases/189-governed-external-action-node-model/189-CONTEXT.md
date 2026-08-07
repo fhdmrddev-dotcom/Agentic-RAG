@@ -2,7 +2,9 @@
 
 **Gathered:** 2026-08-06
 **Refreshed:** 2026-08-07 — the G-5 gate discharged, file pointers re-measured, three open bugs routed.
-**Status:** Ready for planning — **UNBLOCKED. Phase 188.2 has shipped.**
+**Discussed with the operator:** 2026-08-07 — six choices put in plain language; **four ratified
+D-01..D-13 unchanged, two closed the open wording items** (D-15..D-18 below).
+**Status:** Ready for planning — **UNBLOCKED. Phase 188.2 has shipped. Nothing is left to decide.**
 
 <domain>
 ## Phase Boundary
@@ -212,14 +214,64 @@ but to a *larger directory*. Prefer filling an existing slot over creating a six
   check**, exactly as `BUG-260806-01` was closed. Also in scope for the same fast run: the second
   unguarded sink the same sweep found, `frontend/src/lib/providerLogo.tsx:107-108`.
 
+### Operator ratification — 2026-08-07 discussion (D-15 … D-18)
+
+**Six choices were put to the operator in plain language. Four ratified existing decisions
+unchanged; two closed items CONTEXT had left to Claude's discretion.** Recording the four
+confirmations matters as much as the two new words: D-04's "no escape hatch" was carrying a real
+usability cost on Claude's reasoning alone, and it now carries an operator decision instead.
+
+**Ratified unchanged (no edit to the decision text above):**
+
+- **The 189/190 split STANDS** — 189 proves the governance rails while there is nothing to leak;
+  190 swaps the no-op for a real MCP call behind an unchanged seam. The operator was shown the
+  honest risk (190 is STRETCH and gated, so there is a real path where 189's node never sends at
+  all, leaving a step that says "I would have emailed Sarah" and doesn't) and kept the split.
+- **D-04 stands — armed, with NO author escape hatch, ever.** Chosen over "armed by default but
+  disarmable" and over a per-capability taxonomy, with the cost named: even a harmless external
+  action needs a human click.
+- **D-05 / D-06 stand** — approve → record intent → run CONTINUES; the workflow publishes and runs.
+- **D-10 / D-11 stand** — RECORD the existing MCP-first verdict with a dated re-open trigger; do
+  NOT re-validate the 2026-07-24 crawl, and do NOT pull SC#3 out of the phase.
+
+**D-15: the closed capability set is EXACTLY THREE — `send_email`, `create_ticket`,
+`post_message`.** No longer Claude's discretion. Chosen over email-only (too thin a canvas
+vocabulary) and over adding a fourth (190 has no plan to make a fourth real, so it would ship a
+node that can never be connected). **This is the operator's alignment rule made literal: nothing is
+built here that 190 cannot later make real.** The `KB_TOOLS` disjointness check in D-03 still
+applies and must be verified at planning against all three names.
+
+**D-16: the run-time status word is "Not sent — recorded".** No longer Claude's discretion.
+Outcome first, consolation second — it cannot be misread as success, and "recorded" says where the
+detail went. Chosen over "Would have sent" (awkward beside past-tense `Done`/`Failed`), "Simulated"
+(engineer vocabulary on a business canvas, and silent about whether that was intentional) and
+"Recorded only" (reads like a successful log write rather than a withheld send). Renders at all
+three surfaces per D-07: canvas node, run surface, phase output.
+
+**⚠ D-17: THE STORED VALUE AND THE RENDERED WORD ARE DIFFERENT THINGS, and migration 115 stores
+the SLUG.** The CHECK constraint gains `recorded_not_sent` — a lowercase snake_case literal in the
+shape of the five that already exist (`pending, active, completed, failed, skipped`). The sentence
+"Not sent — recorded" is what the client's vocabulary layer RENDERS for that slug. Putting display
+prose inside a database constraint would make the wording un-editable without a second migration,
+would put an em-dash in a CHECK, and would break the shape of the column. **A plan that adds
+`'Not sent — recorded'` to `workflow_phases_status_check` has misread this decision.**
+
+**D-18: the badge word is "Not connected", conditional on that state** (this closes the wording
+half of D-12, whose placement decision was already locked). Plain, states the gap, implies the fix,
+and it retires cleanly — when 190 wires the node up the badge simply stops rendering, which is what
+made a state-conditional badge the right call over a type-conditional one. Chosen over "No
+destination" (wire vocabulary), "Won't send yet" (duplicates what the run status already says, so
+the badge earns less) and spending no badge at all (185's precedent, but it leaves the canvas unable
+to say that this step cannot yet reach outside — the card would look identical before and after 190).
+
 ### Claude's Discretion
 
-- The exact membership and naming of the closed capability set (D-02) — constrained to align with
-  190's email / JIRA / Slack slice and to stay disjoint from `KB_TOOLS`.
-- The exact status word for D-07 and the badge word for D-12 — constrained by the vocabulary
-  rules recorded under `<code_context>`.
 - The 7th `PHASE_GLYPHS` entry — mechanical under the icon convention (see `<code_context>`).
-  **⚠ Its home was mis-stated on 2026-08-06 and is corrected below — it is NOT `phaseVocabulary.ts`.**
+  **⚠ Its home was mis-stated on 2026-08-06 and is corrected below — it is NOT `phaseVocabulary.ts`.
+  It is `soulData.ts:43`, and `lib/phaseGlyph.tsx` must be swapped in the SAME commit.**
+- The exact phrasing of the phase OUTPUT body (the "would have sent to / subject / NOTHING WAS
+  SENT" block) — constrained by `<specifics>`: it must read unmistakably as not-sent, never as a
+  receipt.
 
 </decisions>
 

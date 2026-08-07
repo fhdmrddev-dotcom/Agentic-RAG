@@ -280,3 +280,83 @@ one. `BUG-260609-02` was reviewed and found to have no overlap.
 - New landmines recorded for planning: the subtree GREW +67.1 % (797 → 1332 L) so 189 should fill an
   existing slot rather than add a sixth module; the count gate's `failed` column is not a regression
   backstop on this machine (`D-188.2-DEF-01`); the app has no URL router.
+
+---
+
+# Operator discussion — 2026-08-07 (session 2)
+
+**Trigger:** the operator declined to route straight to `/gsd:plan-phase 189` — *"I think the next
+phase should be discussed not planned directly"* — after `/gsd:fast` closed the BUG-260807-01 code
+half. Since discuss-phase had already run twice, this session was not context-gathering: it was the
+operator pressure-testing decisions someone else had locked, plus closing the two wording items
+CONTEXT had left to Claude's discretion.
+
+**Framing used:** plain language first (what the node IS, what it deliberately does NOT do), then
+the strategic risk stated openly BEFORE any option list — that 190 is STRETCH and gated, so there
+is a real path where 189's node never sends at all and its user-visible value is a step that says
+*"I would have emailed Sarah"* and doesn't. Surfacing that was the point of the session; a
+discussion that only lists implementation options cannot reach it.
+
+## Area: the 189/190 split
+
+**Options presented:** keep the split / merge 189+190 / promote 190 out of STRETCH first / explain
+the risk before choosing.
+**User's choice:** keep the split as scoped.
+**Notes:** The counter-case was stated rather than hidden — merging would pull in the full 190
+threat model (SSRF, org-scoped credentials, the n8n "guarded only when a credential is attached"
+CVE class), which is the highest-risk surface in the milestone. Doing the governance work while
+there is nothing to leak is the cheap moment. **No ROADMAP change.**
+
+## Area: the closed capability set (was Claude's discretion → now D-15)
+
+**Options presented:** email + ticket + message / email only / add a fourth.
+**User's choice:** all three — `send_email`, `create_ticket`, `post_message`.
+**Notes:** Locks the operator's alignment rule literally — nothing is built here that 190 cannot
+later make real. A fourth capability would ship a node that can never be connected. The `KB_TOOLS`
+disjointness check (D-03) must now be verified against three concrete names at planning.
+
+## Area: the approval gate
+
+**Options presented:** always armed / armed-but-disarmable / per-capability.
+**User's choice:** always armed, no escape hatch.
+**Notes:** **The point of asking was to move the cost onto the operator's ledger.** D-04 was
+carrying a real usability cost (even a harmless external action needs a human click) on Claude's
+reasoning alone; it now carries an operator decision. The alternatives were shown with their true
+price: disarmable would require ROADMAP SC#2 to be rewritten, and per-capability was already
+deferred by CONTEXT because 189 has no real egress to calibrate risk against.
+
+## Area: the recorded architecture decision (SC#3)
+
+**Options presented:** record the existing verdict / re-validate first / drop it from 189.
+**User's choice:** record it, do not re-research.
+**Notes:** The 2026-07-24 Beam/Glean/n8n crawl stands; 189 writes it down with a dated re-open
+trigger. SC#3 stays in the phase.
+
+## Area: the run-time status word (was Claude's discretion → now D-16/D-17)
+
+**Options presented, each with a rendered preview across all three surfaces:** "Not sent —
+recorded" / "Would have sent" / "Simulated" / "Recorded only".
+**User's choice:** **"Not sent — recorded"**.
+**Notes:** Outcome first, consolation second. Previews were used deliberately because this word
+lands on three different surfaces and reads differently beside `Done`/`Failed` than it does alone.
+
+**⚠ A TECHNICAL DISTINCTION WAS RAISED BEFORE THE ANSWER WAS RECORDED, and it became D-17:** the
+persisted value and the rendered word are different things. Migration 115 adds the SLUG
+`recorded_not_sent` — matching the shape of the five literals already in
+`workflow_phases_status_check` — and the em-dash sentence is what the vocabulary layer renders.
+Writing display prose into a CHECK constraint would put an em-dash in the database, break the
+column's shape, and make the wording un-editable without a second migration. Flagged here because
+the operator's answer was a SENTENCE and a planner could reasonably have taken it literally.
+
+## Area: the last badge slot (was Claude's discretion → now D-18)
+
+**Options presented, with before/after previews showing the badge retiring when 190 lands:**
+"Not connected" / "No destination" / "Won't send yet" / spend no badge at all.
+**User's choice:** **"Not connected"**.
+**Notes:** The "spend nothing" option was shown honestly with its real cost — 185's precedent is
+genuine, but the preview made visible that the card would look IDENTICAL before and after 190,
+so a user could not tell from the canvas whether a step will really send or quietly record.
+
+## Nothing deferred this session
+
+No scope creep was raised. The `<deferred>` register is unchanged from the 2026-08-07 refresh.
