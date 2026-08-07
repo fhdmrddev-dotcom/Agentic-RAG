@@ -476,3 +476,75 @@ describe("panel/PhaseTimeline 189-08 — the announcer states the not-sent termi
     expect(announcer.textContent).not.toContain("not sent")
   })
 })
+
+/**
+ * REVIEW FINDING WR-05 — the doing-now line printed the RAW CLIENT STATUS SLUG.
+ *
+ * The line read ``` `${activePhase.slug} — ${activePhase.status}` ```: the internal
+ * `Phase["status"]` member, interpolated straight into copy a user reads. For the six
+ * pre-189 members that read tolerably (*notify — running*); for the member 189 ADDED it
+ * read **`notify — recorded-not-sent`** — a kebab-case internal identifier, on the one
+ * surface in this phase whose entire discipline (D-17) is that the stored slug, the panel
+ * word and the canvas sentence are three deliberately DIFFERENT spellings. Every other
+ * consumer in the phase routes through a vocabulary table; this line bypassed `STATUS_META`,
+ * which already held the correct word.
+ *
+ * Driven through the REAL `PhaseTimeline` over the REAL store, like the announcer block
+ * above, because the doing-now string is composed from the resolved ACTIVE phase — a unit
+ * call on the helper would prove the word exists without proving it is what renders.
+ */
+describe("panel/PhaseTimeline WR-05 — the doing-now line speaks the panel's word, not the slug", () => {
+  const activePhases = (status: Phase["status"]) => [
+    { slug: "draft", phaseIndex: 0, phaseType: "llm_single", status: "done" as const, subAgents: [], pendingAsk: null },
+    { slug: "notify", phaseIndex: 1, phaseType: "external_action", status, subAgents: [], pendingAsk: null },
+  ]
+
+  it("the new terminal reads `notify — Not sent`, never the kebab-case member", () => {
+    resetStore()
+    useStreamsStore.getState().actions.replacePhasesForThread(THREAD, activePhases("recorded-not-sent"))
+    const { container } = render(<PhaseTimeline threadId={THREAD} />)
+
+    const text = container.textContent ?? ""
+    expect(
+      text,
+      "WR-05: the internal Phase['status'] member reached user-visible copy. The panel " +
+        "word lives in STATUS_META and this line bypassed it.",
+    ).not.toContain("recorded-not-sent")
+    expect(text).toContain("notify — Not sent")
+  })
+
+  it("POSITIVE CONTROL — a shipped status still renders its own word, so the routing is not a blanket suppression", () => {
+    resetStore()
+    useStreamsStore.getState().actions.replacePhasesForThread(THREAD, activePhases("running"))
+    const { container } = render(<PhaseTimeline threadId={THREAD} />)
+
+    // The pre-189 members read tolerably as raw members too, which is why nothing caught
+    // this — so the control asserts the TABLE's capitalised word, not the lowercase member.
+    expect(container.textContent).toContain("notify — Running")
+  })
+
+  it("an UNRECOGNISED status reads `Unknown`, never the raw string it arrived as", () => {
+    resetStore()
+    useStreamsStore
+      .getState()
+      .actions.replacePhasesForThread(THREAD, activePhases("wat_is_this" as unknown as Phase["status"]))
+    const { container } = render(<PhaseTimeline threadId={THREAD} />)
+
+    const text = container.textContent ?? ""
+    expect(text).toContain("notify — Unknown")
+    expect(text).not.toContain("wat_is_this")
+  })
+
+  it("an INHERITED key reads `Unknown` too — the 188.1-04 own-property guard covers this caller", () => {
+    resetStore()
+    useStreamsStore
+      .getState()
+      .actions.replacePhasesForThread(THREAD, activePhases("constructor" as unknown as Phase["status"]))
+    const { container } = render(<PhaseTimeline threadId={THREAD} />)
+
+    const text = container.textContent ?? ""
+    expect(text).toContain("notify — Unknown")
+    // Without the guard a prototype key resolves to a FUNCTION and its source leaks.
+    expect(text).not.toContain("native code")
+  })
+})

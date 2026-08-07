@@ -34,6 +34,8 @@ import type { Phase } from "@/types"
 // forward unchanged (D-188-21) — the measurement is recorded in that module's docblock.
 import { TERMINAL_RUN_STATUSES } from "@/lib/phaseState"
 import { PhaseCard } from "./PhaseCard"
+// WR-05 — the panel's status vocabulary, read from its ONE home rather than re-derived.
+import { statusWord } from "./phaseStatusMeta"
 
 /** The run-level reconcile frame this timeline needs (subset of ThreadWorkflowState). */
 type RunFrame = Pick<
@@ -182,7 +184,15 @@ export function PhaseTimeline({ threadId }: PhaseTimelineProps) {
   let doingNow = "Setting up…"
   if (runTerminal && frame?.run_status === "completed") doingNow = "Workflow complete"
   else if (activePhase?.status === "failed") doingNow = `Run failed during ${activePhase.slug}.`
-  else if (activePhase) doingNow = `${activePhase.slug} — ${activePhase.status}`
+  // WR-05: the STATUS goes through the vocabulary table, never straight out of the union.
+  // This line used to interpolate `activePhase.status` — the internal `Phase["status"]`
+  // member — into copy a user reads. For the six pre-189 members that read tolerably
+  // (*notify — running*); the member 189 added rendered as **`notify — recorded-not-sent`**,
+  // a kebab-case identifier on the one surface whose whole discipline (D-17) is that the
+  // stored slug, the panel word and the canvas sentence are three DIFFERENT spellings.
+  // `statusWord` is `STATUS_META`'s own `text` (the table two files' worth of comments call
+  // the panel's vocabulary), reached through the same own-property guard the card uses.
+  else if (activePhase) doingNow = `${activePhase.slug} — ${statusWord(activePhase.status)}`
 
   const headerName = frame?.definition_name?.trim() || "Workflow"
 

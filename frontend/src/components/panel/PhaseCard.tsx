@@ -31,6 +31,10 @@ import { cn } from "@/lib/utils"
 import { phaseGlyph } from "@/lib/phaseGlyph"
 import { providerLogo } from "@/lib/providerLogo"
 import type { EmitFailure, EmitSubStep, Phase } from "@/types"
+// WR-05 — the status vocabulary moved to its own module so `PhaseTimeline` can read the
+// SAME words instead of printing the raw union member. See the marker below, where the
+// table used to stand, and that module's header for why the split was forced.
+import { statusMeta } from "./phaseStatusMeta"
 
 // ── PHASE_TYPE_LABEL (DATA-CONTRACT §5.1) — the 5 LOCKED literals → label + glyph
 //    + one-liner. UNKNOWN (forward-compat) falls back to the generic "Step" row;
@@ -95,100 +99,13 @@ function phaseTypeMeta(phaseType: string): PhaseTypeMeta {
   return PHASE_TYPE_LABEL[phaseType]
 }
 
-// ── STATUS_GLYPH (DATA-CONTRACT §5.3) — status → glyph + REAL text + AA color
-//    token (non-color-alone, UI-SPEC §A11Y). Status text uses --color-text /
-//    --panel-status-* (≥4.5:1) — NEVER --muted-foreground-dim (3.59:1 fail).
-//    `retrying` text reads "Attempt N" (filled in at render from phase.attempt). ──
-interface StatusMeta {
-  glyph: string
-  /** Base text (retrying substitutes "Attempt N" at render). */
-  text: string
-  /** Tailwind class for the AA-contrast status text color. */
-  textClass: string
-}
-const STATUS_META: Record<Phase["status"], StatusMeta> = {
-  pending: { glyph: "○", text: "Locked", textClass: "text-panel-muted-foreground" },
-  running: { glyph: "●", text: "Running", textClass: "text-[hsl(var(--panel-status-active))]" },
-  done: { glyph: "✓", text: "Complete", textClass: "text-[hsl(var(--panel-status-done))]" },
-  // Lightened red text on the dim fill clears 4.5:1 (UI-SPEC §A11Y contrast note).
-  failed: { glyph: "✕", text: "Failed", textClass: "text-[hsl(0_80%_80%)]" },
-  // WR-04: the pill LABEL TEXT uses the LIGHTENED --accent-violet-text (9.83:1
-  // dark / 8.52:1 light) to clear the ≥4.5:1 normal-text floor. The base
-  // --accent-violet (text-accent-violet/border-accent-violet) is graphic-level
-  // (≥3:1) and stays on the glyph + the card border below (UI-SPEC §Color).
-  retrying: { glyph: "↻", text: "Attempt", textClass: "text-accent-violet-text" },
-  skipped: { glyph: "⤳", text: "Skipped", textClass: "text-panel-muted-foreground" },
-  // Phase 189 Plan 08 (CONN-01 / D-07) — ADDED, nothing above changed.
-  // This row exists because the compiler demanded it: `Phase["status"]` gained
-  // `"recorded-not-sent"` so the governed external-action step's terminal could stop being
-  // absorbed by `done`, and `Record<Phase["status"], …>` then forced the developer panel to
-  // state that honestly too. That forcing is the mechanism, not collateral damage — it was
-  // observed as a real TS2741 on this table before this row was written.
-  //
-  // WHY NOT REUSE A SHIPPED WORD: none of the six above is true of this state. `Complete`
-  // claims the send happened, `Failed` claims something went wrong, `Skipped` claims the
-  // step did not run — and it DID run, and a person DID approve it. D-07 requires the
-  // not-sent state be distinct from passed and done at every surface it renders.
-  //
-  // The glyph below is INHERITED from the unicode arrow set rather than invented, and it was
-  // CHOSEN BY MEASUREMENT: it appears ZERO times across `frontend/src` today, so it arrives
-  // carrying no other meaning. The obvious alternative — the circled-slash mark — was
-  // rejected although it reads well, because it already means CANCELLED on the run band
-  // (`pages/WorkflowRunPage.tsx`) and *no longer offered* in the admin model-discovery
-  // panel, and one glyph carrying two meanings is what the icon convention forbids. That
-  // rejected mark is NOT re-spelled in this comment on purpose: its occurrence COUNT in
-  // this file is the evidence for the claim, and prose that spells it makes the count
-  // unreadable (the 187-24 lesson). It is asserted against by name in the suite instead.
-  // `text-panel-muted-foreground` is the same AA-cleared muted token
-  // `pending`/`skipped`/`unknown` already use: this is a quiet terminal, not an alarm, and
-  // spending a warning colour on a step that behaved exactly as designed would read as a
-  // fault the run never raised.
-  //
-  // ⚠ THE PANEL KEEPS ITS OWN VOCABULARY. `Not sent` here and the canvas's business
-  // sentence for the same state are two words for one state, which is CORRECT and is a
-  // shipped rule (`lib/phaseState.ts` — the panel has harness words, the canvas has
-  // business words, and only the DERIVATION is shared). The canvas sentence is deliberately
-  // not repeated in this file.
-  "recorded-not-sent": { glyph: "↛", text: "Not sent", textClass: "text-panel-muted-foreground" },
-  // Phase 188 Plan 02 (RUNVIZ-02 / D-188-08 / D-188-06) — ADDED, nothing above changed.
-  // This row exists because the compiler demanded it: `Phase["status"]` gained
-  // `"unknown"` so `reconcilePhases` could stop resolving an unrecognised
-  // `workflow_phases.status` to `done`, and `Record<Phase["status"], …>` then forced the
-  // developer panel to state that honestly too. That forcing is the mechanism, not
-  // collateral damage. The `?` is INHERITED from `VERDICT_MARK.unknown`
-  // (`workflows/nodePresentation.ts:185`) rather than invented — 188 spends zero net-new
-  // glyphs. `text-panel-muted-foreground` is the same AA-cleared muted token
-  // `pending`/`skipped` already use; `--panel-*` is correct HERE because this is a
-  // panel-scoped surface (it is the RUN surface, on `--background`, where it is forbidden).
-  unknown: { glyph: "?", text: "Unknown", textClass: "text-panel-muted-foreground" },
-}
-
-/**
- * The status atom. TOTAL: anything this table does not OWN reads as the declared
- * `unknown` row.
- *
- * ⚠ THE OWN-PROPERTY GUARD IS NOT CEREMONY (WR-04 site 3, 188.1-04), and it was measured
- * RED before it was written. This site was the sharpest of the five: the shipped
- * expression was a bare `STATUS_META[phase.status]` with NO FALLBACK AT ALL, so an
- * inherited name resolved to a FUNCTION and the header's status atom rendered its glyph,
- * its text and its colour class as `undefined` — an empty atom on a card still claiming
- * to show a phase. `Record<Phase["status"], StatusMeta>` makes the compiler the parity
- * guarantee for every DECLARED member (`lib/phaseState.test.ts:80-85` leans on exactly
- * that), and it says nothing at all about an inherited one. `phase.status` is derived one
- * function away from a server-supplied string — totality is a property of the lookup
- * rather than of its current callers (`lib/phaseState.ts:65-75`, the house argument).
- *
- * NO NEW VISUAL STATE WAS INVENTED. The fallback is the row this table ALREADY declares:
- * `unknown`, added by Phase 188 Plan 02 so an unrecognised `workflow_phases.status` reads
- * as *Unknown* and never as *Complete*. This guard is that same lesson applied to the key
- * space rather than to the value space, and it changes no shipped state because no
- * shipped status is a prototype key. Kept honest by
- * `panel/__tests__/PhaseTimeline.test.tsx`'s 188.1-04 falsification.
- */
-function statusMeta(status: Phase["status"]): StatusMeta {
-  if (!Object.prototype.hasOwnProperty.call(STATUS_META, status)) return STATUS_META.unknown
-  return STATUS_META[status]
-}
+// ── STATUS_META (DATA-CONTRACT §5.3) — MOVED (review WR-05) ──────────────────────
+// The status vocabulary (the `StatusMeta` interface, the table and the 188.1-04
+// own-property guard `statusMeta`) now lives in `./phaseStatusMeta`, VERBATIM. It moved
+// because `PhaseTimeline` needs the same words — its doing-now line was printing the raw
+// `Phase["status"]` member at the user — and `react-refresh/only-export-components` is a
+// lint ERROR on a function exported beside a component (measured on this file, 3 → 4,
+// before the split). Nothing was retuned in the move; see that module's header.
 
 // ── SUBSTEP_META (Phase 101.1-04 / GAP-C / D-11) — the emit-moment sub-steps the
 //    harness streams via `phase_substep` (RESEARCH §5). A sealed forced emit is ATOMIC
