@@ -309,6 +309,23 @@ const BASELINE = {
   // printed `PhaseNodeCard.test.tsx 124 128 +4`).
   "PhaseNodeCard.test.tsx": 128,
   "PhaseNode.test.tsx": 26,
+  // 189-10 (CONN-01 / D-16 / D-07) — a NEW FILE, pinned in the SAME COMMIT that creates it.
+  //
+  // ⚠ THIS ONE DID NOT HIT THE TWO-KNOB TRAP, and the reason is worth recording because it
+  // is the FIRST entry in this table for which that is true. Every prior note here (188-08,
+  // 188-09, 188-05, round 5) describes a suite that landed outside BOTH knobs and therefore
+  // never ran. `runVocabulary.test.ts` lives in `src/components/workflows`, which is a
+  // DIRECTORY entry in TARGETS, so it RAN the moment it existed — measured, not assumed: the
+  // gate printed `runVocabulary.test.ts — 12 new` before this line was written. TARGETS was
+  // therefore NOT edited. The pin below is about what is GUARDED, not about what executes.
+  //
+  // What would be unguarded without it: this suite carries the only assertions that the D-16
+  // word is byte-exact (em dash asserted by CODEPOINT — an en dash is invisible in a diff),
+  // that it collides with none of the seven shipped words, that its clause is deliberately
+  // `null`, and that it claims no card border. The border case is an ABSENCE assertion over a
+  // `Partial<>` table, which the compiler cannot see at all and is the easiest kind to delete
+  // unnoticed.
+  "runVocabulary.test.ts": 12,
   // 189-08 (CONN-01 / D-07): 10 → 17. An EXTENSION, not a lowering — no `it(` was deleted,
   // renamed or moved. The +7 are the panel half of the governed not-sent terminal: the new
   // STATUS_META row rendering its own glyph and exact text, the D-07 non-collision case
@@ -543,7 +560,15 @@ const BASELINE = {
 //      `WorkflowCanvas.composition.test.tsx` and `WorkflowBuilderPage.canvas.test.tsx` — and
 //      every one passes in isolation. NONE is in a file this fix touches. D-188.2-DEF-01
 //      stands and is if anything understated.
-const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // ⚠ 2508 (BUG-260807-01)
+// ⚠ A SEVENTH TIME BY 189-08, AND THE NOTE WAS NOT MOVED WITH IT — measured by 189-10 on an
+// unmodified tree: the marker below read `2508` while the gate printed `pinned total 2521`,
+// a drift of 13 (189-08's `phaseState.test.ts` 34 → 40 and `PhaseTimeline.test.tsx` 10 → 17).
+// That is correction #1 above recurring in the very next plan, which is the strongest
+// available argument that a hand-written total beside a derived one is a claim and not a
+// check. Corrected to the measured figure rather than silently rewritten.
+// ⚠ AND AN EIGHTH TIME BY 189-10: 2521 → 2533, the new `runVocabulary.test.ts` (+12) pinned
+// above. Read from THIS SCRIPT'S OWN printed `total` column, in the SAME COMMIT as the pin.
+const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // ⚠ 2533 (189-10)
 
 // ── The Wave-0 blast radius (184-VALIDATION.md § "quick run command"). ──
 const TARGETS = [

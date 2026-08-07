@@ -41,9 +41,27 @@ import type { EmitFailure } from "@/types"
 // ── The words ───────────────────────────────────────────────────────────────────
 
 /**
- * The seven LOCKED canvas words (D-188-04). They may not be reworded here: CONTEXT
- * locks them and the UI contract's copywriting table repeats them, so a change is a
- * decision taken in those documents and reflected here, never the other way round.
+ * The eight LOCKED canvas words (D-188-04, and D-16 for the eighth). They may not be
+ * reworded here: CONTEXT locks them and the UI contract's copywriting table repeats
+ * them, so a change is a decision taken in those documents and reflected here, never
+ * the other way round.
+ *
+ * THE EIGHTH (Phase 189 / CONN-01 / D-16) is the terminal a governed external-action
+ * step reaches: a person approved it, the run continued, and nothing left the building.
+ * Its wording is OUTCOME FIRST, consolation second — the sentence opens on the negation
+ * so it cannot be skimmed as success, and "recorded" then says where the detail went.
+ * D-07 is what makes that a requirement rather than a preference: this reading must read
+ * as neither success, nor failure, nor a step that was passed over, and the suite asserts
+ * all three as inequalities against the shipped words rather than trusting the reading.
+ *
+ * ⚠ EXACT-MATCH ASSERTIONS ONLY when testing this table. The eighth word shares the
+ * prefix "Not " with the first, so a `toContain` on that fragment is ambiguous and would
+ * pass while proving nothing — the same class of vacuous fence the notes below describe.
+ *
+ * ⚠ D-17: the DATABASE spells this state as a snake-case slug, and that slug is not
+ * written in this file at any point. This module holds a rendered SENTENCE; the slug
+ * belongs to the derivation layer and to the migration's CHECK constraint, one language
+ * and 400 lines away. A constraint that took this sentence would be a misread of D-17.
  *
  * The `waiting-for-you` entry below is deliberately NOT the shipped design-time badge
  * that `llm_human_input` steps already carry, and not a tense variant of it (D-188-05,
@@ -66,6 +84,7 @@ export const RUN_READING_WORD: Record<CanvasReading, string> = {
   skipped: "Skipped",
   "waiting-for-you": "Paused for your answer",
   unknown: "State unknown",
+  "recorded-not-sent": "Not sent — recorded",
 }
 
 /**
@@ -175,6 +194,17 @@ const STATIC_CLAUSE: Record<CanvasReading, string | null> = {
   skipped: CLAUSE_SKIPPED,
   "waiting-for-you": CLAUSE_WAITING,
   unknown: CLAUSE_UNKNOWN,
+  // 189 / D-16 — `null`, and the reason is this table's OWN rule rather than an omission.
+  // A clause is carried by the readings a person cannot act on from the word alone. There
+  // is nothing here for the person to do: the approval already happened and the run
+  // carried on. And the word itself ALREADY carries its clause after an em-dash, so
+  // appending a second one would produce a two-em-dash sentence restating exactly what the
+  // design-time badge and the step's own output body both say.
+  //
+  // ⚠ This is the eighth reading the docblock above was written for — added later, and a
+  // TYPECHECK ERROR here until it was, precisely as intended. A `default:` arm would have
+  // absorbed it silently as "no clause" and this decision would never have been taken.
+  "recorded-not-sent": null,
 }
 
 /**
@@ -226,12 +256,20 @@ export interface NodeRunState {
 /**
  * The three readings — and ONLY three — that claim the card's border.
  *
- * `done`, `not-started`, `skipped` and `unknown` are ABSENT ON PURPOSE, and *Complete*
- * is the one worth stating: the closed ring already says it, and recolouring the border
+ * `done`, `not-started`, `skipped`, `unknown` — and, since 189, the recorded-not-sent
+ * reading — are ABSENT ON PURPOSE, and *Complete* is the one worth stating: the closed
+ * ring already says it, and recolouring the border
  * of every finished step floods the canvas with the accent exactly as the run ends,
  * burning the whole 10% accent budget on the least urgent news on the screen. The
  * quiet states stay quiet so the two loud ones (something needs you / something broke)
  * are the only things that pull the eye.
+ *
+ * The FIFTH absence is 189's, and it is recorded here rather than left to be discovered:
+ * an unrecorded omission from a `Partial<>` table is indistinguishable from a bug, and
+ * this one is editorial. The recorded-not-sent reading is a QUIET terminal — the run
+ * moved on, nothing is owed and nothing broke — so it claims no border for the same
+ * reason *Complete* does not. Its ring shape already carries it, and spending the accent
+ * here would dim the only two readings that genuinely need to pull the eye.
  *
  * One border-colour utility per reading, matching the shipped ternary's own rule, so
  * nothing depends on the order Tailwind happens to emit two same-specificity classes.

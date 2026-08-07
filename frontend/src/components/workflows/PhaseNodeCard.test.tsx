@@ -1940,9 +1940,18 @@ describe("188-06 — seven readings, seven ring SHAPES (the greyscale acceptance
       expect(RUN_READING_WORD[reading].trim().length).toBeGreaterThan(0)
       unmount()
     }
-    // Seven readings, seven distinct words — so the text channel separates them on its
-    // own, exactly as the shape channel does.
-    expect(new Set(Object.values(RUN_READING_WORD)).size).toBe(7)
+    // Every reading gets its OWN word — so the text channel separates them on its own,
+    // exactly as the shape channel does.
+    //
+    // 189-10: stated as a PROPERTY OF THE TABLE rather than as the literal `7` it used to
+    // be. A hard-coded count is a pin that the next reading has to be remembered to move,
+    // and a reading added without moving it reads as a regression rather than as growth;
+    // derived, the guard is inherited by the ninth reading for free. (It is 8 as this line
+    // is written — D-16's `recorded-not-sent` word joined the seven.)
+    expect(new Set(Object.values(RUN_READING_WORD)).size).toBe(
+      Object.keys(RUN_READING_WORD).length,
+    )
+    expect(Object.keys(RUN_READING_WORD).length).toBe(8)
   })
 })
 
