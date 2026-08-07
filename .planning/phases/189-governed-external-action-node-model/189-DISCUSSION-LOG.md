@@ -205,3 +205,78 @@ inverts 149-C, which puts the meaningful plain title first and swaps only the su
 - How 190 swaps the no-op for a real call without re-authoring → a 190 planning concern.
 - **Reviewed, not folded:** `spike-nl-workflow-authoring.md` (todo match, score 0.6 on generic
   keywords) — NL authoring is Phase 187's shipped territory, no genuine overlap.
+
+---
+
+# Refresh session — 2026-08-07
+
+**Trigger:** `/gsd:discuss-phase 189` re-run after Phase 188.2 shipped. `check_existing` found an
+existing CONTEXT.md; the operator chose **"Update it"** over a fresh discussion, and D-01…D-13 were
+kept locked as written. No decision changed. What changed was measurements and file pointers.
+
+## Area: What 188.2 invalidated
+
+**Options presented:** Update it / Update it + reopen specific decisions / View it / Skip to planning.
+**User's choice:** Update it — targeted refresh, decisions stay locked.
+**Notes:** The `<gate>` block's whole premise ("188.2 ships FIRST") was discharged. Rather than
+delete it, it is preserved as superseded wording with a then/now table — the same convention the
+ROADMAP used when it amended 189's own no-migration flag. Measured: `PhaseNodeCard.tsx` 797 → 274 L;
+`BUG-260806-01` closed by 188.2 on a driven row with a falsification control.
+
+## Area: Re-verification rather than inheritance
+
+**Notes:** Every load-bearing measurement behind D-01…D-13 was re-executed, not carried. Six held
+(the 5-value status CHECK at `full-schema.sql:1932`; migration 115 still free with 114 as live head;
+the 6-member `PhaseConfig` union; the badge-slot-1 reservation; the max-2 tuple; the claimed
+top-right corner). **Two were false.**
+
+1. `PhaseNodeCard.tsx` at 797 L / G-5 firing — false *because of* 188.2. Expected.
+2. **`PHASE_GLYPHS` in `phaseVocabulary.ts` — false, and false BEFORE 188.2 moved anything.** The
+   glyph map is `soulData.ts:43` (6 entries), resolved by `lib/phaseGlyph.tsx`. `phaseVocabulary.ts`
+   holds the per-type *label/sentence* maps, which is how the two got conflated. This is the same
+   drift class 188.2 found in four `icon-convention.md` pointers, three of which were also already
+   wrong. **The lesson generalises: a wrong pointer written into a CONTEXT survives every gate,
+   because nothing typechecks prose.**
+
+The refresh also strengthened D-12 rather than restating it: the slot-1 reservation survived the cut
+and is now asserted in five source files and guarded by two live test suites, and the max-2 budget
+gained an `@ts-expect-error` control observed RED at 34 type errors and green at 33.
+
+## Area: Reported-bugs cross-check (mandatory touchpoint)
+
+Filtered to `status: open` + `surface: Agentic-RAG` with `affected_areas` overlapping 189's domain.
+Three candidates surfaced.
+
+**`BUG-260807-01`** — `verticalOffsetFor` is an unguarded WR-04 sink; a prototype-key slug returns
+`NaN`, which invalidates the `translate()` on the three elements 188.2 just gave `zIndex 1002`, so a
+mispositioned affordance now lands *above* the cards.
+
+**Options presented:** `/gsd:fast` before 189 / fold into 189 / leave open and defer.
+**User's choice:** `/gsd:fast` now, before 189.
+**Notes:** ⚠ **This diverges from the bug report's own "Suggested routing", which proposed folding
+it into 189 as "a natural, cheap rider" — recorded because a later reader will find the two in
+conflict.** The operator's routing is better supported by the sizing: one file, one import, two call
+sites, no schema and no API surface — G-3 territory. It is 188.2's residue and degrades a fix 188.2
+just shipped, so it does not belong on 189's ledger. Captured as **D-14** with the two constraints
+the fixer must honour (the `editAffordance.ts` LEAF fence must be re-read not assumed; **jsdom
+cannot see this defect**, so the regression check is a driven Chrome MCP row) and the second sink
+from the same sweep, `lib/providerLogo.tsx:107-108`.
+
+**`BUG-260730-02`** (emit gate reports citations when citations were perfect) and **`BUG-260731-01`**
+(judge-model knob may be inert) — both `workflows/publish-gauntlet`.
+
+**Options presented:** leave open + note in `<deferred>` / fold 260730-02 / fold both.
+**User's choice:** leave open, note in `<deferred>` with re-open triggers.
+**Notes:** Both are emit-gate/judge defects, not external-action-node defects. D-06 only requires
+that a workflow containing the node not be *blocked* from publishing, and neither bug changes that.
+Concrete re-open triggers recorded for each, per the standing rule that no deferral ships without
+one. `BUG-260609-02` was reviewed and found to have no overlap.
+
+## Deferred Ideas added this session
+
+- 188.2's two owed manual UAT rows ride into 189 as *look-while-you're-there* items, not blockers:
+  **row A2 ⛔** needs a live run (189 will launch live runs under D-06 — run it on the first one),
+  and **row A1's subjective visual half** is one glance at a Builder card.
+- New landmines recorded for planning: the subtree GREW +67.1 % (797 → 1332 L) so 189 should fill an
+  existing slot rather than add a sixth module; the count gate's `failed` column is not a regression
+  backstop on this machine (`D-188.2-DEF-01`); the app has no URL router.

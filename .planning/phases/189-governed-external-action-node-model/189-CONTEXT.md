@@ -1,7 +1,8 @@
 # Phase 189: Governed External-Action Node Model - Context
 
 **Gathered:** 2026-08-06
-**Status:** Ready for planning — **but see the G-5 gate below: Phase 188.2 ships FIRST.**
+**Refreshed:** 2026-08-07 — the G-5 gate discharged, file pointers re-measured, three open bugs routed.
+**Status:** Ready for planning — **UNBLOCKED. Phase 188.2 has shipped.**
 
 <domain>
 ## Phase Boundary
@@ -18,35 +19,51 @@ external step honestly records what it *would* do.
 
 **Flags carried from ROADMAP:** no SC#10 (design/vocabulary, no live stream) · no threat model
 (it lands WITH 190, which owns the first user-supplied-destination egress surface) · red line
-D-14 (the Deep path stays byte-identical) · UI hint yes · **G-2 does NOT fire** — ROADMAP line
-641 exempts 189 by name as "the design/decision phase".
+D-14 (the Deep path stays byte-identical) · UI hint yes · **G-2 does NOT fire** — ROADMAP
+**line 675** exempts 189 by name as "the design/decision phase".
 
 **⚠ ONE FLAG IS AMENDED BY THIS DISCUSSION: "no migration" → migration 115.** See D-08.
 </domain>
 
 <gate>
-## ⚑ G-5 GATE — Phase 188.2 ships BEFORE this phase
+## ⚑ G-5 GATE — DISCHARGED 2026-08-07 (188.2 shipped)
 
-**G-5 fires on `frontend/src/components/workflows/PhaseNodeCard.tsx`, and it was measured, not
-inherited:** `wc -l` = **797 lines**; `git log -- <file>` shows **4 distinct phases** (184, 185,
-188, 188.1), over the 3-phase threshold. 189 adds a node type, which lands on that file.
+**The gate is closed. This block is kept rather than deleted, because the sequencing it records
+is the reason 188.2 cut where it did.**
 
-**Operator decision (2026-08-06):** insert a dedicated behaviour-preserving refactor phase
-**188.2** on `PhaseNodeCard.tsx` BEFORE 189 executes — the 188.1 shape (a verbatim extraction,
-measured, zero user-visible change, lean prove-unchanged UAT).
+> *Superseded wording, preserved (2026-08-06):* "**G-5 fires on
+> `frontend/src/components/workflows/PhaseNodeCard.tsx`** — `wc -l` = **797 lines**;
+> `git log -- <file>` shows **4 distinct phases** (184, 185, 188, 188.1), over the 3-phase
+> threshold. 189 adds a node type, which lands on that file. **Operator decision:** insert a
+> dedicated behaviour-preserving refactor phase **188.2** BEFORE 189 executes."
 
-**Sequencing rationale, recorded because it inverts the usual order:** this discussion ran
-BEFORE the refactor deliberately. A blind extraction is the one that gets re-opened; 188.2 now
-knows which seams 189 needs (a 7th phase type's face, a conditional badge in slot 1, a
-capability-derived subtitle) and can cut accordingly.
+**What actually happened, measured 2026-08-07 (`wc -l`, `git log --oneline -- <file>`):**
 
-**Fold candidate for 188.2, not 189:** `BUG-260806-01` (a selected card occludes its own ✕ —
-xyflow `z-index: 1000` vs the portal's `auto`; pre-existing, found while driving 188.1's board;
-`affected_areas: [frontend/workflow-canvas, frontend/editing-affordances]`).
+| | Then (2026-08-06) | Now |
+|---|---|---|
+| `PhaseNodeCard.tsx` | 797 L, G-5 **fires** | **274 L** (−65.6 %), ledger row reads *satisfied (188.2 — 2026-08-07)* |
+| Gates | — | 188.2 executed 7/7 · verified 7/7 · secured 34/34 · validated 12 green / 7 partial |
+| `BUG-260806-01` (selected card occludes its own ✕) | fold candidate for 188.2 | ✅ **closed**, `verified_closed_by: 188.2` — on a driven `elementFromPoint` row **with a falsification control observed swinging both ways**, not on the stacking analysis |
+
+**The inverted sequencing paid off, and that is a measurable claim rather than a compliment:**
+this discussion ran BEFORE the refactor so the cut would not be blind. It was not —
+`phaseNodeCardContract.ts`'s own docblock (`:6-7`) reads *"This is the surface 185 / 188 / 189 add
+DATA to, so it is cut out on its own: **189 adds a slot to a contract of this size rather than to
+a 797-line component**."* All three seams this phase named were cut for: a 7th `phase_type`'s
+face, a conditional badge in slot 1, a capability-derived subtitle.
+
+**⚠ THE ONE COST 188.2 RECORDED HONESTLY, and 189 inherits it:** the six-file subtree GREW
+**797 → 1332 L (+67.1 %)** — roughly eight times 188.1's +8 %. 189 adds to a *paid-down card*,
+but to a *larger directory*. Prefer filling an existing slot over creating a sixth module.
 </gate>
 
 <decisions>
 ## Implementation Decisions
+
+> **D-01 … D-13 are LOCKED as written on 2026-08-06.** The 2026-08-07 refresh re-verified every
+> load-bearing measurement each one rests on (results in `<verification_2026_08_07>` below) and
+> changed **no decision**. Where a decision names a FILE, the file may have moved — the decision
+> did not.
 
 ### The node's structure
 
@@ -152,14 +169,25 @@ xyflow `z-index: 1000` vs the portal's `auto`; pre-existing, found while driving
 ### The node's face on the canvas
 
 - **D-12: Spend badge slot 1 on the NOT-YET-CONNECTED state, conditional on that state rather
-  than on the type.** **Verified in the shipped source, not inherited:** `PhaseNodeCard.tsx`'s
-  docblock states *"188 spends ZERO badge slots: slot 1 is still empty and still reserved for
-  Phase 189"* — so 189 holds the **last free word-badge** on the card. It is spent on the one
+  than on the type.** 189 holds the **last free word-badge** on the card. It is spent on the one
   fact the card cannot otherwise carry: this step reaches outside and is not wired to anything
   yet. The armed-for-approval fact is invariant for the type (a badge that is always present on
   a type is really part of the type), and 185 set the precedent by spending **no badge at all**
   on governance — it used the corner seal, and deleted `nodePresentation.GROUNDING_TONE`.
   **Because the badge is conditional on state, it retires cleanly when 190 connects the node.**
+
+  **⚠ RE-VERIFIED AND STRENGTHENED 2026-08-07 — the reservation survived the 188.2 cut and is now
+  MACHINE-GUARDED, not merely documented.** The 2026-08-06 wording cited a single docblock
+  sentence in a 797-line component. That sentence moved; the fact did not, and it is now asserted
+  in **five source files and guarded by two live test suites**:
+  `PhaseNodeCard.tsx:39` · `canvasModel.ts:138` ("both badge slots are committed to 188/189") ·
+  `NodeCornerMarks.tsx:25` · `PhaseNode.tsx:209`/`:259` ("a badge slot 188/189 owns"), with
+  `PhaseNodeCard.test.tsx:2147-2156` ("slot 1 is still empty and still reserved") and
+  `WorkflowCanvas.test.tsx:422-423` failing if it is spent early.
+  **The max-2 budget is likewise now type-enforced AND control-tested:** `BadgeSlots`
+  (`phaseNodeCardContract.ts:104`) is a max-2 tuple union, and 188.2-01 added an
+  `@ts-expect-error` control **observed RED at 34 type errors and back at 33** — so a third badge
+  does not get flagged, it does not compile. **189 spends slot 1 and no more.**
 
 - **D-13: The vocabulary ladder's middle tier is CONFIG-DERIVED from the chosen capability** —
   "Sends an email", "Creates a ticket" — falling back to a generic type sentence only when no
@@ -168,6 +196,22 @@ xyflow `z-index: 1000` vs the portal's `auto`; pre-existing, found while driving
   it is the fix for the measured VOCAB-02 failure: only **10 of 119** phases carry a `phase.name`,
   so the generic sentence is what users actually see.
 
+### Bug routing (operator, 2026-08-07)
+
+- **D-14: `BUG-260807-01` is fixed by `/gsd:fast` BEFORE 189 plans — it is NOT folded into this
+  phase.** The report's own "Suggested routing" section proposed folding it into 189 as "a natural,
+  cheap rider". The operator routed it out instead, and the sizing supports that: **one file, one
+  import, two call sites** (`editAffordance.ts:214-224` → `own()` from the zero-import leaf
+  `ownProperty.ts`), no schema and no API surface — squarely G-3 `/gsd:fast` territory. It is
+  188.2's own residue and it degrades a fix 188.2 just shipped, so it does not belong on 189's
+  ledger. **Two constraints the fixer must honour, both carried from the report:**
+  (1) `editAffordance.ts` is asserted to be a **LEAF** by a live fence in `WorkflowCanvas.test.tsx`
+  — `ownProperty.ts` satisfies it (camelCase, zero imports) but **the fence must be re-read, not
+  assumed**; (2) **jsdom cannot see this defect** — it applies no CSS and computes no stacking
+  contexts, so a green unit suite is not evidence. **A driven Chrome MCP row is the regression
+  check**, exactly as `BUG-260806-01` was closed. Also in scope for the same fast run: the second
+  unguarded sink the same sweep found, `frontend/src/lib/providerLogo.tsx:107-108`.
+
 ### Claude's Discretion
 
 - The exact membership and naming of the closed capability set (D-02) — constrained to align with
@@ -175,8 +219,39 @@ xyflow `z-index: 1000` vs the portal's `auto`; pre-existing, found while driving
 - The exact status word for D-07 and the badge word for D-12 — constrained by the vocabulary
   rules recorded under `<code_context>`.
 - The 7th `PHASE_GLYPHS` entry — mechanical under the icon convention (see `<code_context>`).
+  **⚠ Its home was mis-stated on 2026-08-06 and is corrected below — it is NOT `phaseVocabulary.ts`.**
 
 </decisions>
+
+<verification_2026_08_07>
+## Re-verification at refresh — every load-bearing measurement, re-derived
+
+**The standing project rule is to re-derive rather than inherit.** Every figure below was executed
+on 2026-08-07, not carried from the 2026-08-06 text.
+
+| Claim (from 2026-08-06) | Command | Result |
+|---|---|---|
+| D-08: `workflow_phases_status_check` caps status at 5 | `grep -n workflow_phases_status_check supabase/full-schema.sql` | ✅ **HOLDS** — still 5 values, still `:1932` |
+| D-08: migration **115** is the next free slot | `ls supabase/migrations/ \| tail` | ✅ **HOLDS** — live head is **114**; 115 free |
+| D-01: `PhaseConfig` union has 6 members, a 7th is additive | `sed -n '162,172p' backend/app/models/harness.py` | ✅ **HOLDS** — exactly 6 |
+| D-12: badge slot 1 empty + reserved for 189 | `grep -rn "slot 1\|badge slot" src/components/workflows/` | ✅ **HOLDS AND STRENGTHENED** — 5 files + 2 test guards (see D-12) |
+| D-12: a third badge is a typecheck error | `phaseNodeCardContract.ts:104` + 188.2-01's control | ✅ **HOLDS** — now control-tested (RED at 34, green at 33) |
+| Top-right corner is CLAIMED for the 185 governance seal | `phaseNodeCardContract.ts:196` | ✅ **HOLDS** — verbatim: *"188/189 may not take it"* |
+| `PhaseNodeCard.tsx` is 797 L and G-5 firing | `wc -l` | ❌ **FALSE NOW** — **274 L**, G-5 satisfied |
+| `PHASE_GLYPHS` lives in `phaseVocabulary.ts` | `grep -rln PHASE_GLYPHS frontend/src` | ❌ **WAS ALREADY FALSE** — see below |
+
+**⚠ ONE CORRECTION THAT PREDATES 188.2 — `PHASE_GLYPHS` was never in `phaseVocabulary.ts`.**
+The 2026-08-06 refs pointed at `phaseVocabulary.ts` as "the per-type face maps a 7th type joins".
+That is half right — `phaseVocabulary.ts` (641 L) does hold per-type label/sentence maps — but the
+**glyph map is `soulData.ts:43`**, a plain `Record<string, string>` with **exactly 6 entries**
+(`programmatic`, `llm_single`, `llm_agent`, `llm_batch_agents`, `llm_human_input`, `llm_emit`),
+resolved at render by `phaseGlyph()` in `frontend/src/lib/phaseGlyph.tsx`. This error was
+inherited, not caused by the refactor — the same class of drift 188.2 found in four
+`icon-convention.md` pointers, three of which were already wrong before it moved anything.
+**A 7th entry is one additive line in `soulData.ts`, and `phaseGlyph.tsx` must be swapped in the
+SAME commit** (`phaseGlyph.tsx:34` states that rule explicitly).
+
+</verification_2026_08_07>
 
 <canonical_refs>
 ## Canonical References
@@ -184,15 +259,19 @@ xyflow `z-index: 1000` vs the portal's `auto`; pre-existing, found while driving
 **Downstream agents MUST read these before planning or implementing.**
 
 ### Phase scope + requirement
-- `.planning/ROADMAP.md` §"Phase 189: Governed External-Action Node Model" (lines 573-586) — goal,
-  4 success criteria, flags. **Line 641** is the G-2 exemption; **line 644** confirms the threat
-  model lands with 190.
+- `.planning/ROADMAP.md` §"Phase 189: Governed External-Action Node Model" — **lines 606-620**
+  (⚠ re-derived 2026-08-07; the 2026-08-06 figure of 573-586 shifted when 188.2 was inserted).
+  Goal, 4 success criteria, flags. **Line 675** is the G-2 exemption; **line 678** confirms the
+  threat model lands with 190. **Line 669** is 189's progress row, already updated to record the
+  unblock.
 - `.planning/REQUIREMENTS.md` line 59 — CONN-01 verbatim (and CONN-02/03 at 65-66 for what 190 owns).
 
 ### The engine seam the node plugs into
-- `backend/app/models/harness.py` — the `PhaseConfig` discriminated union; **read
-  `LlmEmitPhaseConfig`'s docblock first** (lines 144+) — it is the additive-member precedent D-01
-  follows. `action_risk_armed` is at line 235.
+- `backend/app/models/harness.py` — the `PhaseConfig` discriminated union (**line 162**, 6 members);
+  **read `LlmEmitPhaseConfig`'s docblock first** (lines 144+) — it is the additive-member precedent
+  D-01 follows. `action_risk_armed` is at line 235. ⚠ `slug: str` at **line 202** is
+  **unconstrained** — no pattern, no enum, no reserved-word list (this is what makes BUG-260807-01
+  reachable, and it is worth knowing before adding any slug-keyed lookup).
 - `backend/app/services/harness/phase_types.py` — `PHASE_TYPE_REGISTRY_ENTRIES` (line 1658) and
   `register_all()`; the 6 executors a 7th joins. 1681 lines.
 - `backend/app/api/runs.py:671` — `resolve_phase_available_tools`, the D-08 server-side re-read
@@ -204,18 +283,42 @@ xyflow `z-index: 1000` vs the portal's `auto`; pre-existing, found while driving
 - `backend/app/db/workflows.py:120-136` — the `harness_audit` event-type literal set (why D-09
   declines a new event).
 - `supabase/full-schema.sql:1932` — `workflow_phases_status_check`, the 5-value cap D-08 amends.
+  **Re-verified 2026-08-07: still 5, still that line.**
 - `supabase/migrations/114_harness_audit_action_risk_pending.sql` — the shape migration 115 copies.
+  **Re-verified: 114 is the live head, so 115 is free.**
 
-### The canvas surface
-- `frontend/src/components/workflows/PhaseNodeCard.tsx` — **read the docblock before drawing
-  anything.** The slot contract, the max-2 `BadgeSlots` tuple (a third badge is a TYPECHECK
-  ERROR), and the explicit reservation of slot 1 for Phase 189. 797 L — **and the target of the
-  188.2 refactor that ships first.**
-- `frontend/src/components/workflows/phaseVocabulary.ts` — the per-type face maps a 7th type
-  joins (641 L).
+### The canvas surface — ⚠ RE-POINTED 2026-08-07 AFTER THE 188.2 CUT
+
+The card is no longer one file. It is a **six-file subtree**, and "read `PhaseNodeCard.tsx`'s
+docblock" is no longer sufficient advice. Read the file that owns the fact you need:
+
+- `frontend/src/components/workflows/PhaseNodeCard.tsx` — **274 L** (was 797). The card body
+  itself; the `// ── The card ──` separator is at **:106**, so the render body is `:106-274`.
+- `frontend/src/components/workflows/phaseNodeCardContract.ts` — **214 L. START HERE FOR D-12.**
+  The slot contract and nothing else: the fourteen slots, `BadgeSlot` / `BadgeSlot2Tuple` /
+  `BadgeSlots` (`:104`, the max-2 tuple — **a third badge is a TYPECHECK ERROR**),
+  `NodeVerdictMark`, `NodeRunStatus`, `PhaseNodeCardProps`. Types-only, zero runtime exports.
+  Its own docblock names 189 at `:6-7`; `:196` records that top-right is claimed for governance.
+- `frontend/src/components/workflows/NodeCornerMarks.tsx` — **272 L.** The verdict mark (left edge)
+  and the ⛨ governance seal (top-right, **not available to 189**).
+- `frontend/src/components/workflows/NodeRunOverlay.tsx` — **319 L.** Status ring, arc and pause
+  chip. Run mode is a MODE, not a decoration. **D-14 red line: it imports `@/lib/phaseState` as a
+  TYPE only** — the card derives no run state.
+- `frontend/src/components/workflows/NodeIconWell.tsx` — **167 L.** The 3D mark and its tint —
+  **this is where a 7th phase type's glyph renders.** Type colour is a tint behind the icon ONLY.
+- `frontend/src/components/workflows/ownProperty.ts` — **86 L, zero imports.** The `own<T>()`
+  WR-04 prototype-pollution guard. Any new slug-keyed or type-keyed lookup 189 adds MUST use it.
+- `frontend/src/components/workflows/soulData.ts:43` — **`PHASE_GLYPHS`, the single source of
+  truth for phase-type glyphs (6 entries).** ⚠ **This corrects the 2026-08-06 refs, which pointed
+  at `phaseVocabulary.ts`.** Its render-time resolver is `frontend/src/lib/phaseGlyph.tsx`, and
+  `phaseGlyph.tsx:34` requires the two be swapped in the SAME commit.
+- `frontend/src/components/workflows/phaseVocabulary.ts` — **641 L.** The per-type label/sentence
+  maps (the D-13 ladder's tier-2/tier-3 material) and `groundingCauseOf`. **Not the glyph map.**
 - `.claude/skills/sketch-findings-agentic-rag/references/canvas-frame-and-node-anatomy.md` — the
-  137-B geometry + badge budget. **The shipped card is 137-B; `themes/canvas-184.css` is the older
-  137-D and would draw a card that no longer exists — always read `PhaseNodeCard.tsx`.**
+  137-B geometry + badge budget. ⚠ 188.2 made the SKILL's pointers per-fact across the six-file
+  subtree; the 248 px / radius-22 / 42-20-20 facts **stayed in the card**, so a blanket "read the
+  new modules" would be as wrong as the old blanket "always read `PhaseNodeCard.tsx`".
+  `themes/canvas-184.css` is the older 137-D and would draw a card that no longer exists.
 - `.claude/skills/sketch-findings-agentic-rag/references/approval-and-review.md` — sketch 144's
   armed-on-by-default finding (names 189 SC#2), the fail-closed `_exec_llm_human_input` timeout
   warning, and the artefact-preview matrix.
@@ -224,7 +327,17 @@ xyflow `z-index: 1000` vs the portal's `auto`; pre-existing, found while driving
 - `.claude/skills/sketch-findings-agentic-rag/references/graded-governance.md` — the corner seal
   is load-bearing and claims top-right; governance spends no colour and no badge.
 - `.claude/skills/sketch-findings-agentic-rag/references/icon-convention.md` §4 — the canvas glyph
-  vocabulary; **read before drawing any mark.** Phase-type icons = the single-source `PHASE_GLYPHS`.
+  vocabulary; **read before drawing any mark.** ⚠ 188.2 corrected four stale pointers in this file
+  (the ⛨ was cited at `PhaseNodeCard.tsx:440` when its true pre-cut home was `:653`, and a
+  `definitionOps.ts:388` was cited that **does not exist**) — treat any remaining `:NNN` here as
+  needing re-derivation.
+
+### The 188.2 record — read before touching the subtree
+- `.planning/phases/188.2-.../188.2-DEFERRED.md` — six deferrals with observable triggers,
+  including **D-188.2-DEF-01: the count gate's `failed` line is NOT a usable regression backstop on
+  this machine** (`failed` varied 1 → 21 → 50 → 10 → 0 → 0 across eight runs at an identical total
+  of 2502 — pre-existing SEED-056 rot). The COUNT columns are sound; the `failed` column is not.
+- `.planning/phases/188.2-.../188.2-UAT.md` — **two rows still owed** (see `<deferred>`).
 
 ### The connector track (for D-10 / D-11)
 - `.planning/seeds/SEED-013-external-integrations-api-mcp.md` and
@@ -248,36 +361,65 @@ xyflow `z-index: 1000` vs the portal's `auto`; pre-existing, found while driving
   zero-migration on the config side; `_StrictBase` guarantees old rows still validate.
 - **The 187 face ladder already computes tier 2 at render** — D-13 fills an existing tier rather
   than adding a mechanism.
+- **NEW (188.2): the card's slot contract is a 214-line types-only leaf.** Adding a slot is now a
+  small, isolated edit to `phaseNodeCardContract.ts` rather than a change to a 797-line component
+  — which is precisely what the refactor was cut for.
+- **NEW (188.2): `own<T>()` exists as a zero-import leaf** (`ownProperty.ts`). Any keyed lookup
+  189 adds gets its WR-04 guard for one import.
 
 ### Established Patterns
 - **Closed registries, never dynamic resolution.** `_TOOL_REGISTRY`, `PROGRAMMATIC_PHASE_REGISTRY`,
   `EMITTER_REGISTRY` all share one rule: *a name not present raises*. D-02 must follow it.
 - **The two-badge budget is enforced by the type system**, not by review discipline —
-  `BadgeSlots` is a max-2 tuple union. A third badge does not get flagged; it does not compile.
+  `BadgeSlots` is a max-2 tuple union, now backed by an `@ts-expect-error` control observed RED.
 - **No focusable control may live inside the node card** — one tab stop per node; the ✕ and ＋
-  live on the lane. Anything 189 adds to the card is non-interactive.
+  live on the lane. Anything 189 adds to the card is non-interactive. **188.2 drove this RED**
+  against a planted `<button>` in `NodeCornerMarks.tsx` (5 failures), so the guard is live, not
+  aspirational.
 - **No per-step-type colour on the card at all** — type colour is a tint behind the ICON ONLY,
   because Phase 188 needs the strong colours for run status.
 - **An icon for the same concept is byte-identical everywhere** — a 7th phase-type glyph is ONE
-  additive entry in the shared `PHASE_GLYPHS` map, never per-surface art.
+  additive entry in **`soulData.ts:43`** (⚠ corrected), swapped with `lib/phaseGlyph.tsx` in the
+  same commit, never per-surface art.
 - **Verdict surfaces fail CLOSED** — an unrecognised state is never a pass (the `findIndex → -1`
   fail-open that painted an unknown blocked stage 8/8 green).
+- **NEW (188.2): the six-file subtree is fenced by `?raw` source guards.** 17 negative fences plus
+  4 haystacks read a six-path `cardSubtreeSource`, and an ESM-cycle fence forbids any destination
+  module importing back into `PhaseNodeCard` **in any form** — including the `.tsx`-suffixed
+  specifier, which secure-phase found the original fence missed. **A 189 edit that adds a file to
+  this subtree must be added to the fence path list, or the fence silently covers less.**
 
 ### Integration Points
-- `PhaseConfig` union + `PHASE_TYPE_REGISTRY_ENTRIES` (a 7th executor).
+- `PhaseConfig` union (`harness.py:162`) + `PHASE_TYPE_REGISTRY_ENTRIES` (a 7th executor).
 - `available_tools` (D-03) — and the `KB_TOOLS` disjointness check.
-- `phaseVocabulary.ts` + `PHASE_GLYPHS` + `PhaseNodeCard.tsx`'s `badges` slot (D-12/D-13).
+- `phaseNodeCardContract.ts` (the slot, D-12) + `soulData.PHASE_GLYPHS` + `lib/phaseGlyph.tsx`
+  (the 7th glyph) + `phaseVocabulary.ts` (the D-13 ladder tier 2) + `NodeIconWell.tsx` (where the
+  glyph renders).
 - `workflow_phases.status` CHECK (migration 115) + every surface that reads a phase status.
 - The publish gauntlet's lint path (D-06 — it must NOT block on an unconnected node).
 
-### ⚠ Landmines measured during this discussion
+### ⚠ Landmines
 - **There is ZERO MCP code in `backend/app`.** "MCP-backed" is a recorded verdict, not existing
   infrastructure. Any plan implying an MCP client exists is wrong.
 - **`_exec_llm_human_input` times out at 300s (cap 1800) and returns NORMALLY — the run
   ADVANCES.** An action-risk gate reusing that substrate must fail CLOSED. Carried from the 185
   design record; re-verify before relying on it.
-- **`workflow_phases.status` has exactly 5 allowed values** — a 6th is a migration, not a code change.
-- **`PhaseNodeCard.tsx` is G-5 FIRING at 797 L across 4 phases.** 188.2 pays it down first.
+- **`workflow_phases.status` has exactly 5 allowed values** — a 6th is a migration, not a code
+  change. **Re-verified 2026-08-07.**
+- ~~`PhaseNodeCard.tsx` is G-5 FIRING at 797 L across 4 phases.~~ **RETIRED 2026-08-07** — 274 L,
+  ledger reads *satisfied (188.2)*.
+- **NEW: the subtree GREW +67.1 % (797 → 1332 L) while the card shrank.** Five new files carry
+  their own headers, imports and props types. **Prefer filling an existing slot over adding a
+  sixth module** — 189 has no refactor budget and would re-arm G-5 on the directory.
+- **NEW: `jsdom` is blind to CSS, stacking contexts and hit-testing in this estate**, and
+  `.click()` bypasses hit-testing entirely. Any 189 claim about *reachability*, *occlusion* or
+  *visual distinguishability* needs a driven Chrome MCP row with `elementFromPoint` — a green unit
+  suite is not evidence. This is how `BUG-260806-01` survived from 184-12 and how
+  `BUG-260807-01` survives today.
+- **NEW: the app has no URL router** — `ActiveView` is React state at `App.tsx:102`, so visiting
+  `/workflows` renders chat and the URL is inert. Relevant to any 189 UAT that assumes deep links.
+- **NEW: the count gate's `failed` column is not a regression backstop** (D-188.2-DEF-01). Its
+  COUNT columns are sound. Do not read `failed 0` as "no regression".
 
 </code_context>
 
@@ -291,6 +433,10 @@ xyflow `z-index: 1000` vs the portal's `auto`; pre-existing, found while driving
   a correctness property, not a scoping convenience.
 - The badge is spent on the **transient** fact (not connected), not the **invariant** one (armed),
   so it retires cleanly when 190 lands.
+- **Added 2026-08-07:** the operator declined to fold an unrelated security fix into this phase
+  even though the bug report itself proposed it as "a cheap rider" (D-14). The consistent
+  preference across this milestone is that a phase carries its own scope and small fixes go out
+  through `/gsd:fast` — the same instinct that produced G-3 and G-7.
 
 </specifics>
 
@@ -309,6 +455,31 @@ xyflow `z-index: 1000` vs the portal's `auto`; pre-existing, found while driving
 - **How 190 swaps the no-op for a real call without re-authoring** — a 190 planning concern; D-05
   commits only to the seam being unchanged.
 
+### Open bugs reviewed at this discuss-phase and NOT folded (2026-08-07)
+
+- **`BUG-260730-02`** — the emit gate reports missing citations when citations were perfect.
+  `affected_areas: [backend/harness, emit/render_template, workflows/publish-gauntlet,
+  observability]`. **Not folded.** It is an emit-gate defect, not an external-action-node defect;
+  D-06 only requires that a workflow containing the node not be *blocked* from publishing, and
+  this bug does not change that. **Re-open trigger:** a 189 workflow containing an
+  `external_action` node fails the publish gauntlet with a citation complaint — that would make it
+  a 189 blocker rather than a neighbouring defect.
+- **`BUG-260731-01`** — the judge-model knob may be inert (env singleton).
+  `affected_areas: [backend/harness, workflows/publish-gauntlet, settings, eval/judge,
+  observability]`. **Not folded**, same reasoning. **Re-open trigger:** 189 needs to vary the
+  judge model to get an `external_action` workflow through the gauntlet's judge hard-wall.
+- **`BUG-260609-02`** (`[frontend/panel, harness/sub-agents]`) — reviewed, no overlap with this
+  phase's domain. Not folded, no trigger added.
+
+### 188.2 residue riding into this phase (look-while-you're-there, NOT blockers)
+
+- **UAT row A2 ⛔** — needs a live workflow run: read the arc presentation attributes for two
+  readings and confirm the seven readings stay distinguishable **by shape alone** in greyscale,
+  the running arc spins, and a card with no reading is still. Registered as `D-188.2-DEF-07`.
+  **189 will launch live runs (D-06); run A2 on the first one.**
+- **UAT row A1's subjective visual half** — zero-cost, one glance at a Builder card.
+  Registered as `D-188.2-DEF-08`.
+
 ### Reviewed Todos (not folded)
 - **`spike-nl-workflow-authoring.md`** (matched at score 0.6 on generic keywords: "real",
   "milestone", "first") — NL→workflow authoring is Phase 187's territory, already shipped. No
@@ -319,4 +490,4 @@ xyflow `z-index: 1000` vs the portal's `auto`; pre-existing, found while driving
 ---
 
 *Phase: 189-governed-external-action-node-model*
-*Context gathered: 2026-08-06*
+*Context gathered: 2026-08-06 · Refreshed against the shipped tree: 2026-08-07*

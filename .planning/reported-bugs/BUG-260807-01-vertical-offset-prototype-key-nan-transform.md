@@ -113,6 +113,25 @@ One more inherited, unguarded sink was noted in the same sweep and is filed here
 - **Plant as seed:** n/a — concrete and local.
 - **External — note only:** no
 
+### ⚠ ACTUAL ROUTING — operator decision, 2026-08-07 at `/gsd:discuss-phase 189`
+
+**NOT folded into Phase 189. Routed to `/gsd:fast`, to run BEFORE 189 plans.**
+
+This **overrides the "Phase 189" suggestion above**, which is left in place rather than rewritten so
+the disagreement is visible. The sizing supports the override: one file, one import, two call sites,
+no schema and no API surface — squarely G-3 `/gsd:fast` territory. It is Phase 188.2's own residue
+and it degrades a fix 188.2 just shipped, so it does not belong on Phase 189's ledger, and the
+"cheap rider" argument (that 189 owed a G-5 audit of this directory) expired when 188.2 discharged
+that gate.
+
+Recorded as **D-14** in `.planning/phases/189-governed-external-action-node-model/189-CONTEXT.md`.
+Also in scope for the same fast run: the second unguarded sink this sweep found,
+`frontend/src/lib/providerLogo.tsx:107-108`.
+
+`status` stays **`open`** and `folded_into` stays **`null`** deliberately — the fix has not landed.
+It flips to `closed` when the `/gsd:fast` run lands **and** the driven browser row below passes;
+a green unit suite may not close it (see the jsdom warning under "Fix sketch").
+
 ## Fix sketch
 
 One import of the zero-import leaf Phase 188.2 just created:
