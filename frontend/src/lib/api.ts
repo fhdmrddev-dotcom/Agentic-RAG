@@ -5473,3 +5473,245 @@ export async function acceptInvitation(token: string): Promise<AcceptInvitationR
     joined: body.joined ?? false,
   }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// Phase 190 (CONN-02 / CONN-03) — the connector-connection client
+// ═══════════════════════════════════════════════════════════════════════════════════════
+//
+// Five functions in this file's EXISTING bare-`fetch` shape: `getAuthHeaders()`, an explicit
+// `res.ok` check, a typed cast. There is deliberately NO generic request wrapper in api.ts
+// and this phase does not introduce one — a wrapper here would be a 5 000-line refactor
+// smuggled in behind a feature.
+//
+// ⚠ THE COPY IS NOT HERE. Every string below is a DEVELOPER message (the `listThreads`
+// idiom, "Failed to …"), never a sentence a person reads. UI-SPEC §4c's six refusal
+// sentences and §4b's two refusal blocks are authored in the component layer as exported
+// identifiers (the `GovernanceSection.tsx:10-17` idiom), so they can be asserted by
+// character-identity. What this layer owes the component is the SERVER'S OWN `reason_code`,
+// unmodified — that code is the key into the closed §4c map, and a client that invents its
+// own wording for it produces a seventh sentence nobody ratified.
+//
+// ⚠ THE CHECK ENDPOINT'S CLIENT FUNCTION IS DELIBERATELY ABSENT. It lands with the check
+// action in plan 190-15, so the function and the endpoint arrive in the same commit.
+
+/** The closed capability set (the backend `ConnectorCapability`, mig 116's CHECK, and
+ *  `EXTERNAL_ACTION_CAPABILITIES` are the other three spellings of this one set). */
+export type ConnectorCapability = "send_email" | "create_ticket" | "post_message"
+
+/** SMTP destination facts. There is NO password field — the credential rides `secret` on
+ *  the create/update body and is never echoed back (T7). `tls` is a closed two-member union
+ *  because D-07 requires TLS either way; there is no plaintext-SMTP member to choose. */
+export interface SendEmailConnectionConfig {
+  host: string
+  port: number
+  from_address: string
+  /** The NON-secret half of the SMTP credential pair (D-03). */
+  username?: string | null
+  tls: "starttls" | "implicit"
+}
+
+/** Jira Cloud destination facts. `account_email` is the basic-auth USERNAME half (D-03) — a
+ *  non-secret fact, which is what lets the pair be shown to an org admin without decrypting
+ *  anything. The API token rides `secret`. */
+export interface CreateTicketConnectionConfig {
+  base_url: string
+  project_key: string
+  account_email: string
+}
+
+/** Slack destination facts — a channel, and NOTHING else (D-02). There is deliberately no
+ *  `base_url` / `host` / `webhook_url`: Slack's API host is a module constant in
+ *  `app/security/egress.py`, so one of the three destinations is unforgeable by
+ *  construction. Do not add a URL field here to "make the form symmetric". */
+export interface PostMessageConnectionConfig {
+  default_channel: string
+}
+
+export type ConnectorConnectionConfig =
+  | SendEmailConnectionConfig
+  | CreateTicketConnectionConfig
+  | PostMessageConnectionConfig
+
+/** What a client is allowed to learn about a connection.
+ *
+ *  WARNING — THIS TYPE MUST NEVER DECLARE A CREDENTIAL FIELD, IN EITHER FORM. The real gate
+ *  is the Pydantic `ConnectorConnectionResponse`, which declares neither, is `extra='forbid'`,
+ *  and whose projection is fenced by a module-scope assert that makes adding one an IMPORT
+ *  failure (proved by a plant in `test_190_connectors_api.py`, observed RED as a collection
+ *  error). This type is documentation — and documentation that names a field the server never
+ *  sends invites a component to render it: first as `undefined`, then, the day somebody
+ *  "fixes" the backend to match the type, for real.
+ *
+ *  `last_check_verdict` is a QUALITY HINT the picker renders (UI-SPEC §6d), never an
+ *  authorization boundary — mig 116 says so in the column's own COMMENT. A `failed`
+ *  connection is still listed and still bindable. */
+export interface ConnectorConnection {
+  id: string
+  org_id: string
+  capability: ConnectorCapability
+  name: string
+  config: ConnectorConnectionConfig
+  is_enabled: boolean
+  last_checked_at?: string | null
+  last_check_verdict?: "not_checked" | "ok" | "failed" | null
+  created_at?: string | null
+  updated_at?: string | null
+}
+
+/** A new connection. `org_id` / `created_by` are absent on purpose — the server hard-sets
+ *  both from the authenticated caller, and a body field for either would be a
+ *  tenant-selection parameter (the D-14 leak with a friendlier name). */
+export interface ConnectorConnectionCreate {
+  capability: ConnectorCapability
+  name: string
+  config: ConnectorConnectionConfig
+  /** Write-only plaintext, at this boundary and nowhere else. Encrypted before it touches
+   *  the database and never rendered back to any browser once saved (UI-SPEC §3d). */
+  secret: string
+}
+
+/** All-optional. A present `secret` is a REPLACE, never a merge — and it resets the stored
+ *  verdict to `not_checked` server-side. `capability` is absent on purpose: changing it
+ *  would orphan both the config shape and the stored credential in one edit. */
+export interface ConnectorConnectionUpdate {
+  name?: string
+  config?: ConnectorConnectionConfig
+  secret?: string
+  is_enabled?: boolean
+}
+
+/** An `ApiError` that also carries the server's machine-readable refusal code.
+ *
+ *  UI-SPEC §4d's single most likely copy defect is flattening REFUSED (we declined to open
+ *  the socket, for a security property) / UNREACHABLE (allowed, nothing answered) /
+ *  REJECTED (we reached it and IT said no) into one "could not connect". Three states, three
+ *  headings, three next steps — and the client can only keep them apart if it keeps the
+ *  server's own code. So `reasonCode` is surfaced verbatim and is NEVER translated here. */
+export class ConnectorApiError extends ApiError {
+  readonly reasonCode: string | null
+  constructor(message: string, status: number, reasonCode: string | null) {
+    super(message, status)
+    this.name = "ConnectorApiError"
+    this.reasonCode = reasonCode
+  }
+}
+
+/** Pull `detail.reason_code` out of a refusal body without inventing one.
+ *
+ *  The server sends `{"detail": {"reason_code": "...", "message": "..."}}` for the refusals
+ *  that have a code (today: `no_encryption_key`, UI-SPEC §4b moment 9 — Save goes DISABLED)
+ *  and a plain string `detail` for the ones that do not. A body carrying no code yields
+ *  `null`, which the component renders as its generic branch — never as a fabricated code
+ *  that would key into the closed §4c map and print the wrong sentence. */
+async function readConnectorReasonCode(res: Response): Promise<string | null> {
+  try {
+    const body = (await res.json()) as { detail?: unknown }
+    const detail = body?.detail
+    if (detail && typeof detail === "object" && "reason_code" in detail) {
+      const code = (detail as { reason_code?: unknown }).reason_code
+      return typeof code === "string" ? code : null
+    }
+  } catch {
+    // A non-JSON body (a proxy's HTML 502, an empty 204) is not a refusal we can key on.
+  }
+  return null
+}
+
+/** `GET /connectors/connections` — every connection in the caller's active org, optionally
+ *  narrowed to one capability (the picker's read; mig 116's `(org_id, capability)` index is
+ *  exactly this pattern). Org-WIDE: read and bind are available to every member (U-02), so a
+ *  non-admin author can still populate the picker. */
+export async function listConnectorConnections(
+  capability?: string,
+): Promise<ConnectorConnection[]> {
+  const headers = await getAuthHeaders()
+  const qs = capability ? `?capability=${encodeURIComponent(capability)}` : ""
+  const res = await fetch(`${API_BASE}/connectors/connections${qs}`, { headers })
+  if (!res.ok) {
+    throw new ConnectorApiError(
+      "Failed to list connections",
+      res.status,
+      await readConnectorReasonCode(res),
+    )
+  }
+  return res.json() as Promise<ConnectorConnection[]>
+}
+
+/** `GET /connectors/connections/{id}` — 404 for an absent id AND for another org's, with no
+ *  way to tell them apart. Do not "improve" the caller by branching on that 404. */
+export async function getConnectorConnection(id: string): Promise<ConnectorConnection> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/connectors/connections/${id}`, { headers })
+  if (!res.ok) {
+    throw new ConnectorApiError(
+      "Failed to load the connection",
+      res.status,
+      await readConnectorReasonCode(res),
+    )
+  }
+  return res.json() as Promise<ConnectorConnection>
+}
+
+/** `POST /connectors/connections` — org admins only, enforced SERVER-side (U-02). The panel
+ *  removes the button for a non-admin, but the refusal that matters is this request's.
+ *  A 503 whose `reasonCode` is `no_encryption_key` is UI-SPEC §4b moment 9: a refusal the
+ *  person cannot fix, so Save goes DISABLED rather than staying enabled over a retry. */
+export async function createConnectorConnection(
+  body: ConnectorConnectionCreate,
+): Promise<ConnectorConnection> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/connectors/connections`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) {
+    throw new ConnectorApiError(
+      "Failed to create the connection",
+      res.status,
+      await readConnectorReasonCode(res),
+    )
+  }
+  return res.json() as Promise<ConnectorConnection>
+}
+
+/** `PATCH /connectors/connections/{id}` — org admins only. Ownership is validated server-side
+ *  BEFORE the body is interpreted, so an unowned id 404s whatever was sent; no status here
+ *  reveals whether an id exists in some other org. */
+export async function updateConnectorConnection(
+  id: string,
+  body: ConnectorConnectionUpdate,
+): Promise<ConnectorConnection> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/connectors/connections/${id}`, {
+    method: "PATCH",
+    headers,
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) {
+    throw new ConnectorApiError(
+      "Failed to update the connection",
+      res.status,
+      await readConnectorReasonCode(res),
+    )
+  }
+  return res.json() as Promise<ConnectorConnection>
+}
+
+/** `DELETE /connectors/connections/{id}` — org admins only. 204 No Content, so there is no
+ *  body to parse. UI-SPEC §2g's graded guard (the victim-naming confirm) lives in the
+ *  component; this function is the wire call it makes once the person has confirmed. */
+export async function deleteConnectorConnection(id: string): Promise<void> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/connectors/connections/${id}`, {
+    method: "DELETE",
+    headers,
+  })
+  if (!res.ok) {
+    throw new ConnectorApiError(
+      "Failed to delete the connection",
+      res.status,
+      await readConnectorReasonCode(res),
+    )
+  }
+}
