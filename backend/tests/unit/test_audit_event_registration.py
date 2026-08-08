@@ -235,6 +235,17 @@ def test_g2_positive_control_detects_a_missing_literal():
 
     An inline SQL fixture missing one literal must be detected in the direction that
     matters (Python has it, SQL does not) — the exact shape of BUG-260731-02.
+
+    ⚠ THIS CONTROL MOVES EVERY TIME A KIND IS ADDED, BY CONSTRUCTION, and that is the
+    point: the fixture is the CHECK body as the PREVIOUS migration left it, so the one
+    literal it lacks is always the newest one. It is a MIRROR of the guard, not a
+    second copy of the vocabulary — if it stopped moving, it would have stopped
+    exercising the shape it exists for.
+
+    Phase 190 (plan 190-03, migration 117) moved it for the first time: the fixture was
+    the 22-literal 070 body missing ``action_risk_pending``; it is now the 23-literal
+    114 body missing ``external_action_sent``. Phase 189 kept this file passing
+    UNCHANGED — 190 is the phase that deliberately moves it (CONTEXT D-20).
     """
     from app.db.workflows import _AUDIT_EVENT_TYPES
 
@@ -250,7 +261,9 @@ def test_g2_positive_control_detects_a_missing_literal():
             'emit_rendered','emit_integrity_failed','emit_failed',
             -- 102 (GATE-01/QUAL-01) — judge / publish / policy / ask_user-approval receipts:
             'judge_verdict','publish_attempted','publish_blocked','publish_succeeded',
-            'policy_applied','validator_ask_user_approved'
+            'policy_applied','validator_ask_user_approved',
+            -- 185 (GOVERN-03 / BUG-260731-02) — the armed action-risk pause:
+            'action_risk_pending'
         )
     );
     """
@@ -259,11 +272,12 @@ def test_g2_positive_control_detects_a_missing_literal():
     assert parsed is not None
 
     # NON-VACUITY of the control itself: the parser must survive the parenthesised
-    # grouping comments, which is exactly where a naive parser under-reports.
-    assert len(parsed) == 22, parsed
+    # grouping comments, which is exactly where a naive parser under-reports. 23 = the
+    # CHECK as migration 114 left it (measured at full-schema.sql:1124 before 117).
+    assert len(parsed) == 23, parsed
 
     missing_from_sql = set(_AUDIT_EVENT_TYPES) - set(parsed)
-    assert missing_from_sql == {"action_risk_pending"}, (
+    assert missing_from_sql == {"external_action_sent"}, (
         "G2's parser failed to detect the BUG-260731-02 shape (a kind registered in "
         "Python but absent from the CHECK) — the real G2 above is therefore not "
         "evidence of anything."
@@ -275,8 +289,10 @@ def test_g2_parser_survives_parenthesised_grouping_comments():
 
     Stripping SQL line comments must happen BEFORE the body match. The comment
     ``-- 069 (Phase 101.1) emit transitions:`` contains a ``)``; without stripping,
-    the body match terminates there and reports 9 literals instead of 23 — a false
-    GREEN in the direction that hides drift.
+    the body match terminates there and reports 9 literals instead of the full set — a
+    false GREEN in the direction that hides drift. The comparison below is deliberately
+    ``<`` rather than a pinned number, so it does not go stale when a kind is added
+    (measured: 9 naive vs 24 real at migration 117).
     """
     naive = re.search(
         r"CONSTRAINT\s+harness_audit_event_type_check\s+CHECK\s*\(\s*"

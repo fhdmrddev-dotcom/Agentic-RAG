@@ -736,6 +736,49 @@ COMMENT ON COLUMN public.code_executions.org_id IS 'Forward-compat (D-PRD-02/D-1
 
 
 --
+-- Name: connector_connections; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.connector_connections (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    org_id uuid NOT NULL,
+    created_by uuid NOT NULL,
+    capability text NOT NULL,
+    name text NOT NULL,
+    config jsonb DEFAULT '{}'::jsonb NOT NULL,
+    secret_ciphertext text,
+    is_enabled boolean DEFAULT true NOT NULL,
+    last_checked_at timestamp with time zone,
+    last_check_verdict text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT connector_connections_capability_check CHECK ((capability = ANY (ARRAY['send_email'::text, 'create_ticket'::text, 'post_message'::text]))),
+    CONSTRAINT connector_connections_last_check_verdict_check CHECK ((last_check_verdict = ANY (ARRAY['not_checked'::text, 'ok'::text, 'failed'::text])))
+);
+
+
+--
+-- Name: COLUMN connector_connections.config; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.connector_connections.config IS 'D-13 / CONN-03 SC#4: NON-SECRET facts ONLY — host, port, base_url, from_address, default_channel, project_key. No token, no password, no API key ever lands here. The workflow definition JSONB stores a connection_id REFERENCE, so no secret and no host reaches the client or the definition.';
+
+
+--
+-- Name: COLUMN connector_connections.secret_ciphertext; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.connector_connections.secret_ciphertext IS 'D-11: the connector secret as an `enc:v1:` envelope produced by the SHIPPED cipher (backend/app/security/secret_cipher.py) — no new crypto, no new key (SECRETS_ENCRYPTION_KEY). Nullable because a row may exist before its secret is set. ⚠ POLARITY INVERSION, stated so it is not read as a bug: get_cipher() returns None when unkeyed, a deliberate fail-OPEN plaintext path for app_settings provider keys (D-150-01). For an org-scoped TENANT credential 190 is fail-CLOSED — it REFUSES to store a connector secret when no cipher is available. Also: this column is NOT in SECRET_COLUMNS, which drives the app_settings boot sweep and does not fit a per-org, per-row table (encrypt at write, decrypt at call time).';
+
+
+--
+-- Name: COLUMN connector_connections.last_check_verdict; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.connector_connections.last_check_verdict IS '190-UI-SPEC §5a: a QUALITY HINT, never an authorization boundary. It feeds the Credential column (§2c) and the client-side picker filter (Gate 1); the SERVER bind gate (Gate 2) validates org + is_enabled ONLY and deliberately does NOT read this column (U-07a, door (b)) — because check is admin-only while bind is org-wide, so a stale `failed` would hard-block a member who cannot clear it. NULL means never checked.';
+
+
+--
 -- Name: departments; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1121,7 +1164,7 @@ CREATE TABLE public.harness_audit (
     metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
     org_id uuid NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT harness_audit_event_type_check CHECK ((event_type = ANY (ARRAY['phase_started'::text, 'phase_completed'::text, 'phase_transition'::text, 'gate_passed'::text, 'gate_failed'::text, 'tool_refused'::text, 'run_started'::text, 'run_completed'::text, 'run_failed'::text, 'emit_forced'::text, 'emit_recovered'::text, 'emit_validated'::text, 'emit_rejected'::text, 'emit_rendered'::text, 'emit_integrity_failed'::text, 'emit_failed'::text, 'judge_verdict'::text, 'publish_attempted'::text, 'publish_blocked'::text, 'publish_succeeded'::text, 'policy_applied'::text, 'validator_ask_user_approved'::text, 'action_risk_pending'::text])))
+    CONSTRAINT harness_audit_event_type_check CHECK ((event_type = ANY (ARRAY['phase_started'::text, 'phase_completed'::text, 'phase_transition'::text, 'gate_passed'::text, 'gate_failed'::text, 'tool_refused'::text, 'run_started'::text, 'run_completed'::text, 'run_failed'::text, 'emit_forced'::text, 'emit_recovered'::text, 'emit_validated'::text, 'emit_rejected'::text, 'emit_rendered'::text, 'emit_integrity_failed'::text, 'emit_failed'::text, 'judge_verdict'::text, 'publish_attempted'::text, 'publish_blocked'::text, 'publish_succeeded'::text, 'policy_applied'::text, 'validator_ask_user_approved'::text, 'action_risk_pending'::text, 'external_action_sent'::text])))
 );
 
 
@@ -2123,6 +2166,14 @@ ALTER TABLE ONLY public.code_executions
 
 
 --
+-- Name: connector_connections connector_connections_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.connector_connections
+    ADD CONSTRAINT connector_connections_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: departments departments_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2724,6 +2775,27 @@ CREATE INDEX idx_classification_rules_user_id ON public.classification_rules USI
 --
 
 CREATE INDEX idx_code_executions_org_id ON public.code_executions USING btree (org_id);
+
+
+--
+-- Name: idx_connector_connections_created_by; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_connector_connections_created_by ON public.connector_connections USING btree (created_by);
+
+
+--
+-- Name: idx_connector_connections_org_capability; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_connector_connections_org_capability ON public.connector_connections USING btree (org_id, capability);
+
+
+--
+-- Name: idx_connector_connections_org_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_connector_connections_org_id ON public.connector_connections USING btree (org_id);
 
 
 --
@@ -3364,6 +3436,20 @@ CREATE TRIGGER code_executions_autofill_org_id BEFORE INSERT ON public.code_exec
 
 
 --
+-- Name: connector_connections connector_connections_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER connector_connections_autofill_org_id BEFORE INSERT ON public.connector_connections FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('created_by');
+
+
+--
+-- Name: connector_connections connector_connections_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER connector_connections_set_updated_at BEFORE UPDATE ON public.connector_connections FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
 -- Name: document_chunks document_chunks_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -3765,6 +3851,22 @@ ALTER TABLE ONLY public.code_executions
 
 ALTER TABLE ONLY public.code_executions
     ADD CONSTRAINT code_executions_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: connector_connections connector_connections_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.connector_connections
+    ADD CONSTRAINT connector_connections_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: connector_connections connector_connections_org_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.connector_connections
+    ADD CONSTRAINT connector_connections_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
 
 
 --
@@ -4989,6 +5091,40 @@ ALTER TABLE public.classification_rules ENABLE ROW LEVEL SECURITY;
 --
 
 ALTER TABLE public.code_executions ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: connector_connections; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.connector_connections ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: connector_connections connector_connections_delete; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY connector_connections_delete ON public.connector_connections FOR DELETE TO authenticated USING (public.current_user_has_permission(org_id, 'org:manage'::text));
+
+
+--
+-- Name: connector_connections connector_connections_insert; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY connector_connections_insert ON public.connector_connections FOR INSERT TO authenticated WITH CHECK ((public.current_user_has_permission(org_id, 'org:manage'::text) AND (org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids))));
+
+
+--
+-- Name: connector_connections connector_connections_select; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY connector_connections_select ON public.connector_connections FOR SELECT TO authenticated USING ((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)));
+
+
+--
+-- Name: connector_connections connector_connections_update; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY connector_connections_update ON public.connector_connections FOR UPDATE TO authenticated USING (public.current_user_has_permission(org_id, 'org:manage'::text)) WITH CHECK ((public.current_user_has_permission(org_id, 'org:manage'::text) AND (org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids))));
+
 
 --
 -- Name: departments; Type: ROW SECURITY; Schema: public; Owner: -

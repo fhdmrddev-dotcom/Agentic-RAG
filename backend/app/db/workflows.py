@@ -93,10 +93,11 @@ CONCURRENCY_TOKEN_SQL = (
 
 # harness_audit.event_type CHECK (migration 059 = 9 kinds; migration 069 = +7 emit
 # kinds → 16; migration 070 = +6 judge/publish/policy/ask_user-approval kinds → 22;
-# migration 114 = +1 armed action-risk pause kind → 23 total). Validate in code so a
-# typo fails fast in tests, not as a Postgres 23514 mid-run (Pitfall 6). MUST stay IN
-# LOCKSTEP with the 069 + 070 + 114 CHECK — a mismatch is the exact fail-fast this set
-# exists for (Phase 101.1 D-12 / Phase 102 D-12).
+# migration 114 = +1 armed action-risk pause kind → 23; migration 117 = +1 send-receipt
+# kind → 24 total). Validate in code so a typo fails fast in tests, not as a Postgres
+# 23514 mid-run (Pitfall 6). MUST stay IN LOCKSTEP with the 069 + 070 + 114 + 117
+# CHECK — a mismatch is the exact fail-fast this set exists for (Phase 101.1 D-12 /
+# Phase 102 D-12).
 #
 # BUG-260731-02 (Phase 185): registering a kind HERE is only half the fix. This set
 # raises a ValueError before the INSERT; the Postgres CHECK raises a 23514 during it.
@@ -133,6 +134,10 @@ _AUDIT_EVENT_TYPES = frozenset(
         "validator_ask_user_approved",
         # 114 (Phase 185 GOVERN-03 / BUG-260731-02) — the armed action-risk pause:
         "action_risk_pending",
+        # 117 (Phase 190 CONN-02/CONN-03, D-20) — the send receipt: a real consequence,
+        # not an intention. Phase 189's D-09 deferred this kind to 190 deliberately,
+        # "where it would describe a real consequence"; 190 is the phase that creates one.
+        "external_action_sent",
     }
 )
 
@@ -1158,10 +1163,11 @@ async def write_audit(
     to a NULL ``run_id`` and carry the definition id in ``metadata`` instead. A
     keyed receipt (run created) passes the real run id; both are valid.
 
-    ``event_type`` MUST be one of the kinds in the 059 + 069 + 070 + 114 CHECK (9
-    harness lifecycle/gate kinds + 7 Phase-101.1 emit-transition kinds + 6
+    ``event_type`` MUST be one of the kinds in the 059 + 069 + 070 + 114 + 117 CHECK
+    (9 harness lifecycle/gate kinds + 7 Phase-101.1 emit-transition kinds + 6
     Phase-102 judge/publish/policy/ask_user-approval receipt kinds + the 1
-    Phase-185 armed-action-risk-pause kind) — asserted here against
+    Phase-185 armed-action-risk-pause kind + the 1 Phase-190 send-receipt
+    kind) — asserted here against
     ``_AUDIT_EVENT_TYPES`` so a typo fails fast in tests (ValueError), not as a
     Postgres 23514 mid-run (Pitfall 6). The count is deliberately NOT written out
     as a number anywhere it could go stale: the error message below derives it from
@@ -1191,7 +1197,7 @@ async def write_audit(
         raise ValueError(
             f"write_audit event_type must be one of the "
             f"{len(_AUDIT_EVENT_TYPES)} harness_audit kinds "
-            f"(059 + 069 + 070 + 114), got {event_type!r}"
+            f"(059 + 069 + 070 + 114 + 117), got {event_type!r}"
         )
     await pool.execute(
         "INSERT INTO harness_audit (run_id, user_id, event_type, metadata) "
