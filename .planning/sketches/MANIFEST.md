@@ -1278,8 +1278,8 @@ identity line is what that picker renders, so no second vocabulary is invented a
 
 | # | Name | Design Question | Winner | Tags |
 |---|------|----------------|--------|------|
-| 155 | connections-at-rest | Where does a per-row, per-org CRUD surface live in a whole-tab-Save Settings — and what is a connection's 3-second identity, at 3 connections and at 24? | *pending* | phase-190, conn-02, settings, placement, scale, instrument-table, kill-switch, seam-proof, g2-sketch-gate |
-| 156 | adding-a-connection | How does the create form make "where this sends" and "what we hold" honest — and how do the two refusals land? | *pending* | phase-190, conn-03, secrets, write-only, egress-refusal, fail-closed, d-11, d-07, d-26, credential-check, g2-sketch-gate |
+| 155 | connections-at-rest | Where does a per-row, per-org CRUD surface live in a whole-tab-Save Settings — and what is a connection's 3-second identity, at 3 connections and at 24? | **C — own tab, instrument table** ★ | phase-190, conn-02, settings, placement, scale, instrument-table, kill-switch, seam-proof, g2-sketch-gate |
+| 156 | adding-a-connection | How does the create form make "where this sends" and "what we hold" honest — and how do the two refusals land? | **A — push/split panel** ★ | phase-190, conn-03, secrets, write-only, egress-refusal, fail-closed, d-11, d-07, d-26, credential-check, g2-sketch-gate |
 
 ### The finding sketch 156 produced before a winner was picked
 
@@ -1314,3 +1314,19 @@ against absent behaviour:
   reads `checked 2 days ago`, which is a column decision for **migration 116**.
 - **Capability glyphs `✉ ▣ ＃` are placeholders**, not shipped art. They are not canvas
   `PHASE_GLYPHS` and must not become a fourth icon vocabulary — settle the source before build.
+
+### Winners (operator, 2026-08-08)
+
+| # | Winner | Why it won |
+|---|---|---|
+| 155 | **C — own tab, instrument table** | The only variant that survives its own future. A's three capability shelves are a projection of *today's* closed set of three (D-04); a fourth capability or SEED-013's catalog needs a fourth shelf, where C needs one more chip in a filter bar it already has. The 24-row drive made it concrete — A becomes three unfilterable lists (Messages alone is 13), C reads `13 of 24` on one scan line. **B did its job by being rejected:** two save models on one screen is not taste, it is one `app_settings` form behind one Save button (`SettingsPage.tsx:1354-1365`) sharing a screen with rows that each own a transaction and a write-only secret. **So Connections is a SIXTH TAB**, and that placement is now a decision with a reason. C is also a re-use, not a new pattern — the 068-A roster shape already carries users and the model registry. |
+| 156 | **A — push/split panel** | Path of least resistance and already shipped three times (`PhaseFormPanel` 140-A, the 037-A rules builder, the 027-A detail shell). Decisive beat: **it is the only container that does not trap you at moment 6** — when a check fails the honest next action is to look at the list (which connection is unusable, is anything else), and B's dialog scrims the list away. Same *scan → fix → next* argument that decided 027-A. C loses on growth, the same axis as 155: the notice blocks are the tallest thing in the form, so at moments 8/9 the inline row grows past ~400px and stops being a row — and inside 155-C's table it would push every row below it. |
+
+**Obligations the winners inherit** — carry these into `/gsd:plan-phase 190` rather than rediscovering them:
+
+- **155-C:** the filter bar + live count are load-bearing at scale, not decoration. The `Credential`
+  column commits **migration 116** to a persisted check verdict + timestamp. `Used by` commits a
+  net-new count over `workflow_definitions.definition` JSONB.
+- **156-A:** must survive **375px** (mobile → bottom sheet, per the shipped shell rule). Unlike the
+  rejected B, the panel gets **no free focus trap or focus restore** from `Dialog` — both are net-new,
+  and the a11y 035-A got for free here has to be built. Name it in the plan, not in review.

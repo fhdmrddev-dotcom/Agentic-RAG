@@ -2,8 +2,10 @@
 sketch: 155
 name: connections-at-rest
 question: "Where does a per-row, per-org CRUD surface live in a whole-tab-Save Settings — and what is a connection's 3-second identity, at 3 connections and at 24?"
-winner: null
-tags: [settings, connections, connectors, phase-190, placement, scale, kill-switch]
+winner: "C"
+winner_name: "Own tab · instrument table"
+decided: 2026-08-08
+tags: [settings, connections, connectors, phase-190, placement, scale, instrument-table, kill-switch]
 phase: 190
 ---
 
@@ -65,6 +67,29 @@ Specifically:
   renders, so no second vocabulary gets invented at the seam. At `empty` scale it reads
   *"nothing bound — this step will record, not send"*, which is the shipped `recorded_not_sent`
   terminal (D-17) told at author time.
+
+## Winner: C — own tab, instrument table (operator, 2026-08-08)
+
+**It is the only variant that survives its own future.** A's three capability shelves are a
+projection of *today's* closed set of three (D-04). The day a fourth capability or SEED-013's broad
+catalog arrives, A needs a fourth shelf and then a fifth; C needs one more chip in a filter bar it
+already has. The 24-row drive makes this concrete rather than theoretical — A becomes three
+unfilterable lists of which Messages alone is 13, while C reads `13 of 24` and keeps one scan line.
+
+**B was built to be rejected and did its job.** Two save models on one screen is not a taste
+question: everything above it is one `app_settings` form behind one **Save Integrations** button
+(`SettingsPage.tsx:1354-1365`), and a connection is a row with its own transaction and a write-only
+secret. Nesting them means either the tab-level Save silently skips the rows, or a row edit is lost
+on navigate-away. **So Connections is a sixth tab** — and that placement is now a decision with a
+recorded reason, not a default.
+
+**It has shipped lineage.** C is the 068-A instrument-table roster, the same shape already carrying
+users and the model registry — so this is a re-use, not a new pattern, and its density behaviour is
+already known at real scale.
+
+**What C inherits as obligations:** the filter bar and live count are load-bearing at scale, not
+decoration; the `Credential` column commits migration 116 to a persisted check verdict + timestamp;
+and `Used by` commits a net-new count (see Open Questions).
 
 ## Grounding
 

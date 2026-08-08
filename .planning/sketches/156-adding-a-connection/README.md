@@ -2,8 +2,10 @@
 sketch: 156
 name: adding-a-connection
 question: "How does the create form make 'where this sends' and 'what we hold' honest — and how do the two refusals land?"
-winner: null
-tags: [settings, connections, connectors, phase-190, secrets, egress, refusal, fail-closed]
+winner: "A"
+winner_name: "Push/split panel"
+decided: 2026-08-08
+tags: [settings, connections, connectors, phase-190, secrets, write-only, egress, refusal, fail-closed]
 phase: 190
 ---
 
@@ -79,6 +81,28 @@ Also worth pushing on:
 - **Container-specific:** does the dialog (B) trap you at moment 6, when the honest next action is
   to go look at the list? Does the inline expand (C) survive the notice blocks growing the row to
   ~400px tall? Does the panel (A) still work at 375px width (toolbar viewport buttons)?
+
+## Winner: A — push/split panel (operator, 2026-08-08)
+
+**Path of least resistance, and that is the argument.** The 400px right-side push/split panel is
+already the shipped shape in three places — `PhaseFormPanel` (140-A), the 037-A rules builder, and
+the 027-A document detail shell. This is a re-use of a known container, not a fourth way to open a
+form.
+
+**It is the only container that does not trap you at moment 6.** When a check fails, the honest next
+action is to look at the list — which connection is now unusable, and is anything else in the same
+state. B's dialog scrims the list away behind the failure; A leaves it in place, which is the same
+*scan → fix → next* argument that decided 027-A for document correction.
+
+**C loses on growth, the same axis as 155.** The notice blocks are the tallest thing in this form,
+and at moments 8/9 the inline row grows past ~400px — the row stops being a row. It also composes
+badly with 155-C: an expanding row inside a table pushes every row below it, which is exactly the
+density the instrument table exists to hold.
+
+**What A inherits as obligations:** it must survive 375px (the toolbar viewport buttons drive this —
+mobile becomes a bottom sheet per the shipped shell rule); and unlike B it gets **no free focus trap
+or focus restore** from `Dialog`, so both are net-new work in the panel, and the a11y that 035-A got
+for free here has to be built. Name that in the plan rather than discovering it in review.
 
 ## Grounding
 
