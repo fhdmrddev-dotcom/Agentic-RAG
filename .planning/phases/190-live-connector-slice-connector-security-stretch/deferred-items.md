@@ -72,3 +72,39 @@ test-only changes alter no architecture the graph indexes.
 
 **Re-open trigger:** the first plan in Phase 190 that lands production source — `190-02`
 (`backend/app/security/egress.py`) is the expected one. Run it there.
+
+---
+
+## D-190-DEF-04 — `backend/tests/test_dual_mode_wiring.py` is ROTTED, 15 failures, all pre-existing
+
+**Found during:** plan 190-03, while checking every consumer of the audit vocabulary after
+migration 117 widened it.
+
+**Measured, and explicitly NOT caused by this plan.** `pytest tests/test_dual_mode_wiring.py -q`
+reports **15 failed, 38 passed**. The failure-reason histogram is
+`32 AttributeError · 8 KeyError · 3 AssertionError · 2 ConnectError`, and the dominant one is:
+
+```
+AttributeError: <module 'app.api.threads'> does not have the attribute 'insert_run'
+httpx.ConnectError: [Errno 11001] getaddrinfo failed
+```
+
+`insert_run` moved out of `threads.py` during the **Phase 162.5** extraction (2444 → 1204 lines);
+the file still `monkeypatch`es it by name. The two `ConnectError`s are tests that reach the real
+network from a machine with no DNS answer for the host.
+
+**Proof this plan did not cause it:** the four tests in that file that DO touch the audit
+vocabulary are green — `pytest tests/test_dual_mode_wiring.py -k "audit or event_type"` →
+**4 passed, 49 deselected**. The file references `_AUDIT_EVENT_TYPES` exactly once, in a
+docstring at `:214`, and pins no count. The two tests that DID pin a count
+(`test_harness_audit_102.py:65`, `test_harness_audit_emit.py:60`) were caused by this plan, were
+observed RED, and were fixed in commit `0e5a62a9` under deviation Rule 3 — they are not deferred.
+
+**Why it is not fixed here:** out of scope by the executor's own scope boundary (a pre-existing
+failure in an unrelated file), and re-pointing 32 monkeypatches at the post-162.5 seams is its own
+change with its own blast radius. It also matches the recorded project finding that the backend
+suite is not a regression backstop.
+
+**Re-open trigger:** the first plan that needs `test_dual_mode_wiring.py` as evidence for a claim
+— or `/gsd:verify-work 190`, if the verifier tries to read a whole-suite number from it. Fix as
+its own `/gsd:fast` (re-point the `insert_run` monkeypatches; mark the two network-reaching tests).
