@@ -273,7 +273,7 @@ the SAME commit, and this entry must be marked resolved with the chosen half nam
 
 ---
 
-## 190-14 · A LATENT IMPORT CYCLE ON THE CONNECTOR REGISTRY — measured, fenced, NOT fixed
+## D-190-DEF-08 — a latent import cycle on the connector registry: measured, fenced, NOT fixed
 
 **Discovered:** plan 190-14 (2026-08-09), while writing the lazy-import fence.
 **Owner of the defect:** 190-08 (`registry.py`) + 190-13 (`phase_types.py:94`). Not 190-14.
