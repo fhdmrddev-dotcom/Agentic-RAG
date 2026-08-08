@@ -987,12 +987,23 @@ describe("phaseVocabulary.notConnectedOf — badge slot 1 (D-12 / D-18)", () => 
    * express `string | undefined` would be testing the type system rather than the
    * predicate. `ABSENT` distinguishes "no key at all" from "the key holding undefined",
    * which are different JSONB shapes and must both resolve to *not connected*.
+   *
+   * Built WITHOUT the shared `phase()` helper, and the cast is deliberate — the same
+   * reasoning `toolPhase` below records for the same reason. `phase()` types its `config`
+   * as `PhaseConfigJSON & Record<string, unknown>`, so a `Record<string, unknown>` built
+   * up conditionally is not assignable to it (measured: `error TS2322`, which took `tsc`
+   * from 33 to 34 on the first draft of this fixture). The conditional build is what
+   * expresses "no key at all", so the cast moves rather than the shape.
    */
   const ABSENT = Symbol("connection_id absent")
   const boundExternalPhase = (connectionId: unknown = ABSENT): PhaseSpecJSON => {
     const config: Record<string, unknown> = { phase_type: "external_action" }
     if (connectionId !== ABSENT) config.connection_id = connectionId
-    return phase({ slug: "notify-owner", config })
+    return {
+      slug: "notify-owner",
+      phase_index: 0,
+      config: config as PhaseSpecJSON["config"],
+    }
   }
 
   it("returns FALSE for an external_action phase that HAS a connection_id bound", () => {
@@ -1103,15 +1114,45 @@ describe("phaseVocabulary.notConnectedOf — badge slot 1 (D-12 / D-18)", () => 
     // single-expression predicate would force 190 to re-open all of them, so the shape is
     // asserted rather than described — the numbered-ladder argument, applied to a
     // two-line function.
+    //
+    // ⚠ AMENDED AT 190-05, AND THE AMENDMENT IS THE POINT. This case shipped at 189-13
+    // asserting `body` matched `/\n\s+return true/` — the shipped LITERAL of the state
+    // test. That is the one line 190 was designed to replace, so the case went RED on
+    // the intended change: it was pinning the placeholder rather than the property. The
+    // PROPERTY is "two separate statements, type first, state second", and that is what
+    // it pins now. The literal is deliberately NOT re-pinned to 190's text either — a
+    // future phase that widens the destination test (a second capability's id shape, an
+    // is_enabled read) must not have to come back here.
     const body = phaseVocabularySource
       .slice(phaseVocabularySource.indexOf("export function notConnectedOf"))
       .split("\n}")[0]
-    expect(body).toMatch(/!== EXTERNAL_ACTION_PHASE_TYPE\) return false/)
-    expect(body).toMatch(/\n\s+return true/)
-    // Positive control: a fused one-liner would NOT match the two-line shape above.
+    // The two tests live on two lines, so the shape is measured over LINES. (Note the
+    // type test's `return false` is NOT at column 0 of its line — it trails an `if (…)`
+    // guard — so a `/^\s*return/` count sees one of the two, which is how the first
+    // draft of this amendment got it wrong and was corrected by running it.)
+    const lines = body.split("\n").filter((l) => /\breturn\b/.test(l))
+    // 1 — EXACTLY TWO lines return. A third would mean a branch nobody named.
+    expect(lines).toHaveLength(2)
+    // 2 — the TYPE test is FIRST, still its own statement, still an early return.
+    expect(lines[0]).toMatch(/!== EXTERNAL_ACTION_PHASE_TYPE\) return false/)
+    // 3 — the STATE test is SECOND, on its OWN line, and decides on the DESTINATION
+    //     rather than on the type a second time.
+    expect(lines[1]).toMatch(/^\s*return\b/)
+    expect(lines[1]).toMatch(/connection_id/)
+    expect(lines[1]).not.toMatch(/EXTERNAL_ACTION_PHASE_TYPE/)
+    // Positive control A: a fused one-liner would NOT match the two-line shape above.
     expect("return phase.config?.phase_type === EXTERNAL_ACTION_PHASE_TYPE").not.toMatch(
       /!== EXTERNAL_ACTION_PHASE_TYPE\) return false/,
     )
+    // Positive control B: a fused predicate carrying BOTH tests in ONE statement passes
+    // control A's negative, but has ONE returning line — which is what assertion 1
+    // catches. This is the exact regression that would re-open `PhaseNode.tsx` and the
+    // card, so the control is a real string driven through the real matcher.
+    const fused =
+      "export function notConnectedOf(p: PhaseSpecJSON): boolean {\n" +
+      '  return p.config?.phase_type === EXTERNAL_ACTION_PHASE_TYPE &&\n' +
+      '    typeof p.config?.connection_id !== "string"'
+    expect(fused.split("\n").filter((l) => /\breturn\b/.test(l))).toHaveLength(1)
   })
 })
 

@@ -794,20 +794,41 @@ export function waitsForYou(phase: PhaseSpecJSON): boolean {
  * resulting `data.notConnected`; the card itself is not edited.
  *
  * ⚠ THE TYPE TEST AND THE STATE TEST ARE ON SEPARATE LINES, ON PURPOSE, and that is the
- * whole reason D-12 chose a STATE-conditional badge over a TYPE-conditional one. When
- * Phase 190 binds a real destination, it edits the SECOND line only — `return
- * <no destination bound>` — the badge stops rendering because the DATA changed, and
- * `PhaseNode.tsx` and `PhaseNodeCard.tsx` are both untouched. A single fused condition
- * would force 190 to re-open the adapter and the card.
+ * whole reason D-12 chose a STATE-conditional badge over a TYPE-conditional one. THE
+ * PREDICTION CAME TRUE AND IS RECORDED RATHER THAN QUIETLY DELETED: Phase 190-05 (CONN-02
+ * / D-24) bound a real destination and edited the SECOND line ONLY. The badge stopped
+ * rendering because the DATA changed. The measured cost was `1 insertion / 1 deletion` in
+ * this file, and `PhaseNode.tsx`, `PhaseNodeCard.tsx` and the six fenced card-subtree
+ * modules (`phaseNodeCardContract.ts`, `ownProperty.ts`, `NodeCornerMarks.tsx`,
+ * `NodeRunOverlay.tsx`, `NodeIconWell.tsx`) each ended that phase at a MEASURED
+ * `git diff --numstat` of `0 0`. A single fused condition would have forced 190 to
+ * re-open the adapter and the card — so the shape STAYS two lines, for the next phase.
  *
- * ⚠ THE FALSE BRANCH OF THE STATE TEST IS UNREACHABLE TODAY, and that is stated rather
- * than hidden: no connection mechanism exists anywhere in this app in 189, so every
- * `external_action` step genuinely IS not-connected and the badge is *de facto*
- * type-conditional until 190. The falsifiable half available NOW is the TYPE test — this
- * returns `false` for every one of the six shipped types — and that is what the suite
- * drives, over all six individually.
+ * ⚠ WHAT CHANGED, AND WHAT DID NOT. The false branch USED to be unreachable — 189 stated
+ * that plainly rather than hiding it, because no connection mechanism existed anywhere in
+ * the app and every `external_action` step genuinely WAS not-connected. It is reachable
+ * now: `ExternalActionPhaseConfig` carries the additive-optional `connection_id`
+ * REFERENCE (D-13), so the suite drives BOTH polarities and the boundary between them.
+ * What did NOT change is the read: this function sees a REFERENCE and nothing else. No
+ * host, no port, no token and no credential enters the definition JSONB or reaches the
+ * canvas — CONN-03 SC#4 read literally.
+ *
+ * ⚠ THE BOUND STATE IS AN ABSENCE, AND NOTHING REPLACES IT (`190-UI-SPEC.md` §7b). A
+ * bound step loses this badge and gains no "Connected" badge, no dot, no tint and no
+ * mark. Two reasons, each binding elsewhere: 137-B allows at most TWO badges and slot 2
+ * is spent, so a third is a typecheck error against `BadgeSlots`; and the canvas is calm
+ * at rest (052-A) — the badge flagged an INCOMPLETE step, so completing it removes the
+ * flag. Where the step sends is legible in the panel's 🔒 footer, at the moment the
+ * author is deciding; the canvas answers "is this step finished?", not "where to?".
+ *
+ * NOT CONNECTED means NO DESTINATION IS BOUND — which is deliberately narrower than
+ * "the id is falsy". An empty or whitespace-only string is not a destination, and neither
+ * is a number, a boolean or an object: the definition column is JSONB and hand-editable,
+ * so the state test admits a value only when it is a NON-EMPTY STRING. A truthiness
+ * check (`!!config.connection_id`) would clear the badge for `""`, and a key-presence
+ * check would clear it for `null` — both are driven RED in the suite.
  */
 export function notConnectedOf(phase: PhaseSpecJSON): boolean {
   if (phase.config?.phase_type !== EXTERNAL_ACTION_PHASE_TYPE) return false
-  return true
+  return typeof phase.config?.connection_id !== "string" || phase.config?.connection_id.trim() === ""
 }
