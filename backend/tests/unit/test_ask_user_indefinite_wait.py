@@ -136,13 +136,13 @@ def test_indefinite_subscribe_waits_and_returns_the_payload():
 
     from app.services.ask_user_service import subscribe_for_response
 
-    pubsub = _FakePubSub({"kind": "response", "response_text": "Approve and run this step"})
+    pubsub = _FakePubSub({"kind": "response", "response_text": "Approve this step"})
     redis = _FakeRedis(pubsub)
     run_id = uuid4()
 
     payload = asyncio.run(subscribe_for_response(redis, run_id, "tc-1", None))
 
-    assert payload == {"kind": "response", "response_text": "Approve and run this step"}
+    assert payload == {"kind": "response", "response_text": "Approve this step"}
     # The load-bearing ordering is intact: SUBSCRIBE happened, then the advertise.
     assert pubsub.subscribed == [f"ask_user:{run_id}:tc-1"]
     assert redis.sadd_calls == [(f"ask_user:channels:{run_id}", f"ask_user:{run_id}:tc-1")]

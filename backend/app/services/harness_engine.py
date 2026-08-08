@@ -1009,7 +1009,7 @@ def _ask_user_choices_from_finding(error_message: str) -> list[str]:
     ``error_message`` prefix:
       - ``freshness:staleness|...``         → ["Proceed anyway", "Abort"]
       - ``freshness:version_ambiguity|...`` → ["Proceed despite version ambiguity", "Abort"]
-      - ``action_risk:approval|...``        → ["Approve and run this step", "Do not run it"]
+      - ``action_risk:approval|...``        → ["Approve this step", "Do not run it"]
     Any other finding falls back to the generic Proceed/Abort pair. The choices are
     presented to the user; the engine maps the chosen text back to a continue/fail
     routing (an Abort-like choice → fail_run; anything else → Proceed).
@@ -1044,7 +1044,27 @@ def _ask_user_choices_from_finding(error_message: str) -> list[str]:
 # once for the same reason ``_ABORT_LIKE_CHOICES`` below writes the decline phrase as
 # the literal the function returns: a rename must not be able to separate the label
 # from the gate that reads it.
-_ACTION_RISK_APPROVE_CHOICE = "Approve and run this step"
+#
+# ⚠ WORDING — corrected at /gsd:verify-work 189 (2026-08-08), operator-decided.
+# This read "Approve and run this step" until Phase 189's live UAT observed it on an
+# ``external_action`` step, whose whole contract is that it RECORDS AN INTENTION AND
+# SENDS NOTHING. "and run" implied an outward effect the governed node exists not to
+# have — it was the one sentence on that surface arguing against SC#4, while the
+# step's own recorded output says "No email was sent. Nothing left this workflow."
+#
+# Deliberately ONE literal for every armed type rather than a phase-type-conditional
+# label: the gate at ``_resolve_failure_with_ask_user`` is an EXACT-MATCH fail-closed
+# compare, and making the label conditional would force that allow-list to accept two
+# strings — widening the consent set on an irreversible action, which is precisely the
+# surface Phase 190 makes dangerous. "Approve this step" is true of every armed type
+# (185's ``llm_human_input`` included) without splitting the label from its gate.
+#
+# ⚠ Changing this literal changes what counts as consent. A run already PAUSED at an
+# armed checkpoint under the old label fails CLOSED on resume (line ~1365 returns
+# fail_run when the answer does not match) — safe, but it does end that run. Verified
+# at edit time that no live paused run existed; the three ``active`` rows were stale
+# zombies from June/July.
+_ACTION_RISK_APPROVE_CHOICE = "Approve this step"
 
 
 # Phase 185 (GOVERN-03 / RESEARCH L-4) — the set of chosen texts that mean "do NOT

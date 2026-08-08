@@ -412,7 +412,7 @@ def test_armed_gate_subscribes_with_no_timeout_at_all():
     # D-187-01: the armed treatment is REQUESTED by the caller (is_action_risk=True),
     # never sniffed out of the finding, and the checkpoint has no validator index.
     finding = _armed_finding(authored)
-    subscribe = AsyncMock(return_value={"kind": "response", "response_text": "Approve and run this step"})
+    subscribe = AsyncMock(return_value={"kind": "response", "response_text": "Approve this step"})
 
     with patch.object(harness_engine, "write_audit", AsyncMock()), \
          patch("app.services.ask_user_service.subscribe_for_response", subscribe):
@@ -562,7 +562,7 @@ def test_armed_prompt_and_row_carry_a_null_deadline_never_zero():
 
     tool_call = supabase.table.return_value.insert.call_args[0][0]["tool_calls"][0]
     assert tool_call["timeout_seconds"] is None
-    assert tool_call["options"] == ["Approve and run this step", "Do not run it"]
+    assert tool_call["options"] == ["Approve this step", "Do not run it"]
 
 
 def test_shutdown_mid_wait_leaves_an_armed_run_resumable():
@@ -936,7 +936,7 @@ def test_a_restart_re_subscribes_the_armed_prompt_with_no_deadline():
     pending = {
         "tool_call_id": "tc-armed-1",
         "prompt": 'Step 2 of 4, "Send the renewal notice", is about to run.',
-        "options": ["Approve and run this step", "Do not run it"],
+        "options": ["Approve this step", "Do not run it"],
         "timeout_seconds": None,
     }
 
@@ -946,7 +946,7 @@ def test_a_restart_re_subscribes_the_armed_prompt_with_no_deadline():
     args, _kwargs = resume_prompt.await_args
     assert args[2] == "tc-armed-1", "the resumed prompt is a DIFFERENT one — orphaned card"
     assert args[5] is None, f"the restart re-introduced a {args[5]!r}s deadline"
-    assert args[4] == ["Approve and run this step", "Do not run it"]
+    assert args[4] == ["Approve this step", "Do not run it"]
 
 
 def test_an_armed_phase_with_no_durable_prompt_row_falls_through_unchanged():

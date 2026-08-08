@@ -309,12 +309,12 @@ def test_non_ask_user_disposition_delegates_to_route():
 def test_action_risk_choices_are_about_the_step_not_a_finding():
     """The ``action_risk:approval|`` prefix yields the armed pair. Nothing was flagged
     on an armed step — the author simply said a person decides first — so the wording is
-    about the STEP ("Approve and run this step" / "Do not run it"), not about proceeding
+    about the STEP ("Approve this step" / "Do not run it"), not about proceeding
     despite a problem. The three shipped freshness/generic branches are untouched."""
     from app.services.harness_engine import _ask_user_choices_from_finding
 
     armed = _ask_user_choices_from_finding(_ARMED_FINDING)
-    assert armed == ["Approve and run this step", "Do not run it"]
+    assert armed == ["Approve this step", "Do not run it"]
 
     # The shipped branches are byte-identical (regression fence for the new branch).
     assert _ask_user_choices_from_finding("freshness:staleness|400d old") == [
@@ -388,14 +388,14 @@ def test_armed_decline_fails_the_run_and_writes_no_approval():
 
 
 def test_armed_approval_runs_the_body_and_writes_the_receipt():
-    """The other half of the pair. "Approve and run this step" on a PRE gate returns
+    """The other half of the pair. "Approve this step" on a PRE gate returns
     ``None`` (the signal: run the body) and writes the governance receipt carrying the
     chosen text — so the ledger records WHO said yes to WHAT."""
     from app.services import harness_engine
 
     write_audit = AsyncMock()
     subscribe = AsyncMock(
-        return_value={"kind": "response", "response_text": "Approve and run this step"}
+        return_value={"kind": "response", "response_text": "Approve this step"}
     )
 
     with patch.object(harness_engine, "write_audit", write_audit), \
@@ -412,7 +412,7 @@ def test_armed_approval_runs_the_body_and_writes_the_receipt():
     assert write_audit.await_count == 1
     _, kwargs = write_audit.await_args
     assert kwargs["event_type"] == "validator_ask_user_approved"
-    assert kwargs["metadata"]["choice"] == "Approve and run this step"
+    assert kwargs["metadata"]["choice"] == "Approve this step"
 
     # ── D-187-18 — THE GOVERNANCE-LEDGER SHAPE CHANGE, PINNED ────────────────────
     # ``metadata["validator"]`` is ``None`` on a HOISTED armed checkpoint's receipt, and
@@ -607,14 +607,14 @@ def test_armed_typed_refusal_is_never_approval():
     # POSITIVE CONTROL, same harness, same run. Without it "0 receipts" could be
     # vacuously true — this proves the counter moves and the assertions above can fail.
     outcome, write_audit = _drive(
-        _armed_phase(), _ARMED_FINDING, _typed("Approve and run this step"),
+        _armed_phase(), _ARMED_FINDING, _typed("Approve this step"),
         is_action_risk=True,
     )
     assert outcome is None, "the exact presented label must proceed (pre-gate → None)"
     assert write_audit.await_count == 1
     _, kwargs = write_audit.await_args
     assert kwargs["event_type"] == "validator_ask_user_approved"
-    assert kwargs["metadata"]["choice"] == "Approve and run this step"
+    assert kwargs["metadata"]["choice"] == "Approve this step"
 
 
 def test_armed_approval_by_choice_index_still_proceeds():
@@ -632,7 +632,7 @@ def test_armed_approval_by_choice_index_still_proceeds():
     assert write_audit.await_count == 1
     _, kwargs = write_audit.await_args
     assert kwargs["event_type"] == "validator_ask_user_approved"
-    assert kwargs["metadata"]["choice"] == "Approve and run this step"
+    assert kwargs["metadata"]["choice"] == "Approve this step"
 
 
 def test_non_armed_free_text_fall_through_is_unchanged():
@@ -748,7 +748,7 @@ def test_armed_checkpoint_on_a_fail_run_phase_still_asks():
 
     # ── the ARMED call: the author's fail_run must not speak for the checkpoint ──
     subscribe = AsyncMock(
-        return_value={"kind": "response", "response_text": "Approve and run this step"}
+        return_value={"kind": "response", "response_text": "Approve this step"}
     )
     with patch.object(harness_engine, "write_audit", AsyncMock()), \
          patch("app.services.ask_user_service.subscribe_for_response", subscribe):

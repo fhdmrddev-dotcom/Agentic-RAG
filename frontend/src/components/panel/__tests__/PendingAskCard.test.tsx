@@ -389,7 +389,7 @@ const mockPendingAskNoDeadline = (): PendingAsk => ({
   ...mockPendingAskWithRunId,
   tool_call_id: "tc-armed-1",
   prompt: 'Step 2 of 4, "Send the renewal notice", is about to run.',
-  options: ["Approve and run this step", "Do not run it"],
+  options: ["Approve this step", "Do not run it"],
   timeout_seconds: null,
 })
 
