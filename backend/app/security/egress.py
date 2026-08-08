@@ -41,19 +41,33 @@ Secret-logging discipline (D-08, inherited verbatim from ``secret_cipher``'s
 T-081.1-04 block): every log line emits the capability, the refused HOST and the reason code
 — NEVER a credential, never a request body, never a URL query string.
 
-SCOPE: this module validates and pins. It opens NOTHING. The httpx IP pin, the smtplib
-``_host`` pin, ``follow_redirects=False`` and the response-size cap are plan 190-07; the
-``redirected`` reason code is declared in the closed table here and raised there.
+SCOPE (extended by plan 190-07): this module validates, pins AND binds. The two transport
+binders at the bottom — ``send_pinned_http`` and ``open_pinned_smtp`` — are the ONLY two
+places in the app where a connector socket is opened (D-05), and the ``redirected`` reason
+code that 190-02 declared and left unraised is raised in ``send_pinned_http``.
+
+⚠ RESIDUAL-190-01 (a NAMED residual risk, guarded by
+``tests/unit/test_190_residual_fence.py``, not by this paragraph): both pin recipes depend on
+NON-PUBLIC attributes — ``smtplib.SMTP._host`` (private, and ``SMTP.connect()``'s
+non-assignment of it is an implementation detail rather than a documented contract) and
+``httpcore``'s ``sni_hostname`` request extension (an httpx/httpcore internal convention, not
+a versioned public API). A CPython or httpx minor upgrade could break the pin **while every
+functional test still passes**, because an un-pinned connection simply re-resolves and still
+works. Trigger: any Python or httpx version bump in ``requirements.txt``.
 """
 from __future__ import annotations
 
 import ipaddress
 import logging
+import smtplib
 import socket
+import ssl
+import zlib
 from dataclasses import dataclass
-from typing import Callable
+from typing import Any, Callable, Mapping, NamedTuple
 
 import httpx
+from starlette.concurrency import run_in_threadpool
 
 logger = logging.getLogger(__name__)
 
@@ -410,12 +424,332 @@ def validate_destination(
     return PinnedDestination(ip=answers[0], hostname=host, port=resolved_port, scheme=scheme)
 
 
+# ══ THE TWO TRANSPORT BINDERS (plan 190-07) ═══════════════════════════════════
+#
+# D-05: these are the ONLY two places a connector socket is opened. Everything above decides
+# WHERE we may connect; everything below is what makes the socket actually go there. The two
+# halves are deliberately one module: the same validated triple has to feed httpx and
+# smtplib, and smtplib has no transport concept at all — so it is one validator and two thin
+# binders, rather than an AsyncHTTPTransport subclass that would make the ordering implicit
+# (RESEARCH §R10's recommendation; D-06's whole point is that the ordering is ASSERTABLE).
+
+
+class EgressResponseTooLarge(Exception):
+    """A response exceeded its byte cap, on the wire or after decompression.
+
+    A NAMED type rather than a generic error because a caller must be able to tell "the
+    remote sent too much" from "the network failed" — D-17's honest terminal cannot be
+    reported from an exception nobody can classify.
+    """
+
+
+class EgressResponseUndecodable(Exception):
+    """A response carried a Content-Encoding this module will not expand, or a truncated one.
+
+    Returning still-compressed bytes to an adapter would be a silent wrong answer, and
+    expanding an arbitrary encoding is how the cap below stops being a cap.
+    """
+
+
+class PinnedResponse(NamedTuple):
+    """``(status_code, headers, body)`` — deliberately UNINTERPRETED.
+
+    ⚠ Do NOT add a ``success`` flag here. Slack returns HTTP 200 with ``{"ok": false}`` on
+    failure while Jira uses real status codes, so any shared notion of success flattens a
+    difference that is the T13 defect — the single most likely way this phase ships a lie.
+    Interpretation belongs to each adapter (190-08/10/11).
+    """
+
+    status_code: int
+    headers: dict[str, str]
+    body: bytes
+
+
+# Content-Encodings this module will expand, and the zlib window each needs. Anything else is
+# refused rather than guessed at.
+_DECODER_WBITS: dict[str, int] = {
+    "gzip": 16 + zlib.MAX_WBITS,
+    "x-gzip": 16 + zlib.MAX_WBITS,
+    "deflate": zlib.MAX_WBITS,  # zlib-wrapped; the raw form is retried at -MAX_WBITS below
+}
+
+
+def _decode_bounded(raw: bytes, content_encoding: str | None, max_bytes: int) -> bytes:
+    """Expand a response body with the cap applied to the DECOMPRESSED size.
+
+    ⚠ MEASURED, and it is why this exists instead of ``response.aiter_bytes()``: 5 MB of one
+    repeated byte gzips to about 5 KB, and httpx delivered the whole 5 MB as a SINGLE decoded
+    chunk — so a between-chunks check has already paid for the memory before it runs. Capping
+    the wire bytes alone is the classic miss; capping only the decoded stream is unbounded in
+    one step. ``zlib.decompressobj().decompress(data, max_length)`` bounds the OUTPUT, which
+    is the only version of this that is actually bounded.
+    """
+    encoding = (content_encoding or "").strip().lower()
+    if encoding in ("", "identity"):
+        return raw
+    if encoding not in _DECODER_WBITS:
+        raise EgressResponseUndecodable(
+            f"response Content-Encoding {encoding!r} is not one of "
+            f"{sorted(_DECODER_WBITS) + ['identity']}"
+        )
+
+    def _inflate(wbits: int) -> bytes:
+        decompressor = zlib.decompressobj(wbits)
+        # max_bytes + 1 so "exactly at the cap" is allowed and "one byte over" is detectable.
+        expanded = decompressor.decompress(raw, max_bytes + 1)
+        if len(expanded) > max_bytes or decompressor.unconsumed_tail:
+            raise EgressResponseTooLarge(
+                f"response expanded past the {max_bytes}-byte cap from {len(raw)} wire bytes "
+                f"(a decompression bomb expands ~1000:1; the wire size is not the cost)"
+            )
+        if not decompressor.eof:
+            raise EgressResponseUndecodable(
+                f"{encoding} body ended mid-stream after {len(expanded)} bytes"
+            )
+        return expanded
+
+    try:
+        return _inflate(_DECODER_WBITS[encoding])
+    except zlib.error:
+        if encoding != "deflate":
+            raise EgressResponseUndecodable(f"{encoding} body did not decode") from None
+        # RFC 1950 vs RFC 1951: "deflate" is served both zlib-wrapped and raw in the wild.
+        try:
+            return _inflate(-zlib.MAX_WBITS)
+        except zlib.error:
+            raise EgressResponseUndecodable("deflate body did not decode") from None
+
+
+async def send_pinned_http(
+    capability: str,
+    method: str,
+    url: str,
+    *,
+    json: Any | None = None,
+    headers: Mapping[str, str] | None = None,
+    auth: tuple[str, str] | None = None,
+    timeout: float,
+    max_bytes: int,
+    allowed_host: str | None = None,
+    resolver: Callable[[str, int], list[str]] | None = None,
+    transport: httpx.AsyncBaseTransport | None = None,
+) -> PinnedResponse:
+    """Send ONE request to a validated destination, pinned to the validated address.
+
+    THE SEQUENCE IS THE SECURITY PROPERTY (D-07): validate once, rewrite the URL to the IP
+    literal so the connection cannot re-resolve, restore the TLS/HTTP identity by name, refuse
+    redirects explicitly, and read the body under a cap that survives compression.
+
+    ``transport`` is a test seam with a production default of ``None`` — the same shape as
+    ``validate_destination``'s ``resolver``, and for the same reason: a binder exercisable
+    only against the live internet is a binder that is untested in CI.
+    """
+    # ── 1 · validate FIRST; a refusal propagates as EgressRefused and is never swallowed ──
+    # D-06: this runs before any credential is touched. `auth` arrives already resolved, but
+    # nothing here reads it, and a refusal below never reaches the transport at all.
+    pinned = validate_destination(
+        capability, url, allowed_host=allowed_host, resolver=resolver
+    )
+
+    # ── 2 · rewrite the URL to the IP literal (D-07 step 5) ──
+    # This single line is the DNS-rebinding TOCTOU fix: the TCP connection goes to the address
+    # that was validated, not to whatever the next DNS answer says. httpx brackets IPv6 for us.
+    target = httpx.URL(url).copy_with(host=pinned.ip)
+
+    # ── 3 · restore the identity the pin would otherwise cost us ──
+    # A pin that loses SNI silently points certificate HOSTNAME verification at an address no
+    # certificate carries, which is a worse bug than the one being fixed.
+    outgoing: dict[str, str] = {
+        # Asking for an unencoded body shrinks the decompression-bomb surface to servers that
+        # ignore the request; _decode_bounded handles the ones that do.
+        "Accept-Encoding": "identity",
+        **{str(k): str(v) for k, v in (headers or {}).items()},
+        "Host": pinned.hostname,
+    }
+
+    explicit_timeout = httpx.Timeout(timeout)
+    async with httpx.AsyncClient(
+        transport=transport,
+        timeout=explicit_timeout,
+        # trust_env=False is a SECURITY setting, not tidiness: an HTTPS_PROXY in the
+        # environment would route this connection through a host nothing validated, and the
+        # pin would be silently worthless while every test still passed.
+        trust_env=False,
+        follow_redirects=False,
+    ) as client:
+        request = client.build_request(
+            method,
+            target,
+            json=json,
+            headers=outgoing,
+            timeout=explicit_timeout,
+        )
+        # RESIDUAL-190-01 (a): httpcore reads this extension and passes it straight into
+        # start_tls(server_hostname=...), independently of the host used for the TCP
+        # connection. Measured present in this venv (httpx 0.28.1):
+        #   'sni_hostname' in inspect.getsource(httpcore._async.connection) -> True
+        # It is an httpcore internal convention, not a versioned public API; the fence in
+        # tests/unit/test_190_residual_fence.py is what makes its removal loud.
+        request.extensions["sni_hostname"] = pinned.hostname
+
+        # follow_redirects=False is set EXPLICITLY even though it is already the httpx
+        # default: D-07 step 4 is a security property, and a default is not a guarantee. A
+        # 30x to 169.254.169.254 is the classic post-validation bypass.
+        response = await client.send(
+            request, auth=auth, follow_redirects=False, stream=True
+        )
+        try:
+            if 300 <= response.status_code < 400:
+                # The raise site for the `redirected` code 190-02 declared. Returning the 30x
+                # to the adapter instead would leave the bypass one adapter line away.
+                location_host = ""
+                try:
+                    location_host = httpx.URL(response.headers.get("location", "")).host
+                except Exception:  # noqa: BLE001 — an unparseable Location is still a refusal
+                    location_host = "<unparseable>"
+                raise _refuse(
+                    capability,
+                    pinned.hostname,
+                    "redirected",
+                    detail=f"{response.status_code} to host {location_host!r}",
+                )
+
+            # A declared over-cap length fails before a single body byte is read.
+            declared = response.headers.get("content-length")
+            if declared is not None:
+                try:
+                    if int(declared) > max_bytes:
+                        raise EgressResponseTooLarge(
+                            f"response declares {int(declared)} bytes, over the "
+                            f"{max_bytes}-byte cap"
+                        )
+                except ValueError:
+                    pass  # an unparseable length is not a permission; the stream cap follows
+
+            # aiter_raw, not aiter_bytes: the wire bytes are capped here and the decompressed
+            # bytes are capped in _decode_bounded. Both, because either alone has a hole.
+            wire = bytearray()
+            async for chunk in response.aiter_raw():
+                wire += chunk
+                if len(wire) > max_bytes:
+                    raise EgressResponseTooLarge(
+                        f"response exceeded the {max_bytes}-byte cap on the wire; the read "
+                        "was abandoned rather than buffered"
+                    )
+            body = _decode_bounded(
+                bytes(wire), response.headers.get("content-encoding"), max_bytes
+            )
+            return PinnedResponse(
+                status_code=response.status_code,
+                headers=dict(response.headers),
+                body=body,
+            )
+        finally:
+            await response.aclose()
+
+
+# smtps -> implicit TLS on 465; smtp+starttls -> cleartext connect then STARTTLS on 587.
+# There is no third entry, and plaintext never reaches here: validate_destination refuses a
+# destination whose scheme is not one of these two.
+_SMTP_TLS_MODES: dict[str, str] = {
+    "smtps": "implicit",
+    "smtp+starttls": "starttls",
+}
+
+
+def _open_pinned_smtp_blocking(
+    pinned: PinnedDestination, *, timeout: float, tls_mode: str
+) -> smtplib.SMTP:
+    """The BLOCKING half. Never call this from the event loop — see ``open_pinned_smtp``."""
+    context = ssl.create_default_context()  # check_hostname=True, verify_mode=CERT_REQUIRED
+    if tls_mode == "implicit":
+        # No host argument: a bare construction does NOT connect (measured:
+        # `smtplib.SMTP_SSL(timeout=1)._host` -> '').
+        client: smtplib.SMTP = smtplib.SMTP_SSL(context=context, timeout=timeout)
+    else:
+        client = smtplib.SMTP(timeout=timeout)
+
+    # RESIDUAL-190-01 (b) — THE PIN. Both stdlib TLS paths derive the certificate hostname
+    # from this attribute (SMTP_SSL._get_socket and SMTP.starttls both call
+    # wrap_socket(..., server_hostname=self._host)), and the measured fact that makes pinning
+    # work at all is:
+    #     '_host' in inspect.getsource(smtplib.SMTP.connect) -> False
+    # i.e. connect() uses its host argument for the TCP socket ONLY and never overwrites the
+    # identity. That is an implementation detail, not a documented contract, which is exactly
+    # why tests/unit/test_190_residual_fence.py asserts it every run.
+    # It MUST be set before connect(): SMTP_SSL wraps the socket inside connect().
+    client._host = pinned.hostname
+
+    client.connect(pinned.ip, pinned.port)  # TCP to the PINNED address; _host untouched
+    if tls_mode == "starttls":
+        # starttls() runs EHLO first and re-wraps the live socket with server_hostname=_host.
+        client.starttls(context=context)
+    return client
+
+
+async def open_pinned_smtp(
+    capability: str,
+    host: str,
+    port: int | None = None,
+    *,
+    tls_mode: str | None = None,
+    timeout: float,
+    allowed_host: str | None = None,
+    resolver: Callable[[str, int], list[str]] | None = None,
+) -> smtplib.SMTP:
+    """Open ONE TLS SMTP session to a validated destination, pinned to the validated address.
+
+    ``host`` carries its TLS scheme (``smtps://`` or ``smtp+starttls://``) because TLS is
+    STATED here, never assumed — ``validate_destination`` refuses a bare hostname.
+
+    ⚠ ``smtplib`` IS BLOCKING and ``_exec_external_action`` is ``async def``. SEED-065
+    measured what that costs: a sync HTTP call left on the event loop froze ALL request
+    serving for the round trip (threadpool 6/200 — blocking, not starvation). The connect
+    therefore runs through ``run_in_threadpool`` (D-v2.5-01), and this async entry point is
+    the ONLY exported way in, so the blocking half cannot be reached by accident.
+
+    Composition and sending are the SMTP adapter's (190-08): this returns an open session and
+    calls no raw-string send API of any kind — a hand-built message bypasses
+    ``EmailMessage``'s CR/LF guard, which is the one way header injection reaches the wire
+    (RESEARCH §R13). The banned token itself is deliberately NOT written out in this prose:
+    the D-05 fence greps for it, and a docstring that names it would trip the grep it is
+    describing. (190-06 hit the same criterion-vs-legibility conflict and had to STATE it;
+    here the sentence can simply be written so both hold.)
+    """
+    pinned = validate_destination(
+        capability, host, port, allowed_host=allowed_host, resolver=resolver
+    )
+    derived = _SMTP_TLS_MODES.get(pinned.scheme)
+    if derived is None:
+        # Reachable only by calling this binder for an HTTP capability — a programming error,
+        # not a destination problem, so it is not an EgressRefused.
+        raise ValueError(
+            f"open_pinned_smtp cannot serve scheme {pinned.scheme!r} (capability "
+            f"{capability!r}); it speaks {sorted(_SMTP_TLS_MODES)}"
+        )
+    if tls_mode is not None and tls_mode != derived:
+        # One source of truth. A tls_mode that disagrees with the validated scheme is how a
+        # "smtps://" destination quietly becomes a cleartext session.
+        raise ValueError(
+            f"tls_mode={tls_mode!r} contradicts the validated scheme {pinned.scheme!r} "
+            f"(which means {derived!r}); the scheme decides"
+        )
+    return await run_in_threadpool(
+        _open_pinned_smtp_blocking, pinned, timeout=timeout, tls_mode=derived
+    )
+
+
 __all__ = [
     "REFUSAL_REASONS",
     "EgressRefused",
+    "EgressResponseTooLarge",
+    "EgressResponseUndecodable",
     "PinnedDestination",
+    "PinnedResponse",
     "refuse_reason",
     "validate_destination",
+    "send_pinned_http",
+    "open_pinned_smtp",
     "ALLOWED_HOST_SUFFIXES",
     "SLACK_API_BASE",
 ]
