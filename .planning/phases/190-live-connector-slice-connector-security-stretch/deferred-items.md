@@ -195,3 +195,78 @@ and ingestion surfaces, zero of them reachable from this plan's one changed line
 whole-frontend-suite number as evidence. **`/gsd:verify-work 190` must not read `npm test` as a
 regression signal for this phase** — use `node scripts/vitest-count-gate.cjs` (48 files, `failed
 0`) plus the per-suite run, which is what plans 190-05 onward actually assert against.
+
+---
+
+## D-190-DEF-06 — the `npm test` rot GREW between plan 190-05 and plan 190-09: 8 files / 21 tests → 9 files / 26 tests
+
+**Found during:** plan 190-09 Task 3, recording the frontend numbers.
+
+**Measured at HEAD after 190-09's three commits:** `cd frontend && npm test` →
+**26 failed | 4562 passed (4588)**, across **9** failing files. D-190-DEF-05 recorded **21
+failures in 8 files**. The extra file is
+`src/components/layout/__tests__/ChatHistoryColumn.test.tsx` (4 of the 5 extra failures; the
+5th is ordering-dependent and does not reproduce in isolation).
+
+**It is NOT this plan's, and that was driven rather than argued.** `api.ts` was temporarily
+rolled back to its `HEAD~1` bytes and the file re-run:
+
+```
+=== WITHOUT the 190-09 api.ts block ===   Tests  4 failed | 16 passed (20)
+=== WITH    the 190-09 api.ts block ===   Tests  4 failed | 16 passed (20)
+```
+
+Identical. `api.ts` was restored md5-identical (`fb4b4de7…`) and `git diff --stat` on it is
+empty. The test file itself has not been touched since `c10cc7d8` (Phase 165), and it imports
+nothing from `lib/api`.
+
+**Why it is not fixed here:** the executor scope boundary. `ChatHistoryColumn` is a chat-layout
+surface with no reachable path from this plan's one appended block, and it belongs to the same
+SEED-056 rot D-190-DEF-05 already carries.
+
+**Why it is recorded rather than folded into D-190-DEF-05:** because the number MOVED. A
+deferral that quotes a stale count invites the next plan to read a real regression as the known
+rot. The honest instrument for this phase remains `node scripts/vitest-count-gate.cjs`
+(48 pinned files, `failed 0`, 2732 tests at 190-09) — `npm test` is not a regression backstop
+here, and `/gsd:verify-work 190` must not read it as one.
+
+**Re-open trigger:** SEED-056's own trigger, or the first time the `npm test` failure count
+moves again inside phase 190 — at which point it must be re-derived and re-attributed by the
+same roll-back-and-re-run method, never inherited from this entry.
+
+---
+
+## D-190-DEF-07 — UI-SPEC §2h's banner copy and plan 190-09's write gate CONTRADICT each other
+
+**Found during:** plan 190-09 Task 1, choosing where to attach `require_visible("live_connectors")`.
+
+**The contradiction, both sides quoted.** Plan 190-09's Task 1 directs the gate onto the WRITE
+endpoints (*"attach `require_visible("live_connectors")` per endpoint on the WRITE endpoints"*)
+and Task 2 requires a test exercising it in BOTH directions. UI-SPEC §2h's operator-approved
+banner copy says, verbatim:
+
+> `Connections below can be saved and bound to a workflow, but no message, ticket or email will leave.`
+
+With the cold default `"off"`, a non-operator org admin is refused on create/edit/delete — so
+the banner's *"can be saved"* is **false for exactly the audience that reads it**. The panel
+notice in §9 carries the same sentence (*"You can save this connection and workflow authors can
+bind it to a step"*) and inherits the same problem.
+
+**What was done, and why.** The PLAN was followed: the gate is attached to the three write
+endpoints and NOT to the reads. The plan is this executor's contract, it was authored with the
+UI-SPEC in its own `<context>`, and of the two possible errors this is the more restrictive one
+— a phase whose whole discipline is not over-claiming should not ship a live-credential surface
+MORE open than its plan says. The conflict is stated in `api/connectors.py`'s module header, in
+`190-09-SUMMARY.md`, and here, so it cannot be discovered as a bug in UAT.
+
+**It is a ONE-LINE decision either way, and the operator owns it:**
+- *the banner is right* → delete the three `dependencies=[Depends(require_visible("live_connectors"))]`
+  entries in `api/connectors.py`; the flag then governs only the SEND path (190-13), which is
+  what D-26 actually describes (*"an `external_action` step behaves precisely as it does
+  today"* — a statement about the executor, not about CRUD);
+- *the gate is right* → amend §2h's and §9's second sentences to say the tab is read-only until
+  an operator turns it on.
+
+**Re-open trigger:** the Settings → Connections UI plan (190-10 / 190-11) — it cannot render the
+§2h banner without meeting this. Whichever way it goes, both the copy and the gate must move in
+the SAME commit, and this entry must be marked resolved with the chosen half named.
