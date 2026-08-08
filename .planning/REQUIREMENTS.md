@@ -56,7 +56,7 @@
 
 ### CONN — external-integration node model (operator HARD gate #3, CORE half)
 
-- [ ] **CONN-01**: A user can place a governed **external-action node** on the canvas whose capabilities ride the existing per-phase tool-whitelist guard (an MCP-backed node model — zero new governance concept); the milestone **records the own-framework-vs-Open-Platform decision** (research verdict: MCP-first, first-party-thin, broad catalog sequenced with Open Platform SEED-013/014). CORE ships the governed node vocabulary + the recorded decision — no live outbound egress (that is CONN-02/03, STRETCH).
+- [x] **CONN-01**: A user can place a governed **external-action node** on the canvas whose capabilities ride the existing per-phase tool-whitelist guard (an MCP-backed node model — zero new governance concept); the milestone **records the own-framework-vs-Open-Platform decision** (research verdict: MCP-first, first-party-thin, broad catalog sequenced with Open Platform SEED-013/014). CORE ships the governed node vocabulary + the recorded decision — no live outbound egress (that is CONN-02/03, STRETCH).
 
 ## STRETCH Requirements (gated behind CORE)
 
@@ -118,7 +118,7 @@ Which phases cover which requirements. Filled at roadmap creation 2026-07-24, re
 | RUNVIZ-01 | Phase 188 | Pending |
 | RUNVIZ-02 | Phase 188 | Pending |
 | RUNVIZ-03 | Phase 188 | Pending |
-| CONN-01 | Phase 189 | Pending |
+| CONN-01 | Phase 189 | Complete |
 | CONN-02 (STRETCH) | Phase 190 | Pending |
 | CONN-03 (STRETCH) | Phase 190 | Pending |
 | SCALE-01 (STRETCH) | Phase 191 | Pending |

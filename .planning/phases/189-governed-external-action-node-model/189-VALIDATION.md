@@ -1,8 +1,8 @@
 ---
 phase: 189
 slug: governed-external-action-node-model
-status: coverage-consolidated-driven-rows-owed
-nyquist_compliant: false
+status: driven-complete
+nyquist_compliant: true
 wave_0_complete: true
 created: 2026-08-07
 consolidated: 2026-08-07
@@ -32,6 +32,19 @@ nyquist_compliant: false  <-- NOT an oversight. It is the honest reading.
   FLIPS TO true WHEN: the 189-16 Task 3 live session records PASS/FAIL verdicts for U1-U6
   plus the D-25 pairing and BUG-260807-01's reachability row, with U2's falsification control
   observed swinging BOTH ways. Nothing else is outstanding.
+
+  ⚠ FLIPPED TO true at /gsd:verify-work 189, 2026-08-08. The trigger above fired exactly as
+  written — checked condition by condition rather than on a general sense that the session
+  "went well":
+    U1 ✅ · U2 ✅ · U3 ✅ · U4 ✅ · U5 ✅ · U6 ✅ · U7 ✅   (all seven have verdicts)
+    D-25 ✅ — the RENDERED half, not just the wire
+    U2's falsification control OBSERVED SWINGING BOTH WAYS — a zIndex 99999 plant drove
+      badgeReachable true -> false, removal drove it false -> true. Both recorded.
+    BUG-260807-01's reachability row ⛔ FAILED — which SATISFIES the trigger. The trigger
+      asked for a PASS/FAIL verdict, not a pass. The row failed into a named successor
+      (BUG-260808-01) and the operator routed it out of this phase at the verify gate.
+  The flag now means "we looked, and here is what we saw" — which is what it was held false
+  to protect. It is NOT being set on the strength of an owed note.
 -->
 
 # Phase 189 — Validation Strategy
