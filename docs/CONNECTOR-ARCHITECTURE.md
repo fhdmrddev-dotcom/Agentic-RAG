@@ -168,3 +168,89 @@ accommodates a read return value without being widened today.
 connector need that no MCP server covers") is *not* what happened — the ask is for a direction the
 verdict never scoped, not for a connector outside the thin set. Recording it here keeps the next
 reader from mistaking silence-on-reads for a decision that reads are out.
+
+## Amendment — 2026-08-08 (Phase 190, D-01): the first three connectors ship as first-party adapters behind an MCP-SHAPED seam
+
+**Appended, never edited in place.** This document's own re-open rule says a superseding decision is
+recorded by amending this file and adding a `D-vX.Y-NN` entry to `.planning/prd-reset/DECISIONS.md`
+— *"never editing the verdict in place without a trace."* The verdict above is therefore untouched;
+the register entry is [`D-v3.6-02`](../.planning/prd-reset/DECISIONS.md), which supersedes
+`D-v3.6-01` on this one clause and on nothing else.
+
+### What changes, in one sentence
+
+Only the clause that said the first three connectors would ride an **MCP client on day one**: Phase
+190 ships them as **first-party adapters behind an MCP-shaped seam**, and builds **no MCP client**.
+
+### What does NOT change
+
+An amendment that does not fence itself gets read as a reversal, so the fence is explicit. All four
+of these stand in full:
+
+1. **MCP-first remains the substrate direction.** When this app builds a connector substrate, it
+   builds against the Model Context Protocol rather than a bespoke connector framework.
+2. **The "be callable BY the tools users already run" bet stands** — this app as an MCP *server*
+   (SEED-013's second consumer mode) is still a first-class story, not an afterthought.
+3. **First-party-thin is exactly this three-capability slice** — `send_email`, `create_ticket`,
+   `post_message`. Thin remains a choice, not a staging post toward breadth.
+4. **Broad catalog still defers to the Open Platform milestone** (SEED-013 / SEED-014). Nothing is
+   forked into v3.6.
+
+Nor is the *"no arbitrary-code / third-party-package connector node, ever"* rule touched: Phase 190
+adds no expression language and no arbitrary-code node.
+
+### Why — three structural reasons, not a matter of effort
+
+**1. A third-party MCP server makes the outbound call itself.** Our egress guard would guard exactly
+one hop — the hop to the MCP server — and **not** the hop to Slack / Jira / the SMTP host. CONN-03
+SC#2 requires that *every connector outbound passes an unconditional SSRF / egress allow-list
+guard*. Through a remote MCP server that sentence is **unprovable, because the socket that matters
+is in someone else's process.** This is the load-bearing reason; the other two would each be
+survivable alone.
+
+**2. Credentials would live in the MCP server's config, not in our DB.** CONN-03 SC#4 requires
+org-scoped, Fernet-encrypted credentials resolved server-side by reference. A remote MCP server
+holds its own token, so we would satisfy the letter of SC#4 for a credential that is **not the one
+doing the sending** — the worst kind of green test.
+
+**3. Running MCP servers locally is a second runtime**, which the milestone's red line **D-14**
+forbids in as many words (*"action node, still no second runtime"*). stdio-subprocess MCP servers
+are precisely that: process supervision, lifecycle management, sandboxing and a new failure class —
+inside a phase whose gate is `threats_open: 0`.
+
+### What ships instead
+
+One `ConnectorAdapter` protocol with **three** adapters, each of which **we own the socket for**, so
+the CONN-03 guard sits on the only path out. The protocol is deliberately **MCP-shaped** — a named
+capability, a JSON argument object, a structured result, a declared input schema — so that when the
+Open Platform milestone builds a real MCP client, adapters register **through** the same seam rather
+than beside it. Nothing here has to be unbuilt for MCP to arrive; the seam is the point.
+
+### The measured evidence that makes this an amendment and not a retreat
+
+Nothing is being walked back, because **there was never any MCP code to walk back.** Re-measured
+today, 2026-08-08, on this working tree:
+
+```
+$ grep -rni "\bmcp\b" backend/app --include=*.py | wc -l
+0
+```
+
+— unchanged from the same measurement recorded above at 2026-08-07. **"MCP-backed" on this page was
+always a chosen direction, never existing infrastructure.**
+
+⚠ One honest refinement of that command, discovered by Phase 189 and worth carrying: `\bmcp\b` does
+**not** match `MCPClient` (after `MCP` comes `C`, so there is no word boundary), so the bare grep
+above is weaker than it looks. The real fence is **Case A of
+`backend/tests/unit/test_189_no_egress.py`** (`test_no_mcp_identifiers_in_backend_app`), which uses a
+starts-a-word matcher with its own positive control (`test_the_mcp_matcher_actually_matches`) so the
+fence cannot pass vacuously. Both were run as this amendment's verification: **2 passed, 0 failed**.
+That fence keeps the zero true rather than merely observed.
+
+### The re-open trigger, expressed as a check rather than a memory
+
+**The MCP client arrives with Open Platform (SEED-013 / SEED-014).** The observable is **a phase
+number appearing on `.planning/ROADMAP.md` for SEED-013**. At that point each of the three adapters
+either becomes an MCP client call behind the **unchanged** `ConnectorAdapter` protocol, or is
+retired. Until that phase number exists, this amendment stands and does not need re-argued — and the
+three re-open triggers of the verdict itself, dated 2026-08-07 above, are unaffected by it.
