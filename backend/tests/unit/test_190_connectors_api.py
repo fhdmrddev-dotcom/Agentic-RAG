@@ -1,10 +1,9 @@
 """Phase 190 (CONN-02 / CONN-03) — the connector-router falsification set.
 
-Six cases, driving plan 190-09 Task 1's router contract. (Task 2 appends the
-`live_connectors` kill-switch cases to this same file — see its own section marker below
-once it lands.) Every case here was plant-driven: a plant was applied to REAL production
-source, the single case run, the verbatim RED recorded in `190-09-SUMMARY.md`, and the file
-restored md5-identical.
+Ten cases. Six drive plan 190-09 Task 1's router contract; four drive Task 2's
+`live_connectors` kill-switch and the router's registration. Every case that CAN be
+plant-driven WAS: a plant was applied to REAL production source, the single case run, the
+verbatim RED recorded in `190-09-SUMMARY.md`, and the file restored md5-identical.
 
   1. a cross-org id reads as ABSENT — 404, never the forbidden status, and the body names
      no owner                                     PLANT: return the forbidden status instead
@@ -17,6 +16,13 @@ restored md5-identical.
                                                    PLANT: drop the ConnectorNotFound handler
   6. **T7** — a row that HAS a `secret_ciphertext` serialises with neither the field name
      nor the ciphertext anywhere in the JSON       PLANT: add the field to the response model
+  7. `live_connectors` is IN `_VISIBILITY_FEATURES` and ABSENT from `_FLAG_HUMAN_NAMES`
+                                                   PLANT: move it to the other allowlist
+  8. its cold default is `"off"`, READ from `_GOVERNED_FEATURES` rather than retyped
+                                                   PLANT: flip the cold default to "everyone"
+  9. the switch is exercised in BOTH directions in code (G-4)
+                                                   PLANT: drop the write endpoint's gate
+ 10. the router is REGISTERED on the real app      PLANT: drop the include_router line
 
 ⚠ WHY CASE 2 IS THE ONE TO READ. UI-SPEC §2b's gate is a UI rule *and* a security rule, and
 only the second half is falsifiable here: *"the gate must be API-enforced, not merely
@@ -366,3 +372,106 @@ def test_no_response_shape_can_carry_the_credential(
     # the real sweep above was looking for something that was genuinely available to leak.
     assert SENTINEL_CIPHERTEXT in STORED_ROW["secret_ciphertext"]
 
+
+# ── 7 · the CORRECTED allowlist (CORRECTION #6) ──────────────────────────────────────────
+def test_live_connectors_is_in_the_zero_migration_allowlist_and_not_the_other():
+    """Case 7 — membership in ONE set and ABSENCE from the other, asserted together.
+
+    CONTEXT D-26 names `admin.py`'s `/admin/flags` allowlist while citing Phase 181's
+    `visual_workflow_canvas` precedent. Measured at HEAD, `visual_workflow_canvas` is at
+    `admin.py:104`, inside `_VISIBILITY_FEATURES` (`:97-105`), NOT `_FLAG_HUMAN_NAMES`
+    (`:67-79`). The difference is not stylistic:
+
+      `_FLAG_HUMAN_NAMES` -> PUT /admin/flags  -> an app_settings BOOLEAN COLUMN -> migration 118
+      `_VISIBILITY_FEATURES` -> PUT /admin/visibility -> mig-098 JSONB + audience enum -> ZERO
+
+    The ABSENCE half is the load-bearing half. Without it, a later "tidy-up" that moves the
+    key into the flags allowlist would be green here while silently owing a migration nobody
+    wrote — and the flag would then read False forever off a column that does not exist.
+    """
+    from app.api.admin import _FLAG_HUMAN_NAMES, _VISIBILITY_FEATURES
+
+    assert "live_connectors" in _VISIBILITY_FEATURES, (
+        "live_connectors must ride PUT /admin/visibility (zero migrations), the path Phase "
+        "181 actually used for visual_workflow_canvas"
+    )
+    assert "live_connectors" not in _FLAG_HUMAN_NAMES, (
+        "live_connectors moved into the /admin/flags allowlist — that path writes an "
+        "app_settings BOOLEAN COLUMN and therefore owes migration 118. Move it back, or "
+        "write the migration in the SAME commit"
+    )
+    # Phase 181's precedent is still where this case says it is — if IT moves, so does the
+    # reasoning above, and this assertion is how that gets noticed.
+    assert "visual_workflow_canvas" in _VISIBILITY_FEATURES
+
+
+# ── 8 · the cold default that makes "zero migration" true ────────────────────────────────
+def test_the_cold_default_is_off_and_is_read_not_retyped():
+    """Case 8 — `live_connectors` is hidden from EVERYONE, operators included, until a flip.
+
+    Read from `_GOVERNED_FEATURES` rather than re-typed, because that dict is THE ONE
+    authoritative cold default: an unseeded `feature_visibility` key falls through to it, and
+    the `app_settings` JSONB gains the key only on an operator flip via
+    `set_feature_visibility`'s atomic `||` merge. That is precisely why no migration is owed.
+    """
+    from app.api.admin import _VISIBILITY_AUDIENCES
+    from app.models.user_settings import _GOVERNED_FEATURES
+
+    assert _GOVERNED_FEATURES["live_connectors"] == "off"
+    # "off" must still be a WRITABLE audience, or the operator could never turn it back on.
+    assert "off" in _VISIBILITY_AUDIENCES and "everyone" in _VISIBILITY_AUDIENCES
+
+
+# ── 9 · the switch, BOTH ways (G-4) — and the registration ───────────────────────────────
+def test_the_kill_switch_refuses_writes_off_and_permits_them_on(
+    mock_asyncpg_pool, mock_execute_result, monkeypatch, router_client
+):
+    """Case 9a — exercised in BOTH directions in code, per G-4's *toggles BOTH ways*.
+
+    A one-directional kill-switch test is satisfied by a router that refuses forever, which
+    is exactly the failure a kill-switch is most likely to ship. `org:manage` is granted in
+    both halves so the ONLY variable between them is the audience.
+    """
+    _as_org_member(monkeypatch, mock_asyncpg_pool, role="org-admin")
+    _install_perms(monkeypatch, {"org:manage": True})
+    mock_execute_result.data = [STORED_ROW]
+
+    # OFF — the cold default. A non-operator org admin is refused.
+    _install_feature(monkeypatch, "off")
+    off = router_client.post(
+        "/connectors/connections", headers=_org_headers(), json=VALID_CREATE_BODY
+    )
+    assert off.status_code == 403, f"live_connectors=off must refuse the write: {off.text!r}"
+
+    # ON — the operator has flipped it to "everyone". The SAME request is not refused.
+    _install_feature(monkeypatch, "everyone")
+    on = router_client.post(
+        "/connectors/connections", headers=_org_headers(), json=VALID_CREATE_BODY
+    )
+    assert on.status_code != 403, (
+        f"live_connectors=everyone must NOT refuse the write — got {on.status_code}: {on.text!r}"
+    )
+    assert on.status_code == 201, on.text
+
+    # And the READ is deliberately NOT gated, in EITHER direction (UI-SPEC §2h): the Settings
+    # tab has to render its OFF banner over the real table rather than a dead page.
+    _install_feature(monkeypatch, "off")
+    read = router_client.get("/connectors/connections", headers=_org_headers())
+    assert read.status_code == 200, (
+        "the read is gated — the OFF banner can never render, and every non-admin author "
+        "loses the picker at the same time"
+    )
+
+
+def test_the_router_is_registered_on_the_real_app():
+    """Case 9b — the router is REACHABLE, which the probe app deliberately cannot prove.
+
+    Asserted against the real `app.main.app` route table (and by path template, not by a
+    response), so a registration deleted in a later merge fails here rather than in UAT.
+    """
+    paths = {getattr(r, "path", None) for r in real_app.routes}
+    assert "/connectors/connections" in paths, (
+        "connectors.router is not included in app.main — every case above would keep passing "
+        "on the probe app while the real surface 404s"
+    )
+    assert "/connectors/connections/{connection_id}" in paths

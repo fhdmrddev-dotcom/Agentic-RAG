@@ -1201,6 +1201,17 @@ _GOVERNED_FEATURES: dict[str, str] = {
     # needed: the app_settings.feature_visibility JSONB gains the key only on an operator
     # flip via set_feature_visibility's atomic `||` merge ("off" -> "everyone" and back).
     "visual_workflow_canvas": "off",
+    # Phase 190 (CONN-03 / D-26): live outbound sending ships behind a governed flag whose
+    # cold default is the same 5th audience enum member "off" — hidden from EVERYONE,
+    # operators included. NO migration is needed for exactly the reason stated above: this
+    # dict is the ONE authoritative cold default (an unseeded feature_visibility key falls
+    # through to it), and the app_settings.feature_visibility JSONB gains the key only on an
+    # operator flip via set_feature_visibility's atomic `||` merge ("off" -> "everyone" and
+    # back). With it off an external_action step behaves exactly as it does today: it
+    # records, it does not send, and it reads "Not sent — recorded" — an already-tested
+    # state, which is what makes this off-switch cheap and honest rather than a second code
+    # path (UI-SPEC §9).
+    "live_connectors": "off",
 }
 
 

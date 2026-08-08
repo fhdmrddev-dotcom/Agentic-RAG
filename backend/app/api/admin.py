@@ -102,6 +102,15 @@ _VISIBILITY_FEATURES = {
     # Phase 181 (REVERT-01 / T-181-03): the v3.6 canvas flag is operator-writable through
     # the SAME allowlisted PUT /admin/visibility path (Off = "off", On = "everyone").
     "visual_workflow_canvas",
+    # Phase 190 (CONN-03 / D-26): the live-connector kill-switch rides the SAME allowlisted
+    # PUT /admin/visibility path (Off = "off", On = "everyone"), for the SAME reason Phase
+    # 181 chose it — ZERO migrations. CONTEXT D-26 names the /admin/flags allowlist above
+    # while citing this very precedent; measured, `visual_workflow_canvas` has always lived
+    # HERE, and the flags path writes an app_settings BOOLEAN COLUMN (= a migration 118 this
+    # phase does not owe). Cold default "off" lives in user_settings._GOVERNED_FEATURES;
+    # test_190_connectors_api.py asserts membership here AND absence from _FLAG_HUMAN_NAMES,
+    # so a later move that silently owes a column fails loudly instead of reading False.
+    "live_connectors",
 }
 # Phase 167 (VIS-01 / D-167-06): the audience enum extends to "role" (zero migration — the
 # mig-098 JSONB shape). A "role" write also carries a roles[] greenlist validated against the
