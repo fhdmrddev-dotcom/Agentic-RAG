@@ -234,6 +234,8 @@ def test_the_mcp_matcher_actually_matches():
         )
 
 
+# Phase 190 / D-01 — UNTOUCHED AND STILL GREEN ON PURPOSE: 190 builds no MCP client, so this
+# fence's continued passing is part of the ROADMAP amendment's evidence rather than a leftover.
 def test_no_mcp_identifiers_in_backend_app():
     """V11 / SC#4 — ZERO `mcp` identifiers exist anywhere under `backend/app`.
 
@@ -337,18 +339,48 @@ def test_the_socket_patch_is_not_inert(monkeypatch):
 
 
 @pytest.mark.parametrize("capability", CAPABILITIES)
-async def test_the_external_action_executor_performs_no_network_io(monkeypatch, capability):
-    """V10 / SC#4 / D-05 — the executor RECORDS the intended action and sends NOTHING.
+async def test_the_external_action_executor_with_no_connection_bound_performs_no_network_io(
+    monkeypatch, capability
+):
+    """V10 / SC#4 / D-05 — a step with NO CONNECTION BOUND records and sends NOTHING.
 
     Every HTTP transport is armed to raise before the executor runs, so any outbound call
     is a hard failure rather than a slow test. The executor must return normally, and its
     output must be a plain dict (`text` by convention, which `_latest_phase_text` scans for).
 
     Run for all three D-15 capabilities: SC#4 is a property of the phase, not of one name.
+
+    ── PHASE 190 · THE DRIVE IS RE-SCOPED, THE SENTINEL IS NOT ──────────────────────────
+    In 189 this was true UNCONDITIONALLY — nothing could send, because no send existed. From
+    190 it is true only for a step with **no ``connection_id``**, and the honest response is to
+    put that precondition in the NAME and assert it, rather than to widen the claim or delete
+    the case.
+
+    **The precondition is not a test convenience.** D-17 keeps ``recorded_not_sent`` as the
+    permanent, shipping terminal for an unbound step — *"Not sent — recorded"* — and it is the
+    half of the demo sentence competitors do not have. So this case does not shrink in 190; it
+    becomes the regression fence over a state the product deliberately still has.
+
+    ``_block_all_http`` itself is **byte-identical**: it is imported by
+    ``test_harness_engine.py:1139``, and editing it here would silently change a different
+    suite's meaning. Its sibling — the new positive case below — is what proves the send went
+    live.
     """
     execute = _external_action_executor()
     phase = _external_action_phase(capability)
     ctx = _run_ctx()
+
+    # ── the precondition, asserted rather than assumed (Phase 190 / D-13 / D-17) ──────────
+    # Inert today: `ExternalActionPhaseConfig` is a `_StrictBase` (`extra='forbid'`) and carries
+    # no `connection_id` field yet, so this cannot currently fail. It is written now so that the
+    # commit which lands D-13's optional field cannot quietly leave this case asserting
+    # "sends nothing" about a step that DOES have a destination bound.
+    assert getattr(phase.config, "connection_id", None) is None, (
+        "this case's whole meaning from Phase 190 onward is that NO connection is bound; a "
+        f"phase carrying connection_id={getattr(phase.config, 'connection_id', None)!r} must "
+        "send, and is covered by "
+        "test_a_bound_connection_under_the_armed_sentinel_MUST_attempt_egress instead"
+    )
 
     _block_all_http(monkeypatch)
 
@@ -361,6 +393,106 @@ async def test_the_external_action_executor_performs_no_network_io(monkeypatch, 
     assert isinstance(output.get("text"), str), (
         "the external_action executor must carry `text` - _latest_phase_text scans for it"
     )
+
+
+# ── Case B′ (PHASE 190, plan 190-01) — the POSITIVE half of the sentinel ──────
+#
+# The case above proves an UNBOUND step sends nothing. On its own that is satisfiable by an
+# executor which sends nothing EVER — which is precisely what ships today, and precisely what
+# Phase 190 exists to change. Without the case below, 190 could land its adapters, its
+# credentials and its guard, break the wiring anywhere along the way, and this suite would
+# report green over a connector that never once opened a socket.
+
+
+def _external_action_phase_with_connection_bound(
+    capability: str = "post_message",
+    connection_id: str = "cccccccc-0000-4000-8000-00000000000b",
+):
+    """A phase WITH a destination bound (D-13's ``connection_id``).
+
+    ⚠ **Duck-typed, and NOT by preference.** Every other builder in this file goes through
+    ``WorkflowDefinition.model_validate`` on purpose ("*so this case exercises the same object
+    the engine passes, not a look-alike*"). That is impossible for this state today, and the
+    reason was MEASURED rather than assumed — ``ExternalActionPhaseConfig`` is a ``_StrictBase``
+    (``extra='forbid'``) with no ``connection_id`` field, and **both** routes to one are closed:
+
+        model_validate(... "connection_id": "x" ...)
+        →  ValidationError: phases.0.config.external_action.connection_id
+           Extra inputs are not permitted [type=extra_forbidden]
+
+        cfg.connection_id = "x"
+        →  ValueError: "ExternalActionPhaseConfig" object has no field "connection_id"
+
+    The executor reads its config through ``getattr`` (``phase_types.py:1867``), so this drives
+    the real function faithfully. **What it cannot do is catch the model rejecting the field.**
+
+    ⚠ **OWED AT THE PLAN THAT LANDS D-13:** switch this builder back to
+    ``WorkflowDefinition.model_validate``. The moment the optional field exists there is no
+    excuse for a look-alike, and leaving one behind would quietly retire this file's own rule.
+    """
+    return SimpleNamespace(
+        slug="notify",
+        phase_index=0,
+        config=SimpleNamespace(
+            phase_type="external_action",
+            capability=capability,
+            available_tools=[capability],
+            connection_id=connection_id,
+        ),
+    )
+
+
+def test_a_bound_connection_under_the_armed_sentinel_MUST_attempt_egress(monkeypatch):
+    """PHASE 190 — a step WITH a connection bound must actually try to send. **RED TODAY.**
+
+    This is the inverse of every other case in this file, and it is the only one that can tell
+    "the guard held" apart from "nothing was ever wired". Its RED is not a defect report — it
+    is the recorded starting state of Phase 190, authored in Wave 0 before any adapter exists,
+    exactly as CONTEXT ``<specifics>`` requires.
+
+    **The RED it produces today is a MEANINGFUL one, not a module-missing one.** Its two
+    siblings in this plan fail with ``ModuleNotFoundError``, which measures the import system.
+    This one imports cleanly, builds a real bound phase, runs the REAL shipped executor with
+    every transport armed, and fails with ``DID NOT RAISE`` — a direct measurement of the
+    property that the shipped executor opens no socket. That is the baseline the send has to
+    move, and it is why this case is worth more than the two that merely cannot import.
+
+    ⚠ **THE LOOP IS BUILT BEFORE THE SENTINEL ARMS**, and the ordering is load-bearing on
+    Windows: ``asyncio.run`` creates a fresh proactor loop whose self-pipe is a ``socketpair()``
+    — itself a ``socket.connect`` the sentinel would catch, failing the case in
+    ``proactor_events._make_self_pipe`` rather than in the executor. Recorded verbatim at
+    ``test_harness_engine.py:1143-1148``, where it was measured the hard way; copied here rather
+    than rediscovered.
+
+    ``is_golden_run=False`` is the other half of the setup and it is deliberate: a golden run
+    must send NOTHING (D-16), and that opposite property has its own already-armed fence in
+    ``test_harness_engine.py::test_a_golden_run_of_an_external_action_performs_no_egress``. Drive
+    this one as a golden run and it would pass forever while proving the reverse.
+    """
+    import asyncio as _asyncio
+
+    execute = _external_action_executor()
+    phase = _external_action_phase_with_connection_bound()
+    ctx = _run_ctx()
+
+    assert ctx.is_golden_run is False, (
+        "a golden run is required NOT to send (D-16); driving this case as one would invert "
+        "the property it is named after"
+    )
+    assert phase.config.connection_id, (
+        "the whole precondition of this case is a BOUND connection - without it this is just "
+        "the unbound case above, and it would pass for the wrong reason"
+    )
+
+    loop = _asyncio.new_event_loop()
+    try:
+        _block_all_http(monkeypatch)
+        with pytest.raises(_EgressAttempted):
+            loop.run_until_complete(
+                execute(phase, {"draft": {"text": "the draft body"}}, ctx)
+            )
+    finally:
+        loop.close()
 
 
 # ── Case D (189-09) — D-02: a name outside the closed set RAISES ──────────────
