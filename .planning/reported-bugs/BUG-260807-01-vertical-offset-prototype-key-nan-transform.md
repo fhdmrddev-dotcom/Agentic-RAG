@@ -195,3 +195,36 @@ it is not `none`, plus an `elementFromPoint` reachability check on a neighbourin
 - `backend/app/models/harness.py:202` — `slug: str`, unconstrained
 - `.planning/phases/188.2-…/188.2-SECURITY.md` § Unregistered Flags — FLAG-01, the origin
 - `BUG-260806-01` — the fix whose `zIndex` this defect now rides on
+
+## THE DRIVEN ROW RAN — 2026-08-08 — and it FAILED into a named successor
+
+The row this report was held open for has now been driven on a live canvas. **The result vindicates
+the closing condition written above:** a green unit suite could not have closed this, because the
+rendered symptom still occurs — through a different sink.
+
+**The fix shipped here HOLDS.** Measured on the live DOM with a phase slugged `constructor` present:
+`transformHasNaN: false` on every node and every affordance. `verticalOffsetFor` can no longer
+return NaN, and nothing about the `own()` guard regressed.
+
+**But the rendered symptom reproduced anyway.** The `constructor`-slugged node receives **no
+transform at all** (`node.style.transform` is empty, computed `none`), so it paints at the canvas
+origin stacked on phase 1 — `retrieve` and `constructor` both measure at rect `58,176`. Control
+observed swinging both ways: the same fixture with the slug changed to `ordinaryslug` renders
+`translate(320px, 0px)`, its correct lane.
+
+Not a NaN — an ABSENT value. A slug-keyed position lookup resolves the inherited
+`Object.prototype.constructor` (a function, never nullish, so `!== undefined` and `?? fallback` both
+pass) instead of an `{x, y}`, and the writer then emits nothing.
+
+**Filed as `BUG-260808-01`** with the measurements, the control, and reproduction steps.
+
+**This report stays `open`** — but its meaning has changed. It is no longer waiting on an unrun row;
+it is waiting on `BUG-260808-01`, because closing this one while a phase slugged `constructor` still
+renders wrong would claim a user-visible fix that has not landed. Flip both together, and prefer the
+class fix (constrain the slug at the boundary, or use `Map`/`Object.create(null)`) over a seventh
+one-site guard — three reports in three days is the signal.
+
+⚠ Reproduction note for whoever takes it: **the UI cannot author this slug.** `D-184-11` is explicit
+that there is no slug field and the caller derives the slug from the phase type, so the row requires
+a seeded `workflow_definitions` fixture (all rows in this project are test data). The fixture used
+here was deleted after the measurement.

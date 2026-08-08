@@ -577,3 +577,126 @@ the `constructor`-slug row all ride that one run.
 | **D-13 tier 4 / D-12 badge slot 1** | ✅ **PASS** | The placed card's face is capability-derived, and the `Not connected` badge occupies slot 1 — the slot 188.2 was forbidden from spending and 189-15 spent. |
 
 **Session total: 8 PASS · 3 still not driven (all behind ONE named blocker) · 1 NEW BLOCKER FOUND.**
+
+---
+
+## ⚠ THE OWED ROWS, DRIVEN — 2026-08-08, on a PUBLISHED external-action workflow
+
+The blocker recorded in the previous session — *"no external-action workflow could be published, so
+no run surface could be opened"* — is **discharged**. `BUG-260807-02` (both halves) shipped in the
+interim, so the 7th step type is now placeable; the workflow below was published and run live.
+
+**How the blocker was cleared, since three earlier attempts failed at the judge on content:** fork a
+STARTER (`Weekly Status Report`), which is the only path that populates `business_requirement` — see
+the finding below — bind it to the KB the published sibling already used
+(`PM Demo Project (sample data)`), insert the external-action step **mid-spine**, publish.
+Result: **`weekly-status-report-wfzqel` v1, `published`**, phases `retrieve · act · emit` with
+`act = external_action / capability: send_email`. `act` is phase **2 of 3** — deliberately NOT last,
+because that is the only arrangement in which the CR-02 mid-run sweep can fire.
+
+**The step was placed BY KEYBOARD** — `End` then `Enter` on the picker — a path that did not exist
+before yesterday's two fixes. `End` scrolled the panel and row 7 became genuinely hit-testable
+(`elementFromPoint` reached it) before `Enter` chose it.
+
+### Rows now driven
+
+| Row | Verdict | Evidence |
+|---|---|---|
+| **U3** — the 8th ring distinguishable **by shape alone in greyscale** | ✅ **PASS — the previously-owed visual half is now DRIVEN** | Read off the LIVE rendered canvas of a real run. The `Not sent` ring: `stroke-dasharray = "32.044 21.363 32.044 21.363 32.044 21.363 32.044 21.363"` — **FOUR arcs** — with `stroke-dashoffset = 16.022` and `stroke = hsl(var(--muted-foreground))`. **Every number 189-10 predicted from a synthetic DOM is confirmed on a real one, including the 16.022.** `animationName: none` → the reading is **still**, not spinning. Under `filter: grayscale(1)` the dash pattern is byte-identical (shape is colour-independent) and the computed stroke reads `rgb(151,161,180)`. It is the **only** ring on the canvas: both `Complete` cards carry **zero** rings, so four-arcs-vs-nothing is unmistakable. |
+| **U5** — **the 188.2 debt** (`D-188.2-DEF-07` row A2): readings distinguishable on a live run · the running arc **spins** · a card with no reading is **still** | ✅ **PASS** | Sampled across the live run as phases transitioned. `Running` → one arc, `stroke-dasharray "55.543 158.085"`, offset 0, **`animating: true`** — the arc genuinely spins. `Not started` / `Locked` → **no ring at all** and `animating: false` — still, as required. `Complete` → no ring. `Not sent` → four arcs, still. Four readings, four distinct shapes, observed on one run. |
+| **D-25** — the run band's RUN-level verdict above a node's PHASE-level *"Not sent"* | ✅ **PASS — the RENDERED half, not just the wire** | On screen at run end: the band reads **"Phase 3 of 3, emit, complete"** and the run completes, while the spine reads `retrieve ✓ Complete ▸ act ↛ Not sent ▸ emit ✓ Complete`. The pairing reads as intended — a completed RUN containing a step that honestly did not send — not as a contradiction. |
+| **`BUG-260807-01`** — the `constructor`-slug reachability row | ⛔ **FAIL — and the failure is the point.** The NaN cause is FIXED; a DIFFERENT sink produces the same rendered symptom | See below. Filed as **`BUG-260808-01`**. |
+
+### ⚠ CR-02 — proven on the LIVE SURFACE, through BOTH sweeps
+
+The previous session proved CR-02 on the wire. This one proves the paint.
+
+As `act` resolved, the live surface read **`act — Not sent`**, `↛ Not sent`, and the milestone
+announced **"Phase 2 of 3, act, not sent"**. Then `emit` started — firing
+`finalizeEarlierPhasesForThread` — and later the run completed, firing
+`finalizeAllPhasesForThread`. **After both**, the timeline still read:
+
+```
+retrieve ✓ Complete   ▸   act ↛ Not sent   ▸   emit ✓ Complete
+```
+
+`act` never flashed *"✓ Complete"*. Before the fix it would have been repainted within milliseconds
+of `emit` starting, because `act` is not the last phase. **This is the exact scenario the defect
+needed, and the card holds its honest terminal through both sweeps.**
+
+### ⚠ The live armed checkpoint — observed, and one wording concern
+
+The live run **paused at `act`** and would not continue: *"This step is marked as needing your
+approval first. The run is waiting here and will not continue until you answer."* That is D-04 /
+189-14 working, and it is the correct counterpart to D-19 (golden runs auto-continue; live runs
+pause) — both halves are now observed on real runs.
+
+⚠ **The approve control reads "Approve and run this step."** By this phase's own contract that step
+**never runs anything outward** — it records an intention and sends nothing. The copy promises an
+action the governed node exists not to take. Not filed as a bug (it is wording, and the recorded
+output is unambiguous), but it is the one sentence on this surface that argues against SC#4 and it
+should be reviewed with Phase 190, when the same button WILL cause a send.
+
+### ⛔ `BUG-260807-01`'s driven row FAILED — a seventh WR-04 sink, filed as `BUG-260808-01`
+
+`BUG-260807-01` was held open for exactly this row, on the recorded ground that *"only the driven
+row can confirm no other path produces the same rendered symptom."* **That caution was correct.**
+
+The `own()` guard shipped for `verticalOffsetFor` **holds** — `transformHasNaN: false` on every node
+and every affordance, including the `constructor` one. Nothing regressed. But a phase slugged
+`constructor` still renders wrong, because a *different* slug-keyed lookup writes **no transform at
+all**:
+
+| Node slug | `node.style.transform` |
+|---|---|
+| `retrieve` | `translate(0px, 0px)` |
+| **`constructor`** | **`(empty)`** → computed `none` |
+| `emit` | `translate(640px, 0px)` |
+
+Both `retrieve` and `constructor` measure at rect `58,176` — **identical coordinates**; the card
+paints at the origin, stacked on phase 1. **Control observed swinging both ways:** the same fixture
+with the slug changed to `ordinaryslug` renders `translate(320px, 0px)`, its correct lane.
+
+Not a NaN this time — an **absent** value: the lookup resolves the inherited
+`Object.prototype.constructor` (a function, never nullish, so every `!== undefined` / `?? fallback`
+passes) instead of an `{x, y}`. Same class, same visible outcome, different sink.
+
+⚠ The UI cannot author this slug at all (`D-184-11` — there is no slug field; the caller derives it),
+so the row was driven from a seeded fixture, which was **deleted afterwards**. Reproduction steps are
+in the new report.
+
+**`BUG-260807-01` therefore stays `open`**, now for a named successor rather than an unrun row.
+
+### Two authoring defects found on the way to publishing
+
+Neither is a Phase 189 regression; both blocked this session and cost real time.
+
+1. **⑂ Tweak fails with a 409 and says nothing.** Forking a published workflow returns
+   `409 Conflict` — `[WorkflowsPage] Tweak fork failed Error: Failed to create workflow draft
+   (status 409)` — visible ONLY in the browser console. The page gives no toast, no inline error, no
+   state change; the button simply does nothing. The cause appears to be a slug collision with an
+   existing draft of the same workflow. **A silent failure on the primary "make a new version" path.**
+2. **The LOOSE "Describe & run" door never persists `business_requirement`, so nothing it creates can
+   ever be published.** Measured end to end: the door consumed the text (the generated workflow is
+   even NAMED from it) and the AI drafted four correct phases — but the saved definition has
+   `business_requirement: None`, and publish then refuses with *"a workflow must declare exactly one
+   business_requirement before publish."* The POWER "Author & govern" door has **no editor for that
+   field at all**, so there is no recovery path: a workflow born through the FASTEST PATH is
+   unpublishable forever. Across the whole table, **87 of 193 definitions carry the field, and every
+   one traces to a STARTER template** (`definitionOps.ts:903` reads
+   `starter.definition?.business_requirement`) — which is why forking a starter was the only route
+   that worked here.
+
+### ✅ One genuinely good result worth recording
+
+**The AI seed placed `external_action` by itself.** Given the plain-language requirement *"…then
+email that answer to the requester"*, the NL generator produced four steps ending in
+`Phase 4: Email the cited answer to the requester (external_action)` with `capability: send_email` —
+and its seed receipt explained the grounding it had chosen (*"1 step reads your documents, so I set
+it to must prove it"*). 189-09 taught the generator the 7th type and it holds on a real request.
+
+### Coverage after this session
+
+**U1 ✅ · U2 ✅ (control both ways) · U3 ✅ · U4 ✅ · U5 ✅ · U6 ✅ · U7 ✅ — all seven driven.**
+D-25 ✅ rendered. CR-02 ✅ wire **and** paint. SC#4 ✅ observed. D-19 ✅ and its live-pause counterpart ✅.
+`BUG-260807-01`'s row ⛔ **FAILED into a named successor** (`BUG-260808-01`), which is a result, not a gap.
