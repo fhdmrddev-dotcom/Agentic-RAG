@@ -254,6 +254,28 @@ class ExternalActionPhaseConfig(_StrictBase):
     # supplies the only admissible value either way.
     available_tools: list[str] = Field(default_factory=list)
 
+    # Phase 190 (CONN-03 SC#4 / D-13) — THE REFERENCE, AND ONLY THE REFERENCE.
+    # The id of a ``public.connector_connections`` row (migration 116) that supplies the
+    # destination and the credential at RUN time. Additive-optional / ZERO-MIGRATION, the
+    # same extension shape this whole member arrived by: an old JSONB phase row never names
+    # it, so every stored definition still ``model_validate()``s, and a step with no
+    # connection bound keeps 189's ``recorded_not_sent`` behaviour unchanged.
+    #
+    # ⚠ WHAT THIS IS NOT, because CONN-03 SC#4 is read LITERALLY: it is not a secret, not a
+    # token, not a password, not a host, not a base_url, not a channel and not an email
+    # address. Every one of those lives on the connection ROW, behind org-scoped RLS and
+    # (for the secret) the ``enc:v1:`` envelope. A workflow definition is copyable,
+    # exportable and hand-editable JSONB that reaches the client verbatim — an id is the
+    # ONLY fact about a credential that may safely live there, and the resolver treats it
+    # as untrusted input scoped by the RUN's org (D-14), never as proof of anything.
+    #
+    # NO VALIDATOR RESOLVES IT, deliberately: an unresolvable / cross-org / deleted id is a
+    # RUN-time ``recorded_not_sent`` (D-17), never a save-time 422. Same reasoning as the
+    # coerce-don't-raise validator below — a stale client must not be able to brick the
+    # definition it is saving, and a save-time existence check would also be an existence
+    # oracle over another org's ids.
+    connection_id: str | None = None
+
     # NO SHAPE-SYMMETRY OPTIONALS, and the omission is the decision. The five LLM members
     # share ``model`` / ``folder_scope`` / ``skill_ref`` / ``skill_snapshot`` because each
     # of them drives a model; this one drives none (D-22), so all four would be inert —
@@ -262,6 +284,15 @@ class ExternalActionPhaseConfig(_StrictBase):
     # ``grounding_cause`` report ``already-set`` for a step that reads nothing. Nothing
     # speculative is carried; a later phase that needs one adds it additively, as this
     # member itself was added.
+    #
+    # ⚠ PHASE 190 (D-13) IS THE FIRST TO ADD AN OPTIONAL HERE, AND THE REFUSAL ABOVE STILL
+    # STANDS. ``connection_id`` is not a shape-symmetry optional — it is not carried
+    # *because the other members carry something like it* (none of them do). It is the one
+    # fact the executor cannot run without and the only fact SC#4 permits into the JSONB:
+    # a reference the run-time resolver must re-scope by org before it means anything. The
+    # test the refusal encodes is unchanged — "does this field DO something on this step,
+    # at run time?" — and a future author who wants a sixth field must answer it the same
+    # way rather than citing this one as precedent for symmetry.
 
     @model_validator(mode="after")
     def _available_tools_is_the_capability(self) -> "ExternalActionPhaseConfig":
