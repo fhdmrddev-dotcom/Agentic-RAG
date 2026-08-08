@@ -1292,6 +1292,159 @@ def test_a_golden_run_of_an_external_action_performs_no_egress(
     )
 
 
+def test_the_external_action_docblock_retires_its_two_false_invariants_by_quotation():
+    """PHASE 190 — **a stale invariant docblock is how this project ships lies.**
+
+    ``_exec_external_action`` carried two sentences that were TRUE for Phase 189 and became
+    FALSE on the commit that added the send:
+
+        "this executor performs NO network I/O"
+        "NOTHING IN THIS FUNCTION MAY NAME A TRANSPORT, NOT EVEN TO DENY IT"
+
+    Deleting them would hide that a promise changed, so they are QUOTED as superseded,
+    dated, with the phase and decision that moved them — the discipline plan 190-04 applies
+    to the ROADMAP. This fence is what keeps the quotation from decaying back into an
+    assertion.
+
+    ⚠ **THIS TEST REPLACES A PLAN CRITERION THAT COULD NOT HOLD, AND SAYS SO.** The plan's
+    acceptance reads ``print('NO network I/O' in d, 'superseded' in d.lower())`` → ``False
+    True``. Its own ``<action>`` — three lines above — requires the superseded sentences to
+    be **quoted inline**. Both cannot hold: a quoted sentence contains its own substring.
+    190-06 met the identical conflict and recorded it rather than lower-casing a word to
+    satisfy a grep, and the same choice is made here. What the criterion was REACHING for is
+    checked instead, and more strictly: every occurrence of each retired sentence must sit
+    inside a block that has already declared itself SUPERSEDED. A future author who deletes
+    the marker but keeps the claim fails this; the grep would have passed them.
+    """
+    import inspect as _inspect
+
+    from app.services.harness.phase_types import _exec_external_action
+
+    doc = _inspect.getdoc(_exec_external_action) or ""
+    retired = (
+        "NO network I/O",
+        "NOTHING IN THIS FUNCTION MAY NAME A TRANSPORT",
+    )
+
+    assert "superseded" in doc.lower(), (
+        "the docblock retires nothing: the two 189 invariants must be marked SUPERSEDED "
+        "with the date and the decision that moved them, never silently deleted"
+    )
+
+    for sentence in retired:
+        assert sentence in doc, (
+            f"the retired invariant {sentence!r} was DELETED rather than superseded. "
+            "Erasing an old invariant hides that a promise changed — the next reader "
+            "cannot tell this executor ever promised not to send."
+        )
+        # every occurrence is preceded, somewhere above it, by the SUPERSEDED marker
+        cursor = 0
+        while (at := doc.find(sentence, cursor)) != -1:
+            preceding = doc[:at].lower()
+            assert "superseded" in preceding, (
+                f"{sentence!r} appears at offset {at} with no SUPERSEDED marker above it — "
+                "it reads as a LIVE invariant of a function that now opens sockets"
+            )
+            cursor = at + 1
+
+    # and the replacement claim is present, because retiring a promise without stating the
+    # narrower one that survives leaves the reader with nothing to hold the code to.
+    assert "app.security.egress" in doc, (
+        "the docblock retires the no-egress invariant without naming the narrower one that "
+        "survives it: every byte still leaves through app.security.egress and this function "
+        "still constructs no client"
+    )
+
+
+@pytest.mark.asyncio
+async def test_a_resumed_run_can_never_be_a_golden_run(mock_asyncpg_pool):
+    """PHASE 190 / A4 — **THE SECOND LATENT DEFECT THIS PHASE'S OWN COMMIT CREATED.**
+
+    D-16 gates the send on ``ctx.is_golden_run``, and that flag rides a ``SimpleNamespace``
+    built at exactly one site (``publish_service._drive_golden_run``). The engine builds a
+    **SECOND** ctx — ``_build_resume_context`` — and it does not set the flag, so anything
+    resumed through it is a LIVE run by default. RESEARCH §M6 / assumption A4 flagged that
+    and said *"golden runs do not pause (D-19 auto-continues), so this SHOULD be unreachable
+    — assert that unreachability with a test rather than assume it."*
+
+    **It was assumed, it was then measured, and it was REACHABLE.** Three facts, each read
+    off the shipped source at plan 190-13:
+
+      1. ``create_workflow_run`` sets ``threads.active_workflow_run_id`` for EVERY run it
+         creates — including the golden run, which passes ``is_golden_run=True`` to it. So a
+         golden run IS anchored.
+      2. ``find_resumable_runs`` selected on ``status IN ('active','paused')`` + that anchor
+         + an ``active`` phase row, and filtered ``is_golden_run`` **not at all**.
+      3. ``_build_resume_context`` does not carry the flag.
+
+    A publish killed by a restart mid-phase therefore left an anchored, stranded golden run
+    that the next boot's sweep would re-drive **as a live run** — and from the commit that
+    added the send, re-driving it means SENDING. Nobody approved it, nobody is waiting for
+    the publish result any more, and it would happen once per boot until it terminalized.
+
+    **The fix is at the ROOT, and deliberately NOT by threading the flag** (which would widen
+    D-16's surface for a path that should not exist): a golden run is never resumable at all.
+    Publishing is a bounded, synchronous validation; a stranded one is abandoned, not
+    re-driven. Closed on BOTH gates, the shape plan 190-06 established for D-14 — the SQL
+    predicate is the gate, and the post-fetch re-check is what survives a future author
+    simplifying the query.
+
+    THREE ASSERTIONS, and the third is what keeps the first two from being vacuous.
+    """
+    import inspect as _inspect
+
+    from app.db import workflows as _workflows
+    from app.services import harness_engine as _engine
+
+    golden = uuid.uuid4()
+    ordinary = uuid.uuid4()
+    mock_asyncpg_pool.set_fetch_result(
+        [
+            {"run_id": golden, "thread_id": uuid.uuid4(), "current_phase_id": None,
+             "inputs": {}, "org_id": None, "user_id": "u", "is_golden_run": True},
+            {"run_id": ordinary, "thread_id": uuid.uuid4(), "current_phase_id": None,
+             "inputs": {}, "org_id": None, "user_id": "u", "is_golden_run": False},
+        ]
+    )
+    rows = await _workflows.find_resumable_runs(mock_asyncpg_pool)
+    returned = [r["run_id"] for r in rows]
+
+    # ── 3. ANTI-VACUITY FIRST: an ORDINARY stranded run is still resumable ───────────
+    # Without this a filter that dropped everything — or a sweep that had simply stopped
+    # working — would satisfy both assertions below forever, and the resume feature would
+    # be silently dead rather than selectively closed.
+    assert ordinary in returned, (
+        f"the resume sweep returned no ordinary stranded run ({returned!r}); every "
+        f"assertion below would then be vacuous, and resume itself would be broken"
+    )
+
+    # ── 1. the golden run is DROPPED, driven rather than read off the SQL ────────────
+    assert golden not in returned, (
+        f"A4: a stranded GOLDEN run was handed to the resume sweep ({returned!r}). "
+        f"_build_resume_context does not carry is_golden_run, so re-driving it would run "
+        f"the publish validation as a LIVE run — and from Phase 190 that means the "
+        f"external_action step SENDS, with nobody asked, once per boot."
+    )
+
+    # ── 2. and the predicate is in the query too, so the row never leaves Postgres ───
+    sql = next(
+        (c[0] for c in mock_asyncpg_pool.calls if "FROM workflow_runs wr" in c[0]), None
+    )
+    assert sql is not None and "is_golden_run" in sql, (
+        f"A4: the exclusion exists only in Python. The SQL is the gate and the post-fetch "
+        f"check is the belt; a sweep on a large table should not ship golden rows over the "
+        f"wire to drop them locally. SQL={sql!r}"
+    )
+
+    # ── the flag is deliberately NOT threaded into the second ctx builder ────────────
+    assert "is_golden_run" not in _inspect.getsource(_engine._build_resume_context), (
+        "A4: is_golden_run was threaded into _build_resume_context. That widens D-16's "
+        "surface to a path that must not exist at all — a golden run is unresumable by "
+        "construction, and the correct place to say so is the sweep, not a second flag "
+        "for a second ctx that a third builder will eventually forget."
+    )
+
+
 def test_an_output_with_no_sentinel_still_routes_to_complete_phase(
     build_workflow_definition, mock_asyncpg_pool
 ):

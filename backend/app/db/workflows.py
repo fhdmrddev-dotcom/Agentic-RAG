@@ -48,11 +48,14 @@ sweep re-runs it.
 from __future__ import annotations
 
 import json
+import logging
 from uuid import UUID
 
 import asyncpg
 
 from app.models.harness import WorkflowDefinition
+
+logger = logging.getLogger(__name__)
 
 # ── Phase 186 (CONCUR-02 / D-186-07) — the optimistic concurrency token ───────
 # ONE canonical expression, referenced by every read AND by the guard, so the value the
@@ -828,15 +831,41 @@ async def find_resumable_runs(pool: asyncpg.Pool) -> list[dict]:
     ``workflow_phases`` EXISTS sub-select keys by ``workflow_run_id`` (migration
     058:16 — a bare ``wp.run_id`` would raise Postgres 42703). The owner FK chain
     (workflow_runs.thread_id -> threads.user_id) closes T-091-23 cross-user reads.
+
+    ⚠ **PHASE 190 (A4) — A GOLDEN RUN IS NEVER RESUMABLE, AND THAT IS A SECURITY
+    PROPERTY, NOT HOUSEKEEPING.** ``create_workflow_run`` sets the ``threads``
+    anchor for EVERY run it creates, the publish path included
+    (``publish_service._drive_golden_run`` passes ``is_golden_run=True`` straight
+    into it). So until Phase 190 a publish killed by a restart mid-phase left an
+    anchored, stranded golden run that this sweep happily returned — and
+    ``harness_engine._build_resume_context`` does not carry ``is_golden_run``, so the
+    next boot re-drove it as a LIVE run. That was inert while the ``external_action``
+    executor sent nothing. From the commit that gave it a real send it stops being
+    inert: **the resumed publish validation would PERFORM the external action, with
+    nobody asked, once per boot until it terminalized** — D-16's defect arriving
+    through the one door D-16's gate does not watch.
+
+    The exclusion lives HERE rather than as a second flag on a second ctx builder,
+    because the honest statement is not *"a resumed golden run must not send"* but
+    *"a golden run is not a thing to resume"*: publishing is a bounded, synchronous
+    validation whose caller is long gone, and abandoning a stranded one is the
+    correct outcome on its own terms.
+
+    **Both gates, the shape plan 190-06 established for D-14:** the SQL predicate is
+    the gate (the row never leaves Postgres), and the post-fetch re-check is what
+    survives a future author simplifying the query. Driven by
+    ``tests/test_harness_engine.py::test_a_resumed_run_can_never_be_a_golden_run``,
+    which was OBSERVED RED against the unfiltered version above.
     """
     rows = await pool.fetch(
         """
         SELECT wr.id AS run_id, wr.thread_id, wr.current_phase_id, wr.inputs,
-               wr.org_id, t.user_id
+               wr.org_id, wr.is_golden_run, t.user_id
         FROM workflow_runs wr
         JOIN threads t ON t.id = wr.thread_id
         WHERE wr.status IN ('active', 'paused')
           AND t.active_workflow_run_id = wr.id
+          AND wr.is_golden_run = false
           AND EXISTS (
             SELECT 1 FROM workflow_phases wp
             WHERE wp.workflow_run_id = wr.id
@@ -844,7 +873,19 @@ async def find_resumable_runs(pool: asyncpg.Pool) -> list[dict]:
           )
         """
     )
-    return [dict(r) for r in rows]
+    resumable: list[dict] = []
+    for row in rows:
+        run = dict(row)
+        if run.get("is_golden_run"):
+            # Unreachable through the predicate above; kept because the predicate is one
+            # careless edit from gone and this is the half that would still refuse.
+            logger.warning(
+                "resume sweep: refusing to resume golden run %s — a publish validation is "
+                "never re-driven (Phase 190 / A4)", run.get("run_id"),
+            )
+            continue
+        resumable.append(run)
+    return resumable
 
 
 async def get_active_phase(pool: asyncpg.Pool, run_id: UUID) -> dict | None:
