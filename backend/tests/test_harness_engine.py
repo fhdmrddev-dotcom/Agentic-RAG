@@ -814,19 +814,35 @@ _RECORDED_SQL = "SET status='recorded_not_sent'"
 _COMPLETED_SQL = "SET status='completed'"
 
 
-def _external_action_definition(build_workflow_definition, *, capability="send_email"):
+def _external_action_definition(
+    build_workflow_definition, *, capability="send_email", connection_id=None
+):
     """A 2-phase workflow: the governed external action, then an ordinary step.
 
     The SECOND phase exists solely so "the run continues" is observable. Its type is
     a shipped one (``llm_single``) whose executor is stubbed in the drive below, so no
     provider is ever called.
+
+    ── PHASE 190 · ``connection_id`` IS OPTIONAL, AND WHY THAT MATTERS ──────────────────
+    Every caller but one leaves it ``None``, which keeps those drives byte-identical: an
+    UNBOUND step is D-17's permanent ``recorded_not_sent`` terminal and it is what they
+    assert. The golden-run fence below binds one, because **without a bound connection that
+    fence cannot fail** — an unbound step sends nothing whether or not D-16's gate exists,
+    so the "re-open trigger, expressed as a check" would have stayed green through the very
+    commit it was armed for. Measured, not assumed (Phase 190 plan 190-13).
+
+    D-13's field is a real, optional member of ``ExternalActionPhaseConfig`` from plan
+    190-06, so this stays a MODEL-VALIDATED definition rather than a look-alike.
     """
+    _external = {"phase_type": "external_action", "capability": capability}
+    if connection_id is not None:
+        _external["connection_id"] = connection_id
     return build_workflow_definition(
         [
             {
                 "slug": "notify",
                 "phase_index": 0,
-                "config": {"phase_type": "external_action", "capability": capability},
+                "config": _external,
             },
             {
                 "slug": "wrap-up",
@@ -837,7 +853,9 @@ def _external_action_definition(build_workflow_definition, *, capability="send_e
     )
 
 
-def _drive_approved_external_action(wf, pool, *, is_golden_run=False, loop=None):
+def _drive_approved_external_action(
+    wf, pool, *, is_golden_run=False, loop=None, extra_inputs=None
+):
     """Drive the REAL ``run_workflow`` over ``wf`` with the human APPROVING.
 
     Returns ``SimpleNamespace(run_id, ids, visited, audits, emits)``.
@@ -896,8 +914,20 @@ def _drive_approved_external_action(wf, pool, *, is_golden_run=False, loop=None)
     # (``publish_service._drive_golden_run``). Defaulting False keeps every existing caller
     # byte-identical; the golden-run fence below is the only drive that flips it.
     ctx = SimpleNamespace(
-        inputs={"kickoff_prompt": "send Sarah the renewal summary"},
+        # `extra_inputs` defaults to None, so every existing caller's bag is byte-identical.
+        # The golden-run fence supplies the ONE argument a real send needs, because an
+        # external_action step with nothing to send fails on its own arguments long before it
+        # reaches a socket — measured, as that fence first failing on
+        # "'text' must be a non-empty string" instead of on egress.
+        inputs={
+            "kickoff_prompt": "send Sarah the renewal summary",
+            **(extra_inputs or {}),
+        },
         is_golden_run=is_golden_run,
+        # Phase 190 / D-14: the RUN's org, which is what a credential lookup is scoped BY.
+        # Unread by every unbound drive (they never reach the resolver); required by the
+        # golden-run fence, whose whole point is to reach as far as the send would.
+        org_id="aaaaaaaa-0000-4000-8000-000000000001",
     )
 
     with (
@@ -1133,12 +1163,77 @@ def test_a_golden_run_of_an_external_action_performs_no_egress(
 
     **THIS TEST PASSES TODAY BECAUSE THE STEP IS INERT. WHEN IT FAILS, READ WR-06.** The
     fix is Phase 190's and is one of two shapes, both named on that branch comment.
+
+    ── ⚠ PHASE 190 · THIS FENCE WAS VACUOUS AND IT WAS MEASURED, NOT SUSPECTED ───────────
+    189 armed this as *"the re-open trigger, expressed as a check rather than as prose"*.
+    When plan 190-13 landed the send and ran it, it stayed **GREEN** — for two independent
+    reasons, either of which alone would have let the publish-time-egress defect ship
+    unnoticed through the very commit this fence exists to catch:
+
+      1. **the step bound no connection**, so the executor took D-17's ``recorded_not_sent``
+         branch and never reached a send at all — an unbound step is inert with or without
+         D-16's gate;
+      2. **``live_connectors`` resolves to ``"off"`` by cold default** (D-26), so even a
+         bound step records rather than sends.
+
+    Both preconditions are therefore SET HERE AND ASSERTED, and the assertions are the point:
+    a fence whose trigger conditions are assumed is a fence that reports on its own setup.
+    With them in place the executor was OBSERVED RED on the send commit and driven green by
+    the one-line ``ctx.is_golden_run`` gate in that SAME commit — which is the evidence D-16
+    asks for, and it did not exist until this rewrite.
+
+    The resolver and DNS are stubbed so the case is hermetic: everything from the gates
+    through the adapter to ``send_pinned_http`` is REAL, and the sentinel catches the socket.
     """
     import asyncio as _asyncio
 
+    from app.security import egress as _egress
+    from app.services.harness import phase_types as _phase_types
     from tests.unit.test_189_no_egress import _block_all_http
 
-    wf = _external_action_definition(build_workflow_definition)
+    wf = _external_action_definition(
+        build_workflow_definition,
+        capability="post_message",
+        connection_id="cccccccc-0000-4000-8000-00000000000b",
+    )
+
+    # ── precondition 1, ASSERTED: the step really is bound ────────────────────────────
+    assert getattr(wf.phases[0].config, "connection_id", None), (
+        "this fence measures a SEND being suppressed; with no connection bound the step is "
+        "inert for reasons that have nothing to do with D-16, and the fence reports on its "
+        "own setup"
+    )
+
+    # ── precondition 2, ASSERTED: the kill-switch is ON for the duration ──────────────
+    monkeypatch.setattr(_phase_types, "feature_audience", lambda _f: "everyone")
+    assert _phase_types.feature_audience("live_connectors") != "off", (
+        "with live_connectors off (its cold default) a bound step records rather than "
+        "sends, and this fence would be green for D-26's reason rather than D-16's"
+    )
+
+    # A resolved connection, without a database. `.secret` is a property on the real object
+    # and must stay one here: an eager attribute would decrypt nothing but would also stop
+    # this stub modelling the lazy-materialisation contract plan 190-06 shipped.
+    class _Resolved:
+        connection_id = "cccccccc-0000-4000-8000-00000000000b"
+        org_id = "aaaaaaaa-0000-4000-8000-000000000001"
+        capability = "post_message"
+        name = "ops channel"
+        config = {"default_channel": "C0190"}
+
+        @property
+        def secret(self):
+            return "xoxb-GOLDEN-RUN-MUST-NEVER-REACH-A-SOCKET"
+
+    async def _stub_resolver(connection_id, *, org_id):
+        return _Resolved()
+
+    monkeypatch.setattr(_phase_types, "resolve_connection", _stub_resolver)
+    # DNS, stubbed to a GLOBALLY ROUTABLE address so the guard's real logic runs without the
+    # internet. ⚠ Not 203.0.113.x: TEST-NET-3 is documentation space and `is_global` is False
+    # for it, so the guard refuses it — measured, as this fence first failing on
+    # `address_not_public` rather than on the send it is meant to catch.
+    monkeypatch.setattr(_egress, "_default_resolver", lambda h, p: ["93.184.216.34"])
 
     # ⚠ THE LOOP IS BUILT BEFORE THE SENTINEL ARMS, and that ordering is load-bearing on
     # Windows: `asyncio.run` creates a fresh proactor loop whose self-pipe is a
@@ -1150,7 +1245,11 @@ def test_a_golden_run_of_an_external_action_performs_no_egress(
         # Armed BEFORE the drive: the golden-run branch and the executor both sit inside it.
         _block_all_http(monkeypatch)
         r = _drive_approved_external_action(
-            wf, mock_asyncpg_pool, is_golden_run=True, loop=loop
+            wf,
+            mock_asyncpg_pool,
+            is_golden_run=True,
+            loop=loop,
+            extra_inputs={"text": "the renewal summary is attached"},
         )
     finally:
         loop.close()

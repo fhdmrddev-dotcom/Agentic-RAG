@@ -73,6 +73,25 @@ from app.services.harness.programmatic import PROGRAMMATIC_PHASE_REGISTRY
 # module top: ``validator_kinds`` imports only ``harness.validators`` (import-light, and
 # already a package dependency), never back into ``phase_types``.
 from app.services.harness.validator_kinds import CITATION_MARKER_GUIDANCE
+
+# ── Phase 190 (CONN-02 / CONN-03) — the four names the external-action send path needs ──
+#
+# ⚠ THEY ARE IMPORTED INTO **THIS MODULE'S OWN NAMESPACE**, DELIBERATELY, AND IT IS A
+# SECURITY PROPERTY RATHER THAN AN IMPORT STYLE. ``validate_destination`` and
+# ``resolve_connection`` are what D-06's ordering is asserted over: because they are
+# module attributes here, ``tests/unit/test_190_egress_ordering.py`` can install recording
+# stubs with ``monkeypatch.setattr(phase_types, ..., raising=True)`` and read back the ORDER
+# the executor called them in. A module-qualified call (``egress.validate_destination(...)``)
+# or a transport subclass would make the ordering unobservable, which is exactly the shape
+# RESEARCH §R10 rejected — *"a transport subclass makes the guard implicit, and D-06's whole
+# point is that the ordering must be assertable directly."* If a future author "tidies" these
+# into qualified calls, three drives fail loudly at the ``setattr`` rather than passing over
+# an executor they never touched.
+from app.models.user_settings import _GOVERNED_FEATURES, feature_audience
+from app.security.egress import SLACK_API_BASE, validate_destination
+from app.services.connector_service import ConnectorDisabled, resolve_connection
+from app.services.connectors.protocol import AdapterError
+from app.services.connectors.registry import get_adapter
 from app.services.openai_service import RENDER_TEMPLATE_TOOL, apply_tool_budget, get_tools
 from app.services.task_service import _stream_one_iteration, run_task_sub_agent
 from app.services.template_asset_service import resolve_template_source
@@ -1807,62 +1826,325 @@ def _external_action_body(capability: str, resolved: dict) -> str:
     return "\n".join(lines)
 
 
+def _external_action_sent_body(capability: str, resolved: dict, result, host: str) -> str:
+    """Compose the SENT body — the ONLY body in this file that may describe something that
+    actually happened, and it is reached only from the adapter's own ``ok`` verdict.
+
+    It opens with the send, in the past tense, because here that is TRUE. The 189 discipline
+    is unchanged in substance: a body may never claim more than the wire supports, so the
+    destination HOST is named (D-08 permits it; the recipient and the credential are not
+    named) and the vendor's words ride verbatim when it gave any.
+    """
+    labels = ["Action", "Destination", *(str(k) for k in resolved)]
+    width = max(len(lbl) for lbl in labels)
+    lines = [
+        f"Sent. {_EXTERNAL_ACTION_PHRASE[capability]} — the destination accepted it.",
+        "",
+        "What this step did",
+        f"  {'Action'.ljust(width)}: {_EXTERNAL_ACTION_PHRASE[capability]}",
+        f"  {'Destination'.ljust(width)}: {host}",
+    ]
+    lines += [f"  {str(key).ljust(width)}: {_clip_for_body(value)}" for key, value in resolved.items()]
+    words = (getattr(result, "provider_message", "") or "").strip()
+    detail = (getattr(result, "detail", "") or "").strip()
+    if words:
+        lines += ["", words]
+    elif detail:
+        lines += ["", detail]
+    return "\n".join(lines)
+
+
+def _external_action_failure_body(capability: str, resolved: dict, provider_words: str) -> str:
+    """Compose the SEND-FAILED body — D-17's second axis.
+
+    ``failed`` and ``recorded_not_sent`` are BOTH "nothing arrived", and conflating them is
+    the real risk on this surface: one is a step the author never bound, the other is a send
+    that was attempted and refused. They must stay distinguishable on all three axes — the
+    STATUS written (``failed`` vs ``recorded_not_sent``), the ``recorded_intent`` key's
+    presence (absent here, present there) and **this first line**.
+
+    Neither body may ever read "Complete", and neither may borrow the other's word: this one
+    never says *"Not sent — recorded"* (which would claim the honest unbound terminal for a
+    failure) and ``_external_action_body`` never says *"failed"*. The provider's own words are
+    reproduced VERBATIM — unparaphrased, untranslated (UI-SPEC §5b / the 071-A rule) — because
+    a paraphrased vendor error is a second, worse invention on top of the failure.
+    """
+    labels = ["Action", *(str(k) for k in resolved)]
+    width = max(len(lbl) for lbl in labels)
+    lines = [
+        "SEND FAILED — nothing arrived.",
+        "",
+        "What this step attempted",
+        f"  {'Action'.ljust(width)}: {_EXTERNAL_ACTION_PHRASE[capability]}",
+    ]
+    lines += [f"  {str(key).ljust(width)}: {_clip_for_body(value)}" for key, value in resolved.items()]
+    lines += [
+        "",
+        provider_words.strip() or "The destination gave no explanation.",
+        "",
+        "This phase failed. Nothing was retried and nothing was queued — a duplicate is "
+        "worse than a missing one, so a re-run is a deliberate human act (D-18).",
+    ]
+    return "\n".join(lines)
+
+
+# ── Phase 190 · the closed maps the send path needs, each DERIVED from the closed set ─────
+
+#: D-26's operator kill-switch. Registered in ``_GOVERNED_FEATURES`` with the cold default
+#: ``"off"``; the assert below is what makes a typo an ImportError rather than a silent
+#: fail-OPEN — ``feature_audience`` answers ``"operators"`` for an UNKNOWN feature, which is
+#: not ``"off"``, so a misspelt constant here would enable live sending everywhere.
+_LIVE_CONNECTORS_FEATURE = "live_connectors"
+assert _LIVE_CONNECTORS_FEATURE in _GOVERNED_FEATURES, (
+    f"D-26: {_LIVE_CONNECTORS_FEATURE!r} is not a governed feature, so feature_audience() "
+    "would answer 'operators' for it and the kill-switch would be OPEN by default"
+)
+
+#: The destination that is knowable **with no credential and no connection row at all**.
+#: D-02 makes Slack's host a code constant, so ``post_message`` has a real pre-credential
+#: destination to guard; the other two live on the CONNECTION ROW (settled at plan 190-06 —
+#: ``CreateTicketConfig.base_url`` / ``SendEmailConfig.host``), so there is nothing to check
+#: before the row is read and their socket-time guard is the binder's (``egress`` owns it,
+#: and the D-05 source fence is what keeps that true). ``None`` is written out per capability
+#: rather than omitted so the map is total and a fourth capability is a KeyError, not a skip.
+_PRE_CREDENTIAL_DESTINATION: dict[str, str | None] = {
+    "post_message": SLACK_API_BASE,
+    "create_ticket": None,
+    "send_email": None,
+}
+
+#: Where the upstream phase's text goes when the run's inputs do not name it. A CLOSED
+#: two-column map, not a template language: D-09 is satisfied by NOT adding an evaluator, and
+#: a per-field mapping UI is deferred with its own trigger.
+_BODY_ARG_FOR_CAPABILITY: dict[str, str] = {
+    "send_email": "body",
+    "create_ticket": "description",
+    "post_message": "text",
+}
+
+assert (
+    set(_PRE_CREDENTIAL_DESTINATION)
+    == set(_BODY_ARG_FOR_CAPABILITY)
+    == set(EXTERNAL_ACTION_CAPABILITIES)
+), (
+    "190 D-04: an external-action send map disagrees with EXTERNAL_ACTION_CAPABILITIES — "
+    f"destinations={sorted(_PRE_CREDENTIAL_DESTINATION)}, "
+    f"body_args={sorted(_BODY_ARG_FOR_CAPABILITY)}, "
+    f"capabilities={sorted(EXTERNAL_ACTION_CAPABILITIES)}"
+)
+
+
+def _pre_credential_destination(config, capability: str) -> str | None:
+    """The destination this step can be checked against BEFORE anything looks for a secret.
+
+    An author-declared destination on the step wins when one exists. Today
+    ``ExternalActionPhaseConfig`` is a ``_StrictBase`` (``extra='forbid'``) carrying only
+    ``connection_id`` (D-13), so in production this read returns ``None`` and the capability
+    constant decides — but the read is written now, and driven by
+    ``tests/unit/test_190_egress_ordering.py``, so the day a destination DOES land on the step
+    the guard is already ahead of the resolver rather than being retrofitted behind it.
+    """
+    declared = getattr(config, "base_url", None)
+    if declared:
+        return str(declared)
+    return _PRE_CREDENTIAL_DESTINATION[capability]
+
+
+def _destination_host(capability: str, config: dict) -> str:
+    """The HOST for the send receipt (D-08: capability, connection id and host — never the
+    credential and never the request body)."""
+    if capability == "post_message":
+        return "slack.com"
+    if capability == "send_email":
+        return str(config.get("host") or "")
+    base = str(config.get("base_url") or "")
+    try:
+        return _url_host(base)
+    except Exception:  # noqa: BLE001 — an unparseable base_url is still a loggable receipt
+        return base
+
+
+def _url_host(url: str) -> str:
+    """``https://acme.atlassian.net/x`` -> ``acme.atlassian.net``. No parser import: the
+    receipt must not become a reason to pull a transport module into this file."""
+    without_scheme = url.split("://", 1)[-1]
+    return without_scheme.split("/", 1)[0].split("@")[-1].split(":")[0]
+
+
+def _adapter_args(adapter, capability: str, resolved: dict) -> dict:
+    """Project the resolved inputs onto the adapter's DECLARED schema, and nothing more.
+
+    Two rules, both fail-closed:
+
+      * only properties the adapter declares are passed — the adapter itself also refuses an
+        undeclared key, so this is belt as well as braces, and it keeps a run input named
+        ``kickoff_prompt``-style scaffolding from ever reaching a vendor;
+      * the upstream phase text (``content``, put there by ``_external_action_inputs``) fills
+        the capability's body field when the run's own inputs did not name it.
+
+    **No expression language, no templating surface** (D-09). This is a closed two-column
+    lookup; where a field must be COMPOSED the shipped ``SandboxedEnvironment(autoescape=True)``
+    path is the only one that may do it, and this phase composes nothing.
+    """
+    declared = set(adapter.INPUT_SCHEMA.get("properties", {}))
+    args = {key: value for key, value in resolved.items() if key in declared}
+    body_arg = _BODY_ARG_FOR_CAPABILITY[capability]
+    if body_arg in declared and body_arg not in args and resolved.get("content"):
+        args[body_arg] = resolved["content"]
+    return args
+
+
+async def _write_send_receipt(
+    ctx, phase, *, capability: str, connection_id: str, host: str, raw_status: int | None
+) -> None:
+    """The ONE ``external_action_sent`` receipt (migration 117 — the literal it added).
+
+    ⚠ **WHAT IT MAY CARRY IS FIXED BY D-08**: the capability, the connection id and the
+    destination HOST. Never the credential, never the request body, never the recipient's
+    address. A receipt is a record that something left the app, not a copy of what left.
+
+    Best-effort, deliberately: the send has ALREADY HAPPENED by the time this runs, and a
+    failed receipt write must not turn a delivered message into a failed phase. It is logged
+    loudly instead — the same posture ``_emit_audit`` takes one function over.
+    """
+    pool = getattr(ctx, "pool", None)
+    if pool is None:
+        return
+    user_id = (getattr(ctx, "current_user", None) or {}).get("id")
+    try:
+        await write_audit(
+            pool,
+            getattr(ctx, "run_id", None),
+            user_id=user_id,
+            event_type="external_action_sent",
+            metadata={
+                "capability": capability,
+                "connection_id": str(connection_id),
+                "destination_host": host,
+                "raw_status": raw_status,
+                "phase": getattr(phase, "slug", None),
+                "phase_index": getattr(phase, "phase_index", None),
+            },
+        )
+    except Exception:  # noqa: BLE001 — a receipt write must never undo a send that happened
+        logger.warning(
+            "external_action: the send receipt could not be written for phase %s "
+            "(the send itself SUCCEEDED — this is a missing record, not a missing message)",
+            getattr(phase, "slug", None),
+        )
+
+
 async def _exec_external_action(phase, accumulated_outputs: dict, ctx) -> dict:
-    """Resolve a capability against the CLOSED set, RECORD what it would have done, and
-    send NOTHING (Phase 189 / CONN-01 — D-01, D-02, D-05, D-22).
+    """Resolve a capability against the CLOSED set and — behind six ordered gates — actually
+    perform it (Phase 190 / CONN-02 + CONN-03 — D-06, D-13, D-14, D-16, D-17, D-18, D-19,
+    D-26; Phase 189 / CONN-01 — D-01, D-02, D-05, D-22).
 
-    ⚠ **SC#4: this executor performs NO network I/O.** It opens no HTTP client, no
-    connection of any other kind, and no remote-tool-protocol client.
+    ── ⚠ TWO INVARIANTS THIS FILE CARRIED UNTIL 2026-08-09 ARE NOW FALSE ──────────────────
+    They are quoted here as SUPERSEDED rather than deleted, because erasing an old invariant
+    hides that a promise changed, and a stale invariant docblock is how this project ships
+    lies. Both were true for Phase 189 and are false from the commit that added the send
+    (Phase 190, CONN-02):
 
-    ⚠ **NOTHING IN THIS FUNCTION MAY NAME A TRANSPORT, NOT EVEN TO DENY IT.** Two source
-    fences read this file rather than its behaviour: `tests/unit/test_189_no_egress.py`
-    walks every ``*.py`` under ``backend/app`` for the remote-tool protocol's three-letter
-    token, and plan 189-09's acceptance criteria grep this executor's own body for HTTP
-    client library names — both requiring ZERO. That is deliberate rather than pedantic: a
-    fence with a prose exemption is a fence somebody widens later, and "the token appears
-    zero times in the app" is a claim you can only make if it appears zero times. Both
-    fences caught an earlier draft of THIS paragraph, which is the best argument for them.
+        SUPERSEDED 2026-08-09 (Phase 190 / D-01, CONN-02):
+          "⚠ SC#4: this executor performs NO network I/O. It opens no HTTP client, no
+           connection of any other kind, and no remote-tool-protocol client."
 
-    `tests/unit/test_189_no_egress.py` proves the no-egress half by
-    FALSIFICATION: every HTTP transport is patched to RAISE, this function runs, and it
-    must return normally. Live connectors are Phase 190, which swaps the no-op here for a
-    real call behind an unchanged seam — ONE function to replace.
+        SUPERSEDED 2026-08-09 (Phase 190 / D-01, CONN-02):
+          "⚠ NOTHING IN THIS FUNCTION MAY NAME A TRANSPORT, NOT EVEN TO DENY IT."
 
-    ── D-02 · the closed-set resolution ──
-    The capability is looked up in ``EXTERNAL_ACTION_CAPABILITIES`` (the ONE runtime home,
-    `harness/grounding.py`) and an absent name RAISES — never resolved dynamically, never
-    ``eval``'d, and never falling back to a default capability. That is the rule
-    ``_TOOL_REGISTRY``, ``PROGRAMMATIC_PHASE_REGISTRY`` and ``EMITTER_REGISTRY`` all share,
-    and the raise below copies ``_exec_programmatic``'s wording deliberately.
+    189's SC#4 said *"no live outbound egress ships in this phase"* — a claim about 189, and
+    it held. 190 is the phase whose entire purpose is to end it.
 
-    ⚠ **DO NOT DELETE THIS CHECK AS REDUNDANT.** In practice
-    ``ExternalActionPhaseConfig.capability`` is a ``Literal`` of exactly three, so a bad
-    name is already a ``ValidationError`` at parse time. This is the SECOND line of
-    defence, for a row that reached the engine another way (a hand-edited JSONB row, a
-    future partial-update path, a caller that builds a ``PhaseSpec`` by hand), and it is
-    what D-02 asks for in as many words.
+    **What is true instead, and it is narrower than the old sentence rather than weaker:**
+    this function still NAMES no transport. It constructs no client, imports no HTTP or mail
+    library, and holds no socket. Every byte leaves through ``app.security.egress``, whose
+    binders validate and PIN the destination, and the D-05 source fence over
+    ``backend/app/services/connectors/**`` is what keeps the adapters honest about it. The
+    fence that moved is the *no-egress* one; the *no-transport-name* one still binds and is
+    unchanged.
 
-    ── D-22 · a STEP the executor performs, not a tool the LLM may call ──
-    There is no agent loop here, no ``tools_override``, no streaming iteration and no
-    model call of any kind. The capability name rides ``available_tools`` as a GOVERNANCE
-    DECLARATION (D-03) — the ``render_template`` precedent MINUS layer 1 (see
-    ``_effective_tools``' two-layer docblock). Making it a callable tool would mean an LLM
-    decides *whether and how* to send, which contradicts D-05 and D-02 both, and would
-    ship most of the plumbing for the live egress SC#4 forbids.
+    **The other 189 fence is UNTOUCHED and still green, and its passing is evidence rather
+    than leftovers.** ``tests/unit/test_189_no_egress.py`` Case A walks every ``*.py`` under
+    ``backend/app`` for the remote-tool protocol's three-letter token and requires ZERO. D-01
+    amended the ROADMAP to build no client for that protocol in this phase — first-party
+    adapters behind a seam SHAPED like it — so Case A is part of the amendment's evidence.
+    Case B was re-scoped by NAME at plan 190-01 (its precondition is now "no connection
+    bound"), and its new positive sibling asserts the opposite property for a BOUND step.
 
-    ── The substrate this deliberately does NOT reuse ──
-    ``_exec_llm_human_input``. It times out and returns NORMALLY, so the run ADVANCES — a
-    fail-OPEN shape. The armed action-risk checkpoint 189 inherits runs through a
-    different path with an indefinite, shutdown-safe wait and is already fail-CLOSED
-    (189-05). **This executor runs AFTER approval and owns no waiting at all.**
+    ── THE ORDER OF THE GATES IS THE SECURITY PROPERTY, AND EACH IS SEPARATELY ASSERTED ────
+    No amount of library quality makes an ordering correct, so the order is driven rather
+    than described:
 
-    ── D-05 · what it returns ──
-    A plain dict carrying ``text`` (the human-readable NOT-SENT body, the key
-    ``_latest_phase_text`` scans for) plus the ``recorded_intent`` sentinel holding the
-    structured record: the capability and the resolved inputs, and nothing else. The
-    ENGINE branches on that key to persist ``recorded_not_sent`` — the ``output["failure"]``
-    → ``fail_phase`` mechanism, one branch over. **That engine branch is plan 189-11's;
-    until it lands the phase simply completes, and the record is still written.**
+      1. **D-02 · the closed capability set.** An absent name RAISES — never resolved
+         dynamically, never ``eval``'d, never falling back to a default. ⚠ **DO NOT DELETE
+         THIS AS REDUNDANT**: ``ExternalActionPhaseConfig.capability`` is a ``Literal`` of
+         three, so this is the SECOND line of defence for a row that reached the engine
+         another way (a hand-edited JSONB row, a ``PhaseSpec`` built by hand).
+      2. **D-16 · the golden-run gate — FIRST among the send gates.** Publishing drives a
+         GOLDEN RUN through this very executor, and the armed action-risk checkpoint is
+         auto-continued on that path (D-19). Without this line, **PUBLISHING A WORKFLOW WOULD
+         PERFORM THE EXTERNAL ACTION, with nobody asked, once per publish attempt** — which is
+         ``D-189-DEF-04`` verbatim, inert until this commit and live from it. Shape 1 of the
+         two the engine's branch comment names: **the send is skipped, the record is NOT**, so
+         ``_external_action_body`` remains the single composer of that sentence and the golden
+         run keeps exercising the REAL executor. ``getattr(ctx, "is_golden_run", False)``
+         matches the engine's own reader at ``harness_engine.py:837`` exactly; no signature
+         changed and the engine was not edited.
+      3. **D-26 · the operator kill-switch.** With ``live_connectors`` resolving to ``"off"``
+         (its cold default) the step behaves EXACTLY as it did in 189: it records, it does not
+         send, and it reads *"Not sent — recorded"*. That is a genuine, already-tested state,
+         which is what makes this off-switch cheap and honest rather than a second code path.
+      4. **D-06 · THE EGRESS GUARD, BEFORE ANY CREDENTIAL WORK. This is the n8n CVE class,
+         inverted.** n8n #28218: *"protection activates conditionally based on credential
+         presence, not request characteristics"*; the prescribed fix, verbatim, is
+         *"decoupling SSRF protection from credential dependency"* — which is an ORDERING OF
+         TWO LINES, invisible to every test that binds a credential. So ``validate_destination``
+         is called here, above the unbound-step branch and above the resolver, and a send with
+         **no credential bound at all** raises the EGRESS REFUSAL rather than a
+         missing-credential error.
+         ``tests/unit/test_190_egress_ordering.py`` is the fence: it asserts the error's
+         IDENTITY, the refusal's CONTENT, and the RECORDED CALL ORDER ``["egress", "resolve"]``
+         — the last being the only assertion that survives someone swapping the two lines.
+         ⚠ ``EgressRefused`` is deliberately NOT caught anywhere in this function: a caught
+         refusal is one ``except`` clause away from being downgraded to a warning.
+      5. **D-13 / D-17 · no connection bound, or a disabled one.** Skip the send and record →
+         ``recorded_not_sent``, *"Not sent — recorded"*. This is NOT a failure and must never
+         read as one; it is the permanent, shipping terminal migration 115 was spent on, and
+         the half of the demo sentence competitors do not have.
+      6. **D-14 · resolve, scoped by the RUN's ORG — never by the id alone.** The definition is
+         authored data; the org is not. An ``id``-only lookup passes every ordinary test and
+         hands org A's workflow org B's decrypted credential — REPRODUCED at plan 190-06
+         before it was closed. ``org_id`` has no default on ``resolve_connection``, and a run
+         with no org resolves nothing.
+      7. **Dispatch** through ``connectors.registry.get_adapter(capability)``, whose key set is
+         the same closed frozenset. The adapter owns its vendor's success contract — Slack
+         answers HTTP 200 with ``{"ok": false}`` for a message nobody received, so only the
+         adapter's OWN verdict produces ``completed``.
+
+    ── D-17 · the outcome, with ZERO NEW STATUSES and ZERO ``workflow_phases`` migration ────
+
+        | outcome                              | key returned      | engine writes        |
+        |--------------------------------------|-------------------|----------------------|
+        | sent (the adapter's own ``ok``)      | neither sentinel  | ``completed``        |
+        | send FAILED                          | ``failure``       | ``failed``           |
+        | golden run / switch off / unbound    | ``recorded_intent``| ``recorded_not_sent``|
+        | approval declined                    | (unchanged path)  | unchanged            |
+
+    Both terminals mean "nothing arrived" and they must stay distinguishable: the status
+    written, the body's FIRST LINE, and the sentinel key's presence all differ, and a test
+    asserts all three. **D-18 — at-MOST-once: there is no retry, no backoff, no idempotency
+    key and no queue anywhere on this path.** A duplicate email is worse than a missing one;
+    a re-run is a deliberate human act.
+
+    ── D-19 · the executor still owns no waiting ────────────────────────────────────────────
+    The send happens AFTER the structurally-armed action-risk checkpoint. 190 adds network I/O
+    to this executor — **not** a second approval and not a second wait. There is no
+    ``await`` on a human anywhere below.
+
+    ── D-22 · a STEP the executor performs, not a tool the LLM may call ─────────────────────
+    Unchanged and load-bearing. No agent loop, no ``tools_override``, no model call. The
+    capability rides ``available_tools`` as a GOVERNANCE DECLARATION (D-03). Making it a
+    callable tool would let an LLM decide *whether and how* to send.
     """
     capability = getattr(phase.config, "capability", None)
     if capability not in EXTERNAL_ACTION_CAPABILITIES:
@@ -1873,16 +2155,111 @@ async def _exec_external_action(phase, accumulated_outputs: dict, ctx) -> dict:
         )
 
     resolved = _external_action_inputs(accumulated_outputs, ctx)
-    logger.info(
-        "189 D-05/SC#4: external_action phase %r RECORDED the intended %r and sent "
-        "nothing — no outbound call was made and none is possible in this phase",
-        getattr(phase, "slug", "?"),
-        capability,
+    slug = getattr(phase, "slug", "?")
+
+    def _record(reason: str) -> dict:
+        """The 189 terminal, unchanged: ONE composer for the one sentence."""
+        logger.info(
+            "190 D-17: external_action phase %r RECORDED the intended %r and sent nothing "
+            "(%s)", slug, capability, reason,
+        )
+        return {
+            "text": _external_action_body(capability, resolved),
+            RECORDED_INTENT_KEY: {"capability": capability, "inputs": resolved},
+        }
+
+    # ── GATE 1 · D-16 — THE GOLDEN-RUN GATE. ONE LINE, AND IT IS THE ONE THAT BITES ─────
+    # OBSERVED RED on the commit that added the send, before this line existed:
+    #   WARNING app.services.harness.phase_types: 190: external_action phase 'notify' failed
+    #   to send: nothing answered at the Slack API: httpx.AsyncClient.send was called -
+    #   outbound egress attempted
+    # i.e. PUBLISHING a workflow performed the external action. Driven green by this gate in
+    # the SAME commit, per D-16. Do not "simplify" it into the engine: shape 1 keeps the
+    # record composed by `_external_action_body`, so one composer still owns that sentence.
+    if getattr(ctx, "is_golden_run", False):
+        return _record("this is a publish-time golden run — D-16 suppresses the SEND only")
+
+    # ── GATE 2 · D-26 — the operator kill-switch ────────────────────────────────────────
+    if feature_audience(_LIVE_CONNECTORS_FEATURE) == "off":
+        return _record("live_connectors is off — the 189 behaviour, unchanged")
+
+    # ── GATE 3 · D-06 — THE EGRESS GUARD, BEFORE ANY CREDENTIAL WORK ────────────────────
+    destination = _pre_credential_destination(phase.config, capability)
+    if destination:
+        validate_destination(capability, destination)
+
+    # ── GATE 4 · D-13 / D-17 — nothing bound is not a failure ───────────────────────────
+    connection_id = getattr(phase.config, "connection_id", None)
+    if not connection_id:
+        return _record("no connection is bound to this step")
+
+    org_id = getattr(ctx, "org_id", None)
+    if not org_id:
+        # Fail CLOSED. A run with no org cannot scope a credential lookup, and an unscoped
+        # lookup is D-14 with a friendlier name.
+        logger.warning(
+            "190 D-14: external_action phase %r has a connection bound but the run carries "
+            "no org — recording rather than resolving unscoped", slug,
+        )
+        return _record("the run carries no org, so no credential can be scoped to it")
+
+    # ── GATE 5 · D-14 — resolve, scoped by the RUN's org ────────────────────────────────
+    try:
+        connection = await resolve_connection(str(connection_id), org_id=str(org_id))
+    except ConnectorDisabled:
+        return _record("the bound connection is disabled")
+
+    if getattr(connection, "capability", capability) != capability:
+        # A connection bound for another capability would send a bot token to a mail host.
+        raise ValueError(
+            f"external_action phase {slug!r}: connection {connection_id!r} is a "
+            f"{getattr(connection, 'capability', None)!r} connection, not {capability!r}"
+        )
+
+    # ── GATE 6 · dispatch ───────────────────────────────────────────────────────────────
+    adapter = get_adapter(capability)
+    config = dict(getattr(connection, "config", None) or {})
+    args = _adapter_args(adapter, capability, resolved)
+
+    try:
+        result = await adapter.send(
+            args=args, credential=connection, config=config, capability=capability
+        )
+    except AdapterError as exc:
+        # The vendor's own refusal, or ours about the arguments. D-18: it is NEVER retried.
+        logger.warning("190: external_action phase %r failed to send: %s", slug, exc)
+        return {
+            "text": _external_action_failure_body(capability, resolved, str(exc)),
+            "failure": f"{capability} was not performed: {exc}",
+        }
+
+    if not getattr(result, "ok", False):
+        # Only the ADAPTER'S OWN verdict produces `completed`. Slack answers HTTP 200 with
+        # {"ok": false} for a message nobody received; reading a status code here is exactly
+        # how a phase comes to read "Complete" for a send that did not leave the app (D-31).
+        words = getattr(result, "provider_message", "") or getattr(result, "detail", "")
+        logger.warning("190: external_action phase %r was refused by the destination", slug)
+        return {
+            "text": _external_action_failure_body(capability, resolved, words),
+            "failure": f"{capability} was not performed: {words}".strip(),
+        }
+
+    host = _destination_host(capability, config)
+    await _write_send_receipt(
+        ctx,
+        phase,
+        capability=capability,
+        connection_id=str(connection_id),
+        host=host,
+        raw_status=getattr(result, "raw_status", None),
     )
-    return {
-        "text": _external_action_body(capability, resolved),
-        RECORDED_INTENT_KEY: {"capability": capability, "inputs": resolved},
-    }
+    logger.info(
+        "190 CONN-02: external_action phase %r performed %r via connection %s (host=%s)",
+        slug, capability, connection_id, host,
+    )
+    # NEITHER sentinel — the engine's else branch calls `complete_phase`, and `completed`
+    # now means what it says: the send happened.
+    return {"text": _external_action_sent_body(capability, resolved, result, host)}
 
 
 # ── registration ──────────────────────────────────────────────────────────
