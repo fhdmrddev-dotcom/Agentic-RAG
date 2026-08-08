@@ -50,19 +50,27 @@ six production-source plants in plan 190-02 Task 3, each observed individually w
 green either side of it. A corpus that only ever passes proves nothing; see
 ``test_the_corpus_would_notice_a_deleted_unwrap_clause`` for the standing fence.
 
-(Line-number honesty, the 190-01 lesson: pasting a traceback into the file it describes moves
-the line it reports. The `:66` above was re-measured to a FIXED POINT: the first observation
-read `:65`, adding this very sentence pushed it to `:66`, and re-running after that edit
-confirmed `:66 == :66`. Exactly the three-step drift 190-01 recorded, met a second time.)
+(Line-number honesty, the 190-01 lesson, met twice here. FIRST: pasting a traceback into the
+file it describes moves the line it reports — the first observation read `:65`, adding the
+sentence that said so pushed it to `:66`, and re-running confirmed `:66 == :66`. SECOND, and
+the more interesting one: Task 3 later added ``test_the_corpus_would_notice_a_deleted_unwrap_clause``
+and its `ast`/`textwrap`/`egress_module` imports, so the import now sits at `:74`. The
+transcript above is deliberately NOT updated to `:69`. It is a record of an observation that
+happened, at the file as it then was; editing it to match today's line would be composing a
+traceback nobody ever saw. Convergence applies while the observation is live — after that,
+the drift is stated instead.)
 """
 from __future__ import annotations
 
+import ast
 import inspect
 import ipaddress
 import logging
+import textwrap
 
 import pytest
 
+from app.security import egress as egress_module
 from app.security.egress import (
     ALLOWED_HOST_SUFFIXES,
     REFUSAL_REASONS,
@@ -80,7 +88,7 @@ from app.security.egress import (
 # ⚠ MEASURED ADDITION, stated rather than smuggled: the plan enumerates 28 addresses and
 # then requires len == 29. The 29th is `::ffff:224.0.0.1`, and it is not filler — it is the
 # ONLY address measured to flip REFUSE -> allow when the `ipv4_mapped` clause is deleted.
-# (See _UNWRAP_AUDIT_IDENTITY below for why the plan's stated PLANT-1 expectation is false:
+# (See _UNWRAP_AUDIT_IDENTITY below for why the plan's stated falsification-1 expectation is false:
 # CPython's IPv6Address.is_global ALREADY unwraps IPv4-mapped, so `::ffff:127.0.0.1` keeps
 # refusing without our clause. Multicast is the one property CPython does not carry across
 # the mapping, because ff00::/8 does not contain ::ffff:e000:1.)
@@ -230,7 +238,7 @@ def test_each_of_the_four_unwrap_clauses_is_load_bearing():
 def test_the_audited_address_is_the_UNWRAPPED_one_not_the_wrapper():
     """Every _unwrap clause is load-bearing, and for two of them the property is the REASON.
 
-    ⚠ MEASURED CORRECTION to plan 190-02's PLANT-1 expectation. CPython's
+    ⚠ MEASURED CORRECTION to plan 190-02's falsification-1 expectation. CPython's
     ``IPv6Address.is_global`` already unwraps IPv4-MAPPED, so deleting our ``ipv4_mapped``
     clause does NOT flip ``::ffff:127.0.0.1`` to allow — it flips what the refusal NAMES
     (``::ffff:7f00:1`` instead of ``127.0.0.1``) and it flips the verdict only for the
@@ -246,6 +254,63 @@ def test_the_audited_address_is_the_UNWRAPPED_one_not_the_wrapper():
             f"reached, {embedded!r} — the `{clause}` clause of _unwrap is missing. An operator "
             "reading this audit line cannot tell they were pointed at a private host."
         )
+
+
+def _code_of(func) -> str:
+    """The function's executable body, with comments AND the docstring removed.
+
+    Via ``ast`` rather than by splitting on `#`: a first attempt at this used the textual
+    approach and its own positive control caught it immediately — a docstring is a string
+    literal, not a comment, so every clause name survived in the "code" through the prose
+    that names them. ``ast.unparse`` cannot make that mistake.
+    """
+    tree = ast.parse(textwrap.dedent(inspect.getsource(func)))
+    body = tree.body[0].body
+    if (
+        body
+        and isinstance(body[0], ast.Expr)
+        and isinstance(body[0].value, ast.Constant)
+        and isinstance(body[0].value.value, str)
+    ):
+        body = body[1:]  # drop the docstring
+    return "\n".join(ast.unparse(node) for node in body)
+
+
+def test_the_corpus_would_notice_a_deleted_unwrap_clause():
+    """A standing fence on the falsification discipline itself.
+
+    This is a WEAK fence on its own — it reads source, not behaviour, and a clause could be
+    present and inert. Its value is that the four driven REDs recorded in 190-02-SUMMARY.md
+    were one-off observations: a future refactor that inlines a clause away, or replaces the
+    peel with a single `is_global` call, fails loudly HERE instead of silently widening the
+    guard. The behavioural fences above remain the real ones.
+
+    Asserted against CODE, not comments — every clause name also appears in `_unwrap`'s
+    docstring and inline notes, so a comment-inclusive check would stay green over a body
+    that had been emptied out entirely.
+    """
+    body = _code_of(egress_module._unwrap)
+
+    # Positive control for the extractor. Both halves matter: prose must be GONE (or the
+    # clause names below are being read out of comments), and real code must be PRESENT (or
+    # an extractor returning "" would satisfy every `not in` and fail every `in`, which at
+    # least fails loudly — but a silent empty body is worth ruling out explicitly).
+    assert "Peel every IPv4-embedding form" not in body, (
+        "the extractor is inert — it left docstring prose in the 'code', so every assertion "
+        "below would pass over a body whose clauses had all been deleted"
+    )
+    assert "return ip" in body, "the extractor returned no code at all"
+
+    for clause in ("ipv4_mapped", "sixtofour", "teredo", "_NAT64", "_V4_TRANSLATED"):
+        assert clause in body, (
+            f"`{clause}` no longer appears in _unwrap's CODE. Each clause has a driven RED "
+            "recorded in 190-02-SUMMARY.md; removing one re-opens a measured hole."
+        )
+
+    assert "_SITE_LOCAL" in _code_of(egress_module.refuse_reason), (
+        "the fec0::/10 pre-check is gone from refuse_reason — HOLE 4, and CPython answers "
+        "is_global=True for it, so nothing downstream will catch it"
+    )
 
 
 # ── 2 · the host tables ───────────────────────────────────────────────────────
