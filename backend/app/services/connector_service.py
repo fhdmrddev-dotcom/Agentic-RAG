@@ -573,6 +573,46 @@ async def update_connection(
     return _to_response(updated)
 
 
+async def delete_connection(
+    connection_id: str,
+    org_id: str,
+    supabase: Client | None = None,
+) -> bool:
+    """Delete one connection IF the caller's org owns it. Returns whether a row went away.
+
+    Added by plan 190-09 — plan 190-06's summary named it as the one CRUD verb it did not
+    author ("Whoever adds delete | ``delete_connection``, against migration 116's existing
+    DELETE policy"), because 190-06's task list enumerated create / update / list / get /
+    resolve and nothing else. The router needs it, so it lands here rather than as SQL in a
+    router that contracts to hold none.
+
+    ── The org scope is on the DELETE ITSELF (D-14) ──
+    ``.eq("id", …).eq("org_id", …)`` — never by id alone. This is the one verb where an
+    unscoped predicate destroys another tenant's row instead of merely revealing it, so the
+    scope is not a convenience even though migration 116's DELETE policy would also refuse
+    it on the user-JWT connection. Two gates, for the same reason ``resolve_connection`` has
+    two: the SQL predicate is the gate, and RLS is what survives a future author simplifying
+    the query.
+
+    Returns ``False`` for both "no such row" and "another org's" — ONE absence, so the
+    router's 404 cannot be read as confirmation that the id names a real row somewhere.
+    Off the event loop via ``aexec`` (D-v2.5-01).
+    """
+    result = await aexec(
+        _client(supabase)
+        .table(_TABLE)
+        .delete()
+        .eq("id", str(connection_id))
+        .eq("org_id", str(org_id))  # D-14 — scoped. Removing this term deletes another org's row.
+    )
+    removed = bool(result.data)
+    logger.info(
+        "connector_service: delete of connection %s for one org removed %d row(s)",
+        connection_id, len(result.data or []),
+    )
+    return removed
+
+
 __all__ = [
     "ConnectorError",
     "ConnectorNotFound",
@@ -586,4 +626,5 @@ __all__ = [
     "list_connections",
     "get_connection",
     "update_connection",
+    "delete_connection",
 ]
