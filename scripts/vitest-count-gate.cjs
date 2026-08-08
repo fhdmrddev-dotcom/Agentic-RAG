@@ -161,7 +161,18 @@ const BASELINE = {
   // assertion, the zero-imports source assertion, the GROUNDING_DIAL_TYPES pin), the
   // three-register word check, and `notConnectedOf`'s three cases. Read from THIS SCRIPT'S
   // OWN `actual` column, never hand-counted.
-  "phaseVocabulary.test.ts": 112,
+  // 190-05 (CONN-02 / D-24), 2026-08-08: 112 → 117. An EXTENSION, never a lowering — no
+  // `it(` was deleted or renamed, and one shipped case (189-13's "SEPARATE LINES" seam)
+  // was AMENDED IN PLACE without changing the count. The +5 are `notConnectedOf`'s state
+  // test finally becoming falsifiable: the first genuine BOUND case in this suite's
+  // history (`connection_id` set → badge absent), its unbound opposite, the
+  // empty/whitespace/non-string boundary, the type half re-asserted BOUND as well as
+  // unbound, and the zero-import property fence. Read from THIS SCRIPT'S OWN `actual`
+  // column across the run that moved it (112 → 117, +5), never hand-counted — and the
+  // pin moves in the SAME COMMIT as the tests, because this gate only fails on a
+  // DECREASE, so a count that grows without its pin edit leaves the gate blind to the
+  // NEXT deleted test rather than red.
+  "phaseVocabulary.test.ts": 117,
   // 188-12: 31 → 46. GREW IN THIS PHASE — 188-06 added the seven-readings and ring-spec
   // cases, 188-07 the derives-nothing property and the type-only-import fence that is the
   // mechanical half of the G-5 diff cap. It began this phase pinned at 31 while running 35.

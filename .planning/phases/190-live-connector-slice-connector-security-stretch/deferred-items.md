@@ -108,3 +108,54 @@ suite is not a regression backstop.
 **Re-open trigger:** the first plan that needs `test_dual_mode_wiring.py` as evidence for a claim
 — or `/gsd:verify-work 190`, if the verifier tries to read a whole-suite number from it. Fix as
 its own `/gsd:fast` (re-point the `insert_run` monkeypatches; mark the two network-reaching tests).
+
+---
+
+## D-190-DEF-05 — `cd frontend && npm test` is NOT green: 21 failures in 8 files, ALL pre-existing
+
+**Found during:** plan 190-05 task 3, running the plan's own `npm test` acceptance criterion.
+
+**The criterion as written is not satisfiable at HEAD, and that is recorded as a finding rather
+than quietly rounded to a pass.** `190-05-PLAN.md` task 3 lists *"`cd frontend && npm test`
+reports `0 failed`"*. Measured on the finished tree:
+
+```
+ Test Files  8 failed | 238 passed (246)
+      Tests  21 failed | 4567 passed (4588)
+```
+
+**Proof it is pre-existing — measured, not argued.** The three files this plan changed were
+temporarily reset to their pre-phase state (`git checkout de122b9a -- <the three>`), the eight
+failing suites were re-run, and the result was **identical**:
+
+```
+ Test Files  8 failed (8)
+      Tests  21 failed | 88 passed (109)
+```
+
+Same 8 files, same 21 tests, with this plan's changes absent. The three files were then restored
+and verified **md5-identical** (`phaseVocabulary.ts` `514bc7ec…`, `phaseVocabulary.test.ts`
+`e270f26a…`).
+
+A second, independent mechanical check agrees: none of the eight failing files mentions
+`phaseVocabulary`, `notConnected` or `workflows/` at all —
+`grep -c -i "phaseVocabulary\|notConnected\|workflows/"` returns **0** for every one of them.
+
+**The eight, and what they are:** `IngestionPage`, `MessageItem`, `Plan04.frontend`,
+`useMessages`, `StreamsProvider.dedup`, `streamsProvider`, `streamsProvider_075_9_clientkey`,
+`lib/model-info` — the chat / ingestion surfaces, i.e. the recorded **SEED-056 frontend vitest
+rot**, not the workflow canvas.
+
+**Why the count gate says `failed 0` while `npm test` says 21:** every one of the eight sits
+**outside** `scripts/vitest-count-gate.cjs`'s `TARGETS`
+(`grep -cE "IngestionPage|MessageItem|streamsProvider|useMessages|model-info|Plan04"` → **0**).
+This is the recorded "the count gate has TWO knobs" trap: the gate is a workflow-surface
+instrument, and a plan that quotes it as whole-suite health is over-claiming.
+
+**Why it is not fixed here:** the executor scope boundary — eight unrelated files across the chat
+and ingestion surfaces, zero of them reachable from this plan's one changed line.
+
+**Re-open trigger:** SEED-056's own trigger, or the first plan in Phase 190 that needs a
+whole-frontend-suite number as evidence. **`/gsd:verify-work 190` must not read `npm test` as a
+regression signal for this phase** — use `node scripts/vitest-count-gate.cjs` (48 files, `failed
+0`) plus the per-suite run, which is what plans 190-05 onward actually assert against.
