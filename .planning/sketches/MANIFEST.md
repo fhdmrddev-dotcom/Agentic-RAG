@@ -1235,3 +1235,82 @@ That bug shipped in two consecutive drafts of 153-A and was only caught by an op
 amber gap sat in the lower-left while the pause chip sat at the top, detached from the gap it was
 supposed to occupy. The offsets are now computed from `offset = (D + G/2) − p` and verified numerically
 in-source. **A sketch's geometry is as reviewable as its code, and a screenshot is the review.**
+
+---
+
+## Session 2026-08-08 — Phase 190: Live Connector Slice (sketches 155-156)
+
+**G-2 sketch gate for Phase 190.** `190-CONTEXT.md` D-27 records the guardrail firing and being
+honoured rather than skipped, and scopes the sketch to **the Settings → Connections page only**,
+capped at ~3 on-screen actions. The author-side picker is deliberately NOT sketched — it reuses
+`ExternalActionSection`'s shipped shape — but sketch 155 draws a small seam strip proving the row's
+identity line is what that picker renders, so no second vocabulary is invented at the seam.
+
+**Two measured facts shaped the decomposition before any variant was drawn:**
+
+1. **The shipped Settings tab shape fights this surface.** `SettingsPage.tsx:875-884` ships five
+   tabs and every one is a *single-value form saved en masse* — Integrations ends in one
+   **Save Integrations** button (`:1354-1365`). `connector_connections` is per-org, **per-row**,
+   with a write-only secret. Row CRUD inside a whole-tab-Save contract puts two save models on one
+   screen. Sketch 155-B exists to make that visible; it is a foil, built to be rejected.
+2. **The surface must survive connection #4 through #40.** SEED-013's broad catalog and the MCP
+   client both land on this exact page. So 155 ships a **scale control (empty · 3 · 24)** — the
+   045 real-scale rule, and the BUG-260624-01 lesson where a fixed grid crammed illegibly at the
+   real roster.
+
+**Two operator decisions taken at intake, recorded here so they are not re-litigated:**
+
+- **The connection form gets a credential check that DELIVERS NOTHING**, run **after save** on the
+  stored connection — Slack `auth.test` / Jira `/myself` / SMTP connect-auth-quit. Rationale: a
+  pre-save check would put a plaintext token on the wire for a non-storage purpose, in the one
+  phase whose whole gate is `threats_open: 0`; a post-save check instead exercises the same
+  org-scoped resolver **D-14** protects. It is not the D-16 shape, because the line that matters is
+  *"did an external side effect occur"*, not *"did a packet leave"* — nobody's inbox, board or
+  channel changes. **Flexibility argument:** it grows `ConnectorAdapter` to `{describe, check, send}`,
+  which is the *more* MCP-shaped protocol — a real MCP server has a handshake, and `check()` is
+  where that lands when SEED-013 arrives. A test-*send* has no MCP analog and would be deleted later.
+- **Kill-switch honesty follows a rule, not a placement preference:** the **banner owns
+  platform-wide truth** (`live_connectors` off — not a fact about any one connection), the **row
+  owns only what is true of that row** (disabled, credential failed). Every future per-connection
+  state has a home; every future platform state has a different one. 155 ships a
+  `banner ⇄ rows ⇄ both` toggle so the rule can be felt before it is committed — at 24 rows,
+  "both" is 24 identical amber lines.
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 155 | connections-at-rest | Where does a per-row, per-org CRUD surface live in a whole-tab-Save Settings — and what is a connection's 3-second identity, at 3 connections and at 24? | *pending* | phase-190, conn-02, settings, placement, scale, instrument-table, kill-switch, seam-proof, g2-sketch-gate |
+| 156 | adding-a-connection | How does the create form make "where this sends" and "what we hold" honest — and how do the two refusals land? | *pending* | phase-190, conn-03, secrets, write-only, egress-refusal, fail-closed, d-11, d-07, d-26, credential-check, g2-sketch-gate |
+
+### The finding sketch 156 produced before a winner was picked
+
+**A refusal you CAN fix leaves the door open; a refusal you CANNOT fix closes it.** Driven in-page
+across all ten moments:
+
+| | moment 8 · egress refused | moment 9 · no encryption key |
+|---|---|---|
+| Cause | the host typed resolves to `10.4.2.19` | no `SECRETS_ENCRYPTION_KEY` configured |
+| Fixable by the person here? | **yes** — correct the host | **no** — nothing they type helps |
+| So Save | stays **enabled** + *"Correct the host and try again"* | goes **disabled** + `aria-describedby` at the reason |
+
+Both follow the 142-B rule: name the cause, name what the refusal **costs**, put the reason in real
+DOM text and never in a `title`. Moment 9 is where **D-11's deliberate fail-CLOSED inversion** of
+`get_cipher()`'s shipped fail-open polarity (D-150-01) becomes visible to a person — it is a
+decision, so it has to read as one.
+
+**156's three containers are content-identical by construction** (verified in-page:
+`aEqualsB: true, aEqualsC: true`), so the container comparison cannot be won by one variant
+happening to tell more truth than another.
+
+### Claims these sketches make that the backend does not yet honour
+
+Recorded now so plan-phase either builds them or deletes the sentence — never ships the copy
+against absent behaviour:
+
+- *"no step will be allowed to use it until this passes"* (156 moment 6) — needs a real gate at
+  bind or publish time, or the sentence goes.
+- **`Used by N steps`** (155's table column) — needs a count over `workflow_definitions.definition`
+  JSONB across published versions. Net-new, and it is what names the victims in a 073-A delete confirm.
+- **A persisted check verdict + timestamp** on `connector_connections` — 155's `Credential` column
+  reads `checked 2 days ago`, which is a column decision for **migration 116**.
+- **Capability glyphs `✉ ▣ ＃` are placeholders**, not shipped art. They are not canvas
+  `PHASE_GLYPHS` and must not become a fourth icon vocabulary — settle the source before build.
