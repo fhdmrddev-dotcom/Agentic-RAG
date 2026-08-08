@@ -5,6 +5,7 @@ status: draft
 shadcn_initialized: true
 preset: none (pre-existing shadcn install — `frontend/components.json`, style `default`, baseColor `slate`, cssVariables true, iconLibrary `lucide`)
 created: 2026-08-08
+revised: 2026-08-08 (checker round 1 — Dimension 4 typography; §5 gate/copy honesty; two non-blocking)
 ---
 
 # Phase 190 — UI Design Contract
@@ -151,7 +152,19 @@ secret row renders its stored form with no `Replace`, and the footer carries no 
 precedent (`dependencies.py:672/693`) is the shape. A hidden button that the API still honours is
 the defect the 069-A contract exists to prevent.
 
+⚠ **This gate has a consequence in §5 that is easy to miss and is load-bearing there:** because
+**check** is admin-only while **bind** is org-wide, a plain member who meets a connection whose
+`last_check_verdict` is stale-`failed` cannot clear that verdict themselves. §5a's door choice
+turns on exactly this.
+
 ### 2c · The table — the columns ARE the contract (155-C, locked)
+
+**The table IS the primary visual anchor of this screen.** It is the single dominant element:
+it opens the tab body, it owns the full content width, everything else on the surface is
+subordinate to it (the filter bar sits directly above it and describes it, the kill-switch
+banner sits above that and qualifies it, the panel opens beside it and never covers it, §3a).
+There is no hero, no summary tile row and no chart competing for first read — a person landing
+on Connections looks at rows, and the first thing any row says is its **name**.
 
 ```
 Connection            Sends to                        Used by      Credential        State
@@ -221,6 +234,8 @@ Per the shipped sketch rule. At rest the page offers:
 
 Nothing else is a button. `Check` is not a per-row visible button — it lives in the overflow and
 in the panel footer, because it has a side effect (it writes `last_checked_at`).
+
+The `⋯` trigger is **icon-only and therefore carries an explicit accessible name** — see §12.
 
 ### 2g · Destructive actions — the graded-guard rule (146–148, locked)
 
@@ -448,9 +463,12 @@ Sketch 156 **moment 6** ships this sentence:
 gate does not exist.** Research states the fork plainly: build cheap gates, or delete the
 sentence.
 
-### 5a · DECISION — build the gates, and narrow the sentence to exactly what they do (**NEW**)
+### 5a · DECISION — build the gates, and narrow the sentence to *exactly* what they do (**NEW**)
 
-Option (a), with the copy corrected so it claims precisely what ships and not one word more.
+**Revised at checker round 1.** The first draft of this section built the gates and then still
+claimed an absolute — *"a workflow author **cannot pick it** while it is failing"* — which no
+specified gate enforced. That is the precise failure mode this section exists to prevent, so the
+sentence is corrected against the gates rather than the gates hand-waved up to the sentence.
 
 **Gate 1 — BIND time, client, real.** `ConnectionPicker` (§6) renders a connection whose
 `last_check_verdict = failed` as **not selectable**: the option carries `✕ credential failed`, is
@@ -463,11 +481,23 @@ failed marker — the picker never silently unbinds an author's choice.
 
 **Gate 2 — BIND time, server, real.** The read endpoint the picker consumes
 (`GET /connectors/connections?capability=…`) returns `last_check_verdict` per row, and the
-`connection_id` write is validated server-side against the row's org **and** its `is_enabled`
-flag. A **disabled** connection is treated as unbound at run time → `recorded_not_sent` (D-17,
-zero new statuses).
+`connection_id` write is validated server-side against **two** things and only two: the row's
+**org** (D-14's scoped resolver) and its **`is_enabled`** flag. A **disabled** connection is
+treated as unbound at run time → `recorded_not_sent` (D-17, zero new statuses).
 
-**What the gates deliberately do NOT do:** they do **not** block a run on a stale
+**⚠ Gate 2 deliberately does NOT read `last_check_verdict` — this is door (b), taken knowingly:**
+
+| | |
+|---|---|
+| What that means | A `connection_id` write naming a connection whose last check failed is **accepted** by the server. A direct API call, a picker regression, or a check→bind race can therefore produce a binding the picker itself would not have offered. |
+| Why that is acceptable | **Blocking the bind prevents no send.** A bound-but-failing connection fails honestly on the next run (§8a / D-17) with the host's verbatim words — the run surface, not the picker, is the surface that must not lie. The failing-verdict rule is a **quality hint**, not an authorization boundary; every actual boundary on this surface (org scoping, `is_enabled`, the egress guard, the armed approval) **is** server-enforced. |
+| The decisive cost of door (a) | §2b makes **check admin-only** while **bind is org-wide**. A server bind-gate on `last_check_verdict` would hard-block a plain member holding a stale-`failed` verdict on a credential that has since been fixed — and they could not clear it themselves, because they cannot run the check. The tempting escape ("the check is one click and it's right there in the picker") is **false under our own §2b gate**. Door (a) would buy a small usability guard by manufacturing a dead end for the majority audience. |
+| What is therefore forbidden | **The copy may not claim what Gate 2 does not do.** §5b's sentence is worded to Gate 1's exact reach — *the picker will not offer it* — and any future edit that restores an absolute verb ("cannot pick", "no step will be allowed") is a defect, listed in §14. |
+
+**Reversing to door (a)** is a one-line server change plus a one-clause copy change, and both must
+land **in the same commit** — see U-07's addendum in §13.
+
+**What the gates deliberately do NOT do, at run time:** they do **not** block a run on a stale
 `last_check_verdict`. A verdict from two days ago deciding a live run is exactly the
 settings-sync-staleness class this codebase has already been bitten by, and a credential rotated
 since the check would be refused while working perfectly. **At run time the executor attempts the
@@ -480,7 +510,7 @@ send and reports the true outcome** (`completed` / `failed`, D-17).
 
     Reached {host}:{port} and it answered — the address is fine, the password is not.
 
-    The connection is saved. A workflow author cannot pick it while it is failing, and
+    The connection is saved. The picker will not offer it while it is failing, and
     a step already bound to it will fail on the next run rather than pretend.
 
     what the host said, verbatim
@@ -489,15 +519,21 @@ send and reports the true outcome** (`completed` / `failed`, D-17).
     └──────────────────────────────────────────────┘
 ```
 
-Only the middle paragraph changed from the sketch. **Every clause in it is honoured by a gate
-above**, and the second clause replaces a universal claim ("no step will be allowed to use it")
-with the true specific ("will fail on the next run rather than pretend"). The verbatim block
-inherits the **071-A verbatim-provider-error rule**: the host's own words, in `font-mono`, under a
-label that says they are verbatim, never paraphrased and never truncated.
+Only the middle paragraph changed from the sketch, and **each of its two clauses maps to exactly
+one shipped mechanism**:
 
-⚠ **The fallback, if the planner finds Gate 1 too expensive:** delete the middle paragraph
-entirely and ship only *"The connection is saved."* That is option (b) and it is legitimate — but
-it must be recorded as a deletion with its reason, not achieved by leaving the sentence in.
+| Clause | Honoured by | Is the claim the mechanism's full reach? |
+|---|---|---|
+| `The picker will not offer it while it is failing` | **Gate 1** (§5a — client, `aria-disabled`, inline refusal) | **Yes.** "The picker will not offer" is a statement about the picker, which is precisely what Gate 1 governs. It does not assert that binding is impossible, because it is not. |
+| `a step already bound to it will fail on the next run rather than pretend` | **run time** (§8a / D-17 — the send is attempted and the true outcome reported) | **Yes.** |
+
+The verbatim block inherits the **071-A verbatim-provider-error rule**: the host's own words, in
+`font-mono`, under a label that says they are verbatim, never paraphrased and never truncated.
+
+⚠ **The remaining fallback, if the planner drops Gate 1 as too expensive:** delete the *first*
+clause too, leaving only `The connection is saved.` plus the run-time clause. That is legitimate —
+but it must be recorded as a deletion with its reason, never achieved by leaving a sentence in
+that describes a picker behaviour which no longer exists.
 
 ### 5c · The check itself (156-A, locked)
 
@@ -597,7 +633,7 @@ seam.**
 | **None exist for this capability** | `No email connection yet — add one in Settings → Connections.` ⚠ **Text only, no link** — the three-homes IA has no router and a leaf inside the builder cannot switch `ActiveView`. Naming the destination is honest; a dead link is not. |
 | **Nothing bound** (the default) | The select shows `— none —` and the footer reads `🔒 nothing bound — this step will record, not send` |
 | **Bound** | The select shows `{name}`; the footer reads `🔒 {sends-to} · {detail}` |
-| **Bound, credential failing** | `{name}  ✕ credential failed` + the §5a refusal line |
+| **Bound, credential failing** | `{name}  ✕ credential failed` + the §5a refusal line. **This state is reachable** — Gate 2 accepts such a write by design (§5a), and a binding that predates the failure is never silently unbound — so the picker must render it rather than assume it away. |
 | **Not checked** | `{name}  ◌ not checked` — selectable (an unchecked connection is not a failed one) |
 | **Disabled connection** | **not listed at all** — a disabled connection is not a choice |
 | **Read failed** | `Could not load connections. The step will record, not send, until one is bound.` (`role="alert"`) — honest 4-state set: populated ≠ empty ≠ loading ≠ error |
@@ -814,16 +850,60 @@ form uses `padding: 16px 18px` on header/body/footer and `margin-bottom: 14px` b
 picker's option rows inherit `ExternalActionSection`'s `px-2 py-1`. Panel width is **400px**, a
 shipped shell constant, not a spacing token.
 
+⚠ **These are JUSTIFIED EXCEPTIONS in the Dimension-5 sense, and they are recorded here so no
+later round misreads them as new debt.** The off-grid `18px` and `14px` values are **inherited
+from shipped code — `PhaseFormPanel.tsx` and `StatusChip.tsx` — and are not introduced by 190**.
+A gap-closure round that "corrects" them to 16px/12px would be (a) changing shipped visual
+rhythm on five surfaces that never asked for it, and (b) **editing `PhaseFormPanel.tsx`, whose
+required diff is `0 0` (§1b, D-23)** — the fix would itself break a hard fence. The grid rule
+binds what 190 AUTHORS; it does not license rewriting what 190 merely renders inside.
+
 ### 11b · Typography
 
-Three families, **four sizes, two weights.** 190 adds no new size and no new weight.
+Three families, **three sizes, two weights.** 190 adds no new size and no new weight.
+
+⚠ **Measured correction (checker round 1).** An earlier draft of this table cited `--text-md` /
+`--text-sm` / `--text-xs` tokens and claimed *"four sizes, two weights"* while listing three
+sizes and three weights. Both halves were wrong. Measured at HEAD: `tailwind.config.js` defines
+**no `fontSize` override** and `index.css` defines **no `--text-*` custom property** — so the real
+vocabulary is Tailwind's default `text-base` (16px) plus the two arbitrary values the shipped
+surfaces actually use, `text-[13px]` and `text-[11px]`.
+
+**The declared scale — three sizes (16 / 13 / 11) and exactly two weights (`500`, `400`):**
 
 | Role | Size | Weight | Line height | Family |
 |------|------|--------|-------------|--------|
-| Page / panel title | 16px (`--text-md`) | 700 | 1.25 | Manrope (`font-headline`) |
-| Body · row name · notice paragraph | 13px (`--text-sm`) | 400 | 1.5 | Inter |
-| Label · state word · column header · help line | 11px (`--text-xs`) | 500 (labels) / 400 (help) | 1.45 | Inter |
-| Technical value — host, port, id, timestamp, verbatim vendor error | 11px | 400 | 1.5 | JetBrains Mono (`font-mono`) |
+| Settings card title (`Connections`) | 16px (`text-base`) | *inherited — see below* | 1.25 | Manrope (`font-headline`) |
+| Row name · body prose · notice paragraph · empty-state body | 13px (`text-[13px]`) | **400** | 1.5 | Inter |
+| Label · column header · state word · filter chip | 11px (`text-[11px]`) | **500** | 1.45 | Inter |
+| Help line · secondary caption · the `Credential` column | 11px (`text-[11px]`) | **400** | 1.45 | Inter |
+| Technical value — host, port, id, timestamp, `live_connectors`, verbatim vendor error | 11px (`text-[11px]`) | **400** | 1.5 | JetBrains Mono (`font-mono`) |
+
+**190 declares exactly two weights: `500` and `400`.** Every emphasis this surface needs is
+carried by the 500/400 pair plus size and family — no third weight is authored anywhere.
+
+**Title weights are INHERITED CHROME, not declared by 190 — measured, with citations:**
+
+| Title | The shipped rule | Where it lives | 190's part |
+|---|---|---|---|
+| Settings card title (`Connections`) | `text-base font-headline font-bold` → 16px / **700** / Manrope | `SettingsPage.tsx:189-195` — the shared `SectionCard` | passes a `title` string; renders no type of its own |
+| Push/split panel title (`Add a connection`) | `text-[13px] font-semibold` → 13px / **600** / Inter | `PhaseFormPanel.tsx:742` | `ConnectionFormPanel` mirrors the shipped header rule verbatim |
+
+⚠ The earlier draft collapsed both into one *"page / panel title — 16px / 700"* row. That is
+wrong on **both halves** for the panel: the shipped panel title is **13px at weight 600**. Match
+the shipped rule at each site; do not invent a third title style, and do not "unify" them.
+
+**Why `500` is kept and `700` / `600` are not declared** — this is the choice the checker asked
+to be stated explicitly, and it is decided by measurement rather than taste. A shipped `500`
+(`font-medium`) is what every element this surface reuses already renders at:
+`StatusChip.tsx:42` (`text-[11px] font-medium` — the state chip 190 renders),
+`PhaseFormPanel.tsx:228` (`text-[11px] font-medium` — the panel field label 190's panel mirrors),
+`UsersAndAccess.tsx:256` and `:282` (the instrument-table row name and its chips — the roster
+190 clones). Demoting labels to `400` would mean either forking `StatusChip` or editing a shared
+primitive four other surfaces render, for no visual gain; promoting them to `700` would invent a
+weight this app uses nowhere at 11px. **Matching a shipped weight is cheaper and more honest than
+inventing one**, and Dimension 4 governs what this contract *declares*, not what shipped CSS
+already does.
 
 **The mono family is reserved for values a person may need to copy or compare character by
 character** — hosts, ports, `live_connectors`, `SECRETS_ENCRYPTION_KEY`, the verbatim error block.
@@ -863,7 +943,7 @@ is paired with a word or a glyph so that removing colour removes nothing.
 | Filtered-to-zero body | `No connection matches this filter.` |
 | **Error state — refused (security)** | `That address was refused before anything was sent` + the §4c reason sentence + `Correct the host and try again.` |
 | **Error state — unreachable** | `That host did not answer` + `The address is allowed — nothing answered on it. Check the host and port, then check again.` |
-| **Error state — credential rejected** | `The host rejected this credential` + `Reached {host}:{port} and it answered — the address is fine, the password is not.` + the verbatim block |
+| **Error state — credential rejected** | `The host rejected this credential` + `Reached {host}:{port} and it answered — the address is fine, the password is not.` + `The connection is saved. The picker will not offer it while it is failing, and a step already bound to it will fail on the next run rather than pretend.` + the verbatim block |
 | **Error state — cannot store (fail-CLOSED)** | `This platform cannot store a credential safely yet` + the §4b block; Save **disabled** with `Disabled because no encryption key is configured.` |
 | Error state — read failure (picker) | `Could not load connections. The step will record, not send, until one is bound.` |
 | Check success | `Credential works — and nothing was sent` |
@@ -875,11 +955,12 @@ is paired with a word or a glyph so that removing colour removes nothing.
 | Picker — none exist | `No {email\|ticket\|message} connection yet — add one in Settings → Connections.` |
 | Picker — failing connection refused | `This connection's credential is failing. Fix it in Settings → Connections, then pick it here.` |
 | Non-admin note | `Only an organisation admin can add or change a connection. You can bind an existing one to a workflow step.` |
+| Row overflow trigger (icon-only) | accessible name only — `More actions for {name}` (§12) |
 | **Destructive confirmation — Delete** | `Delete {name}?` / `{N} published workflow steps send through this connection. They will read “Not sent — recorded” until another connection is bound. The stored credential is destroyed and cannot be recovered. This is recorded with your name.` |
 | **Destructive confirmation — Disable (Used by > 0)** | `Disable {name}?` / `{N} published workflow steps send through this connection. They will read “Not sent — recorded” until it is enabled again. The stored credential is kept, untouched. You can enable it at any time. This is recorded with your name.` |
 | Receipt (every write) | `✎ {verb} · recorded` |
 
-**Four copy rules that bind every string above:**
+**Five copy rules that bind every string above:**
 
 1. **Never `sent successfully` / `done` / `delivered` about an action that did not leave the app.**
 2. **A refusal names its cause and its cost**, in that order (142-B).
@@ -887,6 +968,9 @@ is paired with a word or a glyph so that removing colour removes nothing.
    paraphrased, never truncated, never re-styled as our own sentence.
 4. **`Not sent — recorded` is one string with one meaning**, inherited verbatim from migration 115
    and 189 §9d. **190 must not invent a second phrase for that state**, on any surface.
+5. **No string may use an absolute verb for a guarantee only a client gate provides** (§5a). A
+   sentence that says *cannot*, *never*, *no step will be allowed* must name a server-enforced
+   mechanism; where only the picker enforces it, the sentence says *the picker*.
 
 ---
 
@@ -896,6 +980,7 @@ is paired with a word or a glyph so that removing colour removes nothing.
 |---|---|
 | **Never colour alone** (WCAG 1.4.1) | Every state is a **glyph + word**: `✓ Ready` · `◌ Not checked` · `✕ Credential failed` · `⏻ Disabled`. All four read in greyscale. Refusals lead with a heading sentence, not a colour. |
 | **Text contrast ≥ 4.5:1** | `--muted-foreground` on `--background` ≈ **7.7:1**. Meaningful text never uses a dim-only token. |
+| **Every icon-only control carries an explicit accessible name** | The per-row `⋯` overflow trigger (§2f) renders **`aria-label="More actions for {name}"`** — the connection's own name, so a screen-reader user in a 24-row table hears *which* row's menu they are on. **Do not leave this to a shadcn/Radix default**: `DropdownMenuTrigger` supplies no name for a glyph child, and 24 unnamed "button, more" nodes is the failure this row exists to prevent. The same rule binds any other icon-only affordance added later to this surface. |
 | **Refusal reasons are real DOM text** | Rendered in a `<p id>` wired by `aria-describedby` on the disabled Save. **Never a `title`** — 142-B, and the 184-07 lesson. |
 | **Focus trap + focus restore in the panel** | ⚠ **NET-NEW WORK** — `Dialog` would have given both free; the push/split panel gives neither. Escape closes; focus returns to the row that opened it. Named here so it is a plan task, not a review finding. |
 | **375px** | The panel becomes a bottom sheet below 768px and must remain usable at 375px — the toolbar viewport buttons drive this, and the notice blocks are the tallest content. |
@@ -916,12 +1001,14 @@ is paired with a word or a glyph so that removing colour removes nothing.
 | U-04 | Delete + Disable-with-victims use the victim-naming sheet; Enable and Replace flip direct | §2g | re-grading one row |
 | U-05 | The closed six-row refusal-reason table, with `unresolvable` worded as a lookup failure rather than a refusal | §4c | editing one row's sentence |
 | U-06 | **Refused ≠ unreachable ≠ rejected** — three headings, three glyphs, three next steps | §4d | collapsing two — but that is the exact conflation §4a-3 forbids |
-| U-07 | ⭐ **Build the two gates; narrow sketch 156 moment 6's sentence** to what they honour; do NOT gate a run on a stale check verdict | §5a–b | the named fallback: delete the middle paragraph entirely (option b) |
+| U-07 | ⭐ **Build Gate 1 (client, the picker) + Gate 2 (server: org + `is_enabled`)**; do NOT gate a run on a stale check verdict | §5a–b | the named fallback: delete the picker clause too, leaving only `The connection is saved.` + the run-time clause (recorded as a deletion, with its reason) |
+| **U-07a** | ⭐ **ADDENDUM (checker round 1) — DOOR (b): the copy is narrowed to the client gate; NO server gate reads `last_check_verdict`.** Gate 2 validates org + `is_enabled` **only**, so a `connection_id` write naming a failing connection is accepted; §5b therefore says *"the picker will not offer it"*, never *"cannot pick it"*. **Reasoning:** the failing-verdict rule is a quality hint, not an authorization boundary — blocking the bind prevents no send, since a bound-failing connection fails honestly on the next run (§8a/D-17) — and a server bind-gate would collide with U-02, which makes **check** admin-only while **bind** is org-wide, hard-blocking a member on a stale verdict they cannot clear. | §5a–b, §6d | **door (a):** extend Gate 2 to reject a `connection_id` write when `last_check_verdict = failed`, **and restore the absolute verb in the same commit** — plus either give members the check, or ship the "ask an admin" dead end knowingly. The two halves may never be separated: a gate without the copy under-claims, and the copy without the gate is the §5 defect. |
 | U-08 | The picker's write seam is a new `SelectedPhaseSlugContext` mounted in `WorkflowBuilderPage.tsx`; the picker degrades when no store/provider is present | §6c | adding `selectedSlug` to `builderStore` instead — **never** by adding a prop to `PhaseFormPanel` |
 | U-09 | The picker is a `Select`, not a typeahead | §6d | swapping the control if a real org exceeds ~30 connections per capability |
 | U-10 | ⭐ **A bound node's badge is absent and NOTHING replaces it** | §7b | proposing a positive badge — which is a typecheck error today |
 | U-11 | The kill-switch OFF state is told in the Settings banner + the panel notice, and **nowhere on the canvas, the picker or the run word** | §9 | adding one surface, and accepting the 24-identical-lines finding one scale down |
 | U-12 | Capability marks from `fluent-emoji`, **no vendor logos anywhere** | §10 | sourcing vendor marks — which needs a second icon package and breaks the convention |
+| **U-13** | **Typography declares two weights (`500` + `400`), matching shipped `font-medium`/normal; the two title weights (700 `SectionCard`, 600 panel) are INHERITED CHROME, cited at file:line, not declared** | §11b | declaring a different pair — but only by measuring the shipped sites first, since demoting `500` forks `StatusChip.tsx` and promoting it invents an 11px weight this app uses nowhere |
 
 ---
 
@@ -943,13 +1030,28 @@ Concrete and observable. Each is a UI-visible condition; the backend halves live
 - The **`Not connected`** badge still renders on a step with a `connection_id` bound — or renders
   on a step of any other type.
 - Sketch 156 moment 6's sentence **ships unchanged** while no gate exists.
+- **§5b's middle paragraph regains an absolute verb** — *"cannot pick"*, *"no step will be allowed
+  to use it"*, *"never bound"* — while Gate 2 still validates only org + `is_enabled`. **This is
+  the U-07a defect and it is the single most likely regression in this section**, because the
+  absolute reads stronger and nothing in the type system objects.
+- The **picker offers a `last_check_verdict = failed` connection as a selectable option** (Gate 1
+  regressed). Under door (b) Gate 1 is the **only** gate, so its failure is backed by nothing —
+  which is exactly why §5b claims no more than Gate 1 delivers.
 - A **member** (non-admin) creates a connection through an API the UI merely hid.
-- A **stale** `last_check_verdict` blocks a live run whose credential actually works.
+- A **stale** `last_check_verdict` blocks a live run whose credential actually works — **or**
+  blocks a *bind* by a member who has no way to re-run the check (the door-(a) failure mode, if
+  door (a) is ever taken without also giving members the check).
 - The kill-switch OFF state is announced on a **table row** (24 identical amber lines) or on the
   **canvas**.
 - The panel **traps focus nowhere** (Tab escapes into the table behind it) or **restores focus
   nowhere** on close.
+- The `⋯` row-overflow trigger ships with **no accessible name** — 24 buttons that all announce
+  as "more".
 - A capability mark renders **blank** in production (the `fluent-emoji:direct-hit` trap).
+- A third font weight appears in authored 190 code — e.g. a `font-semibold` label or a
+  `font-bold` column header outside the two inherited title sites (§11b).
+- A gap-closure round "fixes" the inherited `18px` / `14px` panel values onto the 4px grid,
+  editing `PhaseFormPanel.tsx` and breaking its `0 0` fence (§11a).
 
 ---
 
@@ -977,3 +1079,21 @@ Concrete and observable. Each is a UI-visible condition; the backend halves live
 - [ ] Dimension 6 Registry Safety: PASS
 
 **Approval:** pending
+
+---
+
+### Revision log
+
+**Round 1 (2026-08-08)** — checker returned BLOCKED with 2 blocking + 2 non-blocking findings.
+Fixed, and nothing else touched:
+
+| Finding | Section | Resolution |
+|---|---|---|
+| **BLOCKER 1** — three declared weights (700/500/400), prose claiming "four sizes, two weights" | §11b | Rewritten. Declared scale is now **3 sizes (16/13/11) + exactly 2 weights (500/400)**; the two title weights moved to an **inherited-chrome** table with measured citations. Also corrected two fabrications found while measuring: `--text-md/sm/xs` **do not exist** (no `fontSize` override in `tailwind.config.js`, no `--text-*` in `index.css`), and the shipped panel title is **13px/600** (`PhaseFormPanel.tsx:742`), not 16px/700. New U-13. |
+| **BLOCKER 2** — §5b asserted *"cannot pick it"*, a guarantee no server gate provided | §5a, §5b, §6d, §11d, §13, §14 | **Door (b) taken.** Sentence narrowed to *"The picker will not offer it while it is failing"*; Gate 2 documented as validating org + `is_enabled` **only**, with the reasoning table; clause→mechanism mapping added; U-07a addendum records the door and its exact reversal; copy rule 5 and two §14 failure conditions added. |
+| Non-blocking — visual anchor + icon-only label | §2c, §2f, §11d, §12, §14 | The table is named **the primary visual anchor** in §2c; `aria-label="More actions for {name}"` specified for the `⋯` trigger, with the reason Radix defaults are insufficient. |
+| Non-blocking — spacing exception provenance | §11a | Callout now cites the justified-exception clause explicitly: `18px`/`14px` are **inherited from shipped `PhaseFormPanel` / `StatusChip.tsx`**, and "fixing" them would break `PhaseFormPanel.tsx`'s `0 0` fence. |
+
+Everything the checker verified and PASSED — the empty-diff fences, the `phaseVocabulary.ts`
+zero-import property, the badge-slot rules, the no-focusable-control rule, the three-axis status
+vocabulary, the credential-non-leak refusal copy and the D-32 scope fence — is **unchanged**.
