@@ -59,7 +59,9 @@ def test_audit_accepts_102_kinds():
 
     # 16 prior + 6 new = 22 total kinds at Phase 102.
     # Phase 185 / migration 114 (BUG-260731-02) adds the armed action-risk pause kind
-    # `action_risk_pending` → 23. This pin is bumped in lockstep with the
-    # _AUDIT_EVENT_TYPES extension; the drift guard that keeps the Python set equal to
-    # the SQL CHECK lives in tests/unit/test_audit_event_registration.py.
-    assert len(_AUDIT_EVENT_TYPES) == 23
+    # `action_risk_pending` → 23. Phase 190 / migration 117 (CONN-02/CONN-03, plan
+    # 190-03) adds the send receipt `external_action_sent` → 24. This pin is bumped in
+    # lockstep with the _AUDIT_EVENT_TYPES extension; the drift guard that keeps the
+    # Python set equal to the SQL CHECK lives in
+    # tests/unit/test_audit_event_registration.py.
+    assert len(_AUDIT_EVENT_TYPES) == 24
