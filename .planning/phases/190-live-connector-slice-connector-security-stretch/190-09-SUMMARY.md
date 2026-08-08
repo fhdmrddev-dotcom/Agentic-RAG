@@ -283,6 +283,18 @@ Two things are **deliberately absent** rather than stubbed, both with a named ow
 
 **CONN-02 and CONN-03 are not marked complete here, on purpose.** This plan's frontmatter claims neither. The phase convention set by 190-01 (D-190-DEF-02) and followed by every plan since is that they are marked **together at phase close**, after `/gsd:verify-work` + `/gsd:secure-phase`. CONN-03's SC#2 — the unconditional egress guard on a *real send* — is unmet until 190-13 lands the send at all, and CONN-02 has no UI until 190-10/11. Marking either now would assert a capability that does not exist, in the one phase whose whole discipline is not over-claiming (D-31).
 
+## Self-Check appendix — run after the SUMMARY was written
+
+| Claim | Command | Result |
+|---|---|---|
+| the two created files exist | `[ -f … ]` | **FOUND** ×2 |
+| the three task commits exist | `git log --oneline --all \| grep` | **FOUND** `6c91ebe6`, `727d87b7`, `42932238` |
+| no commit deleted a file | `git diff --diff-filter=D --name-only HEAD~4 HEAD` | **empty** |
+| `STATE.md` hand-edit is additive | `git diff --numstat` | **28 / 6** — every one of the 6 deletions is a replacement; 9 `### Previous stopped_at` blocks intact; exactly **ONE** `stopped_at:` key (the demoted 190-08 block converted to plain narrative, the convention commit `735d1033` established) |
+| `ROADMAP.md` | `git diff --numstat` | **2 / 2** — `190-09` row `[x]`, progress cell `9/19`; checkbox tally 9 done + 10 open = 19 |
+| `REQUIREMENTS.md` untouched | `git diff --numstat` | **empty** — deliberate (D-190-DEF-02) |
+| the docs commit | `git log -1` | `8de9db3b` |
+
 ---
 *Phase: 190-live-connector-slice-connector-security-stretch*
 *Completed: 2026-08-09*
