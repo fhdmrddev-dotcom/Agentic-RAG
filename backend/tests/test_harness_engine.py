@@ -924,6 +924,12 @@ def _drive_approved_external_action(
             **(extra_inputs or {}),
         },
         is_golden_run=is_golden_run,
+        # Phase 190: the ctx bag carries the pool in BOTH production builders
+        # (threads.py and publish_service._drive_golden_run), and the executor's audit
+        # writers read it off the ctx. Without it here the send receipt is skipped by the
+        # "minimal ctx" guard and the receipt fence measures nothing — this drive was less
+        # faithful than the real thing, and that is what the receipt case found.
+        pool=pool,
         # Phase 190 / D-14: the RUN's org, which is what a credential lookup is scoped BY.
         # Unread by every unbound drive (they never reach the resolver); required by the
         # golden-run fence, whose whole point is to reach as far as the send would.
@@ -1289,6 +1295,232 @@ def test_a_golden_run_of_an_external_action_performs_no_egress(
         f"STRUCTURE, and the D-04 checkpoint that would have asked a person is exactly the "
         f"one D-19 skips. See the WR-06 comment on the golden-run branch in "
         f"harness_engine._run_phase_with_gates. writes={failed!r}"
+    )
+
+
+def _bind_a_live_connection(monkeypatch, *, adapter, capability="post_message"):
+    """Arm the send path for a REAL engine drive: kill-switch on, credential resolved, DNS
+    answered, adapter supplied by the caller. Everything else stays the shipped code."""
+    from app.security import egress as _egress
+    from app.services.harness import phase_types as _phase_types
+
+    class _Resolved:
+        connection_id = "cccccccc-0000-4000-8000-00000000000b"
+        org_id = "aaaaaaaa-0000-4000-8000-000000000001"
+        name = "ops channel"
+        config = {"default_channel": "C0190"}
+
+        @property
+        def secret(self):
+            return _SEND_SECRET_SENTINEL
+
+    _Resolved.capability = capability
+
+    async def _stub_resolver(connection_id, *, org_id):
+        return _Resolved()
+
+    monkeypatch.setattr(_phase_types, "feature_audience", lambda _f: "everyone")
+    monkeypatch.setattr(_phase_types, "resolve_connection", _stub_resolver)
+    monkeypatch.setattr(_phase_types, "get_adapter", lambda _c: adapter)
+    monkeypatch.setattr(_egress, "_default_resolver", lambda h, p: ["93.184.216.34"])
+
+
+#: The credential a successful send resolves. It exists ONLY so "the receipt carries no
+#: secret" is a claim with a subject — a sweep for a string nothing ever held proves nothing.
+_SEND_SECRET_SENTINEL = "xoxb-190-RECEIPT-MUST-NEVER-CARRY-THIS"
+
+
+def test_a_failed_send_and_a_recorded_not_sent_step_differ_on_all_three_axes(
+    build_workflow_definition, mock_asyncpg_pool, monkeypatch
+):
+    """D-17 / UI-SPEC §8b — **the two "nothing arrived" outcomes must stay distinguishable.**
+
+    ``failed`` and ``recorded_not_sent`` both mean nothing reached the destination, and
+    conflating them is the real risk on this surface: one is a step nobody bound, the other is
+    a send that was attempted and refused. A person reading the run has to be able to tell
+    them apart, and so does anything querying ``workflow_phases`` later.
+
+    Driven as TWO REAL ENGINE RUNS — not two executor calls — because axis 1 is the STATUS the
+    engine writes, and only the engine writes it. Three axes, and each is separately
+    falsifiable:
+
+      1. **the status written** — ``recorded_not_sent`` vs ``failed``, and neither is
+         ``completed``;
+      2. **the body's first line** — and neither may borrow the other's words: the failure
+         may never read *"Not sent — recorded"* (claiming the honest unbound terminal) and the
+         record may never read *"failed"*;
+      3. **the sentinel key on the durable output** — ``recorded_intent`` vs ``failure``,
+         which is what the engine's own branch dispatches on.
+
+    ⚠ Neither may EVER read "Complete". Asserted directly, because that is D-31's named
+    observable failure — *"a phase reads 'Complete' for a send that did not leave the app"*.
+    """
+    import json as _json
+
+    from app.services.connectors.protocol import AdapterError
+
+    # ── run A · the UNBOUND step: D-17's permanent recorded terminal ─────────────────
+    wf_a = _external_action_definition(build_workflow_definition)
+    r_a = _drive_approved_external_action(wf_a, mock_asyncpg_pool)
+    recorded_writes = [
+        (sql, args) for sql, args in mock_asyncpg_pool.calls if _RECORDED_SQL in sql
+    ]
+    assert len(recorded_writes) == 1, (
+        f"the unbound half never reached recorded_not_sent ({recorded_writes!r}); every "
+        f"comparison below would be against nothing"
+    )
+    record_output = _json.loads(recorded_writes[0][1][1])
+
+    # ── run B · the BOUND step whose adapter refuses ─────────────────────────────────
+    class _RefusingAdapter:
+        CAPABILITY = "post_message"
+        INPUT_SCHEMA = {"type": "object", "properties": {"text": {"type": "string"}}}
+
+        async def send(self, **kwargs):
+            raise AdapterError("channel_not_found")
+
+    mock_asyncpg_pool.calls.clear()
+    _bind_a_live_connection(monkeypatch, adapter=_RefusingAdapter())
+    wf_b = _external_action_definition(
+        build_workflow_definition,
+        capability="post_message",
+        connection_id="cccccccc-0000-4000-8000-00000000000b",
+    )
+    r_b = _drive_approved_external_action(
+        wf_b, mock_asyncpg_pool, extra_inputs={"text": "the renewal summary"}
+    )
+    failed_writes = [
+        (sql, args) for sql, args in mock_asyncpg_pool.calls if "SET status='failed'" in sql
+    ]
+    assert failed_writes, (
+        f"the bound half's refused send did not land `failed`; the engine writes: "
+        f"{[s for s, _ in mock_asyncpg_pool.calls if 'workflow_phases' in s]!r}"
+    )
+    fail_output = _json.loads(failed_writes[0][1][-1]) if False else None
+    fail_args = failed_writes[0][1]
+    fail_output = next(
+        (_json.loads(a) for a in fail_args if isinstance(a, str) and a.startswith("{")), None
+    )
+    assert fail_output is not None, f"no durable output on the failed write: {fail_args!r}"
+
+    # ── AXIS 1 · the status ───────────────────────────────────────────────────────────
+    assert not [s for s, _ in mock_asyncpg_pool.calls if _RECORDED_SQL in s], (
+        "the FAILED send also wrote recorded_not_sent — the two terminals collapsed into one"
+    )
+    assert r_b.ids[0] not in [
+        args[0] for sql, args in mock_asyncpg_pool.calls if _COMPLETED_SQL in sql
+    ], "a refused send was written `completed` — D-31's named failure condition, exactly"
+
+    # ── AXIS 3 · the sentinel key ─────────────────────────────────────────────────────
+    assert "recorded_intent" in record_output and "failure" not in record_output
+    assert "failure" in fail_output and "recorded_intent" not in fail_output, (
+        f"the failed output carries the record's sentinel, so the engine's own branch cannot "
+        f"tell them apart: {sorted(fail_output)!r}"
+    )
+
+    # ── AXIS 2 · the first line, and no borrowed words ────────────────────────────────
+    record_first = record_output["text"].splitlines()[0]
+    fail_first = fail_output["text"].splitlines()[0]
+    assert record_first != fail_first, f"both bodies open with {record_first!r}"
+    assert record_first.startswith("NOT SENT"), record_first
+    assert fail_first.startswith("SEND FAILED"), fail_first
+    assert "recorded" not in fail_first.lower(), (
+        f"the FAILURE borrows the unbound terminal's word: {fail_first!r}. 'Not sent — "
+        f"recorded' is a deliberate, honest state; a failure wearing it is a lie about which "
+        f"of the two happened."
+    )
+    assert "fail" not in record_first.lower(), (
+        f"the RECORD reads as a failure: {record_first!r}. An unbound step is not broken."
+    )
+    for body, name in ((record_output["text"], "record"), (fail_output["text"], "failure")):
+        assert "complete" not in body.lower(), (
+            f"the {name} body says 'complete' for something that never arrived: {body!r}"
+        )
+
+
+def test_a_successful_send_writes_a_receipt_that_carries_no_credential(
+    build_workflow_definition, mock_asyncpg_pool, monkeypatch
+):
+    """D-08 / T-190-13-T5 — the send receipt names the capability, the connection and the
+    HOST. **Never the credential, never the request body.**
+
+    A receipt is a record that something left the app, not a copy of what left. The sweep is
+    over the WHOLE metadata payload rendered as text, so a secret nested at any depth is
+    caught, and it runs against a resolved connection that really does hold the sentinel —
+    without that, "no secret in the receipt" is a claim about a string nothing ever had.
+
+    ANTI-VACUITY, and it is the half that earns its keep: the receipt must EXIST and carry the
+    literal ``external_action_sent`` that migration 117 added. A send that wrote no receipt at
+    all would satisfy the leak assertion perfectly.
+    """
+    import json as _json
+
+    from app.services.harness import phase_types as _phase_types
+
+    class _SendingAdapter:
+        CAPABILITY = "post_message"
+        INPUT_SCHEMA = {"type": "object", "properties": {"text": {"type": "string"}}}
+
+        async def send(self, **kwargs):
+            from app.services.connectors.protocol import AdapterResult
+
+            # The credential IS read, exactly as a real adapter reads it — so the sentinel is
+            # genuinely in scope at receipt-writing time.
+            assert kwargs["credential"].secret == _SEND_SECRET_SENTINEL
+            return AdapterResult(
+                ok=True, provider_message="", raw_status=200, detail="posted"
+            )
+
+    receipts: list[tuple] = []
+
+    async def _capture(pool, run_id, *, user_id=None, event_type=None, metadata=None):
+        receipts.append((event_type, metadata))
+
+    _bind_a_live_connection(monkeypatch, adapter=_SendingAdapter())
+    monkeypatch.setattr(_phase_types, "write_audit", _capture)
+
+    wf = _external_action_definition(
+        build_workflow_definition,
+        capability="post_message",
+        connection_id="cccccccc-0000-4000-8000-00000000000b",
+    )
+    r = _drive_approved_external_action(
+        wf, mock_asyncpg_pool, extra_inputs={"text": "the renewal summary"}
+    )
+
+    # ── ANTI-VACUITY: the receipt exists, under migration 117's literal ───────────────
+    sent = [m for et, m in receipts if et == "external_action_sent"]
+    assert len(sent) == 1, (
+        f"expected exactly ONE external_action_sent receipt, saw {receipts!r}. The literal is "
+        f"the one migration 117 added; a send with no receipt makes the leak sweep vacuous."
+    )
+    payload = sent[0]
+    assert payload.get("capability") == "post_message"
+    assert payload.get("destination_host") == "slack.com", (
+        f"the receipt must name the destination HOST — the one piece of the request an "
+        f"operator needs and the only one they may safely be given: {payload!r}"
+    )
+
+    # ── the leak sweep, over the WHOLE payload at any depth ──────────────────────────
+    rendered = _json.dumps(payload, default=str)
+    assert _SEND_SECRET_SENTINEL not in rendered, (
+        f"D-08: the send receipt carries the resolved credential: {rendered!r}"
+    )
+    assert "xoxb-" not in rendered, (
+        f"D-08: a bare token prefix reached the receipt — a partial secret is still a "
+        f"secret: {rendered!r}"
+    )
+    assert "renewal summary" not in rendered, (
+        f"D-08: the REQUEST BODY reached the receipt. A receipt records that something left; "
+        f"copying what left turns the audit ledger into a second store of user content: "
+        f"{rendered!r}"
+    )
+
+    # ── and the phase completed, because it genuinely did send ───────────────────────
+    completed = [args[0] for sql, args in mock_asyncpg_pool.calls if _COMPLETED_SQL in sql]
+    assert r.ids[0] in completed, (
+        f"the successful send did not write `completed`; only the ADAPTER'S OWN ok verdict "
+        f"produces it, and here the adapter said ok: {completed!r}"
     )
 
 

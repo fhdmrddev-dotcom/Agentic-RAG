@@ -94,6 +94,62 @@ resolver-first one — which is the only thing this file is for.
 
 A file whose only recorded RED is an import error has measured the import system. The tenant is
 protected by the second observation, not the first.
+
+── THE MEANINGFUL RED, OBSERVED AT PLAN 190-13 (2026-08-09) ─────────────────────────────
+The five-line egress-guard block was MOVED below ``resolve_connection`` in
+``phase_types.py`` — the n8n ordering, deliberately, planted into production source and
+restored md5-identical afterwards (``bb7c4ed6614434bbcac495657ac330f2``, before and after;
+``git diff --numstat`` empty; ``grep -c PLANT`` → 0). Verbatim, all three:
+
+    E       Failed: DID NOT RAISE <class 'app.security.egress.EgressRefused'>
+    ------------------------------ Captured log call ------------------------------
+    INFO  app.services.harness.phase_types: 190 D-17: external_action phase
+    'file-the-ticket' RECORDED the intended 'create_ticket' and sent nothing
+    (no connection is bound to this step)
+
+    E       AssertionError: D-06: the credential was resolved BEFORE the destination was
+            refused. Nothing has leaked yet, but the ordering is the defect - the secret is
+            now in memory, in a traceback frame and one log line away from disk. Resolver
+            calls: [(('dddddddd-0000-4000-8000-00000000000c',), {'org_id':
+            'aaaaaaaa-0000-4000-8000-000000000001'})]
+    ------------------------------ Captured log call ------------------------------
+    WARNING app.security.egress: egress refused: capability=create_ticket
+    host=169.254.169.254 reason=host_not_allowed
+
+    E       AssertionError: D-06 / n8n #28218: the recorded call order is ['resolve'], not
+            ['egress', 'resolve'].
+
+⚠ **READ THE FIRST ONE, AND ITS LOG LINE — IT IS SHARPER THAN THIS FILE PREDICTED.** The
+docstring below expects a resolver-first executor to raise *the wrong thing*. It did
+something worse: it raised **nothing at all**. With the guard below the credential path, an
+UNBOUND step aimed at ``169.254.169.254`` never reaches the guard, falls into D-17's
+unbound branch and returns the perfectly ordinary sentence *"Not sent — recorded"*. No
+refusal, no error, no log line about the destination — a step pointed at the cloud metadata
+endpoint reports that nothing is wrong, because nothing ever looked. That is n8n #28218's
+root cause in its purest form: *"protection activates conditionally based on credential
+presence, not request characteristics."*
+
+The second failure is the other half and it is the one that would bite in production: WITH a
+credential bound the guard did fire and did refuse the metadata host — the outcome is
+byte-identical to a correct executor — but ``resolve_connection`` had **already run and
+already returned the secret**. Only the recorded call order can see that.
+
+After restoring the correct order: **3 passed.**
+
+── A PRECONDITION THIS FILE DID NOT NEED IN WAVE 0 AND DOES NEED NOW ────────────────────
+``live_connectors`` (D-26) did not exist when these drives were authored (plan 190-09 landed
+it). Its **cold default is ``"off"``**, and with it off an ``external_action`` step behaves
+exactly as it did in Phase 189: it records, it does not send. That is a genuine, permanent,
+shipping state — and it means the send path is unreachable, so all three cases below would
+refuse nothing and pass vacuously... except they would FAIL, loudly, which is how it was
+found: ``DID NOT RAISE <class 'app.security.egress.EgressRefused'>``, three times.
+
+So the switch is turned ON for this module, as a stated PRECONDITION rather than a quiet
+fixture — and the precondition is itself DRIVEN by
+``test_with_live_connectors_OFF_the_same_step_records_instead_of_refusing``, which turns it
+back off and asserts the step records. **No assertion in this file was weakened, relaxed or
+deleted to make anything pass**; one was added, in the direction that makes the setup
+falsifiable.
 """
 
 from __future__ import annotations
@@ -124,6 +180,19 @@ ALLOWED_BASE_URL = f"https://{ALLOWED_HOST}"
 STUBBED_SECRET = "xoxb-190-THIS-STRING-MAY-NEVER-APPEAR-IN-A-REFUSAL"
 
 BOUND_CONNECTION_ID = "dddddddd-0000-4000-8000-00000000000c"
+
+
+@pytest.fixture(autouse=True)
+def _live_connectors_on(monkeypatch):
+    """D-26's kill-switch, ON for this module. See the docstring's PRECONDITION block.
+
+    Patched on ``phase_types``' own namespace with the same reasoning the stubs below carry:
+    if the executor reads the audience some other way, this ``setattr`` still binds the name
+    it does not read and the cases fail rather than passing over an executor they never
+    touched. ``test_with_live_connectors_OFF_...`` turns it back off and proves the
+    precondition is load-bearing rather than decorative.
+    """
+    monkeypatch.setattr(phase_types, "feature_audience", lambda _feature: "everyone")
 
 
 def _external_action_phase(*, connection_id: str | None, base_url: str = REFUSED_BASE_URL):
@@ -327,4 +396,122 @@ async def test_the_guard_is_called_before_the_resolver(monkeypatch):
         "'Decoupling SSRF protection from credential dependency' is an ordering of two lines, "
         "and this is the assertion that survives someone swapping them — every outcome-based "
         "test in this suite reads identically either way."
+    )
+
+
+# ── PLAN 190-13 · the two cases this file owed, and why they live HERE ────────────────────
+#
+# Both drive the SAME executor and both need the SAME `live_connectors` precondition the
+# autouse fixture above installs. Splitting them into a fourth file would duplicate that
+# fixture, and a duplicated precondition is a precondition that drifts.
+
+
+async def test_with_live_connectors_OFF_the_same_step_records_instead_of_refusing(monkeypatch):
+    """D-26 — **the precondition of this whole module, driven in the other direction.**
+
+    The autouse fixture turns the kill-switch ON, and a fixture nobody falsifies is a fixture
+    that can quietly stop mattering. So this case turns it back OFF and drives the IDENTICAL
+    phase the first case drives — aimed at the cloud metadata endpoint, unbound — and asserts
+    the executor records rather than refusing.
+
+    That is D-26 read literally: *"with it off an external_action step behaves precisely as it
+    does today: records, does not send, reads 'Not sent — recorded'"*. It is a genuine,
+    already-tested state, which is what makes this off-switch cheap and honest rather than a
+    second code path — and it is why the guard sits BELOW the switch and above everything
+    else. Refusing a destination that will never be contacted would be a spurious failure on
+    a workflow the operator has deliberately taken off the wire.
+
+    ⚠ The two cases together are the non-vacuity pair. Case 1 without this one could be
+    passing because of the fixture; this one without case 1 could be passing because the guard
+    does not exist.
+    """
+    monkeypatch.setattr(phase_types, "feature_audience", lambda _feature: "off")
+
+    output = await _exec_external_action(
+        _external_action_phase(connection_id=None), {}, _run_ctx()
+    )
+
+    assert isinstance(output, dict) and phase_types.RECORDED_INTENT_KEY in output, (
+        f"D-26: with live_connectors off the step must reach the shipped recorded terminal; "
+        f"got {output!r}"
+    )
+    assert output["text"].startswith("NOT SENT"), (
+        f"D-26: the off-switch must produce the SHIPPED 189 body, not a new sentence for a "
+        f"new state — that would be the second code path this switch exists to avoid: "
+        f"{output['text'][:80]!r}"
+    )
+
+
+async def test_the_guard_is_called_before_the_resolver_on_a_MODEL_VALIDATED_phase(monkeypatch):
+    """D-06's ordering, driven on the object the ENGINE actually passes — **the debt plan
+    190-01 recorded, paid in substance rather than by editing a builder.**
+
+    190-01 duck-typed its phase configs because ``ExternalActionPhaseConfig`` (``extra='forbid'``)
+    rejected ``connection_id`` by both routes, and owed a switch back to
+    ``WorkflowDefinition.model_validate`` "at the plan that lands D-13". 190-06 landed the
+    field, and re-measured the blocker gone.
+
+    **The switch cannot be taken on the three cases above, and the reason is a DECISION rather
+    than an obstacle.** Those cases put ``base_url`` on the STEP; 190-06 settled that
+    non-secret destination config lives on the CONNECTION ROW (``CreateTicketConfig.base_url``),
+    so a model-validated config cannot carry it — by design, and permanently. Editing the
+    model to admit it would undo the settlement to satisfy a test.
+
+    So the debt is paid where it can be paid honestly: this case validates through the real
+    model, binds a real ``connection_id``, and asserts the SAME ordering — using
+    ``post_message``, whose destination is a CODE CONSTANT (D-02) and therefore knowable with
+    no credential and no row. That also makes it the case that proves the pre-credential guard
+    is **not decorative in production**: this is the shipped configuration, with nothing
+    duck-typed anywhere in it.
+    """
+    from app.models.harness import WorkflowDefinition
+
+    wf = WorkflowDefinition.model_validate({
+        "slug": "phase-190-ordering-probe",
+        "version": 1,
+        "name": "Phase 190 ordering probe",
+        "status": "draft",
+        "phases": [{
+            "slug": "notify",
+            "phase_index": 0,
+            "config": {
+                "phase_type": "external_action",
+                "capability": "post_message",
+                "available_tools": ["post_message"],
+                "connection_id": BOUND_CONNECTION_ID,
+            },
+        }],
+    })
+    phase = wf.phases[0]
+    assert type(phase.config).__name__ == "ExternalActionPhaseConfig", (
+        f"this case's whole point is the REAL model; got {type(phase.config).__name__}"
+    )
+    assert getattr(phase.config, "base_url", None) is None, (
+        "the shipped model must NOT carry a step-level destination — 190-06 settled that on "
+        "the connection row, and this assertion is what would notice it moving back"
+    )
+
+    order: list[str] = []
+
+    class _StopAfterResolve(RuntimeError):
+        pass
+
+    def _recording_guard(*args, **kwargs):
+        order.append("egress")
+        return ("93.184.216.34", "slack.com", 443)
+
+    async def _recording_resolver(*args, **kwargs):
+        order.append("resolve")
+        raise _StopAfterResolve("stop before any adapter runs")
+
+    monkeypatch.setattr(phase_types, "validate_destination", _recording_guard, raising=True)
+    monkeypatch.setattr(phase_types, "resolve_connection", _recording_resolver, raising=True)
+
+    with pytest.raises(_StopAfterResolve):
+        await _exec_external_action(phase, {}, _run_ctx())
+
+    assert order == ["egress", "resolve"], (
+        f"D-06 on the SHIPPED config shape: the recorded order is {order!r}. An empty first "
+        f"entry would mean the pre-credential guard never runs for a real, model-validated "
+        f"step — i.e. that it is decoration on every production path."
     )

@@ -187,17 +187,26 @@ def _external_action_phase(capability: str = "send_email"):
     return wf.phases[0]
 
 
-def _run_ctx():
-    """A permissive duck-typed run ctx. Every executor reads ctx via ``getattr``."""
-    return SimpleNamespace(
+def _run_ctx(**overrides):
+    """A permissive duck-typed run ctx. Every executor reads ctx via ``getattr``.
+
+    ``org_id`` (Phase 190 / D-14) is the RUN's org — what a credential lookup is scoped BY,
+    never the connection id alone. Every UNBOUND case here ignores it (they never reach the
+    resolver); the bound case below cannot work without it, and a run with no org resolves
+    nothing at all, by design.
+    """
+    base = dict(
         inputs={},
         user_settings=None,
         retry_feedback=None,
         run_id=None,
         thread_id=None,
         user_id=None,
+        org_id="aaaaaaaa-0000-4000-8000-000000000001",
         is_golden_run=False,
     )
+    base.update(overrides)
+    return SimpleNamespace(**base)
 
 
 # ── Case A — the source fence (V11) ───────────────────────────────────────────
@@ -410,66 +419,101 @@ def _external_action_phase_with_connection_bound(
 ):
     """A phase WITH a destination bound (D-13's ``connection_id``).
 
-    ⚠ **Duck-typed, and NOT by preference.** Every other builder in this file goes through
-    ``WorkflowDefinition.model_validate`` on purpose ("*so this case exercises the same object
-    the engine passes, not a look-alike*"). That is impossible for this state today, and the
-    reason was MEASURED rather than assumed — ``ExternalActionPhaseConfig`` is a ``_StrictBase``
-    (``extra='forbid'``) with no ``connection_id`` field, and **both** routes to one are closed:
+    ── ✔ THE DEBT PLAN 190-01 RECORDED IS PAID HERE (plan 190-13, 2026-08-09) ──────────────
+    This builder was duck-typed in Wave 0, and NOT by preference. The reason was MEASURED:
+    ``ExternalActionPhaseConfig`` was a ``_StrictBase`` (``extra='forbid'``) with no
+    ``connection_id`` field, and **both** routes to a bound phase were closed —
 
         model_validate(... "connection_id": "x" ...)
         →  ValidationError: phases.0.config.external_action.connection_id
            Extra inputs are not permitted [type=extra_forbidden]
-
         cfg.connection_id = "x"
         →  ValueError: "ExternalActionPhaseConfig" object has no field "connection_id"
 
-    The executor reads its config through ``getattr`` (``phase_types.py:1867``), so this drives
-    the real function faithfully. **What it cannot do is catch the model rejecting the field.**
+    — and 190-01 wrote down what it owed: *"OWED AT THE PLAN THAT LANDS D-13: switch this
+    builder back to WorkflowDefinition.model_validate. The moment the optional field exists
+    there is no excuse for a look-alike, and leaving one behind would quietly retire this
+    file's own rule."*
 
-    ⚠ **OWED AT THE PLAN THAT LANDS D-13:** switch this builder back to
-    ``WorkflowDefinition.model_validate``. The moment the optional field exists there is no
-    excuse for a look-alike, and leaving one behind would quietly retire this file's own rule.
+    Plan 190-06 landed the field. The builder is switched back, so this case once again
+    *"exercises the same object the engine passes, not a look-alike"* — and it now catches the
+    thing the duck type structurally could not: **the model rejecting the field.** If a future
+    edit removes ``connection_id`` from ``ExternalActionPhaseConfig``, this builder raises a
+    ``ValidationError`` at collection instead of silently constructing a bound phase the real
+    engine could never produce.
     """
-    return SimpleNamespace(
-        slug="notify",
-        phase_index=0,
-        config=SimpleNamespace(
-            phase_type="external_action",
-            capability=capability,
-            available_tools=[capability],
-            connection_id=connection_id,
-        ),
-    )
+    from app.models.harness import WorkflowDefinition
+
+    wf = WorkflowDefinition.model_validate({
+        "slug": "phase-190-bound-connection-probe",
+        "version": 1,
+        "name": "Phase 190 bound-connection probe",
+        "status": "draft",
+        "phases": [{
+            "slug": "notify",
+            "phase_index": 0,
+            "config": {
+                "phase_type": "external_action",
+                "capability": capability,
+                "available_tools": [capability],
+                "connection_id": connection_id,
+            },
+        }],
+    })
+    return wf.phases[0]
 
 
 def test_a_bound_connection_under_the_armed_sentinel_MUST_attempt_egress(monkeypatch):
-    """PHASE 190 — a step WITH a connection bound must actually try to send. **RED TODAY.**
+    """PHASE 190 — a step WITH a connection bound must actually try to send. **NOW GREEN.**
 
     This is the inverse of every other case in this file, and it is the only one that can tell
-    "the guard held" apart from "nothing was ever wired". Its RED is not a defect report — it
-    is the recorded starting state of Phase 190, authored in Wave 0 before any adapter exists,
+    "the guard held" apart from "nothing was ever wired". Its RED was not a defect report — it
+    was the recorded starting state of Phase 190, authored in Wave 0 before any adapter existed,
     exactly as CONTEXT ``<specifics>`` requires.
 
-    **The RED it produces today is a MEANINGFUL one, not a module-missing one.** Its two
-    siblings in this plan fail with ``ModuleNotFoundError``, which measures the import system.
-    This one imports cleanly, builds a real bound phase, runs the REAL shipped executor with
-    every transport armed, and fails with ``DID NOT RAISE`` — a direct measurement of the
-    property that the shipped executor opens no socket. That is the baseline the send has to
-    move, and it is why this case is worth more than the two that merely cannot import.
+    **Its Wave-0 RED was a MEANINGFUL one, not a module-missing one.** Its two siblings failed
+    with ``ModuleNotFoundError``, which measures the import system. This one imported cleanly,
+    built a real bound phase, ran the REAL shipped executor with every transport armed, and
+    failed with ``DID NOT RAISE`` — a direct measurement of the property that the shipped
+    executor opened no socket. That was the baseline the send had to move, and plan 190-13
+    moved it.
 
     ⚠ **THE LOOP IS BUILT BEFORE THE SENTINEL ARMS**, and the ordering is load-bearing on
     Windows: ``asyncio.run`` creates a fresh proactor loop whose self-pipe is a ``socketpair()``
     — itself a ``socket.connect`` the sentinel would catch, failing the case in
     ``proactor_events._make_self_pipe`` rather than in the executor. Recorded verbatim at
-    ``test_harness_engine.py:1143-1148``, where it was measured the hard way; copied here rather
-    than rediscovered.
+    ``test_harness_engine.py``, where it was measured the hard way; copied here rather than
+    rediscovered.
 
     ``is_golden_run=False`` is the other half of the setup and it is deliberate: a golden run
     must send NOTHING (D-16), and that opposite property has its own already-armed fence in
     ``test_harness_engine.py::test_a_golden_run_of_an_external_action_performs_no_egress``. Drive
     this one as a golden run and it would pass forever while proving the reverse.
+
+    ── ⚠ WHAT THE WAVE-0 ASSERTION PREDICTED, AND WHAT THE SHIPPED ARCHITECTURE DOES ───────
+    The original assertion was ``pytest.raises(_EgressAttempted)`` — it predicted the sentinel
+    would escape the executor untouched. **It does not, and the reason is a reviewed design
+    decision rather than a defect**, so the assertion is made PRECISE rather than the code bent
+    to satisfy it:
+
+      * the adapter classifies transport failures into a NAMED ``AdapterError``
+        (``connectors/protocol.py``: *"A bare Exception reaching the engine reads to a user as
+        an internal error"*), so ``_EgressAttempted`` arrives wrapped;
+      * the executor maps an ``AdapterError`` to D-17's ``failed`` terminal — a returned
+        ``{"text", "failure"}`` output — because a vendor refusing a send is a FAILED PHASE
+        with the vendor's words, not an unhandled exception.
+
+    So nothing escapes, and the property is asserted where it actually lands. **All three
+    assertions below are required and none of them is satisfiable by an inert executor:** the
+    output must be the failure shape (an inert executor returns the RECORDED shape), it must
+    NOT carry the recorded sentinel (which is what the unbound / switch-off / golden-run
+    branches all produce), and it must carry **the sentinel's own words** — proving the thing
+    that refused was the patched socket layer and not an argument check on the way there.
     """
     import asyncio as _asyncio
+
+    from app.security import egress as _egress
+    from app.services.harness import phase_types as _phase_types
 
     execute = _external_action_executor()
     phase = _external_action_phase_with_connection_bound()
@@ -484,15 +528,58 @@ def test_a_bound_connection_under_the_armed_sentinel_MUST_attempt_egress(monkeyp
         "the unbound case above, and it would pass for the wrong reason"
     )
 
+    # ── the third precondition, added at 190-13 and ASSERTED like the other two ──────────
+    # `live_connectors` (D-26) has the cold default "off", and with it off a bound step
+    # records rather than sending — so without this the case would fail for D-26's reason
+    # while reporting on D-13's.
+    monkeypatch.setattr(_phase_types, "feature_audience", lambda _f: "everyone")
+    assert _phase_types.feature_audience("live_connectors") != "off", (
+        "with the kill-switch off there is no send path to measure at all"
+    )
+
+    # The credential layer and DNS, stubbed — everything between the gates and the socket is
+    # REAL. Neither stub can manufacture the sentinel: one returns a row, the other an address.
+    class _Resolved:
+        connection_id = "cccccccc-0000-4000-8000-00000000000b"
+        org_id = "aaaaaaaa-0000-4000-8000-000000000001"
+        capability = "post_message"
+        name = "ops channel"
+        config = {"default_channel": "C0190"}
+
+        @property
+        def secret(self):
+            return "xoxb-SENTINEL-CREDENTIAL-MUST-NEVER-REACH-A-SOCKET"
+
+    async def _stub_resolver(connection_id, *, org_id):
+        return _Resolved()
+
+    monkeypatch.setattr(_phase_types, "resolve_connection", _stub_resolver)
+    # A GLOBALLY ROUTABLE answer: 203.0.113.x is TEST-NET-3 and the guard refuses it, which
+    # would fail this case on `address_not_public` instead of on the send.
+    monkeypatch.setattr(_egress, "_default_resolver", lambda h, p: ["93.184.216.34"])
+
     loop = _asyncio.new_event_loop()
     try:
         _block_all_http(monkeypatch)
-        with pytest.raises(_EgressAttempted):
-            loop.run_until_complete(
-                execute(phase, {"draft": {"text": "the draft body"}}, ctx)
-            )
+        output = loop.run_until_complete(
+            execute(phase, {"draft": {"text": "the draft body"}}, ctx)
+        )
     finally:
         loop.close()
+
+    assert "failure" in output, (
+        f"the bound step did not reach a send: the executor returned {sorted(output)!r}. With "
+        f"every transport armed a REAL send is a failed phase; an executor that still sends "
+        f"nothing returns the recorded shape instead, which is the Wave-0 RED unchanged."
+    )
+    assert _phase_types.RECORDED_INTENT_KEY not in output, (
+        f"the bound step took a RECORD branch (golden run / kill-switch / unbound / disabled) "
+        f"rather than the send path: {output!r}"
+    )
+    assert "outbound egress attempted" in output["failure"], (
+        f"the step failed, but not at the socket — the sentinel's own words are absent, so "
+        f"this could be an argument or config refusal on the way there: {output['failure']!r}"
+    )
 
 
 # ── Case D (189-09) — D-02: a name outside the closed set RAISES ──────────────
