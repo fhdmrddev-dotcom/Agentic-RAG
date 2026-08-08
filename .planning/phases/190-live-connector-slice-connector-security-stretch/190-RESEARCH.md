@@ -1710,9 +1710,22 @@ them in review:**
 
 ---
 
-## Open Questions
+## Open Questions — **ALL SIX RESOLVED at plan-phase (2026-08-08)**
 
-1. **Which allowlist does `live_connectors` join? (⚠ blocks a migration decision)**
+> Each question below was resolved during planning and is now IMPLEMENTED by a named plan task.
+> The resolution pointer is recorded inline so the audit trail does not depend on this section
+> being re-read as still-open. Resolutions, in order:
+>
+> | # | Resolved to | Resolved in | Implemented by |
+> |---|---|---|---|
+> | 1 | `_VISIBILITY_FEATURES` (`admin.py:104`) — **zero migrations**, no 118 | this doc's own recommendation, re-measured by PATTERNS | `190-09` Task 2 |
+> | 2 | Gate **creation** on org-admin (`current_user_has_permission(org_id, 'org:manage')`); read/use stays org-wide | UI-SPEC §2b (and it is a threat-model row, not a follow-up) | `190-09`, `190-16` |
+> | 3 | Real at **both** ends — picker refuses a `check`-failed connection at BIND time; executor treats it as unbound → `recorded_not_sent` at RUN time. No new status (D-17) | UI-SPEC §5a ("build the gates, and narrow the sentence to *exactly* what they do"); §5b replaces sketch 156 moment 6's sentence | `190-15` (Gate 2), `190-12` |
+> | 4 | **Yes** — `Replace` resets `last_check_verdict` to `not_checked` in the same UPDATE | this doc's recommendation, accepted | `190-06`, `190-15` |
+> | 5 | **Assert the unreachability with a test**; do NOT thread `is_golden_run` into a second ctx builder (it would widen D-16's surface) | this doc §A4 | `190-13` |
+> | 6 | **Measure once** against the local corpus before committing to a live count; if slow it becomes an on-demand expand (UI change, not schema) | this doc's recommendation, accepted | `190-16` |
+
+1. **Which allowlist does `live_connectors` join? (⚠ blocks a migration decision)** — **RESOLVED → `_VISIBILITY_FEATURES`, implemented in `190-09`.**
    - Known: Phase 181's `visual_workflow_canvas` is in `_VISIBILITY_FEATURES` (`admin.py:104`,
      JSONB, **zero migration**), **not** `_FLAG_HUMAN_NAMES` (`admin.py:67`, which needs an
      `app_settings` **boolean column** = **migration 118**).
@@ -1723,7 +1736,7 @@ them in review:**
      (`dependencies.py:672/693`, `api/features.py:69`). If the operator wants true kill-switch
      semantics, **budget migration 118 explicitly at plan-phase.**
 
-2. **Does the Settings → Connections tab need an org-admin gate?**
+2. **Does the Settings → Connections tab need an org-admin gate?** — **RESOLVED → yes for creation, org-wide for read/use; implemented in `190-09` + `190-16`.**
    - Known: D-12 makes connections org-shared with no per-user variant.
    - Unclear: nothing in CONTEXT says whether a plain **member** may create one — and a member
      who can create a connection can bind the org's colleagues to a destination of their choosing.
@@ -1731,7 +1744,7 @@ them in review:**
      155's own open questions and it is a genuine access-control decision, so it belongs in the
      **threat model**, not a follow-up.
 
-3. **What blocks a step from using a `check`-failed connection?**
+3. **What blocks a step from using a `check`-failed connection?** — **RESOLVED → both gates ship (BIND + RUN); implemented in `190-15` + `190-12`.**
    - Known: sketch 156 moment 6 promises *"no step will be allowed to use it until this passes."*
    - Unclear: nothing in the backend honours that today.
    - **Recommendation: make it real at BIND time** (the picker refuses to select a failed
@@ -1740,15 +1753,15 @@ them in review:**
      must be removed from the UI** — a promise a surface cannot keep is the exact over-claiming
      this whole node type exists to avoid.
 
-4. **Does a `Replace` on the stored secret invalidate `last_check_verdict`?**
+4. **Does a `Replace` on the stored secret invalidate `last_check_verdict`?** — **RESOLVED → yes, same UPDATE; implemented in `190-06` + `190-15`.**
    - **Recommendation: yes** — set it back to `not_checked` in the same UPDATE. One column,
      zero ambiguity.
 
-5. **Does `_build_resume_context` need `is_golden_run` threaded?**
+5. **Does `_build_resume_context` need `is_golden_run` threaded?** — **RESOLVED → no; assert unreachability with a test; implemented in `190-13`.**
    - See A4. **Recommendation: assert the unreachability with a test rather than thread the flag.**
      Threading it into a second ctx builder widens D-16's surface for a path that should not exist.
 
-6. **`Used by N steps` — is the JSONB scan cheap enough at org scale?**
+6. **`Used by N steps` — is the JSONB scan cheap enough at org scale?** — **RESOLVED → measure once, then decide cell vs on-demand expand; implemented in `190-16`.**
    - Known: sketch 155 flags it as net-new and does not assume it.
    - **Recommendation: measure once against the local corpus (193 definitions per STATE.md) before
      committing to a live count.** If it is slow, the column becomes an on-demand expand rather
