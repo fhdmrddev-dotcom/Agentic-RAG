@@ -274,10 +274,14 @@ async def test_an_author_supplied_ADF_object_is_REFUSED(monkeypatch):
     module = _adapter()
     recorder = _Recorder()
 
+    # A distinctive value rather than a short word, so the D-08 assertion below measures the
+    # VALUE not being echoed rather than accidentally matching an English substring of the
+    # refusal's own prose.
+    injected = "INJECTED-RICH-CONTENT-PAYLOAD-190"
     author_supplied = {
         "type": "doc",
         "version": 1,
-        "content": [{"type": "paragraph", "content": [{"type": "text", "text": "hi"}]}],
+        "content": [{"type": "paragraph", "content": [{"type": "text", "text": injected}]}],
     }
 
     with pytest.raises(module.JiraDocumentRefused) as excinfo:
@@ -290,7 +294,7 @@ async def test_an_author_supplied_ADF_object_is_REFUSED(monkeypatch):
     message = str(excinfo.value)
     assert "description" in message
     # D-08: a refusal names the FIELD and the category of problem, never the value.
-    assert "hi" not in message
+    assert injected not in message
 
     # The builder refuses on its own too, for every non-string shape.
     for hostile in (author_supplied, ["paragraph"], 7, None):
