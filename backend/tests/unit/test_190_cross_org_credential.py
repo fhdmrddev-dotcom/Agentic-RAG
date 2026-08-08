@@ -47,6 +47,12 @@ green security gate over a connector feature that can never send anything at all
 **Observed 2026-08-08**, verbatim, exit code **2**:
 ``cd backend && venv/Scripts/python.exe -m pytest tests/unit/test_190_cross_org_credential.py -q``
 
+⚠ The ``:92`` below is the line number in the file **as committed**, and getting it there took
+three measurements. The first observation recorded ``:81``; pasting this transcript into the
+docstring pushed the import down to ``:86``; adding *this very note* pushed it to ``:92``.
+Each intermediate value was true when measured and false once written down. Re-measured to a
+fixed point rather than copied forward — a small instance of exactly what this file is about.
+
     =================================== ERRORS ====================================
     ________ ERROR collecting tests/unit/test_190_cross_org_credential.py _________
     ImportError while importing test module 'C:\\Vibe Apps\\Agentic RAG\\backend\\tests\\unit\\test_190_cross_org_credential.py'.
@@ -55,7 +61,7 @@ green security gate over a connector feature that can never send anything at all
     C:\\Python312\\Lib\\importlib\\__init__.py:90: in import_module
         return _bootstrap._gcd_import(name[level:], package, level)
                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    tests\\unit\\test_190_cross_org_credential.py:81: in <module>
+    tests\\unit\\test_190_cross_org_credential.py:92: in <module>
         from app.services.connector_service import ConnectorNotFound, resolve_connection
     E   ModuleNotFoundError: No module named 'app.services.connector_service'
     ============================== warnings summary ===============================
