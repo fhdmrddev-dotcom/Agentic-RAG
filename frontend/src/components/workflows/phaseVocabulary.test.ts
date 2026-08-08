@@ -920,6 +920,183 @@ describe("phaseVocabulary.notConnectedOf — badge slot 1 (D-12 / D-18)", () => 
     expect(notConnectedOf(malformed)).toBe(false)
   })
 
+  // ── Phase 190-05 (CONN-02 / D-13 / D-24) — the STATE test becomes falsifiable ────
+  //
+  // 189-13 recorded, in this file and in the function's own docblock, that the false
+  // branch of the state test was UNREACHABLE: no connection mechanism existed anywhere
+  // in the app, so every `external_action` step genuinely WAS not-connected and the
+  // badge was *de facto* type-conditional. 190 is the phase that makes it reachable —
+  // `ExternalActionPhaseConfig` gains the additive-optional `connection_id` REFERENCE
+  // (D-13: no secret, no host, no token ever enters the definition JSONB), so the
+  // predicate can finally be driven on BOTH polarities.
+  //
+  // The four cases below are the pair, the boundary and the type half. Without all
+  // four the one-line edit at `phaseVocabulary.ts` is unguarded: the pair alone would
+  // not catch a truthiness bug that accepts `""` as a destination, and neither would
+  // catch the badge silently widening to a second phase type (a `190-UI-SPEC.md` §14
+  // failure condition, verbatim).
+  //
+  // RED OBSERVED (plan 190-05), verbatim from
+  // `npx vitest run src/components/workflows/phaseVocabulary.test.ts` at commit d78817b8,
+  // BEFORE the one-line edit to `phaseVocabulary.ts:812` — recorded here rather than in a
+  // summary nobody re-reads, because a test written after the fix it guards proves only
+  // that the fix is present, never that the test can see its absence:
+  //
+  //   ❯ src/components/workflows/phaseVocabulary.test.ts (117 tests | 2 failed) 35ms
+  //        × returns FALSE for an external_action phase that HAS a connection_id bound 7ms
+  //        × returns TRUE when connection_id is present but empty or whitespace 1ms
+  //
+  //    FAIL … > returns FALSE for an external_action phase that HAS a connection_id bound
+  //   AssertionError: expected true to be false // Object.is equality
+  //   - Expected
+  //   + Received
+  //   - false
+  //   + true
+  //    ❯ src/components/workflows/phaseVocabulary.test.ts:1003:88
+  //
+  //    FAIL … > returns TRUE when connection_id is present but empty or whitespace
+  //   AssertionError: expected true to be false // Object.is equality
+  //   - Expected
+  //   + Received
+  //   - false
+  //   + true
+  //    ❯ src/components/workflows/phaseVocabulary.test.ts:1039:53
+  //
+  //    Test Files  1 failed (1)
+  //         Tests  2 failed | 115 passed (117)
+  //
+  // ⚠ The two `:LINE:COL` references were RE-CAPTURED against the file as committed,
+  // after the transcript itself was pasted in — inserting 33 comment lines above an
+  // assertion moves it, and a transcript citing pre-insertion numbers would point a
+  // future reader at the wrong lines. (The same correction plan 190-01 had to make in
+  // commit 0d52542c.) Re-derive with:
+  //   npx vitest run src/components/workflows/phaseVocabulary.test.ts
+  //
+  // ⚠ NOTE WHICH LINE THE SECOND FAILURE LANDED ON — `:1039`, the CONTRAST assertion
+  // (`"a"` → false), not one of the eight empty/whitespace/non-string lines above it.
+  // That is the whole reason the contrast is in the case: against an unconditional
+  // `return true` every "is TRUE" line passes vacuously, so a boundary case without its
+  // opposite would have shipped GREEN while pinning nothing at all.
+
+  /**
+   * An `external_action` phase carrying a raw stored `connection_id`.
+   *
+   * `unknown` on purpose, and for the same reason `externalPhase` above types its
+   * capability that way: the definition column is JSONB and hand-editable, so the value
+   * reaches the client as any JSON value — or not at all. A fixture that could only
+   * express `string | undefined` would be testing the type system rather than the
+   * predicate. `ABSENT` distinguishes "no key at all" from "the key holding undefined",
+   * which are different JSONB shapes and must both resolve to *not connected*.
+   */
+  const ABSENT = Symbol("connection_id absent")
+  const boundExternalPhase = (connectionId: unknown = ABSENT): PhaseSpecJSON => {
+    const config: Record<string, unknown> = { phase_type: "external_action" }
+    if (connectionId !== ABSENT) config.connection_id = connectionId
+    return phase({ slug: "notify-owner", config })
+  }
+
+  it("returns FALSE for an external_action phase that HAS a connection_id bound", () => {
+    // THE FIRST GENUINE BOUND CASE IN THIS SUITE'S HISTORY. Before 190 this assertion
+    // could not be written honestly — there was nothing to bind. It reads the reference
+    // field and nothing else: no host, no token, no secret is available to the canvas
+    // to read, and none is asked for (D-13 / CONN-03 SC#4 read literally).
+    expect(notConnectedOf(boundExternalPhase("3f6c2a1e-9b4d-4c77-a0f2-15b8e7d9c204"))).toBe(
+      false,
+    )
+    // …and it is the DATA that decided, not the type: the same phase type with nothing
+    // bound still carries the badge. This is D-12's whole reason for choosing a
+    // STATE-conditional badge over a TYPE-conditional one.
+    expect(notConnectedOf(boundExternalPhase())).toBe(true)
+  })
+
+  it("returns TRUE for an external_action phase with NO connection_id", () => {
+    // The shipped polarity, kept beside its new opposite so neither can be deleted
+    // without the other looking odd. Three distinct JSONB shapes all mean the same
+    // thing — no destination — and none of them may be mistaken for one.
+    expect(notConnectedOf(boundExternalPhase())).toBe(true) // key absent entirely
+    expect(notConnectedOf(boundExternalPhase(undefined))).toBe(true) // key holding undefined
+    expect(notConnectedOf(boundExternalPhase(null))).toBe(true) // key holding null
+    // The capability-carrying fixture the rest of this file uses agrees, unbound.
+    expect(notConnectedOf(externalPhase("send_email"))).toBe(true)
+  })
+
+  it("returns TRUE when connection_id is present but empty or whitespace", () => {
+    // AN EMPTY STRING IS NOT A DESTINATION. This pins the SHAPE of the state test, not
+    // merely its two headline answers: a `!!phase.config.connection_id` truthiness bug
+    // would pass the pair above and fail here, and a `"connection_id" in config` key
+    // test would fail here too. The badge must keep flagging a step that cannot reach
+    // anything, and a step bound to `""` cannot reach anything.
+    expect(notConnectedOf(boundExternalPhase(""))).toBe(true)
+    expect(notConnectedOf(boundExternalPhase("   "))).toBe(true)
+    expect(notConnectedOf(boundExternalPhase("\t\n "))).toBe(true)
+    // A non-string is not an id either — the column is JSONB and admits all of these.
+    expect(notConnectedOf(boundExternalPhase(42))).toBe(true)
+    expect(notConnectedOf(boundExternalPhase(true))).toBe(true)
+    expect(notConnectedOf(boundExternalPhase({ id: "x" }))).toBe(true)
+    expect(notConnectedOf(boundExternalPhase(["x"]))).toBe(true)
+    // THE CONTRAST that makes every line above falsifiable rather than vacuous: the
+    // boundary is non-empty-string, so the shortest possible real id is connected.
+    expect(notConnectedOf(boundExternalPhase("a"))).toBe(false)
+    expect(notConnectedOf(boundExternalPhase("  a  "))).toBe(false)
+  })
+
+  it("still returns FALSE for every non-external_action phase type, bound or not", () => {
+    // THE TYPE HALF, RE-ASSERTED ACROSS THE ONE-LINE EDIT. 190 touches the second line
+    // only, and this case is what proves the first line still decides first: a state
+    // test that ran before the type test — or one fused into a single expression —
+    // would light the badge on a `programmatic` step with no `connection_id`, which is
+    // the "renders on a step of any other type" failure condition of §14.
+    for (const t of PHASE_TYPE_ORDER.filter((x) => x !== "external_action")) {
+      expect(notConnectedOf(phase({ config: { phase_type: t } }))).toBe(false)
+      expect(
+        notConnectedOf(phase({ config: { phase_type: t, connection_id: "" } })),
+      ).toBe(false)
+      expect(
+        notConnectedOf(
+          phase({ config: { phase_type: t, connection_id: "3f6c2a1e-9b4d" } }),
+        ),
+      ).toBe(false)
+    }
+    // An eighth type nobody has written yet is covered by the same rule.
+    expect(
+      notConnectedOf(
+        phase({ config: { phase_type: "llm_future_type", connection_id: "3f6c2a1e" } }),
+      ),
+    ).toBe(false)
+  })
+
+  it("phaseVocabulary.ts has ZERO import statements", () => {
+    // A PROPERTY FENCE, not a description. `phaseVocabulary.ts` has never imported
+    // anything, and its own docblock at `:679` warns that this is not the change that
+    // should make it start. 190's replacement line reads `phase.config` — a parameter
+    // the function already receives — so the property survives BY CONSTRUCTION rather
+    // than by care. Its positive control is inline below; its REAL positive control is
+    // a planted import in the production file, driven RED in plan 190-05 task 3.
+    const IMPORT_FORM =
+      /^\s*import[\s({'"]|^\s*export\s[^=]*\bfrom\s*['"]|\brequire\s*\(|\bimport\s*\(/
+
+    // Strip comments first: the module's only two `import`-matching lines are PROSE
+    // (`:509` inside a block comment, `:679` inside a line comment), and a fence that
+    // counted those would be permanently red for a property that actually holds.
+    const code = phaseVocabularySource
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "")
+    const offenders = code.split("\n").filter((line) => IMPORT_FORM.test(line))
+    expect(offenders).toEqual([])
+
+    // Belt-and-braces on the UNSTRIPPED source, so a comment-stripping mistake above
+    // cannot silently disarm the fence.
+    expect(phaseVocabularySource).not.toMatch(/^import\s/m)
+
+    // POSITIVE CONTROLS — four real import forms, each of which the fence must catch.
+    // A fence with no control is a fence nobody has proved bites.
+    expect('import { own } from "./ownProperty"').toMatch(IMPORT_FORM)
+    expect('import type { Foo } from "./canvasModel"').toMatch(IMPORT_FORM)
+    expect('export { thing } from "./definitionOps"').toMatch(IMPORT_FORM)
+    expect('const y = require("./canvasModel")').toMatch(IMPORT_FORM)
+    expect('const p = await import("./canvasModel")').toMatch(IMPORT_FORM)
+  })
+
   it("the TYPE test and the STATE test are on SEPARATE LINES (the Phase-190 seam)", () => {
     // D-12 chose a STATE-conditional badge over a TYPE-conditional one so that 190 edits
     // ONE line and the adapter, `PhaseNode.tsx` and the card are all untouched. A fused
