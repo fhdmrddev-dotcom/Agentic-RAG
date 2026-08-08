@@ -91,6 +91,68 @@ import pytest
 
 from app.services.connector_service import ConnectorNotFound, resolve_connection
 
+# ══════════════════════════════════════════════════════════════════════════════════════════
+# ⭐ THE MEANINGFUL RED, OBSERVED AT PLAN 190-06 — the debt the block above declares, PAID
+# ══════════════════════════════════════════════════════════════════════════════════════════
+# ⚠ RECORDED **BELOW** THE IMPORT ON PURPOSE. The docstring above pins the import at ``:92``
+# and reaching that number took three measurements (see its own note). Every line added
+# above the import falsifies it again. This block therefore goes underneath, where it can
+# grow without moving anything the transcript above describes.
+#
+# `connector_service` landed at plan 190-06. Per the instruction above, the resolver was
+# authored **id-only FIRST** and observed failing, before ``AND org_id = $2`` was written.
+#
+# ── (A) THE LEAK ITSELF ────────────────────────────────────────────────────────────────────
+# This file's ``_fake_fetch_row`` models a CORRECTLY SCOPED storage layer, which is the right
+# choice — it measures the resolver rather than the stub — but it means the leak cannot be
+# *seen* here, only inferred from a refusal. So the id-only resolver was additionally driven
+# against a faithful ``SELECT * FROM connector_connections WHERE id = $1`` fetch and a REAL
+# Fernet token. Verbatim output:
+#
+#     CALLER ORG (the RUN's org) : aaaaaaaa-0000-4000-8000-000000000001
+#     ROW OWNER ORG              : bbbbbbbb-0000-4000-8000-000000000002
+#     RESOLVED SECRET FOR ORG A  : xoxb-ORG-B-REAL-BOT-TOKEN-NEVER-CROSS-A-TENANT
+#     LEAKED                     : True
+#
+# Org A's run held org B's decrypted bot token. D-14, reproduced rather than reasoned about.
+#
+# ── (B) THIS FILE, CATCHING THAT SAME RESOLVER ─────────────────────────────────────────────
+# ``pytest tests/unit/test_190_cross_org_credential.py -q`` → **2 failed, 1 passed**:
+#
+#     >       assert _fetch_calls == [(CONNECTION_OWNED_BY_ORG_B, ORG_A)], (
+#     E       assert [('cccccccc-0...0000b', None)] == [('cccccccc-0...00000000001')]
+#     E         At index 0 diff: ('cccccccc-0000-4000-8000-00000000000b', None)
+#                 != ('cccccccc-0000-4000-8000-00000000000b',
+#                     'aaaaaaaa-0000-4000-8000-000000000001')
+#     tests\unit\test_190_cross_org_credential.py:190: AssertionError
+#
+#     FAILED …::test_a_connection_id_from_another_org_does_not_resolve
+#     FAILED …::test_the_same_connection_id_DOES_resolve_for_its_owning_org
+#
+# ⚠ THE ``:190`` ABOVE IS TRUE OF THE FILE AS IT WAS WHEN MEASURED, AND FALSE OF THIS ONE —
+# the same three-step drift the docstring records, happening again to the transcript that
+# describes it. Pasting this block above that assertion pushed it to ``:252``. The number is
+# NOT corrected in the quoted output, because a transcript edited after the fact is no longer
+# a transcript; the drift is stated here instead. Re-derive at any time with
+# ``grep -n "assert _fetch_calls == " tests/unit/test_190_cross_org_credential.py``.
+#
+# **Which assertion fired is the whole lesson.** Not ``pytest.raises`` — the id-only resolver
+# satisfied that, because an unscoped lookup handed ``None`` to a scoped stub and got nothing
+# back. It was the RECORDED-FETCH-CALL assertion, the one this file's docstring calls
+# load-bearing, and the NON-VACUITY case failed in the same run. Either alone would have been
+# green over a leaking resolver. Both were needed, and both earned their keep here.
+#
+# ── (C) ONE MEASURED CONSEQUENCE FOR THIS FILE'S FIXTURE ───────────────────────────────────
+# ``ORG_B_SECRET_CIPHERTEXT`` is a greppable sentinel wearing the envelope prefix, NOT a real
+# Fernet token — and a ``SECRETS_ENCRYPTION_KEY`` is configured in this environment. A
+# resolver that decrypts EAGERLY therefore cannot satisfy the non-vacuity control at all,
+# however correct its scoping (observed: ``1 failed, 2 passed``, raising
+# ``cryptography.fernet.InvalidToken`` at ``secret_cipher.py:104``). **The fixture was not
+# edited to suit the implementation** — a security drive is not adjusted until it passes.
+# ``resolve_connection`` evaluates both D-11 read gates eagerly and defers only the Fernet
+# call to ``ResolvedConnection.secret``, so this fixture stays a sentinel and the fail-closed
+# property is unmoved. ``test_190_credentials.py`` case 4 covers the real round trip.
+
 # ── the two tenants ───────────────────────────────────────────────────────────
 # Fixed literals rather than uuid4(): a failure message that names the same id every run is
 # greppable against a stored row, and nothing here reaches a database.
