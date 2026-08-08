@@ -706,6 +706,21 @@ const BASELINE = {
   // an unpinned file is not lightly guarded, it is UNGUARDED, so the pin is not deferred
   // "while the count grows".
   "ExternalActionSection.test.tsx": 25,
+  // 190-12 (CONN-02 / CONN-03) — NET-NEW: the connection picker's suite, pinned in THE
+  // COMMIT THAT CREATED IT, the rule `ExternalActionSection.test.tsx:12` states verbatim.
+  // ⚠ NO `TARGETS` EDIT ACCOMPANIES THIS PIN either, and the omission is measured the same
+  // way its 189-14 neighbour above measured its own: `src/components/workflows` is already
+  // a TARGETS **directory** entry, so this file RAN and printed as `new` in two agreeing
+  // gate runs BEFORE this line existed — which is how the number below was read, out of
+  // this script's own `actual` column, rather than counted by hand.
+  // The 20 pin the picker's seven UI-SPEC §6d states as SEVEN (populated ≠ empty ≠ loading
+  // ≠ error), Gate 1 with its own non-vacuity control (a healthy connection DOES bind), the
+  // provider-less render that protects two shipped suites, and T6 — that the ONLY key ever
+  // written into the definition JSONB is `connection_id`. Four were driven RED against real
+  // plants in production source, each restored with an empty `git diff`: the planted
+  // `smtp_password` write, Gate 1 short-circuited off, the effect's disconnected guard
+  // deleted, and the `aria-disabled` attribute removed. Recorded in `190-12-SUMMARY.md`.
+  "ConnectionPicker.test.tsx": 20,
   // 184.1 pinned NOTHING here on purpose ("it postdates the 424 pin, so it reports as `new`
   // and its own count is free to grow"). Four phases later it is still the ONLY guard on the
   // flag-off Builder header — D-181-01's byte-identity promise — and it has stopped growing.
@@ -854,7 +869,20 @@ const BASELINE = {
 // the SAME two pre-existing under-pins recorded in the paragraph above
 // (`ExternalActionSection.test.tsx` +9, `PhaseTimeline.test.tsx` +4), unchanged by this
 // work and still owed as their own edit.
-const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // ⚠ 2712 (BUG-260807-02 keyboard half)
+// ⚠ AND BY 190-12 (CONN-02 / CONN-03): the pinned FILE count 48 → 49, `ConnectionPicker.test.tsx`
+// (20) — the connection picker's net-new suite, pinned in the commit that created it. READ
+// FROM THIS SCRIPT'S OWN PRINTED `pinned total` after the map entry above was added, across
+// two agreeing runs (2739), never by adding 20 to a figure in this comment — which is what
+// the paragraph above means when it says this note has gone stale seven times by being
+// computed rather than read. IT WAS STALE AGAIN: the trailing marker below read `2712` while
+// the reduce computed **2719** on an UNMODIFIED tree, so the correction rides here rather
+// than being smoothed over. The +13 gap the two paragraphs above describe is UNCHANGED and
+// still owed as its own edit — `ExternalActionSection.test.tsx` (25 pinned / 34 actual, +9)
+// and `PhaseTimeline.test.tsx` (17 / 21, +4). 190-12 deliberately did not re-pin either:
+// `ExternalActionSection.test.tsx` IS in this plan's blast radius, but its count is unmoved
+// at 34 by the two-insertion mount, so re-pinning it here would fold an unrelated
+// pre-existing drift into a commit that did not cause it.
+const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // ⚠ 2739 (190-12)
 
 // ── The Wave-0 blast radius (184-VALIDATION.md § "quick run command"). ──
 const TARGETS = [

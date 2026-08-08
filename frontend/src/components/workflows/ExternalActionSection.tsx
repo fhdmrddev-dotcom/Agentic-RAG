@@ -63,6 +63,7 @@ import {
   EXTERNAL_ACTION_NOTHING_CHOSEN_NOTE,
 } from "@/components/workflows/definitionOps"
 import { EXTERNAL_CAPABILITY_SENTENCES } from "@/components/workflows/phaseVocabulary"
+import { ConnectionPicker } from "./ConnectionPicker"
 
 /**
  * The CLOSED client mirror of `ExternalActionPhaseConfig.capability`
@@ -219,6 +220,7 @@ export function ExternalActionSection({
         })}
       </div>
 
+      {selected !== null && <ConnectionPicker capability={selected} />}
       {/* Said ONLY when no row is selected — the empty/no-capability note by name
           (UI-SPEC §9d). A step with a capability chosen still sends nothing in 189, and
           that fact is carried where D-12 and D-16 put it: the canvas badge at design
