@@ -1419,6 +1419,21 @@ This entry discharges the *recorded-decision* half of requirement **CONN-01** an
 
 The basis, what the verdict deliberately does NOT decide, and the dated re-open trigger are not restated here. This is a pointer; the full text lives in `docs/CONNECTOR-ARCHITECTURE.md`.
 
+⚠ **PARTIALLY SUPERSEDED 2026-08-08 by `D-v3.6-02` below** — on ONE clause only: the first three connectors ship as first-party adapters behind an MCP-shaped seam, and no MCP client is built in Phase 190. Everything else in this entry stands unchanged, and this entry is preserved rather than edited so the record of what was believed when survives.
+
+---
+
+## D-v3.6-02 — Phase 190 ships first-party adapters behind an MCP-SHAPED seam (supersedes ONE clause of `D-v3.6-01`)
+
+**Status:** Ratified 2026-08-08
+**Type:** Per-milestone architectural decision (v3.6). The third `D-vX.Y-NN` entry recorded in this file. It is the superseding entry that `docs/CONNECTOR-ARCHITECTURE.md`'s own dated re-open rule requires — that doc is amended by APPENDING a dated section, never by editing the verdict in place, and this entry is its citable D-number.
+
+Phase 190's live connector slice ships **three first-party adapters behind one MCP-shaped `ConnectorAdapter` protocol**, and **builds no MCP client**. The reason is structural rather than a matter of effort: a remote MCP server makes the outbound call in its own process, so requirement CONN-03's *unconditional* egress guard would cover only the hop to that server — which makes the guarantee unprovable through one.
+
+**What this supersedes, precisely:** only the clause of `D-v3.6-01` implying the first three connectors would ride an MCP client on day one. **MCP-first remains the substrate direction**, first-party-thin remains exactly this three-capability slice, and broad catalog still defers to Open Platform (SEED-013 / SEED-014). `D-v3.6-01` is preserved above, annotated, not deleted.
+
+The three structural reasons, the four things explicitly NOT amended, the measured evidence (zero MCP code has ever existed under `backend/app`) and the re-open trigger expressed as a check are not restated here. This is a pointer; the full text lives in `docs/CONNECTOR-ARCHITECTURE.md` § "Amendment — 2026-08-08 (Phase 190, D-01)". The corresponding ROADMAP correction is on Phase 190's Success Criterion 1, with the superseded wording preserved inline.
+
 ---
 
 ## Cross-references
@@ -1429,7 +1444,7 @@ The basis, what the verdict deliberately does NOT decide, and the dated re-open 
 - PRD template (Plan 02 output, downstream of this file): `.planning/prd-reset/PRD-TEMPLATE.md`
 - 6 milestone PRDs (Plans 03-08 outputs): `.planning/PRDs/v2.6.md`, `.planning/PRDs/v3.0.md`, `.planning/PRDs/v3.1.md`, `.planning/PRDs/v3.2.md`, `.planning/PRDs/v3.3.md`, `.planning/PRDs/v3.4.md`
 - Cross-PRD consistency report (Plan 09 output): `.planning/prd-reset/SUMMARY.md`
-- Connector architecture (the `D-v3.6-01` pointer target — the full MCP-first verdict, its basis and its dated re-open trigger): `docs/CONNECTOR-ARCHITECTURE.md`
+- Connector architecture (the `D-v3.6-01` **and** `D-v3.6-02` pointer target — the full MCP-first verdict, its basis, its dated re-open trigger, and the appended 2026-08-08 amendment that `D-v3.6-02` records): `docs/CONNECTOR-ARCHITECTURE.md`
 - Project state: `.planning/PROJECT.md` (Key Decisions table — the per-milestone D-vN.N-NN ADRs live there; this file is for cross-milestone D-PRD-NN ADRs)
 - Project memory cross-refs cited inline above:
   - `project_target_scale.md` (D-PRD-01)
