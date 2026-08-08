@@ -270,3 +270,45 @@ MORE open than its plan says. The conflict is stated in `api/connectors.py`'s mo
 **Re-open trigger:** the Settings → Connections UI plan (190-10 / 190-11) — it cannot render the
 §2h banner without meeting this. Whichever way it goes, both the copy and the gate must move in
 the SAME commit, and this entry must be marked resolved with the chosen half named.
+
+---
+
+## 190-14 · A LATENT IMPORT CYCLE ON THE CONNECTOR REGISTRY — measured, fenced, NOT fixed
+
+**Discovered:** plan 190-14 (2026-08-09), while writing the lazy-import fence.
+**Owner of the defect:** 190-08 (`registry.py`) + 190-13 (`phase_types.py:94`). Not 190-14.
+**Status:** unreachable in production today; guarded by a tripwire; fix deferred.
+
+`import app.services.connectors.registry` in a cold interpreter **fails**, verbatim:
+
+```
+registry.py:38            from app.services.harness.grounding import EXTERNAL_ACTION_CAPABILITIES
+harness/__init__.py:22    from . import phase_types
+phase_types.py:94         from app.services.connectors.registry import get_adapter
+ImportError: cannot import name 'get_adapter' from partially initialized module
+             'app.services.connectors.registry' (most likely due to a circular import)
+```
+
+It does not bite today for exactly one measured reason: `phase_types.py:94` is the **only**
+importer of the registry anywhere under `backend/app`
+(`grep -rn "connectors.registry" backend/app --include=*.py` → one import line, one docstring
+mention), so the registry is never the module that opens the cycle. Importing the harness first
+— the app's real order — works and loads **zero** vendor adapter modules, which is the lazy
+property 190-08 promised and which is now driven.
+
+**Why 190-14 did not fix it.** The plan is test-only (`files_modified` = two test files) and
+D-32 fences this plan to fences. The cycle is not caused by anything in this plan, so the
+scope-boundary rule applies: log it, do not fix it.
+
+**What it got instead — a tripwire, not a comment.**
+`test_190_connector_source_fence.py::test_no_vendor_module_enters_the_import_graph_until_a_send_happens`
+asserts the sole-importer condition literally
+(`importers == ["app/services/harness/phase_types.py:94"]`). The commit that adds a second
+importer is the commit that makes the cycle live, and it is the commit this fence turns RED on.
+
+**Re-open trigger:** the first plan that needs to import `connectors.registry` from anywhere
+other than `phase_types` — the Open Platform client (SEED-013), a worker entry point, a
+management script, or `api/connectors.py` growing a capability list. Break the cycle in that
+same commit (the cheapest cut: `registry.py` importing `EXTERNAL_ACTION_CAPABILITIES` from a
+module that does not re-export the harness package, or `phase_types` resolving `get_adapter`
+lazily inside `_exec_external_action`), and mark this entry resolved naming which cut was taken.

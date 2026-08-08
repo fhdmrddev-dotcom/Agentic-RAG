@@ -423,31 +423,105 @@ def test_no_adapter_hand_builds_an_encoded_credential_EXCEPT_where_the_vendor_re
     )
 
 
-def test_the_registry_module_constructs_nothing_at_import():
-    """D-05's corollary: importing the registry must not import a transport either.
+def test_no_vendor_module_enters_the_import_graph_until_a_send_happens():
+    """D-05's corollary: the registry resolves adapters LAZILY, and that is now measured.
 
-    ``registry.py`` resolves adapter modules LAZILY, and the reason is written in its own
-    docstring: importing the registry must not drag every vendor module into the import
-    graph. That is a property with a mechanical test — import the registry into a fresh
-    module object and assert the adapter modules are not yet loaded — and without it the
-    lazy-import comment is a claim nobody checks.
+    ``registry.py``'s docstring gives three reasons for the lazy import, the first being that
+    importing the registry must not pull every vendor module into the import graph. That is a
+    claim with a mechanical test, and without one it is a comment nobody checks.
+
+    ⚠ **Driven in a SUBPROCESS, deliberately.** The obvious in-process version deletes the
+    ``app.services.connectors.*`` entries from ``sys.modules`` and re-imports — which mutates
+    global interpreter state for every test that runs after it in the same session, in order to
+    measure a property about a *fresh* interpreter. A subprocess is both safer and strictly
+    more faithful: it is genuinely the cold start this property is about.
+
+    ⚠⚠ **A LATENT IMPORT CYCLE WAS MEASURED HERE AND IS DELIBERATELY NOT FIXED BY THIS PLAN.**
+    The first draft of this test imported ``app.services.connectors.registry`` directly in a
+    cold interpreter, and that FAILS today::
+
+        registry.py:38   from app.services.harness.grounding import EXTERNAL_ACTION_CAPABILITIES
+        harness/__init__.py:22   from . import phase_types
+        phase_types.py:94        from app.services.connectors.registry import get_adapter
+        ImportError: cannot import name 'get_adapter' from partially initialized module
+                     'app.services.connectors.registry' (most likely due to a circular import)
+
+    It is unreachable in production for exactly one reason, measured rather than assumed:
+    ``phase_types.py:94`` is the **only** importer of the registry anywhere under
+    ``backend/app``, so the registry is never the module that opens the cycle. The day a second
+    module imports it first, the app stops booting.
+
+    This plan is test-only (D-32), and the cycle was created by 190-08 + 190-13 rather than by
+    anything here, so it is logged in ``190-DEFERRED``/``deferred-items.md`` rather than fixed.
+    What it gets INSTEAD is a tripwire: the sole-importer condition is asserted below, so the
+    fence turns RED on the commit that makes the cycle live — which is more useful than a
+    comment, and is the only thing this plan is entitled to do about it.
     """
+    import subprocess
     import sys
 
-    for name in list(sys.modules):
-        if name.startswith("app.services.connectors."):
-            del sys.modules[name]
+    # The property, driven through the app's REAL entry point rather than through the module
+    # under test — which is also the import order that exists in production.
+    probe = (
+        "import sys;"
+        "import app.services.harness.phase_types;"
+        "print('REGISTRY', 'app.services.connectors.registry' in sys.modules);"
+        "print('ADAPTERS', [n for n in sys.modules"
+        " if n.startswith('app.services.connectors.') and n.endswith('_adapter')])"
+    )
+    completed = subprocess.run(
+        [sys.executable, "-c", probe],
+        cwd=str(_BACKEND_ROOT),
+        capture_output=True,
+        text=True,
+    )
+    assert completed.returncode == 0, (
+        "importing the harness in a cold interpreter FAILED — either the D-04 module-scope "
+        f"assert fired or the import cycle above became live:\n{completed.stderr[-2000:]}"
+    )
+    lines = {
+        line.split(" ", 1)[0]: line.split(" ", 1)[1]
+        for line in completed.stdout.strip().splitlines()
+        if line.startswith(("REGISTRY ", "ADAPTERS "))
+    }
+    assert lines.get("REGISTRY") == "True", (
+        "the registry was NOT loaded by importing the harness, so the assertion below is "
+        f"vacuous — it would report 'no adapters loaded' for a registry nobody imported: {lines!r}"
+    )
+    assert lines.get("ADAPTERS") == "[]", (
+        f"importing the harness loaded {lines.get('ADAPTERS')}. The resolution is meant to be "
+        "lazy so a vendor module cannot enter the import graph of anything that merely asks "
+        "which capabilities exist."
+    )
 
-    registry = importlib.import_module("app.services.connectors.registry")
-    assert registry is not None
+    # The tripwire on the latent cycle — see the docstring. Measured at plan time with
+    # `grep -rn "connectors.registry" backend/app --include=*.py` -> one import, one docstring
+    # mention.
+    importers = []
+    import_line = re.compile(
+        r"^\s*(?:from\s+app\.services\.connectors\.registry\s+import|"
+        r"import\s+app\.services\.connectors\.registry)"
+    )
+    assert import_line.search("from app.services.connectors.registry import get_adapter"), (
+        "the sole-importer matcher does not fire on a real import line"
+    )
+    assert not import_line.search(
+        "      7. **Dispatch** through ``connectors.registry.get_adapter(capability)``"
+    ), "the sole-importer matcher fires on prose, so the tripwire would read as tripped forever"
 
-    loaded = [
-        name
-        for name in sys.modules
-        if name.startswith("app.services.connectors.") and name.endswith("_adapter")
-    ]
-    assert loaded == [], (
-        f"importing the registry loaded {loaded!r}. The resolution is meant to be lazy so a "
-        "vendor module cannot enter the import graph of anything that merely asks which "
-        "capabilities exist."
+    for path in (_BACKEND_ROOT / "app").rglob("*.py"):
+        if "__pycache__" in path.parts:
+            continue
+        for lineno, line in enumerate(
+            path.read_text(encoding="utf-8", errors="replace").splitlines(), start=1
+        ):
+            if import_line.search(line):
+                importers.append(f"{path.relative_to(_BACKEND_ROOT).as_posix()}:{lineno}")
+
+    assert importers == ["app/services/harness/phase_types.py:94"], (
+        f"the connector registry now has these importers: {importers!r}. It had exactly one, "
+        "and that is the ONLY reason the measured import cycle "
+        "(registry -> harness.grounding -> harness/__init__ -> phase_types -> registry) stays "
+        "unreachable. A second importer that runs first turns a latent cycle into an app that "
+        "does not boot. Break the cycle before adding one — see this test's docstring."
     )
