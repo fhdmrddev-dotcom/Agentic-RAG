@@ -167,6 +167,7 @@ import {
   SAVED_STILL_A_DRAFT,
 } from "@/components/workflows/builderStore"
 import { BuilderStoreProvider } from "@/components/workflows/BuilderStoreProvider"
+import { SelectedPhaseSlugProvider } from "@/components/workflows/SelectedPhaseSlugContext"
 // 186-07 (G-5): the header's save region — four sentences and three controls — has its own
 // file, so composing autosave into this page did not grow it.
 import { BuilderSaveRegion } from "@/components/workflows/BuilderSaveRegion"
@@ -1806,6 +1807,12 @@ export function WorkflowBuilderPage({
 
   return (
     <BuilderStoreProvider store={store}>
+    {/* Phase 190-12 (CONN-02 / D-23, UI-SPEC U-08) — the slug rides beside the store, over
+        the SAME subtree, so a leaf under the form panel can write `patchConfig(slug, …)`
+        without the panel gaining a prop. `PhaseFormPanel.tsx`'s diff for this phase is
+        `0 0` and this wrapper is how. Children-only, so the grid's first child is unmoved.
+        Only THIS mount is wrapped: the pre-draft describe mount (`:1530`) carries no panel. */}
+    <SelectedPhaseSlugProvider slug={selectedSlug}>
     <div className="flex h-full flex-col bg-background">
       {/* D-184.1-01 — the WHOLE gate. Flag on ⇒ ONE row; flag off ⇒ the three-band surface
           that shipped, reached by a branch that cannot see `headerLead` / `headerTrail` at
@@ -1863,6 +1870,7 @@ export function WorkflowBuilderPage({
         />
       </div>
     </div>
+    </SelectedPhaseSlugProvider>
     </BuilderStoreProvider>
   )
 }
