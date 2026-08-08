@@ -8,8 +8,8 @@ status: open
 affected_areas: [frontend/workflow-run-surface, frontend/approval-checkpoint, frontend/chat-panel-seam, information-architecture]
 folded_into: null
 verified_closed_by: null
-related_seeds: [SEED-139, SEED-136]
-re_open_trigger: null
+related_seeds: [SEED-139, SEED-136, SEED-140]
+re_open_trigger: "The next workflow-surface phase, or the v3.7 milestone kickoff — whichever comes first. Raise as a candidate REQ-ID at that kickoff, bundled with SEED-139 (run threads indistinguishable in the chat list) and SEED-140 (no stop control on the run surface): all three are the same question — what does the run surface own, and what is chat for? Reviewed and DEFERRED at /gsd:discuss-phase 190 (2026-08-08): 190 raises the stakes (after it, the approval you must leave the run surface to give is the one that actually SENDS), but folding a run-surface IA rebuild into a phase gated on threats_open:0 is the capability-smuggling G-7 names, and the operator said explicitly on 2026-08-08 not to fold it. See 190-CONTEXT.md <deferred>."
 reproduces_on:
   branch: develop
   commit: HEAD at the 189-16 owed-rows UAT session (post 690ead48)
