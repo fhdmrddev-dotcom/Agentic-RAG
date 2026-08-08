@@ -135,3 +135,36 @@ external-action step, with no network call anywhere in it:
 Phase 190 (CONN-02 / CONN-03, STRETCH) swaps that no-op for a real MCP-backed call behind an
 unchanged seam. Until then, the honest summary is: **the direction is recorded, the rails are built,
 and nothing sends.**
+
+## Recorded direction 2026-08-08 — connectors are TWO-WAY; this verdict only ever described the outbound half
+
+**This is an addition, not an amendment.** The verdict above stands in full: MCP-first,
+first-party-thin, broad catalog sequenced with Open Platform. Nothing in it is retracted here.
+
+What is added is a direction the operator gave immediately after the Phase 190 context lock, which
+this page had no clause for either way:
+
+> "it should be a two way communication… we need the ability to read write to pull something from
+> Jira from email from Slack from anything. And also to send."
+
+Everything this doc and Phase 190 describe is **outbound** — `send_email`, `create_ticket`,
+`post_message` are three writes. There is no read anywhere on the connector track, and knowledge-base
+ingestion is manual-upload-only by a standing rule. The operator's direction is that the app must also
+**pull** from external systems inside a workflow, and that a connected drive should **auto-ingest**
+into the knowledge base.
+
+**Where it lands:** the Open Platform milestone (SEED-013 / SEED-014), as an input to its scope rather
+than a follow-on. SEED-013's `## Update 2026-08-08` records it as a fourth consumer mode — *us as MCP
+client* — alongside the three inbound modes it already lists. The full analysis is
+[`SEED-142`](../.planning/seeds/SEED-142-two-way-connectors-read-pull-auto-ingest.md).
+
+**What it changes about Phase 190: nothing.** 190 stays outbound-only, three capabilities, static
+tokens, no OAuth, no scheduler — it is gated on `threats_open: 0` and it *builds the prerequisites*
+two-way needs (the org-scoped credential store, the egress guard, the `ConnectorAdapter` seam).
+Read adapters register through that same seam later. The protocol is already MCP-shaped, so it
+accommodates a read return value without being widened today.
+
+**Which re-open trigger this is, precisely:** none of the three above has fired. Trigger 2 ("a real
+connector need that no MCP server covers") is *not* what happened — the ask is for a direction the
+verdict never scoped, not for a connector outside the thin set. Recording it here keeps the next
+reader from mistaking silence-on-reads for a decision that reads are out.
