@@ -35,6 +35,37 @@ recurring corruption — a writer that cannot parse the file it is editing will 
 189-16, 190-planning and 190-01), or the first time a consumer of this frontmatter is observed
 reading a wrong value. Fix as its own `/gsd:fast`, not inside a feature phase.
 
+### ⚠ THE TRIGGER FIRED AGAIN — occurrence #4, plan 190-06 (2026-08-08)
+
+Recorded because the trigger above asks for it, and because this occurrence is **worse than the
+earlier ones in one specific way: both verbs REPORTED FAILURE and destroyed the file anyway.**
+
+```
+$ gsd-sdk query state.advance-plan
+{ "error": "Cannot parse Current Plan or Total Plans in Phase from STATE.md" }
+$ gsd-sdk query state.update-progress
+{ "updated": false, "reason": "Progress field not found in STATE.md" }
+
+$ git diff --numstat .planning/STATE.md
+7  39  .planning/STATE.md
+```
+
+**39 lines deleted after two calls that both said they had changed nothing.** What went: the
+`stopped_at` key entirely, the rich `last_activity` narrative, `status: executing` → `planning`,
+`last_updated` rewound to a *stale* `18:49:07.592Z`, and **three `### Previous stopped_at` history
+blocks**, replaced by a fabricated `progress:` block (`completed_plans: 147`, `percent: 52`) that
+nothing measured.
+
+**Recovered** by restoring a copy taken *before* the calls (`git diff --numstat` → empty, byte-exact
+against `HEAD`) and hand-editing, per the plan-03/04/05 convention. Note also that the failing
+parse is of the markdown **body** ("Current Plan or Total Plans"), not the frontmatter — so
+repairing the YAML would NOT have prevented this, and might make it worse by turning a loud error
+into a silent successful rewrite. Any fix must address the destructive-write path, not only the
+parse.
+
+**Standing instruction for every remaining plan in this phase:** copy `STATE.md` aside first, and
+run `git diff --numstat .planning/STATE.md` after any state verb. Do not trust a verb's own report.
+
 ---
 
 ## D-190-DEF-02 — `CONN-03` deliberately NOT marked complete by plan 190-01
@@ -72,6 +103,11 @@ test-only changes alter no architecture the graph indexes.
 
 **Re-open trigger:** the first plan in Phase 190 that lands production source — `190-02`
 (`backend/app/security/egress.py`) is the expected one. Run it there.
+
+**DISCHARGED at plan 190-06** (2026-08-08): `graphify update .` run after landing
+`app/models/connector.py` + `app/services/connector_service.py` — *"Rebuilt: 19444 nodes, 50603
+edges, 1687 communities"*, exit 0. `graphify-out/` is untracked, so the rebuild put nothing into
+this plan's commits. Later plans that land production source should run it too.
 
 ---
 
