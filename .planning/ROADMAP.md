@@ -673,7 +673,7 @@ Plans:
 **Plans**: 19 plans in 8 waves
 
 - [x] 190-01-PLAN.md — Wave-0 RED drives — D-14 cross-org leak, D-06 ordering, the re-scoped transport sentinel
-- [ ] 190-02-PLAN.md — `security/egress.py` validator — scheme, label-boundary host, the 29-address IP corpus
+- [x] 190-02-PLAN.md — `security/egress.py` validator — scheme, label-boundary host, the 29-address IP corpus
 - [ ] 190-03-PLAN.md — Migrations 116 (`connector_connections`) + 117 (`external_action_sent`) + [BLOCKING] operator apply
 - [ ] 190-04-PLAN.md — D-01 amendment — CONNECTOR-ARCHITECTURE + D-v3.6-02 + ROADMAP SC#1 + deploy parity + hot-file ledger
 - [ ] 190-05-PLAN.md — The `Not connected` badge retires by DATA — one line at `phaseVocabulary.ts`
