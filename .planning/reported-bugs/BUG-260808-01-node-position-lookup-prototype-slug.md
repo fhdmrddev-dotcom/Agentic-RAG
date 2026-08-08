@@ -125,6 +125,59 @@ Then read `document.querySelector('.react-flow__node[data-id="constructor"]').st
 - **Plant as seed:** the *class* deserves one if the boundary fix is not taken.
 - **External — note only:** no
 
+## CODE FIX LANDED 2026-08-08 (`/gsd:fast`) — the sink is ISOLATED and guarded; `status` stays `open`
+
+**The report told whoever fixed this to locate the exact read rather than trust its hypothesis
+paragraph. That was done, and the paragraph was half right.** The sink is NOT in `canvasModel.ts` —
+that module keys everything through `Map`, so it was never exposed. It is in `WorkflowCanvas.tsx`,
+in the two-memo split, at **three** bare-index sites:
+
+| Site | Lookup | Effect for a slug named `constructor` |
+|---|---|---|
+| `WorkflowCanvas.tsx:674` (overlay memo) | `dragOverlay[node.id]` | **THE MEASURED ONE.** Resolves the inherited function; `!== undefined` passes; the node's `position` BECOMES that function, with no `.x`/`.y` → the library writes no transform at all |
+| `:639` (settled memo) | `nudges?.[node.id] ?? 0` | the function is not nullish, so `?? 0` passes it through and it is ADDED to `position.y` |
+| `:866` (`onNodeDragStop`) | `nudges?.[node.id] ?? 0` | same, on the commit path |
+
+`:674` is the one that reproduces the exact reported symptom, and it fires on **every render** —
+`dragOverlay` is `useState({})`, so nothing needs to be dragged for the sink to be live.
+
+**What shipped:** all three route through `own()` from the zero-import leaf `ownProperty.ts`.
+
+**Driven RED before green, and the RED reproduced this report's own measurement.** Two rows in
+`WorkflowCanvas.editing.test.tsx` were run against the pre-fix body with the source stashed:
+
+```
+AssertionError: slug "constructor" got position function Object() { [native code] }:
+                expected 'function' to be 'object'
+AssertionError: slug "constructor" y=undefined: expected false to be true
+```
+
+⚠ **This report claimed jsdom cannot see this. That is HALF WRONG and the correction matters** — it
+is true of the *computed style* and false of the *cause*. The `nodes` array is a captured prop, so
+the position the library is handed is directly assertable, and the guard sits there. Both rows carry
+positive controls (an ordinary slug still lands on the lane-1 pitch; an OWN nudge is still applied),
+so a rewrite that positions nothing cannot pass. Count-gate pin extended 63 → 65.
+
+One source fence was re-spelled, not weakened: `WorkflowCanvas.test.tsx:968`'s positive control
+anchored on the literal `dragOverlay[node.id]` and now anchors on `own(dragOverlay, node.id)`.
+Both canvas suites green at 118/118.
+
+**THE ONE THING OWED — the driven row**, and `status` stays `open` for it deliberately. This report's
+own regression check is *"a driven read of `node.style.transform` with the slug control swung both
+ways."* The unit guard closes the CAUSE; only the driven row confirms the rendered symptom is gone,
+and relaxing that condition on the strength of the evidence it names as insufficient is exactly what
+`BUG-260807-01` was held open to avoid. Requires a seeded `workflow_definitions` fixture (the UI
+cannot author this slug — `D-184-11`).
+
+**Flip BOTH this and `BUG-260807-01` to `closed` when that row passes.** Cheapest moment: any live
+canvas session — the fixture is 3 lines of Python and free to delete.
+
+⚠ **The CLASS is still open, and the fix count is now seven.** Both this report and `BUG-260807-01`
+say stop guarding sinks one at a time. This run did not take the class fix, because constraining
+`slug` at the boundary touches `harness.py` + a CHECK constraint (schema + API surface — outside
+`/gsd:fast` under G-3). It remains the right fix, and this report's own routing said *"plant as seed
+if the boundary fix is not taken"* — so it is planted: **`SEED-143`**.
+
 ## Reference / evidence links
 
 - `frontend/src/components/workflows/canvasModel.ts` — the node builder (slug-keyed)

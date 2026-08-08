@@ -40,7 +40,7 @@
  */
 import { createElement, useMemo } from "react"
 import { describe, it, expect, vi, beforeAll, afterAll, beforeEach, type MockInstance } from "vitest"
-import { act, fireEvent, render, screen } from "@testing-library/react"
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { useStore } from "zustand"
 
 // FILE-LOCAL, never setupTests.ts — the helper mutates HTMLElement.prototype and a
@@ -1555,6 +1555,73 @@ describe("editAffordance BUG-260807-01 — verticalOffsetFor is total over any s
     expect(verticalOffsetFor("a", {}, { a: { x: 0, y: 90 } }, 30)).toBe(60)
     // …and the overlay still WINS over the nudge, the pre-existing precedence.
     expect(verticalOffsetFor("a", { a: 12 }, { a: { x: 0, y: 90 } }, 30)).toBe(60)
+  })
+})
+
+// ── BUG-260808-01 — the node POSITION lookup is total over a prototype-key slug ─────
+//
+// The SEVENTH WR-04 sink, and a DIFFERENT one from the sixth guarded above. That one made
+// `verticalOffsetFor` return `NaN`, which invalidates a `translate()` the browser then
+// drops. This one makes the position ABSENT: `dragOverlay[slug]` resolved the inherited
+// `Object.prototype.constructor` — a function, so `!== undefined` passed — and the node's
+// `position` became that function, with no `.x`/`.y` for the library to write. Measured on
+// the live canvas: the `constructor` node carried NO transform and painted at the origin,
+// stacked on phase 1 (both at rect `58,176`), while the same fixture slugged `ordinaryslug`
+// rendered `translate(320px, 0px)`.
+//
+// ⚠ THIS ESTATE CAN SEE THIS ONE, and that is worth stating because the sixth sink's guard
+// above correctly says it cannot see ITS rendered half. The difference is not CSS: the
+// assertion here is on the `nodes` array handed to the library — the cause, captured as a
+// prop — not on a computed style. No claim is made about stacking or paint order.
+describe("WorkflowCanvas BUG-260808-01 — node position is total over any slug", () => {
+  /** `evalCoverage`, with the phase at lane 1 renamed to a prototype member name. */
+  function withSlugAtLane1(slug: string): typeof evalCoverage {
+    return evalCoverage.map((p) => (p.phase_index === 1 ? { ...p, slug } : p))
+  }
+
+  const PROTOTYPE_KEYS = ["constructor", "toString", "valueOf", "__proto__"] as const
+
+  function positionOf(id: string): unknown {
+    const nodes = (flow.props?.nodes ?? []) as Array<{ id: string; position?: unknown }>
+    return nodes.find((n) => n.id === id)?.position
+  }
+
+  it("hands the library a FINITE {x, y} for every prototype-member slug", () => {
+    // Positive control FIRST, so a rewrite that positions nothing cannot pass this file:
+    // an ordinary slug at lane 1 must still land on the lane-1 pitch.
+    renderCanvas(withSlugAtLane1("ordinaryslug"))
+    expect(positionOf("ordinaryslug")).toEqual({ x: LANE_X[1], y: expect.any(Number) })
+
+    for (const key of PROTOTYPE_KEYS) {
+      cleanup()
+      renderCanvas(withSlugAtLane1(key))
+      const position = positionOf(key) as { x: number; y: number } | undefined
+      // State the property that failed rather than only the value — pre-fix this was a
+      // Function, and `toEqual` on a function reports unhelpfully.
+      expect(typeof position, `slug "${key}" got position ${String(position)}`).toBe("object")
+      expect(Number.isFinite(position?.x), `slug "${key}" x=${position?.x}`).toBe(true)
+      expect(Number.isFinite(position?.y), `slug "${key}" y=${position?.y}`).toBe(true)
+      expect(position?.x).toBe(LANE_X[1])
+    }
+  })
+
+  it("does not read an INHERITED nudge, and still reads an OWN one", () => {
+    // The nudge table is the second sink in the same memo — a prototype key there resolved
+    // the inherited function, `?? 0` passed it through, and it was ADDED to `position.y`.
+    for (const key of PROTOTYPE_KEYS) {
+      cleanup()
+      renderCanvas(withSlugAtLane1(key), { nudges: {} })
+      const position = positionOf(key) as { x: number; y: number } | undefined
+      expect(Number.isFinite(position?.y), `slug "${key}" y=${position?.y}`).toBe(true)
+    }
+    // Non-vacuity: an OWN nudge is still applied, so the guard rejects inherited members
+    // rather than rejecting every nudge.
+    cleanup()
+    renderCanvas(withSlugAtLane1("ordinaryslug"), { nudges: {} })
+    const base = (positionOf("ordinaryslug") as { y: number }).y
+    cleanup()
+    renderCanvas(withSlugAtLane1("ordinaryslug"), { nudges: { ordinaryslug: 40 } })
+    expect((positionOf("ordinaryslug") as { y: number }).y).toBe(base + 40)
   })
 })
 

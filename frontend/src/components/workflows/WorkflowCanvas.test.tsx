@@ -965,7 +965,11 @@ describe("WorkflowCanvas 188-07 — the canvas DERIVES nothing (Req 2 · the G-5
     const overlay = workflowCanvasSource.slice(workflowCanvasSource.indexOf("const nodes = useMemo"))
     expect(overlay).not.toContain("runState")
     // POSITIVE CONTROL — the slice really is the overlay memo and really is non-empty.
-    expect(overlay).toContain("dragOverlay[node.id]")
+    // ⚠ RE-SPELLED BY `BUG-260808-01`, never weakened: the lookup was `dragOverlay[node.id]`
+    // until the bare index was found to resolve `Object.prototype.constructor` for a phase
+    // slugged `constructor`, leaving the node with no position and no transform. The control
+    // still anchors on the overlay memo's own lookup — it is the guarded spelling now.
+    expect(overlay).toContain("own(dragOverlay, node.id)")
   })
 })
 

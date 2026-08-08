@@ -216,6 +216,7 @@ import { CanvasToolbar, type ToolbarSaveState } from "@/components/workflows/Can
 import { resolveDrop, type PhaseTypeId } from "@/components/workflows/definitionOps"
 import { FlowEdge } from "@/components/workflows/FlowEdge"
 import type { VerdictMarkKind } from "@/components/workflows/nodePresentation"
+import { own } from "@/components/workflows/ownProperty"
 import { EndCapNode, PhaseNode, UnresolvedSkipNode } from "@/components/workflows/PhaseNode"
 import type { NameContext, PhaseSpecJSON } from "@/components/workflows/phaseVocabulary"
 import { PlaneEditingLayer } from "@/components/workflows/PlaneEditingLayer"
@@ -636,7 +637,11 @@ export function WorkflowCanvas({
         // The cosmetic offset is merged into a COPY of the position. A zero offset
         // reuses the model's own object, so an idle canvas hands the library a stable
         // reference and does not re-measure on every parent render.
-        const dy = nudges?.[node.id] ?? 0
+        // WR-04 — `own()`, not a bare index. A slug naming an `Object.prototype` member
+        // (`constructor`, `toString`, …) otherwise resolves the INHERITED value, which is
+        // a function: never nullish, so `?? 0` passes and the offset poisons the position.
+        // BUG-260808-01.
+        const dy = own(nudges ?? {}, node.id) ?? 0
         const position = dy === 0 ? node.position : { x: node.position.x, y: node.position.y + dy }
 
         const measured = measuredById[node.id]
@@ -671,7 +676,11 @@ export function WorkflowCanvas({
   const nodes = useMemo<CanvasNode[]>(() => {
     let touched = false
     const next = settledNodes.map((node) => {
-      const overlay = dragOverlay[node.id]
+      // WR-04 — THE SINK BUG-260808-01 MEASURED. A bare index on a slug named
+      // `constructor` resolves the inherited function, which is `!== undefined`, so the
+      // node's `position` became a Function with no `.x`/`.y` — and the library then
+      // wrote NO transform at all, painting the card at the origin on top of phase 1.
+      const overlay = own(dragOverlay, node.id)
       if (overlay === undefined) return node
       touched = true
       return { ...node, position: overlay }
@@ -863,7 +872,7 @@ export function WorkflowCanvas({
       // RESULTING offset is handed over rather than this drag's delta, so a second nudge
       // does not silently discard the first (the previous offset is already inside
       // `origin.y`, which is why the two are added rather than one replacing the other).
-      if (dy !== 0) onNudge?.(node.id, (nudges?.[node.id] ?? 0) + dy)
+      if (dy !== 0) onNudge?.(node.id, (own(nudges ?? {}, node.id) ?? 0) + dy)
     },
     [lanes, nudges, onCommitNodes, onNudge, nodesWithMove],
   )

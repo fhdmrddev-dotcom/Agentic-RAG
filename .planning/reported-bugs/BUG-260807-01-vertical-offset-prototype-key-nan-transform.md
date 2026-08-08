@@ -224,6 +224,23 @@ renders wrong would claim a user-visible fix that has not landed. Flip both toge
 class fix (constrain the slug at the boundary, or use `Map`/`Object.create(null)`) over a seventh
 one-site guard — three reports in three days is the signal.
 
+### 2026-08-08 — THE SUCCESSOR'S CODE FIX LANDED (`/gsd:fast`). Still `open`, and the reason has narrowed to ONE row.
+
+`BUG-260808-01`'s sink was isolated and guarded. Its hypothesis paragraph pointed at
+`canvasModel.ts`; the real sink was `WorkflowCanvas.tsx:674` — `dragOverlay[node.id]` in the overlay
+memo, plus the two `nudges?.[node.id]` sites at `:639` and `:866`. All three now route through the
+same `own()` leaf this report's fix introduced. Driven RED first; the RED printed
+`got position function Object() { [native code] }`, which is the inherited-function mechanism this
+report predicted when it wrote *"not a NaN — an ABSENT value."*
+
+**This report's own fix is re-confirmed intact** — nothing about the `own()` guard in
+`editAffordance.ts` was touched, and both canvas suites are green at 118/118.
+
+**What is still owed is now exactly one thing, shared by both reports:** the driven browser row.
+Author a phase slugged `constructor`, read the affordance's computed `transform` (this report's half)
+and the node's `style.transform` (`BUG-260808-01`'s half), with the slug control swung both ways.
+**Flip BOTH to `closed` on that one row** — they no longer need separate evidence.
+
 ⚠ Reproduction note for whoever takes it: **the UI cannot author this slug.** `D-184-11` is explicit
 that there is no slug field and the caller derives the slug from the phase type, so the row requires
 a seeded `workflow_definitions` fixture (all rows in this project are test data). The fixture used

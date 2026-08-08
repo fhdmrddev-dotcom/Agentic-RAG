@@ -568,7 +568,15 @@ const BASELINE = {
   // sink, and the one `188.2-DEF-02` does NOT cover). Nothing was deleted and no other pin
   // moved. Both rows were observed RED against the pre-fix body before the pin moved, and
   // the RED reproduced the report's own measurement exactly (`expected NaN to be +0`).
-  "WorkflowCanvas.editing.test.tsx": 63,
+  // BUG-260808-01 (`/gsd:fast`, 2026-08-08): 63 → 65. EXTENDED, not lowered — two rows
+  // guarding the NODE POSITION lookup's totality over a prototype-member slug (the SEVENTH
+  // WR-04 sink, a DIFFERENT one from the sixth pinned directly above: that one returned
+  // `NaN`, this one returned the inherited FUNCTION, so the node's `position` had no `.x`/`.y`
+  // and the library wrote no transform at all). Nothing was deleted and no other pin moved.
+  // Both rows were observed RED against the pre-fix body before the pin moved, and the RED
+  // reproduced the report's own measurement exactly (`got position function Object() {
+  // [native code] }`). Read from a full-file run: 65 passed.
+  "WorkflowCanvas.editing.test.tsx": 65,
   "builderStore.test.ts": 52,
   "phaseVocabulary.corpus.test.ts": 45,
   // 189-12: 43 → 46. The 7th row — one case pinning it is offered LAST (a bare count
