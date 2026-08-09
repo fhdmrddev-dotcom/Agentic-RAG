@@ -711,3 +711,63 @@ fences twice (`Dockerfile.sandbox` ↔ `docs/SANDBOX-PACKAGES.md`, and
 **Re-open trigger:** the next migration that contains `GRANT` or `REVOKE` — or the first
 greenfield/cloud deploy after which a privilege is observed missing. Whoever hits it should
 take shape 2 and register it beside the existing drift checks.
+
+---
+
+## D-190-DEF-17 — ⛔ BLOCKER: only 1 of 3 capabilities can be driven from a workflow at all
+
+**Discovered:** 2026-08-10, live UAT, immediately after the Jira credential check went green.
+**Severity:** Critical — makes ROADMAP **SC#1 ("2-3 first-party live connectors") unreachable by
+construction**, not merely undemonstrated.
+**Owner of the defect:** the seam between `_adapter_args` (190-13) and the adapters' declared
+`INPUT_SCHEMA.required` (190-08 / 190-10 / 190-11). Not any single plan.
+
+### Measured, by composing the two shipped functions against a realistic `resolved`
+
+```
+resolved = {'kickoff_prompt': ..., 'content': <upstream phase text>}
+
+post_message    required=['text']                    built=['text']          MISSING=None
+create_ticket   required=['description','summary']   built=['description']   MISSING=['summary']
+send_email      required=['body','subject','to']     built=['body']          MISSING=['subject','to']
+```
+
+`_adapter_args` fills exactly ONE field — `_BODY_ARG_FOR_CAPABILITY[capability]` — from the
+upstream phase text. Everything else must already be present in `ctx.inputs`, which carries only
+`kickoff_prompt` (+ optional `folder_id`). So:
+
+* **`create_ticket`** raises `JiraArgumentsInvalid: 'summary' must be a non-empty string`.
+* **`send_email`** is missing BOTH the subject and **the recipient** — an email connector with no
+  way to say who it goes to.
+* **`post_message` succeeds only because its required set is exactly the one auto-filled field.**
+  That is a coincidence, not a design.
+
+### Why every gate missed it
+
+The same shape as the `org_id` Critical fixed in `3aedf2fc`: each side was tested in isolation.
+`_adapter_args` has tests, the adapters have tests, and **nothing composed them**. Every adapter
+test passes `args=` explicitly — the shape the executor never produces. The Slack-first UAT
+ordering (correct for falsifying T13) also happened to exercise the only capability that works.
+
+### Why this is NOT a gap-closure fix (G-7)
+
+There is nowhere for an author to supply these values:
+
+* `ExternalActionPhaseConfig` is `extra='forbid'` with no `summary` / `subject` / `to` field.
+* `ExternalActionSection` picks a capability and a connection, nothing else.
+* Deriving them from `content` would be COMPOSITION, which **D-09 forbids in as many words**
+  ("no expression language, no templating surface"); D-05's fences would go red.
+
+So closing it means **new authoring surface + a config-model change + a UI field set**, i.e. a
+capability. G-7 forbids a closure round adding one. **This is a phase.**
+
+### Design note for whoever takes it
+
+The natural home is the per-capability input form generated from the adapter's own
+`INPUT_SCHEMA` — which already exists and is already the right primitive. That is the SAME
+mechanism SEED-144 needs for a 50-integration catalog, so the two should be scoped together
+rather than solved twice. Non-body required fields also interact with D-09: a static author-typed
+value needs no expression language, which is likely the cheapest honest first cut.
+
+**Re-open trigger:** any attempt to demonstrate `create_ticket` or `send_email` end-to-end, or
+any move to close SC#1 at 2-of-3.
