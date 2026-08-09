@@ -786,6 +786,15 @@ def _adapter_and_config(capability: str):
     ).model_dump()
 
 
+class _FakeQueryParams(dict):
+    """`httpx.QueryParams`' immutable `.set()` in four lines — the shape `_project` writes."""
+
+    def set(self, key, value):  # noqa: A003 — mirrors httpx.QueryParams.set exactly
+        merged = _FakeQueryParams(self)
+        merged[key] = value
+        return merged
+
+
 class _RecordingSupabase:
     """A minimal supabase-py stand-in that RECORDS the update payload and the filters.
 
@@ -798,6 +807,11 @@ class _RecordingSupabase:
         self._results = list(results)
         self.updates: list[dict] = []
         self.filters: list[tuple[str, Any]] = []
+        # CR-01 / migration 118 — the production code pins PostgREST's returning projection
+        # with `connector_service._project(builder)`, which writes `builder.request.params`.
+        # A double that lacks it would fail with AttributeError rather than measure anything,
+        # so the shape is modelled here; `self.request.params["select"]` is then ASSERTABLE.
+        self.request = SimpleNamespace(params=_FakeQueryParams())
 
     def table(self, _name):
         return self

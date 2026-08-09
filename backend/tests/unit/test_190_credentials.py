@@ -21,6 +21,7 @@ and asserts it IS found. Without it the row is decorative.
 from __future__ import annotations
 
 import logging
+from types import SimpleNamespace
 
 import pytest
 
@@ -67,10 +68,23 @@ class _FakeResult:
         self.data = data
 
 
+class _FakeQueryParams(dict):
+    """`httpx.QueryParams`' immutable `.set()` in four lines — the shape `_project` writes."""
+
+    def set(self, key, value):  # noqa: A003 — mirrors httpx.QueryParams.set exactly
+        merged = _FakeQueryParams(self)
+        merged[key] = value
+        return merged
+
+
 class _FakeInsert:
     def __init__(self, store: list, row: dict):
         self._store = store
         self._row = row
+        # CR-01 / migration 118 — `connector_service._project` pins PostgREST's returning
+        # projection by writing `builder.request.params`. Modelled so the double stays
+        # faithful to the real builder rather than failing with AttributeError.
+        self.request = SimpleNamespace(params=_FakeQueryParams())
 
     def execute(self):
         stored = {"id": CONNECTION_ID, **self._row}

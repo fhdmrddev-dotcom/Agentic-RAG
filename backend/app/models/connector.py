@@ -46,9 +46,9 @@ remembered; it is checked at import.
 
 from __future__ import annotations
 
-from typing import Literal, get_args
+from typing import Annotated, Literal, get_args
 
-from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 # The runtime home of the closed capability set. Imported for the static agreement assert
 # below — this module never calls into the service layer at request time.
@@ -65,6 +65,31 @@ class _StrictBase(BaseModel):
     """
 
     model_config = ConfigDict(extra="forbid")
+
+
+# ── WR-05 · the emptiness constraints, declared ONCE ─────────────────────────────────────
+# Before this, NO field on `ConnectorConnectionCreate` or on any of the three config models
+# carried a length, format or non-empty constraint — `name`, `host`, `from_address`,
+# `base_url`, `default_channel` and `secret` all accepted `""`. So *Add a connection* →
+# *Sends an email* → **Save**, with nothing typed, produced `{host: "", port: 0,
+# from_address: "", tls: "starttls"}` with `secret = ""`, the API answered **201**, and
+# `encrypt_secret("")` stored a real `enc:v1:` envelope over an empty password. Settings then
+# listed a connection named `""` with a blank *Sends to* column that a workflow author could
+# bind, and the first time anyone found out was a FAILED WORKFLOW RUN (`host_not_allowed` —
+# `_host_is_allowed` fails closed on an empty `allowed_host`).
+#
+# Constrained HERE rather than in the panel, because the model is the one place the API, a
+# curl request and every future caller all pass through. The panel mirrors it (a disabled
+# Save is kinder than a 422) but the panel is not the gate.
+NonEmpty = Annotated[str, Field(min_length=1)]
+
+# ⚠ IN-03 is folded in here rather than deferred, because it is the same defect wearing a
+# number instead of a string. `configFromDraft` maps an unparseable port to `0`, and
+# `egress.validate_destination` computes
+# `resolved_port = port or parsed.port or _DEFAULT_PORTS[scheme]` — which treats `0` as FALSY
+# and silently substitutes 465/587. Someone who typed `four sixty five` got a working
+# connection on a port they never chose, with no indication their input was discarded.
+Port = Annotated[int, Field(ge=1, le=65535)]
 
 
 # ── the capability vocabulary ────────────────────────────────────────────────────────────
@@ -89,10 +114,13 @@ class SendEmailConfig(_StrictBase):
     TLS on 465, or STARTTLS on 587. There is no plaintext-SMTP member to select.
     """
 
-    host: str
-    port: int
-    from_address: str
-    username: str | None = None  # the NON-secret half of the SMTP credential pair (D-03)
+    host: NonEmpty
+    port: Port
+    from_address: NonEmpty
+    # ⚠ `username` stays UNCONSTRAINED-optional on purpose (D-03: the non-secret half of the
+    # SMTP credential pair, absent for every host whose login IS the mailbox). Making it
+    # NonEmpty would refuse the majority configuration.
+    username: str | None = None
     tls: Literal["starttls", "implicit"] = "starttls"
 
 
@@ -104,9 +132,9 @@ class CreateTicketConfig(_StrictBase):
     displayed to an org admin without ever decrypting anything.
     """
 
-    base_url: str
-    project_key: str
-    account_email: str
+    base_url: NonEmpty
+    project_key: NonEmpty
+    account_email: NonEmpty
 
 
 class PostMessageConfig(_StrictBase):
@@ -118,7 +146,7 @@ class PostMessageConfig(_StrictBase):
     refuse to accept in the first place.
     """
 
-    default_channel: str
+    default_channel: NonEmpty
 
 
 ConnectorConfig = SendEmailConfig | CreateTicketConfig | PostMessageConfig
@@ -164,12 +192,14 @@ class ConnectorConnectionCreate(_StrictBase):
     """
 
     capability: ConnectorCapability
-    name: str
+    name: NonEmpty
     config: ConnectorConfig
     # Plaintext at the API boundary and NOWHERE else: the service encrypts it with the
     # shipped cipher before the row is written, and refuses the write outright when no
-    # cipher is configured (D-11's fail-CLOSED inversion).
-    secret: str
+    # cipher is configured (D-11's fail-CLOSED inversion). NonEmpty (WR-05): an `enc:v1:`
+    # envelope over an empty password is a credential-shaped object that authenticates
+    # nowhere, and it looks exactly like a real one in every list, table and picker.
+    secret: NonEmpty
 
     @model_validator(mode="after")
     def _config_matches_capability(self) -> "ConnectorConnectionCreate":
@@ -184,9 +214,12 @@ class ConnectorConnectionUpdate(_StrictBase):
     stored secret in one edit. Re-pointing a connection at a different vendor is a new row.
     """
 
-    name: str | None = None
+    # WR-05 on the PATCH path: ABSENT stays legal (that is what "all-optional" means), but
+    # PRESENT-BUT-EMPTY does not. `secret=""` would otherwise encrypt an empty password over
+    # a working one and reset the check verdict while doing it.
+    name: NonEmpty | None = None
     config: ConnectorConfig | None = None
-    secret: str | None = None
+    secret: NonEmpty | None = None
     is_enabled: bool | None = None
 
 

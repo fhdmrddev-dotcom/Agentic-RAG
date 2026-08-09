@@ -84,6 +84,7 @@ from app.models.connector import (
     ConnectorConnectionCreate,
     ConnectorConnectionResponse,
     ConnectorConnectionUpdate,
+    _reject_config_capability_mismatch,
 )
 from app.security.secret_cipher import decrypt_secret, encrypt_secret, get_cipher, is_encrypted
 from app.utils.db import aexec
@@ -109,6 +110,33 @@ assert "secret_ciphertext" not in _RESPONSE_KEYS and "secret" not in _RESPONSE_K
     "T7: ConnectorConnectionResponse grew a secret-bearing field — the response projection "
     f"would now carry it to every client. Fields: {_RESPONSE_KEYS}"
 )
+
+# ── CR-01 / migration 118 — the PostgREST projection, and why it must be EXPLICIT ─────────
+# Migration 118 revoked the blanket `GRANT SELECT` on `connector_connections` from
+# `authenticated` and re-granted it COLUMN BY COLUMN, omitting `secret_ciphertext`. That
+# closes the devtools hole (a plain org member could read every credential envelope in their
+# org straight off PostgREST, past every gate in this file) — and it has one consequence that
+# is stated here rather than discovered in production:
+#
+#   **`SELECT *` now FAILS for the `authenticated` role**, with
+#   `42501 permission denied for table connector_connections`. Postgres expands `*` to every
+#   column and checks SELECT on each; one missing column refuses the whole statement.
+#
+# PostgREST's default projection is `select=*`. So every query this module runs on the
+# USER-JWT client — reads AND the `return=representation` half of every write — has to name
+# its columns. Measured against the live PostgREST after 118, as `authenticated`:
+#
+#   GET  ?select=*                    -> 403 42501 permission denied for table …
+#   GET  ?select=secret_ciphertext    -> 403 42501 permission denied for table …
+#   GET  ?select=<the list below>     -> 200 []
+#   POST Prefer:return=representation -> 403 42501 permission denied for table …
+#   POST …&select=<the list below>    -> 403 "new row violates row-level security policy"
+#                                        (i.e. it got PAST the privilege check to the row gate)
+#
+# DERIVED from the response model, never retyped: a column added to the table tomorrow cannot
+# enter a projection unless somebody adds a field to `ConnectorConnectionResponse`, in a diff
+# a reviewer reads. That is the same single source of truth `_to_response` already uses.
+_SELECTABLE_COLUMNS: str = ",".join(_RESPONSE_KEYS)
 
 
 # ── refusals ─────────────────────────────────────────────────────────────────────────────
@@ -227,6 +255,23 @@ def _client(supabase: Client | None) -> Client:
     return supabase if supabase is not None else get_supabase()
 
 
+def _project(builder):
+    """Pin PostgREST's projection to `_SELECTABLE_COLUMNS` (CR-01 / migration 118).
+
+    Used on every WRITE that asks for `return=representation`, because postgrest-py 2.x
+    exposes no chaining API for `?select=` on POST / PATCH / DELETE — the reads say it with
+    `.select(...)` instead. Without this the write returns `RETURNING *`, which the column
+    grant refuses outright (`42501`), so the failure mode is LOUD rather than silent.
+
+    `QueryParams.set` returns a new mapping carrying every other parameter, so this composes
+    with the `.eq()` filters regardless of call order. It touches `builder.request`, which
+    postgrest-py exposes without an underscore; a version that renamed it would raise
+    `AttributeError` here at the call site rather than degrade quietly.
+    """
+    builder.request.params = builder.request.params.set("select", _SELECTABLE_COLUMNS)
+    return builder
+
+
 def _to_response(row: dict) -> ConnectorConnectionResponse:
     """Project a raw row through the response model — the ONE place a row becomes output.
 
@@ -247,6 +292,11 @@ async def _fetch_connection_row(connection_id: str, org_id: str) -> dict | None:
     Runs on the service-role client (the harness engine has no user JWT), which is exactly
     why the `org_id` predicate below is the GATE and not a convenience (D-15, case 2).
     Off the event loop via `aexec` (D-v2.5-01).
+
+    ⚠ THIS IS THE ONE QUERY IN THIS MODULE THAT MAY STILL SAY `select("*")`, and the reason
+    is the whole of CR-01: migration 118 leaves `secret_ciphertext` readable by `service_role`
+    ALONE, and this is the only caller that needs it. Every other query here runs (or may run)
+    on the user-JWT client, where `*` is now a `42501`.
     """
     result = await aexec(
         _client(None)
@@ -447,7 +497,7 @@ async def create_connection(
         "is_enabled": True,
         "last_check_verdict": "not_checked",
     }
-    result = await aexec(_client(supabase).table(_TABLE).insert(row))
+    result = await aexec(_project(_client(supabase).table(_TABLE).insert(row)))
     created = (result.data or [None])[0]
     if created is None:
         raise ConnectorNotFound("the connection could not be created")
@@ -469,7 +519,12 @@ async def list_connections(
     this read pattern), and projected through the response model so no row reaches a caller
     with its ciphertext attached.
     """
-    query = _client(supabase).table(_TABLE).select("*").eq("org_id", str(org_id))
+    query = (
+        _client(supabase)
+        .table(_TABLE)
+        .select(_SELECTABLE_COLUMNS)  # CR-01 — never `*` on the user-JWT client
+        .eq("org_id", str(org_id))
+    )
     if capability is not None:
         query = query.eq("capability", capability)
     result = await aexec(query.order("name"))
@@ -494,7 +549,7 @@ async def get_connection(
     result = await aexec(
         _client(supabase)
         .table(_TABLE)
-        .select("*")
+        .select(_SELECTABLE_COLUMNS)  # CR-01 — never `*` on the user-JWT client
         .eq("id", str(connection_id))
         .eq("org_id", str(org_id))  # D-14 — scoped, never by id alone
         .limit(1)
@@ -525,7 +580,7 @@ async def update_connection(
     client = _client(supabase)
     existing = await aexec(
         client.table(_TABLE)
-        .select("*")
+        .select(_SELECTABLE_COLUMNS)  # CR-01 — never `*` on the user-JWT client
         .eq("id", str(connection_id))
         .eq("org_id", str(org_id))  # ownership FIRST, and org-scoped (D-14)
         .limit(1)
@@ -543,160 +598,348 @@ async def update_connection(
     if "name" in submitted and payload.name is not None:
         changes["name"] = payload.name
     if "config" in submitted and payload.config is not None:
+        # ── WR-02 — the capability↔config validator `create_connection` enforces ──────────
+        # `ConnectorConnectionCreate` runs `_reject_config_capability_mismatch` in a
+        # `@model_validator(mode="after")`, so a `create_ticket` row can never be CREATED
+        # carrying a `PostMessageConfig`. `ConnectorConnectionUpdate` cannot run the same
+        # validator — it has no `capability` field, on purpose (changing the capability would
+        # orphan both the config shape and the stored secret in one edit) — so the check has
+        # to happen HERE, where the stored capability is in hand.
+        #
+        # Without it: `PATCH {"config": {"default_channel": "#ops"}}` on a `send_email`
+        # connection resolves through Pydantic's SMART UNION to a `PostMessageConfig`, is
+        # written, and the API answers 200 with the new row. The SMTP host, port and
+        # from-address are GONE. Settings then renders a blank *Sends to* cell, the picker's
+        # `destinationPartsOf` returns `[]`, and the next run of every workflow bound to it
+        # fails with `SmtpConfigInvalid` — with nothing anywhere reporting that a valid PATCH
+        # destroyed the destination.
+        #
+        # The `ValueError` becomes a 422 in the router, deliberately NOT a 404: ownership was
+        # already settled above, so there is no oracle to protect here.
+        _reject_config_capability_mismatch(str(current["capability"]), payload.config)
         changes["config"] = payload.config.model_dump(mode="json", exclude_none=True)
+
     if "is_enabled" in submitted and payload.is_enabled is not None:
+
         changes["is_enabled"] = payload.is_enabled
+
     if "secret" in submitted and payload.secret is not None:
+
         cipher = get_cipher()
+
         if cipher is None:
+
             logger.error(
+
                 "connector_service: refusing to replace the secret on connection %s — no "
+
                 "SECRETS_ENCRYPTION_KEY is configured (fail closed, D-11). Nothing written.",
+
                 connection_id,
+
             )
+
             raise ConnectorCipherUnavailable(
+
                 "a connector secret cannot be stored while no encryption key is configured"
+
             )
+
         changes["secret_ciphertext"] = encrypt_secret(payload.secret, cipher)
+
         changes["last_check_verdict"] = "not_checked"  # OQ#4 — same UPDATE, never a second
+
         changes["last_checked_at"] = None
 
+
+
     if not changes:
+
         return _to_response(current)
 
+
+
     result = await aexec(
-        client.table(_TABLE)
-        .update(changes)
-        .eq("id", str(connection_id))
-        .eq("org_id", str(org_id))  # scoped on the write too — the read gate is not enough
+
+        _project(
+
+            client.table(_TABLE)
+
+            .update(changes)
+
+            .eq("id", str(connection_id))
+
+            .eq("org_id", str(org_id))  # scoped on the write too — the read gate is not enough
+
+        )
+
     )
+
     updated = (result.data or [None])[0]
+
     if updated is None:
+
         raise ConnectorNotFound(f"no connection {connection_id}")
+
     logger.info(
+
         "connector_service: updated connection %s (columns changed=%s)",
+
         connection_id, sorted(changes),
+
     )
+
     return _to_response(updated)
+
+
+
 
 
 async def record_check_verdict(
+
     connection_id: str,
+
     org_id: str,
+
     verdict: str,
+
     supabase: Client | None = None,
+
 ) -> ConnectorConnectionResponse:
+
     """Persist ONE credential-check verdict, org-scoped. Written by the check action alone.
 
+
+
     The whole reason UI-SPEC §5c's check is a DEDICATED action rather than a query
+
     parameter on the read: it has a SIDE EFFECT. This is that side effect, in one place.
 
+
+
     ── WHAT IT WRITES, AND WHAT IT DELIBERATELY DOES NOT ──
+
     Two columns, both in ONE update: ``last_check_verdict`` and ``last_checked_at``. It
+
     never touches ``is_enabled`` — a failing check does not disable a connection, because
+
     disabling is a person's decision with a victim-naming confirm behind it (UI-SPEC §2g)
+
     and a background verdict must not make it silently.
 
+
+
     ── THE VERDICT IS A QUALITY HINT, NOT AN AUTHORIZATION BOUNDARY (U-07a, door (b)) ──
+
     Migration 116 says so in the column's own ``COMMENT``, and it is worth repeating at the
+
     only site that writes it: the server's bind gate (Gate 2) validates the row's ORG and
+
     its ``is_enabled`` flag and reads THIS COLUMN NOWHERE. Checking is admin-only while
+
     binding is org-wide, so a server bind-gate here would hard-block a plain member holding
+
     a stale ``failed`` on a credential that has since been fixed — and they could not clear
+
     it themselves, because they cannot run the check. Writing this value is therefore an act
+
     of INFORMING, never of gating.
 
+
+
     Org-scoped on the write itself (D-14), never by id alone: this is a row mutation, and an
+
     unscoped predicate would let one tenant's check stamp another tenant's row. Returns the
+
     settled row so the caller reports the timestamp the DATABASE recorded rather than the one
+
     it hoped for. Raises ``ConnectorNotFound`` for both absent and another org's — one
+
     absence, as everywhere else in this module.
 
+
+
     Off the event loop via ``aexec`` (D-v2.5-01).
+
     """
+
     if verdict not in _CHECK_VERDICTS:
+
         # Enforced at the write, not merely declared: migration 116's CHECK constraint would
+
         # also refuse it, but a ValueError names the offending value at the call site instead
+
         # of surfacing as an opaque database error three layers away.
+
         raise ValueError(
+
             f"check verdict {verdict!r} is not one of {sorted(_CHECK_VERDICTS)} "
+
             "(migration 116's CHECK constraint on last_check_verdict)"
+
         )
 
+
+
     changes = {
+
         "last_check_verdict": verdict,
+
         "last_checked_at": datetime.now(timezone.utc).isoformat(),
+
     }
+
     result = await aexec(
-        _client(supabase)
-        .table(_TABLE)
-        .update(changes)
-        .eq("id", str(connection_id))
-        .eq("org_id", str(org_id))  # D-14 — scoped. A verdict is a WRITE, so it is scoped too.
+
+        _project(
+
+            _client(supabase)
+
+            .table(_TABLE)
+
+            .update(changes)
+
+            .eq("id", str(connection_id))
+
+            .eq("org_id", str(org_id))  # D-14 — scoped. A verdict is a WRITE, so it is scoped too.
+
+        )
+
     )
+
     updated = (result.data or [None])[0]
+
     if updated is None:
+
         raise ConnectorNotFound(f"no connection {connection_id}")
+
     logger.info(
+
         "connector_service: recorded a check verdict for connection %s (columns changed=%s)",
+
         connection_id, sorted(changes),
+
     )
+
     return _to_response(updated)
 
 
+
+
+
 async def delete_connection(
+
     connection_id: str,
+
     org_id: str,
+
     supabase: Client | None = None,
+
 ) -> bool:
+
     """Delete one connection IF the caller's org owns it. Returns whether a row went away.
 
+
+
     Added by plan 190-09 — plan 190-06's summary named it as the one CRUD verb it did not
+
     author ("Whoever adds delete | ``delete_connection``, against migration 116's existing
+
     DELETE policy"), because 190-06's task list enumerated create / update / list / get /
+
     resolve and nothing else. The router needs it, so it lands here rather than as SQL in a
+
     router that contracts to hold none.
 
+
+
     ── The org scope is on the DELETE ITSELF (D-14) ──
+
     ``.eq("id", …).eq("org_id", …)`` — never by id alone. This is the one verb where an
+
     unscoped predicate destroys another tenant's row instead of merely revealing it, so the
+
     scope is not a convenience even though migration 116's DELETE policy would also refuse
+
     it on the user-JWT connection. Two gates, for the same reason ``resolve_connection`` has
+
     two: the SQL predicate is the gate, and RLS is what survives a future author simplifying
+
     the query.
 
+
+
     Returns ``False`` for both "no such row" and "another org's" — ONE absence, so the
+
     router's 404 cannot be read as confirmation that the id names a real row somewhere.
+
     Off the event loop via ``aexec`` (D-v2.5-01).
+
     """
+
     result = await aexec(
-        _client(supabase)
-        .table(_TABLE)
-        .delete()
-        .eq("id", str(connection_id))
-        .eq("org_id", str(org_id))  # D-14 — scoped. Removing this term deletes another org's row.
+
+        _project(
+
+            _client(supabase)
+
+            .table(_TABLE)
+
+            .delete()
+
+            .eq("id", str(connection_id))
+
+            .eq("org_id", str(org_id))  # D-14 — scoped. Removing this term deletes another org's row.
+
+        )
+
     )
+
     removed = bool(result.data)
+
     logger.info(
+
         "connector_service: delete of connection %s for one org removed %d row(s)",
+
         connection_id, len(result.data or []),
+
     )
+
     return removed
 
 
+
+
+
 __all__ = [
+
     "ConnectorError",
+
     "ConnectorNotFound",
+
     "ConnectorDisabled",
+
     "ConnectorCipherUnavailable",
+
     "ConnectorSecretNotEncrypted",
+
     "ConnectorSecretUnreadable",
+
     "ResolvedConnection",
+
     "resolve_connection",
+
     "create_connection",
+
     "list_connections",
+
     "get_connection",
+
     "update_connection",
+
     "delete_connection",
+
     "record_check_verdict",
+
 ]
+

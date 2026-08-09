@@ -25,6 +25,10 @@
 --               read policy: shared branch ORG-GATED to current_user_org_ids(), SEED-125 CR-02)
 --   auth     -> migration 001 (on_auth_user_created)
 --   realtime -> migrations 002 (documents), 014 (folders), 032 (messages)
+--   ACLs     -> migration 118 (connector_connections.secret_ciphertext column grant,
+--               CR-01). pg_dump runs with --no-privileges, so ANY migration that
+--               narrows a table privilege must be mirrored here or it is absent from
+--               every greenfield bootstrap.
 -- ============================================================
 
 
@@ -182,3 +186,53 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE public.messages;
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+
+-- ============================================================
+-- 5. Column-level privilege: connector_connections.secret_ciphertext
+--    (migration 118 / Phase 190 code-review finding CR-01)
+-- ============================================================
+-- ⚠ WHY THIS LIVES HERE RATHER THAN IN THE DUMP: regenerate-full-schema.sh runs
+--    `pg_dump --no-privileges`, so full-schema.sql carries NO ACLs AT ALL
+--    (`grep -c '^GRANT\|^REVOKE' supabase/full-schema.sql` -> 0, measured
+--    2026-08-09). Migration 118 is therefore INVISIBLE to the generated dump —
+--    its COMMENT survives, its GRANT does not. A greenfield project bootstrapped
+--    from full-schema.sql alone would ship with `secret_ciphertext` readable over
+--    PostgREST by every authenticated org member, which is exactly the defect 118
+--    exists to close.
+--
+--    The rest of this file's ACL story is unchanged: Supabase's stock
+--    `GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role`
+--    default privileges are what give every other table its grants, and that is
+--    still the right posture for every table that holds no secret. This one holds
+--    a tenant credential, so it opts out — and the opt-out has to be re-stated in
+--    a place the bootstrap can see.
+--
+--    Idempotent, like everything else in this file: REVOKE and GRANT are.
+--
+--    ⚠ ORDER MATTERS AGAINST THE DEFAULT PRIVILEGES. This block must run AFTER
+--    the table exists and after any blanket grant, which it does: the supplement
+--    is appended at the END of full-schema.sql.
+REVOKE ALL ON public.connector_connections FROM anon;
+REVOKE ALL ON public.connector_connections FROM authenticated;
+
+-- One column per line so the OMISSION is visible in a diff. The column that is not
+-- here is `secret_ciphertext`.
+GRANT SELECT (
+    id,
+    org_id,
+    created_by,
+    capability,
+    name,
+    config,
+    is_enabled,
+    last_checked_at,
+    last_check_verdict,
+    created_at,
+    updated_at
+) ON public.connector_connections TO authenticated;
+
+-- Writes stay at TABLE level, INCLUDING the secret column: the org-admin create/edit
+-- path runs on the user-JWT client and must be able to store an `enc:v1:` envelope.
+-- A role may INSERT into and UPDATE a column it can never SELECT.
+GRANT INSERT, UPDATE, DELETE ON public.connector_connections TO authenticated;

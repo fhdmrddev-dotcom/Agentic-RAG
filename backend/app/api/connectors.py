@@ -380,6 +380,14 @@ async def update_connection(
     whether the body was valid. The alternative makes the status code an oracle: a 422 would
     mean *the id exists and is yours, but your body is wrong*, which is a fact about another
     org's rows.
+
+    ── WR-02 — the capability↔config mismatch is a 422, and it is deliberately NOT a 404 ──
+    `ConnectorConnectionUpdate` carries no `capability` field (changing it would orphan the
+    config shape and the stored secret in one edit), so the cross-field check runs in the
+    service against the STORED capability and raises `ValueError`. It is mapped here rather
+    than left to surface as a 500. A 422 leaks nothing: ownership has already been settled by
+    the time the body is interpreted, so the caller already knows the row is theirs — the
+    oracle the paragraph above protects against is created by ordering, not by this code.
     """
     try:
         return await connector_service.update_connection(
@@ -389,6 +397,10 @@ async def update_connection(
         raise _CIPHER_UNAVAILABLE
     except connector_service.ConnectorNotFound:
         raise _NOT_FOUND
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
 
 
 @router.delete(
