@@ -128,6 +128,11 @@ becomes the assistant message and the last phase with output "wins" as the deliv
 (`publish_service.py:901`), so a connector-last workflow reports *"Sent."* as its headline
 output rather than the artefact. Worth a deliberate decision rather than a default.
 
+> **↑ This seed is ONE DIMENSION of [`SEED-146`](SEED-146-integration-capability-surface.md)**,
+> the umbrella map of the whole integration capability surface. Read 146 before scoping this
+> one — the largest gap it names is that **every capability here is a WRITE and the app has no
+> READ capability at all**, which changes what "first cut" should mean.
+
 ## Recommendation
 
 Do **not** fold this into a gap-closure round on 190 (G-7 forbids a closure round adding a

@@ -104,6 +104,11 @@ adaptation of something shipped and tested, not a new invention.
    HARNESS-scoped ledger. A send from chat needs a receipt too, and `harness_audit` may be the
    wrong home for it.
 
+> **↑ This seed is ONE DIMENSION of [`SEED-146`](SEED-146-integration-capability-surface.md)**,
+> the umbrella map of the whole integration capability surface. Read 146 before scoping this
+> one — the largest gap it names is that **every capability here is a WRITE and the app has no
+> READ capability at all**, which changes what "first cut" should mean.
+
 ## Recommendation
 
 Treat SEED-144 and SEED-145 as **one milestone, not two phases**: "Connections as a platform
