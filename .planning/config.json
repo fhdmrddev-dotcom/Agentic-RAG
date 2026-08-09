@@ -15,7 +15,8 @@
     "ui_review": true,
     "auto_advance": false,
     "skip_discuss": false,
-    "use_worktrees": false,
+    "use_worktrees": true,
+    "worktree_bootstrap": "scripts/bootstrap-worktree.sh",
     "research_before_questions": false
   },
   "model_profile": "quality",

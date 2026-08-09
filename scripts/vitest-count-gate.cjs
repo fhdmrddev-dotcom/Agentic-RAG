@@ -1231,6 +1231,16 @@ function runVitest() {
     `--outputFile=${outFile}`,
   ]
 
+  // Worktree-parallel safety valve (measured 2026-08-10). Two uncapped vitest
+  // runs on this 16-core box spawn ~16 workers EACH; the oversubscription shows
+  // up as bare timeouts in suites the plan never touched — `failed 6` / `failed 5`
+  // on two concurrent runs whose serial baseline is `failed 0`. Capped at 4
+  // workers each, two concurrent runs agree EXACTLY (9 files / 23 tests failing,
+  // the known SEED-056 rot set, on both). Absent => unchanged single-run behaviour.
+  if (process.env.GSD_VITEST_MAX_WORKERS) {
+    args.push(`--maxWorkers=${process.env.GSD_VITEST_MAX_WORKERS}`)
+  }
+
   console.log(`running: npx ${args.join(" ")}`)
   console.log(`   cwd: ${FRONTEND_DIR}`)
   console.log(`report: ${outFile}`)

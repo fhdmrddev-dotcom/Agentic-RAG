@@ -37,6 +37,74 @@ interface; document ingestion is a manual file-upload flow.
 - **Run-buffer key conventions** (Phase 061+): `run:{run_id}` (Redis Stream — per-run event buffer), `runs_by_thread:{thread_id}` (sorted set — active runs per thread), `runs:active` (sorted set — all currently-streaming run_ids for global cleanup). Defined in code, not in any migration script.
 - **Setup guides**: `supabase/SETUP.md` for Supabase (local + cloud + migrations), `REDIS-SETUP.md` for Redis (local + cloud + key conventions). Read these when connecting a new environment or onboarding a contributor.
 
+## Parallel execution — worktrees are ENABLED (MANDATORY rules)
+
+`workflow.use_worktrees` is **`true`** as of 2026-08-10. It was `false` for a year, and that made
+every GSD phase fully serial: Phase 190 measured **10.8 h of execution for 19 plans**, against
+**5.7 h** if its eight waves had run in parallel — roughly **five hours lost to serialisation on
+one phase**. Sequential execution is not acceptable; treat parallelism as the default.
+
+**The reason it used to be off was real, and it is now SOLVED rather than ignored.** `git worktree
+add` checks out TRACKED files only, and four things verification depends on are gitignored, so a
+fresh worktree false-failed every plan:
+
+| Artifact | Size | Handling |
+|---|---|---|
+| `backend/venv` | **1.7 GB** | **junction** (copying is fatal) |
+| `frontend/node_modules` | **541 MB** | **junction** |
+| `backend/.env` | small | **copy** (a worktree must never mutate the operator's env) |
+| `frontend/.env.local` | small | **copy** |
+
+### The four rules
+
+1. **Every worktree MUST be bootstrapped before any command runs in it.** The executor's FIRST
+   action — before the HEAD assertion, before reading the plan — is:
+   ```bash
+   bash scripts/bootstrap-worktree.sh "$(pwd)"
+   ```
+   It is idempotent and fails loudly. A worktree that skipped it will report green typechecks and
+   red tests for reasons that look like the plan's fault.
+
+2. **Cap vitest workers in every parallel run: `GSD_VITEST_MAX_WORKERS=4`.** Measured on this
+   16-core box: two UNCAPPED concurrent vitest runs spawn ~16 workers each, and the
+   oversubscription surfaces as bare timeouts in suites the plan never touched — `failed 6` and
+   `failed 5` against a serial baseline of `failed 0`. **Capped at 4 each, two concurrent runs
+   agree exactly** (9 files / 23 tests failing, the known SEED-056 rot set, on both).
+   `scripts/vitest-count-gate.cjs` reads this env var; absent, single-run behaviour is unchanged.
+   This is very likely what Phases 190-16/17/18 saw and misattributed to `userEvent` delay.
+
+3. **NEVER `rm -rf` a bootstrapped worktree, and never let git do it either.** A recursive delete
+   FOLLOWS a junction and destroys the operator's real 1.7 GB `venv` — silently. `git worktree
+   remove --force` does not fall into that trap but fails outright (`Invalid argument`) and leaves
+   the directory behind. Always tear down with:
+   ```bash
+   bash scripts/teardown-worktree.sh <path>       # or --all-agents
+   ```
+   It detaches each junction as a reparse point first (`Directory.Delete(p, $false)` — the
+   non-recursive flag is load-bearing), then removes, then **asserts the source venv and
+   node_modules are still intact**.
+
+4. **Serialize any plan whose tests MUTATE the local database.** Worktrees isolate files, not
+   Postgres. Two plans writing the same local Supabase concurrently will interfere, and no
+   `files_modified` check can see it. Read-only/stubbed suites are safe — two concurrent full
+   `backend/tests/unit` runs were measured identical to serial (62 failed / 1986 passed on both).
+
+### Measured constraints worth not rediscovering
+
+- **Windows `MAX_PATH` binds.** `LongPathsEnabled` is **0** at the OS level here and
+  `core.longpaths` is unset, so the ceiling is 260 chars. The longest tracked path in this repo is
+  **138**, so a worktree root must stay under ~120 chars. Claude Code places worktrees at
+  `<repo>/.claude/worktrees/agent-<id>` = **66 chars** → 204/260, **56 chars of headroom**: fine.
+  A worktree under the scratchpad (123 chars) **fails** — `git worktree add` checks the files out,
+  then dies with *"Could not reset index file to revision 'HEAD'"* and rolls the whole thing back.
+  If a future base path is long, raising the OS registry flag needs admin **and a reboot** — an
+  operator action, never a silent one.
+- `.claude/worktrees/` is gitignored, so worktrees do not pollute `git status`.
+- Junctions need **no elevation**; create them with PowerShell `New-Item -ItemType Junction`.
+  `cmd //c mklink /J` has its `/J` switch mangled by MSYS path conversion under Git Bash.
+- Dispatch worktree agents **one message at a time** (`run_in_background: true`), never several
+  `Agent()` calls in one message — simultaneous `git worktree add` races on `.git/config.lock`.
+
 ## Deployment (cloud) — operator-gated
 
 Live deploys are **always operator-triggered**. The branch + promotion model and the local↔cloud parity rules live in `docs/DEPLOYMENT-WORKFLOW.md`; recurring failure modes + their fixes live in `docs/DEPLOYMENT-LESSONS.md` (read both before any cloud-touching work). Architecture/accounts: `docs/DEPLOYMENT-PIPELINE.md`.
