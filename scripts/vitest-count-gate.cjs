@@ -721,6 +721,40 @@ const BASELINE = {
   // `smtp_password` write, Gate 1 short-circuited off, the effect's disconnected guard
   // deleted, and the `aria-disabled` attribute removed. Recorded in `190-12-SUMMARY.md`.
   "ConnectionPicker.test.tsx": 20,
+  // 190-16 (CONN-02 / D-25 / D-26 / D-27) — NET-NEW: the Settings → Connections suite,
+  // pinned in THE COMMIT THAT CREATED IT, the rule `ExternalActionSection.test.tsx:12`
+  // states verbatim and that `ConnectionPicker.test.tsx` above followed.
+  // ⚠ UNLIKE its two neighbours, THIS ONE DID NEED A `TARGETS` EDIT, and the difference is
+  // the two-knob rule rather than an oversight: `src/components/settings/` is covered by
+  // NOTHING in `TARGETS` — the directory entries reach only `src/components/workflows`,
+  // and everything else is a NAMED file under `src/pages/`, `src/components/panel/__tests__/`,
+  // `src/lib/` or `src/components/layout/`. Measured: the gate's printed file list did not
+  // contain this suite before the entry existed. So TARGETS gained a file-level line in the
+  // same commit (see its own note below the map), and the number here is this script's own
+  // printed `actual` column across TWO AGREEING RUNS on 2026-08-09 (both printed
+  // `ConnectionsTab.test.tsx — 34 new`, total 2786, failed 0) — never a hand count of `it(`
+  // literals, which is unsound under `it.each`.
+  //
+  // What would be unguarded without it: SEVEN of the 34 cases are ABSENCE assertions, the
+  // easiest kind to delete unnoticed — the non-admin Add button ABSENT rather than
+  // `disabled` (U-02: a `toBeDisabled()` assertion PASSES on the very defect), the OFF
+  // banner appearing ZERO times on any row (D-26 — at 24 rows a per-row notice is 24
+  // identical amber lines), zero `[title]` nodes with a menu AND a sheet open (142-B), no
+  // secret-shaped key in the markup (T-190-16-T7), no toast mounted (062-A), the
+  // `Check credential` item REMOVED rather than inert while 190-15 is unlanded, and both
+  // no-victim direct flips opening NO dialog. Seven plants were applied to real production
+  // source and each observed RED before this pin existed, with the file restored
+  // md5-identical (`cb66363a…`) after every one — recorded in `190-16-SUMMARY.md`.
+  //
+  // ⚠ ONE MEASUREMENT WORTH INHERITING: the first gate run with this suite in it reported
+  // **8 failing tests — 2 here and SIX IN UNRELATED SHIPPED SUITES**
+  // (`WorkflowBuilderPage`, `FlowEdge`, `PhaseNode`, `PhaseSpineGraph`, `StepTypePicker`,
+  // `WorkflowCanvas.editing`), all as bare `STACK_TRACE_ERROR` timeouts. None was a
+  // regression: this suite's `userEvent.setup()` calls used the DEFAULT per-keystroke delay,
+  // and the resulting wall-clock cost starved six neighbours past the 5 s default. Switching
+  // to `userEvent.setup({ delay: null })` cleared all eight. A slow new suite inside this
+  // gate is not merely slow — it reds files it never touches.
+  "ConnectionsTab.test.tsx": 34,
   // 184.1 pinned NOTHING here on purpose ("it postdates the 424 pin, so it reports as `new`
   // and its own count is free to grow"). Four phases later it is still the ONLY guard on the
   // flag-off Builder header — D-181-01's byte-identity promise — and it has stopped growing.
@@ -882,7 +916,19 @@ const BASELINE = {
 // `ExternalActionSection.test.tsx` IS in this plan's blast radius, but its count is unmoved
 // at 34 by the two-insertion mount, so re-pinning it here would fold an unrelated
 // pre-existing drift into a commit that did not cause it.
-const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // ⚠ 2739 (190-12)
+// ⚠ AND BY 190-16 (CONN-02 / D-25): the pinned FILE count 49 → 50,
+// `ConnectionsTab.test.tsx` (34) — the Settings → Connections suite, pinned in the commit
+// that creates it, and the FIRST entry in this map whose file also required a `TARGETS`
+// line (`src/components/settings/` is covered by nothing above — the two-knob rule).
+// READ FROM THIS SCRIPT'S OWN PRINTED `pinned total` after the map entry landed, never by
+// adding 34 to a figure in this comment — which is exactly what the paragraphs above mean
+// when they say this note has gone stale eight times by being computed rather than read.
+// The +13 gap those paragraphs describe is UNCHANGED and still owed as its own edit:
+// `ExternalActionSection.test.tsx` (25 pinned / 34 actual, +9) and `PhaseTimeline.test.tsx`
+// (17 / 21, +4). 190-16 deliberately re-pins neither — both sit outside this plan's blast
+// radius entirely, and folding an unrelated pre-existing drift into a commit that did not
+// cause it is the thing this whole header argues against.
+const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // ⚠ 2773 (190-16)
 
 // ── The Wave-0 blast radius (184-VALIDATION.md § "quick run command"). ──
 const TARGETS = [
@@ -1014,6 +1060,36 @@ const TARGETS = [
   // 31 shipped + 8 added here that 188-10 predicted, but the pin is the MEASUREMENT, not
   // the prediction it happens to agree with.
   "src/components/panel/__tests__/WorkspacePanel.test.tsx",
+  // Added in 190-16, in the SAME COMMIT that creates the file — the SIXTH occurrence of
+  // the two-knob trap the entries above state as a rule, and the first one on
+  // `src/components/settings/`, which is covered by NOTHING above: the directory entries
+  // reach only `src/components/workflows`, five named `src/pages/` files, three named
+  // `src/components/panel/__tests__/` files, one `src/lib/` file and one
+  // `src/components/layout/` file. Measured before this line was written: the gate's
+  // printed file list did NOT contain `ConnectionsTab.test.tsx`, so without this entry the
+  // suite would never be EXECUTED by the gate — and a falsification that does not run has
+  // falsified nothing (verification truth 14, round 5 of Phase 187).
+  //
+  // ⚠ THE TIMING IS NOT COSMETIC: an entry pointing at a path that does not yet exist makes
+  // the gate ERROR (exit 2) rather than fail, so it can only land in the commit that creates
+  // the file — never before, never after.
+  //
+  // What would be unguarded without it: the whole Settings → Connections honesty estate.
+  // Seven of its cases are ABSENCE assertions, which are the easiest kind to delete
+  // unnoticed — the non-admin Add button being ABSENT rather than `disabled` (U-02: a
+  // `toBeDisabled()` assertion would PASS on the defect), the OFF banner appearing ZERO
+  // times on a row (D-26), no `[title]` node anywhere (142-B), no secret-shaped key in the
+  // markup (T-190-16-T7), no toast mounted (062-A), the `Check credential` item being
+  // removed rather than inert, and both no-victim direct flips opening NO dialog. Each of
+  // the seven was driven RED against a real plant in production source before this pin
+  // existed, and the file was restored md5-identical after each (see `190-16-SUMMARY.md`).
+  //
+  // FILE-LEVEL, deliberately NOT the bare directory `src/components/settings` — the same
+  // reasoning recorded for the panel directory, `src/lib`, `src/pages` and
+  // `src/components/layout` above. The directory holds three suites this plan does not
+  // read (`EngineHealthCard`, `JudgeModelPicker`, `ModelDefaultPreference`), and adopting
+  // them would make this phase the owner of their future rot.
+  "src/components/settings/__tests__/ConnectionsTab.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
