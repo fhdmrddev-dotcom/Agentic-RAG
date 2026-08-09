@@ -1,7 +1,7 @@
 ---
 phase: 190-live-connector-slice-connector-security-stretch
 verified: 2026-08-09T09:20:00Z
-status: gaps_found
+status: human_needed
 score: 3/5 success criteria verified
 overrides_applied: 0
 base_commit: de122b9a
@@ -61,6 +61,46 @@ human_verification:
     expected: "As authored in 190-VALIDATION.md."
     why_human: "Visual appearance and lived-experience scenarios (G-4); jsdom paints nothing."
 ---
+
+> ## ⚠ ADDENDUM — 2026-08-09, after this report: BOTH named gaps are CLOSED
+>
+> This report was written at `gaps_found` with exactly two gaps. Both were closed the same day,
+> so the status is amended to **`human_needed`** — no actionable gap remains, and the one unmet
+> criterion is a stated operator dependency, not a defect.
+>
+> **Gap 1 — SECURITY.md missing → CLOSED.** `/gsd:secure-phase 190` ran and produced
+> `190-SECURITY.md` at `status: verified`, **`threats_open: 0`**, over a 115-threat register
+> (102 closed · 13 accepted-risk). All fourteen of D-28's minimum threats have a mitigation at a
+> read file:line and a test observed RED against a real plant. **SC#5 is therefore now MET in
+> both halves** — the cross-org leak test passes and is non-vacuous, and the SECURITY.md exists
+> and is verified.
+>
+> **Gap 2 — the false closing measurement → CORRECTED** (`.planning/REQUIREMENTS.md` and
+> `190-VALIDATION.md`, committed). The close recorded *0 definitions of any status containing an
+> `external_action` phase*; there are **5, one published** (`ff3c6ca3` "Weekly Status Report",
+> `send_email`, authored at Phase 189's UAT). Two compounding errors caused it, both now written
+> into VALIDATION: `definition->'phases'` on a jsonb column holding a **JSON string scalar**
+> (194 of 222 rows) silently returns zero rows; and **`phase_type` lives inside `phase["config"]`**,
+> not at the phase top level. **Consequence: `BLOCK-190-UAT-01` is TWO links, not three — the
+> owed rows need a destination and the flag, not authoring.**
+>
+> **Amended score: 4 of 5 success criteria verified.** SC#1 remains unmet and is the phase's own
+> recorded decision (D-30): twelve UAT rows are ⛔ *awaiting operator-provided destination*, none
+> silently omitted. **First row to run: Slack `post_message`** — it falsifies T13 and retires
+> assumption A3 in one run. Note the `send_email` row needs a **publicly-routable TLS SMTP host**,
+> not merely a mailbox — `supabase_inbucket` was tested and refused by the phase's own guard
+> (`scheme_not_tls` / `address_not_public`), which is the guard working correctly.
+>
+> **Two security findings this audit ADDED, both accepted-risk `AR-190-09`, neither a blocker:**
+> `require_visible` gates four endpoints and the fourth is **`/check`, an egress surface**; and
+> `require_visible` has no `ensure_settings_fresh()` at HEAD (CR-02's root cause was fixed in the
+> executor but not here). No send can result — GATE 2 is independent, freshness-bounded and
+> positively tested.
+>
+> **⚠ Loudest operational item, unchanged: cloud parity `099 → 118` is owed and 118 is
+> security-bearing — cloud still has CR-01.** Migration 118 and the `connector_service.py` deploy
+> MUST land in the same operation; the grant without the code breaks every connector read with
+> `42501`.
 
 # Phase 190: Live Connector Slice + Connector Security — Verification Report
 
