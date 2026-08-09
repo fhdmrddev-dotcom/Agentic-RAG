@@ -55,6 +55,8 @@ import json
 import logging
 from uuid import UUID, uuid4
 
+from starlette.concurrency import run_in_threadpool
+
 from app.config import settings
 from app.db.workflows import write_audit
 from app.services.ask_user_service import subscribe_for_response
@@ -87,7 +89,16 @@ from app.services.harness.validator_kinds import CITATION_MARKER_GUIDANCE
 # point is that the ordering must be assertable directly."* If a future author "tidies" these
 # into qualified calls, three drives fail loudly at the ``setattr`` rather than passing over
 # an executor they never touched.
-from app.models.user_settings import _GOVERNED_FEATURES, feature_audience
+#
+# ⚠ CR-02 adds a FIFTH name, ``ensure_settings_fresh``, to this same namespace and for the
+# same reason: the kill-switch drive stubs it with ``monkeypatch.setattr(phase_types, …)`` to
+# simulate the operator's flip arriving on another worker. A module-qualified call would make
+# that unobservable.
+from app.models.user_settings import (
+    _GOVERNED_FEATURES,
+    ensure_settings_fresh,
+    feature_audience,
+)
 from app.security.egress import SLACK_API_BASE, validate_destination
 from app.services.connector_service import ConnectorDisabled, resolve_connection
 from app.services.connectors.protocol import AdapterError
@@ -2184,13 +2195,48 @@ async def _exec_external_action(phase, accumulated_outputs: dict, ctx) -> dict:
         return _record("this is a publish-time golden run — D-16 suppresses the SEND only")
 
     # ── GATE 2 · D-26 — the operator kill-switch ────────────────────────────────────────
-    if feature_audience(_LIVE_CONNECTORS_FEATURE) == "off":
-        return _record("live_connectors is off — the 189 behaviour, unchanged")
+    #
+    # ⚠ CR-02 — BOUND THE STALENESS FIRST. ``feature_audience`` resolves through the SYNC
+    # settings reader, and ``models/user_settings.py:365-398`` states the problem in its own
+    # words: ``load_app_settings()`` reads ``_settings_cache`` with **no staleness check at
+    # all**; the 30s TTL is checked only by the ASYNC loader, so on a NON-writing worker
+    # nothing expires the sync reader's view — it keeps serving the pre-flip audience with
+    # **no code-level bound**. At the documented ``WORKER_COUNT=2`` default, an operator who
+    # discovers a leaked bot token and flips this switch off has their write land on ONE
+    # worker; a run scheduled on the other reads ``"everyone"`` and POSTS THE MESSAGE, minutes
+    # or hours after they believe sending is stopped.
+    #
+    # Every other gated read in the tree already awaits this helper — ``api/features.py:57``,
+    # ``dependencies.py:669`` (``require_canvas``), ``middleware/canvas_gate.py`` — and the
+    # helper exists *specifically because* T-184-UAT-02 measured a flipped-off
+    # ``visual_workflow_canvas`` still answering ``true``. This was the only kill switch in
+    # the tree reading the flag raw, and the one whose false negative sends real email.
+    # TTL-checked (no DB I/O on a warm cache) and NEVER RAISES.
+    await ensure_settings_fresh()
+    # ⚠ CR-03 — THE TEST IS POSITIVE, NOT AN ABSENCE, AND THAT IS THE FIX.
+    # ``PUT /admin/visibility`` accepts FOUR audiences for any allow-listed feature
+    # (``admin.py`` ``_VISIBILITY_AUDIENCES = {"everyone", "operators", "role", "off"}``) and
+    # ``live_connectors`` was added with no restriction to D-26's two names. ``!= "off"``
+    # therefore read three of the four as FULLY ON: an operator piloting live sending for
+    # super-admins only (``audience: "role"``) would have every published workflow in every
+    # org start sending for real, run by any member, while the CRUD surface correctly refused
+    # them — the Control Room reading "restricted" over a send path that was wide open.
+    #
+    # Requiring the positive answer is also fail-CLOSED against a hand-edited ``app_settings``
+    # row and against any FIFTH audience added later, which a deny-list cannot be (the Phase
+    # 185 lesson: *a deny-list cannot be made fail-closed by extension*).
+    if feature_audience(_LIVE_CONNECTORS_FEATURE) != "everyone":
+        return _record("live_connectors is not fully on — the 189 behaviour, unchanged")
 
     # ── GATE 3 · D-06 — THE EGRESS GUARD, BEFORE ANY CREDENTIAL WORK ────────────────────
+    # ⚠ CR-04 — the RESOLUTION runs off the event loop (D-v2.5-01). ``validate_destination``
+    # is a plain ``def`` that calls ``socket.getaddrinfo``, a BLOCKING libc call, and this
+    # executor is ``async def``. The name stays a module attribute and stays synchronous so
+    # the D-06 ordering fence's ``monkeypatch.setattr(phase_types, "validate_destination", …)``
+    # still binds the thing the executor actually calls — only the THREAD moves.
     destination = _pre_credential_destination(phase.config, capability)
     if destination:
-        validate_destination(capability, destination)
+        await run_in_threadpool(validate_destination, capability, destination)
 
     # ── GATE 4 · D-13 / D-17 — nothing bound is not a failure ───────────────────────────
     connection_id = getattr(phase.config, "connection_id", None)
@@ -2244,11 +2290,29 @@ async def _exec_external_action(phase, accumulated_outputs: dict, ctx) -> dict:
         return _record("the bound connection is disabled (is_enabled is false — Gate 2)")
 
     if getattr(connection, "capability", capability) != capability:
-        # A connection bound for another capability would send a bot token to a mail host.
-        raise ValueError(
-            f"external_action phase {slug!r}: connection {connection_id!r} is a "
-            f"{getattr(connection, 'capability', None)!r} connection, not {capability!r}"
+        # A connection bound for another capability would send a bot token to a mail host,
+        # so the send never happens either way. ⚠ WR-03 — WHAT CHANGED IS THE TERMINAL, not
+        # the refusal: this used to raise a bare ``ValueError``, which is not an
+        # ``AdapterError``, so the handler below never caught it. The run died with no
+        # ``text``, no ``failure`` sentence and none of D-17's four outcomes — a
+        # stack-trace-shaped error on the surface whose whole discipline is not over-claiming.
+        #
+        # It is a DATA condition an author caused, not a programming error, and it is
+        # REACHABLE by an ordinary edit: binding a Slack connection to a step and then
+        # changing the step's capability strands ``connection_id`` in the JSONB. Nothing
+        # clears it — not ``ExternalActionSection`` (its capability rows patch ``capability``
+        # only), not ``ConnectionPicker`` (which writes on ``<select>`` change), not
+        # ``PhaseFormPanel`` (``0 0`` by D-23). And the author is told there is nothing to
+        # clean up: the picker's read is capability-filtered so the footer reads *"🔒 nothing
+        # bound"*, while ``notConnectedOf`` sees a non-empty string and drops the canvas
+        # badge. (The UI half — clearing the reference on a capability change — is
+        # ``D-190-DEF-11``; this half makes the run honest regardless of what the UI does.)
+        logger.warning(
+            "190 WR-03: external_action phase %r is bound to a %r connection, not %r — "
+            "recording rather than sending", slug,
+            getattr(connection, "capability", None), capability,
         )
+        return _record("the bound connection is for a different capability")
 
     # ── GATE 6 · dispatch ───────────────────────────────────────────────────────────────
     adapter = get_adapter(capability)

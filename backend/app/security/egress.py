@@ -547,8 +547,24 @@ async def send_pinned_http(
     # ── 1 · validate FIRST; a refusal propagates as EgressRefused and is never swallowed ──
     # D-06: this runs before any credential is touched. `auth` arrives already resolved, but
     # nothing here reads it, and a refusal below never reaches the transport at all.
-    pinned = validate_destination(
-        capability, url, allowed_host=allowed_host, resolver=resolver
+    #
+    # ⚠ CR-04 / D-v2.5-01 — THE VALIDATION RUNS OFF THE EVENT LOOP, and the reason is the DNS
+    # lookup inside it, not the validation. `_default_resolver` calls `socket.getaddrinfo`,
+    # which is a BLOCKING libc call, and this function is `async def` — so before this wrapper
+    # the resolution ran on the event loop thread. `timeout=` does NOT bound it: the timeout
+    # goes to the transport, not to `getaddrinfo`, so a blackholed nameserver blocks for the
+    # OS resolver's own budget (glibc `timeout:5 attempts:2` per nameserver — tens of seconds)
+    # with no application-level cap anywhere. The docstring below cites SEED-065's measurement
+    # of what that costs: *"a sync HTTP call left on the event loop froze ALL request serving
+    # for the round trip."*
+    #
+    # `validate_destination` stays a plain `def` and a plain module attribute, deliberately:
+    # the D-06 ordering fence installs recording stubs with `monkeypatch.setattr`, and making
+    # it a coroutine or hiding it behind a wrapper name would make that ordering unobservable
+    # — the exact shape RESEARCH §R10 rejected.
+    pinned = await run_in_threadpool(
+        validate_destination, capability, url, None,
+        allowed_host=allowed_host, resolver=resolver,
     )
 
     # ── 2 · rewrite the URL to the IP literal (D-07 step 5) ──
@@ -716,8 +732,21 @@ async def open_pinned_smtp(
     describing. (190-06 hit the same criterion-vs-legibility conflict and had to STATE it;
     here the sentence can simply be written so both hold.)
     """
-    pinned = validate_destination(
-        capability, host, port, allowed_host=allowed_host, resolver=resolver
+    # ⚠ CR-04 — THE OTHER HALF OF THE SAME FIX, and this is the site where half a fix read
+    # exactly like a whole one: the SMTP **connect** below has been wrapped in
+    # `run_in_threadpool` since 190-07, while the DNS lookup that PRECEDES it stayed on the
+    # event loop. `validate_destination` is `def` and calls `socket.getaddrinfo`; this is
+    # `async def`. See the fuller note at `send_pinned_http`.
+    #
+    # This path is the remotely-triggerable one: `POST /connectors/connections/{id}/check`
+    # reaches it on a user HTTP request with no rate limit, so an org admin creating a
+    # `send_email` connection pointed at any domain whose authoritative NS drops packets and
+    # clicking *Check* twice would park both workers' event loops — stopping every concurrent
+    # SSE chat stream on the box. No credential needed, no egress permitted; the guard
+    # "working correctly" is what triggered it.
+    pinned = await run_in_threadpool(
+        validate_destination, capability, host, port,
+        allowed_host=allowed_host, resolver=resolver,
     )
     derived = _SMTP_TLS_MODES.get(pinned.scheme)
     if derived is None:

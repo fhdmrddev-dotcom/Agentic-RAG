@@ -442,12 +442,12 @@ def test_no_vendor_module_enters_the_import_graph_until_a_send_happens():
 
         registry.py:38   from app.services.harness.grounding import EXTERNAL_ACTION_CAPABILITIES
         harness/__init__.py:22   from . import phase_types
-        phase_types.py:94        from app.services.connectors.registry import get_adapter
+        phase_types.py:105       from app.services.connectors.registry import get_adapter
         ImportError: cannot import name 'get_adapter' from partially initialized module
                      'app.services.connectors.registry' (most likely due to a circular import)
 
     It is unreachable in production for exactly one reason, measured rather than assumed:
-    ``phase_types.py:94`` is the **only** MODULE-SCOPE importer of the registry anywhere under
+    ``phase_types.py:105`` is the **only** MODULE-SCOPE importer of the registry anywhere under
     ``backend/app``, so the registry is never the module that opens the cycle. The day a second
     module imports it AT MODULE SCOPE first, the app stops booting.
 
@@ -564,7 +564,13 @@ def test_no_vendor_module_enters_the_import_graph_until_a_send_happens():
         module_scope_importers += found_module
         function_local_importers += found_local
 
-    assert module_scope_importers == ["app/services/harness/phase_types.py:94"], (
+    # ⚠ The line number moved 94 -> 105 at the Phase-190 code-review fix round: CR-02 added
+    # `ensure_settings_fresh` to the same import block and CR-04 added `run_in_threadpool`
+    # above it. The IMPORTER SET is unchanged (still exactly one, still `phase_types`), which
+    # is the property; the number is re-derived here rather than inherited, and the fence
+    # firing on a line move is the fence working — it is asserting an exact list, and an exact
+    # list that tolerated drift would also tolerate a second importer arriving on a new line.
+    assert module_scope_importers == ["app/services/harness/phase_types.py:105"], (
         f"the connector registry now has these MODULE-SCOPE importers: "
         f"{module_scope_importers!r}. It had exactly one, and that is the ONLY reason the "
         "measured import cycle (registry -> harness.grounding -> harness/__init__ -> "
