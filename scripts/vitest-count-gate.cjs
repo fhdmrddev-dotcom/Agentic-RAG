@@ -784,7 +784,26 @@ const BASELINE = {
   // ⚠ `userEvent.setup({ delay: null })` in every case, inheriting the measurement recorded
   // against `ConnectionsTab.test.tsx` directly above: a slow new suite in this gate is not
   // merely slow, it reds six files it never touches.
-  "ConnectionFormPanel.test.tsx": 31,
+  //
+  // ── RE-PINNED 31 → 63 by plan 190-18 (2026-08-09), in the commit that adds the cases ──
+  // The +32 are the refusal copy, the check moments and the graded guards: §4c's closed
+  // six-row table read against `egress.py`'s OWN source through `?raw` (parser falsified on
+  // synthetic input first), §4b's asymmetry asserted in BOTH directions with the
+  // `aria-describedby` proved to RESOLVE, §4d's two forbidden swaps over all three buckets,
+  // §5b's sentence by EXACT equality plus an absolute-verb fence over every string the copy
+  // module can produce, §5c's negation pinned against `_EXTERNAL_ACTION_NEGATION`, a sentinel
+  // secret swept out of every `data-*` / `aria-label` / `title` with a positive control, and
+  // §2g's graded guards.
+  //
+  // TEN plants were applied to real production source and every one observed RED, each file
+  // restored md5-identical. ⚠ TWO OF THEM STAYED GREEN ON THE FIRST ATTEMPT AND BOTH ARE
+  // RECORDED RATHER THAN QUIETLY RE-AIMED: plant C renamed the `aria-describedby` id in the
+  // ONE constant that feeds both ends, so the wiring still resolved (the plant was wrong, and
+  // desynchronising the two ends reds it); plant D made the REFUSED branch render §5b's
+  // sentence and the fence saw nothing, because that sentence carries "failing" and "fail"
+  // but never the whole word "failed" that §14 names — THE TEST was wrong, and it now
+  // asserts the stem.
+  "ConnectionFormPanel.test.tsx": 63,
   // 184.1 pinned NOTHING here on purpose ("it postdates the 424 pin, so it reports as `new`
   // and its own count is free to grow"). Four phases later it is still the ONLY guard on the
   // flag-off Builder header — D-181-01's byte-identity promise — and it has stopped growing.
