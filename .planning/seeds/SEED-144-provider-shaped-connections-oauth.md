@@ -93,6 +93,41 @@ Phase 190's outbound path is well-fenced, which makes this cheaper than it looks
   and published definitions are immutable versions. Decide this BEFORE the migration, not
   during it.
 
+## ⚠ Related gap found in the same session: connectors can send TEXT ONLY
+
+Measured 2026-08-10, during the first successful live Slack run. The workflow's `emit` phase
+produced a real deliverable — `/weekly-status-report.docx`, 37,515 bytes — and **the connector
+standing next to it could not attach it.**
+
+- `post_message` INPUT_SCHEMA: `required: ["text"]`, exactly one property, and `send()` rejects
+  unknown args (`unknown = set(args) - set(INPUT_SCHEMA["properties"])`).
+- The same is true of `send_email` (no attachment) and `create_ticket` (no attachment).
+
+So the single most natural use of this whole feature — *"run the report and send me the
+file"* — is structurally impossible. Every capability is a text-only verb.
+
+Each vendor treats attachments as a **separate API with a separate scope**, which is why this is
+not a small addition and why D-32 fenced it:
+
+| Capability | Attachment path | Extra scope |
+|---|---|---|
+| `post_message` | `files.getUploadURLExternal` + `completeUploadExternal` (NOT `chat.postMessage`) | `files:write` |
+| `send_email` | MIME multipart — the message shape changes, not just a field | — |
+| `create_ticket` | a SECOND call to `/rest/api/3/issue/{key}/attachments` after the issue exists | — |
+
+**Design note for whoever picks this up:** attachment support argues for the same
+account/grant split this seed proposes, because "can post" and "can upload files" are
+**different OAuth scopes on one account** — which is precisely the distinction an
+action-shaped connection cannot express. It also interacts with D-18 (at-most-once): a ticket
+plus a failed attachment upload is a partial success with no retry, and the outcome vocabulary
+(D-17) has no word for it today.
+
+**Also relevant to ordering** (asked in the same session): nothing forces `emit` to be the last
+phase — the only rules are `phase_index` contiguity and reachability. But the LAST phase's text
+becomes the assistant message and the last phase with output "wins" as the deliverable
+(`publish_service.py:901`), so a connector-last workflow reports *"Sent."* as its headline
+output rather than the artefact. Worth a deliberate decision rather than a default.
+
 ## Recommendation
 
 Do **not** fold this into a gap-closure round on 190 (G-7 forbids a closure round adding a

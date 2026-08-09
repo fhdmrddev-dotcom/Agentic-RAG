@@ -62,6 +62,39 @@ human_verification:
     why_human: "Visual appearance and lived-experience scenarios (G-4); jsdom paints nothing."
 ---
 
+> ## ✅ SECOND ADDENDUM — 2026-08-10: SC#1 is CLOSED, and closing it exposed a CRITICAL
+>
+> **A real Slack message was sent through the full governed path.** `act` reads `completed`
+> — *"Sent. Posts a message — the destination accepted it."* — with migration 117's
+> `external_action_sent` audit receipt written, the run org-scoped, and the credential absent
+> from the database, the logs and git. **SC#1 is now MET: 5 of 5 success criteria.** The phase's
+> own sentence *"no message, ticket or email has left this application"* is no longer true.
+>
+> ⚠ **But this report scored SC#1 "owed, not broken", and that was WRONG — it was BROKEN.**
+> `workflow_kickoff.build_harness_run_context`, the live-kickoff path every ordinary run takes,
+> never set `org_id` on the harness ctx. `_exec_external_action` scopes every credential lookup
+> by `getattr(ctx, "org_id", None)` and fails CLOSED without it, so **no bound connection could
+> ever send — on any provider, with any destination.** Supplying the operator destinations would
+> not have closed SC#1; it would only have revealed this. Fixed in `3aedf2fc`.
+>
+> **Why nineteen plans of RED-first testing, a code review and this verification all missed it:**
+> every org test in the phase injected a `SimpleNamespace` ctx that DID carry `org_id` — the
+> shape the shipped path does not produce. The code review saw the pattern (WR-01, on `base_url`)
+> and did not generalise it. **A test that constructs its own subject cannot discover that the
+> real builder never builds it.** The new fence (`test_190_ctx_org_scoping.py`) therefore asserts
+> over the REAL SOURCE of the real ctx builders via AST, and was driven RED against the shipped
+> defect before being trusted.
+>
+> Two corrections made on measurement while fixing it: `_build_resume_context` HAS carried
+> `org_id` since Phase 163 (only the live builder lacked it — the compiler refuted the first
+> diagnosis as a duplicate-keyword `SyntaxError`); and `publish_service`'s golden-run ctx
+> **deliberately still withholds** `org_id` as a second fence behind D-16, now documented and pinned.
+>
+> **Still owed** (unchanged, and none of it blocks): the 7 remaining SC#10 provider rows, the
+> `send_email` and `create_ticket` live rows (both need real destinations — email needs a
+> publicly-routable TLS SMTP host), and the 375px rendered-geometry row. **Cloud parity
+> `099 → 118` remains owed and 118 is security-bearing.**
+
 > ## ⚠ ADDENDUM — 2026-08-09, after this report: BOTH named gaps are CLOSED
 >
 > This report was written at `gaps_found` with exactly two gaps. Both were closed the same day,
