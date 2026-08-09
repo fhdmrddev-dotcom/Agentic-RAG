@@ -754,7 +754,7 @@ const BASELINE = {
   // and the resulting wall-clock cost starved six neighbours past the 5 s default. Switching
   // to `userEvent.setup({ delay: null })` cleared all eight. A slow new suite inside this
   // gate is not merely slow — it reds files it never touches.
-  "ConnectionsTab.test.tsx": 34,
+  "ConnectionsTab.test.tsx": 36,
   // 184.1 pinned NOTHING here on purpose ("it postdates the 424 pin, so it reports as `new`
   // and its own count is free to grow"). Four phases later it is still the ONLY guard on the
   // flag-off Builder header — D-181-01's byte-identity promise — and it has stopped growing.
@@ -928,7 +928,16 @@ const BASELINE = {
 // (17 / 21, +4). 190-16 deliberately re-pins neither — both sit outside this plan's blast
 // radius entirely, and folding an unrelated pre-existing drift into a commit that did not
 // cause it is the thing this whole header argues against.
-const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // ⚠ 2773 (190-16)
+// ⚠ AND BY 190-15 (CONN-02, the credential check): `ConnectionsTab.test.tsx` 34 → 36. The
+// two new cases are `?raw` source fences over the CONTAINER, which the 34 shipped cases
+// structurally could not see — they all render `ConnectionsTabView` with props, and were
+// green for the whole of 190-16 while `Check credential` was absent from the running app
+// because the container passed no `onCheck`. Both were driven RED against real plants in
+// `ConnectionsTab.tsx` (the wiring removed; the handler flipping local state instead of
+// re-fetching), one case each, file restored md5-identical. The +13 gap above is STILL
+// unchanged and still owed as its own edit — 190-15 re-pins neither of those two files, for
+// the same reason 190-12 and 190-16 did not.
+const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // ⚠ 2775 (190-15)
 
 // ── The Wave-0 blast radius (184-VALIDATION.md § "quick run command"). ──
 const TARGETS = [

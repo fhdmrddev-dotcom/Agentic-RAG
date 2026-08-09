@@ -69,6 +69,7 @@ import {
   getEffectiveFeatures,
   listConnectorConnections,
   listPublishedWorkflows,
+  checkConnectorConnection,
   deleteConnectorConnection,
   updateConnectorConnection,
 } from "@/lib/api"
@@ -180,7 +181,9 @@ export interface ConnectionsTabViewProps {
   liveConnectorsOn: boolean
   onDelete: (connection: ConnectorConnection) => Promise<void>
   onSetEnabled: (connection: ConnectorConnection, next: boolean) => Promise<void>
-  /** Absent until plan 190-15 lands `checkConnectorConnection` + its endpoint together.
+  /** Supplied by the container since plan 190-15 landed the client function + its endpoint
+   *  together. Still OPTIONAL, so a view rendered without it removes the item rather than
+   *  disabling it — the shipped 185 rule, and the reason the suite drives both directions.
    *  Absent ⇒ the menu item is REMOVED, never rendered inert. */
   onCheck?: (connection: ConnectorConnection) => Promise<void>
   /** Absent until plan 190-17 lands the add/edit panel. Absent ⇒ no Add affordance. */
@@ -599,9 +602,11 @@ function ConnectionRow({
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 {/* Check has a side effect (it writes `last_checked_at`), so it lives in
-                    the overflow rather than as a visible per-row button. It is REMOVED
-                    while no handler exists — plan 190-15 lands the client function and
-                    the endpoint in one commit. */}
+                    the overflow rather than as a visible per-row button. The handler
+                    landed with the endpoint in plan 190-15, so this renders now — and the
+                    `onCheck &&` guard STAYS: it is what keeps the removed-not-disabled
+                    rule true for the view when it is rendered without one (the suite
+                    drives both directions). */}
                 {onCheck && (
                   <DropdownMenuItem
                     data-testid="connections-action-check"
@@ -830,6 +835,21 @@ export function ConnectionsTab() {
     [reload],
   )
 
+  /** The check writes `last_check_verdict` and `last_checked_at` server-side, so the row's
+   *  Credential chip comes from the SERVER's new truth — re-fetched, never flipped
+   *  optimistically (the 068-A rule this container already follows for the other two
+   *  writes). The returned result is deliberately DISCARDED here: §5c's headline and §4d's
+   *  three refusal states are the add/edit panel's surface (plan 190-18), and rendering a
+   *  second, shorter version of them on the table row is how one closed sentence table
+   *  becomes two. What the table shows is the chip, which is the persisted verdict. */
+  const handleCheck = useCallback(
+    async (connection: ConnectorConnection) => {
+      await checkConnectorConnection(connection.id)
+      reload()
+    },
+    [reload],
+  )
+
   return (
     <ConnectionsTabView
       connections={read.kind === "ready" ? read.rows : read.kind === "error" ? [] : null}
@@ -839,7 +859,7 @@ export function ConnectionsTab() {
       liveConnectorsOn={liveConnectorsOn}
       onDelete={handleDelete}
       onSetEnabled={handleSetEnabled}
-      // `onCheck` → plan 190-15 (the client function and the endpoint arrive together).
+      onCheck={handleCheck}
       // `onAdd` / `onOpen` → plan 190-17 (the add/edit push-split panel).
     />
   )

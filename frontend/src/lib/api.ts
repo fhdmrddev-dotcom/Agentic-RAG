@@ -5505,8 +5505,8 @@ export async function acceptInvitation(token: string): Promise<AcceptInvitationR
 // unmodified — that code is the key into the closed §4c map, and a client that invents its
 // own wording for it produces a seventh sentence nobody ratified.
 //
-// ⚠ THE CHECK ENDPOINT'S CLIENT FUNCTION IS DELIBERATELY ABSENT. It lands with the check
-// action in plan 190-15, so the function and the endpoint arrive in the same commit.
+// The check action's client function landed with its endpoint in plan 190-15, in one commit —
+// the seam plan 190-09 named. Six functions now.
 
 /** The closed capability set (the backend `ConnectorCapability`, mig 116's CHECK, and
  *  `EXTERNAL_ACTION_CAPABILITIES` are the other three spellings of this one set). */
@@ -5728,4 +5728,78 @@ export async function deleteConnectorConnection(id: string): Promise<void> {
       await readConnectorReasonCode(res),
     )
   }
+}
+
+/** UI-SPEC §4d's THREE STATES, and they must survive to the client as DISTINCT values.
+ *
+ *  `refused`     — WE declined to open the socket, for a security property. `reasonCode`
+ *                  keys into §4c's CLOSED six-row sentence table; there is no vendor to
+ *                  quote, so `provider_message` is empty on this branch.
+ *  `unreachable` — the address is allowed and nothing answered on it. The next step is the
+ *                  network, not the token.
+ *  `rejected`    — we reached it and IT said no. This is the only bucket §5b's *"The host
+ *                  rejected this credential"* is written for.
+ *
+ *  Collapsing these into one "could not connect" is the single most likely copy defect on
+ *  this surface, and THIS TYPE is where that collapse would first become possible — a union
+ *  of three is a compile error away from becoming a boolean. Do not widen it to a string. */
+export type ConnectorCheckBucket = "refused" | "unreachable" | "rejected"
+
+/** The result of one credential check (`POST /connectors/connections/{id}/check`).
+ *
+ *  ⚠ A CHECK RETURNS A VERDICT — never the credential, in either form. The enforcing gate is
+ *  the Pydantic `ConnectorCheckResponse` (no `secret` field, no `secret_ciphertext` field,
+ *  `extra='forbid'`); this type is documentation, and documentation that named a credential
+ *  field would invite a component to render it.
+ *
+ *  `bucket` is `null` on success. `reasonCode` is the SERVER'S OWN code, unmodified — a
+ *  client that invents its own wording for it produces a seventh sentence nobody ratified. */
+export interface ConnectorCheckResult {
+  ok: boolean
+  verdict: "ok" | "failed"
+  /** WHO we authenticated as, as the vendor names it. §5c renders *"Authenticated as
+   *  {identity}"*, and it is the half that makes a green check mean something: a credential
+   *  that works for the WRONG account is a distinct failure from one that does not work. */
+  identity: string | null
+  /** The destination that was contacted, derived from the STORED row — never from a body. */
+  host: string
+  port: number | null
+  checked_at: string | null
+  bucket: ConnectorCheckBucket | null
+  /** The vendor's words VERBATIM — unparaphrased, untranslated, untruncated (071-A, the rule
+   *  §5b's `what the host said, verbatim` block binds). `""` when the vendor said nothing. */
+  provider_message: string
+  /** The guard's own `egress.REFUSAL_REASONS` code on a `refused` bucket, else `null`. */
+  reason_code: string | null
+}
+
+/** `POST /connectors/connections/{id}/check` — org admins only, enforced SERVER-side (U-02).
+ *
+ *  ⚠ IT SENDS NO BODY, AND THAT IS THE SECURITY PROPERTY RATHER THAN AN OMISSION. The check
+ *  runs on the connection ALREADY STORED, so no plaintext secret ever crosses the wire for a
+ *  non-storage purpose — and it exercises the same org-scoped resolver a RUN uses, which is
+ *  what makes a green verdict evidence about the row the engine will actually resolve. Do
+ *  not "improve" this by posting the form's fields.
+ *
+ *  It has a SIDE EFFECT (it writes the stored verdict and its timestamp), which is why it is
+ *  a POST on its own path rather than a query parameter on the read. Callers should re-fetch
+ *  the connection list afterwards rather than flipping a chip optimistically (the 068-A rule).
+ *
+ *  Authors no user-facing sentence: §5c's headline and §4c's six refusal sentences live in
+ *  the component layer as exported identifiers so they can be asserted by character-identity.
+ *  A string here is a string nobody tests for drift. */
+export async function checkConnectorConnection(id: string): Promise<ConnectorCheckResult> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/connectors/connections/${id}/check`, {
+    method: "POST",
+    headers,
+  })
+  if (!res.ok) {
+    throw new ConnectorApiError(
+      "Failed to check the credential",
+      res.status,
+      await readConnectorReasonCode(res),
+    )
+  }
+  return res.json() as Promise<ConnectorCheckResult>
 }

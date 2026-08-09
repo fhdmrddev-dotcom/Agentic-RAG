@@ -42,6 +42,9 @@ import { render, screen, cleanup, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 
 import { ConnectionsTabView } from "../ConnectionsTab"
+// The container's SOURCE via Vite's `?raw` loader — the shipped house idiom for a fence the
+// rendered DOM cannot express (`ConnectionPicker.test.tsx:31`, `CanvasToolbar.test.tsx:32`).
+import connectionsTabSource from "../ConnectionsTab?raw"
 import {
   CONNECTIONS_ADD_CTA,
   CONNECTIONS_BANNER_HEADING,
@@ -656,5 +659,30 @@ describe("the 155-C column contract and the read's four states", () => {
     // person to create something they may already have.
     expect(screen.getByTestId("connections-read-failed")).toHaveAttribute("role", "alert")
     expect(screen.queryByTestId("connections-empty")).toBeNull()
+  })
+})
+
+// ── the container actually SUPPLIES onCheck (plan 190-15) ─────────────────────────────────
+// The two cases above this comment prove the VIEW removes the item without a handler and
+// renders it with one. Neither can see whether the CONTAINER ever passes one — and while it
+// did not (190-16, deliberately, because the endpoint did not exist yet) both were green with
+// `Check credential` absent from the running app. That gap is what these two close.
+describe("the container wires the credential check", () => {
+  it("passes onCheck to the view, so the menu item is not permanently removed", () => {
+    expect(connectionsTabSource).toMatch(/onCheck=\{handleCheck\}/)
+    expect(connectionsTabSource).not.toMatch(/`onCheck` → plan 190-15/)
+  })
+
+  it("the handler calls the check endpoint and RE-FETCHES rather than flipping a chip", () => {
+    const handler = connectionsTabSource.slice(
+      connectionsTabSource.indexOf("const handleCheck"),
+      connectionsTabSource.indexOf("return (", connectionsTabSource.indexOf("const handleCheck")),
+    )
+    expect(handler).toContain("await checkConnectorConnection(connection.id)")
+    // The Credential chip is the SERVER's persisted verdict (the 068-A rule the other two
+    // writes already follow). A handler that set local state from the response would show a
+    // verdict the database may not have accepted.
+    expect(handler).toContain("reload()")
+    expect(handler).not.toMatch(/set[A-Z]\w*\(/)
   })
 })
