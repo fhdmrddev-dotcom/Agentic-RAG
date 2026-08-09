@@ -623,6 +623,52 @@ The one-way RLS door that turns Agentic RAG from a per-user app into an org-awar
 - Model mix: executor opus, verifier sonnet (per config); worktrees off → sequential on main tree.
 - Delivered CORE in ~4 days (2026-07-18 → 07-22); STRETCH deferred to preserve momentum toward the visual workflow builder (SEED-123).
 
+## Milestone: v3.6 — Visual / No-Code Workflow Studio
+
+**Shipped:** 2026-08-09
+**Phases:** 13 (CORE 181–189 + STRETCH 190 + inserts 184.1 / 188.1 / 188.2) | **Plans:** 151 | **Commits:** 1,064 over 18 days | **Migrations:** 114–118
+
+### What Was Built
+A drag-and-drop visual authoring + non-technical live-run-observability layer on top of the existing governed harness engine — a third, most-approachable authoring door beside "Describe & run" and "Author & govern". The tested off-switch first (181, HARD gate #1), then one server-side source of validation truth reusing `lint_workflow` verbatim (182), a read-only projection to prove the model before any write complexity (183), the editable canvas with live structural validation (184), **graded per-node governance — the headline differentiator (185)**, autosave + co-edit safety (186), plain-language vocabulary + an AI-seeded canvas (187), non-technical run observability with the run getting its own home (188), the governed external-action node (189, HARD gate #3 CORE half), and a live connector slice with the app's first outbound egress (190, STRETCH). Two dedicated refactor phases (188.1, 188.2) paid down G-5 debt mid-milestone rather than after.
+
+### What Worked
+- **Sequencing the tested off-switch FIRST.** Phase 181 shipped `visual_workflow_canvas` + `test_revert_byte_identical` before a single canvas pixel existed. Every subsequent phase inherited a provable revert, which is why a 13-phase build on the hottest surface in the app never needed a rollback conversation.
+- **Read-only before editable (183 → 184).** Proving the pure-projection model with zero write complexity meant the round-trip serializer had one job when it arrived. **Measured at close: 7 harness executors, exactly as at open** — the D-14 red line held across all 13 phases with no second runtime.
+- **Reusing the validation function rather than the validation RULES.** `POST /workflows/validate` calls the same `lint_workflow` `publish_workflow` calls, so canvas verdicts *structurally cannot* drift from the publish gauntlet. Anti-drift by construction beats anti-drift by discipline.
+- **Refactoring BETWEEN feature waves, not after.** 188.1 and 188.2 were inserted because G-5 fired, and 188.2 cut `PhaseNodeCard.tsx` 797 → 274 L along exactly the seams 189 then needed. The alternative was 189 adding a seventh phase type to an 800-line file.
+- **Characterization baselines captured on the UNMOVED tree.** 188.2 proved the rendered DOM byte-identical via three whole-`innerHTML` baselines taken at a commit where all five destination modules answered *No such file or directory* — and re-scoped all seventeen negative fences BEFORE one line moved, driving three of them RED against real plants.
+- **Standard-depth code review kept earning its cost.** It caught a BLOCKER in 181 that UAT missed, a fail-open Critical in 185 (a *typed* refusal on an armed checkpoint ran the step and wrote a false approval receipt), and in 190 **a real credential exposure that nineteen plans of RED-first self-checking had missed**.
+
+### What Was Inefficient
+- **Nineteen plans of rigorous self-checking did not find CR-01, and the reason generalises.** Phase 190's RLS shape was copied from `sso_configs` — **a table with no secret column** — so five fences were written that *could not fire*. A precedent is only safe when its shape matches; copying a policy from a table with a different threat surface is the failure mode, not sloppiness.
+- **Paperwork fell behind code, consistently and measurably.** Three phases shipped with NO `VERIFICATION.md` carrying nine requirements; the ROADMAP checklist left five shipped phases unchecked; **Phase 188.2 was absent from the checklist entirely** despite being verified and secured; the Progress table read `184 | 1/13 | In Progress` for thirteen days after 184 shipped all 13 plans. The code was in markedly better shape than the record of it, for the whole milestone.
+- **The milestone audit was run mid-flight and then nearly used at close.** It predated Phases 189 and 190 — 35 plans, including the app's first outbound egress — and had to be re-run at the close gate. An audit is a photograph, and it should be dated at the moment it is used.
+- **A trigger fired twice and was missed twice.** SEED-133's re-open trigger named Phase 187, then Phase 189; both shipped without surfacing it. A re-open trigger written as prose in a seed file is not a control.
+- **Seven Phase-190 summaries marked requirements complete against that phase's own convention**, and for CONN-02 the claim was measurably false — the same false-completion class as the GSD SDK `state.*` verbs, which corrupted STATE.md five times during that single phase.
+- **CONN-02 shipped three adapters and one working path.** `_adapter_args` fills only each capability's `body_arg`; Slack passes because its one required field happens to be that arg. **Nobody checked the OTHER two adapters' required-argument lists against what the executor supplies** — a nine-line comparison that would have caught it at plan time.
+
+### Patterns Established
+- **The revert gate ships in phase one**, tested in CI *and* re-run at milestone close — not asserted in prose.
+- **Server-authoritative verdicts, function-level reuse.** The client renders verdicts; it never invents a severity, and never re-implements a rule.
+- **Extraction refactors split into "create additively" then "cut"**, with the characterization baseline captured before either step.
+- **Governance derived structurally, never declared.** Grounding mode is computed from `available_tools ∩ KB_TOOLS` and the gate attaches at RUN time, so no authoring path — including the AI seed — can bypass it. This is what made "not author-loosenable-away" true rather than aspirational.
+- **Guards must be positively tested.** Phase 190's kill switch failed OPEN for 3 of its 4 legal audiences; the fix asserts a positive `!= "everyone"`, which is fail-closed against a hand-edited row *and* against a fifth audience that does not exist yet.
+- **G-7 (gap-closure round cap) held its first real test** — CONN-02 was routed to a future milestone rather than built inside a closure round, which is exactly what the rule exists to prevent.
+
+### Key Lessons
+- **A precedent carries its threat surface with it.** Copy an RLS policy only from a table with the same kind of secret.
+- **Verify the PROPERTY, not the PATCH** — a deny-list cannot be made fail-closed by extending it.
+- **"Wired" and "reachable" are different claims.** Three connector adapters were wired; one was reachable. Check the consumer's required inputs against what the caller actually supplies.
+- **Date every audit at the moment you rely on it**, and re-run rather than inherit — this close found six findings stale and four things the old audit never saw.
+- **A trigger that fails silently twice is not a control.** Re-arm against a named phase with a mechanical check, or close the item.
+- **Closing a milestone with owed rows is legitimate; claiming they ran is not.** CONN-02 is recorded as unsatisfied with its file:line reason, and the real Slack send is recorded as the genuine win it is — neither rounded toward the other.
+
+### Cost Observations
+- **Parallel execution was enabled at the very end of this milestone (2026-08-10), after it had already cost the milestone dearly.** Phase 190 alone measured **10.8 h of serial execution for 19 plans against 5.7 h if its eight waves had run in parallel — roughly five hours lost on one phase.** The blocker was real (a fresh `git worktree` checks out tracked files only, and `venv` / `node_modules` / two `.env` files are gitignored) and is now solved by junctions + `bootstrap-worktree.sh` rather than worked around.
+- **Vitest oversubscription was misdiagnosed as flaky tests.** Two uncapped concurrent runs spawn ~16 workers each on this 16-core box and produce bare timeouts in untouched suites; capped at `GSD_VITEST_MAX_WORKERS=4`, two concurrent runs agree exactly. Phases 190-16/17/18 very likely saw this and blamed `userEvent` delay.
+- Model mix: executor opus, verifier/checker sonnet (config `model_profile: quality`).
+- 151 plans / 18 days is the project's largest milestone by plan count and the second-longest by wall clock — **11.6 plans per phase, nearly double the prior high** (v3.3 at 6.8).
+
 ## Cross-Milestone Trends
 
 | Milestone | Phases | Plans | Avg Plans/Phase | Timeline |
@@ -642,3 +688,12 @@ The one-way RLS door that turns Agentic RAG from a per-user app into an org-awar
 | v3.1 Workflow & Skill Studio (CORE) | 9 | 40 | 4.4 | 7 days |
 | v3.2 Skill Eval Studio + Self-Improving | 16 | 81 | 5.1 | 12 days |
 | v3.3 Operator UX | 14 | 95 | 6.8 | 8 days |
+| v3.4 Multi-Tenancy & Org Access (CORE) | 10 | 56 | 5.6 | 4 days |
+| v3.5 UX Consolidation & Chat Polish (CORE) | 4 | 17 | 4.25 | 1 day |
+| **v3.6 Visual / No-Code Workflow Studio** | **13** | **151** | **11.6** | **18 days** |
+
+> ⚠ The v3.4 and v3.5 rows were **missing** from this table and were added at the v3.6 close —
+> both milestones shipped without a trends row. **v3.6 is the project's largest milestone by plan
+> count (151, +59% over v3.3's 95) and by plans-per-phase (11.6, +71% over the prior high).** Read
+> that alongside the note above: the whole of it ran **serially**, because worktree parallelism was
+> not enabled until the milestone was already over.
