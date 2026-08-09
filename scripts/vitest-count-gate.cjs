@@ -755,6 +755,36 @@ const BASELINE = {
   // to `userEvent.setup({ delay: null })` cleared all eight. A slow new suite inside this
   // gate is not merely slow — it reds files it never touches.
   "ConnectionsTab.test.tsx": 36,
+  // ── 190-17: the add/edit panel's own suite, pinned in the commit that creates it. ──
+  // Number read from THIS SCRIPT'S OWN `actual` column across two agreeing runs — never a
+  // hand count of `it(` literals, which is unsound under the `it.each` this suite uses for
+  // the three capability field-counts.
+  //
+  // What would be unguarded without it: NINE of the 31 cases are ABSENCE assertions, and
+  // three of those guard properties that exist NOWHERE else in the tree —
+  //   · the FOCUS TRAP and the FOCUS RESTORE, which `Dialog` would have supplied for free
+  //     and which sketch 156-A's push/split container supplies not at all (§14 verbatim:
+  //     *"the panel traps focus nowhere (Tab escapes into the table behind it)"*). Both are
+  //     asserted through `document.activeElement`, not by the presence of a handler — a
+  //     handler that exists and does the wrong thing passes the weaker check;
+  //   · the write-only secret: NO `input[type=password]` in edit mode, the dots proved to
+  //     be a `<span>`, and a whole-markup sweep for `xoxb-` / `enc:v1:` / `ciphertext`;
+  //   · D-190-DEF-07's structural half — with `live_connectors` off, Save / `Replace` /
+  //     every input are ABSENT rather than `disabled`, plus zero `[disabled]` nodes.
+  //
+  // TEN plants were applied to real production source (nine to `ConnectionFormPanel.tsx`,
+  // one to `ConnectionsTab.tsx`) and every one observed RED before this pin existed, each
+  // file restored md5-identical afterwards. ⚠ THE ONE TO READ IS PLANT E: Save rendered
+  // `disabled={saving || !showSave}` instead of REMOVED — 190-16's plant C, applied to this
+  // surface — and it was checked for REACH, not merely for RED: the two failures it
+  // produces are named `renders static text, no Replace and no Save — ABSENT, not disabled`
+  // and `every WRITE affordance is REMOVED while the switch is off`. A `toBeDisabled()`
+  // assertion would have PASSED on both.
+  //
+  // ⚠ `userEvent.setup({ delay: null })` in every case, inheriting the measurement recorded
+  // against `ConnectionsTab.test.tsx` directly above: a slow new suite in this gate is not
+  // merely slow, it reds six files it never touches.
+  "ConnectionFormPanel.test.tsx": 31,
   // 184.1 pinned NOTHING here on purpose ("it postdates the 424 pin, so it reports as `new`
   // and its own count is free to grow"). Four phases later it is still the ONLY guard on the
   // flag-off Builder header — D-181-01's byte-identity promise — and it has stopped growing.
@@ -1099,6 +1129,22 @@ const TARGETS = [
   // read (`EngineHealthCard`, `JudgeModelPicker`, `ModelDefaultPreference`), and adopting
   // them would make this phase the owner of their future rot.
   "src/components/settings/__tests__/ConnectionsTab.test.tsx",
+  // Added in 190-17, in the SAME COMMIT that creates the file — the SEVENTH occurrence of
+  // the two-knob trap, and the second on `src/components/settings/`. The entry directly
+  // above is FILE-LEVEL, not a directory entry (deliberately, so this phase does not become
+  // the owner of `EngineHealthCard` / `JudgeModelPicker` / `ModelDefaultPreference`'s future
+  // rot), which means a SECOND file in that same directory is still invisible to the gate.
+  //
+  // MEASURED BEFORE THIS LINE WAS WRITTEN rather than assumed: the gate was run with the
+  // suite already on disk and green, and `ConnectionFormPanel.test.tsx` did NOT appear in
+  // its printed file list — 50/50 pinned files, total 2788, the suite absent. A
+  // falsification that does not run has falsified nothing (verification truth 14, round 5
+  // of Phase 187).
+  //
+  // ⚠ THE TIMING IS NOT COSMETIC: an entry pointing at a path that does not yet exist makes
+  // the gate ERROR (exit 2) rather than fail, so it can only land in the commit that creates
+  // the file — never before, never after.
+  "src/components/settings/__tests__/ConnectionFormPanel.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
