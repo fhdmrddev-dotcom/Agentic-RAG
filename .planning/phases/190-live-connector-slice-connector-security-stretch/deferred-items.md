@@ -271,6 +271,25 @@ MORE open than its plan says. The conflict is stated in `api/connectors.py`'s mo
 §2h banner without meeting this. Whichever way it goes, both the copy and the gate must move in
 the SAME commit, and this entry must be marked resolved with the chosen half named.
 
+### ✅ RESOLVED — plan **190-16**, 2026-08-09. Branch **(b): the GATE is right, the COPY moved.**
+
+The trigger fired on the plan that actually renders the banner (**190-16**, not 190-10/11 — the
+Settings tab landed there). The chosen half, and why:
+
+| | |
+|---|---|
+| **Branch taken** | **(b)** — `require_visible("live_connectors")` STAYS on the three write endpoints; §2h's second sentence is amended to state the truth. |
+| **Why not (a)** | Deleting the three `dependencies=` entries would remove a security gate from a security phase, inside a Settings-table plan, and would turn a shipped **plant-driven** test RED (`test_190_connectors_api.py` case 9 asserts the OFF direction refuses the write). Removing a gate that was PROVED to work is not a copy fix. |
+| **Why (b) is honest** | Of the two possible errors the gate is the more restrictive one, and a phase whose whole discipline is not over-claiming should not ship a live-credential WRITE surface more open than its plan says. The banner renders ONLY while the switch is off — the exact state it now describes — so the corrected sentence can never appear in a state it does not fit. |
+| **What moved, in ONE commit** | `190-UI-SPEC.md` §2h's second sentence · `connectionsCopy.ts`'s `CONNECTIONS_BANNER_BODY` (the rendered string, asserted by character-identity in `ConnectionsTab.test.tsx`) · and the STRUCTURAL half: while the switch is off, every write affordance is **REMOVED, not disabled** (`＋ Add a connection` and the row `⋯`), per the shipped 185 rule. |
+| **Reversal cost** | Delete the three `dependencies=[Depends(require_visible("live_connectors"))]` entries in `backend/app/api/connectors.py`; re-point `test_190_connectors_api.py` case 9; restore §2h + `CONNECTIONS_BANNER_BODY` to 155-C's wording; drop the OFF-state affordance removal in `ConnectionsTab.tsx`. **All four in the same commit** — a gate without the copy under-claims, and the copy without the gate is the D-31 defect. |
+
+⚠ **ONE HALF IS STILL OWED, and it is named rather than closed:** UI-SPEC **§9's panel notice**
+carries the same false sentence (*"You can save this connection and workflow authors can bind it
+to a step"*) and is out of 190-16's surface. **Plan 190-17 must amend it in the commit that
+builds the panel**, and must remove the panel's write affordances under the same OFF state. A
+recorded note in §2h points at it so it cannot be lost.
+
 ---
 
 ## D-190-DEF-08 — a latent import cycle on the connector registry: measured, fenced, NOT fixed
@@ -312,3 +331,66 @@ management script, or `api/connectors.py` growing a capability list. Break the c
 same commit (the cheapest cut: `registry.py` importing `EXTERNAL_ACTION_CAPABILITIES` from a
 module that does not re-export the harness package, or `phase_types` resolving `get_adapter`
 lazily inside `_exec_external_action`), and mark this entry resolved naming which cut was taken.
+
+---
+
+## D-190-DEF-09 — `live_connectors` has NO operator card in the Control Room, and the client `GovernedFeature` union does not name it
+
+**Found during:** plan 190-16, wiring the UI-SPEC §2h OFF banner to a real feature read.
+
+**Both halves are ONE gap and must land in ONE commit.** They are recorded together because
+fixing either alone is worse than fixing neither: widening the type without the card leaves five
+exhaustive maps edited for no user-visible reason, and adding the card without the type does not
+typecheck.
+
+**Half 1 — the client type is stale against the server.** Plan 190-09 added `"live_connectors"`
+to the backend's `_VISIBILITY_FEATURES` (`api/admin.py:97-105`) and `_GOVERNED_FEATURES`
+(`models/user_settings.py`, cold default `"off"`). `GET /features` therefore RETURNS the key
+(`api/features.py:81` iterates `_GOVERNED_FEATURES`) — measured, not assumed. But
+`frontend/src/lib/api.ts`'s `GovernedFeature` union still names only five features, so
+`features.live_connectors` is a type error.
+
+**Measured cost of widening it** (190-16 tried it, then reverted): `tsc -p tsconfig.app.json`
+went **33 → 38**. The five new errors are all `Record<GovernedFeature, …>` exhaustive maps that
+then miss a key:
+
+```
+src/components/admin/ControlRoomPage.tsx(188,7)                      DEFAULT_VISIBILITY
+src/components/admin/ControlRoomPage.tsx(229,81)                     greenlist initial state
+src/components/admin/__tests__/ControlRoomPage.test.tsx(88,53)       fixture
+src/components/admin/__tests__/FeatureVisibility.a11y.test.tsx(24,7) fixture
+src/components/admin/revertByteIdentical.test.tsx(88,3)              fixture
+```
+
+Each is a one-line map-key addition. **Two of them are `/admin` source**, which phase 190's
+**D-25** fences ("connections are managed in SETTINGS… do not add anything to `/admin`").
+
+**Half 2 — and this is the one that makes a shipped sentence false.** The Control Room's
+visibility grid does NOT render from `Record<GovernedFeature, …>`; it renders from the
+hand-curated `FEATURES` array in `frontend/src/components/admin/FeatureVisibility.tsx:101-157`,
+whose entries carry seven authored fields each (`name`, `desc`, `livesOn`, `glyph`, `uiSurface`,
+`refusedApi`, `routePrefixes`). **There is no `live_connectors` entry, so no card renders and an
+operator has no UI to flip the switch** — the only route today is a raw
+`PUT /admin/visibility {feature: "live_connectors", audience: "everyone"}`, which is what
+`190-09-SUMMARY.md` § Cloud parity already records as the operator action.
+
+**Why 190-16 did not close it:** authoring a `FEATURES` entry is a **new user-facing capability
+in `/admin`** — the exact thing D-25 fences and the exact class G-7 forbids smuggling into
+another plan. 190-16 is the Settings table; the operator's card is its own small change.
+
+**What 190-16 did instead, so nothing is silent:** it reads the key through ONE documented,
+fail-closed reader (`settings/connectionsCopy.ts` → `liveConnectorsOnFrom`), and both this entry
+and `lib/api.ts`'s union comment point here.
+
+⚠ **THE CONSEQUENCE, STATED RATHER THAN SMOOTHED:** UI-SPEC §2h's banner closes with *"An
+operator turns `live_connectors` on in the Control Room."* That sentence names the right owner
+and the right home (D-25: the operator sets the lock) — but **until Half 2 lands, an operator who
+goes there finds no row.** The sentence is kept verbatim because it is operator-approved and its
+home is correct; the missing card is recorded here rather than discovered in UAT.
+
+**Re-open trigger:** ANY of — plan 190-17 (the next 190 plan that touches this surface's copy);
+`/gsd:verify-work 190` reaching the §2h banner's last sentence; or the first operator who tries
+to turn live sending on. Fix as ONE `/gsd:quick`: widen the union, add the five map keys, and
+author the `FEATURES` entry (Off | On control, `offOn={def.key === …}` — the
+`visual_workflow_canvas` precedent at `FeatureVisibility.tsx:147-156, :311` is the exact shape).
+Mark this entry resolved naming the audience the card writes.

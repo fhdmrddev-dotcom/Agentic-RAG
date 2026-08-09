@@ -258,14 +258,45 @@ amber lines. **So the platform fact is told ONCE, in a banner above the card, an
 
 ```
 ⛨  Live sending is off for this platform
-    Connections below can be saved and bound to a workflow, but no message, ticket or email
-    will leave. Steps still record what they would have done and read “Not sent — recorded”.
+    Connections below are read-only until an operator turns it on — nothing here can be
+    added or changed, and no message, ticket or email will leave. Steps still record what
+    they would have done and read “Not sent — recorded”.
     An operator turns live_connectors on in the Control Room.
 ```
 
-Verbatim from 155-C. `live_connectors` renders in `font-mono` inside a `<code>` — it is the one
-place a technical name appears on this surface, because it is the exact string the operator must
-find.
+`live_connectors` renders in `font-mono` inside a `<code>` — it is the one place a technical
+name appears on this surface, because it is the exact string the operator must find.
+
+⚠ **THE SECOND SENTENCE IS AMENDED, and this is the D-190-DEF-07 resolution — plan 190-16,
+2026-08-09.** 155-C's operator-approved wording was *"Connections below **can be saved** and
+bound to a workflow, but no message, ticket or email will leave."* Measured against the surface
+plan 190-09 shipped, that sentence is **FALSE**: `api/connectors.py` carries
+`require_visible("live_connectors")` on all three WRITE endpoints, so while the switch is off an
+org admin's create / edit / delete is refused 403 — the banner promised a save the API declines,
+to exactly the audience that reads it. 190-09 recorded the contradiction in three places rather
+than smoothing it and handed the one-line choice here.
+
+**Branch taken: (b) — the GATE is right, and the COPY moves.** Branch (a) (deleting the three
+`require_visible` entries) would remove a security gate from a security phase inside a
+Settings-table plan, and would turn a shipped plant-driven test RED
+(`test_190_connectors_api.py` case 9 asserts the OFF direction refuses the write). Of the two
+possible errors the gate is the more restrictive one, and this banner renders ONLY while the
+switch is off — the exact state it now describes — so the corrected sentence can never be shown
+in a state it does not fit.
+
+**The structural half rides with it (same commit):** while the switch is off, every WRITE
+affordance on this surface is **REMOVED, not disabled** (the shipped 185 rule) — no
+`＋ Add a connection`, no row `⋯`. A hidden button the API still honours is one defect; a
+rendered button the API refuses is the other, and this surface ships neither.
+
+**Reversal cost, both halves in ONE commit:** delete the three
+`dependencies=[Depends(require_visible("live_connectors"))]` entries in
+`backend/app/api/connectors.py`, re-point `test_190_connectors_api.py` case 9, restore this
+sentence to 155-C's wording, and drop the OFF-state affordance removal in `ConnectionsTab.tsx`.
+
+⚠ **§9's panel notice inherits the same problem and is OWED BY PLAN 190-17.** Its sentence
+(*"You can save this connection and workflow authors can bind it to a step"*) is false under
+branch (b) for the same reason, and must be amended in the commit that builds the panel.
 
 ---
 
